@@ -2,7 +2,7 @@
 
 [![Project Page](https://img.shields.io/badge/noon.sh-FineType-blue)](https://noon.sh/projects/finetype/)
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 152 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 159 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 $ finetype infer -i "192.168.1.1"
@@ -17,7 +17,7 @@ identity.person.email
 
 ## Features
 
-- **152 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, credit cards, and more
+- **159 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing
 - **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
@@ -25,7 +25,7 @@ identity.person.email
 - **Fast inference** — Character-level CNN model (600+ classifications/sec, 8.5 MB memory)
 - **Real-world validated** — 85-100% accuracy on format-detectable types in [GitTables benchmark](https://zenodo.org/record/5706316) (2,363 columns)
 - **Pure Rust** — no Python runtime, Candle ML framework
-- **155 tests** — taxonomy validation, model inference, column disambiguation, data generation
+- **163 tests** — taxonomy validation, model inference, column disambiguation, data generation
 
 ## Installation
 
@@ -132,13 +132,13 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **152 types** across **6 domains**:
+FineType recognizes **159 types** across **6 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
 | `datetime` | 46 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
 | `technology` | 35 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
-| `identity` | 25 | Names, emails, phone numbers, passwords, gender symbols |
+| `identity` | 32 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
 | `representation` | 19 | Integers, floats, booleans, hex colors, base64, JSON |
 | `geography` | 16 | Latitude, longitude, countries, cities, postal codes |
 | `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
@@ -147,7 +147,7 @@ Each type is a **transformation contract** — if the model predicts `datetime.d
 
 Label format: `{domain}.{category}.{type}` (e.g., `technology.internet.ip_v4`). Locale-specific types append a locale suffix: `identity.person.phone_number.EN_AU`.
 
-See [`labels/`](labels/) for the complete taxonomy (YAML definitions with validation schemas, transforms, and sample data).
+See [`labels/`](labels/) for the complete taxonomy (YAML definitions with validation schemas, transforms, and sample data). For a comparison with schema.org, Wikidata, and GitTables type systems, see [`docs/TAXONOMY_COMPARISON.md`](docs/TAXONOMY_COMPARISON.md).
 
 ## Performance
 
@@ -155,7 +155,7 @@ See [`labels/`](labels/) for the complete taxonomy (YAML definitions with valida
 
 | Model | Accuracy | Test Samples |
 |-------|----------|-------------|
-| Flat CharCNN v2 | **91.97%** | 15,100 |
+| Flat CharCNN v4 | **91.62%** | 15,900 |
 
 ### Real-World Evaluation (GitTables)
 
@@ -201,13 +201,76 @@ finetype profile -f data.csv
 
 ## Architecture
 
+### Inference Pipeline
+
+FineType operates in three modes — single-value, column, and profile — each building on the previous:
+
+```mermaid
+flowchart TB
+    subgraph single ["Single-Value Mode"]
+        direction TB
+        A["Input string"] --> B["Character tokenizer
+        (per-char integer encoding)"]
+        B --> C["CharCNN model
+        (softmax → 159 types)"]
+        C --> D{"Post-process rules
+        (6 format checks)"}
+        D -->|corrected| E["Predicted type
+        + confidence"]
+        D -->|unchanged| E
+    end
+
+    subgraph column ["Column Mode"]
+        direction TB
+        F["Column values"] --> G["Sample ≤100 values"]
+        G --> H["Batch single-value
+        inference"]
+        H --> I["Vote aggregation
+        (label → fraction)"]
+        I --> J{"Disambiguation
+        rules"}
+        J -->|"date, coordinate,
+        numeric rules"| K["Column type
+        + confidence"]
+        J -->|"majority vote
+        stands"| K
+    end
+
+    subgraph profile ["Profile Mode"]
+        direction TB
+        L["CSV file"] --> M["Parse columns
+        + null detection"]
+        M --> N["Column-mode inference
+        per column"]
+        N --> O["Column type table"]
+    end
+
+    single -.->|"used by"| column
+    column -.->|"used by"| profile
+
+    style single fill:#f0f7ff,stroke:#4a90d9
+    style column fill:#f0fff0,stroke:#4a9050
+    style profile fill:#fff8f0,stroke:#d9904a
+```
+
+**Pipeline stages explained:**
+
+| Stage | What it does | Where |
+|---|---|---|
+| **Character tokenizer** | Encodes each character as an integer (0-127 ASCII + padding). Fixed-length input to the CNN. | `finetype-core` |
+| **CharCNN** | 3-layer character-level CNN with max-pooling → softmax over 159 types. Trained on synthetic data from taxonomy generators. ~8.5 MB model. | `finetype-model` |
+| **Post-processing** | 6 deterministic rules that correct known model confusions using format signals the model struggles with (e.g., `T` vs space in timestamps, `@` for email rescue, hash length check). | `finetype-model` |
+| **Vote aggregation** | In column mode, runs single-value inference on a sample of up to 100 values, then counts votes per type. | `finetype-model` |
+| **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length). | `finetype-model` |
+| **Profile** | CSV parsing with null detection, then column-mode inference on each column. Outputs a type table with confidence scores. | `finetype-cli` |
+
 **Four crates:**
 
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
-| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation (65 tests) | `serde_yaml`, `fake`, `chrono`, `uuid` |
+| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation (73 tests) | `serde_yaml`, `fake`, `chrono`, `uuid` |
 | `finetype-model` | Candle CharCNN inference, column-mode disambiguation (62 tests) | `candle-core`, `candle-nn` |
-| `finetype-cli` | Binary: 9 CLI commands (28 tests) | `clap`, `csv` |
+| `finetype-cli` | Binary: 11 CLI commands (28 tests) | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
 
 **Repository structure:**
@@ -219,8 +282,8 @@ finetype/
 │   ├── finetype-model/       # Candle CNN model, column-mode inference
 │   ├── finetype-cli/         # CLI binary
 │   └── finetype-duckdb/      # DuckDB extension (5 scalar functions)
-├── labels/                   # Taxonomy definitions (151 types, 6 domains, YAML)
-├── models/char-cnn-v2/       # Pre-trained flat model weights, config, label mapping
+├── labels/                   # Taxonomy definitions (159 types, 6 domains, YAML)
+├── models/char-cnn-v4/       # Pre-trained flat model weights, config, label mapping
 ├── eval/gittables/           # GitTables real-world benchmark evaluation
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
 └── .github/workflows/        # CI/CD: fmt, clippy, test, finetype check; release cross-compile
@@ -259,14 +322,14 @@ cargo run --release -- generate --samples 500 --output data/train.ndjson
 cargo run --release -- train --data data/train.ndjson --epochs 10
 
 # Evaluate model
-cargo run --release -- eval --data data/test.ndjson --model models/char-cnn-v2
+cargo run --release -- eval --data data/test.ndjson --model models/char-cnn-v4
 ```
 
 Project tasks are tracked in [`backlog/`](backlog/) using [Backlog.md](https://backlog.md).
 
 ### Taxonomy Definitions
 
-Each of the 152 types is defined in YAML under `labels/`:
+Each of the 159 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
