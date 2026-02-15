@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Pre-commit hook: runs the same checks as CI.
+# Install with:  git config core.hooksPath .githooks
+set -euo pipefail
+
+echo "══ pre-commit: cargo fmt ══"
+cargo fmt --all -- --check
+
+echo "══ pre-commit: cargo clippy ══"
+cargo clippy -- -D warnings
+
+echo "══ pre-commit: cargo test ══"
+cargo test --quiet
+
+echo "══ pre-commit: all checks passed ══"

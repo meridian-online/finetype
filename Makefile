@@ -8,6 +8,13 @@ EVAL_DIR       := eval/gittables
 GT_DIR         := $(HOME)/git-tables
 EVAL_OUTPUT    := $(GT_DIR)/eval_output
 
+# ─── Setup ───────────────────────────────────
+.PHONY: setup
+
+setup:
+	git config core.hooksPath .githooks
+	@echo "✓ Git hooks installed (.githooks/pre-commit)"
+
 # ─── CI (run locally before pushing) ─────────
 .PHONY: ci lint fmt clippy
 
