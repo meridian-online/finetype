@@ -210,7 +210,22 @@ fn disambiguate(
         }
     }
 
-    // Rule 4: Numeric type disambiguation
+    // Rule 4: Gender detection (must be before generic categorical)
+    if let Some(label) = disambiguate_gender(values) {
+        return Some((label, "gender_detection".to_string()));
+    }
+
+    // Rule 5: Boolean override — prevent boolean classification for small integer spreads
+    if let Some((label, rule)) = disambiguate_boolean_override(values, &top_labels) {
+        return Some((label, rule));
+    }
+
+    // Rule 6: Categorical detection — low cardinality string columns
+    if let Some((label, rule)) = disambiguate_categorical(values, &top_labels) {
+        return Some((label, rule));
+    }
+
+    // Rule 7: Numeric type disambiguation
     if let Some((label, rule)) = disambiguate_numeric(values, results, &top_labels) {
         return Some((label, rule));
     }
@@ -221,6 +236,178 @@ fn disambiguate(
 /// Check if two labels are both present in the top candidates.
 fn contains_pair(labels: &[&str], a: &str, b: &str) -> bool {
     labels.contains(&a) && labels.contains(&b)
+}
+
+/// Detect gender columns by checking if all values match a known gender value set.
+///
+/// Rule: If ALL non-empty values are in the gender set → identity.person.gender
+fn disambiguate_gender(values: &[String]) -> Option<String> {
+    const GENDER_VALUES: &[&str] = &[
+        "male", "female", "m", "f", "Male", "Female", "M", "F",
+        "MALE", "FEMALE", "man", "woman", "Man", "Woman",
+        "MAN", "WOMAN", "boy", "girl", "Boy", "Girl",
+    ];
+
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let all_gender = non_empty.iter().all(|v| GENDER_VALUES.contains(v));
+    if all_gender {
+        Some("identity.person.gender".to_string())
+    } else {
+        None
+    }
+}
+
+/// Override boolean classification when the column has small integer values
+/// with more than 2 unique values and a spread > 1.
+///
+/// Rule: If majority vote is boolean but values are integers with >2 unique values
+///       spanning 0-N where N > 1, override to integer_number.
+fn disambiguate_boolean_override(
+    values: &[String],
+    top_labels: &[&str],
+) -> Option<(String, String)> {
+    // Only trigger when boolean is in the top predictions
+    let has_boolean = top_labels.iter().any(|l| {
+        *l == "representation.logical.boolean"
+            || *l == "technology.data.boolean"
+    });
+    if !has_boolean {
+        return None;
+    }
+
+    let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    // Check single-character non-numeric values first (e.g., Embarked: S, C, Q)
+    let all_single_char = non_empty.iter().all(|v| v.chars().count() == 1);
+    let all_digits = non_empty.iter().all(|v| v.chars().all(|c| c.is_ascii_digit()));
+    if all_single_char && !all_digits {
+        let mut unique_chars: Vec<&str> = non_empty.clone();
+        unique_chars.sort();
+        unique_chars.dedup();
+        if unique_chars.len() >= 2 {
+            // Single chars that aren't just 0/1 or T/F → categorical
+            let is_boolean_set = unique_chars.len() == 2 && {
+                let set: std::collections::HashSet<&str> = unique_chars.iter().copied().collect();
+                set.contains("0") && set.contains("1")
+                    || set.contains("T") && set.contains("F")
+                    || set.contains("t") && set.contains("f")
+                    || set.contains("Y") && set.contains("N")
+                    || set.contains("y") && set.contains("n")
+            };
+            if !is_boolean_set {
+                return Some((
+                    "representation.discrete.categorical".to_string(),
+                    "boolean_override_single_char_categorical".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Parse values as integers — check for small integer spread
+    let parsed: Vec<i64> = values
+        .iter()
+        .filter_map(|v| v.trim().parse::<i64>().ok())
+        .collect();
+
+    if parsed.len() >= 3 {
+        let mut unique: Vec<i64> = parsed.clone();
+        unique.sort();
+        unique.dedup();
+        let n_unique = unique.len();
+        let min = *unique.first().unwrap();
+        let max = *unique.last().unwrap();
+
+        // If >2 unique integer values and spread > 1, it's not boolean
+        if n_unique > 2 && (max - min) > 1 {
+            return Some((
+                "representation.numeric.integer_number".to_string(),
+                "boolean_override_integer_spread".to_string(),
+            ));
+        }
+    }
+
+    None
+}
+
+/// Detect categorical columns based on cardinality and value characteristics.
+///
+/// Rules:
+/// - All values are single characters with > 2 unique → categorical
+/// - 3-20 unique string values → categorical
+fn disambiguate_categorical(
+    values: &[String],
+    top_labels: &[&str],
+) -> Option<(String, String)> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let mut unique_values: Vec<&str> = non_empty.clone();
+    unique_values.sort();
+    unique_values.dedup();
+    let n_unique = unique_values.len();
+
+    // All single-character values with > 2 unique → categorical
+    // But not if all values are numeric digits (handled by numeric rules)
+    if non_empty.iter().all(|v| v.chars().count() == 1) && n_unique > 2 {
+        let all_digits = non_empty.iter().all(|v| v.chars().all(|c| c.is_ascii_digit()));
+        if !all_digits {
+            return Some((
+                "representation.discrete.categorical".to_string(),
+                "categorical_single_char".to_string(),
+            ));
+        }
+    }
+
+    // Low cardinality string column: 3-20 unique values, not already categorical
+    // Only override if the current top prediction is a generic type
+    let generic_types = [
+        "representation.text.word",
+        "representation.text.plain_text",
+        "representation.logical.boolean",
+        "technology.data.boolean",
+        "representation.text.abbreviation",
+        "representation.numeric.integer_number",
+    ];
+    let top_is_generic = top_labels
+        .first()
+        .map(|l| generic_types.contains(l))
+        .unwrap_or(false);
+
+    if n_unique >= 3 && n_unique <= 20 && top_is_generic {
+        // Check that values are short strings (not sentences)
+        let all_short = non_empty.iter().all(|v| v.len() <= 50);
+        // Check that values are not purely numeric (handled by numeric rules)
+        let all_numeric = non_empty.iter().all(|v| v.parse::<f64>().is_ok());
+
+        if all_short && !all_numeric {
+            return Some((
+                "representation.discrete.categorical".to_string(),
+                "categorical_low_cardinality".to_string(),
+            ));
+        }
+    }
+
+    let _ = top_labels; // suppress warning
+    None
 }
 
 /// Disambiguate us_slash vs eu_slash dates.
@@ -1124,5 +1311,175 @@ mod tests {
         };
         assert_eq!(result.label, "unknown");
         assert_eq!(result.samples_used, 0);
+    }
+
+    // ── Cardinality & categorical rule tests ────────────────────────────
+
+    #[test]
+    fn test_gender_detection_mixed_case() {
+        let values: Vec<String> = vec![
+            "male", "female", "Male", "Female", "male", "female", "male", "Female", "male", "Male",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(result, Some("identity.person.gender".to_string()));
+    }
+
+    #[test]
+    fn test_gender_detection_single_char() {
+        let values: Vec<String> = vec!["M", "F", "M", "F", "M", "F", "M", "F", "M", "F"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(result, Some("identity.person.gender".to_string()));
+    }
+
+    #[test]
+    fn test_gender_detection_fails_for_non_gender() {
+        let values: Vec<String> = vec!["red", "blue", "green", "red", "blue"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_boolean_override_integer_spread() {
+        // SibSp-like column: integers 0-8 with >2 unique values
+        let values: Vec<String> = vec!["0", "1", "2", "3", "0", "1", "4", "0", "5", "8"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.logical.boolean", "representation.numeric.integer_number"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_integer_spread");
+    }
+
+    #[test]
+    fn test_boolean_override_preserves_real_boolean() {
+        // Actual boolean column: only 0 and 1
+        let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1", "0", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.logical.boolean"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        // Should return None — this IS a boolean column (only 2 unique, spread=1)
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_boolean_override_single_char_categorical() {
+        // Embarked-like column: single chars S, C, Q
+        let values: Vec<String> = vec!["S", "C", "Q", "S", "S", "C", "Q", "S", "S", "C"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.logical.boolean", "representation.text.word"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert_eq!(rule, "boolean_override_single_char_categorical");
+    }
+
+    #[test]
+    fn test_boolean_override_preserves_true_false_chars() {
+        // T/F single-char boolean values should stay boolean
+        let values: Vec<String> = vec!["T", "F", "T", "F", "T", "F", "T", "F"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.logical.boolean"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        // Should return None — T/F is a valid boolean encoding
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_categorical_single_char_detection() {
+        // Column of single characters with >2 unique values
+        let values: Vec<String> = vec!["A", "B", "C", "D", "A", "B", "C", "A", "B", "D"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.text.word"];
+
+        let result = disambiguate_categorical(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert_eq!(rule, "categorical_single_char");
+    }
+
+    #[test]
+    fn test_categorical_low_cardinality() {
+        // Column with 3-20 unique short string values
+        let values: Vec<String> = vec![
+            "red", "blue", "green", "red", "blue", "green", "red", "blue", "green", "red",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let top_labels = vec!["representation.text.word"];
+
+        let result = disambiguate_categorical(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert_eq!(rule, "categorical_low_cardinality");
+    }
+
+    #[test]
+    fn test_categorical_not_triggered_for_high_cardinality() {
+        // Column with >20 unique values → not categorical
+        let values: Vec<String> = (1..=25)
+            .map(|i| format!("value_{}", i))
+            .collect();
+        let top_labels = vec!["representation.text.word"];
+
+        let result = disambiguate_categorical(&values, &top_labels);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_categorical_not_triggered_for_numeric_values() {
+        // Purely numeric column should not be overridden to categorical
+        let values: Vec<String> = vec!["1", "2", "3", "1", "2", "3", "1", "2", "3", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.numeric.integer_number"];
+
+        let result = disambiguate_categorical(&values, &top_labels);
+        // Should be None because values are all numeric
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_categorical_not_triggered_for_specific_types() {
+        // If top prediction is already a specific type (e.g., iata_code), don't override
+        let values: Vec<String> = vec!["SYD", "LAX", "JFK", "LHR", "SYD", "LAX"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["geography.transport.iata_code"];
+
+        let result = disambiguate_categorical(&values, &top_labels);
+        assert!(result.is_none());
     }
 }

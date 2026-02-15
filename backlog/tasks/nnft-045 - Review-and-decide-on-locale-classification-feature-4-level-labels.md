@@ -1,11 +1,11 @@
 ---
 id: NNFT-045
 title: Review and decide on locale classification feature (4-level labels)
-status: To Do
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-13 10:40'
-updated_date: '2026-02-14 10:08'
+updated_date: '2026-02-15 08:33'
 labels:
   - architecture
   - locale
@@ -45,11 +45,11 @@ The decision should weigh: transformation contract integrity, model accuracy imp
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Decision documented: which locale detection approach to pursue (two-stage, full 4-level, normalization layer, or defer)
-- [ ] #2 DuckDB strptime locale limitation documented in project (README or docs)
+- [x] #1 Decision documented: which locale detection approach to pursue (two-stage, full 4-level, normalization layer, or defer)
+- [x] #2 DuckDB strptime locale limitation documented in project (README or docs)
 - [ ] #3 If shipping: create follow-up tasks for locale-aware model and transform pipeline
-- [ ] #4 If deferring: document which types are affected and add known-limitation note
-- [ ] #5 README updated to reflect locale support status and any transform caveats
+- [x] #4 If deferring: document which types are affected and add known-limitation note
+- [x] #5 README updated to reflect locale support status and any transform caveats
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -68,4 +68,33 @@ This breaks FineType's transformation contract for non-English date formats. If 
 **Types affected:** Any type using `%B` (full month name), `%b` (abbreviated month), or `%A`/`%a` (day name) in the transform — primarily `datetime.date.long_full_month`, `datetime.date.abbreviated_month`, `datetime.date.weekday_full_month`, `datetime.date.weekday_abbreviated_month`, and similar timestamp variants.
 
 **Current scope of locale generators:** 16 locales across identity (names, phones), datetime (date formats), and geography (addresses, postal codes) domains.
+
+Decision: Option 4 — Keep as infra, document limitation.
+
+Rationale:
+1. DuckDB strptime only accepts English month/day names — hard constraint
+2. 4-level label infrastructure already built and available for future tiered models
+3. Current 3-level model at 91.62% accuracy serves production needs
+4. Non-English locale support adds significant complexity (translation tables for 16+ languages, normalization layer) without clear user demand
+5. The transformation contract integrity is maintained by documenting English-only scope
+
+AC #3 not applicable (deferring, not shipping). No follow-up tasks needed — the infrastructure already exists in the training pipeline.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decided to **defer locale classification** (Option 4: Keep as infra, document limitation).
+
+The 4-level label training data generation infrastructure remains available for future tiered models. The production model guarantees transformation contracts only for English-locale data.
+
+Changes:
+- Added 'Known Limitations' section to README documenting:
+  - DuckDB strptime locale limitation (English-only month/day names)
+  - Affected types (%B, %b, %A, %a format specifiers)
+  - Current 3-level vs future 4-level label status
+  - Scope decision rationale
+- Updated README type counts (159→163) and test counts
+- Updated disambiguation rules documentation with new NNFT-065 rules
+- Updated representation domain type count (19→23)"
+<!-- SECTION:FINAL_SUMMARY:END -->

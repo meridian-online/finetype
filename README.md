@@ -2,7 +2,7 @@
 
 [![Project Page](https://img.shields.io/badge/noon.sh-FineType-blue)](https://noon.sh/projects/finetype/)
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 159 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 163 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 $ finetype infer -i "192.168.1.1"
@@ -17,7 +17,7 @@ identity.person.email
 
 ## Features
 
-- **159 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
+- **163 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing
 - **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
@@ -25,7 +25,7 @@ identity.person.email
 - **Fast inference** — Character-level CNN model (600+ classifications/sec, 8.5 MB memory)
 - **Real-world validated** — 85-100% accuracy on format-detectable types in [GitTables benchmark](https://zenodo.org/record/5706316) (2,363 columns)
 - **Pure Rust** — no Python runtime, Candle ML framework
-- **163 tests** — taxonomy validation, model inference, column disambiguation, data generation
+- **85+ tests** — taxonomy validation, model inference, column disambiguation, data generation
 
 ## Installation
 
@@ -132,14 +132,14 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **159 types** across **6 domains**:
+FineType recognizes **163 types** across **6 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
 | `datetime` | 46 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
 | `technology` | 35 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
 | `identity` | 32 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
-| `representation` | 19 | Integers, floats, booleans, hex colors, base64, JSON |
+| `representation` | 23 | Integers, floats, booleans, categorical, ordinal, hex colors, base64, JSON |
 | `geography` | 16 | Latitude, longitude, countries, cities, postal codes |
 | `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
 
@@ -190,6 +190,9 @@ Column-mode inference resolves this by analyzing the distribution of values in a
 - **Year detection** — 4-digit integers predominantly in 1900-2100 range
 - **Coordinate resolution** — latitude vs longitude based on value ranges
 - **Numeric type disambiguation** — ports, increments, postal codes, street numbers
+- **Gender detection** — known gender value sets → `identity.person.gender`
+- **Categorical detection** — low cardinality string columns, single-character columns
+- **Boolean override** — prevents boolean misclassification for integer spreads and multi-value chars
 
 ```bash
 # CLI column-mode
@@ -212,7 +215,7 @@ flowchart TB
         A["Input string"] --> B["Character tokenizer
         (per-char integer encoding)"]
         B --> C["CharCNN model
-        (softmax → 159 types)"]
+        (softmax → 163 types)"]
         C --> D{"Post-process rules
         (6 format checks)"}
         D -->|corrected| E["Predicted type
@@ -258,10 +261,10 @@ flowchart TB
 | Stage | What it does | Where |
 |---|---|---|
 | **Character tokenizer** | Encodes each character as an integer (0-127 ASCII + padding). Fixed-length input to the CNN. | `finetype-core` |
-| **CharCNN** | 3-layer character-level CNN with max-pooling → softmax over 159 types. Trained on synthetic data from taxonomy generators. ~8.5 MB model. | `finetype-model` |
+| **CharCNN** | 3-layer character-level CNN with max-pooling → softmax over 163 types. Trained on synthetic data from taxonomy generators. ~8.5 MB model. | `finetype-model` |
 | **Post-processing** | 6 deterministic rules that correct known model confusions using format signals the model struggles with (e.g., `T` vs space in timestamps, `@` for email rescue, hash length check). | `finetype-model` |
 | **Vote aggregation** | In column mode, runs single-value inference on a sample of up to 100 values, then counts votes per type. | `finetype-model` |
-| **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length). | `finetype-model` |
+| **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length), gender detection, categorical (low cardinality), boolean override (integer spread). | `finetype-model` |
 | **Profile** | CSV parsing with null detection, then column-mode inference on each column. Outputs a type table with confidence scores. | `finetype-cli` |
 
 **Four crates:**
@@ -269,7 +272,7 @@ flowchart TB
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
 | `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation (73 tests) | `serde_yaml`, `fake`, `chrono`, `uuid` |
-| `finetype-model` | Candle CharCNN inference, column-mode disambiguation (62 tests) | `candle-core`, `candle-nn` |
+| `finetype-model` | Candle CharCNN inference, column-mode disambiguation (85 tests) | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: 11 CLI commands (28 tests) | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
 
@@ -282,7 +285,7 @@ finetype/
 │   ├── finetype-model/       # Candle CNN model, column-mode inference
 │   ├── finetype-cli/         # CLI binary
 │   └── finetype-duckdb/      # DuckDB extension (5 scalar functions)
-├── labels/                   # Taxonomy definitions (159 types, 6 domains, YAML)
+├── labels/                   # Taxonomy definitions (163 types, 6 domains, YAML)
 ├── models/char-cnn-v4/       # Pre-trained flat model weights, config, label mapping
 ├── eval/gittables/           # GitTables real-world benchmark evaluation
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
@@ -329,7 +332,7 @@ Project tasks are tracked in [`backlog/`](backlog/) using [Backlog.md](https://b
 
 ### Taxonomy Definitions
 
-Each of the 159 types is defined in YAML under `labels/`:
+Each of the 163 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -350,6 +353,82 @@ datetime.timestamp.iso_8601:
 ```
 
 Key fields: `broad_type` (target DuckDB type), `transform` (DuckDB SQL expression using `{col}` placeholder), `validation` (JSON Schema fragment for data quality).
+
+## Data Validation
+
+FineType includes a validation engine that checks data quality against the taxonomy's JSON Schema fragments. The pipeline is: **Infer → Validate → Transform**.
+
+### CLI Usage
+
+```bash
+# Validate NDJSON file (each line has "value" and "label" fields)
+finetype validate -f data.ndjson
+
+# Validate plain text values against a specific type
+finetype validate -f values.txt --label technology.internet.ip_v4
+
+# Choose a strategy for handling invalid values
+finetype validate -f data.ndjson --strategy quarantine   # (default) separate invalid values
+finetype validate -f data.ndjson --strategy null          # replace invalid with NULL
+finetype validate -f data.ndjson --strategy ffill         # forward-fill from last valid
+finetype validate -f data.ndjson --strategy bfill         # backward-fill from next valid
+
+# Output format (plain, json, csv)
+finetype validate -f data.ndjson --output json
+```
+
+### Validation Strategies
+
+| Strategy | Behavior | Use When |
+|----------|----------|----------|
+| `quarantine` | Invalid values collected in separate file, removed from output | You want to review and fix invalid data manually |
+| `null` | Invalid values replaced with NULL | Missing data is acceptable and downstream can handle NULLs |
+| `ffill` | Invalid values replaced with last valid value | Time-series data where carrying forward is appropriate |
+| `bfill` | Invalid values replaced with next valid value | Backfilling is more appropriate than forward-filling |
+
+### Schema Format
+
+Each taxonomy type has an optional `validation` field containing a JSON Schema fragment:
+
+```yaml
+technology.internet.ip_v4:
+  validation:
+    type: string
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    minLength: 7
+    maxLength: 15
+```
+
+Supported schema fields: `pattern` (regex), `minLength`, `maxLength`, `minimum`, `maximum`, `enum` (allowed value list).
+
+### Library API
+
+```rust
+use finetype_core::validator::{validate_value, validate_column, InvalidStrategy};
+use finetype_core::taxonomy::Validation;
+
+// Single-value validation
+let schema = taxonomy.get("technology.internet.ip_v4").unwrap().validation.as_ref().unwrap();
+let result = validate_value("192.168.1.1", schema).unwrap();
+assert!(result.is_valid);
+
+// Column validation with strategy
+let values = vec![Some("192.168.1.1"), Some("bad"), None, Some("10.0.0.1")];
+let result = validate_column(&values, schema, InvalidStrategy::Quarantine).unwrap();
+println!("Valid: {}, Invalid: {}", result.stats.valid_count, result.stats.invalid_count);
+```
+
+## Known Limitations
+
+### Locale Support
+
+FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (163 types) and does not distinguish between locales at inference time.
+
+**DuckDB `strptime` locale limitation:** DuckDB's `strptime` function only accepts English month and day names. Non-English dates like `6 janvier 2025` will fail with `strptime(col, '%d %B %Y')`. There is no DuckDB locale setting to change this behavior.
+
+**Affected types:** Any type whose transform uses `%B` (full month name), `%b` (abbreviated month), `%A` (full day name), or `%a` (abbreviated day name) — primarily `datetime.date.long_full_month`, `datetime.date.abbreviated_month`, and related timestamp variants.
+
+**Current status:** The 4-level label infrastructure (`domain.category.type.LOCALE`) exists in the training data pipeline but is reserved for future tiered models. The production model guarantees transformation contracts only for English-locale data. This is a deliberate scope decision — non-English locale support requires either a normalization layer or locale-aware transforms, both of which add significant complexity without clear demand.
 
 ## License
 
