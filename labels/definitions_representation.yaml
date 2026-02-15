@@ -675,3 +675,169 @@ representation.scientific.metric_prefix:
     v1 migration: Was science.metric_prefix marked broad_words.
     SI metric prefixes: 10^24 (yotta) to 10^-24 (yocto).
     Decompose extracts prefix and multiplier.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: discrete
+#
+# Discrete value types — low cardinality categorical and ordinal data.
+# These are partially semantic types: the single-value model learns common
+# patterns (e.g., "male"/"female", "A"/"B"/"C"), but full accuracy
+# requires column-level cardinality analysis (see NNFT-065).
+# ═════════════════════════════════════════════════════════════════════
+
+representation.discrete.categorical:
+  title: "Categorical Value"
+  description: >
+    Discrete string value from a small, unordered set (e.g., "male"/"female",
+    "S"/"C"/"Q", "red"/"blue"/"green", "active"/"inactive").
+    Typical cardinality: 2-20 unique values. Transforms to VARCHAR.
+    Column-level identification relies on low cardinality detection.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    minLength: 1
+    maxLength: 50
+  tier: [VARCHAR, discrete]
+  release_priority: 3
+  aliases: [category, enum, factor, level]
+  samples:
+    - "active"
+    - "male"
+    - "S"
+    - "red"
+    - "pending"
+    - "Type A"
+  references: null
+  notes: >
+    New for NNFT-063. Covers low-cardinality string columns common in tabular data.
+    Single-value model learns common categorical vocabulary; column-mode
+    disambiguation (NNFT-065) resolves ambiguous cases via cardinality analysis.
+
+representation.discrete.ordinal:
+  title: "Ordinal Value"
+  description: >
+    Discrete value from an ordered set with ranking semantics.
+    Examples: grades ("A"/"B"/"C"/"D"/"F"), priority levels ("low"/"medium"/"high"),
+    star ratings (1-5), class rankings (1st/2nd/3rd).
+    Distinguished from categorical by implicit ordering.
+    Transforms to VARCHAR (ordering is semantic, not numeric).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    minLength: 1
+    maxLength: 30
+  tier: [VARCHAR, discrete]
+  release_priority: 2
+  aliases: [rank, grade, rating, tier]
+  samples:
+    - "high"
+    - "A"
+    - "1st"
+    - "★★★"
+    - "3"
+    - "excellent"
+  references: null
+  notes: >
+    New for NNFT-063. Ordinal values have natural ordering but may not be
+    numeric. Common in survey data, grading systems, and priority fields.
+    At the single-value level, hard to distinguish from categorical or integer.
+    Column-level analysis (NNFT-065) needed for reliable detection.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: code
+#
+# Structured code/identifier strings that aren't specific enough
+# to match a known format (UUID, ISIN, etc.) but have recognizable
+# alphanumeric patterns.
+# ═════════════════════════════════════════════════════════════════════
+
+representation.code.alphanumeric_id:
+  title: "Alphanumeric Identifier"
+  description: >
+    Mixed letter-and-digit identifier string that doesn't match a known
+    specific format. Examples: product codes ("SKU-12345"), cabin numbers
+    ("C85"), ticket IDs ("A/5 21171"), lot numbers ("LOT-2024-0042"),
+    license plates ("ABC 1234").
+    Format-detectable: contains both alphabetic and numeric characters.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    alpha_part: "REGEXP_EXTRACT({col}, '[A-Za-z]+')"
+    numeric_part: "REGEXP_EXTRACT({col}, '[0-9]+')"
+  validation:
+    type: string
+    pattern: "^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$"
+  tier: [VARCHAR, code]
+  release_priority: 4
+  aliases: [product_code, reference_code, ticket_id, lot_number]
+  samples:
+    - "SKU-12345"
+    - "C85"
+    - "A/5 21171"
+    - "LOT-2024-0042"
+    - "ABC 1234"
+    - "REF-00742"
+    - "B28"
+    - "FL-2087"
+  references: null
+  notes: >
+    New for NNFT-063. Catches mixed letter+digit identifiers that fall through
+    more specific types (UUID, ISIN, IATA, etc.). The validation pattern requires
+    at least one letter AND one digit. This is format-detectable and should train
+    well with the char-CNN model.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: logical
+#
+# Logical/boolean types. Planned relocation from technology.development.
+# ═════════════════════════════════════════════════════════════════════
+
+representation.logical.boolean:
+  title: "Boolean Value"
+  description: >
+    Logical true/false value represented as a string. Common representations:
+    "true"/"false", "yes"/"no", "1"/"0", "on"/"off".
+    Transforms to DuckDB BOOLEAN type.
+    Canonical location for boolean (replaces technology.development.boolean).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: BOOLEAN
+  format_string: null
+  transform: "CAST({col} AS BOOLEAN)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    enum: ["true", "false", "yes", "no", "1", "0", "on", "off", "True", "False", "YES", "NO", "ON", "OFF"]
+  tier: [BOOLEAN, logical]
+  release_priority: 5
+  aliases: [bool, flag]
+  samples:
+    - "true"
+    - "false"
+    - "yes"
+    - "no"
+    - "1"
+    - "0"
+  references: null
+  notes: >
+    New for NNFT-063. Boolean is a universal concept that belongs in
+    representation domain, not technology. This is the canonical location.
+    technology.development.boolean remains as an alias until model retraining
+    migrates to this label. Both labels will coexist during transition.

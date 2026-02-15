@@ -945,9 +945,44 @@ impl Generator {
                 let locale = self.current_locale();
                 // East Asian: LastName FirstName order
                 if matches!(locale, "JA" | "ZH" | "KO") {
-                    Ok(format!("{}{}", last, first))
-                } else {
-                    Ok(format!("{} {}", first, last))
+                    return Ok(format!("{}{}", last, first));
+                }
+                // Generate diverse name formats for better model training.
+                // This helps the char-CNN distinguish names from user_agent strings
+                // by exposing it to formats like "LastName, Title. FirstName"
+                // which have similar character patterns (commas, dots, mixed case).
+                let format_idx = self.rng.gen_range(0..10);
+                match format_idx {
+                    // "FirstName LastName" (basic — most common)
+                    0 | 1 | 2 => Ok(format!("{} {}", first, last)),
+                    // "LastName, FirstName" (CSV/database style)
+                    3 | 4 => Ok(format!("{}, {}", last, first)),
+                    // "LastName, Title. FirstName" (Titanic style)
+                    5 => {
+                        let titles = ["Mr.", "Mrs.", "Ms.", "Dr.", "Rev.", "Prof."];
+                        let title = titles[self.rng.gen_range(0..titles.len())];
+                        Ok(format!("{}, {} {}", last, title, first))
+                    }
+                    // "LASTNAME, FIRSTNAME" (all caps)
+                    6 => Ok(format!("{}, {}", last.to_uppercase(), first.to_uppercase())),
+                    // "Title FirstName LastName" (title prefix)
+                    7 => {
+                        let titles = ["Dr.", "Mr.", "Mrs.", "Ms.", "Prof.", "Sir"];
+                        let title = titles[self.rng.gen_range(0..titles.len())];
+                        Ok(format!("{} {} {}", title, first, last))
+                    }
+                    // "FirstName M. LastName" (middle initial)
+                    8 => {
+                        let initial = (b'A' + self.rng.gen_range(0..26)) as char;
+                        Ok(format!("{} {}. {}", first, initial, last))
+                    }
+                    // "LastName, Title. FirstName MiddleName" (formal with middle name)
+                    _ => {
+                        let titles = ["Mr.", "Mrs.", "Miss", "Dr.", "Rev."];
+                        let title = titles[self.rng.gen_range(0..titles.len())];
+                        let middle = self.random_first_name();
+                        Ok(format!("{}, {} {} {}", last, title, first, middle))
+                    }
                 }
             }
             ("person", "first_name") => Ok(self.random_first_name()),
@@ -1627,6 +1662,132 @@ impl Generator {
                     "deca", "deci", "centi", "milli", "micro", "nano", "pico", "femto", "atto",
                 ];
                 Ok(prefixes[self.rng.gen_range(0..prefixes.len())].to_string())
+            }
+
+            // ── discrete (2 types) ────────────────────────────────────────
+            ("discrete", "categorical") => {
+                // Generate values that look like typical categorical column entries.
+                // Multiple "vocabularies" to give the model diverse categorical patterns.
+                let vocab_idx = self.rng.gen_range(0..12);
+                let vocab: &[&str] = match vocab_idx {
+                    0 => &["male", "female"],
+                    1 => &["yes", "no", "maybe"],
+                    2 => &["active", "inactive", "pending", "suspended"],
+                    3 => &["red", "blue", "green", "yellow", "orange", "purple"],
+                    4 => &["S", "C", "Q"],
+                    5 => &["A", "B", "C", "D"],
+                    6 => &["cat", "dog", "bird", "fish", "hamster"],
+                    7 => &["left", "right", "center"],
+                    8 => &["small", "medium", "large"],
+                    9 => &["north", "south", "east", "west"],
+                    10 => &["pass", "fail"],
+                    _ => &["Type A", "Type B", "Type C", "Type D", "Type E"],
+                };
+                Ok(vocab[self.rng.gen_range(0..vocab.len())].to_string())
+            }
+            ("discrete", "ordinal") => {
+                // Generate values that look like ordinal/ranked entries.
+                let vocab_idx = self.rng.gen_range(0..10);
+                let vocab: &[&str] = match vocab_idx {
+                    0 => &["low", "medium", "high"],
+                    1 => &["low", "medium", "high", "critical"],
+                    2 => &["poor", "fair", "good", "very good", "excellent"],
+                    3 => &["1st", "2nd", "3rd", "4th", "5th"],
+                    4 => &["A", "B", "C", "D", "F"],
+                    5 => &["freshman", "sophomore", "junior", "senior"],
+                    6 => &["★", "★★", "★★★", "★★★★", "★★★★★"],
+                    7 => &["I", "II", "III", "IV", "V"],
+                    8 => &["none", "mild", "moderate", "severe"],
+                    _ => &["beginner", "intermediate", "advanced", "expert"],
+                };
+                Ok(vocab[self.rng.gen_range(0..vocab.len())].to_string())
+            }
+
+            // ── code (1 type) ─────────────────────────────────────────────
+            ("code", "alphanumeric_id") => {
+                // Generate mixed letter+digit identifier patterns.
+                let pattern_idx = self.rng.gen_range(0..10);
+                match pattern_idx {
+                    // PREFIX-NNNNN (product/ticket codes)
+                    0 => {
+                        let prefixes = ["SKU", "REF", "LOT", "INV", "PO", "WO", "TKT", "ORD"];
+                        let prefix = prefixes[self.rng.gen_range(0..prefixes.len())];
+                        let num = self.rng.gen_range(1000..99999);
+                        Ok(format!("{}-{:05}", prefix, num))
+                    }
+                    // L-NNN (cabin/seat codes like C85, B28, A5)
+                    1 => {
+                        let letter = (b'A' + self.rng.gen_range(0..8)) as char;
+                        let num = self.rng.gen_range(1..200);
+                        Ok(format!("{}{}", letter, num))
+                    }
+                    // LL-NNNN (flight/batch codes)
+                    2 => {
+                        let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let num = self.rng.gen_range(100..9999);
+                        Ok(format!("{}{}-{}", l1, l2, num))
+                    }
+                    // LLL NNN (license plates)
+                    3 => {
+                        let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l3 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let num = self.rng.gen_range(100..999);
+                        Ok(format!("{}{}{} {}", l1, l2, l3, num))
+                    }
+                    // L/N NNNNN (Titanic ticket style)
+                    4 => {
+                        let letter = (b'A' + self.rng.gen_range(0..10)) as char;
+                        let num = self.rng.gen_range(10000..99999);
+                        Ok(format!("{}/{} {}", letter, self.rng.gen_range(1..9), num))
+                    }
+                    // LLNN-NNN (product batch)
+                    5 => {
+                        let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let n1 = self.rng.gen_range(10..99);
+                        let n2 = self.rng.gen_range(100..999);
+                        Ok(format!("{}{}{}-{}", l1, l2, n1, n2))
+                    }
+                    // PREFIX-YYYY-NNNN (year-based lot numbers)
+                    6 => {
+                        let prefixes = ["LOT", "BATCH", "RUN", "SN"];
+                        let prefix = prefixes[self.rng.gen_range(0..prefixes.len())];
+                        let year = self.rng.gen_range(2018..2026);
+                        let seq = self.rng.gen_range(1..9999);
+                        Ok(format!("{}-{}-{:04}", prefix, year, seq))
+                    }
+                    // NNN-LL (zone codes)
+                    7 => {
+                        let num = self.rng.gen_range(100..999);
+                        let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        Ok(format!("{}-{}{}", num, l1, l2))
+                    }
+                    // L.NNN.NN (part numbers)
+                    8 => {
+                        let letter = (b'A' + self.rng.gen_range(0..8)) as char;
+                        let n1 = self.rng.gen_range(100..999);
+                        let n2 = self.rng.gen_range(10..99);
+                        Ok(format!("{}.{}.{}", letter, n1, n2))
+                    }
+                    // LLLNNNNN (compact alphanumeric)
+                    _ => {
+                        let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l3 = (b'a' + self.rng.gen_range(0..26)) as char;
+                        let num = self.rng.gen_range(10000..99999);
+                        Ok(format!("{}{}{}{}", l1, l2, l3, num))
+                    }
+                }
+            }
+
+            // ── logical (1 type) ──────────────────────────────────────────
+            ("logical", "boolean") => {
+                let vals = ["true", "false", "yes", "no", "1", "0", "True", "False",
+                            "YES", "NO", "on", "off", "ON", "OFF"];
+                Ok(vals[self.rng.gen_range(0..vals.len())].to_string())
             }
 
             _ => Err(GeneratorError::NotImplemented(format!(

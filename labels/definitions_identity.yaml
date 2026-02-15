@@ -46,7 +46,7 @@ identity.person.full_name:
     type: string
     minLength: 2
     maxLength: 200
-    pattern: "^[\\p{L}\\s'\\-]+$"
+    pattern: "^[\\p{L}\\s'\\-.,]+$"
   tier: [VARCHAR, person]
   release_priority: 5
   aliases: [name, fullname]
@@ -56,6 +56,9 @@ identity.person.full_name:
     - "Jacques Dubois"
     - "田中太郎"
     - "محمد علي"
+    - "Smith, Mr. John"
+    - "Dr. Jane Wilson"
+    - "BROWN, ALICE"
   references: null
   notes: >
     v1 migration: Was person.full_name. Locale-specific due to name order
