@@ -961,9 +961,9 @@ impl Generator {
                 let format_idx = self.rng.gen_range(0..10);
                 match format_idx {
                     // "FirstName LastName" (basic — most common)
-                    0 | 1 | 2 => Ok(format!("{} {}", first, last)),
+                    0..=2 => Ok(format!("{} {}", first, last)),
                     // "LastName, FirstName" (CSV/database style)
-                    3 | 4 => Ok(format!("{}, {}", last, first)),
+                    3..=4 => Ok(format!("{}, {}", last, first)),
                     // "LastName, Title. FirstName" (Titanic style)
                     5 => {
                         let titles = ["Mr.", "Mrs.", "Ms.", "Dr.", "Rev.", "Prof."];
@@ -1384,12 +1384,9 @@ impl Generator {
                 let prefix: u64 = if self.rng.gen_bool(0.7) { 1 } else { 2 };
                 let middle: u64 = self.rng.gen_range(0..100_000_000);
                 let partial = prefix * 100_000_000 + middle; // 9 digits
-                // Calculate Luhn check digit: prepend 80840, append 0 as placeholder
+                                                             // Calculate Luhn check digit: prepend 80840, append 0 as placeholder
                 let test_str = format!("80840{}0", partial);
-                let digits: Vec<u32> = test_str
-                    .chars()
-                    .map(|c| c.to_digit(10).unwrap())
-                    .collect();
+                let digits: Vec<u32> = test_str.chars().map(|c| c.to_digit(10).unwrap()).collect();
                 let mut sum: u32 = 0;
                 for (i, &d) in digits.iter().rev().enumerate() {
                     if i % 2 == 0 {
@@ -1604,7 +1601,13 @@ impl Generator {
                 if precision == 0 {
                     Ok(format!("{}{}{}", prefix, value as u64, suffix))
                 } else {
-                    Ok(format!("{}{:.prec$}{}", prefix, value, suffix, prec = precision))
+                    Ok(format!(
+                        "{}{:.prec$}{}",
+                        prefix,
+                        value,
+                        suffix,
+                        prec = precision
+                    ))
                 }
             }
 
@@ -1760,17 +1763,29 @@ impl Generator {
                     // Date formats
                     3 => {
                         let fmts = [
-                            "mm/dd/yyyy", "dd/mm/yyyy", "yyyy-mm-dd", "m/d/yy",
-                            "d-mmm-yy", "d-mmm", "mmm-yy", "dd-mmm-yyyy",
-                            "yyyy/mm/dd", "mm-dd-yyyy",
+                            "mm/dd/yyyy",
+                            "dd/mm/yyyy",
+                            "yyyy-mm-dd",
+                            "m/d/yy",
+                            "d-mmm-yy",
+                            "d-mmm",
+                            "mmm-yy",
+                            "dd-mmm-yyyy",
+                            "yyyy/mm/dd",
+                            "mm-dd-yyyy",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
                     // Time formats
                     4 => {
                         let fmts = [
-                            "h:mm:ss AM/PM", "h:mm AM/PM", "h:mm:ss",
-                            "hh:mm:ss", "hh:mm", "mm:ss", "h:mm:ss.00",
+                            "h:mm:ss AM/PM",
+                            "h:mm AM/PM",
+                            "h:mm:ss",
+                            "hh:mm:ss",
+                            "hh:mm",
+                            "mm:ss",
+                            "h:mm:ss.00",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
@@ -1958,8 +1973,10 @@ impl Generator {
 
             // ── logical (1 type) ──────────────────────────────────────────
             ("logical", "boolean") => {
-                let vals = ["true", "false", "yes", "no", "1", "0", "True", "False",
-                            "YES", "NO", "on", "off", "ON", "OFF"];
+                let vals = [
+                    "true", "false", "yes", "no", "1", "0", "True", "False", "YES", "NO", "on",
+                    "off", "ON", "OFF",
+                ];
                 Ok(vals[self.rng.gen_range(0..vals.len())].to_string())
             }
 
@@ -3133,7 +3150,10 @@ impl Generator {
                 if self.rng.gen_bool(0.3) {
                     // With apt/suite
                     let apt = self.rng.gen_range(1..999);
-                    Ok(format!("{} {}, Apt {}, {}, {} {}", num, street, apt, city, state, zip))
+                    Ok(format!(
+                        "{} {}, Apt {}, {}, {} {}",
+                        num, street, apt, city, state, zip
+                    ))
                 } else {
                     Ok(format!("{} {}, {}, {} {}", num, street, city, state, zip))
                 }
@@ -3607,8 +3627,14 @@ test.test.test:
             );
         }
         // Verify format diversity: all three formats should appear
-        assert!(national_count > 0, "Should generate NATIONAL format numbers");
-        assert!(intl_count > 0, "Should generate INTERNATIONAL format numbers");
+        assert!(
+            national_count > 0,
+            "Should generate NATIONAL format numbers"
+        );
+        assert!(
+            intl_count > 0,
+            "Should generate INTERNATIONAL format numbers"
+        );
         assert!(e164_count > 0, "Should generate E164 format numbers");
     }
 
@@ -3617,7 +3643,12 @@ test.test.test:
         let mut gen = Generator::with_seed(test_taxonomy(), 99);
 
         // Helper: generate many samples and check that at least one has the expected prefix
-        fn locale_produces_prefix(gen: &mut Generator, locale: &str, prefix: &str, national_prefix: &str) {
+        fn locale_produces_prefix(
+            gen: &mut Generator,
+            locale: &str,
+            prefix: &str,
+            national_prefix: &str,
+        ) {
             gen.locale = Some(locale.to_string());
             let mut saw_intl = false;
             let mut saw_national = false;
@@ -3633,7 +3664,9 @@ test.test.test:
             assert!(
                 saw_intl || saw_national,
                 "{} should produce {} or {} numbers in 30 samples",
-                locale, prefix, national_prefix
+                locale,
+                prefix,
+                national_prefix
             );
         }
 

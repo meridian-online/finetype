@@ -207,20 +207,15 @@ impl ColumnClassifier {
                 result.label = hinted_type.to_string();
                 result.confidence = hint_fraction.max(0.6);
                 result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(format!(
-                    "header_hint:{}",
-                    header.to_lowercase()
-                ));
+                result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
             } else if result.confidence < 0.3 && !hint_in_votes {
                 // Very low confidence and hint type not even in votes —
                 // still apply hint but with low confidence
                 result.label = hinted_type.to_string();
                 result.confidence = 0.4;
                 result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(format!(
-                    "header_hint_fallback:{}",
-                    header.to_lowercase()
-                ));
+                result.disambiguation_rule =
+                    Some(format!("header_hint_fallback:{}", header.to_lowercase()));
             }
         }
 
@@ -313,9 +308,8 @@ fn contains_pair(labels: &[&str], a: &str, b: &str) -> bool {
 /// Rule: If ALL non-empty values are in the gender set → identity.person.gender
 fn disambiguate_gender(values: &[String]) -> Option<String> {
     const GENDER_VALUES: &[&str] = &[
-        "male", "female", "m", "f", "Male", "Female", "M", "F",
-        "MALE", "FEMALE", "man", "woman", "Man", "Woman",
-        "MAN", "WOMAN", "boy", "girl", "Boy", "Girl",
+        "male", "female", "m", "f", "Male", "Female", "M", "F", "MALE", "FEMALE", "man", "woman",
+        "Man", "Woman", "MAN", "WOMAN", "boy", "girl", "Boy", "Girl",
     ];
 
     let non_empty: Vec<&str> = values
@@ -346,22 +340,27 @@ fn disambiguate_boolean_override(
     top_labels: &[&str],
 ) -> Option<(String, String)> {
     // Only trigger when boolean is in the top predictions
-    let has_boolean = top_labels.iter().any(|l| {
-        *l == "representation.logical.boolean"
-            || *l == "technology.data.boolean"
-    });
+    let has_boolean = top_labels
+        .iter()
+        .any(|l| *l == "representation.logical.boolean" || *l == "technology.data.boolean");
     if !has_boolean {
         return None;
     }
 
-    let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
     if non_empty.len() < 3 {
         return None;
     }
 
     // Check single-character non-numeric values first (e.g., Embarked: S, C, Q)
     let all_single_char = non_empty.iter().all(|v| v.chars().count() == 1);
-    let all_digits = non_empty.iter().all(|v| v.chars().all(|c| c.is_ascii_digit()));
+    let all_digits = non_empty
+        .iter()
+        .all(|v| v.chars().all(|c| c.is_ascii_digit()));
     if all_single_char && !all_digits {
         let mut unique_chars: Vec<&str> = non_empty.clone();
         unique_chars.sort();
@@ -416,10 +415,7 @@ fn disambiguate_boolean_override(
 /// Rules:
 /// - All values are single characters with > 2 unique → categorical
 /// - 3-20 unique string values → categorical
-fn disambiguate_categorical(
-    values: &[String],
-    top_labels: &[&str],
-) -> Option<(String, String)> {
+fn disambiguate_categorical(values: &[String], top_labels: &[&str]) -> Option<(String, String)> {
     let non_empty: Vec<&str> = values
         .iter()
         .map(|v| v.trim())
@@ -438,7 +434,9 @@ fn disambiguate_categorical(
     // All single-character values with > 2 unique → categorical
     // But not if all values are numeric digits (handled by numeric rules)
     if non_empty.iter().all(|v| v.chars().count() == 1) && n_unique > 2 {
-        let all_digits = non_empty.iter().all(|v| v.chars().all(|c| c.is_ascii_digit()));
+        let all_digits = non_empty
+            .iter()
+            .all(|v| v.chars().all(|c| c.is_ascii_digit()));
         if !all_digits {
             return Some((
                 "representation.discrete.categorical".to_string(),
@@ -462,7 +460,7 @@ fn disambiguate_categorical(
         .map(|l| generic_types.contains(l))
         .unwrap_or(false);
 
-    if n_unique >= 3 && n_unique <= 20 && top_is_generic {
+    if (3..=20).contains(&n_unique) && top_is_generic {
         // Check that values are short strings (not sentences)
         let all_short = non_empty.iter().all(|v| v.len() <= 50);
         // Check that values are not purely numeric (handled by numeric rules)
@@ -491,7 +489,7 @@ fn disambiguate_categorical(
 fn header_hint(header: &str) -> Option<&'static str> {
     let h = header.to_lowercase();
     // Remove common prefixes/suffixes and separators for matching
-    let h = h.replace('_', " ").replace('-', " ");
+    let h = h.replace(['_', '-'], " ");
     let h = h.trim();
 
     // Exact or near-exact matches first (most specific)
@@ -1423,12 +1421,10 @@ mod tests {
         // but the fraction is too low (3/10 = 30%) and the column is clearly ages.
         // With the ≥30% threshold and the sequential/year checks running first,
         // this should NOT be classified as port.
-        let values: Vec<String> = vec![
-            "22", "25", "30", "35", "40", "45", "50", "53", "60", "70",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
+        let values: Vec<String> = vec!["22", "25", "30", "35", "40", "45", "50", "53", "60", "70"]
+            .into_iter()
+            .map(String::from)
+            .collect();
 
         let results: Vec<ClassificationResult> = values
             .iter()
@@ -1458,8 +1454,7 @@ mod tests {
         // Realistic Titanic-like age column: mix of young and old ages.
         // Values 21, 22, 25, 53 match common ports but that's only 4/15 = 27% < 30%.
         let values: Vec<String> = vec![
-            "2", "5", "14", "17", "21", "22", "25", "28", "33", "38", "42", "47", "53", "61",
-            "75",
+            "2", "5", "14", "17", "21", "22", "25", "28", "33", "38", "42", "47", "53", "61", "75",
         ]
         .into_iter()
         .map(String::from)
@@ -1545,7 +1540,10 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.logical.boolean", "representation.numeric.integer_number"];
+        let top_labels = vec![
+            "representation.logical.boolean",
+            "representation.numeric.integer_number",
+        ];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(result.is_some());
@@ -1635,9 +1633,7 @@ mod tests {
     #[test]
     fn test_categorical_not_triggered_for_high_cardinality() {
         // Column with >20 unique values → not categorical
-        let values: Vec<String> = (1..=25)
-            .map(|i| format!("value_{}", i))
-            .collect();
+        let values: Vec<String> = (1..=25).map(|i| format!("value_{}", i)).collect();
         let top_labels = vec!["representation.text.word"];
 
         let result = disambiguate_categorical(&values, &top_labels);
@@ -1684,33 +1680,57 @@ mod tests {
     #[test]
     fn test_header_hint_phone() {
         assert_eq!(header_hint("phone"), Some("identity.person.phone_number"));
-        assert_eq!(header_hint("Phone Number"), Some("identity.person.phone_number"));
-        assert_eq!(header_hint("telephone"), Some("identity.person.phone_number"));
+        assert_eq!(
+            header_hint("Phone Number"),
+            Some("identity.person.phone_number")
+        );
+        assert_eq!(
+            header_hint("telephone"),
+            Some("identity.person.phone_number")
+        );
         assert_eq!(header_hint("mobile"), Some("identity.person.phone_number"));
     }
 
     #[test]
     fn test_header_hint_postal() {
         assert_eq!(header_hint("zip"), Some("geography.address.postal_code"));
-        assert_eq!(header_hint("zip_code"), Some("geography.address.postal_code"));
-        assert_eq!(header_hint("Postal Code"), Some("geography.address.postal_code"));
-        assert_eq!(header_hint("postcode"), Some("geography.address.postal_code"));
+        assert_eq!(
+            header_hint("zip_code"),
+            Some("geography.address.postal_code")
+        );
+        assert_eq!(
+            header_hint("Postal Code"),
+            Some("geography.address.postal_code")
+        );
+        assert_eq!(
+            header_hint("postcode"),
+            Some("geography.address.postal_code")
+        );
     }
 
     #[test]
     fn test_header_hint_names() {
         assert_eq!(header_hint("Name"), Some("identity.person.full_name"));
         assert_eq!(header_hint("full_name"), Some("identity.person.full_name"));
-        assert_eq!(header_hint("first_name"), Some("identity.person.first_name"));
+        assert_eq!(
+            header_hint("first_name"),
+            Some("identity.person.first_name")
+        );
         assert_eq!(header_hint("last_name"), Some("identity.person.last_name"));
         assert_eq!(header_hint("surname"), Some("identity.person.last_name"));
     }
 
     #[test]
     fn test_header_hint_geo() {
-        assert_eq!(header_hint("latitude"), Some("geography.coordinate.latitude"));
+        assert_eq!(
+            header_hint("latitude"),
+            Some("geography.coordinate.latitude")
+        );
         assert_eq!(header_hint("lat"), Some("geography.coordinate.latitude"));
-        assert_eq!(header_hint("longitude"), Some("geography.coordinate.longitude"));
+        assert_eq!(
+            header_hint("longitude"),
+            Some("geography.coordinate.longitude")
+        );
         assert_eq!(header_hint("lng"), Some("geography.coordinate.longitude"));
         assert_eq!(header_hint("country"), Some("geography.location.country"));
         assert_eq!(header_hint("city"), Some("geography.location.city"));
@@ -1737,7 +1757,10 @@ mod tests {
     #[test]
     fn test_header_hint_date() {
         assert_eq!(header_hint("date"), Some("datetime.timestamp.iso_8601"));
-        assert_eq!(header_hint("created_date"), Some("datetime.timestamp.iso_8601"));
+        assert_eq!(
+            header_hint("created_date"),
+            Some("datetime.timestamp.iso_8601")
+        );
         assert_eq!(header_hint("year"), Some("datetime.component.year"));
         assert_eq!(header_hint("birth_date"), Some("datetime.date.iso_date"));
         assert_eq!(header_hint("dob"), Some("datetime.date.iso_date"));
@@ -1745,9 +1768,18 @@ mod tests {
 
     #[test]
     fn test_header_hint_numeric() {
-        assert_eq!(header_hint("price"), Some("representation.numeric.decimal_number"));
-        assert_eq!(header_hint("amount"), Some("representation.numeric.decimal_number"));
-        assert_eq!(header_hint("count"), Some("representation.numeric.integer_number"));
+        assert_eq!(
+            header_hint("price"),
+            Some("representation.numeric.decimal_number")
+        );
+        assert_eq!(
+            header_hint("amount"),
+            Some("representation.numeric.decimal_number")
+        );
+        assert_eq!(
+            header_hint("count"),
+            Some("representation.numeric.integer_number")
+        );
         assert_eq!(header_hint("id"), Some("representation.numeric.increment"));
     }
 
@@ -1763,11 +1795,33 @@ mod tests {
     fn test_header_hint_coverage() {
         // Verify at least 20 distinct column name patterns are covered
         let test_headers = vec![
-            "email", "phone", "zip", "postal", "name", "full_name",
-            "first_name", "last_name", "latitude", "longitude",
-            "country", "city", "state", "gender", "age", "url",
-            "ip", "uuid", "port", "date", "year", "password",
-            "price", "amount", "count", "address", "street",
+            "email",
+            "phone",
+            "zip",
+            "postal",
+            "name",
+            "full_name",
+            "first_name",
+            "last_name",
+            "latitude",
+            "longitude",
+            "country",
+            "city",
+            "state",
+            "gender",
+            "age",
+            "url",
+            "ip",
+            "uuid",
+            "port",
+            "date",
+            "year",
+            "password",
+            "price",
+            "amount",
+            "count",
+            "address",
+            "street",
         ];
         let matches: Vec<&str> = test_headers
             .iter()

@@ -96,18 +96,12 @@ fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::pa
         .collect();
     yaml_paths.sort();
 
-    code.push_str(&format!(
-        "\npub const TAXONOMY_YAMLS: &[&str] = &[\n"
-    ));
+    code.push_str("\npub const TAXONOMY_YAMLS: &[&str] = &[\n");
     for path in &yaml_paths {
         let canonical = path.canonicalize().unwrap();
-        code.push_str(&format!(
-            "    include_str!(\"{}\"),\n",
-            canonical.display()
-        ));
+        code.push_str(&format!("    include_str!(\"{}\"),\n", canonical.display()));
     }
     code.push_str("];\n");
 
-    fs::write(&dest, code)
-        .unwrap_or_else(|e| panic!("Failed to write {}: {}", dest.display(), e));
+    fs::write(&dest, code).unwrap_or_else(|e| panic!("Failed to write {}: {}", dest.display(), e));
 }

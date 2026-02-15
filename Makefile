@@ -8,6 +8,20 @@ EVAL_DIR       := eval/gittables
 GT_DIR         := $(HOME)/git-tables
 EVAL_OUTPUT    := $(GT_DIR)/eval_output
 
+# ─── CI (run locally before pushing) ─────────
+.PHONY: ci lint fmt clippy
+
+ci: fmt clippy test check
+	@echo "═══ All CI checks passed ═══"
+
+lint: fmt clippy
+
+fmt:
+	cargo fmt --all -- --check
+
+clippy:
+	cargo clippy -- -D warnings
+
 # ─── Build ────────────────────────────────────
 .PHONY: build build-release check test generate
 

@@ -382,9 +382,7 @@ impl CharClassifier {
     pub fn set_validation_patterns(&mut self, patterns: HashMap<String, String>) {
         let compiled: HashMap<String, Regex> = patterns
             .into_iter()
-            .filter_map(|(label, pattern)| {
-                Regex::new(&pattern).ok().map(|re| (label, re))
-            })
+            .filter_map(|(label, pattern)| Regex::new(&pattern).ok().map(|re| (label, re)))
             .collect();
         if !compiled.is_empty() {
             self.validation_patterns = Some(compiled);
@@ -1081,9 +1079,7 @@ mod pattern_validate_tests {
                 ("representation.text.word", 0.05),
             ],
         );
-        let patterns = make_patterns(vec![
-            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
-        ]);
+        let patterns = make_patterns(vec![("geography.transportation.iata_code", r"^[A-Z]{3}$")]);
 
         pattern_validate(&mut result, "SFO", &patterns);
         assert_eq!(result.label, "geography.transportation.iata_code");
@@ -1102,9 +1098,7 @@ mod pattern_validate_tests {
                 ("technology.internet.hostname", 0.05),
             ],
         );
-        let patterns = make_patterns(vec![
-            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
-        ]);
+        let patterns = make_patterns(vec![("geography.transportation.iata_code", r"^[A-Z]{3}$")]);
 
         pattern_validate(&mut result, "C85", &patterns);
         // Should fall back to "representation.text.word" (no pattern → accepted)
@@ -1123,9 +1117,7 @@ mod pattern_validate_tests {
                 ("geography.transportation.iata_code", 0.1),
             ],
         );
-        let patterns = make_patterns(vec![
-            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
-        ]);
+        let patterns = make_patterns(vec![("geography.transportation.iata_code", r"^[A-Z]{3}$")]);
 
         pattern_validate(&mut result, "hello", &patterns);
         assert_eq!(result.label, "representation.text.word");
@@ -1141,8 +1133,8 @@ mod pattern_validate_tests {
             0.6,
             vec![
                 ("geography.transportation.iata_code", 0.6),
-                ("technology.code.issn", 0.2),          // has pattern, will fail
-                ("representation.text.word", 0.1),       // no pattern → accepted
+                ("technology.code.issn", 0.2), // has pattern, will fail
+                ("representation.text.word", 0.1), // no pattern → accepted
             ],
         );
         let patterns = make_patterns(vec![
@@ -1173,7 +1165,10 @@ mod pattern_validate_tests {
         );
         let patterns = make_patterns(vec![
             ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
-            ("technology.cryptographic.hash", r"^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$"),
+            (
+                "technology.cryptographic.hash",
+                r"^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+            ),
             ("geography.address.postal_code", r"^\d{3,10}$"),
         ]);
 
@@ -1261,9 +1256,7 @@ mod pattern_validate_tests {
                 ("technology.internet.hostname", 0.05),
             ],
         );
-        let patterns = make_patterns(vec![
-            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
-        ]);
+        let patterns = make_patterns(vec![("geography.transportation.iata_code", r"^[A-Z]{3}$")]);
 
         pattern_validate(&mut result, "C85", &patterns);
         assert_ne!(result.label, "geography.transportation.iata_code");
