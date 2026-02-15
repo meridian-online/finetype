@@ -278,6 +278,20 @@ else
 fi
 rm -f "$TMPBIN2" "$TMPCSV"
 
+# Taxonomy command with embedded taxonomy (no labels/ dir)
+TMPBIN3=$(mktemp /tmp/finetype-smoke-bin3-XXXXXX)
+cp "$FINETYPE" "$TMPBIN3"
+chmod +x "$TMPBIN3"
+
+OUT=$("$TMPBIN3" taxonomy 2>/dev/null) || true
+if echo "$OUT" | grep -qi "Total labels"; then
+    pass "taxonomy works from /tmp without labels/ dir"
+else
+    ERR=$("$TMPBIN3" taxonomy 2>&1) || true
+    fail "taxonomy works from /tmp without labels/ dir" "got: $ERR"
+fi
+rm -f "$TMPBIN3"
+
 # ── Error Handling ────────────────────────────────────────────────────────────
 
 section "8. Error Handling"

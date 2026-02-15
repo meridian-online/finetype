@@ -99,6 +99,7 @@ enum Commands {
     },
 
     /// Train a model
+    #[command(hide = true)]
     Train {
         /// Training data file (NDJSON)
         #[arg(short, long)]
@@ -234,6 +235,7 @@ enum Commands {
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
+    #[command(hide = true)]
     EvalGittables {
         /// Directory containing GitTables benchmark data
         #[arg(short, long, default_value = "eval/gittables")]
@@ -253,6 +255,7 @@ enum Commands {
     },
 
     /// Evaluate model accuracy on a test set
+    #[command(hide = true)]
     Eval {
         /// Test data file (NDJSON with "text" and "classification" fields)
         #[arg(short, long)]
@@ -2440,9 +2443,24 @@ fn cmd_eval(
 
 /// Load taxonomy from a file or directory.
 fn load_taxonomy(path: &PathBuf) -> Result<Taxonomy> {
-    if path.is_dir() {
-        Ok(Taxonomy::from_directory(path)?)
+    if path.exists() {
+        if path.is_dir() {
+            Ok(Taxonomy::from_directory(path)?)
+        } else {
+            Ok(Taxonomy::from_file(path)?)
+        }
     } else {
-        Ok(Taxonomy::from_file(path)?)
+        // Fall back to embedded taxonomy (release binaries)
+        #[cfg(feature = "embed-models")]
+        {
+            Ok(Taxonomy::from_yamls(embedded::TAXONOMY_YAMLS)?)
+        }
+        #[cfg(not(feature = "embed-models"))]
+        {
+            anyhow::bail!(
+                "Taxonomy path {:?} not found. Build with `embed-models` feature for standalone use.",
+                path
+            )
+        }
     }
 }

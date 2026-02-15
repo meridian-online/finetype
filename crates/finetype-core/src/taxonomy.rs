@@ -209,6 +209,24 @@ impl Taxonomy {
         })
     }
 
+    /// Parse taxonomy from multiple YAML strings (e.g. embedded at compile time).
+    pub fn from_yamls(yamls: &[&str]) -> Result<Self, TaxonomyError> {
+        let mut all_definitions = HashMap::new();
+
+        for yaml in yamls {
+            let defs: HashMap<String, Definition> = serde_yaml::from_str(yaml)?;
+            all_definitions.extend(defs);
+        }
+
+        let mut labels: Vec<String> = all_definitions.keys().cloned().collect();
+        labels.sort();
+
+        Ok(Taxonomy {
+            definitions: all_definitions,
+            labels,
+        })
+    }
+
     /// Get a definition by its full key (e.g., "datetime.timestamp.iso_8601")
     pub fn get(&self, key: &str) -> Option<&Definition> {
         self.definitions.get(key)
