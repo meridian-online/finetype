@@ -1490,14 +1490,7 @@ impl Generator {
             }
 
             // ── address (5 types) ────────────────────────────────────────
-            ("address", "full_address") => {
-                let num = self.rng.gen_range(1..9999);
-                let streets = locale_data::street_names(self.current_locale());
-                let cities = locale_data::cities(self.current_locale());
-                let street = streets[self.rng.gen_range(0..streets.len())];
-                let city = cities[self.rng.gen_range(0..cities.len())];
-                Ok(format!("{} {}, {}", num, street, city))
-            }
+            ("address", "full_address") => self.gen_full_address(),
             ("address", "street_number") => {
                 if self.rng.gen_bool(0.9) {
                     Ok(self.rng.gen_range(1..9999).to_string())
@@ -3113,6 +3106,153 @@ impl Generator {
                         })
                     }
                 }
+            }
+        }
+    }
+
+    /// Generate a full address with locale-specific formatting.
+    /// Address format order varies by locale:
+    /// - EN: {num} {street}, {city}, {state} {zip}
+    /// - DE/NL/PL: {street} {num}, {plz} {city}
+    /// - FR/ES/IT: {num} {street}, {code} {city}
+    /// - JA/ZH/KO: large→small (prefecture/province → district → street → number)
+    /// - RU: {city}, {street}, д. {num}
+    fn gen_full_address(&mut self) -> Result<String, GeneratorError> {
+        let locale = self.current_locale().to_string();
+        let streets = locale_data::street_names(&locale);
+        let cities = locale_data::cities(&locale);
+        let regions = locale_data::states_or_regions(&locale);
+        let street = streets[self.rng.gen_range(0..streets.len())];
+        let city = cities[self.rng.gen_range(0..cities.len())];
+        let num = self.rng.gen_range(1..999);
+
+        match locale.as_str() {
+            "EN_US" | "EN" => {
+                let state = regions[self.rng.gen_range(0..regions.len())];
+                let zip = format!("{:05}", self.rng.gen_range(10000..99999));
+                if self.rng.gen_bool(0.3) {
+                    // With apt/suite
+                    let apt = self.rng.gen_range(1..999);
+                    Ok(format!("{} {}, Apt {}, {}, {} {}", num, street, apt, city, state, zip))
+                } else {
+                    Ok(format!("{} {}, {}, {} {}", num, street, city, state, zip))
+                }
+            }
+            "EN_CA" => {
+                let prov = regions[self.rng.gen_range(0..regions.len())];
+                let pc = format!(
+                    "{}{}{} {}{}{}",
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    self.rng.gen_range(1..9),
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    self.rng.gen_range(1..9),
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    self.rng.gen_range(1..9),
+                );
+                Ok(format!("{} {}, {}, {} {}", num, street, city, prov, pc))
+            }
+            "EN_GB" => {
+                let pc = format!(
+                    "{}{}{} {}{}{}",
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    self.rng.gen_range(1..9),
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    self.rng.gen_range(1..9),
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                );
+                Ok(format!("{} {}, {}, {}", num, street, city, pc))
+            }
+            "EN_AU" => {
+                let state = regions[self.rng.gen_range(0..regions.len())];
+                let pc = format!("{:04}", self.rng.gen_range(2000..9999));
+                Ok(format!("{} {}, {} {} {}", num, street, city, state, pc))
+            }
+            "DE" => {
+                // German: Straße Hausnummer, PLZ Stadt
+                let plz = format!("{:05}", self.rng.gen_range(10000..99999));
+                Ok(format!("{} {}, {} {}", street, num, plz, city))
+            }
+            "FR" => {
+                // French: numéro rue, code postal ville
+                let cp = format!("{:05}", self.rng.gen_range(10000..99999));
+                Ok(format!("{} {}, {} {}", num, street, cp, city))
+            }
+            "ES" => {
+                // Spanish: Calle nombre número, CP ciudad
+                let cp = format!("{:05}", self.rng.gen_range(10000..52999));
+                Ok(format!("{} {}, {} {}", street, num, cp, city))
+            }
+            "IT" => {
+                // Italian: Via nome numero, CAP città
+                let cap = format!("{:05}", self.rng.gen_range(10000..99999));
+                Ok(format!("{} {}, {} {}", street, num, cap, city))
+            }
+            "NL" => {
+                // Dutch: Straat huisnummer, postcode stad
+                let pc = format!(
+                    "{:04} {}{}",
+                    self.rng.gen_range(1000..9999),
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                    (b'A' + self.rng.gen_range(0..26)) as char,
+                );
+                Ok(format!("{} {}, {} {}", street, num, pc, city))
+            }
+            "PL" => {
+                // Polish: ul. nazwa numer, kod miasto
+                let code = format!(
+                    "{:02}-{:03}",
+                    self.rng.gen_range(10..99),
+                    self.rng.gen_range(100..999)
+                );
+                Ok(format!("{} {}, {} {}", street, num, code, city))
+            }
+            "RU" => {
+                // Russian: город, улица, д. номер
+                let idx = format!("{:06}", self.rng.gen_range(100000..999999));
+                Ok(format!("{}, {}, д. {}, {}", city, street, num, idx))
+            }
+            "JA" => {
+                // Japanese: large→small (prefecture → city → district → chome-ban-go)
+                let prefectures = locale_data::states_or_regions("JA");
+                let districts = locale_data::districts("JA");
+                let pref = prefectures[self.rng.gen_range(0..prefectures.len())];
+                let dist = districts[self.rng.gen_range(0..districts.len())];
+                let chome = self.rng.gen_range(1..9);
+                let ban = self.rng.gen_range(1..30);
+                let go = self.rng.gen_range(1..20);
+                let pc = format!(
+                    "{:03}-{:04}",
+                    self.rng.gen_range(100..999),
+                    self.rng.gen_range(1000..9999)
+                );
+                Ok(format!("〒{} {}{}{}-{}-{}", pc, pref, dist, chome, ban, go))
+            }
+            "ZH" => {
+                // Chinese: large→small (province → city → district → street → number)
+                let provinces = locale_data::states_or_regions("ZH");
+                let districts = locale_data::districts("ZH");
+                let prov = provinces[self.rng.gen_range(0..provinces.len())];
+                let dist = districts[self.rng.gen_range(0..districts.len())];
+                Ok(format!("{}{}{}{}{}号", prov, city, dist, street, num))
+            }
+            "KO" => {
+                // Korean: city → district → street → number
+                let districts = locale_data::districts("KO");
+                let dist = districts[self.rng.gen_range(0..districts.len())];
+                let pc = format!("{:05}", self.rng.gen_range(10000..99999));
+                Ok(format!("({}) {} {} {} {}", pc, city, dist, street, num))
+            }
+            "AR" => {
+                // Arabic: street number, city
+                Ok(format!("{} {}، {}", street, num, city))
+            }
+            _ => {
+                // Fallback US format
+                let state = locale_data::states_or_regions("EN");
+                let st = state[self.rng.gen_range(0..state.len())];
+                let zip = format!("{:05}", self.rng.gen_range(10000..99999));
+                Ok(format!("{} {}, {}, {} {}", num, street, city, st, zip))
             }
         }
     }

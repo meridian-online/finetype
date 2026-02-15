@@ -2152,6 +2152,87 @@ pub fn calling_codes(locale: &str) -> &'static [&'static str] {
     }
 }
 
+/// Get state, province, or region names for address generation.
+pub fn states_or_regions(locale: &str) -> &'static [&'static str] {
+    match locale {
+        "EN_US" | "EN" => &[
+            "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+        ],
+        "EN_CA" => &[
+            "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT",
+        ],
+        "EN_AU" => &["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"],
+        "EN_GB" => &[
+            "London", "Manchester", "Birmingham", "Leeds", "Glasgow",
+            "Edinburgh", "Bristol", "Liverpool", "Cardiff", "Belfast",
+        ],
+        "DE" => &[
+            "Bayern", "Baden-Württemberg", "Nordrhein-Westfalen", "Hessen",
+            "Sachsen", "Berlin", "Hamburg", "Niedersachsen", "Thüringen",
+            "Brandenburg", "Schleswig-Holstein", "Sachsen-Anhalt",
+        ],
+        "FR" => &[
+            "Île-de-France", "Provence-Alpes-Côte d'Azur", "Nouvelle-Aquitaine",
+            "Occitanie", "Auvergne-Rhône-Alpes", "Hauts-de-France",
+            "Grand Est", "Bretagne", "Normandie", "Pays de la Loire",
+        ],
+        "ES" => &[
+            "Madrid", "Cataluña", "Andalucía", "Valencia", "Galicia",
+            "País Vasco", "Castilla y León", "Canarias", "Aragón", "Murcia",
+        ],
+        "IT" => &[
+            "Lombardia", "Lazio", "Campania", "Sicilia", "Veneto",
+            "Piemonte", "Emilia-Romagna", "Toscana", "Puglia", "Calabria",
+        ],
+        "JA" => &[
+            "東京都", "大阪府", "京都府", "北海道", "愛知県",
+            "福岡県", "神奈川県", "埼玉県", "千葉県", "兵庫県",
+        ],
+        "ZH" => &[
+            "北京市", "上海市", "广东省", "浙江省", "江苏省",
+            "四川省", "湖北省", "湖南省", "福建省", "山东省",
+        ],
+        "KO" => &[
+            "서울특별시", "부산광역시", "인천광역시", "대구광역시",
+            "대전광역시", "광주광역시", "울산광역시", "경기도",
+            "강원도", "충청북도", "충청남도", "전라북도",
+        ],
+        "RU" => &[
+            "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург",
+            "Казань", "Нижний Новгород", "Самара", "Челябинск",
+            "Ростов-на-Дону", "Красноярск",
+        ],
+        "AR" => &[
+            "الرياض", "جدة", "مكة المكرمة", "المدينة المنورة",
+            "الدمام", "أبوظبي", "دبي", "القاهرة",
+        ],
+        _ => states_or_regions("EN"),
+    }
+}
+
+/// Get district/neighborhood names for East Asian address generation.
+pub fn districts(locale: &str) -> &'static [&'static str] {
+    match locale {
+        "JA" => &[
+            "新宿区", "渋谷区", "港区", "千代田区", "中央区",
+            "豊島区", "文京区", "台東区", "品川区", "目黒区",
+        ],
+        "ZH" => &[
+            "朝阳区", "海淀区", "东城区", "西城区", "浦东新区",
+            "黄浦区", "徐汇区", "天河区", "福田区", "南山区",
+        ],
+        "KO" => &[
+            "강남구", "서초구", "송파구", "마포구", "용산구",
+            "종로구", "중구", "영등포구", "성동구", "광진구",
+        ],
+        _ => &[],
+    }
+}
+
 /// Get the base locale for regional variants (e.g., EN_AU -> EN for name data).
 pub fn base_locale(locale: &str) -> &str {
     if locale.starts_with("EN_") {
