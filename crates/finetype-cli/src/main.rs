@@ -630,17 +630,20 @@ fn cmd_infer(
 
 /// Load a CharClassifier: try the model directory first, then fall back to
 /// the embedded model if the path doesn't exist (release binaries).
+///
+/// Automatically loads validation patterns from the taxonomy to enable
+/// pattern-gated post-processing (NNFT-064).
 fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifier> {
-    if model.exists() {
-        Ok(finetype_model::CharClassifier::load(model)?)
+    let mut classifier = if model.exists() {
+        finetype_model::CharClassifier::load(model)?
     } else {
         #[cfg(feature = "embed-models")]
         {
-            Ok(finetype_model::CharClassifier::from_bytes(
+            finetype_model::CharClassifier::from_bytes(
                 embedded::FLAT_WEIGHTS,
                 embedded::FLAT_LABELS,
                 embedded::FLAT_CONFIG,
-            )?)
+            )?
         }
         #[cfg(not(feature = "embed-models"))]
         {
@@ -649,7 +652,20 @@ fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifie
                 model
             )
         }
+    };
+
+    // Load validation patterns from taxonomy for pattern-gated post-processing.
+    // This validates model predictions against taxonomy regex patterns and falls
+    // back to next-best predictions on mismatch (e.g., "C85" ≠ iata_code pattern).
+    let taxonomy_path = PathBuf::from("labels");
+    if let Ok(taxonomy) = load_taxonomy(&taxonomy_path) {
+        let patterns = finetype_model::extract_validation_patterns(&taxonomy);
+        if !patterns.is_empty() {
+            classifier.set_validation_patterns(patterns);
+        }
     }
+
+    Ok(classifier)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

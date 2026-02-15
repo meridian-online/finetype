@@ -16,7 +16,7 @@ pub mod training;
 pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab};
 pub use char_training::{CharTrainer, CharTrainingConfig};
 pub use column::{ColumnClassifier, ColumnConfig, ColumnResult};
-pub use inference::{CharClassifier, ClassificationResult, Classifier};
+pub use inference::{extract_validation_patterns, CharClassifier, ClassificationResult, Classifier};
 pub use model::{TextClassifier, TextClassifierConfig};
 pub use tiered::TieredClassifier;
 pub use tiered_training::{TieredTrainer, TieredTrainingConfig, TieredTrainingReport};

@@ -5,6 +5,7 @@ use crate::model::{TextClassifier, TextClassifierConfig};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use finetype_core::{Taxonomy, Tokenizer};
+use regex::Regex;
 use std::collections::HashMap;
 use std::path::Path;
 use thiserror::Error;
@@ -205,6 +206,10 @@ pub struct CharClassifier {
     index_to_label: HashMap<usize, String>,
     device: Device,
     max_seq_length: usize,
+    /// Compiled validation patterns from taxonomy, keyed by type label.
+    /// When set, predictions are validated against these patterns and
+    /// fall back to next-best predictions on mismatch.
+    validation_patterns: Option<HashMap<String, Regex>>,
 }
 
 impl CharClassifier {
@@ -272,6 +277,7 @@ impl CharClassifier {
             index_to_label,
             device,
             max_seq_length,
+            validation_patterns: None,
         })
     }
 
@@ -364,7 +370,30 @@ impl CharClassifier {
             index_to_label,
             device,
             max_seq_length,
+            validation_patterns: None,
         })
+    }
+
+    /// Set validation patterns from taxonomy definitions.
+    ///
+    /// Compiles regex patterns from the taxonomy's validation fields. After this,
+    /// `classify_batch()` will validate predictions against patterns and fall back
+    /// to next-best predictions when the input doesn't match.
+    pub fn set_validation_patterns(&mut self, patterns: HashMap<String, String>) {
+        let compiled: HashMap<String, Regex> = patterns
+            .into_iter()
+            .filter_map(|(label, pattern)| {
+                Regex::new(&pattern).ok().map(|re| (label, re))
+            })
+            .collect();
+        if !compiled.is_empty() {
+            self.validation_patterns = Some(compiled);
+        }
+    }
+
+    /// Get the validation patterns (if set).
+    pub fn validation_patterns(&self) -> Option<&HashMap<String, Regex>> {
+        self.validation_patterns.as_ref()
     }
 
     /// Classify a single text input.
@@ -433,6 +462,15 @@ impl CharClassifier {
         // Post-process: apply format-based corrections for known model confusions
         for (result, text) in results.iter_mut().zip(texts.iter()) {
             post_process(result, text);
+        }
+
+        // Pattern-validate: check predictions against taxonomy validation patterns.
+        // If the input doesn't match the predicted type's pattern, fall back to
+        // the next-best prediction that either has no pattern or matches.
+        if let Some(ref patterns) = self.validation_patterns {
+            for (result, text) in results.iter_mut().zip(texts.iter()) {
+                pattern_validate(result, text.trim(), patterns);
+            }
         }
 
         Ok(results)
@@ -601,6 +639,88 @@ fn post_process(result: &mut ClassificationResult, text: &str) {
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATTERN VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Validate a prediction against the taxonomy's validation pattern.
+///
+/// If the predicted type has a validation pattern and the input text doesn't
+/// match it, fall back to the next-best prediction (by confidence) that either
+/// has no pattern or whose pattern matches the input.
+///
+/// This runs AFTER post-processing rules, which handle known confusion pairs.
+/// Pattern validation is a general-purpose safety net that catches mismatches
+/// the model can't see (e.g., "C85" predicted as iata_code but failing ^[A-Z]{3}$).
+///
+/// Only falls back through the top 5 predictions to avoid expensive regex checks
+/// on low-probability candidates.
+fn pattern_validate(
+    result: &mut ClassificationResult,
+    text: &str,
+    patterns: &HashMap<String, Regex>,
+) {
+    // If the current prediction has no pattern, nothing to validate
+    let current_pattern = match patterns.get(&result.label) {
+        Some(pat) => pat,
+        None => return,
+    };
+
+    // If the input matches the current prediction's pattern, keep it
+    if current_pattern.is_match(text) {
+        return;
+    }
+
+    // Input doesn't match the predicted type's pattern — find a fallback.
+    // Sort all_scores by confidence descending and try the top candidates.
+    let mut candidates: Vec<(String, f32)> = result.all_scores.clone();
+    candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (label, score) in candidates.iter().take(5) {
+        // Skip the current (rejected) prediction
+        if *label == result.label {
+            continue;
+        }
+        // Accept if: no pattern for this type, OR input matches the pattern
+        match patterns.get(label.as_str()) {
+            None => {
+                // No pattern constraint — accept this fallback
+                result.label = label.clone();
+                result.confidence = *score;
+                return;
+            }
+            Some(pat) if pat.is_match(text) => {
+                // Pattern matches — accept this fallback
+                result.label = label.clone();
+                result.confidence = *score;
+                return;
+            }
+            _ => {
+                // Pattern doesn't match — try next candidate
+                continue;
+            }
+        }
+    }
+
+    // No valid fallback found — keep original prediction (better than nothing)
+}
+
+/// Extract validation patterns from a taxonomy as a label → pattern string map.
+///
+/// This is a convenience function for building the patterns map to pass to
+/// `CharClassifier::set_validation_patterns()`.
+pub fn extract_validation_patterns(taxonomy: &Taxonomy) -> HashMap<String, String> {
+    taxonomy
+        .definitions()
+        .filter_map(|(label, def)| {
+            def.validation
+                .as_ref()
+                .and_then(|v| v.pattern.as_ref())
+                .map(|p| (label.clone(), p.clone()))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -920,5 +1040,234 @@ mod post_process_tests {
         let mut result = make_result("identity.person.username");
         post_process(&mut result, "user@localhost");
         assert_eq!(result.label, "identity.person.username");
+    }
+}
+
+#[cfg(test)]
+mod pattern_validate_tests {
+    use super::*;
+
+    /// Helper to build a ClassificationResult with all_scores for fallback testing.
+    fn make_result_with_scores(
+        label: &str,
+        confidence: f32,
+        scores: Vec<(&str, f32)>,
+    ) -> ClassificationResult {
+        ClassificationResult {
+            label: label.to_string(),
+            confidence,
+            all_scores: scores
+                .into_iter()
+                .map(|(l, s)| (l.to_string(), s))
+                .collect(),
+        }
+    }
+
+    fn make_patterns(pairs: Vec<(&str, &str)>) -> HashMap<String, Regex> {
+        pairs
+            .into_iter()
+            .map(|(label, pat)| (label.to_string(), Regex::new(pat).unwrap()))
+            .collect()
+    }
+
+    #[test]
+    fn test_pattern_match_keeps_prediction() {
+        // Input "SFO" matches IATA pattern ^[A-Z]{3}$ → keep prediction
+        let mut result = make_result_with_scores(
+            "geography.transportation.iata_code",
+            0.9,
+            vec![
+                ("geography.transportation.iata_code", 0.9),
+                ("representation.text.word", 0.05),
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
+        ]);
+
+        pattern_validate(&mut result, "SFO", &patterns);
+        assert_eq!(result.label, "geography.transportation.iata_code");
+        assert_eq!(result.confidence, 0.9);
+    }
+
+    #[test]
+    fn test_pattern_mismatch_triggers_fallback() {
+        // Input "C85" does NOT match IATA pattern ^[A-Z]{3}$ → fall back
+        let mut result = make_result_with_scores(
+            "geography.transportation.iata_code",
+            0.7,
+            vec![
+                ("geography.transportation.iata_code", 0.7),
+                ("representation.text.word", 0.15),
+                ("technology.internet.hostname", 0.05),
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
+        ]);
+
+        pattern_validate(&mut result, "C85", &patterns);
+        // Should fall back to "representation.text.word" (no pattern → accepted)
+        assert_eq!(result.label, "representation.text.word");
+        assert_eq!(result.confidence, 0.15);
+    }
+
+    #[test]
+    fn test_no_pattern_for_predicted_type_keeps_prediction() {
+        // Predicted type has no validation pattern → nothing to validate, keep it
+        let mut result = make_result_with_scores(
+            "representation.text.word",
+            0.8,
+            vec![
+                ("representation.text.word", 0.8),
+                ("geography.transportation.iata_code", 0.1),
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
+        ]);
+
+        pattern_validate(&mut result, "hello", &patterns);
+        assert_eq!(result.label, "representation.text.word");
+        assert_eq!(result.confidence, 0.8);
+    }
+
+    #[test]
+    fn test_fallback_skips_candidates_that_also_fail_pattern() {
+        // Input "12AB" fails predicted type AND the first fallback's pattern,
+        // but matches a later fallback's pattern.
+        let mut result = make_result_with_scores(
+            "geography.transportation.iata_code",
+            0.6,
+            vec![
+                ("geography.transportation.iata_code", 0.6),
+                ("technology.code.issn", 0.2),          // has pattern, will fail
+                ("representation.text.word", 0.1),       // no pattern → accepted
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
+            ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
+        ]);
+
+        pattern_validate(&mut result, "12AB", &patterns);
+        // IATA fails (not 3 uppercase letters), ISSN fails (not DDDD-DDDX),
+        // word has no pattern → accepted
+        assert_eq!(result.label, "representation.text.word");
+        assert_eq!(result.confidence, 0.1);
+    }
+
+    #[test]
+    fn test_fallback_to_candidate_whose_pattern_matches() {
+        // Input "12345678" predicted as ISSN (fails DDDD-DDDX pattern).
+        // Fallback 1 (hash) has a pattern that also fails (wrong length).
+        // Fallback 2 (postal_code) has a pattern that matches.
+        let mut result = make_result_with_scores(
+            "technology.code.issn",
+            0.5,
+            vec![
+                ("technology.code.issn", 0.5),
+                ("technology.cryptographic.hash", 0.3),
+                ("geography.address.postal_code", 0.15),
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
+            ("technology.cryptographic.hash", r"^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$"),
+            ("geography.address.postal_code", r"^\d{3,10}$"),
+        ]);
+
+        pattern_validate(&mut result, "12345678", &patterns);
+        // ISSN fails (no hyphen), hash fails (8 chars), postal_code matches
+        assert_eq!(result.label, "geography.address.postal_code");
+        assert_eq!(result.confidence, 0.15);
+    }
+
+    #[test]
+    fn test_no_valid_fallback_keeps_original() {
+        // All candidates have patterns and none match → keep original
+        let mut result = make_result_with_scores(
+            "geography.transportation.iata_code",
+            0.6,
+            vec![
+                ("geography.transportation.iata_code", 0.6),
+                ("technology.code.issn", 0.3),
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
+            ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
+        ]);
+
+        pattern_validate(&mut result, "ZZZZ", &patterns);
+        // IATA fails (4 chars), ISSN fails → keep original
+        assert_eq!(result.label, "geography.transportation.iata_code");
+        assert_eq!(result.confidence, 0.6);
+    }
+
+    #[test]
+    fn test_empty_patterns_map_keeps_prediction() {
+        let mut result = make_result_with_scores(
+            "geography.transportation.iata_code",
+            0.9,
+            vec![("geography.transportation.iata_code", 0.9)],
+        );
+        let patterns: HashMap<String, Regex> = HashMap::new();
+
+        pattern_validate(&mut result, "whatever", &patterns);
+        assert_eq!(result.label, "geography.transportation.iata_code");
+    }
+
+    #[test]
+    fn test_extract_validation_patterns_from_taxonomy() {
+        // Test the extract helper with a real taxonomy
+        use finetype_core::Taxonomy;
+
+        // Try loading from labels/ directory
+        let labels_path = std::path::PathBuf::from("../../labels");
+        if labels_path.exists() {
+            let taxonomy = Taxonomy::from_directory(&labels_path).unwrap();
+            let patterns = extract_validation_patterns(&taxonomy);
+
+            // We know at least iata_code and ip_v4 have patterns
+            assert!(
+                patterns.len() > 50,
+                "Expected >50 validation patterns, got {}",
+                patterns.len()
+            );
+
+            // Spot-check a few known patterns
+            assert!(
+                patterns.contains_key("geography.transportation.iata_code"),
+                "iata_code should have a validation pattern"
+            );
+            assert!(
+                patterns.contains_key("technology.internet.ip_v4"),
+                "ip_v4 should have a validation pattern"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cabin_value_rejected_as_iata() {
+        // Real-world scenario: Titanic "Cabin" values like "C85" predicted as iata_code.
+        // Pattern ^[A-Z]{3}$ rejects "C85" (only 3 chars but includes digit).
+        let mut result = make_result_with_scores(
+            "geography.transportation.iata_code",
+            0.65,
+            vec![
+                ("geography.transportation.iata_code", 0.65),
+                ("representation.text.word", 0.2),
+                ("technology.internet.hostname", 0.05),
+            ],
+        );
+        let patterns = make_patterns(vec![
+            ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
+        ]);
+
+        pattern_validate(&mut result, "C85", &patterns);
+        assert_ne!(result.label, "geography.transportation.iata_code");
+        // Should fall back to word (no pattern constraint)
+        assert_eq!(result.label, "representation.text.word");
     }
 }
