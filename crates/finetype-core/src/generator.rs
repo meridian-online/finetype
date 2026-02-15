@@ -1370,6 +1370,80 @@ impl Generator {
                 Ok(unis[self.rng.gen_range(0..unis.len())].to_string())
             }
 
+            // ── medical (3 types) ──────────────────────────────────────
+            ("medical", "npi") => {
+                // NPI: 10 digits starting with 1 or 2, with Luhn check digit
+                // Generate first 9 digits (prefix + 8 random)
+                let prefix: u64 = if self.rng.gen_bool(0.7) { 1 } else { 2 };
+                let middle: u64 = self.rng.gen_range(0..100_000_000);
+                let partial = prefix * 100_000_000 + middle; // 9 digits
+                // Calculate Luhn check digit: prepend 80840, append 0 as placeholder
+                let test_str = format!("80840{}0", partial);
+                let digits: Vec<u32> = test_str
+                    .chars()
+                    .map(|c| c.to_digit(10).unwrap())
+                    .collect();
+                let mut sum: u32 = 0;
+                for (i, &d) in digits.iter().rev().enumerate() {
+                    if i % 2 == 0 {
+                        let doubled = d * 2;
+                        sum += if doubled > 9 { doubled - 9 } else { doubled };
+                    } else {
+                        sum += d;
+                    }
+                }
+                let check = (10 - (sum % 10)) % 10;
+                Ok(format!("{}{}", partial, check))
+            }
+            ("medical", "dea_number") => {
+                // DEA: 2 letters + 7 digits with check digit
+                let reg_types = ['A', 'B', 'F', 'M'];
+                let first = reg_types[self.rng.gen_range(0..reg_types.len())];
+                let second = (b'A' + self.rng.gen_range(0..26u8)) as char;
+                // Generate 6 digits for positions 1-6
+                let d: Vec<u32> = (0..6).map(|_| self.rng.gen_range(0..10u32)).collect();
+                // Check digit: (d1+d3+d5) + 2*(d2+d4+d6), last digit of sum
+                let odd_sum = d[0] + d[2] + d[4];
+                let even_sum = d[1] + d[3] + d[5];
+                let check = (odd_sum + 2 * even_sum) % 10;
+                Ok(format!(
+                    "{}{}{}{}{}{}{}{}{}",
+                    first, second, d[0], d[1], d[2], d[3], d[4], d[5], check
+                ))
+            }
+            ("medical", "ndc") => {
+                // NDC: 3 formats (4-4-2, 5-3-2, 5-4-1)
+                let format_choice = self.rng.gen_range(0..4);
+                match format_choice {
+                    0 => {
+                        // 4-4-2
+                        let a = self.rng.gen_range(0..10000u32);
+                        let b = self.rng.gen_range(0..10000u32);
+                        let c = self.rng.gen_range(0..100u32);
+                        Ok(format!("{:04}-{:04}-{:02}", a, b, c))
+                    }
+                    1 => {
+                        // 5-3-2
+                        let a = self.rng.gen_range(0..100000u32);
+                        let b = self.rng.gen_range(0..1000u32);
+                        let c = self.rng.gen_range(0..100u32);
+                        Ok(format!("{:05}-{:03}-{:02}", a, b, c))
+                    }
+                    2 => {
+                        // 5-4-1
+                        let a = self.rng.gen_range(0..100000u32);
+                        let b = self.rng.gen_range(0..10000u32);
+                        let c = self.rng.gen_range(0..10u32);
+                        Ok(format!("{:05}-{:04}-{}", a, b, c))
+                    }
+                    _ => {
+                        // 11-digit no dashes
+                        let n: u64 = self.rng.gen_range(0..100_000_000_000u64);
+                        Ok(format!("{:011}", n))
+                    }
+                }
+            }
+
             _ => Err(GeneratorError::NotImplemented(format!(
                 "identity.{}.{}",
                 category, type_name
@@ -1509,6 +1583,30 @@ impl Generator {
                 }
             }
             ("numeric", "increment") => Ok(self.rng.gen_range(1..100000).to_string()),
+            ("numeric", "si_number") => {
+                let suffixes = ['K', 'k', 'M', 'm', 'B', 'b', 'T', 't'];
+                let suffix = suffixes[self.rng.gen_range(0..suffixes.len())];
+                let prefixes = ["", "$", "€", "£", "+", "-"];
+                let prefix = if self.rng.gen_bool(0.3) {
+                    prefixes[self.rng.gen_range(0..prefixes.len())]
+                } else {
+                    ""
+                };
+                let value: f64 = match suffix.to_ascii_uppercase() {
+                    'K' => self.rng.gen_range(1.0..999.9),
+                    'M' => self.rng.gen_range(1.0..999.9),
+                    'B' => self.rng.gen_range(1.0..99.9),
+                    'T' => self.rng.gen_range(1.0..9.9),
+                    _ => self.rng.gen_range(1.0..999.9),
+                };
+                // Choose precision: 0 (whole), 1, or 2 decimal places
+                let precision = self.rng.gen_range(0..3);
+                if precision == 0 {
+                    Ok(format!("{}{}{}", prefix, value as u64, suffix))
+                } else {
+                    Ok(format!("{}{:.prec$}{}", prefix, value, suffix, prec = precision))
+                }
+            }
 
             // ── text (5 types) ───────────────────────────────────────────
             ("text", "plain_text") => {

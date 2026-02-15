@@ -1039,3 +1039,103 @@ identity.academic.university:
   references: null
   notes: >
     v1 migration: Was person.university marked broad_words. No strict validation.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: medical
+#
+# Healthcare and medical identifier types.
+# ═════════════════════════════════════════════════════════════════════
+
+identity.medical.npi:
+  title: "NPI (National Provider Identifier)"
+  description: >
+    10-digit numeric identifier for US healthcare providers, issued by CMS.
+    Includes a Luhn check digit as the 10th digit. Required for HIPAA
+    transactions. Format: exactly 10 digits starting with 1 or 2.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[12]\\d{9}$"
+    minLength: 10
+    maxLength: 10
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [national_provider_identifier, provider_id]
+  samples:
+    - "1234567893"
+    - "1003000126"
+    - "1992789456"
+  references: null
+  notes: >
+    NPI is a 10-digit identifier where the prefix 80840 is prepended
+    for Luhn check digit calculation per the CMS algorithm.
+
+identity.medical.dea_number:
+  title: "DEA Number"
+  description: >
+    Drug Enforcement Administration registration number for US
+    prescribers. Format: 2 letters followed by 7 digits. First letter
+    indicates registrant type (A/B/F/M for practitioners, P/R for
+    distributors). Check digit is last digit, computed via weighted
+    sum of odd and even position digits.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[ABFMPRabfmpr][A-Za-z]\\d{7}$"
+    minLength: 9
+    maxLength: 9
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [dea, dea_registration]
+  samples:
+    - "AB1234563"
+    - "FA5678901"
+    - "BJ3456782"
+  references: null
+  notes: >
+    DEA check digit algorithm: sum odd-position digits (1,3,5),
+    sum even-position digits (2,4,6) and multiply by 2, add both
+    sums, last digit of total is the check digit (position 7).
+
+identity.medical.ndc:
+  title: "NDC (National Drug Code)"
+  description: >
+    10-11 digit identifier for drug products in the US, assigned by
+    the FDA. Three segments: labeler code, product code, package code.
+    Common formats with dashes: 4-4-2, 5-3-2, or 5-4-1 (totaling
+    10 digits). May also appear as 11 digits with zero-padded segments.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{4}-\\d{2}$|^\\d{5}-\\d{3}-\\d{2}$|^\\d{5}-\\d{4}-\\d{1}$|^\\d{11}$"
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [national_drug_code, drug_code]
+  samples:
+    - "0002-1433-80"
+    - "12345-678-90"
+    - "12345-6789-0"
+    - "00021433801"
+  references: null
+  notes: >
+    NDC formats vary by segment width. The FDA accepts multiple formats.
+    Transformation preserves the string since the dash-separated format
+    carries structural meaning.

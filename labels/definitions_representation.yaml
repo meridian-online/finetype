@@ -173,6 +173,49 @@ representation.numeric.increment:
     auto-incrementing primary keys or row numbers. Difficult to distinguish from
     regular integers without column context.
 
+representation.numeric.si_number:
+  title: "SI-Prefix Number"
+  description: >
+    Human-readable number with SI/business notation suffix indicating
+    magnitude. Common in dashboards, reports, and financial summaries.
+    K=thousands, M=millions, B=billions, T=trillions. May include
+    optional currency prefix ($, €, £) or sign (+/-).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DOUBLE
+  format_string: null
+  transform: >
+    CASE
+      WHEN regexp_extract(regexp_replace({col}, '^[\\$€£+-]', ''), '[KkMmBbTt]$') IN ('K','k')
+        THEN CAST(regexp_replace(regexp_replace({col}, '^[\\$€£+-]', ''), '[Kk]$', '') AS DOUBLE) * 1000
+      WHEN regexp_extract(regexp_replace({col}, '^[\\$€£+-]', ''), '[KkMmBbTt]$') IN ('M','m')
+        THEN CAST(regexp_replace(regexp_replace({col}, '^[\\$€£+-]', ''), '[Mm]$', '') AS DOUBLE) * 1000000
+      WHEN regexp_extract(regexp_replace({col}, '^[\\$€£+-]', ''), '[KkMmBbTt]$') IN ('B','b')
+        THEN CAST(regexp_replace(regexp_replace({col}, '^[\\$€£+-]', ''), '[Bb]$', '') AS DOUBLE) * 1000000000
+      WHEN regexp_extract(regexp_replace({col}, '^[\\$€£+-]', ''), '[KkMmBbTt]$') IN ('T','t')
+        THEN CAST(regexp_replace(regexp_replace({col}, '^[\\$€£+-]', ''), '[Tt]$', '') AS DOUBLE) * 1000000000000
+    END
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[\\$€£+-]?\\d+\\.?\\d*[KkMmBbTt]$"
+  tier: [DOUBLE, numeric]
+  release_priority: 3
+  aliases: [business_notation, human_readable_number, abbreviated_number]
+  samples:
+    - "12.2K"
+    - "1.5M"
+    - "2.3B"
+    - "$500K"
+    - "-1.2M"
+  references: null
+  notes: >
+    Inspired by python-ballpark library "business notation." Extremely common
+    in web dashboards, financial reports, and social media metrics (e.g.,
+    "1.2M followers"). The pattern requires a trailing suffix letter to
+    distinguish from plain numbers.
+
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: text
 #
