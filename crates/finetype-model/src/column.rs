@@ -385,10 +385,14 @@ fn disambiguate_numeric(
     };
 
     // Port detection: 0-65535, common ports cluster
+    // Require ≥30% of values to match common ports (not just "any").
+    // This prevents false positives on age/count columns where a few values
+    // (e.g., 22, 25, 53) coincidentally match common port numbers.
     let all_in_port_range = min >= 0 && max <= 65535;
-    let has_common_ports = parsed
-        .iter()
-        .any(|v| [80, 443, 8080, 3306, 5432, 22, 21, 25, 53, 3000, 8000, 8443].contains(v));
+    let common_ports = [80, 443, 8080, 3306, 5432, 22, 21, 25, 53, 3000, 8000, 8443];
+    let common_port_count = parsed.iter().filter(|v| common_ports.contains(v)).count();
+    let common_port_fraction = common_port_count as f64 / parsed.len() as f64;
+    let has_common_ports = common_port_fraction >= 0.3;
 
     // Postal code detection: typically 3-10 digits, non-sequential, bounded range
     let all_positive = min > 0;
@@ -1035,6 +1039,75 @@ mod tests {
         // 5 of 10 values are 4-digit (50% < 80%) → should NOT be year
         if let Some((label, _)) = result {
             assert_ne!(label, "datetime.component.year");
+        }
+    }
+
+    #[test]
+    fn test_age_column_not_detected_as_port() {
+        // Age values like 22, 25, 53 coincidentally match common port numbers,
+        // but the fraction is too low (3/10 = 30%) and the column is clearly ages.
+        // With the ≥30% threshold and the sequential/year checks running first,
+        // this should NOT be classified as port.
+        let values: Vec<String> = vec![
+            "22", "25", "30", "35", "40", "45", "50", "53", "60", "70",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let results: Vec<ClassificationResult> = values
+            .iter()
+            .map(|_| ClassificationResult {
+                label: "technology.internet.port".to_string(),
+                confidence: 0.7,
+                all_scores: vec![],
+            })
+            .collect();
+
+        let votes = vec![
+            ("technology.internet.port".to_string(), 6),
+            ("representation.numeric.integer_number".to_string(), 4),
+        ];
+        let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
+
+        let result = disambiguate_numeric(&values, &results, &top_labels);
+        // Should NOT be port — only 3 of 10 values (22, 25, 53) match common ports
+        // and these are typical age values
+        if let Some((label, _)) = result {
+            assert_ne!(label, "technology.internet.port");
+        }
+    }
+
+    #[test]
+    fn test_age_column_with_mixed_values_not_port() {
+        // Realistic Titanic-like age column: mix of young and old ages.
+        // Values 21, 22, 25, 53 match common ports but that's only 4/15 = 27% < 30%.
+        let values: Vec<String> = vec![
+            "2", "5", "14", "17", "21", "22", "25", "28", "33", "38", "42", "47", "53", "61",
+            "75",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let results: Vec<ClassificationResult> = values
+            .iter()
+            .map(|_| ClassificationResult {
+                label: "technology.internet.port".to_string(),
+                confidence: 0.6,
+                all_scores: vec![],
+            })
+            .collect();
+
+        let votes = vec![
+            ("technology.internet.port".to_string(), 8),
+            ("representation.numeric.integer_number".to_string(), 7),
+        ];
+        let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
+
+        let result = disambiguate_numeric(&values, &results, &top_labels);
+        if let Some((label, _)) = result {
+            assert_ne!(label, "technology.internet.port");
         }
     }
 
