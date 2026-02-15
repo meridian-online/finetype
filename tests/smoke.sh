@@ -139,7 +139,7 @@ OUT=$("$FINETYPE" infer -i "bc89:60a9:23b8:c1e9:3924:56de:3eb1:3b90" 2>/dev/null
 assert_contains "IPv6 classified" "$OUT" "ip_v6"
 
 OUT=$("$FINETYPE" infer -i "https://example.com" 2>/dev/null)
-assert_contains "URL classified" "$OUT" "url"
+assert_contains "URL classified" "$OUT" "uri"
 
 # ── Infer: Stdin ──────────────────────────────────────────────────────────────
 
