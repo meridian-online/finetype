@@ -1680,7 +1680,7 @@ impl Generator {
                 Ok(emojis[self.rng.gen_range(0..emojis.len())].to_string())
             }
 
-            // ── file (3 types) ───────────────────────────────────────────
+            // ── file (4 types) ───────────────────────────────────────────
             ("file", "extension") => {
                 let exts = [
                     "txt", "pdf", "docx", "xlsx", "csv", "json", "xml", "html", "js", "py", "rs",
@@ -1723,6 +1723,81 @@ impl Generator {
                     self.rng.gen_range(1..999).to_string()
                 };
                 Ok(format!("{} {}", size, unit))
+            }
+            ("file", "excel_format") => {
+                // Excel custom number format strings
+                let choice = self.rng.gen_range(0..8);
+                let fmt = match choice {
+                    // Number formats
+                    0 => {
+                        let decimals = self.rng.gen_range(0..5);
+                        if decimals == 0 {
+                            "#,##0".to_string()
+                        } else {
+                            format!("#,##0.{}", "0".repeat(decimals))
+                        }
+                    }
+                    // Currency formats
+                    1 => {
+                        let symbols = ["$", "€", "£", "¥"];
+                        let sym = symbols[self.rng.gen_range(0..symbols.len())];
+                        let decimals = self.rng.gen_range(0..3);
+                        if decimals == 0 {
+                            format!("{}#,##0", sym)
+                        } else {
+                            format!("{}#,##0.{}", sym, "0".repeat(decimals))
+                        }
+                    }
+                    // Percentage formats
+                    2 => {
+                        let decimals = self.rng.gen_range(0..4);
+                        if decimals == 0 {
+                            "0%".to_string()
+                        } else {
+                            format!("0.{}%", "0".repeat(decimals))
+                        }
+                    }
+                    // Date formats
+                    3 => {
+                        let fmts = [
+                            "mm/dd/yyyy", "dd/mm/yyyy", "yyyy-mm-dd", "m/d/yy",
+                            "d-mmm-yy", "d-mmm", "mmm-yy", "dd-mmm-yyyy",
+                            "yyyy/mm/dd", "mm-dd-yyyy",
+                        ];
+                        fmts[self.rng.gen_range(0..fmts.len())].to_string()
+                    }
+                    // Time formats
+                    4 => {
+                        let fmts = [
+                            "h:mm:ss AM/PM", "h:mm AM/PM", "h:mm:ss",
+                            "hh:mm:ss", "hh:mm", "mm:ss", "h:mm:ss.00",
+                        ];
+                        fmts[self.rng.gen_range(0..fmts.len())].to_string()
+                    }
+                    // Scientific notation
+                    5 => {
+                        let decimals = self.rng.gen_range(1..5);
+                        format!("0.{}E+00", "0".repeat(decimals))
+                    }
+                    // Fraction formats
+                    6 => {
+                        let fmts = ["# ?/?", "# ??/??", "# ???/???", "# ?/2", "# ?/4", "# ?/8"];
+                        fmts[self.rng.gen_range(0..fmts.len())].to_string()
+                    }
+                    // Conditional / multi-section formats
+                    _ => {
+                        let fmts = [
+                            "#,##0.00;(#,##0.00)",
+                            "#,##0.00;[Red](#,##0.00)",
+                            "$#,##0.00;($#,##0.00)",
+                            "0.00;-0.00;0",
+                            "#,##0;-#,##0;\"--\"",
+                            "[>100]#,##0;[Red]#,##0",
+                        ];
+                        fmts[self.rng.gen_range(0..fmts.len())].to_string()
+                    }
+                };
+                Ok(fmt)
             }
 
             // ── scientific (5 types) ─────────────────────────────────────

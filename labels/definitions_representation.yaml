@@ -507,6 +507,43 @@ representation.file.file_size:
     v1 migration: Was file.size. Transform converts to bytes.
     Handles B, KB, MB, GB, TB. Decompose extracts size value and unit.
 
+representation.file.excel_format:
+  title: "Excel Number Format String"
+  description: >
+    Spreadsheet custom number format code that defines how values are
+    displayed. Found in metadata, headers, or as literal strings in
+    spreadsheet data exports. Uses format tokens: # (optional digit),
+    0 (required digit), comma grouping, percent, date/time codes
+    (yyyy, mm, dd, h, m, s), and optional multi-section syntax
+    (positive;negative;zero;text).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[#0.,;\\[\\]$€£¥%EeAaPpMm/dDyYhHsS ?:\"\\-+()<>\\w]*$"
+    minLength: 2
+    maxLength: 100
+  tier: [VARCHAR, file]
+  release_priority: 3
+  aliases: [number_format, cell_format, format_code]
+  samples:
+    - "#,##0.00"
+    - "$#,##0.00"
+    - "0.00%"
+    - "mm/dd/yyyy"
+    - "h:mm:ss AM/PM"
+    - "0.00E+00"
+  references: null
+  notes: >
+    Common in GitTables data where format strings appear as column metadata.
+    Not a data value itself but a format specification. VARCHAR passthrough
+    since the format string should be preserved as-is.
+
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: scientific
 #
