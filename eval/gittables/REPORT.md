@@ -1,10 +1,19 @@
 # GitTables Evaluation Report
 
 **FineType v0.1.0 (CharCNN flat model, 91.97% synthetic accuracy)**
+
+> **Primary benchmark:** GitTables 1M stratified sample (4,380 tables, 50/topic) — **55.3% domain accuracy**
+> See [§ GitTables 1M Evaluation](#gittables-1m-evaluation) for the primary results.
+> The legacy 1,101-table subset is retained below for historical comparison.
+
+---
+
+## Legacy Benchmark (1,101 tables)
+
 **Date:** 2026-02-11
 **Benchmark:** [GitTables Column Type Detection](https://zenodo.org/record/5706316) (1,101 tables)
 
-## Summary
+### Summary
 
 FineType was evaluated against the GitTables benchmark, which contains 1,101 real-world CSV tables with semantic type annotations from Schema.org and DBpedia ontologies. This is the first evaluation against real-world data — all prior metrics used synthetic data from FineType's own generators.
 

@@ -1,13 +1,22 @@
--- GitTables 1M Evaluation: FineType on sampled corpus with annotations
+-- GitTables 1M Evaluation: FineType on stratified corpus sample
 -- =============================================================================
--- Uses pre-extracted metadata from extract_metadata_1m.py
--- Reads sampled parquet files, unpivots, classifies with FineType,
--- compares against Schema.org/DBpedia ground truth annotations.
+-- PRIMARY BENCHMARK for FineType accuracy measurement.
+-- Baseline: 55.3% domain accuracy (v0.1.0, 2026-02-13)
 --
--- Usage: duckdb -unsigned < eval/gittables/eval_1m.sql
+-- Pipeline (3 steps):
+--   1. extract_metadata_1m.py  — Extract annotations from parquet KV metadata
+--   2. prepare_1m_values.py    — Sample column values from parquet files
+--   3. This script             — Classify with FineType, compare to ground truth
+--
+-- Usage:
+--   make eval-1m                                    # Via Makefile (recommended)
+--   duckdb -unsigned < eval/gittables/eval_1m.sql   # Direct
+--
 -- Prerequisites:
---   1. python3 eval/gittables/extract_metadata_1m.py  (generates metadata CSVs)
---   2. Topic zips extracted to /home/hugh/git-tables/topics/{topic}/
+--   1. GitTables 1M corpus at ~/git-tables/topics/{topic}/
+--   2. Pre-extracted metadata: make eval-extract eval-values
+--      (generates ~/git-tables/eval_output/{catalog,metadata}.csv and column_values.parquet)
+--   3. DuckDB extension built: cargo build --release
 
 SET threads = 8;
 SET memory_limit = '4GB';
