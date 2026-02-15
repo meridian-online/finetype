@@ -395,5 +395,88 @@ SELECT
     count(DISTINCT topic) AS total_topics
 FROM classified;
 
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 6. PER-TOPIC ACCURACY HARNESS (NNFT-041)
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          PER-TOPIC ACCURACY                                      '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 6a. Per-topic domain accuracy (top 10 best)
+.print ''
+.print '--- Top 10 topics by domain accuracy ---'
+SELECT
+    er.topic,
+    count(*) AS mapped_cols,
+    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
+    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
+FROM eval_results er
+JOIN type_mapping tm ON er.gt_label = tm.gt_label
+GROUP BY er.topic
+HAVING count(*) >= 5
+ORDER BY accuracy_pct DESC
+LIMIT 10;
+
+-- 6b. Per-topic domain accuracy (bottom 10 worst)
+.print ''
+.print '--- Bottom 10 topics by domain accuracy ---'
+SELECT
+    er.topic,
+    count(*) AS mapped_cols,
+    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
+    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
+FROM eval_results er
+JOIN type_mapping tm ON er.gt_label = tm.gt_label
+GROUP BY er.topic
+HAVING count(*) >= 5
+ORDER BY accuracy_pct ASC
+LIMIT 10;
+
+-- 6c. Per-topic confusion: worst topics' most common misclassifications
+.print ''
+.print '--- Confusion matrix for bottom 10 topics ---'
+WITH topic_accuracy AS (
+    SELECT
+        er.topic,
+        count(*) AS mapped_cols,
+        ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
+    FROM eval_results er
+    JOIN type_mapping tm ON er.gt_label = tm.gt_label
+    GROUP BY er.topic
+    HAVING count(*) >= 5
+    ORDER BY accuracy_pct ASC
+    LIMIT 10
+)
+SELECT
+    er.topic,
+    er.gt_label,
+    er.predicted_label,
+    tm.expected_ft_domain AS expected_domain,
+    er.ft_domain AS predicted_domain,
+    count(*) AS columns,
+    CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 'correct' ELSE 'wrong' END AS match
+FROM eval_results er
+JOIN type_mapping tm ON er.gt_label = tm.gt_label
+JOIN topic_accuracy ta ON er.topic = ta.topic
+GROUP BY er.topic, er.gt_label, er.predicted_label, tm.expected_ft_domain, er.ft_domain
+HAVING count(*) >= 2
+ORDER BY er.topic, columns DESC;
+
+-- 6d. Full per-topic accuracy report
+.print ''
+.print '--- Full per-topic accuracy (all topics with mapped columns) ---'
+SELECT
+    er.topic,
+    count(*) AS mapped_cols,
+    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
+    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
+FROM eval_results er
+JOIN type_mapping tm ON er.gt_label = tm.gt_label
+GROUP BY er.topic
+HAVING count(*) >= 3
+ORDER BY er.topic;
+
 .print ''
 .print '--- Evaluation complete ---'
