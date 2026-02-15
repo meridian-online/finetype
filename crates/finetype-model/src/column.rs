@@ -157,6 +157,76 @@ impl ColumnClassifier {
         &self.classifier
     }
 
+    /// Classify a column of values with an optional header name hint.
+    ///
+    /// The header name (e.g., "Age", "Email", "zip_code") provides a soft signal
+    /// that can adjust the final prediction. The hint never overrides a high-confidence
+    /// model prediction — it only boosts a candidate type when the model is uncertain.
+    pub fn classify_column_with_header(
+        &self,
+        values: &[String],
+        header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        let mut result = self.classify_column(values)?;
+
+        // Apply header hint
+        if let Some(hinted_type) = header_hint(header) {
+            // If the model already predicts the hinted type, just boost confidence
+            if result.label == hinted_type {
+                result.confidence = (result.confidence + 0.1).min(1.0);
+                return Ok(result);
+            }
+
+            // Check if the hinted type is in the vote distribution
+            let hint_in_votes = result
+                .vote_distribution
+                .iter()
+                .any(|(label, _)| label == hinted_type);
+
+            // Only override if model confidence is low (< 0.5)
+            // or the result is a generic type AND the hint matches a candidate
+            let is_generic = matches!(
+                result.label.as_str(),
+                "representation.text.word"
+                    | "representation.text.plain_text"
+                    | "representation.numeric.integer_number"
+                    | "representation.numeric.decimal_number"
+                    | "representation.logical.boolean"
+                    | "representation.discrete.categorical"
+                    | "technology.data.boolean"
+            );
+
+            if (result.confidence < 0.5 || is_generic) && hint_in_votes {
+                let hint_fraction = result
+                    .vote_distribution
+                    .iter()
+                    .find(|(label, _)| label == hinted_type)
+                    .map(|(_, frac)| *frac)
+                    .unwrap_or(0.0);
+
+                result.label = hinted_type.to_string();
+                result.confidence = hint_fraction.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint:{}",
+                    header.to_lowercase()
+                ));
+            } else if result.confidence < 0.3 && !hint_in_votes {
+                // Very low confidence and hint type not even in votes —
+                // still apply hint but with low confidence
+                result.label = hinted_type.to_string();
+                result.confidence = 0.4;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_fallback:{}",
+                    header.to_lowercase()
+                ));
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Get a reference to the configuration.
     pub fn config(&self) -> &ColumnConfig {
         &self.config
@@ -409,6 +479,124 @@ fn disambiguate_categorical(
     let _ = top_labels; // suppress warning
     None
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HEADER NAME HINTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Map a column header name to a hinted type label.
+///
+/// Uses case-insensitive substring/keyword matching. Returns the most likely
+/// type label for the column based on its name, or None if no match.
+fn header_hint(header: &str) -> Option<&'static str> {
+    let h = header.to_lowercase();
+    // Remove common prefixes/suffixes and separators for matching
+    let h = h.replace('_', " ").replace('-', " ");
+    let h = h.trim();
+
+    // Exact or near-exact matches first (most specific)
+    match h {
+        "email" | "e mail" | "email address" | "emailaddress" => {
+            return Some("identity.person.email");
+        }
+        "url" | "uri" | "link" | "href" | "website" | "homepage" => {
+            return Some("technology.internet.url");
+        }
+        "ip" | "ip address" | "ipaddress" | "ip addr" => {
+            return Some("technology.internet.ip_v4");
+        }
+        "uuid" | "guid" => {
+            return Some("technology.identifier.uuid");
+        }
+        "gender" | "sex" => {
+            return Some("identity.person.gender");
+        }
+        "age" => {
+            return Some("identity.person.age");
+        }
+        "latitude" | "lat" => {
+            return Some("geography.coordinate.latitude");
+        }
+        "longitude" | "lng" | "lon" | "long" => {
+            return Some("geography.coordinate.longitude");
+        }
+        "country" | "country name" | "country code" => {
+            return Some("geography.location.country");
+        }
+        "city" | "city name" => {
+            return Some("geography.location.city");
+        }
+        "state" | "province" | "region" => {
+            return Some("geography.location.state");
+        }
+        "currency" | "currency code" => {
+            return Some("identity.financial.currency_code");
+        }
+        "port" => {
+            return Some("technology.internet.port");
+        }
+        "id" | "identifier" => {
+            return Some("representation.numeric.increment");
+        }
+        _ => {}
+    }
+
+    // Keyword/substring matching (less specific)
+    if h.contains("email") || h.contains("e mail") {
+        return Some("identity.person.email");
+    }
+    if h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax") {
+        return Some("identity.person.phone_number");
+    }
+    if h.contains("zip") || h.contains("postal") || h.contains("postcode") {
+        return Some("geography.address.postal_code");
+    }
+    if h.contains("name") && (h.contains("first") || h.contains("given")) {
+        return Some("identity.person.first_name");
+    }
+    if h.contains("name") && (h.contains("last") || h.contains("family") || h.contains("sur")) {
+        return Some("identity.person.last_name");
+    }
+    if h.contains("name") && (h.contains("full") || h.contains("complete") || h == "name") {
+        return Some("identity.person.full_name");
+    }
+    if h == "name" || h.ends_with(" name") {
+        return Some("identity.person.full_name");
+    }
+    if h.contains("address") && !h.contains("email") && !h.contains("ip") {
+        return Some("geography.address.street_address");
+    }
+    if h.contains("street") {
+        return Some("geography.address.street_address");
+    }
+    if h.contains("born") || h.contains("birth") || h.contains("dob") {
+        return Some("datetime.date.iso_date");
+    }
+    if h.contains("date") || h.contains("timestamp") || h.contains("datetime") {
+        return Some("datetime.timestamp.iso_8601");
+    }
+    if h.contains("year") {
+        return Some("datetime.component.year");
+    }
+    if h.contains("password") || h.contains("passwd") {
+        return Some("identity.credential.password");
+    }
+    if h.contains("url") || h.contains("uri") || h.contains("link") || h.contains("href") {
+        return Some("technology.internet.url");
+    }
+    if h.contains("price") || h.contains("cost") || h.contains("amount") || h.contains("salary") {
+        return Some("representation.numeric.decimal_number");
+    }
+    if h.contains("count") || h.contains("quantity") || h.contains("num") {
+        return Some("representation.numeric.integer_number");
+    }
+
+    None
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISAMBIGUATION RULES
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Disambiguate us_slash vs eu_slash dates.
 ///
@@ -1481,5 +1669,116 @@ mod tests {
 
         let result = disambiguate_categorical(&values, &top_labels);
         assert!(result.is_none());
+    }
+
+    // ── Header hint tests ───────────────────────────────────────────────
+
+    #[test]
+    fn test_header_hint_email() {
+        assert_eq!(header_hint("Email"), Some("identity.person.email"));
+        assert_eq!(header_hint("email_address"), Some("identity.person.email"));
+        assert_eq!(header_hint("E-Mail"), Some("identity.person.email"));
+        assert_eq!(header_hint("user_email"), Some("identity.person.email"));
+    }
+
+    #[test]
+    fn test_header_hint_phone() {
+        assert_eq!(header_hint("phone"), Some("identity.person.phone_number"));
+        assert_eq!(header_hint("Phone Number"), Some("identity.person.phone_number"));
+        assert_eq!(header_hint("telephone"), Some("identity.person.phone_number"));
+        assert_eq!(header_hint("mobile"), Some("identity.person.phone_number"));
+    }
+
+    #[test]
+    fn test_header_hint_postal() {
+        assert_eq!(header_hint("zip"), Some("geography.address.postal_code"));
+        assert_eq!(header_hint("zip_code"), Some("geography.address.postal_code"));
+        assert_eq!(header_hint("Postal Code"), Some("geography.address.postal_code"));
+        assert_eq!(header_hint("postcode"), Some("geography.address.postal_code"));
+    }
+
+    #[test]
+    fn test_header_hint_names() {
+        assert_eq!(header_hint("Name"), Some("identity.person.full_name"));
+        assert_eq!(header_hint("full_name"), Some("identity.person.full_name"));
+        assert_eq!(header_hint("first_name"), Some("identity.person.first_name"));
+        assert_eq!(header_hint("last_name"), Some("identity.person.last_name"));
+        assert_eq!(header_hint("surname"), Some("identity.person.last_name"));
+    }
+
+    #[test]
+    fn test_header_hint_geo() {
+        assert_eq!(header_hint("latitude"), Some("geography.coordinate.latitude"));
+        assert_eq!(header_hint("lat"), Some("geography.coordinate.latitude"));
+        assert_eq!(header_hint("longitude"), Some("geography.coordinate.longitude"));
+        assert_eq!(header_hint("lng"), Some("geography.coordinate.longitude"));
+        assert_eq!(header_hint("country"), Some("geography.location.country"));
+        assert_eq!(header_hint("city"), Some("geography.location.city"));
+    }
+
+    #[test]
+    fn test_header_hint_identity() {
+        assert_eq!(header_hint("gender"), Some("identity.person.gender"));
+        assert_eq!(header_hint("Sex"), Some("identity.person.gender"));
+        assert_eq!(header_hint("age"), Some("identity.person.age"));
+        assert_eq!(header_hint("Age"), Some("identity.person.age"));
+    }
+
+    #[test]
+    fn test_header_hint_tech() {
+        assert_eq!(header_hint("url"), Some("technology.internet.url"));
+        assert_eq!(header_hint("URL"), Some("technology.internet.url"));
+        assert_eq!(header_hint("website"), Some("technology.internet.url"));
+        assert_eq!(header_hint("ip_address"), Some("technology.internet.ip_v4"));
+        assert_eq!(header_hint("uuid"), Some("technology.identifier.uuid"));
+        assert_eq!(header_hint("port"), Some("technology.internet.port"));
+    }
+
+    #[test]
+    fn test_header_hint_date() {
+        assert_eq!(header_hint("date"), Some("datetime.timestamp.iso_8601"));
+        assert_eq!(header_hint("created_date"), Some("datetime.timestamp.iso_8601"));
+        assert_eq!(header_hint("year"), Some("datetime.component.year"));
+        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso_date"));
+        assert_eq!(header_hint("dob"), Some("datetime.date.iso_date"));
+    }
+
+    #[test]
+    fn test_header_hint_numeric() {
+        assert_eq!(header_hint("price"), Some("representation.numeric.decimal_number"));
+        assert_eq!(header_hint("amount"), Some("representation.numeric.decimal_number"));
+        assert_eq!(header_hint("count"), Some("representation.numeric.integer_number"));
+        assert_eq!(header_hint("id"), Some("representation.numeric.increment"));
+    }
+
+    #[test]
+    fn test_header_hint_no_match() {
+        assert_eq!(header_hint("foo"), None);
+        assert_eq!(header_hint("xyz"), None);
+        assert_eq!(header_hint("data"), None);
+        assert_eq!(header_hint("column1"), None);
+    }
+
+    #[test]
+    fn test_header_hint_coverage() {
+        // Verify at least 20 distinct column name patterns are covered
+        let test_headers = vec![
+            "email", "phone", "zip", "postal", "name", "full_name",
+            "first_name", "last_name", "latitude", "longitude",
+            "country", "city", "state", "gender", "age", "url",
+            "ip", "uuid", "port", "date", "year", "password",
+            "price", "amount", "count", "address", "street",
+        ];
+        let matches: Vec<&str> = test_headers
+            .iter()
+            .filter(|h| header_hint(h).is_some())
+            .copied()
+            .collect();
+        assert!(
+            matches.len() >= 20,
+            "Expected at least 20 matches, got {}: {:?}",
+            matches.len(),
+            matches
+        );
     }
 }

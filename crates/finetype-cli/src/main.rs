@@ -232,6 +232,10 @@ enum Commands {
         /// CSV delimiter character (default: auto-detect)
         #[arg(long)]
         delimiter: Option<char>,
+
+        /// Disable column name header hints
+        #[arg(long)]
+        no_header_hint: bool,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -421,7 +425,8 @@ fn main() -> Result<()> {
             output,
             sample_size,
             delimiter,
-        } => cmd_profile(file, model, output, sample_size, delimiter),
+            no_header_hint,
+        } => cmd_profile(file, model, output, sample_size, delimiter, no_header_hint),
 
         Commands::EvalGittables {
             dir,
@@ -1397,6 +1402,7 @@ fn cmd_profile(
     output: OutputFormat,
     sample_size: usize,
     delimiter: Option<char>,
+    no_header_hint: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig};
 
@@ -1488,7 +1494,11 @@ fn cmd_profile(
             continue;
         }
 
-        let result = column_classifier.classify_column(col_values)?;
+        let result = if no_header_hint {
+            column_classifier.classify_column(col_values)?
+        } else {
+            column_classifier.classify_column_with_header(col_values, &name)?
+        };
 
         profiles.push(ColProfile {
             name,
