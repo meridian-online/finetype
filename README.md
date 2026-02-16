@@ -4,7 +4,7 @@
 
 > **Early Development** — FineType is under active development. Expect breaking changes to taxonomy labels, CLI arguments, library APIs, and model formats between releases. Pin to a specific version if stability matters for your use case.
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 163 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 169 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 $ finetype infer -i "192.168.1.1"
@@ -19,7 +19,7 @@ identity.person.email
 
 ## Features
 
-- **163 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
+- **169 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing
 - **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
@@ -27,7 +27,7 @@ identity.person.email
 - **Fast inference** — Character-level CNN model (600+ classifications/sec, 8.5 MB memory)
 - **Real-world validated** — 85-100% accuracy on format-detectable types in [GitTables benchmark](https://zenodo.org/record/5706316) (2,363 columns)
 - **Pure Rust** — no Python runtime, Candle ML framework
-- **85+ tests** — taxonomy validation, model inference, column disambiguation, data generation
+- **213 tests** — taxonomy validation, model inference, column disambiguation, data generation
 
 ## Installation
 
@@ -78,7 +78,7 @@ finetype generate --samples 1000 --output training.ndjson
 finetype train --data data/train.ndjson --epochs 10 --batch-size 64
 
 # Evaluate model accuracy
-finetype eval --data data/test.ndjson --model models/char-cnn-v2
+finetype eval --data data/test.ndjson --model models/char-cnn-v6
 
 # Evaluate on GitTables benchmark (column-mode vs row-mode)
 finetype eval-gittables --dir eval/gittables
@@ -134,14 +134,14 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **163 types** across **6 domains**:
+FineType recognizes **169 types** across **6 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
 | `datetime` | 46 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
-| `technology` | 35 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
-| `identity` | 32 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
-| `representation` | 23 | Integers, floats, booleans, categorical, ordinal, hex colors, base64, JSON |
+| `technology` | 34 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
+| `identity` | 35 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
+| `representation` | 27 | Integers, floats, booleans (binary/initials/terms), categorical, ordinal, hex colors, JSON |
 | `geography` | 16 | Latitude, longitude, countries, cities, postal codes |
 | `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
 
@@ -155,9 +155,11 @@ See [`labels/`](labels/) for the complete taxonomy (YAML definitions with valida
 
 ### Model Accuracy
 
-| Model | Accuracy | Test Samples |
-|-------|----------|-------------|
-| Flat CharCNN v4 | **91.62%** | 15,900 |
+| Model | Accuracy | Classes |
+|-------|----------|---------|
+| CharCNN v6 | **89.15%** | 169 |
+| CharCNN v5 | 90.09% | 168 |
+| CharCNN v4 | 91.62% | 159 |
 
 ### Real-World Evaluation (GitTables)
 
@@ -217,7 +219,7 @@ flowchart TB
         A["Input string"] --> B["Character tokenizer
         (per-char integer encoding)"]
         B --> C["CharCNN model
-        (softmax → 163 types)"]
+        (softmax → 169 types)"]
         C --> D{"Post-process rules
         (6 format checks)"}
         D -->|corrected| E["Predicted type
@@ -263,7 +265,7 @@ flowchart TB
 | Stage | What it does | Where |
 |---|---|---|
 | **Character tokenizer** | Encodes each character as an integer (0-127 ASCII + padding). Fixed-length input to the CNN. | `finetype-core` |
-| **CharCNN** | 3-layer character-level CNN with max-pooling → softmax over 163 types. Trained on synthetic data from taxonomy generators. ~8.5 MB model. | `finetype-model` |
+| **CharCNN** | 3-layer character-level CNN with max-pooling → softmax over 169 types. Trained on synthetic data from taxonomy generators. ~340 KB model. | `finetype-model` |
 | **Post-processing** | 6 deterministic rules that correct known model confusions using format signals the model struggles with (e.g., `T` vs space in timestamps, `@` for email rescue, hash length check). | `finetype-model` |
 | **Vote aggregation** | In column mode, runs single-value inference on a sample of up to 100 values, then counts votes per type. | `finetype-model` |
 | **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length), gender detection, categorical (low cardinality), boolean override (integer spread). | `finetype-model` |
@@ -274,8 +276,8 @@ flowchart TB
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
 | `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation (73 tests) | `serde_yaml`, `fake`, `chrono`, `uuid` |
-| `finetype-model` | Candle CharCNN inference, column-mode disambiguation (85 tests) | `candle-core`, `candle-nn` |
-| `finetype-cli` | Binary: 11 CLI commands (28 tests) | `clap`, `csv` |
+| `finetype-model` | Candle CharCNN inference, column-mode disambiguation (109 tests) | `candle-core`, `candle-nn` |
+| `finetype-cli` | Binary: 11 CLI commands | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
 
 **Repository structure:**
@@ -287,8 +289,8 @@ finetype/
 │   ├── finetype-model/       # Candle CNN model, column-mode inference
 │   ├── finetype-cli/         # CLI binary
 │   └── finetype-duckdb/      # DuckDB extension (5 scalar functions)
-├── labels/                   # Taxonomy definitions (163 types, 6 domains, YAML)
-├── models/char-cnn-v4/       # Pre-trained flat model weights, config, label mapping
+├── labels/                   # Taxonomy definitions (169 types, 6 domains, YAML)
+├── models/char-cnn-v6/       # Pre-trained model weights, config, label mapping
 ├── eval/gittables/           # GitTables real-world benchmark evaluation
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
 └── .github/workflows/        # CI/CD: fmt, clippy, test, finetype check; release cross-compile
@@ -308,7 +310,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 # Build
 cargo build --release
 
-# Run all tests (155)
+# Run all tests (213)
 cargo test --all
 
 # Validate taxonomy (generator ↔ definition alignment)
@@ -327,14 +329,14 @@ cargo run --release -- generate --samples 500 --output data/train.ndjson
 cargo run --release -- train --data data/train.ndjson --epochs 10
 
 # Evaluate model
-cargo run --release -- eval --data data/test.ndjson --model models/char-cnn-v4
+cargo run --release -- eval --data data/test.ndjson --model models/char-cnn-v6
 ```
 
 Project tasks are tracked in [`backlog/`](backlog/) using [Backlog.md](https://backlog.md).
 
 ### Taxonomy Definitions
 
-Each of the 163 types is defined in YAML under `labels/`:
+Each of the 169 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -424,7 +426,7 @@ println!("Valid: {}, Invalid: {}", result.stats.valid_count, result.stats.invali
 
 ### Locale Support
 
-FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (163 types) and does not distinguish between locales at inference time.
+FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (169 types) and does not distinguish between locales at inference time.
 
 **DuckDB `strptime` locale limitation:** DuckDB's `strptime` function only accepts English month and day names. Non-English dates like `6 janvier 2025` will fail with `strptime(col, '%d %B %Y')`. There is no DuckDB locale setting to change this behavior.
 

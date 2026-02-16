@@ -4,6 +4,41 @@ All notable changes to FineType will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-02-16
+
+### Breaking Changes
+
+- **Boolean taxonomy restructured** (NNFT-075): `technology.development.boolean` replaced by three format-specific subtypes:
+  - `representation.boolean.binary` — 0/1 values
+  - `representation.boolean.initials` — T/F, Y/N (single character, any case)
+  - `representation.boolean.terms` — true/false, yes/no, on/off, enabled/disabled, active/inactive (any case)
+  - All three map to DuckDB `BOOLEAN` type with normalization support
+  - Legacy `technology.development.boolean` label is no longer emitted by the model
+
+### Added
+
+- **3 boolean subtypes** with dedicated generators producing case variants (NNFT-075)
+- **Small-integer ordinal disambiguation** rule for columns like Pclass, ratings (NNFT-076)
+- **30+ column header hints** for domain-specific columns: class/rank/tier, count/qty, survived/alive, ticket/cabin, fare/fee, embarked/terminal (NNFT-076)
+- **Centralized `BOOLEAN_LABELS` constant** prevents label mismatch bugs across disambiguation rules (NNFT-076)
+- **Early-development disclaimer** in README (NNFT-077)
+- **Pre-commit hook** for automated fmt/clippy/test checks before commits
+- 11 new tests for column disambiguation, header hints, boolean override behaviour
+
+### Fixed
+
+- **Boolean label mismatch** — `disambiguate_boolean_override()` was checking non-existent labels instead of actual model output (NNFT-076)
+- Clippy warnings: `useless_format` in build.rs, `manual_range_contains` in generator.rs, `collapsible_str_replace` in column.rs
+
+### Changed
+
+- **CharCNN v6 model** trained on 169 types (up from 168), 89.15% accuracy
+- Default model: `models/default` → `char-cnn-v6` (was char-cnn-v5)
+- Taxonomy: 168 → 169 types (net +1: removed 1 boolean, added 3 boolean subtypes)
+- Test suite: 213 tests (73 core + 109 model + 31 duckdb), up from 182
+- DuckDB normalization: all three boolean subtypes routed to `normalize_boolean()`
+- JSON boolean literals now annotated as `representation.boolean.terms` (was `technology.development.boolean`)
+
 ## [0.1.3] - 2026-02-15
 
 ### Added
