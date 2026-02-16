@@ -13,6 +13,14 @@
 use crate::inference::{CharClassifier, ClassificationResult, InferenceError};
 use std::collections::HashMap;
 
+/// All known boolean type labels (current model output and future/legacy variants).
+/// Centralised to avoid label mismatches across disambiguation rules.
+const BOOLEAN_LABELS: &[&str] = &[
+    "technology.development.boolean", // current CharCNN model label
+    "representation.logical.boolean", // planned (NNFT-075)
+    "technology.data.boolean",        // legacy
+];
+
 /// Configuration for column-mode inference.
 #[derive(Debug, Clone)]
 pub struct ColumnConfig {
@@ -191,10 +199,9 @@ impl ColumnClassifier {
                     | "representation.text.plain_text"
                     | "representation.numeric.integer_number"
                     | "representation.numeric.decimal_number"
-                    | "representation.logical.boolean"
                     | "representation.discrete.categorical"
-                    | "technology.data.boolean"
-            );
+                    | "datetime.component.day_of_month"
+            ) || BOOLEAN_LABELS.contains(&result.label.as_str());
 
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
                 let hint_fraction = result
@@ -285,12 +292,18 @@ fn disambiguate(
         return Some((label, rule));
     }
 
-    // Rule 6: Categorical detection — low cardinality string columns
+    // Rule 6: Small-integer ordinal detection — override day_of_month for
+    // columns where all values are small positive integers (e.g. Pclass: 1,2,3)
+    if let Some((label, rule)) = disambiguate_small_integer_ordinal(values, &top_labels) {
+        return Some((label, rule));
+    }
+
+    // Rule 7: Categorical detection — low cardinality string columns
     if let Some((label, rule)) = disambiguate_categorical(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 7: Numeric type disambiguation
+    // Rule 8: Numeric type disambiguation
     if let Some((label, rule)) = disambiguate_numeric(values, results, &top_labels) {
         return Some((label, rule));
     }
@@ -340,9 +353,7 @@ fn disambiguate_boolean_override(
     top_labels: &[&str],
 ) -> Option<(String, String)> {
     // Only trigger when boolean is in the top predictions
-    let has_boolean = top_labels
-        .iter()
-        .any(|l| *l == "representation.logical.boolean" || *l == "technology.data.boolean");
+    let has_boolean = top_labels.iter().any(|l| BOOLEAN_LABELS.contains(l));
     if !has_boolean {
         return None;
     }
@@ -410,6 +421,66 @@ fn disambiguate_boolean_override(
     None
 }
 
+/// Override day_of_month or similar classifications for small-integer columns
+/// that look like ordinal/class labels (e.g. Pclass: 1, 2, 3).
+///
+/// Rule: If values are all small positive integers with ≤10 unique values,
+///       the range is small (max ≤ 20), and the top prediction is day_of_month
+///       or another misfit type, override to ordinal.
+fn disambiguate_small_integer_ordinal(
+    values: &[String],
+    top_labels: &[&str],
+) -> Option<(String, String)> {
+    // Only trigger when day_of_month or generic integer types lead the vote
+    let misfit_types = [
+        "datetime.component.day_of_month",
+        "representation.numeric.integer_number",
+        "representation.numeric.increment",
+    ];
+    let top_is_misfit = top_labels
+        .first()
+        .map(|l| misfit_types.contains(l))
+        .unwrap_or(false);
+    if !top_is_misfit {
+        return None;
+    }
+
+    let parsed: Vec<i64> = values
+        .iter()
+        .filter_map(|v| v.trim().parse::<i64>().ok())
+        .collect();
+
+    if parsed.len() < 3 {
+        return None;
+    }
+
+    let mut unique: Vec<i64> = parsed.clone();
+    unique.sort();
+    unique.dedup();
+    let n_unique = unique.len();
+    let min = *unique.first().unwrap();
+    let max = *unique.last().unwrap();
+
+    // Ordinal pattern: small set of small positive integers
+    // e.g. {1,2,3} for Pclass, {1,2,3,4,5} for ratings
+    if (2..=10).contains(&n_unique) && min >= 0 && max <= 20 {
+        // Exclude pure boolean (only {0,1})
+        if n_unique == 2 && min == 0 && max == 1 {
+            return None;
+        }
+        // Exclude sequential ranges that look like increments (1..N where N matches sample count)
+        // Only classify as ordinal if there's repetition (i.e. fewer unique than total samples)
+        if n_unique < parsed.len() {
+            return Some((
+                "representation.discrete.ordinal".to_string(),
+                "small_integer_ordinal".to_string(),
+            ));
+        }
+    }
+
+    None
+}
+
 /// Detect categorical columns based on cardinality and value characteristics.
 ///
 /// Rules:
@@ -447,14 +518,14 @@ fn disambiguate_categorical(values: &[String], top_labels: &[&str]) -> Option<(S
 
     // Low cardinality string column: 3-20 unique values, not already categorical
     // Only override if the current top prediction is a generic type
-    let generic_types = [
+    let mut generic_types = vec![
         "representation.text.word",
         "representation.text.plain_text",
-        "representation.logical.boolean",
-        "technology.data.boolean",
         "representation.text.abbreviation",
         "representation.numeric.integer_number",
+        "datetime.component.day_of_month",
     ];
+    generic_types.extend_from_slice(BOOLEAN_LABELS);
     let top_is_generic = top_labels
         .first()
         .map(|l| generic_types.contains(l))
@@ -536,6 +607,36 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "id" | "identifier" => {
             return Some("representation.numeric.increment");
         }
+        // Count / frequency columns — small integers representing quantities
+        "sibsp" | "parch" | "siblings" | "parents" | "children" | "dependents" | "qty"
+        | "quantity" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Class / rank / tier columns — ordinal categories
+        "class" | "pclass" | "grade" | "rank" | "level" | "tier" | "rating" | "priority"
+        | "score" => {
+            return Some("representation.discrete.ordinal");
+        }
+        // Survival / binary outcome columns
+        "survived" | "alive" | "deceased" | "dead" | "active" | "enabled" | "disabled"
+        | "deleted" | "verified" | "approved" | "flagged" => {
+            return Some("technology.development.boolean");
+        }
+        // Embarked / boarding columns — categorical
+        "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
+            return Some("representation.discrete.categorical");
+        }
+        // Ticket / cabin — alphanumeric identifiers
+        "ticket" | "ticket number" | "ticketno" => {
+            return Some("representation.alphanumeric.alphanumeric_id");
+        }
+        "cabin" | "room" | "compartment" | "berth" | "seat" => {
+            return Some("representation.alphanumeric.alphanumeric_id");
+        }
+        // Fare / fee columns
+        "fare" | "fee" | "toll" | "charge" => {
+            return Some("representation.numeric.decimal_number");
+        }
         _ => {}
     }
 
@@ -587,6 +688,15 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
     if h.contains("count") || h.contains("quantity") || h.contains("num") {
         return Some("representation.numeric.integer_number");
+    }
+    if h.contains("class") || h.contains("grade") || h.contains("rank") || h.contains("tier") {
+        return Some("representation.discrete.ordinal");
+    }
+    if h.contains("ticket") || h.contains("cabin") || h.contains("seat") || h.contains("room") {
+        return Some("representation.alphanumeric.alphanumeric_id");
+    }
+    if h.contains("fare") || h.contains("fee") || h.contains("charge") || h.contains("toll") {
+        return Some("representation.numeric.decimal_number");
     }
 
     None
@@ -1833,6 +1943,228 @@ mod tests {
             "Expected at least 20 matches, got {}: {:?}",
             matches.len(),
             matches
+        );
+    }
+
+    // ── NNFT-076: Small-integer disambiguation tests ────────────────────
+
+    #[test]
+    fn test_boolean_override_with_current_model_label() {
+        // The actual model outputs "technology.development.boolean", not the
+        // previously-checked labels. Verify the override fires for this label.
+        let values: Vec<String> = vec!["0", "1", "2", "3", "0", "1", "4", "0", "5", "8"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec![
+            "technology.development.boolean",
+            "representation.numeric.integer_number",
+        ];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(
+            result.is_some(),
+            "Boolean override must trigger for technology.development.boolean"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_integer_spread");
+    }
+
+    #[test]
+    fn test_boolean_override_preserves_real_boolean_current_label() {
+        // Actual {0,1} boolean column with current model label should NOT override
+        let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1", "0", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["technology.development.boolean"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(
+            result.is_none(),
+            "Real boolean {{0,1}} must not be overridden"
+        );
+    }
+
+    #[test]
+    fn test_small_integer_ordinal_pclass() {
+        // Pclass: values {1, 2, 3} with repetitions, model says day_of_month
+        let values: Vec<String> = vec!["3", "1", "3", "1", "3", "2", "3", "1", "3", "3", "1", "2"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec![
+            "datetime.component.day_of_month",
+            "representation.numeric.integer_number",
+        ];
+
+        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
+        assert!(
+            result.is_some(),
+            "Small integer ordinal should fire for Pclass"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.ordinal");
+        assert_eq!(rule, "small_integer_ordinal");
+    }
+
+    #[test]
+    fn test_small_integer_ordinal_skips_boolean() {
+        // Pure {0, 1} column should not become ordinal
+        let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["datetime.component.day_of_month"];
+
+        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
+        assert!(result.is_none(), "Pure {{0,1}} should not be ordinal");
+    }
+
+    #[test]
+    fn test_small_integer_ordinal_skips_large_range() {
+        // Integers with max > 20 should not trigger ordinal
+        let values: Vec<String> = vec!["1", "5", "10", "25", "50", "1", "5", "25"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["datetime.component.day_of_month"];
+
+        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
+        assert!(
+            result.is_none(),
+            "Large-range integers should not be ordinal"
+        );
+    }
+
+    #[test]
+    fn test_small_integer_ordinal_ratings() {
+        // Star ratings: {1, 2, 3, 4, 5} with repetitions
+        let values: Vec<String> = vec!["5", "4", "3", "5", "2", "4", "5", "1", "3", "4", "5", "5"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec![
+            "datetime.component.day_of_month",
+            "representation.numeric.integer_number",
+        ];
+
+        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
+        assert!(result.is_some(), "Star ratings should be ordinal");
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "representation.discrete.ordinal");
+    }
+
+    // ── NNFT-076: New header hint tests ─────────────────────────────────
+
+    #[test]
+    fn test_header_hint_class_columns() {
+        assert_eq!(
+            header_hint("Pclass"),
+            Some("representation.discrete.ordinal")
+        );
+        assert_eq!(
+            header_hint("class"),
+            Some("representation.discrete.ordinal")
+        );
+        assert_eq!(
+            header_hint("grade"),
+            Some("representation.discrete.ordinal")
+        );
+        assert_eq!(
+            header_hint("rating"),
+            Some("representation.discrete.ordinal")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_count_columns() {
+        assert_eq!(
+            header_hint("SibSp"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("Parch"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("siblings"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("children"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("qty"),
+            Some("representation.numeric.integer_number")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_survival_columns() {
+        assert_eq!(
+            header_hint("Survived"),
+            Some("technology.development.boolean")
+        );
+        assert_eq!(header_hint("alive"), Some("technology.development.boolean"));
+        assert_eq!(
+            header_hint("active"),
+            Some("technology.development.boolean")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_ticket_cabin() {
+        assert_eq!(
+            header_hint("Ticket"),
+            Some("representation.alphanumeric.alphanumeric_id")
+        );
+        assert_eq!(
+            header_hint("Cabin"),
+            Some("representation.alphanumeric.alphanumeric_id")
+        );
+        assert_eq!(
+            header_hint("seat"),
+            Some("representation.alphanumeric.alphanumeric_id")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_embarked() {
+        assert_eq!(
+            header_hint("Embarked"),
+            Some("representation.discrete.categorical")
+        );
+        assert_eq!(
+            header_hint("terminal"),
+            Some("representation.discrete.categorical")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_fare() {
+        assert_eq!(
+            header_hint("Fare"),
+            Some("representation.numeric.decimal_number")
+        );
+        assert_eq!(
+            header_hint("fee"),
+            Some("representation.numeric.decimal_number")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_class_keyword_matching() {
+        // Keyword matching for compound names containing "class"
+        assert_eq!(
+            header_hint("passenger_class"),
+            Some("representation.discrete.ordinal")
+        );
+        assert_eq!(
+            header_hint("ticket_class"),
+            Some("representation.discrete.ordinal")
         );
     }
 }
