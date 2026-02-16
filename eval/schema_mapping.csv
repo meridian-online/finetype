@@ -1,0 +1,193 @@
+gt_label,source,finetype_label,finetype_domain,match_quality,expand
+email,schema,identity.person.email,identity,direct,false
+url,schema,technology.internet.url,technology,direct,false
+gender,both,identity.person.gender,identity,direct,false
+postal code,both,geography.address.postal_code,geography,direct,false
+zip code,dbpedia,geography.address.postal_code,geography,direct,false
+country,both,geography.location.country,geography,direct,false
+state,both,geography.location.region,geography,direct,false
+city,both,geography.location.city,geography,direct,false
+issn,dbpedia,technology.code.issn,technology,direct,false
+percentage,dbpedia,representation.numeric.percentage,representation,direct,false
+year,dbpedia,datetime.component.year,datetime,direct,false
+latitude,schema,geography.coordinate.latitude,geography,direct,false
+longitude,schema,geography.coordinate.longitude,geography,direct,false
+abbreviation,dbpedia,representation.text.word,representation,close,false
+name,both,identity.person.full_name,identity,close,false
+author,both,identity.person.full_name,identity,close,false
+speaker,dbpedia,identity.person.full_name,identity,close,false
+writer,dbpedia,identity.person.full_name,identity,close,false
+publisher,dbpedia,identity.person.full_name,identity,close,false
+producer,both,identity.person.full_name,identity,close,false
+manufacturer,both,representation.text.word,representation,close,false
+address,dbpedia,geography.address.full_address,geography,close,false
+county,dbpedia,geography.location.region,geography,close,false
+region,dbpedia,geography.location.region,geography,close,false
+location,both,geography.location.city,geography,close,false
+age,dbpedia,identity.person.age,identity,close,false
+height,both,identity.person.height,identity,close,false
+weight,dbpedia,identity.person.weight,identity,close,false
+sentence,dbpedia,representation.text.sentence,representation,close,false
+date,dbpedia,,datetime,partial,false
+created,dbpedia,,datetime,partial,false
+updated,dbpedia,,datetime,partial,false
+start date,dbpedia,,datetime,partial,false
+end date,dbpedia,,datetime,partial,false
+start time,both,,datetime,partial,false
+end time,both,,datetime,partial,false
+time,both,,datetime,partial,false
+date issued,schema,,datetime,partial,false
+purchase date,schema,,datetime,partial,false
+duration,both,datetime.duration.iso_8601,datetime,partial,false
+id,both,representation.numeric.increment,representation,partial,false
+code,both,representation.code.alphanumeric_id,representation,partial,false
+number,dbpedia,representation.numeric.integer_number,representation,partial,false
+file format,schema,representation.file.mime_type,representation,partial,false
+content type,schema,representation.file.mime_type,representation,partial,false
+color,schema,representation.text.color_hex,representation,partial,false
+version,both,technology.development.version,technology,partial,false
+language,both,technology.code.locale_code,technology,partial,true
+isbn,schema,technology.code.isbn,technology,partial,false
+sex,dbpedia,identity.person.gender,identity,partial,false
+coordinates,schema,geography.coordinate.coordinates,geography,partial,false
+long name,dbpedia,identity.person.full_name,identity,partial,false
+common name,dbpedia,representation.text.word,representation,partial,false
+scientific name,dbpedia,representation.text.word,representation,partial,false
+telephone,schema,identity.person.phone_number,identity,direct,false
+title,both,,representation,semantic_only,false
+description,both,,representation,semantic_only,false
+abstract,both,,representation,semantic_only,false
+comment,both,,representation,semantic_only,false
+note,dbpedia,,representation,semantic_only,false
+notes,dbpedia,,representation,semantic_only,false
+text,schema,,representation,semantic_only,false
+message,schema,,representation,semantic_only,false
+category,both,,representation,semantic_only,false
+class,both,,representation,semantic_only,false
+classification,dbpedia,,representation,semantic_only,false
+type,dbpedia,,representation,semantic_only,false
+status,both,,representation,semantic_only,false
+rating,both,,representation,semantic_only,false
+score,dbpedia,,representation,semantic_only,false
+rank,dbpedia,,representation,semantic_only,false
+order,dbpedia,,representation,semantic_only,false
+value,both,,representation,semantic_only,false
+price,both,,representation,semantic_only,false
+cost,dbpedia,,representation,semantic_only,false
+depth,both,,representation,semantic_only,false
+width,both,,representation,semantic_only,false
+size,schema,,representation,semantic_only,false
+length,dbpedia,,representation,semantic_only,false
+min,dbpedia,,representation,semantic_only,false
+volume,dbpedia,,representation,semantic_only,false
+frequency,dbpedia,,representation,semantic_only,false
+temperature,dbpedia,,representation,semantic_only,false
+capacity,dbpedia,,representation,semantic_only,false
+parent,both,,representation,semantic_only,false
+object,schema,,representation,semantic_only,false
+target,schema,,representation,semantic_only,false
+action,schema,,representation,semantic_only,false
+event,both,,representation,semantic_only,false
+product,both,,representation,semantic_only,false
+project,both,,representation,semantic_only,false
+series,both,,representation,semantic_only,false
+school,schema,,representation,semantic_only,false
+role,both,,representation,semantic_only,false
+role name,schema,,representation,semantic_only,false
+line,schema,,representation,semantic_only,false
+step,schema,,representation,semantic_only,false
+interaction type,schema,,representation,semantic_only,false
+members,schema,,representation,semantic_only,false
+brand,schema,,representation,semantic_only,false
+currency,schema,identity.payment.currency_code,identity,partial,false
+tool,schema,,representation,semantic_only,false
+serial number,schema,,representation,semantic_only,true
+order number,schema,,representation,semantic_only,true
+access,dbpedia,,representation,semantic_only,false
+activity,dbpedia,,representation,semantic_only,false
+alias,dbpedia,,representation,semantic_only,false
+award,dbpedia,,representation,semantic_only,false
+block,dbpedia,,representation,semantic_only,false
+cites,dbpedia,,representation,semantic_only,false
+cluster,dbpedia,,representation,semantic_only,false
+collection,dbpedia,,representation,semantic_only,false
+company,dbpedia,,representation,semantic_only,false
+component,dbpedia,,representation,semantic_only,false
+dam,dbpedia,,representation,semantic_only,false
+definition,dbpedia,,representation,semantic_only,false
+department,dbpedia,,representation,semantic_only,false
+discontinued,dbpedia,,representation,semantic_only,false
+facility id,dbpedia,representation.code.alphanumeric_id,representation,partial,false
+family,dbpedia,,representation,semantic_only,false
+fc,dbpedia,,representation,semantic_only,false
+field,dbpedia,,representation,semantic_only,false
+focus,dbpedia,,representation,semantic_only,false
+format,dbpedia,,representation,semantic_only,false
+formula,dbpedia,,representation,semantic_only,true
+genus,dbpedia,,representation,semantic_only,false
+lyrics,dbpedia,,representation,semantic_only,false
+material,dbpedia,,representation,semantic_only,false
+ons,dbpedia,,representation,semantic_only,false
+operator,dbpedia,,representation,semantic_only,false
+orientation,dbpedia,,representation,semantic_only,false
+origin,dbpedia,,representation,semantic_only,false
+period,dbpedia,,representation,semantic_only,false
+place,dbpedia,,geography,semantic_only,false
+plant,dbpedia,,representation,semantic_only,false
+portfolio,dbpedia,,representation,semantic_only,false
+prefix,dbpedia,,representation,semantic_only,false
+publication,dbpedia,,representation,semantic_only,false
+range,dbpedia,,representation,semantic_only,false
+reference,dbpedia,,representation,semantic_only,false
+resolution,dbpedia,,representation,semantic_only,false
+route,dbpedia,,representation,semantic_only,false
+second,dbpedia,,representation,semantic_only,false
+selection,dbpedia,,representation,semantic_only,false
+source,dbpedia,,representation,semantic_only,false
+space,dbpedia,,representation,semantic_only,false
+species,dbpedia,,representation,semantic_only,false
+start,dbpedia,,representation,semantic_only,false
+style,dbpedia,,representation,semantic_only,false
+subsystem,dbpedia,,representation,semantic_only,false
+team,dbpedia,,representation,semantic_only,false
+technique,dbpedia,,representation,semantic_only,false
+training,dbpedia,,representation,semantic_only,false
+utc offset,dbpedia,datetime.offset.utc,datetime,direct,false
+property,schema,,representation,semantic_only,false
+data type,dbpedia,,representation,semantic_only,true
+unit code,dbpedia,representation.scientific.measurement_unit,representation,partial,false
+ticker symbol,dbpedia,,identity,semantic_only,true
+iso code,dbpedia,,technology,semantic_only,true
+language code,dbpedia,technology.code.locale_code,technology,close,true
+country code,dbpedia,geography.location.country_code,geography,direct,false
+time zone,dbpedia,datetime.offset.iana,datetime,close,false
+flag,dbpedia,representation.boolean.terms,representation,partial,false
+boolean,dbpedia,representation.boolean.binary,representation,direct,false
+keywords,dbpedia,,representation,semantic_only,false
+image,dbpedia,technology.internet.url,technology,partial,false
+citation,dbpedia,,representation,semantic_only,true
+position,dbpedia,,representation,semantic_only,false
+tag,dbpedia,,representation,semantic_only,false
+person,dbpedia,identity.person.full_name,identity,close,false
+organization,dbpedia,,representation,semantic_only,true
+artist,dbpedia,identity.person.full_name,identity,close,false
+race,dbpedia,,representation,semantic_only,false
+industry,dbpedia,,representation,semantic_only,false
+procedure type,dbpedia,,representation,semantic_only,false
+short story,dbpedia,,representation,semantic_only,false
+location created,dbpedia,,geography,semantic_only,false
+web content,dbpedia,,representation,semantic_only,false
+contact points,dbpedia,,representation,semantic_only,false
+search results page,dbpedia,,representation,semantic_only,false
+error,dbpedia,,representation,semantic_only,false
+word count,dbpedia,representation.numeric.integer_number,representation,partial,false
+genre,dbpedia,,representation,semantic_only,false
+day of week,dbpedia,datetime.component.day_of_week,datetime,direct,false
+record label,dbpedia,,representation,semantic_only,false
+article,dbpedia,,representation,semantic_only,false
+operating system,dbpedia,technology.development.os,technology,close,false
+software source code,dbpedia,,technology,semantic_only,false
+time of day,dbpedia,,datetime,partial,false
+published on,dbpedia,,datetime,partial,false
+dec,dbpedia,,representation,semantic_only,false
+filename,dbpedia,,representation,semantic_only,true

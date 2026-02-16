@@ -78,6 +78,27 @@ eval-benchmark: $(EXTENSION)
 eval-all: eval-extract eval-values eval-1m
 	@echo "═══ Full evaluation pipeline complete ═══"
 
+# ─── Profile Evaluation ─────────────────────
+# Evaluate finetype profile against annotated CSVs.
+# Uses schema mapping (eval/schema_mapping.csv) for scoring.
+#
+# Usage:
+#   make eval-profile                               # default manifest
+#   make eval-profile MANIFEST=path/to/manifest.csv # custom manifest
+
+MANIFEST ?= eval/datasets/manifest.csv
+
+.PHONY: eval-profile eval-mapping
+
+eval-mapping:
+	@echo "═══ Generating schema_mapping.csv from YAML ═══"
+	python3 -c "import yaml,csv; d=yaml.safe_load(open('eval/schema_mapping.yaml')); w=csv.writer(open('eval/schema_mapping.csv','w')); w.writerow(['gt_label','source','finetype_label','finetype_domain','match_quality','expand']); [w.writerow([m['gt_label'],m['source'],m.get('finetype_label') or '',m.get('finetype_domain',''),m['match_quality'],'true' if m.get('expand') else 'false']) for m in d['mappings']]"
+	@echo "✓ eval/schema_mapping.csv generated"
+
+eval-profile: eval-mapping
+	@echo "═══ Running profile evaluation ═══"
+	./eval/profile_eval.sh $(MANIFEST)
+
 # ─── Taxonomy stats ───────────────────────────
 .PHONY: stats taxonomy
 

@@ -1,9 +1,11 @@
 ---
 id: NNFT-080
 title: Build automated profile-and-compare evaluation pipeline
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@nightingale'
 created_date: '2026-02-16 10:49'
+updated_date: '2026-02-16 21:51'
 labels:
   - evaluation
   - tooling

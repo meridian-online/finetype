@@ -1,7 +1,7 @@
 ---
 id: NNFT-079
 title: Create machine-readable schema.org → FineType type mapping
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-16 10:49'
@@ -53,3 +53,27 @@ Validation results:
 
 The mapping uses YAML for richer structure: each entry has gt_label, source, finetype_label, finetype_domain, match_quality, expand flag, and notes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Created eval/schema_mapping.yaml — a machine-readable mapping of schema.org and DBpedia ground truth labels to FineType types for automated evaluation scoring.
+
+Coverage:
+- 191 entries covering all 145 unique GT labels from schema_labels.csv (59) and dbpedia_labels.csv (122)
+- 46 additional long-tail labels from the GitTables 1M corpus metadata
+- All finetype_label references validated against the 169-type taxonomy
+
+Match quality breakdown:
+- 17 direct matches (email, url, gender, postal_code, country, city, state, issn, etc.)
+- 21 close matches (name→full_name, author→full_name, address→full_address, etc.)
+- 33 partial matches (date→datetime.*, id→increment, code→alphanumeric_id, etc.)
+- 120 semantic-only (title, description, category, rating, price — no format signal)
+
+11 taxonomy expansion candidates flagged:
+- ticker symbol, filename, citation, language code, ISO code, data type, formula, organization name, serial number, order number, language
+
+Schema per entry: gt_label, source, finetype_label, finetype_domain, match_quality, expand, notes
+
+This mapping is the prerequisite for NNFT-080 (automated eval pipeline) and NNFT-082 (GitTables v6 eval).
+<!-- SECTION:FINAL_SUMMARY:END -->

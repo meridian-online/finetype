@@ -1,0 +1,13 @@
+dataset,file_path,column_name,gt_label
+titanic,/home/hugh/datasets/titanic.csv,PassengerId,id
+titanic,/home/hugh/datasets/titanic.csv,Survived,boolean
+titanic,/home/hugh/datasets/titanic.csv,Pclass,class
+titanic,/home/hugh/datasets/titanic.csv,Name,name
+titanic,/home/hugh/datasets/titanic.csv,Sex,gender
+titanic,/home/hugh/datasets/titanic.csv,Age,age
+titanic,/home/hugh/datasets/titanic.csv,SibSp,number
+titanic,/home/hugh/datasets/titanic.csv,Parch,number
+titanic,/home/hugh/datasets/titanic.csv,Ticket,code
+titanic,/home/hugh/datasets/titanic.csv,Fare,price
+titanic,/home/hugh/datasets/titanic.csv,Cabin,code
+titanic,/home/hugh/datasets/titanic.csv,Embarked,category
