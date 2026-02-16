@@ -1,9 +1,11 @@
 ---
 id: NNFT-079
 title: Create machine-readable schema.org → FineType type mapping
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@nightingale'
 created_date: '2026-02-16 10:49'
+updated_date: '2026-02-16 10:59'
 labels:
   - evaluation
   - taxonomy
@@ -19,10 +21,35 @@ Codify the schema.org/DBpedia → FineType label mapping from TAXONOMY_COMPARISO
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Mapping file exists at eval/schema_mapping.csv or eval/schema_mapping.yaml
-- [ ] #2 Covers all ~180 unique GT labels from GitTables 1M metadata
-- [ ] #3 Each entry has: gt_label, finetype_label (or NULL), match_quality (direct/close/partial/semantic_only)
-- [ ] #4 Format-detectable types have correct finetype mappings
-- [ ] #5 Semantic-only types explicitly marked as NULL/unmappable
-- [ ] #6 Boundary types flagged for potential taxonomy expansion
+- [x] #1 Mapping file exists at eval/schema_mapping.csv or eval/schema_mapping.yaml
+- [x] #2 Covers all ~180 unique GT labels from GitTables 1M metadata
+- [x] #3 Each entry has: gt_label, finetype_label (or NULL), match_quality (direct/close/partial/semantic_only)
+- [x] #4 Format-detectable types have correct finetype mappings
+- [x] #5 Semantic-only types explicitly marked as NULL/unmappable
+- [x] #6 Boundary types flagged for potential taxonomy expansion
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Collect all unique GT labels from schema_labels.csv (59) + dbpedia_labels.csv (122) = 181 unique labels
+2. Cross-reference with TAXONOMY_COMPARISON.md prose mappings and eval_1m.sql type_mapping table
+3. Map each GT label to best FineType label (or NULL), classify match quality
+4. Also query actual GT label frequencies from 1M metadata for prioritization
+5. Create eval/schema_mapping.yaml with structured mappings
+6. Validate mapping covers all labels, run through a quick sanity check
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Created eval/schema_mapping.yaml with 191 entries covering all 145 unique GT labels from schema_labels.csv (59) + dbpedia_labels.csv (122), plus 46 additional long-tail labels from the 1M corpus metadata.
+
+Validation results:
+- All finetype_label references valid against 169-type taxonomy
+- All finetype_domain values valid
+- 17 direct matches, 21 close, 33 partial, 120 semantic_only
+- 11 expansion candidates flagged (ticker symbol, filename, citation, language code, formula, etc.)
+
+The mapping uses YAML for richer structure: each entry has gt_label, source, finetype_label, finetype_domain, match_quality, expand flag, and notes.
+<!-- SECTION:NOTES:END -->

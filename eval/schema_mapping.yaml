@@ -1,0 +1,1598 @@
+# Schema.org / DBpedia → FineType Type Mapping
+# =============================================================================
+# Machine-readable mapping for automated evaluation scoring.
+#
+# Sources:
+#   - schema_labels.csv: 59 schema.org annotation labels
+#   - dbpedia_labels.csv: 122 DBpedia ontology annotation labels
+#   - Combined unique labels: 181 (some labels appear in both sources)
+#
+# Match quality levels:
+#   direct    — GT label maps 1:1 to a FineType label (same concept, same format)
+#   close     — GT label maps to a FineType label with minor semantic gap
+#   partial   — GT label sometimes maps to a FineType label depending on data format
+#   semantic_only — GT label describes meaning, not format; no FineType equivalent
+#
+# Taxonomy expansion flags:
+#   expand: true  — GT label has reproducible format patterns worth adding to taxonomy
+#   expand: false — GT label is purely semantic or already well-covered
+#
+# Usage:
+#   Load this file in eval pipelines to score FineType predictions against GT labels.
+#   A prediction is "correct" if finetype_label matches OR finetype_domain matches.
+#
+# Schema: Each entry has:
+#   gt_label:        Ground truth annotation label (lowercase, as in metadata)
+#   source:          schema | dbpedia | both
+#   finetype_label:  Best matching FineType label, or null if semantic-only
+#   finetype_domain: Expected FineType domain for domain-level accuracy
+#   match_quality:   direct | close | partial | semantic_only
+#   expand:          Whether this GT concept could become a FineType type
+#   notes:           Explanation of the mapping decision
+
+mappings:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DIRECT MATCHES — GT label maps 1:1 to FineType label
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: email
+    source: schema
+    finetype_label: identity.person.email
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: Both identify email address format
+
+  - gt_label: url
+    source: schema
+    finetype_label: technology.internet.url
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: Both identify URL format
+
+  - gt_label: gender
+    source: both
+    finetype_label: identity.person.gender
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: FineType also has gender_code and gender_symbol subtypes
+
+  - gt_label: postal code
+    source: both
+    finetype_label: geography.address.postal_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Format-detectable postal/zip codes
+
+  - gt_label: zip code
+    source: dbpedia
+    finetype_label: geography.address.postal_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Alias for postal code
+
+  - gt_label: country
+    source: both
+    finetype_label: geography.location.country
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Country name strings
+
+  - gt_label: state
+    source: both
+    finetype_label: geography.location.region
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: US state / region names
+
+  - gt_label: city
+    source: both
+    finetype_label: geography.location.city
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: City name strings
+
+  - gt_label: issn
+    source: dbpedia
+    finetype_label: technology.code.issn
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: ISSN identifier format (XXXX-XXXX)
+
+  - gt_label: percentage
+    source: dbpedia
+    finetype_label: representation.numeric.percentage
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+    notes: Values with % sign
+
+  - gt_label: year
+    source: dbpedia
+    finetype_label: datetime.component.year
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: 4-digit year values; column-mode disambiguation helps
+
+  - gt_label: latitude
+    source: schema
+    finetype_label: geography.coordinate.latitude
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Decimal latitude values (-90 to 90)
+
+  - gt_label: longitude
+    source: schema
+    finetype_label: geography.coordinate.longitude
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Decimal longitude values (-180 to 180)
+
+  - gt_label: abbreviation
+    source: dbpedia
+    finetype_label: representation.text.word
+    finetype_domain: representation
+    match_quality: close
+    expand: false
+    notes: Short text tokens; no distinct abbreviation type in FineType
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CLOSE MATCHES — Mostly correct with minor semantic gap
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: name
+    source: both
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: "schema:name is broader (includes org names); FineType detects person name format"
+
+  - gt_label: author
+    source: both
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Semantic role (who wrote it) but format is person name
+
+  - gt_label: speaker
+    source: dbpedia
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Semantic role but format is person name
+
+  - gt_label: writer
+    source: dbpedia
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Semantic role but format is person name
+
+  - gt_label: publisher
+    source: dbpedia
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Could be person or org name
+
+  - gt_label: producer
+    source: both
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Semantic role; format is person/org name
+
+  - gt_label: manufacturer
+    source: both
+    finetype_label: representation.text.word
+    finetype_domain: representation
+    match_quality: close
+    expand: false
+    notes: Company/org names; no dedicated org name type
+
+  - gt_label: address
+    source: dbpedia
+    finetype_label: geography.address.full_address
+    finetype_domain: geography
+    match_quality: close
+    expand: false
+    notes: Full address strings; FineType has full_address type
+
+  - gt_label: county
+    source: dbpedia
+    finetype_label: geography.location.region
+    finetype_domain: geography
+    match_quality: close
+    expand: false
+    notes: County is a subdivision; maps to region
+
+  - gt_label: region
+    source: dbpedia
+    finetype_label: geography.location.region
+    finetype_domain: geography
+    match_quality: close
+    expand: false
+    notes: Direct concept match
+
+  - gt_label: location
+    source: both
+    finetype_label: geography.location.city
+    finetype_domain: geography
+    match_quality: close
+    expand: false
+    notes: Generic location; could be city, state, or full address
+
+  - gt_label: age
+    source: dbpedia
+    finetype_label: identity.person.age
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Age values; FineType has age disambiguation
+
+  - gt_label: height
+    source: both
+    finetype_label: identity.person.height
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Height measurements; also plain decimal numbers
+
+  - gt_label: weight
+    source: dbpedia
+    finetype_label: identity.person.weight
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Weight measurements; also plain decimal numbers
+
+  - gt_label: sentence
+    source: dbpedia
+    finetype_label: representation.text.sentence
+    finetype_domain: representation
+    match_quality: close
+    expand: false
+    notes: Text sentence format
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PARTIAL MATCHES — Sometimes detectable, depends on data format
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: date
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: "Maps to many FineType date types: iso, us_slash, eu_slash, etc."
+
+  - gt_label: created
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Timestamps in various formats; semantic role is creation time
+
+  - gt_label: updated
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Timestamps in various formats; semantic role is update time
+
+  - gt_label: start date
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Date format detectable; start vs end is semantic
+
+  - gt_label: end date
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Date format detectable; start vs end is semantic
+
+  - gt_label: start time
+    source: both
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Time/timestamp format detectable; start role is semantic
+
+  - gt_label: end time
+    source: both
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Time/timestamp format detectable; end role is semantic
+
+  - gt_label: time
+    source: both
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Could be time, timestamp, or duration
+
+  - gt_label: date issued
+    source: schema
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Date format detectable; issued role is semantic
+
+  - gt_label: purchase date
+    source: schema
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Date format detectable; purchase role is semantic
+
+  - gt_label: duration
+    source: both
+    finetype_label: datetime.duration.iso_8601
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: ISO 8601 durations detectable; HH:MM:SS and free text durations less so
+
+  - gt_label: id
+    source: both
+    finetype_label: representation.numeric.increment
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Sequential integers map to increment; UUIDs to uuid; mixed formats vary
+
+  - gt_label: code
+    source: both
+    finetype_label: representation.code.alphanumeric_id
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Some codes are alphanumeric IDs; others are arbitrary strings
+
+  - gt_label: number
+    source: dbpedia
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Generic number; could be integer, decimal, or increment
+
+  - gt_label: file format
+    source: schema
+    finetype_label: representation.file.mime_type
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: MIME types detectable; free text format names are not
+
+  - gt_label: content type
+    source: schema
+    finetype_label: representation.file.mime_type
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: MIME types when present; otherwise semantic
+
+  - gt_label: color
+    source: schema
+    finetype_label: representation.text.color_hex
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Hex colors detectable; named colors (red, blue) are text
+
+  - gt_label: version
+    source: both
+    finetype_label: technology.development.version
+    finetype_domain: technology
+    match_quality: partial
+    expand: false
+    notes: Semver/calver detectable; arbitrary version strings less so
+
+  - gt_label: language
+    source: both
+    finetype_label: technology.code.locale_code
+    finetype_domain: technology
+    match_quality: partial
+    expand: true
+    notes: ISO 639 codes detectable; full language names are text. Candidate for ISO 639 type.
+
+  - gt_label: isbn
+    source: schema
+    finetype_label: technology.code.isbn
+    finetype_domain: technology
+    match_quality: partial
+    expand: false
+    notes: ISBN when present in proper format; sometimes just a number
+
+  - gt_label: sex
+    source: dbpedia
+    finetype_label: identity.person.gender
+    finetype_domain: identity
+    match_quality: partial
+    expand: false
+    notes: Often same values as gender (M/F/Male/Female)
+
+  - gt_label: coordinates
+    source: schema
+    finetype_label: geography.coordinate.coordinates
+    finetype_domain: geography
+    match_quality: partial
+    expand: false
+    notes: Lat,lon pairs detectable; other coordinate formats vary
+
+  - gt_label: long name
+    source: dbpedia
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: partial
+    expand: false
+    notes: Could be person name or long form of any entity
+
+  - gt_label: common name
+    source: dbpedia
+    finetype_label: representation.text.word
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Scientific common names; text format
+
+  - gt_label: scientific name
+    source: dbpedia
+    finetype_label: representation.text.word
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: "Binomial nomenclature (Genus species); could be a taxonomy expansion candidate"
+
+  - gt_label: telephone
+    source: schema
+    finetype_label: identity.person.phone_number
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: Phone number format
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SEMANTIC-ONLY — No format signal; purely about meaning
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: title
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text title; same format as any text string
+
+  - gt_label: description
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text; FineType sees as sentence or plain_text
+
+  - gt_label: abstract
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text summary; no format distinction from description
+
+  - gt_label: comment
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text; no format pattern
+
+  - gt_label: note
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text note
+
+  - gt_label: notes
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text notes (plural)
+
+  - gt_label: text
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Generic text content
+
+  - gt_label: message
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text message
+
+  - gt_label: category
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Arbitrary category labels; FineType has discrete.categorical
+
+  - gt_label: class
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Arbitrary class labels; same format as any text
+
+  - gt_label: classification
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Arbitrary classification strings
+
+  - gt_label: type
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Arbitrary type labels
+
+  - gt_label: status
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Arbitrary status values
+
+  - gt_label: rating
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric but meaning-dependent; FineType sees decimal/integer
+
+  - gt_label: score
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric values with semantic meaning
+
+  - gt_label: rank
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Ordinal numbers with semantic role
+
+  - gt_label: order
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Ordering/sequence number or taxonomic order
+
+  - gt_label: value
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Generic value; format varies completely
+
+  - gt_label: price
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Decimal numbers with monetary meaning; FineType sees decimal_number
+
+  - gt_label: cost
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Same as price — decimal with monetary meaning
+
+  - gt_label: depth
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric measurement; FineType sees decimal_number
+
+  - gt_label: width
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric measurement; FineType sees decimal_number
+
+  - gt_label: size
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Various formats (numeric, text sizes like S/M/L)
+
+  - gt_label: length
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric measurement
+
+  - gt_label: min
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric minimum value
+
+  - gt_label: volume
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric measurement or publication volume number
+
+  - gt_label: frequency
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric frequency value
+
+  - gt_label: temperature
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric measurement with unit context
+
+  - gt_label: capacity
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric capacity value
+
+  - gt_label: parent
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Relational role; format varies (ID, name, path)
+
+  - gt_label: object
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Generic entity reference
+
+  - gt_label: target
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Generic target reference
+
+  - gt_label: action
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Action type; no format pattern
+
+  - gt_label: event
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Entity type; no distinctive format
+
+  - gt_label: product
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Entity name; no format pattern
+
+  - gt_label: project
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Project name; arbitrary text
+
+  - gt_label: series
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Series name; arbitrary text
+
+  - gt_label: school
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Institution name; could partially map to university
+
+  - gt_label: role
+    source: both
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Semantic role label; arbitrary text
+
+  - gt_label: role name
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Role name string
+
+  - gt_label: line
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Generic line reference (text line, transport line, etc.)
+
+  - gt_label: step
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Step number or description; no format pattern
+
+  - gt_label: interaction type
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Type of interaction; arbitrary text
+
+  - gt_label: members
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Member names or count; format varies
+
+  - gt_label: brand
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Brand name; same format as any word/text
+
+  - gt_label: currency
+    source: schema
+    finetype_label: identity.payment.currency_code
+    finetype_domain: identity
+    match_quality: partial
+    expand: false
+    notes: ISO 4217 codes detectable; full currency names are text
+
+  - gt_label: tool
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Tool name; arbitrary text
+
+  - gt_label: serial number
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Varies by manufacturer; some patterns could be detected
+
+  - gt_label: order number
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Varies by system; some alphanumeric patterns could be detected
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DBPEDIA-ONLY SEMANTIC LABELS
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: access
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Access level/type; arbitrary text
+
+  - gt_label: activity
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Activity description
+
+  - gt_label: alias
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Alternative name; same format as text
+
+  - gt_label: award
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Award name; arbitrary text
+
+  - gt_label: block
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Block identifier or description
+
+  - gt_label: cites
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Citation reference
+
+  - gt_label: cluster
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Cluster identifier
+
+  - gt_label: collection
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Collection name
+
+  - gt_label: company
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Company name; no dedicated org name type
+
+  - gt_label: component
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Component name
+
+  - gt_label: dam
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Dam name
+
+  - gt_label: definition
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Free text definition
+
+  - gt_label: department
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Department name
+
+  - gt_label: discontinued
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Discontinuation info (date or boolean)
+
+  - gt_label: facility id
+    source: dbpedia
+    finetype_label: representation.code.alphanumeric_id
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Facility identifier; format varies
+
+  - gt_label: family
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Taxonomic family or family name
+
+  - gt_label: fc
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Football club name
+
+  - gt_label: field
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Field of study or field name
+
+  - gt_label: focus
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Focus area description
+
+  - gt_label: format
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Format description; not a standardized format string
+
+  - gt_label: formula
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Chemical/math formulas could have detectable patterns
+
+  - gt_label: genus
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Taxonomic genus name
+
+  - gt_label: lyrics
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Song lyrics text
+
+  - gt_label: material
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Material name
+
+  - gt_label: ons
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Office for National Statistics reference
+
+  - gt_label: operator
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Operator name/entity
+
+  - gt_label: orientation
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Orientation value
+
+  - gt_label: origin
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Origin location or source
+
+  - gt_label: period
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Time period description
+
+  - gt_label: place
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: geography
+    match_quality: semantic_only
+    expand: false
+    notes: Place name; could be city, state, country, or venue
+
+  - gt_label: plant
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Plant name (botanical)
+
+  - gt_label: portfolio
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Portfolio reference
+
+  - gt_label: prefix
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Name prefix or code prefix
+
+  - gt_label: publication
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Publication name
+
+  - gt_label: range
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Numeric range or geographic range
+
+  - gt_label: reference
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Reference identifier or citation
+
+  - gt_label: resolution
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Screen resolution or decision resolution
+
+  - gt_label: route
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Route name/number
+
+  - gt_label: second
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Second value or second place
+
+  - gt_label: selection
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Selection identifier
+
+  - gt_label: source
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Source reference; could be URL but often text
+
+  - gt_label: space
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Space name or measurement
+
+  - gt_label: species
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Species name; potential expansion for binomial nomenclature
+
+  - gt_label: start
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Start value (date, number, or text)
+
+  - gt_label: style
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Style description
+
+  - gt_label: subsystem
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Subsystem name
+
+  - gt_label: team
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Team name
+
+  - gt_label: technique
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Technique description
+
+  - gt_label: training
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Training description
+
+  - gt_label: utc offset
+    source: dbpedia
+    finetype_label: datetime.offset.utc
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: UTC offset values like +05:30
+
+  - gt_label: property
+    source: schema
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Generic property name
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BOUNDARY TYPES — Partially detectable, expansion candidates
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: data type
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Data type names (int, string, float); could detect programming type names
+
+  - gt_label: unit code
+    source: dbpedia
+    finetype_label: representation.scientific.measurement_unit
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Unit codes may match measurement_unit
+
+  - gt_label: ticker symbol
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: identity
+    match_quality: semantic_only
+    expand: true
+    notes: Stock ticker symbols (1-5 uppercase letters); distinctive format worth adding
+
+  - gt_label: iso code
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: technology
+    match_quality: semantic_only
+    expand: true
+    notes: Various ISO codes; could detect ISO 3166 country codes, ISO 639 language codes
+
+  - gt_label: language code
+    source: dbpedia
+    finetype_label: technology.code.locale_code
+    finetype_domain: technology
+    match_quality: close
+    expand: true
+    notes: ISO 639 language codes (en, fr, de); close to locale_code. Candidate for dedicated type.
+
+  - gt_label: country code
+    source: dbpedia
+    finetype_label: geography.location.country_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: ISO 3166 country codes (US, GB, DE)
+
+  - gt_label: time zone
+    source: dbpedia
+    finetype_label: datetime.offset.iana
+    finetype_domain: datetime
+    match_quality: close
+    expand: false
+    notes: IANA timezone names (America/New_York)
+
+  - gt_label: flag
+    source: dbpedia
+    finetype_label: representation.boolean.terms
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Boolean flags when 0/1 or true/false; sometimes text labels
+
+  - gt_label: keywords
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Keyword lists; could be comma-separated
+
+  - gt_label: image
+    source: dbpedia
+    finetype_label: technology.internet.url
+    finetype_domain: technology
+    match_quality: partial
+    expand: false
+    notes: Image URLs detectable; filenames less so
+
+  - gt_label: citation
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Citation strings have recognizable patterns (APA, MLA, BibTeX)
+
+  - gt_label: position
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Position title or number
+
+  - gt_label: tag
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Tag label; arbitrary text
+
+  - gt_label: person
+    source: dbpedia
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Person name strings
+
+  - gt_label: organization
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Organization names; could develop org name detection
+
+  - gt_label: artist
+    source: dbpedia
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Artist names are person names
+
+  - gt_label: race
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Race/ethnicity labels; arbitrary text
+
+  - gt_label: industry
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Industry sector name
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LONG TAIL — Low-frequency GT labels from the 1M corpus
+  # These labels appear in the GitTables metadata but have <50 column
+  # occurrences. They are included for completeness but most are
+  # domain-specific semantic labels with no format signal.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # -- Composite/domain-specific labels from 1M metadata --
+  # These are the long-tail labels that appear in the actual GitTables 1M
+  # corpus but not in the standard schema_labels/dbpedia_labels files.
+  # Most are highly domain-specific (medical, legal, e-commerce) and
+  # purely semantic. A representative sample:
+
+  - gt_label: procedure type
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Medical/legal procedure type
+
+  - gt_label: short story
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Literary content type
+
+  - gt_label: location created
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: geography
+    match_quality: semantic_only
+    expand: false
+    notes: Creation location; semantic role
+
+  - gt_label: web content
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Web content type
+
+  - gt_label: contact points
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Contact information aggregate
+
+  - gt_label: search results page
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Search results content type
+
+  - gt_label: error
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Error message or code
+
+  - gt_label: word count
+    source: dbpedia
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Integer count with semantic meaning
+
+  - gt_label: genre
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Genre classification label
+
+  - gt_label: day of week
+    source: dbpedia
+    finetype_label: datetime.component.day_of_week
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: Day names (Monday, Tuesday, etc.)
+
+  - gt_label: record label
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Music record label name
+
+  - gt_label: article
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Article content
+
+  - gt_label: operating system
+    source: dbpedia
+    finetype_label: technology.development.os
+    finetype_domain: technology
+    match_quality: close
+    expand: false
+    notes: OS names; FineType has os type
+
+  - gt_label: software source code
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: technology
+    match_quality: semantic_only
+    expand: false
+    notes: Source code content
+
+  - gt_label: time of day
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Time values; maps to various datetime.time types
+
+  - gt_label: published on
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: Publication date; datetime format detectable
+
+  - gt_label: dec
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Declination or December abbreviation; context-dependent
+
+  - gt_label: filename
+    source: dbpedia
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: true
+    notes: Filenames have detectable patterns (name.ext); candidate for expansion
