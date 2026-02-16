@@ -883,18 +883,21 @@ representation.code.alphanumeric_id:
     well with the char-CNN model.
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: logical
+# CATEGORY: boolean
 #
-# Logical/boolean types. Planned relocation from technology.development.
+# Boolean values split by string format. Enables format-aware casting
+# and normalization. All subtypes map to DuckDB BOOLEAN.
+#
+# NNFT-075: Replaces technology.development.boolean (single catch-all)
+# and representation.logical.boolean (interim location).
 # ═════════════════════════════════════════════════════════════════════
 
-representation.logical.boolean:
-  title: "Boolean Value"
+representation.boolean.binary:
+  title: "Binary Boolean (0/1)"
   description: >
-    Logical true/false value represented as a string. Common representations:
-    "true"/"false", "yes"/"no", "1"/"0", "on"/"off".
+    Boolean value represented as a binary digit: "0" for false, "1" for true.
+    Common in CSV exports, database dumps, and flag columns.
     Transforms to DuckDB BOOLEAN type.
-    Canonical location for boolean (replaces technology.development.boolean).
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BOOLEAN
@@ -904,20 +907,86 @@ representation.logical.boolean:
   decompose: null
   validation:
     type: string
-    enum: ["true", "false", "yes", "no", "1", "0", "on", "off", "True", "False", "YES", "NO", "ON", "OFF"]
-  tier: [BOOLEAN, logical]
+    enum: ["0", "1"]
+  tier: [BOOLEAN, binary]
   release_priority: 5
-  aliases: [bool, flag]
+  aliases: [binary_bool, bit]
+  samples:
+    - "0"
+    - "1"
+  references: null
+  notes: >
+    NNFT-075. The simplest boolean format — just 0 and 1. The model must
+    distinguish this from single-digit integers in count/ordinal columns
+    (handled by column-level disambiguation rules).
+
+representation.boolean.initials:
+  title: "Boolean Initials (T/F, Y/N)"
+  description: >
+    Boolean value represented as a single initial character:
+    T/F (true/false) or Y/N (yes/no), in any case.
+    Transforms to DuckDB BOOLEAN type.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: BOOLEAN
+  format_string: null
+  transform: "CAST({col} AS BOOLEAN)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    enum: ["T", "F", "t", "f", "Y", "N", "y", "n"]
+  tier: [BOOLEAN, initials]
+  release_priority: 5
+  aliases: [initial_bool, char_bool]
+  samples:
+    - "T"
+    - "F"
+    - "Y"
+    - "N"
+    - "t"
+    - "f"
+    - "y"
+    - "n"
+  references: null
+  notes: >
+    NNFT-075. Single-character boolean encoding. The model must distinguish
+    these from categorical single-char columns (handled by boolean_set check
+    in column classifier).
+
+representation.boolean.terms:
+  title: "Boolean Terms (True/False, Yes/No)"
+  description: >
+    Boolean value represented as a full word or phrase:
+    true/false, yes/no, on/off, enabled/disabled, active/inactive.
+    Any casing (TRUE, True, true). Transforms to DuckDB BOOLEAN type.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: BOOLEAN
+  format_string: null
+  transform: "CAST({col} AS BOOLEAN)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    enum: ["true", "false", "yes", "no", "on", "off", "True", "False", "Yes", "No", "On", "Off",
+           "TRUE", "FALSE", "YES", "NO", "ON", "OFF",
+           "enabled", "disabled", "Enabled", "Disabled", "ENABLED", "DISABLED",
+           "active", "inactive", "Active", "Inactive", "ACTIVE", "INACTIVE"]
+  tier: [BOOLEAN, terms]
+  release_priority: 5
+  aliases: [word_bool, text_bool]
   samples:
     - "true"
     - "false"
     - "yes"
     - "no"
-    - "1"
-    - "0"
+    - "on"
+    - "off"
+    - "True"
+    - "False"
   references: null
   notes: >
-    New for NNFT-063. Boolean is a universal concept that belongs in
-    representation domain, not technology. This is the canonical location.
-    technology.development.boolean remains as an alias until model retraining
-    migrates to this label. Both labels will coexist during transition.
+    NNFT-075. Full-word boolean encoding. The most common format in
+    application data and user-facing systems. DuckDB natively accepts
+    true/false, yes/no, on/off (case-insensitive) for CAST to BOOLEAN.

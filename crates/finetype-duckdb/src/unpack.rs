@@ -44,7 +44,7 @@ fn annotate_value(value: &Value, classifier: &CharClassifier) -> Value {
             anno.insert("value".to_string(), Value::Bool(*b));
             anno.insert(
                 "type".to_string(),
-                Value::String("technology.development.boolean".to_string()),
+                Value::String("representation.boolean.terms".to_string()),
             );
             anno.insert("confidence".to_string(), Value::from(1.0));
             anno.insert(

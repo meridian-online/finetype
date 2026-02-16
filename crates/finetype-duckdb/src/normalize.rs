@@ -22,6 +22,7 @@ pub fn normalize(value: &str, label: &str) -> Option<String> {
         ("technology", "development") if label == "technology.development.boolean" => {
             normalize_boolean(value)
         }
+        ("representation", "boolean") => normalize_boolean(value),
         ("technology", "cryptographic") if label == "technology.cryptographic.uuid" => {
             normalize_uuid(value)
         }
@@ -618,6 +619,58 @@ mod tests {
             Some("false".to_string())
         );
         assert_eq!(normalize("maybe", "technology.development.boolean"), None);
+    }
+
+    #[test]
+    fn test_boolean_binary_normalization() {
+        assert_eq!(
+            normalize("1", "representation.boolean.binary"),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            normalize("0", "representation.boolean.binary"),
+            Some("false".to_string())
+        );
+    }
+
+    #[test]
+    fn test_boolean_initials_normalization() {
+        assert_eq!(
+            normalize("T", "representation.boolean.initials"),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            normalize("F", "representation.boolean.initials"),
+            Some("false".to_string())
+        );
+        assert_eq!(
+            normalize("Y", "representation.boolean.initials"),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            normalize("N", "representation.boolean.initials"),
+            Some("false".to_string())
+        );
+    }
+
+    #[test]
+    fn test_boolean_terms_normalization() {
+        assert_eq!(
+            normalize("True", "representation.boolean.terms"),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            normalize("FALSE", "representation.boolean.terms"),
+            Some("false".to_string())
+        );
+        assert_eq!(
+            normalize("yes", "representation.boolean.terms"),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            normalize("off", "representation.boolean.terms"),
+            Some("false".to_string())
+        );
     }
 
     // ── UUID Tests ───────────────────────────────────────────────────────

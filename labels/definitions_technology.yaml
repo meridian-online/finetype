@@ -956,36 +956,9 @@ technology.development.os:
     v1 migration: Was development.os marked broad_words. Values typically
     follow consistent capitalization (Windows, macOS, Linux, etc.).
 
-technology.development.boolean:
-  title: "Boolean Value"
-  description: >
-    Logical true/false value represented as a string. Common representations:
-    "true"/"false", "yes"/"no", "1"/"0", "on"/"off".
-    Transforms to DuckDB BOOLEAN type.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: BOOLEAN
-  format_string: null
-  transform: "CAST({col} AS BOOLEAN)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    enum: ["true", "false", "yes", "no", "1", "0", "on", "off", "True", "False", "YES", "NO", "ON", "OFF"]
-  tier: [BOOLEAN, development]
-  release_priority: 5
-  aliases: [bool]
-  samples:
-    - "true"
-    - "false"
-    - "yes"
-    - "no"
-    - "1"
-    - "0"
-  references: null
-  notes: >
-    v1 migration: Was development.boolean. DuckDB BOOLEAN type accepts
-    true, false, 1, 0, yes, no, on, off (case-insensitive).
+# technology.development.boolean — REMOVED in NNFT-075
+# Relocated to representation.boolean.{binary,initials,terms}
+# See labels/definitions_representation.yaml for the three new subtypes.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: hardware

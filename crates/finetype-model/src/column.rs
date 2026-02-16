@@ -13,12 +13,15 @@
 use crate::inference::{CharClassifier, ClassificationResult, InferenceError};
 use std::collections::HashMap;
 
-/// All known boolean type labels (current model output and future/legacy variants).
+/// All known boolean type labels (current and legacy).
 /// Centralised to avoid label mismatches across disambiguation rules.
 const BOOLEAN_LABELS: &[&str] = &[
-    "technology.development.boolean", // current CharCNN model label
-    "representation.logical.boolean", // planned (NNFT-075)
-    "technology.data.boolean",        // legacy
+    "representation.boolean.binary",   // NNFT-075: 0/1
+    "representation.boolean.initials", // NNFT-075: T/F, Y/N
+    "representation.boolean.terms",    // NNFT-075: true/false, yes/no, on/off
+    "technology.development.boolean",  // legacy (pre-NNFT-075 model)
+    "representation.logical.boolean",  // legacy interim label
+    "technology.data.boolean",         // legacy
 ];
 
 /// Configuration for column-mode inference.
@@ -620,7 +623,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         // Survival / binary outcome columns
         "survived" | "alive" | "deceased" | "dead" | "active" | "enabled" | "disabled"
         | "deleted" | "verified" | "approved" | "flagged" => {
-            return Some("technology.development.boolean");
+            return Some("representation.boolean.binary");
         }
         // Embarked / boarding columns — categorical
         "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
@@ -2106,13 +2109,10 @@ mod tests {
     fn test_header_hint_survival_columns() {
         assert_eq!(
             header_hint("Survived"),
-            Some("technology.development.boolean")
+            Some("representation.boolean.binary")
         );
-        assert_eq!(header_hint("alive"), Some("technology.development.boolean"));
-        assert_eq!(
-            header_hint("active"),
-            Some("technology.development.boolean")
-        );
+        assert_eq!(header_hint("alive"), Some("representation.boolean.binary"));
+        assert_eq!(header_hint("active"), Some("representation.boolean.binary"));
     }
 
     #[test]

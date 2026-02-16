@@ -881,12 +881,8 @@ impl Generator {
                 ];
                 Ok(oses[self.rng.gen_range(0..oses.len())].to_string())
             }
-            ("development", "boolean") => {
-                let bools = [
-                    "true", "false", "yes", "no", "1", "0", "True", "False", "YES", "NO",
-                ];
-                Ok(bools[self.rng.gen_range(0..bools.len())].to_string())
-            }
+            // technology.development.boolean — REMOVED in NNFT-075
+            // Relocated to representation.boolean.{binary,initials,terms}
 
             // ── hardware (4 types) ───────────────────────────────────────
             ("hardware", "cpu") => {
@@ -1971,11 +1967,21 @@ impl Generator {
                 }
             }
 
-            // ── logical (1 type) ──────────────────────────────────────────
-            ("logical", "boolean") => {
+            // ── boolean (3 types) ─────────────────────────────────────────
+            // NNFT-075: Split from single boolean into format-specific subtypes
+            ("boolean", "binary") => {
+                let vals = ["0", "1"];
+                Ok(vals[self.rng.gen_range(0..vals.len())].to_string())
+            }
+            ("boolean", "initials") => {
+                let vals = ["T", "F", "t", "f", "Y", "N", "y", "n"];
+                Ok(vals[self.rng.gen_range(0..vals.len())].to_string())
+            }
+            ("boolean", "terms") => {
                 let vals = [
-                    "true", "false", "yes", "no", "1", "0", "True", "False", "YES", "NO", "on",
-                    "off", "ON", "OFF",
+                    "true", "false", "True", "False", "TRUE", "FALSE", "yes", "no", "Yes", "No",
+                    "YES", "NO", "on", "off", "On", "Off", "ON", "OFF", "enabled", "disabled",
+                    "Enabled", "Disabled", "active", "inactive", "Active", "Inactive",
                 ];
                 Ok(vals[self.rng.gen_range(0..vals.len())].to_string())
             }

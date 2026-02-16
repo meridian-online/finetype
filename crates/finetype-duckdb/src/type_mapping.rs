@@ -92,7 +92,7 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "technology.cryptographic.token_urlsafe" => "VARCHAR",
 
         // ── technology.development ─────────────────────────────────────
-        "technology.development.boolean" => "BOOLEAN",
+        "technology.development.boolean" => "BOOLEAN", // legacy label
         "technology.development.version"
         | "technology.development.calver"
         | "technology.development.programming_language"
@@ -189,6 +189,11 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "representation.scientific.measurement_unit"
         | "representation.scientific.metric_prefix" => "VARCHAR",
 
+        // ── representation.boolean ───────────────────────────────────
+        "representation.boolean.binary"
+        | "representation.boolean.initials"
+        | "representation.boolean.terms" => "BOOLEAN",
+
         // ── container.object ───────────────────────────────────────────
         "container.object.json" | "container.object.json_array" => "JSON",
         "container.object.xml" | "container.object.yaml" | "container.object.csv" => "VARCHAR",
@@ -224,6 +229,10 @@ mod tests {
         );
         assert_eq!(to_duckdb_type("geography.coordinate.latitude"), "DOUBLE");
         assert_eq!(to_duckdb_type("technology.development.boolean"), "BOOLEAN");
+        // NNFT-075: new boolean subtypes
+        assert_eq!(to_duckdb_type("representation.boolean.binary"), "BOOLEAN");
+        assert_eq!(to_duckdb_type("representation.boolean.initials"), "BOOLEAN");
+        assert_eq!(to_duckdb_type("representation.boolean.terms"), "BOOLEAN");
     }
 
     #[test]
