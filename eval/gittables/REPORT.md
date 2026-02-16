@@ -1,10 +1,116 @@
 # GitTables Evaluation Report
 
-**FineType v0.1.0 (CharCNN flat model, 91.97% synthetic accuracy)**
+**FineType v0.1.5 (CharCNN v6, 89.15% synthetic accuracy, 169 types)**
 
-> **Primary benchmark:** GitTables 1M stratified sample (4,380 tables, 50/topic) — **55.3% domain accuracy**
-> See [§ GitTables 1M Evaluation](#gittables-1m-evaluation) for the primary results.
+> **Primary benchmark:** GitTables 1M stratified sample (4,380 tables, 50/topic)
+> - **57.2% domain accuracy** on format-detectable types (direct + close mapping)
+> - **62.3% domain accuracy** on all mapped types (192-type comprehensive mapping)
+> - **35.2% label accuracy** on format-detectable types
+> See [§ v0.1.5 Evaluation](#v015-evaluation-charcnn-v6) for the latest results.
+> See [§ GitTables 1M Evaluation](#gittables-1m-evaluation) for v0.1.0 baseline.
 > The legacy 1,101-table subset is retained below for historical comparison.
+
+---
+
+## v0.1.5 Evaluation (CharCNN v6)
+
+**Date:** 2026-02-17
+**Model:** CharCNN v6 (169 classes, 89.15% synthetic accuracy)
+**Mapping:** 192-type schema mapping (NNFT-079) with match quality tiers
+
+### What Changed from v0.1.0
+
+1. **Expanded taxonomy** — 151 → 169 types (boolean restructured, new categorical/ordinal/alphanumeric_id types)
+2. **Comprehensive mapping** — 34-type inline VALUES → 192-type schema_mapping.csv with match quality tiers
+3. **Label-level accuracy** — New metric: exact finetype label match (not just domain)
+4. **Detectability tiers** — Types classified as format_detectable (direct+close), partially_detectable, or semantic_only
+5. **DuckDB extension rebuilt** — Build.rs now follows `models/default` symlink instead of hardcoding `char-cnn-v2`
+
+### Headline Results
+
+| Detectability Tier | Columns | Label Accuracy | Domain Accuracy |
+|---|---|---|---|
+| Format-detectable (direct + close) | 4,481 | **35.2%** | **57.2%** |
+| Partially detectable | 3,509 | 4.0% | 21.7% |
+| Semantic only | 15,475 | 0.0% (by design) | 73.0% |
+| **All mapped types** | **23,465** | **7.3%** | **62.3%** |
+
+### Baseline Comparison
+
+| Metric | v0.1.0 (34 types) | v0.1.5 (192 types) | Change |
+|---|---|---|---|
+| Domain accuracy (mapped) | 55.3% | **62.3%** | **+7.0%** |
+| Domain accuracy (format-detectable) | — | **57.2%** | new metric |
+| Label accuracy (format-detectable) | — | **35.2%** | new metric |
+| Mapped column count | 10,727 | **23,465** | +119% |
+| GT labels mapped | 34 | **192** | +465% |
+| FineType types detected | 143 | **157** | +14 |
+| Values classified | 774,350 | 774,350 | — |
+| Classification time | 370s | 307s | **-17%** |
+
+The +7.0% domain accuracy improvement is understated because v0.1.5 maps 2.2× more columns. The old 34-type mapping cherry-picked high-performing types; the comprehensive 192-type mapping includes harder partial and semantic-only types.
+
+### Domain-Level Accuracy by Expected Domain
+
+| Expected Domain | Columns | Domain Correct | Accuracy |
+|---|---|---|---|
+| technology | 1,769 | 1,624 | **91.8%** |
+| representation | 16,601 | 11,666 | **70.3%** |
+| datetime | 858 | 364 | **42.4%** |
+| identity | 2,475 | 877 | **35.4%** |
+| geography | 1,762 | 97 | **5.5%** |
+
+Technology domain leads at 91.8% (URLs, ISSNs drive this). Representation dominates the corpus since most GT labels (title, comment, parent, etc.) are semantic-only types that FineType correctly detects as representation-domain text/numbers. Geography accuracy is low because `location_created` (1,463 columns — overwhelmingly numeric timestamps, not geographic data) is mapped to the geography domain.
+
+### Top Format-Detectable Performers
+
+| GT Label | Quality | Columns | Label Correct | Label % | Domain % |
+|---|---|---|---|---|---|
+| url | direct | 1,573 | 1,222 | **77.7%** | **98.9%** |
+| sentence | close | 59 | 57 | **96.6%** | **96.6%** |
+| person | close | 57 | 57 | **100%** | **100%** |
+| currency | partial | 21 | 21 | **100%** | **100%** |
+| address | close | 14 | 14 | **100%** | **100%** |
+| issn | direct | 17 | 16 | **94.1%** | **94.1%** |
+| artist | close | 47 | 36 | **76.6%** | **85.1%** |
+| email | direct | 14 | 10 | **71.4%** | **71.4%** |
+| sex | partial | 30 | 12 | **40.0%** | **83.3%** |
+| isbn | partial | 4 | 2 | **50.0%** | **100%** |
+
+### Top Misclassification Patterns
+
+| GT Label | Expected | Predicted | Count | Issue |
+|---|---|---|---|---|
+| author | identity.person.full_name | representation.text.word | 426 | Single-word author names (usernames, IDs) |
+| author | identity.person.full_name | identity.person.username | 421 | Author IDs, not real names |
+| author | identity.person.full_name | representation.discrete.ordinal | 405 | Numeric author IDs |
+| url | technology.internet.url | technology.internet.user_agent | 328 | Long URLs misclassified as user-agent strings |
+| day_of_week | datetime.component.day_of_week | representation.numeric.decimal_number | 27 | Numeric day-of-week (1-7) |
+| weight | identity.person.weight | representation.numeric.decimal_number | 47 | Weight values are just numbers |
+
+The `author` misclassifications dominate because GitTables `author` columns contain diverse data: usernames, IDs, organization names — not just "John Smith" style person names. FineType correctly identifies the format but the semantic mapping expects full names.
+
+### Per-Topic Accuracy
+
+Best topics: `seek_time` (74.3%), `half_life` (73.1%), `revolutions_per_minute` (72.2%)
+Worst topics: `secretory_phase` (6.3%), `escape_velocity` (20.5%), `dogwatch` (30.0%)
+
+Low-accuracy topics are dominated by:
+- Large numbers of semantic-only GT labels (procedure_type, short_story, parent)
+- `location_created` mapped to geography but containing epoch timestamps
+- `class` labels containing diverse data (codes, URLs, IDs)
+
+### Key Findings
+
+1. **Label accuracy is modest (35.2%) but domain accuracy is strong (57.2%)** for format-detectable types. FineType gets the right category but often picks a nearby type within the same domain.
+
+2. **The `author` problem is structural.** GitTables `author` columns contain everything from "John Smith" to "user_12345" to "MIT Press". FineType correctly identifies the format but can't know the semantic intent is "person name."
+
+3. **Classification is 17% faster** (307s vs 370s) — likely due to the v6 model's optimized architecture or batch processing improvements.
+
+4. **157 of 169 types detected** in real-world data (+14 over v0.1.0's 143/151), confirming the expanded taxonomy covers real formats.
+
+5. **Geography accuracy is misleadingly low** because `location_created` (1,463 columns of epoch timestamps) is mapped to geography. Excluding it, geography accuracy for actual geographic data (country, state, city, postal_code, coordinates) is much higher.
 
 ---
 

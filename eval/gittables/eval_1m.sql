@@ -1,7 +1,8 @@
 -- GitTables 1M Evaluation: FineType on stratified corpus sample
 -- =============================================================================
 -- PRIMARY BENCHMARK for FineType accuracy measurement.
--- Baseline: 55.3% domain accuracy (v0.1.0, 2026-02-13)
+-- Baseline v0.1.0 (2026-02-13): 55.3% domain accuracy (34-type inline mapping)
+-- Baseline v0.1.5 (2026-02-17): TBD (192-type schema mapping, label+domain accuracy)
 --
 -- Pipeline (3 steps):
 --   1. extract_metadata_1m.py  — Extract annotations from parquet KV metadata
@@ -16,7 +17,8 @@
 --   1. GitTables 1M corpus at ~/git-tables/topics/{topic}/
 --   2. Pre-extracted metadata: make eval-extract eval-values
 --      (generates ~/git-tables/eval_output/{catalog,metadata}.csv and column_values.parquet)
---   3. DuckDB extension built: cargo build --release
+--   3. DuckDB extension built: cargo build -p finetype_duckdb --release
+--   4. Schema mapping generated: make eval-mapping
 
 SET threads = 8;
 SET memory_limit = '4GB';
@@ -161,6 +163,20 @@ FROM column_predictions;
 .print '          GROUND TRUTH COMPARISON                                 '
 .print '═══════════════════════════════════════════════════════════════════'
 
+-- Schema mapping (comprehensive, from NNFT-079)
+CREATE OR REPLACE TABLE schema_mapping AS
+SELECT * FROM read_csv('eval/schema_mapping.csv', auto_detect=true);
+
+.print ''
+.print '--- Schema mapping loaded ---'
+SELECT
+    count(*) AS total_mappings,
+    count(*) FILTER (match_quality = 'direct') AS direct,
+    count(*) FILTER (match_quality = 'close') AS close,
+    count(*) FILTER (match_quality = 'partial') AS partial,
+    count(*) FILTER (match_quality = 'semantic_only') AS semantic_only
+FROM schema_mapping;
+
 CREATE OR REPLACE TABLE eval_results AS
 SELECT
     cp.topic,
@@ -169,79 +185,239 @@ SELECT
     cp.predicted_label,
     cp.vote_pct,
     gt.gt_label,
-    split_part(cp.predicted_label, '.', 1) AS ft_domain
+    split_part(cp.predicted_label, '.', 1) AS ft_domain,
+    sm.finetype_label AS expected_ft_label,
+    sm.finetype_domain AS expected_ft_domain,
+    sm.match_quality,
+    -- Label-level match (exact finetype label)
+    CASE
+        WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
+             AND cp.predicted_label = sm.finetype_label
+        THEN true
+        ELSE false
+    END AS label_match,
+    -- Domain-level match
+    CASE
+        WHEN sm.finetype_domain IS NOT NULL AND sm.finetype_domain != ''
+             AND split_part(cp.predicted_label, '.', 1) = sm.finetype_domain
+        THEN true
+        ELSE false
+    END AS domain_match,
+    -- Detectability tier
+    CASE
+        WHEN sm.match_quality IN ('direct', 'close') THEN 'format_detectable'
+        WHEN sm.match_quality = 'partial' THEN 'partially_detectable'
+        WHEN sm.match_quality = 'semantic_only' THEN 'semantic_only'
+        ELSE 'unmapped'
+    END AS detectability
 FROM column_predictions cp
 JOIN ground_truth gt ON cp.topic = gt.topic
     AND cp.table_name = gt.table_name
-    AND cp.col_name = gt.col_name;
+    AND cp.col_name = gt.col_name
+LEFT JOIN schema_mapping sm ON gt.gt_label = sm.gt_label;
 
 SELECT
     count(*) AS columns_with_gt,
     count(DISTINCT gt_label) AS unique_gt_labels,
     count(DISTINCT predicted_label) AS unique_ft_predictions,
-    count(DISTINCT topic) AS topics
+    count(DISTINCT topic) AS topics,
+    count(*) FILTER (match_quality IS NOT NULL) AS mapped,
+    count(*) FILTER (match_quality IS NULL) AS unmapped
 FROM eval_results;
 
--- Domain mapping for accuracy measurement
-CREATE OR REPLACE TABLE type_mapping AS
-SELECT * FROM (VALUES
-    ('email',       'identity'),
-    ('url',         'technology'),
-    ('date',        'datetime'),
-    ('start date',  'datetime'),
-    ('end date',    'datetime'),
-    ('start time',  'datetime'),
-    ('end time',    'datetime'),
-    ('time',        'datetime'),
-    ('created',     'datetime'),
-    ('updated',     'datetime'),
-    ('year',        'datetime'),
-    ('postal code', 'geography'),
-    ('zip code',    'geography'),
-    ('country',     'geography'),
-    ('state',       'geography'),
-    ('city',        'geography'),
-    ('id',          'technology'),
-    ('name',        'identity'),
-    ('percentage',  'representation'),
-    ('age',         'representation'),
-    ('price',       'representation'),
-    ('weight',      'representation'),
-    ('height',      'representation'),
-    ('depth',       'representation'),
-    ('width',       'representation'),
-    ('length',      'representation'),
-    ('duration',    'datetime'),
-    ('gender',      'identity'),
-    ('author',      'identity'),
-    ('description', 'representation'),
-    ('title',       'representation'),
-    ('abstract',    'representation'),
-    ('comment',     'representation'),
-    ('status',      'representation'),
-    ('category',    'representation'),
-    ('type',        'representation'),
-    ('telephone',   'identity'),
-    ('currency',    'representation'),
-    ('latitude',    'geography'),
-    ('longitude',   'geography'),
-    ('address',     'geography'),
-    ('brand',       'identity'),
-    ('color',       'representation'),
-    ('language',    'representation'),
-    ('coordinates', 'geography')
-) AS t(gt_label, expected_ft_domain);
-
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 5. ANALYSIS RESULTS
+-- 5. HEADLINE ACCURACY
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 .print ''
 .print '═══════════════════════════════════════════════════════════════════'
-.print '          ANALYSIS RESULTS                                        '
+.print '          HEADLINE ACCURACY                                       '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- 5a. FineType domain distribution (all profiled columns)
+-- 5a. Accuracy by detectability tier
+.print ''
+.print '--- Accuracy by detectability tier ---'
+SELECT
+    detectability,
+    count(*) AS columns,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_accuracy_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_accuracy_pct
+FROM eval_results
+WHERE match_quality IS NOT NULL
+GROUP BY detectability
+ORDER BY
+    CASE detectability
+        WHEN 'format_detectable' THEN 1
+        WHEN 'partially_detectable' THEN 2
+        WHEN 'semantic_only' THEN 3
+        ELSE 4
+    END;
+
+-- 5b. Headline: format-detectable types (direct + close)
+.print ''
+.print '--- HEADLINE: Format-detectable accuracy (direct + close) ---'
+SELECT
+    'Format-detectable (direct + close)' AS metric,
+    count(*) AS columns,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / NULLIF(count(*), 0), 1) AS label_accuracy_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / NULLIF(count(*), 0), 1) AS domain_accuracy_pct
+FROM eval_results
+WHERE detectability = 'format_detectable';
+
+-- 5c. Overall mapped domain accuracy (for baseline comparison)
+.print ''
+.print '--- Overall mapped accuracy (all mapped types, domain + label) ---'
+SELECT
+    'All mapped types' AS metric,
+    count(*) AS total,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_accuracy_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_accuracy_pct
+FROM eval_results
+WHERE match_quality IS NOT NULL;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 6. PER-TYPE METRICS
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          PER-TYPE METRICS                                        '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 6a. Per GT label recall
+.print ''
+.print '--- Per GT label accuracy (direct + close + partial) ---'
+SELECT
+    gt_label,
+    match_quality,
+    expected_ft_label,
+    count(*) AS total,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_recall_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_recall_pct,
+    ROUND(avg(vote_pct), 1) AS avg_confidence
+FROM eval_results
+WHERE match_quality IN ('direct', 'close', 'partial')
+GROUP BY gt_label, match_quality, expected_ft_label
+HAVING count(*) >= 3
+ORDER BY total DESC;
+
+-- 6b. Domain-level accuracy breakdown
+.print ''
+.print '--- Domain-level accuracy by expected domain ---'
+SELECT
+    expected_ft_domain,
+    count(*) AS total_columns,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
+FROM eval_results
+WHERE expected_ft_domain IS NOT NULL AND expected_ft_domain != ''
+GROUP BY expected_ft_domain
+ORDER BY total_columns DESC;
+
+-- 6c. GT label → FineType prediction (top 40 by frequency)
+.print ''
+.print '--- GT label → FineType prediction (top 40 by frequency) ---'
+SELECT
+    gt_label,
+    predicted_label,
+    count(*) AS columns,
+    ROUND(avg(vote_pct), 1) AS avg_conf
+FROM eval_results
+GROUP BY gt_label, predicted_label
+HAVING count(*) >= 5
+ORDER BY gt_label, columns DESC
+LIMIT 40;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 7. MODEL ERRORS vs SEMANTIC GAPS
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          MODEL ERRORS vs SEMANTIC GAPS                           '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 7a. Top misclassification patterns (format-detectable)
+.print ''
+.print '--- Top misclassification patterns (format-detectable, wrong) ---'
+SELECT
+    gt_label,
+    expected_ft_label,
+    predicted_label AS actual_prediction,
+    match_quality,
+    count(*) AS occurrences,
+    ROUND(avg(vote_pct), 1) AS avg_conf,
+    list(DISTINCT topic ORDER BY topic)[:3] AS example_topics
+FROM eval_results
+WHERE NOT label_match
+  AND match_quality IN ('direct', 'close')
+  AND expected_ft_label IS NOT NULL
+  AND expected_ft_label != ''
+GROUP BY gt_label, expected_ft_label, predicted_label, match_quality
+ORDER BY occurrences DESC
+LIMIT 20;
+
+-- 7b. Partial detection misses
+.print ''
+.print '--- Partial detection misses (wrong domain) ---'
+SELECT
+    gt_label,
+    predicted_label,
+    count(*) AS occurrences,
+    ROUND(avg(vote_pct), 1) AS avg_confidence
+FROM eval_results
+WHERE detectability = 'partially_detectable'
+  AND NOT domain_match
+GROUP BY gt_label, predicted_label
+ORDER BY occurrences DESC
+LIMIT 20;
+
+-- 7c. Semantic gap summary
+.print ''
+.print '--- Semantic gap summary (FineType cannot detect by design) ---'
+SELECT
+    gt_label,
+    count(*) AS columns,
+    list(DISTINCT predicted_label ORDER BY predicted_label)[:5] AS ft_predictions,
+    ROUND(avg(vote_pct), 1) AS avg_confidence
+FROM eval_results
+WHERE detectability = 'semantic_only'
+GROUP BY gt_label
+HAVING count(*) >= 3
+ORDER BY columns DESC
+LIMIT 20;
+
+-- 7d. Unmapped GT labels (not in schema_mapping at all)
+.print ''
+.print '--- GT labels with NO mapping (not in schema_mapping.csv) ---'
+SELECT
+    gt_label,
+    count(*) AS columns,
+    list(DISTINCT ft_domain ORDER BY ft_domain) AS ft_domains_seen
+FROM eval_results
+WHERE match_quality IS NULL
+GROUP BY gt_label
+ORDER BY columns DESC
+LIMIT 25;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 8. DISTRIBUTION & COVERAGE
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          DISTRIBUTION & COVERAGE                                 '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 8a. FineType domain distribution (all profiled columns)
 .print ''
 .print '--- FineType domain distribution (all columns) ---'
 SELECT
@@ -252,7 +428,7 @@ FROM column_predictions
 GROUP BY ft_domain
 ORDER BY columns DESC;
 
--- 5b. Top 30 FineType predictions
+-- 8b. Top 30 FineType predictions
 .print ''
 .print '--- Top 30 FineType predictions ---'
 SELECT
@@ -265,34 +441,16 @@ GROUP BY predicted_label
 ORDER BY columns DESC
 LIMIT 30;
 
--- 5c. GT label → FineType domain mapping accuracy
+-- 8c. Top 20 GT labels
 .print ''
-.print '--- Domain-level accuracy for mapped types ---'
-SELECT
-    tm.expected_ft_domain,
-    count(*) AS total_columns,
-    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
-    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
-FROM eval_results er
-JOIN type_mapping tm ON er.gt_label = tm.gt_label
-GROUP BY tm.expected_ft_domain
-ORDER BY total_columns DESC;
+.print '--- Top 20 ground truth labels ---'
+SELECT gt_label, count(*) AS columns
+FROM ground_truth
+GROUP BY gt_label
+ORDER BY columns DESC
+LIMIT 20;
 
--- 5d. Detailed: GT label × FineType prediction
-.print ''
-.print '--- GT label → FineType prediction (top 40 by frequency) ---'
-SELECT
-    er.gt_label,
-    er.predicted_label,
-    count(*) AS columns,
-    ROUND(avg(er.vote_pct), 1) AS avg_conf
-FROM eval_results er
-GROUP BY er.gt_label, er.predicted_label
-HAVING count(*) >= 5
-ORDER BY er.gt_label, columns DESC
-LIMIT 40;
-
--- 5e. Per-topic type diversity
+-- 8d. Per-topic type diversity
 .print ''
 .print '--- Per-topic type diversity (top 20 topics by column count) ---'
 SELECT
@@ -305,31 +463,7 @@ GROUP BY topic
 ORDER BY columns DESC
 LIMIT 20;
 
--- 5f. Per-topic dominant domain
-.print ''
-.print '--- Per-topic dominant FineType domain ---'
-WITH topic_domains AS (
-    SELECT
-        topic,
-        split_part(predicted_label, '.', 1) AS ft_domain,
-        count(*) AS cnt,
-        count(*) OVER (PARTITION BY topic) AS total
-    FROM column_predictions
-    GROUP BY topic, ft_domain
-),
-ranked AS (
-    SELECT *,
-           row_number() OVER (PARTITION BY topic ORDER BY cnt DESC) AS rk,
-           ROUND(cnt * 100.0 / total, 1) AS pct
-    FROM topic_domains
-)
-SELECT topic, ft_domain AS dominant_domain, cnt AS columns, pct, total AS total_cols
-FROM ranked
-WHERE rk = 1
-ORDER BY total_cols DESC
-LIMIT 30;
-
--- 5g. Low confidence predictions
+-- 8e. Low confidence predictions
 .print ''
 .print '--- Low confidence predictions (vote_pct < 60%) ---'
 SELECT
@@ -342,50 +476,7 @@ GROUP BY predicted_label
 ORDER BY low_conf_columns DESC
 LIMIT 20;
 
--- 5h. Perfect agreement predictions
-.print ''
-.print '--- Perfect agreement by domain (vote_pct = 100%) ---'
-SELECT
-    split_part(predicted_label, '.', 1) AS ft_domain,
-    count(*) AS perfect_columns,
-    ROUND(count(*) * 100.0 / sum(count(*)) OVER (), 1) AS pct
-FROM column_predictions
-WHERE vote_pct = 100
-GROUP BY ft_domain
-ORDER BY perfect_columns DESC;
-
--- 5i. Unmapped GT labels (gaps in taxonomy)
-.print ''
-.print '--- GT labels with NO domain mapping (potential taxonomy gaps) ---'
-SELECT
-    er.gt_label,
-    count(*) AS columns,
-    list(DISTINCT er.ft_domain ORDER BY er.ft_domain) AS ft_domains_seen
-FROM eval_results er
-LEFT JOIN type_mapping tm ON er.gt_label = tm.gt_label
-WHERE tm.gt_label IS NULL
-GROUP BY er.gt_label
-ORDER BY columns DESC
-LIMIT 25;
-
--- 5j. Overall domain accuracy
-.print ''
-.print '--- Overall mapped domain accuracy ---'
-SELECT
-    'Mapped types (domain match)' AS metric,
-    count(*) AS total,
-    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
-    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
-FROM eval_results er
-JOIN type_mapping tm ON er.gt_label = tm.gt_label;
-
--- 5k. Comparison with benchmark subset
-.print ''
-.print '--- Benchmark comparison metrics ---'
-.print '    (Benchmark subset: 2,384 columns, 42.2% domain accuracy)'
-.print '    (1M sample results above)'
-
--- 5l. Throughput
+-- 8f. Throughput summary
 .print ''
 .print '--- Throughput summary ---'
 SELECT
@@ -396,7 +487,7 @@ SELECT
 FROM classified;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 6. PER-TOPIC ACCURACY HARNESS (NNFT-041)
+-- 9. PER-TOPIC ACCURACY HARNESS (NNFT-041)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 .print ''
@@ -404,47 +495,51 @@ FROM classified;
 .print '          PER-TOPIC ACCURACY                                      '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- 6a. Per-topic domain accuracy (top 10 best)
+-- 9a. Per-topic accuracy (top 10 best)
 .print ''
 .print '--- Top 10 topics by domain accuracy ---'
 SELECT
-    er.topic,
+    topic,
     count(*) AS mapped_cols,
-    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
-    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
-FROM eval_results er
-JOIN type_mapping tm ON er.gt_label = tm.gt_label
-GROUP BY er.topic
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results
+WHERE match_quality IS NOT NULL
+GROUP BY topic
 HAVING count(*) >= 5
-ORDER BY accuracy_pct DESC
+ORDER BY domain_pct DESC
 LIMIT 10;
 
--- 6b. Per-topic domain accuracy (bottom 10 worst)
+-- 9b. Per-topic accuracy (bottom 10 worst)
 .print ''
 .print '--- Bottom 10 topics by domain accuracy ---'
 SELECT
-    er.topic,
+    topic,
     count(*) AS mapped_cols,
-    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
-    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
-FROM eval_results er
-JOIN type_mapping tm ON er.gt_label = tm.gt_label
-GROUP BY er.topic
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results
+WHERE match_quality IS NOT NULL
+GROUP BY topic
 HAVING count(*) >= 5
-ORDER BY accuracy_pct ASC
+ORDER BY domain_pct ASC
 LIMIT 10;
 
--- 6c. Per-topic confusion: worst topics' most common misclassifications
+-- 9c. Per-topic confusion: worst topics' most common misclassifications
 .print ''
 .print '--- Confusion matrix for bottom 10 topics ---'
 WITH topic_accuracy AS (
     SELECT
-        er.topic,
+        topic,
         count(*) AS mapped_cols,
-        ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
-    FROM eval_results er
-    JOIN type_mapping tm ON er.gt_label = tm.gt_label
-    GROUP BY er.topic
+        ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
+    FROM eval_results
+    WHERE match_quality IS NOT NULL
+    GROUP BY topic
     HAVING count(*) >= 5
     ORDER BY accuracy_pct ASC
     LIMIT 10
@@ -453,30 +548,32 @@ SELECT
     er.topic,
     er.gt_label,
     er.predicted_label,
-    tm.expected_ft_domain AS expected_domain,
+    er.expected_ft_domain,
     er.ft_domain AS predicted_domain,
     count(*) AS columns,
-    CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 'correct' ELSE 'wrong' END AS match
+    CASE WHEN er.domain_match THEN 'correct' ELSE 'wrong' END AS match
 FROM eval_results er
-JOIN type_mapping tm ON er.gt_label = tm.gt_label
 JOIN topic_accuracy ta ON er.topic = ta.topic
-GROUP BY er.topic, er.gt_label, er.predicted_label, tm.expected_ft_domain, er.ft_domain
+WHERE er.match_quality IS NOT NULL
+GROUP BY er.topic, er.gt_label, er.predicted_label, er.expected_ft_domain, er.ft_domain, er.domain_match
 HAVING count(*) >= 2
 ORDER BY er.topic, columns DESC;
 
--- 6d. Full per-topic accuracy report
+-- 9d. Full per-topic accuracy report
 .print ''
 .print '--- Full per-topic accuracy (all topics with mapped columns) ---'
 SELECT
-    er.topic,
+    topic,
     count(*) AS mapped_cols,
-    sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) AS correct,
-    ROUND(sum(CASE WHEN er.ft_domain = tm.expected_ft_domain THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS accuracy_pct
-FROM eval_results er
-JOIN type_mapping tm ON er.gt_label = tm.gt_label
-GROUP BY er.topic
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results
+WHERE match_quality IS NOT NULL
+GROUP BY topic
 HAVING count(*) >= 3
-ORDER BY er.topic;
+ORDER BY topic;
 
 .print ''
 .print '--- Evaluation complete ---'

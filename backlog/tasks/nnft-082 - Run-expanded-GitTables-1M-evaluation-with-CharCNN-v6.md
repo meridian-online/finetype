@@ -1,9 +1,11 @@
 ---
 id: NNFT-082
 title: Run expanded GitTables 1M evaluation with CharCNN v6
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@nightingale'
 created_date: '2026-02-16 10:49'
+updated_date: '2026-02-16 22:02'
 labels:
   - evaluation
   - benchmark
@@ -27,3 +29,14 @@ Re-run the GitTables 1M stratified evaluation with the v6 model and updated taxo
 - [ ] #5 Regressions from v5→v6 identified and documented
 - [ ] #6 REPORT.md updated with v0.1.5 results section
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Build DuckDB extension with v6 model (cargo build --release)
+2. Update eval_1m.sql to replace inline type_mapping VALUES with schema_mapping.csv
+3. Add label-level accuracy scoring alongside domain-level
+4. Run eval (duckdb -unsigned < eval/gittables/eval_1m.sql)
+5. Compare results against v0.1.0 baseline
+6. Update REPORT.md with v0.1.5 section
+<!-- SECTION:PLAN:END -->
