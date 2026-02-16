@@ -2,6 +2,8 @@
 
 [![Project Page](https://img.shields.io/badge/noon.sh-FineType-blue)](https://noon.sh/projects/finetype/)
 
+> **Early Development** — FineType is under active development. Expect breaking changes to taxonomy labels, CLI arguments, library APIs, and model formats between releases. Pin to a specific version if stability matters for your use case.
+
 Precision format detection for text data. FineType classifies strings into a rich taxonomy of 163 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
