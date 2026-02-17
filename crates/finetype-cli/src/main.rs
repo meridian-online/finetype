@@ -58,8 +58,8 @@ enum Commands {
         #[arg(short, long)]
         value: bool,
 
-        /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "char-cnn")]
+        /// Model type (tiered, char-cnn, transformer)
+        #[arg(long, default_value = "tiered")]
         model_type: ModelType,
 
         /// Inference mode: row (per-value) or column (distribution-based disambiguation)
@@ -126,7 +126,7 @@ enum Commands {
         device: String,
 
         /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "tiered")]
         model_type: ModelType,
     },
 
@@ -238,7 +238,7 @@ enum Commands {
         no_header_hint: bool,
 
         /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "tiered")]
         model_type: ModelType,
     },
 
@@ -278,7 +278,7 @@ enum Commands {
         taxonomy: PathBuf,
 
         /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "tiered")]
         model_type: ModelType,
 
         /// Number of top confusions to show
@@ -635,7 +635,7 @@ fn cmd_infer(
             }
         }
         ModelType::Tiered => {
-            let classifier = finetype_model::TieredClassifier::load(&model)?;
+            let classifier = load_tiered_classifier(&model)?;
             for text in inputs {
                 let result = classifier.classify(&text)?;
                 output_result(&text, &result, output, show_value, show_confidence);
@@ -684,6 +684,37 @@ fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifie
     }
 
     Ok(classifier)
+}
+
+/// Load a TieredClassifier: try the model directory first, then fall back to
+/// the embedded tiered model if the path doesn't exist (release binaries).
+fn load_tiered_classifier(model: &PathBuf) -> Result<finetype_model::TieredClassifier> {
+    if model.exists() && model.join("tier_graph.json").exists() {
+        Ok(finetype_model::TieredClassifier::load(model)?)
+    } else {
+        #[cfg(feature = "embed-models")]
+        {
+            if embedded::EMBEDDED_MODEL_TYPE == "tiered" {
+                Ok(finetype_model::TieredClassifier::from_embedded(
+                    embedded::TIER_GRAPH,
+                    embedded::get_tiered_model_data,
+                )?)
+            } else {
+                anyhow::bail!(
+                    "Tiered model not found at {:?} and embedded model is flat. \
+                     Use --model-type char-cnn or provide a tiered model path.",
+                    model
+                )
+            }
+        }
+        #[cfg(not(feature = "embed-models"))]
+        {
+            anyhow::bail!(
+                "Model directory {:?} not found. Build with `embed-models` feature for standalone use.",
+                model
+            )
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1423,7 +1454,7 @@ fn cmd_profile(
     eprintln!("Loading model from {:?}", model);
     let classifier: Box<dyn ValueClassifier> = match model_type {
         ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-        ModelType::Tiered => Box::new(finetype_model::TieredClassifier::load(&model)?),
+        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
         ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
     };
 
@@ -2243,7 +2274,7 @@ fn cmd_eval(
             }
         }
         ModelType::Tiered => {
-            let classifier = finetype_model::TieredClassifier::load(&model)?;
+            let classifier = load_tiered_classifier(&model)?;
             eprintln!("Running tiered inference...");
 
             let batch_size = 128;
