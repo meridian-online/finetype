@@ -32,6 +32,19 @@ pub struct ClassificationResult {
     pub all_scores: Vec<(String, f32)>,
 }
 
+/// Trait for any classifier that can classify text values.
+///
+/// Implemented by `CharClassifier`, `TieredClassifier`, and `Classifier`.
+/// Used by `ColumnClassifier` to support both flat and tiered models.
+pub trait ValueClassifier: Send + Sync {
+    /// Classify a single text value.
+    fn classify(&self, text: &str) -> Result<ClassificationResult, InferenceError>;
+
+    /// Classify a batch of text values.
+    fn classify_batch(&self, texts: &[String])
+        -> Result<Vec<ClassificationResult>, InferenceError>;
+}
+
 /// Classifier for text classification inference.
 pub struct Classifier {
     model: TextClassifier,
@@ -196,6 +209,19 @@ impl Classifier {
     /// Get the device being used.
     pub fn device(&self) -> &Device {
         &self.device
+    }
+}
+
+impl ValueClassifier for Classifier {
+    fn classify(&self, text: &str) -> Result<ClassificationResult, InferenceError> {
+        self.classify(text)
+    }
+
+    fn classify_batch(
+        &self,
+        texts: &[String],
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        self.classify_batch(texts)
     }
 }
 
@@ -491,6 +517,19 @@ impl CharClassifier {
         }
 
         Device::Cpu
+    }
+}
+
+impl ValueClassifier for CharClassifier {
+    fn classify(&self, text: &str) -> Result<ClassificationResult, InferenceError> {
+        self.classify(text)
+    }
+
+    fn classify_batch(
+        &self,
+        texts: &[String],
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        self.classify_batch(texts)
     }
 }
 

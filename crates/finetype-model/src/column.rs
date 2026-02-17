@@ -10,7 +10,7 @@
 //! - `latitude` vs `longitude` coordinates
 //! - Numeric types (port, increment, postal_code, integer_number)
 
-use crate::inference::{CharClassifier, ClassificationResult, InferenceError};
+use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use std::collections::HashMap;
 
 /// All known boolean type labels (current and legacy).
@@ -61,19 +61,22 @@ pub struct ColumnResult {
 }
 
 /// Column-mode classifier that wraps a single-value classifier.
+///
+/// Accepts any `ValueClassifier` implementation (CharClassifier, TieredClassifier, etc.)
+/// via `Box<dyn ValueClassifier>`.
 pub struct ColumnClassifier {
-    classifier: CharClassifier,
+    classifier: Box<dyn ValueClassifier>,
     config: ColumnConfig,
 }
 
 impl ColumnClassifier {
-    /// Create a new column classifier wrapping a CharClassifier.
-    pub fn new(classifier: CharClassifier, config: ColumnConfig) -> Self {
+    /// Create a new column classifier wrapping any ValueClassifier.
+    pub fn new(classifier: Box<dyn ValueClassifier>, config: ColumnConfig) -> Self {
         Self { classifier, config }
     }
 
     /// Create with default configuration.
-    pub fn with_defaults(classifier: CharClassifier) -> Self {
+    pub fn with_defaults(classifier: Box<dyn ValueClassifier>) -> Self {
         Self::new(classifier, ColumnConfig::default())
     }
 
@@ -164,8 +167,8 @@ impl ColumnClassifier {
     }
 
     /// Get a reference to the underlying classifier.
-    pub fn classifier(&self) -> &CharClassifier {
-        &self.classifier
+    pub fn classifier(&self) -> &dyn ValueClassifier {
+        &*self.classifier
     }
 
     /// Classify a column of values with an optional header name hint.
@@ -309,6 +312,18 @@ fn disambiguate(
     // Rule 8: Numeric type disambiguation
     if let Some((label, rule)) = disambiguate_numeric(values, results, &top_labels) {
         return Some((label, rule));
+    }
+
+    // Rule 9: SI number override — if the top vote is si_number but no sampled
+    // values contain an SI suffix (K, M, B, T, G, etc.), the model confused
+    // plain decimals for SI numbers. Override to decimal_number.
+    if top_labels
+        .first()
+        .is_some_and(|l| *l == "representation.numeric.si_number")
+    {
+        if let Some((label, rule)) = disambiguate_si_number(values) {
+            return Some((label, rule));
+        }
     }
 
     None
@@ -989,6 +1004,39 @@ fn disambiguate_numeric(
     // (return None to let the majority vote stand)
     let _ = results; // suppress unused warning
     None
+}
+
+/// SI number override: plain decimals misclassified as si_number.
+///
+/// The T2_DOUBLE_numeric model sometimes predicts `si_number` for columns of
+/// plain decimals (e.g. "5.1", "3.5") because the numeric prefix of SI values
+/// (before the suffix like K, M, G) looks identical. If no sampled values
+/// contain an SI suffix, override to `decimal_number`.
+fn disambiguate_si_number(values: &[String]) -> Option<(String, String)> {
+    // SI suffixes: K/k (kilo), M/m (mega), B/b (billion), T/t (tera/trillion),
+    // G/g (giga). Also check for % which would be percentage.
+    const SI_SUFFIXES: &[char] = &['K', 'k', 'M', 'm', 'B', 'b', 'T', 't', 'G', 'g'];
+
+    let has_si_suffix = values.iter().any(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() {
+            return false;
+        }
+        // Check if the last character (ignoring trailing whitespace) is an SI suffix
+        trimmed
+            .chars()
+            .last()
+            .is_some_and(|c| SI_SUFFIXES.contains(&c))
+    });
+
+    if !has_si_suffix {
+        Some((
+            "representation.numeric.decimal_number".to_string(),
+            "si_number_override_no_suffix".to_string(),
+        ))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -2165,6 +2213,78 @@ mod tests {
         assert_eq!(
             header_hint("ticket_class"),
             Some("representation.discrete.ordinal")
+        );
+    }
+
+    // ── NNFT-084: SI number override tests ─────────────────────────────
+
+    #[test]
+    fn test_si_number_override_plain_decimals() {
+        // Plain decimal values with no SI suffixes → should override to decimal_number
+        let values: Vec<String> = vec!["5.1", "3.5", "1.4", "7.9", "0.2", "4.6"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = disambiguate_si_number(&values);
+        assert_eq!(
+            result,
+            Some((
+                "representation.numeric.decimal_number".to_string(),
+                "si_number_override_no_suffix".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_si_number_override_real_si_values() {
+        // Values with SI suffixes → should NOT override
+        let values: Vec<String> = vec!["5.1K", "3.5M", "1.4B"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = disambiguate_si_number(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_si_number_override_mixed_values() {
+        // Even one SI suffix means the column is genuinely SI → no override
+        let values: Vec<String> = vec!["5.1", "3.5K", "1.4"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = disambiguate_si_number(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_si_number_override_negative_decimals() {
+        // Negative decimals with no suffixes → should override
+        let values: Vec<String> = vec!["-450.12", "732.57", "-1.003", "98.6"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = disambiguate_si_number(&values);
+        assert_eq!(
+            result,
+            Some((
+                "representation.numeric.decimal_number".to_string(),
+                "si_number_override_no_suffix".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_si_number_override_empty_values() {
+        // Empty values → should override (no SI suffixes found)
+        let values: Vec<String> = vec!["", "  ", ""].into_iter().map(String::from).collect();
+        let result = disambiguate_si_number(&values);
+        assert_eq!(
+            result,
+            Some((
+                "representation.numeric.decimal_number".to_string(),
+                "si_number_override_no_suffix".to_string()
+            ))
         );
     }
 }

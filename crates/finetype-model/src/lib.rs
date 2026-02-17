@@ -17,7 +17,7 @@ pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab};
 pub use char_training::{CharTrainer, CharTrainingConfig};
 pub use column::{ColumnClassifier, ColumnConfig, ColumnResult};
 pub use inference::{
-    extract_validation_patterns, CharClassifier, ClassificationResult, Classifier,
+    extract_validation_patterns, CharClassifier, ClassificationResult, Classifier, ValueClassifier,
 };
 pub use model::{TextClassifier, TextClassifierConfig};
 pub use tiered::TieredClassifier;

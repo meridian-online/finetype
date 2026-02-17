@@ -8,7 +8,7 @@
 //! The engine loads models from a directory structure created by `TieredTrainer`.
 
 use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab};
-use crate::inference::{ClassificationResult, InferenceError};
+use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use std::collections::HashMap;
@@ -467,6 +467,19 @@ impl TieredClassifier {
         }
 
         Device::Cpu
+    }
+}
+
+impl ValueClassifier for TieredClassifier {
+    fn classify(&self, text: &str) -> Result<ClassificationResult, InferenceError> {
+        self.classify(text)
+    }
+
+    fn classify_batch(
+        &self,
+        texts: &[String],
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        self.classify_batch(texts)
     }
 }
 

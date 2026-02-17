@@ -236,6 +236,10 @@ enum Commands {
         /// Disable column name header hints
         #[arg(long)]
         no_header_hint: bool,
+
+        /// Model type (char-cnn, tiered, transformer)
+        #[arg(long, default_value = "char-cnn")]
+        model_type: ModelType,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -426,7 +430,16 @@ fn main() -> Result<()> {
             sample_size,
             delimiter,
             no_header_hint,
-        } => cmd_profile(file, model, output, sample_size, delimiter, no_header_hint),
+            model_type,
+        } => cmd_profile(
+            file,
+            model,
+            output,
+            sample_size,
+            delimiter,
+            no_header_hint,
+            model_type,
+        ),
 
         Commands::EvalGittables {
             dir,
@@ -538,7 +551,7 @@ fn cmd_infer(
                     sample_size,
                     ..Default::default()
                 };
-                let column_classifier = ColumnClassifier::new(classifier, config);
+                let column_classifier = ColumnClassifier::new(Box::new(classifier), config);
                 let result = column_classifier.classify_column(&inputs)?;
 
                 match output {
@@ -1403,11 +1416,16 @@ fn cmd_profile(
     sample_size: usize,
     delimiter: Option<char>,
     no_header_hint: bool,
+    model_type: ModelType,
 ) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig};
+    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
     eprintln!("Loading model from {:?}", model);
-    let classifier = load_char_classifier(&model)?;
+    let classifier: Box<dyn ValueClassifier> = match model_type {
+        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+        ModelType::Tiered => Box::new(finetype_model::TieredClassifier::load(&model)?),
+        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+    };
 
     let config = ColumnConfig {
         sample_size,
@@ -1619,7 +1637,7 @@ fn cmd_eval_gittables(
         sample_size,
         ..Default::default()
     };
-    let column_classifier = ColumnClassifier::new(classifier, config);
+    let column_classifier = ColumnClassifier::new(Box::new(classifier), config);
 
     // ── 2. Load ground truth ────────────────────────────────────────────────
     eprintln!("Loading ground truth from {:?}", dir);
