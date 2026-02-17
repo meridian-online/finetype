@@ -94,13 +94,37 @@ impl TieredTrainer {
         let graph = taxonomy.tier_graph();
         let mut report = TieredTrainingReport::default();
 
+        // Normalize sample labels: strip locale suffixes (.UNIVERSAL, .en_US, etc.)
+        // Generated labels are 4-level (domain.category.type.LOCALE) but the taxonomy
+        // uses 3-level keys (domain.category.type).
+        let samples: Vec<Sample> = samples
+            .iter()
+            .map(|s| {
+                let label = if graph.tier_path(&s.label).is_some() {
+                    s.label.clone()
+                } else if let Some((prefix, _)) = s.label.rsplit_once('.') {
+                    if graph.tier_path(prefix).is_some() {
+                        prefix.to_string()
+                    } else {
+                        s.label.clone()
+                    }
+                } else {
+                    s.label.clone()
+                };
+                Sample {
+                    text: s.text.clone(),
+                    label,
+                }
+            })
+            .collect();
+
         eprintln!("=== Tiered Training ===");
         eprintln!("{}", graph.summary());
 
         // --- Tier 0: Broad type classification ---
         eprintln!("\n--- Training Tier 0 (broad type) ---");
         let tier0_dir = output_dir.join("tier0");
-        let tier0_accuracy = self.train_tier0(&graph, samples, &tier0_dir)?;
+        let tier0_accuracy = self.train_tier0(&graph, &samples, &tier0_dir)?;
         report.tier0_accuracy = tier0_accuracy;
         report.tier0_classes = graph.num_broad_types();
         eprintln!(
@@ -129,18 +153,26 @@ impl TieredTrainer {
                 categories.len()
             );
             let tier1_dir = output_dir.join(format!("tier1_{}", broad_type));
-            let tier1_accuracy = self.train_tier1(&graph, broad_type, samples, &tier1_dir)?;
-            report.tier1_results.push(TierModelResult {
-                name: broad_type.clone(),
-                classes: categories.len(),
-                accuracy: tier1_accuracy,
-            });
-            eprintln!(
-                "Tier 1 [{}]: {:.2}% accuracy ({} categories)",
-                broad_type,
-                tier1_accuracy * 100.0,
-                categories.len()
-            );
+            match self.train_tier1(&graph, broad_type, &samples, &tier1_dir) {
+                Ok(tier1_accuracy) => {
+                    report.tier1_results.push(TierModelResult {
+                        name: broad_type.clone(),
+                        classes: categories.len(),
+                        accuracy: tier1_accuracy,
+                    });
+                    eprintln!(
+                        "Tier 1 [{}]: {:.2}% accuracy ({} categories)",
+                        broad_type,
+                        tier1_accuracy * 100.0,
+                        categories.len()
+                    );
+                }
+                Err(TieredTrainingError::EmptyGroup { .. }) => {
+                    eprintln!("Tier 1 [{}]: skipped (no training samples)", broad_type);
+                    report.tier1_skipped.push(broad_type.clone());
+                }
+                Err(e) => return Err(e),
+            }
         }
 
         // --- Tier 2: Per-category type models ---
@@ -157,25 +189,37 @@ impl TieredTrainer {
                     broad_type, category, n_types
                 );
                 let tier2_dir = output_dir.join(format!("tier2_{}_{}", broad_type, category));
-                let tier2_accuracy =
-                    self.train_tier2(&graph, broad_type, category, samples, &tier2_dir)?;
-                report.tier2_results.push(TierModelResult {
-                    name: format!("{}/{}", broad_type, category),
-                    classes: n_types,
-                    accuracy: tier2_accuracy,
-                });
-                eprintln!(
-                    "Tier 2 [{}/{}]: {:.2}% accuracy ({} types)",
-                    broad_type,
-                    category,
-                    tier2_accuracy * 100.0,
-                    n_types
-                );
+                match self.train_tier2(&graph, broad_type, category, &samples, &tier2_dir) {
+                    Ok(tier2_accuracy) => {
+                        report.tier2_results.push(TierModelResult {
+                            name: format!("{}/{}", broad_type, category),
+                            classes: n_types,
+                            accuracy: tier2_accuracy,
+                        });
+                        eprintln!(
+                            "Tier 2 [{}/{}]: {:.2}% accuracy ({} types)",
+                            broad_type,
+                            category,
+                            tier2_accuracy * 100.0,
+                            n_types
+                        );
+                    }
+                    Err(TieredTrainingError::EmptyGroup { .. }) => {
+                        eprintln!(
+                            "Tier 2 [{}/{}]: skipped (no training samples)",
+                            broad_type, category
+                        );
+                        report
+                            .tier2_skipped
+                            .push(format!("{}/{}", broad_type, category));
+                    }
+                    Err(e) => return Err(e),
+                }
             }
         }
 
-        // Save tier graph metadata
-        let graph_meta = self.build_graph_metadata(&graph);
+        // Save tier graph metadata (only reference models that were actually trained)
+        let graph_meta = self.build_graph_metadata(&graph, &report, output_dir);
         let graph_json =
             serde_json::to_string_pretty(&graph_meta).unwrap_or_else(|_| "{}".to_string());
         std::fs::create_dir_all(output_dir)?;
@@ -422,7 +466,17 @@ impl TieredTrainer {
         for sample in samples {
             let ids = self.vocab.encode(&sample.text, max_len);
             all_ids.extend(ids);
-            let label_idx = label_to_index.get(&sample.label).copied().unwrap_or(0) as u32;
+            // Try exact match first, then strip locale/UNIVERSAL suffix from generated labels
+            let label_idx = label_to_index
+                .get(&sample.label)
+                .or_else(|| {
+                    sample
+                        .label
+                        .rsplit_once('.')
+                        .and_then(|(prefix, _)| label_to_index.get(prefix))
+                })
+                .copied()
+                .unwrap_or(0) as u32;
             all_labels.push(label_idx);
         }
 
@@ -433,17 +487,26 @@ impl TieredTrainer {
     }
 
     /// Build graph metadata JSON for the inference engine.
-    fn build_graph_metadata(&self, graph: &TierGraph) -> serde_json::Value {
+    ///
+    /// Only references models that were actually trained (have directories on disk).
+    /// Skipped groups use "direct" resolution to first type.
+    fn build_graph_metadata(
+        &self,
+        graph: &TierGraph,
+        _report: &TieredTrainingReport,
+        output_dir: &Path,
+    ) -> serde_json::Value {
         use serde_json::json;
 
         let mut tier1_models = serde_json::Map::new();
         for broad_type in graph.broad_types() {
             let categories = graph.categories_for(broad_type);
-            if categories.len() > 1 {
+            let tier1_dir = format!("tier1_{}", broad_type);
+            if categories.len() > 1 && output_dir.join(&tier1_dir).exists() {
                 tier1_models.insert(
                     broad_type.clone(),
                     json!({
-                        "dir": format!("tier1_{}", broad_type),
+                        "dir": tier1_dir,
                         "categories": categories,
                     }),
                 );
@@ -462,16 +525,20 @@ impl TieredTrainer {
             for category in graph.categories_for(broad_type) {
                 let n_types = graph.num_types(broad_type, category);
                 let key = format!("{}_{}", broad_type, category);
-                if n_types > self.config.tier2_min_types {
+                let tier2_dir = format!("tier2_{}_{}", broad_type, category);
+
+                if n_types > self.config.tier2_min_types && output_dir.join(&tier2_dir).exists() {
+                    // Model was trained — reference its directory
                     tier2_models.insert(
                         key,
                         json!({
-                            "dir": format!("tier2_{}_{}", broad_type, category),
+                            "dir": tier2_dir,
                             "types": graph.types_for(broad_type, category),
                             "count": n_types,
                         }),
                     );
                 } else {
+                    // Single type or skipped training — resolve directly to first type
                     let types = graph.types_for(broad_type, category);
                     tier2_models.insert(
                         key,
@@ -532,6 +599,7 @@ pub struct TieredTrainingReport {
     pub tier1_results: Vec<TierModelResult>,
     pub tier1_skipped: Vec<String>,
     pub tier2_results: Vec<TierModelResult>,
+    pub tier2_skipped: Vec<String>,
 }
 
 impl std::fmt::Display for TieredTrainingReport {
@@ -558,7 +626,12 @@ impl std::fmt::Display for TieredTrainingReport {
                 r.classes
             )?;
         }
-        writeln!(f, "  Tier 2: {} models trained", self.tier2_results.len())?;
+        writeln!(
+            f,
+            "  Tier 2: {} models trained, {} skipped (no samples)",
+            self.tier2_results.len(),
+            self.tier2_skipped.len()
+        )?;
         for r in &self.tier2_results {
             writeln!(
                 f,

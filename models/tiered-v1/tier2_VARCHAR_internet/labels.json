@@ -1,0 +1,9 @@
+[
+  "technology.internet.hostname",
+  "technology.internet.http_method",
+  "technology.internet.slug",
+  "technology.internet.top_level_domain",
+  "technology.internet.uri",
+  "technology.internet.url",
+  "technology.internet.user_agent"
+]

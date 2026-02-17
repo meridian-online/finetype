@@ -1,0 +1,17 @@
+[
+  "BIGINT",
+  "BOOLEAN",
+  "DATE",
+  "DOUBLE",
+  "INET",
+  "INTEGER",
+  "INTERVAL",
+  "JSON",
+  "POINT",
+  "SMALLINT",
+  "TIME",
+  "TIMESTAMP",
+  "TIMESTAMPTZ",
+  "UUID",
+  "VARCHAR"
+]

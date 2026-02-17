@@ -1,0 +1,7 @@
+[
+  "datetime.time.hm_12h",
+  "datetime.time.hm_24h",
+  "datetime.time.hms_12h",
+  "datetime.time.hms_24h",
+  "datetime.time.iso"
+]

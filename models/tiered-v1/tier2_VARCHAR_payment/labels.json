@@ -1,0 +1,15 @@
+[
+  "identity.payment.bitcoin_address",
+  "identity.payment.credit_card_network",
+  "identity.payment.credit_card_number",
+  "identity.payment.currency_code",
+  "identity.payment.currency_symbol",
+  "identity.payment.cusip",
+  "identity.payment.cvv",
+  "identity.payment.ethereum_address",
+  "identity.payment.isin",
+  "identity.payment.lei",
+  "identity.payment.paypal_email",
+  "identity.payment.sedol",
+  "identity.payment.swift_bic"
+]

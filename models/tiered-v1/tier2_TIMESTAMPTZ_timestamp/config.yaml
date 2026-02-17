@@ -1,0 +1,7 @@
+vocab_size: 97
+max_seq_length: 128
+embed_dim: 32
+num_filters: 64
+hidden_dim: 128
+n_classes: 4
+model_type: char_cnn

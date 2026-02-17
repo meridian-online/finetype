@@ -1,0 +1,7 @@
+[
+  "geography.location.city",
+  "geography.location.continent",
+  "geography.location.country",
+  "geography.location.country_code",
+  "geography.location.region"
+]

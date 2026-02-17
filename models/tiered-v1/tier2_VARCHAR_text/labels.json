@@ -1,0 +1,8 @@
+[
+  "representation.text.color_hex",
+  "representation.text.color_rgb",
+  "representation.text.emoji",
+  "representation.text.plain_text",
+  "representation.text.sentence",
+  "representation.text.word"
+]

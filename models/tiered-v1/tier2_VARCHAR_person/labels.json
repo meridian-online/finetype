@@ -1,0 +1,15 @@
+[
+  "identity.person.blood_type",
+  "identity.person.email",
+  "identity.person.first_name",
+  "identity.person.full_name",
+  "identity.person.gender",
+  "identity.person.gender_code",
+  "identity.person.gender_symbol",
+  "identity.person.last_name",
+  "identity.person.nationality",
+  "identity.person.occupation",
+  "identity.person.password",
+  "identity.person.phone_number",
+  "identity.person.username"
+]

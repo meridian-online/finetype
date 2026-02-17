@@ -1,0 +1,497 @@
+{
+  "tier0": {
+    "broad_types": [
+      "BIGINT",
+      "BOOLEAN",
+      "DATE",
+      "DOUBLE",
+      "INET",
+      "INTEGER",
+      "INTERVAL",
+      "JSON",
+      "POINT",
+      "SMALLINT",
+      "TIME",
+      "TIMESTAMP",
+      "TIMESTAMPTZ",
+      "UUID",
+      "VARCHAR"
+    ],
+    "dir": "tier0"
+  },
+  "tier1": {
+    "BIGINT": {
+      "categories": [
+        "epoch",
+        "file",
+        "hardware",
+        "numeric"
+      ],
+      "dir": "tier1_BIGINT"
+    },
+    "BOOLEAN": {
+      "categories": [
+        "binary",
+        "initials",
+        "terms"
+      ],
+      "dir": "tier1_BOOLEAN"
+    },
+    "DATE": {
+      "categories": [
+        "date",
+        "payment"
+      ],
+      "dir": "tier1_DATE"
+    },
+    "DOUBLE": {
+      "categories": [
+        "coordinate",
+        "hardware",
+        "numeric",
+        "person"
+      ],
+      "dir": "tier1_DOUBLE"
+    },
+    "INET": {
+      "direct": "internet"
+    },
+    "INTEGER": {
+      "direct": "component"
+    },
+    "INTERVAL": {
+      "direct": "duration"
+    },
+    "JSON": {
+      "direct": "object"
+    },
+    "POINT": {
+      "direct": "coordinate"
+    },
+    "SMALLINT": {
+      "categories": [
+        "internet",
+        "person"
+      ],
+      "dir": "tier1_SMALLINT"
+    },
+    "TIME": {
+      "direct": "time"
+    },
+    "TIMESTAMP": {
+      "direct": "timestamp"
+    },
+    "TIMESTAMPTZ": {
+      "direct": "timestamp"
+    },
+    "UUID": {
+      "direct": "cryptographic"
+    },
+    "VARCHAR": {
+      "categories": [
+        "academic",
+        "address",
+        "array",
+        "code",
+        "component",
+        "contact",
+        "cryptographic",
+        "development",
+        "discrete",
+        "file",
+        "hardware",
+        "internet",
+        "key_value",
+        "location",
+        "medical",
+        "object",
+        "offset",
+        "payment",
+        "person",
+        "scientific",
+        "text",
+        "transportation"
+      ],
+      "dir": "tier1_VARCHAR"
+    }
+  },
+  "tier2": {
+    "BIGINT_epoch": {
+      "count": 3,
+      "dir": "tier2_BIGINT_epoch",
+      "types": [
+        "datetime.epoch.unix_microseconds",
+        "datetime.epoch.unix_milliseconds",
+        "datetime.epoch.unix_seconds"
+      ]
+    },
+    "BIGINT_file": {
+      "count": 1,
+      "direct": "representation.file.file_size"
+    },
+    "BIGINT_hardware": {
+      "count": 1,
+      "direct": "technology.hardware.ram_size"
+    },
+    "BIGINT_numeric": {
+      "count": 2,
+      "dir": "tier2_BIGINT_numeric",
+      "types": [
+        "representation.numeric.increment",
+        "representation.numeric.integer_number"
+      ]
+    },
+    "BOOLEAN_binary": {
+      "count": 1,
+      "direct": "representation.boolean.binary"
+    },
+    "BOOLEAN_initials": {
+      "count": 1,
+      "direct": "representation.boolean.initials"
+    },
+    "BOOLEAN_terms": {
+      "count": 1,
+      "direct": "representation.boolean.terms"
+    },
+    "DATE_date": {
+      "count": 17,
+      "dir": "tier2_DATE_date",
+      "types": [
+        "datetime.date.abbreviated_month",
+        "datetime.date.compact_dmy",
+        "datetime.date.compact_mdy",
+        "datetime.date.compact_ymd",
+        "datetime.date.eu_dot",
+        "datetime.date.eu_slash",
+        "datetime.date.iso",
+        "datetime.date.iso_week",
+        "datetime.date.julian",
+        "datetime.date.long_full_month",
+        "datetime.date.ordinal",
+        "datetime.date.short_dmy",
+        "datetime.date.short_mdy",
+        "datetime.date.short_ymd",
+        "datetime.date.us_slash",
+        "datetime.date.weekday_abbreviated_month",
+        "datetime.date.weekday_full_month"
+      ]
+    },
+    "DATE_payment": {
+      "count": 1,
+      "direct": "identity.payment.credit_card_expiration_date"
+    },
+    "DOUBLE_coordinate": {
+      "count": 2,
+      "dir": "tier2_DOUBLE_coordinate",
+      "types": [
+        "geography.coordinate.latitude",
+        "geography.coordinate.longitude"
+      ]
+    },
+    "DOUBLE_hardware": {
+      "count": 1,
+      "direct": "technology.hardware.screen_size"
+    },
+    "DOUBLE_numeric": {
+      "count": 4,
+      "dir": "tier2_DOUBLE_numeric",
+      "types": [
+        "representation.numeric.decimal_number",
+        "representation.numeric.percentage",
+        "representation.numeric.scientific_notation",
+        "representation.numeric.si_number"
+      ]
+    },
+    "DOUBLE_person": {
+      "count": 2,
+      "direct": "identity.person.height"
+    },
+    "INET_internet": {
+      "count": 4,
+      "dir": "tier2_INET_internet",
+      "types": [
+        "technology.internet.ip_v4",
+        "technology.internet.ip_v4_with_port",
+        "technology.internet.ip_v6",
+        "technology.internet.mac_address"
+      ]
+    },
+    "INTEGER_component": {
+      "count": 2,
+      "direct": "datetime.component.day_of_month"
+    },
+    "INTERVAL_duration": {
+      "count": 1,
+      "direct": "datetime.duration.iso_8601"
+    },
+    "JSON_object": {
+      "count": 2,
+      "dir": "tier2_JSON_object",
+      "types": [
+        "container.object.json",
+        "container.object.json_array"
+      ]
+    },
+    "POINT_coordinate": {
+      "count": 1,
+      "direct": "geography.coordinate.coordinates"
+    },
+    "SMALLINT_internet": {
+      "count": 2,
+      "dir": "tier2_SMALLINT_internet",
+      "types": [
+        "technology.internet.http_status_code",
+        "technology.internet.port"
+      ]
+    },
+    "SMALLINT_person": {
+      "count": 1,
+      "direct": "identity.person.age"
+    },
+    "TIMESTAMPTZ_timestamp": {
+      "count": 4,
+      "dir": "tier2_TIMESTAMPTZ_timestamp",
+      "types": [
+        "datetime.timestamp.iso_8601_offset",
+        "datetime.timestamp.rfc_2822",
+        "datetime.timestamp.rfc_2822_ordinal",
+        "datetime.timestamp.rfc_3339"
+      ]
+    },
+    "TIMESTAMP_timestamp": {
+      "count": 8,
+      "dir": "tier2_TIMESTAMP_timestamp",
+      "types": [
+        "datetime.timestamp.american",
+        "datetime.timestamp.american_24h",
+        "datetime.timestamp.european",
+        "datetime.timestamp.iso_8601",
+        "datetime.timestamp.iso_8601_compact",
+        "datetime.timestamp.iso_8601_microseconds",
+        "datetime.timestamp.iso_microseconds",
+        "datetime.timestamp.sql_standard"
+      ]
+    },
+    "TIME_time": {
+      "count": 5,
+      "dir": "tier2_TIME_time",
+      "types": [
+        "datetime.time.hm_12h",
+        "datetime.time.hm_24h",
+        "datetime.time.hms_12h",
+        "datetime.time.hms_24h",
+        "datetime.time.iso"
+      ]
+    },
+    "UUID_cryptographic": {
+      "count": 1,
+      "direct": "technology.cryptographic.uuid"
+    },
+    "VARCHAR_academic": {
+      "count": 2,
+      "direct": "identity.academic.degree"
+    },
+    "VARCHAR_address": {
+      "count": 5,
+      "dir": "tier2_VARCHAR_address",
+      "types": [
+        "geography.address.full_address",
+        "geography.address.postal_code",
+        "geography.address.street_name",
+        "geography.address.street_number",
+        "geography.address.street_suffix"
+      ]
+    },
+    "VARCHAR_array": {
+      "count": 4,
+      "dir": "tier2_VARCHAR_array",
+      "types": [
+        "container.array.comma_separated",
+        "container.array.pipe_separated",
+        "container.array.semicolon_separated",
+        "container.array.whitespace_separated"
+      ]
+    },
+    "VARCHAR_code": {
+      "count": 8,
+      "dir": "tier2_VARCHAR_code",
+      "types": [
+        "representation.code.alphanumeric_id",
+        "technology.code.doi",
+        "technology.code.ean",
+        "technology.code.imei",
+        "technology.code.isbn",
+        "technology.code.issn",
+        "technology.code.locale_code",
+        "technology.code.pin"
+      ]
+    },
+    "VARCHAR_component": {
+      "count": 4,
+      "direct": "datetime.component.century"
+    },
+    "VARCHAR_contact": {
+      "count": 1,
+      "direct": "geography.contact.calling_code"
+    },
+    "VARCHAR_cryptographic": {
+      "count": 3,
+      "dir": "tier2_VARCHAR_cryptographic",
+      "types": [
+        "technology.cryptographic.hash",
+        "technology.cryptographic.token_hex",
+        "technology.cryptographic.token_urlsafe"
+      ]
+    },
+    "VARCHAR_development": {
+      "count": 6,
+      "dir": "tier2_VARCHAR_development",
+      "types": [
+        "technology.development.calver",
+        "technology.development.os",
+        "technology.development.programming_language",
+        "technology.development.software_license",
+        "technology.development.stage",
+        "technology.development.version"
+      ]
+    },
+    "VARCHAR_discrete": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_discrete",
+      "types": [
+        "representation.discrete.categorical",
+        "representation.discrete.ordinal"
+      ]
+    },
+    "VARCHAR_file": {
+      "count": 3,
+      "dir": "tier2_VARCHAR_file",
+      "types": [
+        "representation.file.excel_format",
+        "representation.file.extension",
+        "representation.file.mime_type"
+      ]
+    },
+    "VARCHAR_hardware": {
+      "count": 2,
+      "direct": "technology.hardware.cpu"
+    },
+    "VARCHAR_internet": {
+      "count": 7,
+      "dir": "tier2_VARCHAR_internet",
+      "types": [
+        "technology.internet.hostname",
+        "technology.internet.http_method",
+        "technology.internet.slug",
+        "technology.internet.top_level_domain",
+        "technology.internet.uri",
+        "technology.internet.url",
+        "technology.internet.user_agent"
+      ]
+    },
+    "VARCHAR_key_value": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_key_value",
+      "types": [
+        "container.key_value.form_data",
+        "container.key_value.query_string"
+      ]
+    },
+    "VARCHAR_location": {
+      "count": 5,
+      "dir": "tier2_VARCHAR_location",
+      "types": [
+        "geography.location.city",
+        "geography.location.continent",
+        "geography.location.country",
+        "geography.location.country_code",
+        "geography.location.region"
+      ]
+    },
+    "VARCHAR_medical": {
+      "count": 3,
+      "dir": "tier2_VARCHAR_medical",
+      "types": [
+        "identity.medical.dea_number",
+        "identity.medical.ndc",
+        "identity.medical.npi"
+      ]
+    },
+    "VARCHAR_object": {
+      "count": 3,
+      "direct": "container.object.csv"
+    },
+    "VARCHAR_offset": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_offset",
+      "types": [
+        "datetime.offset.iana",
+        "datetime.offset.utc"
+      ]
+    },
+    "VARCHAR_payment": {
+      "count": 13,
+      "dir": "tier2_VARCHAR_payment",
+      "types": [
+        "identity.payment.bitcoin_address",
+        "identity.payment.credit_card_network",
+        "identity.payment.credit_card_number",
+        "identity.payment.currency_code",
+        "identity.payment.currency_symbol",
+        "identity.payment.cusip",
+        "identity.payment.cvv",
+        "identity.payment.ethereum_address",
+        "identity.payment.isin",
+        "identity.payment.lei",
+        "identity.payment.paypal_email",
+        "identity.payment.sedol",
+        "identity.payment.swift_bic"
+      ]
+    },
+    "VARCHAR_person": {
+      "count": 13,
+      "dir": "tier2_VARCHAR_person",
+      "types": [
+        "identity.person.blood_type",
+        "identity.person.email",
+        "identity.person.first_name",
+        "identity.person.full_name",
+        "identity.person.gender",
+        "identity.person.gender_code",
+        "identity.person.gender_symbol",
+        "identity.person.last_name",
+        "identity.person.nationality",
+        "identity.person.occupation",
+        "identity.person.password",
+        "identity.person.phone_number",
+        "identity.person.username"
+      ]
+    },
+    "VARCHAR_scientific": {
+      "count": 5,
+      "direct": "representation.scientific.dna_sequence"
+    },
+    "VARCHAR_text": {
+      "count": 6,
+      "dir": "tier2_VARCHAR_text",
+      "types": [
+        "representation.text.color_hex",
+        "representation.text.color_rgb",
+        "representation.text.emoji",
+        "representation.text.plain_text",
+        "representation.text.sentence",
+        "representation.text.word"
+      ]
+    },
+    "VARCHAR_transportation": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_transportation",
+      "types": [
+        "geography.transportation.iata_code",
+        "geography.transportation.icao_code"
+      ]
+    }
+  },
+  "tier2_min_types": 1,
+  "version": 1
+}

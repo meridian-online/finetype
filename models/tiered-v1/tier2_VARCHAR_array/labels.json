@@ -1,0 +1,6 @@
+[
+  "container.array.comma_separated",
+  "container.array.pipe_separated",
+  "container.array.semicolon_separated",
+  "container.array.whitespace_separated"
+]

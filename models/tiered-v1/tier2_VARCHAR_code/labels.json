@@ -1,0 +1,10 @@
+[
+  "representation.code.alphanumeric_id",
+  "technology.code.doi",
+  "technology.code.ean",
+  "technology.code.imei",
+  "technology.code.isbn",
+  "technology.code.issn",
+  "technology.code.locale_code",
+  "technology.code.pin"
+]

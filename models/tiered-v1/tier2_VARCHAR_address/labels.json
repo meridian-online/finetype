@@ -1,0 +1,7 @@
+[
+  "geography.address.full_address",
+  "geography.address.postal_code",
+  "geography.address.street_name",
+  "geography.address.street_number",
+  "geography.address.street_suffix"
+]

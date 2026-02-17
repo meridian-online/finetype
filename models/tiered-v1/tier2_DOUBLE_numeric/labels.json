@@ -1,0 +1,6 @@
+[
+  "representation.numeric.decimal_number",
+  "representation.numeric.percentage",
+  "representation.numeric.scientific_notation",
+  "representation.numeric.si_number"
+]

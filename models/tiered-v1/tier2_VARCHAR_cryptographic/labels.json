@@ -1,0 +1,5 @@
+[
+  "technology.cryptographic.hash",
+  "technology.cryptographic.token_hex",
+  "technology.cryptographic.token_urlsafe"
+]
