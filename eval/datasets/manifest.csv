@@ -44,10 +44,10 @@ world_cities,/home/hugh/datasets/world_cities.csv,name,city
 world_cities,/home/hugh/datasets/world_cities.csv,country,country
 world_cities,/home/hugh/datasets/world_cities.csv,subcountry,region
 world_cities,/home/hugh/datasets/world_cities.csv,geonameid,id
-iris,/home/hugh/datasets/iris.csv,sepal_length,number
-iris,/home/hugh/datasets/iris.csv,sepal_width,number
-iris,/home/hugh/datasets/iris.csv,petal_length,number
-iris,/home/hugh/datasets/iris.csv,petal_width,number
+iris,/home/hugh/datasets/iris.csv,sepal_length,decimal number
+iris,/home/hugh/datasets/iris.csv,sepal_width,decimal number
+iris,/home/hugh/datasets/iris.csv,petal_length,decimal number
+iris,/home/hugh/datasets/iris.csv,petal_width,decimal number
 iris,/home/hugh/datasets/iris.csv,species,category
 ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,order_id,code
 ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,customer_email,email
@@ -95,7 +95,7 @@ financial_data,/home/hugh/datasets/financial_data.csv,high_price,price
 financial_data,/home/hugh/datasets/financial_data.csv,low_price,price
 financial_data,/home/hugh/datasets/financial_data.csv,volume,number
 financial_data,/home/hugh/datasets/financial_data.csv,market_cap,value
-financial_data,/home/hugh/datasets/financial_data.csv,pe_ratio,number
+financial_data,/home/hugh/datasets/financial_data.csv,pe_ratio,decimal number
 financial_data,/home/hugh/datasets/financial_data.csv,dividend_yield,percentage
 financial_data,/home/hugh/datasets/financial_data.csv,currency,currency
 financial_data,/home/hugh/datasets/financial_data.csv,exchange,category
@@ -145,7 +145,7 @@ medical_records,/home/hugh/datasets/medical_records.csv,date_of_birth,date
 medical_records,/home/hugh/datasets/medical_records.csv,gender,gender
 medical_records,/home/hugh/datasets/medical_records.csv,blood_pressure,value
 medical_records,/home/hugh/datasets/medical_records.csv,heart_rate,number
-medical_records,/home/hugh/datasets/medical_records.csv,temperature_f,number
+medical_records,/home/hugh/datasets/medical_records.csv,temperature_f,decimal number
 medical_records,/home/hugh/datasets/medical_records.csv,weight_lbs,weight
 medical_records,/home/hugh/datasets/medical_records.csv,height_in,height
 medical_records,/home/hugh/datasets/medical_records.csv,diagnosis_code,code
@@ -176,12 +176,12 @@ network_logs,/home/hugh/datasets/network_logs.csv,payload_size_bytes,number
 network_logs,/home/hugh/datasets/network_logs.csv,query_params,code
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,experiment_id,id
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,measurement_unit,measurement unit
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,value,number
+scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,value,decimal number
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,percentage,percentage
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,formula,code
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,ph_value,number
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,temperature_celsius,number
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,pressure_atm,number
+scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,ph_value,decimal number
+scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,temperature_celsius,decimal number
+scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,pressure_atm,decimal number
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,timestamp,timestamp
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,latitude,latitude
 scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,longitude,longitude

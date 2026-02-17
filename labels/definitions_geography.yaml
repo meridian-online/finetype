@@ -235,7 +235,7 @@ geography.address.street_number:
     suffix: "REGEXP_EXTRACT({col}, '[0-9]+([A-Z]*)$')"
   validation:
     type: string
-    pattern: "^[0-9]+[A-Z]?(-[0-9]+[A-Z]?)?$"
+    pattern: "^[0-9]+[A-Z]?(/[A-Z])?(-[0-9]+[A-Z]?)?( 1/2)?$"
   tier: [VARCHAR, address]
   release_priority: 3
   aliases: [house_number]
@@ -243,6 +243,8 @@ geography.address.street_number:
     - "123"
     - "456B"
     - "100-102"
+    - "12 1/2"
+    - "45A/B"
   references: null
   notes: >
     v1 migration: Was address.street_number. Includes ranges (100-102)

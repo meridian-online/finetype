@@ -235,7 +235,17 @@ impl CharTrainer {
             let ids = self.vocab.encode(&sample.text, max_len);
             all_ids.extend(ids);
 
-            let label_idx = label_to_index.get(&sample.label).copied().unwrap_or(0) as u32;
+            // Try exact match first, then strip locale/UNIVERSAL suffix from generated labels
+            let label_idx = label_to_index
+                .get(&sample.label)
+                .or_else(|| {
+                    sample
+                        .label
+                        .rsplit_once('.')
+                        .and_then(|(prefix, _)| label_to_index.get(prefix))
+                })
+                .copied()
+                .unwrap_or(0) as u32;
             all_labels.push(label_idx);
         }
 

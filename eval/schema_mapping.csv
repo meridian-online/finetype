@@ -214,3 +214,4 @@ iata,eval,geography.transportation.iata_code,geography,direct,false
 icao,eval,geography.transportation.icao_code,geography,direct,false
 npi,eval,identity.medical.npi,identity,direct,false
 measurement unit,eval,representation.scientific.measurement_unit,representation,partial,false
+decimal number,eval,representation.numeric.decimal_number,representation,direct,false

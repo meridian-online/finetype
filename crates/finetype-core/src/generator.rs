@@ -1143,10 +1143,11 @@ impl Generator {
             }
             ("payment", "cvv") => {
                 if self.rng.gen_bool(0.85) {
-                    Ok(format!("{:03}", self.rng.gen_range(100..999)))
+                    // 3-digit CVV (include leading zeros as distinctive signal)
+                    Ok(format!("{:03}", self.rng.gen_range(0..1000)))
                 } else {
-                    // Amex 4-digit CID
-                    Ok(format!("{:04}", self.rng.gen_range(1000..9999)))
+                    // Amex 4-digit CID (include leading zeros)
+                    Ok(format!("{:04}", self.rng.gen_range(0..10000)))
                 }
             }
             ("payment", "credit_card_network") => {
@@ -1485,11 +1486,33 @@ impl Generator {
             // ── address (5 types) ────────────────────────────────────────
             ("address", "full_address") => self.gen_full_address(),
             ("address", "street_number") => {
-                if self.rng.gen_bool(0.9) {
-                    Ok(self.rng.gen_range(1..9999).to_string())
+                // Street numbers are typically 1-3000, with distinctive address
+                // formats to help distinguish from generic integers.
+                let r = self.rng.gen::<f64>();
+                if r < 0.50 {
+                    // Plain number (common range 1-2000)
+                    Ok(self.rng.gen_range(1..2001).to_string())
+                } else if r < 0.75 {
+                    // Letter suffix: 12A, 100B, 45C (common in European addresses)
+                    let suffix = ['A', 'B', 'C', 'D', 'E'][self.rng.gen_range(0..5)];
+                    Ok(format!("{}{}", self.rng.gen_range(1..500), suffix))
+                } else if r < 0.90 {
+                    // Hyphenated range: 12-14, 100-102 (multi-unit buildings)
+                    let base = self.rng.gen_range(1..500);
+                    Ok(format!("{}-{}", base, base + self.rng.gen_range(1..5)))
                 } else {
-                    let suffix = ['A', 'B', 'C'][self.rng.gen_range(0..3)];
-                    Ok(format!("{}{}", self.rng.gen_range(1..999), suffix))
+                    // Fraction or unit: 12 1/2, 100A/B
+                    if self.rng.gen_bool(0.5) {
+                        Ok(format!("{} 1/2", self.rng.gen_range(1..200)))
+                    } else {
+                        let suffix = ['A', 'B', 'C'][self.rng.gen_range(0..3)];
+                        Ok(format!(
+                            "{}{}/{}",
+                            self.rng.gen_range(1..200),
+                            suffix,
+                            (b'A' + self.rng.gen_range(0..3)) as char
+                        ))
+                    }
                 }
             }
             ("address", "street_name") => {
@@ -1555,7 +1578,28 @@ impl Generator {
     ) -> Result<String, GeneratorError> {
         match (category, type_name) {
             // ── numeric (5 types) ────────────────────────────────────────
-            ("numeric", "integer_number") => Ok(self.rng.gen_range(-100000i64..100000).to_string()),
+            ("numeric", "integer_number") => {
+                // Wider range with varied magnitudes to distinguish from
+                // street_number (1-2000), cvv (3-4 digits), postal codes, etc.
+                let r = self.rng.gen::<f64>();
+                let val = if r < 0.3 {
+                    // Large numbers (thousands to millions)
+                    self.rng.gen_range(1000i64..10_000_000)
+                } else if r < 0.5 {
+                    // Negative numbers (distinctive vs street/postal/cvv)
+                    self.rng.gen_range(-100000i64..-1)
+                } else if r < 0.7 {
+                    // Medium range
+                    self.rng.gen_range(-10000i64..10000)
+                } else if r < 0.85 {
+                    // Small positive (overlaps with others, but still needed)
+                    self.rng.gen_range(0i64..1000)
+                } else {
+                    // Very large
+                    self.rng.gen_range(100000i64..1_000_000_000)
+                };
+                Ok(val.to_string())
+            }
             ("numeric", "decimal_number") => {
                 let val = (self.rng.gen::<f64>() - 0.5) * 2000.0;
                 let precision = self.rng.gen_range(1..8);
