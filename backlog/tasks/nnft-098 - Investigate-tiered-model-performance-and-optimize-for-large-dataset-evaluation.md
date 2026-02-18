@@ -1,9 +1,11 @@
 ---
 id: NNFT-098
 title: Investigate tiered model performance and optimize for large dataset evaluation
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@nightingale'
 created_date: '2026-02-18 01:40'
+updated_date: '2026-02-18 06:08'
 labels:
   - performance
   - model
@@ -32,8 +34,41 @@ Need to investigate:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Throughput benchmarked: flat vs tiered (values/sec, both single-threaded and batched)
-- [ ] #2 Tier-level timing breakdown identifies where time is spent
-- [ ] #3 At least one optimization implemented or documented with measured impact
-- [ ] #4 CLI --model-type guidance documents performance/accuracy tradeoff
+- [x] #1 Throughput benchmarked: flat vs tiered (values/sec, both single-threaded and batched)
+- [x] #2 Tier-level timing breakdown identifies where time is spent
+- [x] #3 At least one optimization implemented or documented with measured impact
+- [x] #4 CLI --model-type guidance documents performance/accuracy tradeoff
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Optimized tiered inference throughput by 30x and added CLI performance instrumentation.
+
+## Changes
+
+### Batched tier processing (c2a3bf3)
+- Rewrote `classify_batch` in tiered.rs: group-then-batch processing replaces per-sample T1/T2 forwarding
+- CLI infer command now processes in chunks of 128 (was per-value) for all model types
+- **Throughput: 17 → 580 val/sec (tiered), 1500 val/sec (flat)**
+
+### Performance instrumentation (fa29ed4)
+- `--bench` flag on infer command: prints throughput + tier-level timing breakdown to stderr
+- `TierTiming` struct + `classify_batch_timed()` method for per-tier measurement
+- `--model-type` help text documents throughput tradeoff (~600 vs ~1500 val/sec)
+
+### Column mode fix (fa29ed4)
+- `--mode column` now works with all model types (was char-cnn only), fixing CI smoke test failure
+
+## Benchmark results (10K values)
+| Model | Throughput | T0 share | T1 share | T2 share |
+|-------|-----------|----------|----------|----------|
+| Tiered | ~580 val/sec | 37% | 32% | 31% |
+| Flat | ~1500 val/sec | — | — | — |
+
+Tier time is evenly distributed across T0/T1/T2 — no single bottleneck tier.
+
+## Commits
+- c2a3bf3: Batch tiered inference (30x improvement)
+- fa29ed4: --bench flag, tier timing, column mode fix
+<!-- SECTION:FINAL_SUMMARY:END -->
