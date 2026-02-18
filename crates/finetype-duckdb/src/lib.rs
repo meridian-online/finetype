@@ -3,7 +3,10 @@
 //! Provides scalar functions for semantic type classification:
 //! - `finetype_version()` — Returns the extension version
 //! - `finetype(value)` — Classify a single value, returns the semantic type label
+//! - `finetype(list(values))` — Column-level classification with disambiguation
+//! - `finetype(list(values), header)` — Column-level classification with header hint
 //! - `finetype_detail(value)` — Classify with detail: returns JSON with type, confidence, DuckDB type
+//! - `finetype_detail(list(values))` — Column-level classification with full JSON detail
 //! - `finetype_cast(value)` — Normalize a value for safe TRY_CAST (dates → ISO, booleans → true/false, etc.)
 //! - `finetype_unpack(json)` — Recursively classify JSON fields, returns annotated JSON
 
@@ -16,6 +19,8 @@ use std::ffi::CString;
 
 mod type_mapping;
 
+#[cfg(feature = "embed-models")]
+mod column_fn;
 #[cfg(feature = "embed-models")]
 mod normalize;
 #[cfg(feature = "embed-models")]
@@ -143,10 +148,21 @@ impl VScalar for FineTypeVersion {
     }
 }
 
-/// `finetype(value VARCHAR) → VARCHAR` — Classify a single value.
+/// `finetype(value VARCHAR) → VARCHAR` — Semantic type classification.
+/// `finetype(list(values) LIST<VARCHAR>) → VARCHAR` — Explicit column classification.
+/// `finetype(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR` — Column with header hint.
 ///
-/// Returns the full semantic type label (e.g. "technology.internet.url",
-/// "datetime.date.iso", "identity.person.email").
+/// Classifies data as a semantic type (e.g. "datetime.date.iso", "identity.person.email").
+///
+/// In scalar mode (`finetype(col)`), the function automatically uses the DuckDB
+/// processing chunk (~2048 rows) as a sample for column-level disambiguation.
+/// This means majority vote + disambiguation rules (date formats, coordinates,
+/// boolean subtypes, categorical detection, numeric range, etc.) are applied
+/// even without an explicit `list()` wrapper.
+///
+/// The `list()` overload gives explicit control over the sample — useful with
+/// GROUP BY to classify each group independently, or when you want the full
+/// column rather than a chunk-sized sample.
 #[cfg(feature = "embed-models")]
 struct FineType;
 
@@ -159,34 +175,39 @@ impl VScalar for FineType {
         input: &mut DataChunkHandle,
         output: &mut dyn WritableVector,
     ) -> Result<(), Box<dyn Error>> {
-        let classifier = get_classifier();
-        let len = input.len();
-        let output_vec = output.flat_vector();
+        // Dispatch based on input type: VARCHAR vs LIST<VARCHAR>
+        if column_fn::is_list_input(input) {
+            return column_fn::invoke_column_label(input, output);
+        }
 
-        // Collect non-null values for batch inference
-        let mut indices: Vec<usize> = Vec::with_capacity(len);
+        // Scalar path: use the chunk as a column sample for disambiguation.
+        // Collect all non-null, non-empty values, run column classification,
+        // and write the consensus label for every row.
+        let len = input.len();
+        let mut output_vec = output.flat_vector();
+
+        let mut non_null_indices: Vec<usize> = Vec::with_capacity(len);
         let mut texts: Vec<String> = Vec::with_capacity(len);
 
         for i in 0..len {
             if let Some(text) = read_varchar(input, 0, i) {
                 if !text.is_empty() {
-                    indices.push(i);
+                    non_null_indices.push(i);
                     texts.push(text);
                 } else {
-                    // Empty string → unknown
                     let cstr = CString::new("unknown")?;
                     output_vec.insert(i, cstr);
                 }
+            } else {
+                output_vec.set_null(i);
             }
-            // NULL values: DuckDB handles NULL propagation for scalar functions
         }
 
-        // Batch classify all non-null, non-empty values
         if !texts.is_empty() {
-            let results = classifier.classify_batch(&texts)?;
-            for (idx, result) in indices.iter().zip(results.iter()) {
-                let label = CString::new(result.label.as_str())?;
-                output_vec.insert(*idx, label);
+            let col_result = column_fn::classify_column(&texts)?;
+            let label = CString::new(col_result.label.as_str())?;
+            for idx in &non_null_indices {
+                output_vec.insert(*idx, label.clone());
             }
         }
 
@@ -194,19 +215,47 @@ impl VScalar for FineType {
     }
 
     fn signatures() -> Vec<ScalarFunctionSignature> {
-        vec![ScalarFunctionSignature::exact(
-            vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
-            LogicalTypeHandle::from(LogicalTypeId::Varchar),
-        )]
+        let varchar = LogicalTypeHandle::from(LogicalTypeId::Varchar);
+        let list_varchar = LogicalTypeHandle::list(&varchar);
+
+        vec![
+            // finetype(value VARCHAR) → VARCHAR
+            ScalarFunctionSignature::exact(
+                vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ),
+            // finetype(list(values) LIST<VARCHAR>) → VARCHAR
+            ScalarFunctionSignature::exact(
+                vec![list_varchar],
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ),
+            // finetype(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR
+            ScalarFunctionSignature::exact(
+                vec![
+                    LogicalTypeHandle::list(&LogicalTypeHandle::from(LogicalTypeId::Varchar)),
+                    LogicalTypeHandle::from(LogicalTypeId::Varchar),
+                ],
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ),
+        ]
     }
 }
 
-/// `finetype_detail(value VARCHAR) → VARCHAR` — Classify with full detail.
+/// `finetype_detail(value VARCHAR) → VARCHAR` — Detailed semantic type classification.
+/// `finetype_detail(list(values) LIST<VARCHAR>) → VARCHAR` — Explicit column detail.
+/// `finetype_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR` — Column detail with header.
 ///
-/// Returns a JSON object with:
+/// Returns a JSON object with classification details. In both scalar and list modes,
+/// the output includes:
 /// - `type`: semantic type label
-/// - `confidence`: model confidence (0.0 to 1.0)
+/// - `confidence`: classification confidence (0.0 to 1.0)
 /// - `duckdb_type`: recommended DuckDB CAST target type
+/// - `samples`: number of values in the sample
+/// - `disambiguation`: name of disambiguation rule applied (if any)
+/// - `votes`: top vote distribution (label → fraction)
+///
+/// In scalar mode, the DuckDB processing chunk (~2048 rows) is used as the
+/// column sample. The `list()` overload gives explicit control over the sample.
 #[cfg(feature = "embed-models")]
 struct FineTypeDetail;
 
@@ -219,27 +268,40 @@ impl VScalar for FineTypeDetail {
         input: &mut DataChunkHandle,
         output: &mut dyn WritableVector,
     ) -> Result<(), Box<dyn Error>> {
-        let classifier = get_classifier();
+        // Dispatch based on input type: VARCHAR vs LIST<VARCHAR>
+        if column_fn::is_list_input(input) {
+            return column_fn::invoke_column_detail(input, output);
+        }
+
+        // Scalar path: column classification over the chunk
         let len = input.len();
-        let output_vec = output.flat_vector();
+        let mut output_vec = output.flat_vector();
+
+        let mut non_null_indices: Vec<usize> = Vec::with_capacity(len);
+        let mut texts: Vec<String> = Vec::with_capacity(len);
 
         for i in 0..len {
             if let Some(text) = read_varchar(input, 0, i) {
-                if text.is_empty() {
+                if !text.is_empty() {
+                    non_null_indices.push(i);
+                    texts.push(text);
+                } else {
                     let cstr = CString::new(
-                        r#"{"type":"unknown","confidence":0.0,"duckdb_type":"VARCHAR"}"#,
+                        r#"{"type":"unknown","confidence":0.0,"duckdb_type":"VARCHAR","samples":0}"#,
                     )?;
                     output_vec.insert(i, cstr);
-                    continue;
                 }
-                let result = classifier.classify(&text)?;
-                let duckdb_type = type_mapping::to_duckdb_type(&result.label);
-                let json = format!(
-                    r#"{{"type":"{}","confidence":{:.4},"duckdb_type":"{}"}}"#,
-                    result.label, result.confidence, duckdb_type
-                );
-                let cstr = CString::new(json)?;
-                output_vec.insert(i, cstr);
+            } else {
+                output_vec.set_null(i);
+            }
+        }
+
+        if !texts.is_empty() {
+            let col_result = column_fn::classify_column(&texts)?;
+            let json = column_fn::format_column_result_json(&col_result);
+            let cstr = CString::new(json)?;
+            for idx in &non_null_indices {
+                output_vec.insert(*idx, cstr.clone());
             }
         }
 
@@ -247,10 +309,29 @@ impl VScalar for FineTypeDetail {
     }
 
     fn signatures() -> Vec<ScalarFunctionSignature> {
-        vec![ScalarFunctionSignature::exact(
-            vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
-            LogicalTypeHandle::from(LogicalTypeId::Varchar),
-        )]
+        let varchar = LogicalTypeHandle::from(LogicalTypeId::Varchar);
+        let list_varchar = LogicalTypeHandle::list(&varchar);
+
+        vec![
+            // finetype_detail(value VARCHAR) → VARCHAR
+            ScalarFunctionSignature::exact(
+                vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ),
+            // finetype_detail(list(values) LIST<VARCHAR>) → VARCHAR
+            ScalarFunctionSignature::exact(
+                vec![list_varchar],
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ),
+            // finetype_detail(list(values) LIST<VARCHAR>, header VARCHAR) → VARCHAR
+            ScalarFunctionSignature::exact(
+                vec![
+                    LogicalTypeHandle::list(&LogicalTypeHandle::from(LogicalTypeId::Varchar)),
+                    LogicalTypeHandle::from(LogicalTypeId::Varchar),
+                ],
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ),
+        ]
     }
 }
 

@@ -578,5 +578,158 @@ GROUP BY topic
 HAVING count(*) >= 3
 ORDER BY topic;
 
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 10. COLUMN-LEVEL CLASSIFICATION via finetype(list())
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Uses finetype(list(values)) for integrated column-level classification
+-- with built-in disambiguation rules (date formats, coordinates, boolean subtypes,
+-- categorical detection, numeric range analysis, etc.)
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          finetype(list()) vs PER-VALUE MAJORITY VOTE      '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 10a. Run column-level classification
+CREATE OR REPLACE TABLE column_predictions_v2 AS
+SELECT
+    cv.topic,
+    cv.table_name,
+    cv.col_name,
+    finetype(list(cv.col_value)) AS predicted_label,
+    finetype_detail(list(cv.col_value)) AS detail_json
+FROM column_values cv
+GROUP BY cv.topic, cv.table_name, cv.col_name;
+
+.print ''
+.print '--- Column-level predictions ---'
+SELECT
+    count(*) AS total_columns,
+    count(DISTINCT predicted_label) AS unique_ft_predictions
+FROM column_predictions_v2;
+
+-- 10b. Join with ground truth (same schema mapping)
+CREATE OR REPLACE TABLE eval_results_v2 AS
+SELECT
+    cp.topic,
+    cp.table_name,
+    cp.col_name,
+    cp.predicted_label,
+    cp.detail_json,
+    gt.gt_label,
+    split_part(cp.predicted_label, '.', 1) AS ft_domain,
+    sm.finetype_label AS expected_ft_label,
+    sm.finetype_domain AS expected_ft_domain,
+    sm.match_quality,
+    CASE
+        WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
+             AND cp.predicted_label = sm.finetype_label
+        THEN true ELSE false
+    END AS label_match,
+    CASE
+        WHEN sm.finetype_domain IS NOT NULL AND sm.finetype_domain != ''
+             AND split_part(cp.predicted_label, '.', 1) = sm.finetype_domain
+        THEN true ELSE false
+    END AS domain_match,
+    CASE
+        WHEN sm.match_quality IN ('direct', 'close') THEN 'format_detectable'
+        WHEN sm.match_quality = 'partial' THEN 'partially_detectable'
+        WHEN sm.match_quality = 'semantic_only' THEN 'semantic_only'
+        ELSE 'unmapped'
+    END AS detectability
+FROM column_predictions_v2 cp
+JOIN ground_truth gt ON cp.topic = gt.topic
+    AND cp.table_name = gt.table_name
+    AND cp.col_name = gt.col_name
+LEFT JOIN schema_mapping sm ON gt.gt_label = sm.gt_label;
+
+-- 10c. Side-by-side headline comparison
+.print ''
+.print '--- COMPARISON: per-value majority vote vs finetype(list()) ---'
+SELECT
+    'per-value majority vote' AS method,
+    count(*) AS total,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results WHERE match_quality IS NOT NULL
+UNION ALL
+SELECT
+    'finetype(list())' AS method,
+    count(*) AS total,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results_v2 WHERE match_quality IS NOT NULL;
+
+-- 10d. Format-detectable comparison
+.print ''
+.print '--- COMPARISON: Format-detectable only (direct + close) ---'
+SELECT
+    'per-value majority vote' AS method,
+    count(*) AS total,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results WHERE detectability = 'format_detectable'
+UNION ALL
+SELECT
+    'finetype(list())' AS method,
+    count(*) AS total,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS label_pct,
+    sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct,
+    ROUND(sum(CASE WHEN domain_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS domain_pct
+FROM eval_results_v2 WHERE detectability = 'format_detectable';
+
+-- 10e. Where finetype(list()) differs from majority vote
+.print ''
+.print '--- Columns where finetype(list()) CHANGED the prediction ---'
+SELECT
+    v1.predicted_label AS majority_vote,
+    v2.predicted_label AS column_fn,
+    v1.gt_label,
+    v1.match_quality,
+    count(*) AS columns,
+    sum(CASE WHEN v2.label_match AND NOT v1.label_match THEN 1 ELSE 0 END) AS fixed,
+    sum(CASE WHEN v1.label_match AND NOT v2.label_match THEN 1 ELSE 0 END) AS broken
+FROM eval_results v1
+JOIN eval_results_v2 v2 ON v1.topic = v2.topic
+    AND v1.table_name = v2.table_name
+    AND v1.col_name = v2.col_name
+WHERE v1.predicted_label != v2.predicted_label
+  AND v1.match_quality IS NOT NULL
+GROUP BY v1.predicted_label, v2.predicted_label, v1.gt_label, v1.match_quality
+ORDER BY columns DESC
+LIMIT 30;
+
+-- 10f. Net improvement summary
+.print ''
+.print '--- Net improvement: finetype(list()) vs per-value majority vote ---'
+WITH diff AS (
+    SELECT
+        CASE
+            WHEN v2.label_match AND NOT v1.label_match THEN 'fixed'
+            WHEN v1.label_match AND NOT v2.label_match THEN 'broken'
+            WHEN v1.label_match AND v2.label_match THEN 'both_correct'
+            ELSE 'both_wrong'
+        END AS outcome
+    FROM eval_results v1
+    JOIN eval_results_v2 v2 ON v1.topic = v2.topic
+        AND v1.table_name = v2.table_name
+        AND v1.col_name = v2.col_name
+    WHERE v1.match_quality IS NOT NULL
+)
+SELECT
+    outcome,
+    count(*) AS columns,
+    ROUND(count(*) * 100.0 / sum(count(*)) OVER (), 1) AS pct
+FROM diff
+GROUP BY outcome
+ORDER BY columns DESC;
+
 .print ''
 .print '--- Evaluation complete ---'
