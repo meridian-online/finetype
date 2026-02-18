@@ -622,23 +622,36 @@ fn cmd_infer(
     match model_type {
         ModelType::Transformer => {
             let classifier = Classifier::load(&model)?;
-            for text in inputs {
-                let result = classifier.classify(&text)?;
-                output_result(&text, &result, output, show_value, show_confidence);
+            let batch_size = 32;
+            for chunk in inputs.chunks(batch_size) {
+                let batch_texts: Vec<String> = chunk.to_vec();
+                let results = classifier.classify_batch(&batch_texts)?;
+                for (text, result) in chunk.iter().zip(results.iter()) {
+                    output_result(text, result, output, show_value, show_confidence);
+                }
             }
         }
         ModelType::CharCnn => {
             let classifier = load_char_classifier(&model)?;
-            for text in inputs {
-                let result = classifier.classify(&text)?;
-                output_result(&text, &result, output, show_value, show_confidence);
+            let batch_size = 128;
+            for chunk in inputs.chunks(batch_size) {
+                let batch_texts: Vec<String> = chunk.to_vec();
+                let results = classifier.classify_batch(&batch_texts)?;
+                for (text, result) in chunk.iter().zip(results.iter()) {
+                    output_result(text, result, output, show_value, show_confidence);
+                }
             }
         }
         ModelType::Tiered => {
             let classifier = load_tiered_classifier(&model)?;
-            for text in inputs {
-                let result = classifier.classify(&text)?;
-                output_result(&text, &result, output, show_value, show_confidence);
+            // Batch inference: process in chunks for efficiency
+            let batch_size = 128;
+            for chunk in inputs.chunks(batch_size) {
+                let batch_texts: Vec<String> = chunk.to_vec();
+                let results = classifier.classify_batch(&batch_texts)?;
+                for (text, result) in chunk.iter().zip(results.iter()) {
+                    output_result(text, result, output, show_value, show_confidence);
+                }
             }
         }
     }

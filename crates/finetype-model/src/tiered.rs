@@ -182,6 +182,10 @@ impl TieredClassifier {
     }
 
     /// Classify multiple text inputs through the tier chain.
+    ///
+    /// Uses group-then-batch processing: after each tier, samples are grouped
+    /// by their predicted class, then batch-forwarded through the next tier's
+    /// model. This reduces forward passes from O(N) to O(num_models) per tier.
     pub fn classify_batch(
         &self,
         texts: &[String],
@@ -191,52 +195,93 @@ impl TieredClassifier {
         // Encode all inputs once (shared across tiers)
         let input_ids = self.encode_batch(texts)?;
 
-        // --- Tier 0: Get broad types ---
+        // --- Tier 0: batch forward all inputs ---
         let tier0_results = self.run_model(&self.tier0, &input_ids)?;
 
+        // Per-sample state: (broad_type, t0_conf, category, t1_conf, label, t2_conf)
+        let mut broad_types: Vec<String> = Vec::with_capacity(batch_size);
+        let mut t0_confs: Vec<f32> = Vec::with_capacity(batch_size);
+        let mut categories: Vec<String> = vec![String::new(); batch_size];
+        let mut t1_confs: Vec<f32> = vec![0.0; batch_size];
+        let mut final_labels: Vec<String> = vec![String::new(); batch_size];
+        let mut t2_confs: Vec<f32> = vec![0.0; batch_size];
+
+        for (bt, conf) in &tier0_results {
+            broad_types.push(bt.clone());
+            t0_confs.push(*conf);
+        }
+
+        // --- Tier 1: group by broad_type, batch each group ---
+        // Collect indices per T1 model key
+        let mut t1_groups: HashMap<String, Vec<usize>> = HashMap::new();
+        for (i, bt) in broad_types.iter().enumerate() {
+            if self.tier1.contains_key(bt) {
+                t1_groups.entry(bt.clone()).or_default().push(i);
+            } else if let Some(direct) = self.tier1_direct.get(bt) {
+                categories[i] = direct.clone();
+                t1_confs[i] = 1.0;
+            } else {
+                categories[i] = "unknown".to_string();
+                t1_confs[i] = 0.0;
+            }
+        }
+
+        for (bt, indices) in &t1_groups {
+            let model = &self.tier1[bt];
+            let group_input = self.gather_rows(&input_ids, indices)?;
+            let results = self.run_model(model, &group_input)?;
+            for (j, idx) in indices.iter().enumerate() {
+                categories[*idx] = results[j].0.clone();
+                t1_confs[*idx] = results[j].1;
+            }
+        }
+
+        // --- Tier 2: group by (broad_type, category), batch each group ---
+        let mut t2_groups: HashMap<String, Vec<usize>> = HashMap::new();
+        for i in 0..batch_size {
+            let key = format!("{}_{}", broad_types[i], categories[i]);
+            if self.tier2.contains_key(&key) {
+                t2_groups.entry(key).or_default().push(i);
+            } else if let Some(direct) = self.tier2_direct.get(&key) {
+                final_labels[i] = direct.clone();
+                t2_confs[i] = 1.0;
+            } else {
+                final_labels[i] = format!("{}.{}", broad_types[i], categories[i]);
+                t2_confs[i] = 0.0;
+            }
+        }
+
+        for (key, indices) in &t2_groups {
+            let model = &self.tier2[key];
+            let group_input = self.gather_rows(&input_ids, indices)?;
+            let results = self.run_model(model, &group_input)?;
+            for (j, idx) in indices.iter().enumerate() {
+                final_labels[*idx] = results[j].0.clone();
+                t2_confs[*idx] = results[j].1;
+            }
+        }
+
+        // --- Assemble final results ---
         let mut final_results = Vec::with_capacity(batch_size);
-
-        // Process each sample through the tier chain
-        for (i, (broad_type, tier0_confidence)) in tier0_results.iter().enumerate() {
-            // --- Tier 1: Get category ---
-            let (category, tier1_confidence) = if let Some(model) = self.tier1.get(broad_type) {
-                // Run Tier 1 model for this single sample
-                let single_input = input_ids.narrow(0, i, 1)?;
-                let results = self.run_model(model, &single_input)?;
-                (results[0].0.clone(), results[0].1)
-            } else if let Some(direct) = self.tier1_direct.get(broad_type) {
-                // Direct resolution — single category
-                (direct.clone(), 1.0)
-            } else {
-                // Fallback: unknown broad type
-                ("unknown".to_string(), 0.0)
-            };
-
-            // --- Tier 2: Get specific type ---
-            let tier2_key = format!("{}_{}", broad_type, category);
-            let (final_label, tier2_confidence) = if let Some(model) = self.tier2.get(&tier2_key) {
-                let single_input = input_ids.narrow(0, i, 1)?;
-                let results = self.run_model(model, &single_input)?;
-                (results[0].0.clone(), results[0].1)
-            } else if let Some(direct) = self.tier2_direct.get(&tier2_key) {
-                // Direct resolution — single type
-                (direct.clone(), 1.0)
-            } else {
-                // Fallback: construct label from broad_type and category
-                (format!("{}.{}", broad_type, category), 0.0)
-            };
-
-            // Combined confidence is the product of tier confidences
-            let combined_confidence = tier0_confidence * tier1_confidence * tier2_confidence;
-
+        for i in 0..batch_size {
+            let combined_confidence = t0_confs[i] * t1_confs[i] * t2_confs[i];
             final_results.push(ClassificationResult {
-                label: final_label,
+                label: final_labels[i].clone(),
                 confidence: combined_confidence,
-                all_scores: vec![], // Tiered model doesn't compute full score distribution
+                all_scores: vec![],
             });
         }
 
         Ok(final_results)
+    }
+
+    /// Gather specific rows from a 2D tensor by indices.
+    fn gather_rows(&self, tensor: &Tensor, indices: &[usize]) -> Result<Tensor, InferenceError> {
+        let index_tensor = Tensor::new(
+            indices.iter().map(|&i| i as u32).collect::<Vec<u32>>(),
+            tensor.device(),
+        )?;
+        Ok(tensor.index_select(&index_tensor, 0)?)
     }
 
     /// Encode a batch of texts to tensor.
