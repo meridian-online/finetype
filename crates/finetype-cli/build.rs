@@ -48,37 +48,35 @@ fn main() {
 #[cfg(feature = "embed-models")]
 fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::path::Path) {
     // Follow the models/default symlink to find the active model.
-    // On Windows, git may check out symlinks as plain text files containing
-    // the target path, so we fall back to reading the file content.
+    //
+    // Resolution order (handles all platforms):
+    //  1. read_link — works on Linux/macOS and Windows with real symlinks
+    //  2. read_to_string — Windows fallback where git checks out symlinks as
+    //     plain text files containing the target path
+    //
+    // We skip the exists() check because on Windows a file-type symlink
+    // pointing to a directory returns false for exists() even when the
+    // target directory is present.
     let default_link = models_base.join("default");
-    let model_dir = if default_link.exists() {
-        std::fs::read_link(&default_link)
-            .map(|target| {
-                if target.is_relative() {
-                    models_base.join(target)
-                } else {
-                    target
-                }
-            })
-            .or_else(|_| {
-                // Windows fallback: read as plain text file (git symlink compat)
-                std::fs::read_to_string(&default_link)
-                    .map(|content| models_base.join(content.trim()))
-            })
-            .unwrap_or_else(|_| {
-                panic!(
-                    "Cannot resolve models/default at {:?}. \
-                     Ensure the symlink or text file points to a valid model directory.",
-                    default_link
-                )
-            })
-    } else {
-        panic!(
-            "models/default not found at {:?}. \
-             Run download-model.sh or create a symlink to the active model directory.",
-            default_link
-        )
-    };
+    let model_dir = std::fs::read_link(&default_link)
+        .map(|target| {
+            if target.is_relative() {
+                models_base.join(target)
+            } else {
+                target
+            }
+        })
+        .or_else(|_| {
+            // Windows fallback: read as plain text file (git symlink compat)
+            std::fs::read_to_string(&default_link).map(|content| models_base.join(content.trim()))
+        })
+        .unwrap_or_else(|e| {
+            panic!(
+                "Cannot resolve models/default at {:?}: {e}. \
+                 Run download-model.sh or create a symlink to the active model directory.",
+                default_link
+            )
+        });
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest = PathBuf::from(&out_dir).join("embedded_models.rs");
