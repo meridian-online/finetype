@@ -2,8 +2,10 @@
 """Read sampled parquet files, unpivot, sample values per column.
 Outputs column_values.parquet for DuckDB classification.
 """
+import argparse
 import csv
 import json
+import os
 import random
 import sys
 from pathlib import Path
@@ -11,9 +13,16 @@ from pathlib import Path
 random.seed(42)
 SAMPLE_VALUES_PER_COL = 20
 MAX_VALUE_LEN = 500
-OUTPUT = Path("/home/hugh/git-tables/eval_output")
+_GITTABLES_DIR = os.environ.get("GITTABLES_DIR", os.path.expanduser("~/datasets/gittables"))
+DEFAULT_OUTPUT = Path(os.environ.get("EVAL_OUTPUT", os.path.join(_GITTABLES_DIR, "eval_output")))
 
 def main():
+    parser = argparse.ArgumentParser(description="Extract column values from sampled parquet files.")
+    parser.add_argument("--output-dir", type=str, default=str(DEFAULT_OUTPUT),
+                        help=f"Output directory containing metadata.csv (default: {DEFAULT_OUTPUT})")
+    args = parser.parse_args()
+    output = Path(args.output_dir)
+
     try:
         import pyarrow.parquet as pq
         import pyarrow as pa
@@ -23,7 +32,7 @@ def main():
 
     # Read metadata
     metadata = []
-    with open(OUTPUT / 'metadata.csv') as f:
+    with open(output / 'metadata.csv') as f:
         for row in csv.DictReader(f):
             metadata.append(row)
 
@@ -77,7 +86,7 @@ def main():
         'col_value': [r['col_value'] for r in rows],
     })
 
-    out_path = OUTPUT / 'column_values.parquet'
+    out_path = output / 'column_values.parquet'
     pq.write_table(out_table, out_path)
     print(f"\nOutput: {out_path}")
     print(f"  Rows: {len(rows)}")

@@ -10,12 +10,20 @@ import csv
 import sys
 from pathlib import Path
 
-TOPICS_DIR = Path("/home/hugh/git-tables/topics")
-OUTPUT_DIR = Path("/home/hugh/git-tables/eval_output")
-SAMPLE_PER_TOPIC = 50
+GITTABLES_DIR = Path(os.environ.get("GITTABLES_DIR", os.path.expanduser("~/datasets/gittables")))
+TOPICS_DIR = GITTABLES_DIR / "topics"
+OUTPUT_DIR = Path(os.environ.get("EVAL_OUTPUT", str(GITTABLES_DIR / "eval_output")))
+DEFAULT_SAMPLE_PER_TOPIC = 50
 random.seed(42)
 
-OUTPUT_DIR.mkdir(exist_ok=True)
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="Extract GitTables metadata from parquet files.")
+    parser.add_argument("--samples-per-topic", type=int, default=DEFAULT_SAMPLE_PER_TOPIC,
+                        help=f"Number of tables to sample per topic (default: {DEFAULT_SAMPLE_PER_TOPIC})")
+    parser.add_argument("--output-dir", type=str, default=str(OUTPUT_DIR),
+                        help=f"Output directory (default: {OUTPUT_DIR})")
+    return parser.parse_args()
 
 def extract_parquet_metadata(filepath):
     """Extract gittables metadata from parquet file using pyarrow."""
@@ -33,9 +41,14 @@ def extract_parquet_metadata(filepath):
     return None
 
 def main():
+    args = parse_args()
+    sample_per_topic = args.samples_per_topic
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(exist_ok=True)
+
     # Catalog all topics
     topics = sorted([d for d in TOPICS_DIR.iterdir() if d.is_dir()])
-    print(f"Found {len(topics)} topics")
+    print(f"Found {len(topics)} topics (sampling {sample_per_topic}/topic)")
 
     catalog_rows = []
     metadata_rows = []
@@ -49,7 +62,7 @@ def main():
         total_files += len(parquet_files)
 
         # Sample
-        sample = random.sample(parquet_files, min(SAMPLE_PER_TOPIC, len(parquet_files)))
+        sample = random.sample(parquet_files, min(sample_per_topic, len(parquet_files)))
         total_sampled += len(sample)
 
         # Catalog entry
@@ -109,13 +122,13 @@ def main():
               f"{annotated_count} annotated ({ann_pct:.0f}%)")
 
     # Write catalog
-    with open(OUTPUT_DIR / 'catalog.csv', 'w', newline='') as f:
+    with open(output_dir / 'catalog.csv', 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=['topic', 'total_tables', 'sampled_tables'])
         w.writeheader()
         w.writerows(catalog_rows)
 
     # Write metadata
-    with open(OUTPUT_DIR / 'metadata.csv', 'w', newline='') as f:
+    with open(output_dir / 'metadata.csv', 'w', newline='') as f:
         fields = ['topic', 'table_name', 'file_path', 'nrows', 'ncols',
                   'has_schema', 'has_dbpedia', 'n_annotated_cols', 'annotations_json']
         w = csv.DictWriter(f, fieldnames=fields)
@@ -123,7 +136,7 @@ def main():
         w.writerows(metadata_rows)
 
     # Write file list (for DuckDB read_parquet)
-    with open(OUTPUT_DIR / 'sampled_files.txt', 'w') as f:
+    with open(output_dir / 'sampled_files.txt', 'w') as f:
         for row in metadata_rows:
             f.write(row['file_path'] + '\n')
 
@@ -132,7 +145,7 @@ def main():
     print(f"Total tables: {total_files}")
     print(f"Sampled: {total_sampled}")
     print(f"With annotations: {total_annotated} ({total_annotated/total_sampled*100:.1f}%)")
-    print(f"\nOutput: {OUTPUT_DIR}/")
+    print(f"\nOutput: {output_dir}/")
     print(f"  catalog.csv: {len(catalog_rows)} rows")
     print(f"  metadata.csv: {len(metadata_rows)} rows")
     print(f"  sampled_files.txt: {len(metadata_rows)} paths")

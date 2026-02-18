@@ -11,19 +11,22 @@
 --
 -- Usage:
 --   make eval-1m                                    # Via Makefile (recommended)
---   duckdb -unsigned < eval/gittables/eval_1m.sql   # Direct
+--   source eval/config.env && envsubst '...' < eval/gittables/eval_1m.sql | duckdb -unsigned
+--
+-- Path variables (substituted by envsubst via Makefile):
+--   ${EXTENSION_PATH}  — DuckDB extension .duckdb_extension file
+--   ${EVAL_OUTPUT}     — Directory with catalog.csv, metadata.csv, column_values.parquet
 --
 -- Prerequisites:
---   1. GitTables 1M corpus at ~/git-tables/topics/{topic}/
+--   1. GitTables 1M corpus at $GITTABLES_DIR/topics/{topic}/
 --   2. Pre-extracted metadata: make eval-extract eval-values
---      (generates ~/git-tables/eval_output/{catalog,metadata}.csv and column_values.parquet)
 --   3. DuckDB extension built: cargo build -p finetype_duckdb --release
 --   4. Schema mapping generated: make eval-mapping
 
 SET threads = 8;
 SET memory_limit = '4GB';
 
-LOAD '/home/hugh/github/noon-org/finetype/target/release/finetype_duckdb.duckdb_extension';
+LOAD '${EXTENSION_PATH}';
 
 .mode box
 .timer on
@@ -38,10 +41,10 @@ LOAD '/home/hugh/github/noon-org/finetype/target/release/finetype_duckdb.duckdb_
 .print '═══════════════════════════════════════════════════════════════════'
 
 CREATE OR REPLACE TABLE catalog AS
-SELECT * FROM read_csv('/home/hugh/git-tables/eval_output/catalog.csv', auto_detect=true);
+SELECT * FROM read_csv('${EVAL_OUTPUT}/catalog.csv', auto_detect=true);
 
 CREATE OR REPLACE TABLE metadata AS
-SELECT * FROM read_csv('/home/hugh/git-tables/eval_output/metadata.csv', auto_detect=true);
+SELECT * FROM read_csv('${EVAL_OUTPUT}/metadata.csv', auto_detect=true);
 
 SELECT
     (SELECT sum(total_tables) FROM catalog) AS total_corpus_tables,
@@ -93,7 +96,7 @@ LIMIT 20;
 .print '═══════════════════════════════════════════════════════════════════'
 
 CREATE OR REPLACE TABLE column_values AS
-SELECT * FROM read_parquet('/home/hugh/git-tables/eval_output/column_values.parquet');
+SELECT * FROM read_parquet('${EVAL_OUTPUT}/column_values.parquet');
 
 SELECT
     count(*) AS total_values,
@@ -128,7 +131,7 @@ WITH vote_counts AS (
         col_name,
         ft_label,
         count(*) AS votes,
-        count(*) OVER (PARTITION BY topic, table_name, col_name) AS total_votes
+        sum(count(*)) OVER (PARTITION BY topic, table_name, col_name) AS total_votes
     FROM classified
     GROUP BY topic, table_name, col_name, ft_label
 ),

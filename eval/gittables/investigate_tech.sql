@@ -8,16 +8,16 @@
 SET threads = 8;
 SET memory_limit = '4GB';
 
-LOAD '/home/hugh/github/noon-org/finetype/target/release/finetype_duckdb.duckdb_extension';
+LOAD '${EXTENSION_PATH}';
 
 .mode box
 
 -- Load pre-extracted data
 CREATE OR REPLACE TABLE metadata AS
-SELECT * FROM read_csv('/home/hugh/git-tables/eval_output/metadata.csv', auto_detect=true);
+SELECT * FROM read_csv('${EVAL_OUTPUT}/metadata.csv', auto_detect=true);
 
 CREATE OR REPLACE TABLE column_values AS
-SELECT * FROM read_parquet('/home/hugh/git-tables/eval_output/column_values.parquet');
+SELECT * FROM read_parquet('${EVAL_OUTPUT}/column_values.parquet');
 
 -- Flatten annotations
 CREATE OR REPLACE TABLE ground_truth AS
@@ -51,7 +51,7 @@ WITH vote_counts AS (
     SELECT
         topic, table_name, col_name, ft_label,
         count(*) AS votes,
-        count(*) OVER (PARTITION BY topic, table_name, col_name) AS total_votes
+        sum(count(*)) OVER (PARTITION BY topic, table_name, col_name) AS total_votes
     FROM classified
     GROUP BY topic, table_name, col_name, ft_label
 ),

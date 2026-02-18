@@ -1,14 +1,185 @@
 # GitTables Evaluation Report
 
-**FineType v0.1.7 (Tiered v2, 34 CharCNN models, 168 types)**
+**FineType v0.1.8 (CharCNN v7 flat, 169 types) + SOTAB Benchmark**
 
-> **Primary benchmark:** GitTables 1M stratified sample (4,380 tables, 50/topic)
-> - **80.9% domain accuracy** on format-detectable types (direct + close mapping)
-> - **40.9% label accuracy** on format-detectable types
-> - See [§ v0.1.7 Evaluation](#v017-evaluation-tiered-v2) for the latest results.
-> - See [§ v0.1.5 Evaluation](#v015-evaluation-charcnn-v6) for flat CharCNN v6 baseline.
-> - See [§ GitTables 1M Evaluation](#gittables-1m-evaluation) for v0.1.0 baseline.
-> - The legacy 1,101-table subset is retained below for historical comparison.
+> **GitTables 1M** (200/topic, 14,850 tables, 2.7M values):
+> - **57.8% domain accuracy** / **34.8% label accuracy** on format-detectable types
+> - See [§ v0.1.8 Evaluation](#v018-evaluation-charcnn-v7-200topic)
+>
+> **SOTAB CTA** (validation, 5,728 tables, 16,765 annotated columns):
+> - **53.7% domain accuracy** / **25.4% label accuracy** on format-detectable types
+> - See [§ SOTAB Evaluation](#sotab-cta-evaluation)
+>
+> **Prior results:** [v0.1.7](#v017-evaluation-tiered-v2) | [v0.1.5](#v015-evaluation-charcnn-v6) | [v0.1.0](#gittables-1m-evaluation) | [Legacy 1,101-table](#legacy-benchmark-1101-tables)
+
+---
+
+## v0.1.8 Evaluation (CharCNN v7, 200/topic)
+
+**Date:** 2026-02-18
+**Model:** CharCNN v7 (flat, 169 classes) via DuckDB extension
+**Sample:** 200 tables/topic (14,850 tables, 3.4× the v0.1.7 sample)
+**Mapping:** 216-type schema mapping with match quality tiers
+
+### What Changed from v0.1.7
+
+1. **Sample size** — 50/topic → 200/topic (4,380 → 14,850 tables, 774K → 2.7M values classified)
+2. **Model** — DuckDB extension uses flat CharCNN v7 (169 classes), not tiered v2
+3. **Scripts** — `extract_metadata_1m.py` and `prepare_1m_values.py` updated with CLI args (`--samples-per-topic`, `--output-dir`)
+4. **Bug fix** — vote_pct window function corrected (`sum(count(*))` instead of `count(*)`)
+
+> **Note on model difference:** The v0.1.7 DuckDB eval embedded a flat CharCNN model in the extension (the DuckDB extension only supports flat models). The v0.1.8 CLI uses tiered-v2 as its default model for interactive use, but the DuckDB extension embeds the latest flat model (char-cnn-v7) for batch processing. Accuracy differences between v0.1.7 and v0.1.8 DuckDB evals reflect both the model change and the larger, more diverse sample.
+
+### Headline Results
+
+| Detectability Tier | Columns | Label Accuracy | Domain Accuracy |
+|---|---|---|---|
+| Format-detectable (direct + close) | 15,748 | **34.8%** | **57.8%** |
+| Partially detectable | 11,655 | 3.7% | 21.8% |
+| Semantic only | 53,729 | 0.0% (by design) | 73.8% |
+| **All mapped types** | **81,132** | **7.3%** | **63.2%** |
+
+### Scale Comparison
+
+| Metric | v0.1.7 (50/topic) | v0.1.8 (200/topic) |
+|---|---|---|
+| Tables sampled | 4,380 | **14,850** |
+| Values classified | 774,350 | **2,716,301** |
+| Columns with GT | 23,466 | **113,423** |
+| Mapped columns | 23,466 | **81,132** |
+| Format-detectable columns | 4,482 | **15,748** |
+| Unique GT labels | 1,726 | **2,276** |
+| Classification time | 809s | **1,406s** |
+| Throughput (values/sec) | 957 | **1,932** |
+
+### Domain-Level Accuracy
+
+| Expected Domain | Columns | Correct | Accuracy |
+|---|---|---|---|
+| technology | 6,198 | 5,809 | **93.7%** |
+| representation | 57,127 | 40,718 | **71.3%** |
+| datetime | 2,784 | 1,320 | **47.4%** |
+| identity | 8,788 | 3,092 | **35.2%** |
+| geography | 6,235 | 345 | **5.5%** |
+
+### Top Format-Detectable Performers
+
+| GT Label | Quality | Columns | Label % | Domain % |
+|---|---|---|---|---|
+| url | direct | 5,574 | **76.0%** | **99.3%** |
+| address | close | 58 | **98.3%** | **98.3%** |
+| person | close | 196 | **98.0%** | **98.0%** |
+| currency | partial | 64 | **95.3%** | **98.4%** |
+| sentence | close | 198 | **95.5%** | **95.5%** |
+| issn | direct | 73 | **94.5%** | **94.5%** |
+| artist | close | 114 | **78.1%** | **80.7%** |
+| email | direct | 45 | **51.1%** | **51.1%** |
+| country | direct | 121 | **38.8%** | **63.6%** |
+| name | close | 1,625 | **24.1%** | **48.1%** |
+
+### Top Misclassification Patterns
+
+| GT Label | Expected | Predicted | Count | Insight |
+|---|---|---|---|---|
+| author → username | identity.person.full_name | identity.person.username | 1,590 | Authors are often IDs, not real names |
+| author → word | identity.person.full_name | representation.text.word | 1,531 | Single-word identifiers |
+| url → user_agent | technology.internet.url | technology.internet.user_agent | 1,259 | Long URLs misclassified |
+| author → ordinal | identity.person.full_name | representation.discrete.ordinal | 1,336 | Numeric author IDs |
+
+### Key Findings
+
+1. **Accuracy holds at 4× scale.** Format-detectable domain accuracy (57.8%) closely matches v0.1.5's 57.2% on the smaller sample, suggesting the flat model performance is stable across sample sizes.
+
+2. **200/topic reveals more GT label diversity.** 2,276 unique GT labels (vs 1,726 at 50/topic) with 32,291 unmapped columns — the long tail of semantic labels grows with sample size.
+
+3. **Throughput improved.** 1,932 values/sec (vs 957 in v0.1.7 tiered eval), reflecting the flat model's efficiency at batch classification in DuckDB.
+
+4. **Geography remains the weakest domain** at 5.5%. `location_created` columns (epoch timestamps mapped to geography) and diverse address formats drive this down.
+
+---
+
+## SOTAB CTA Evaluation
+
+**Date:** 2026-02-18
+**Model:** CharCNN v7 (flat, 169 classes) via DuckDB extension
+**Dataset:** [SOTAB CTA](https://webdatacommons.org/structureddata/sotab/) validation split (5,732 tables, 16,840 annotated columns)
+**Mapping:** 92-type schema mapping (`eval/sotab/sotab_schema_mapping.csv`)
+
+### Why SOTAB?
+
+SOTAB provides a fundamentally different data distribution from GitTables:
+- **Source:** Real website tables (Schema.org markup) vs GitHub repositories
+- **Labels:** 91 Schema.org CTA types (telephone, email, postalCode, Duration, etc.)
+- **Format signal:** **68.5% format-detectable** (vs GitTables ~19%) — SOTAB labels are inherently more format-oriented
+
+### Headline Results
+
+| Detectability Tier | Columns | Label Accuracy | Domain Accuracy |
+|---|---|---|---|
+| Format-detectable (direct + close) | 11,484 | **25.4%** | **53.7%** |
+| Partially detectable | 1,928 | 9.6% | 24.2% |
+| Semantic only | 3,353 | 0.1% | 25.3% |
+| **All mapped types** | **16,765** | **18.5%** | **44.6%** |
+
+### Direct Match Accuracy
+
+For the 17 labels with exact FineType equivalents:
+
+| SOTAB Label | FineType Label | Columns | Label % | Domain % |
+|---|---|---|---|---|
+| currency | identity.payment.currency_code | 582 | **87.8%** | **94.2%** |
+| URL | technology.internet.url | 301 | **87.7%** | **96.7%** |
+| Duration | datetime.duration.iso_8601 | 587 | **47.4%** | **60.8%** |
+| telephone | identity.person.phone_number | 486 | **33.3%** | **43.0%** |
+| Integer | representation.numeric.integer_number | 456 | **33.3%** | **79.2%** |
+| Boolean | representation.boolean.terms | 59 | **28.8%** | **39.0%** |
+| Person | identity.person.full_name | 315 | **25.4%** | **38.1%** |
+| Country | geography.location.country | 323 | **24.5%** | **69.3%** |
+| postalCode | geography.address.postal_code | 178 | **19.1%** | **29.8%** |
+| CoordinateAT | geography.coordinate.coordinates | 306 | **17.0%** | **27.5%** |
+| email | identity.person.email | 93 | **16.1%** | **21.5%** |
+| addressRegion | geography.location.region | 323 | **12.1%** | **27.6%** |
+| addressLocality | geography.location.city | 393 | **8.9%** | **20.6%** |
+| GenderType | identity.person.gender | 33 | **6.1%** | **9.1%** |
+| DayOfWeek | datetime.component.day_of_week | 61 | **4.9%** | **18.0%** |
+| faxNumber | identity.person.phone_number | 20 | **0%** | **25.0%** |
+
+### Domain-Level Accuracy
+
+| Expected Domain | Columns | Correct | Accuracy |
+|---|---|---|---|
+| technology | 330 | 303 | **91.8%** |
+| identity | 4,092 | 2,120 | **51.8%** |
+| datetime | 1,866 | 813 | **43.6%** |
+| representation | 8,361 | 4,226 | **50.5%** |
+| geography | 2,116 | 14 | **0.7%** |
+
+### Cross-Benchmark Comparison
+
+| Metric | GitTables (200/topic) | SOTAB (validation) |
+|---|---|---|
+| Format-detectable label accuracy | **34.8%** | 25.4% |
+| Format-detectable domain accuracy | **57.8%** | 53.7% |
+| All mapped label accuracy | 7.3% | **18.5%** |
+| All mapped domain accuracy | **63.2%** | 44.6% |
+| Format-detectable columns | 15,748 (19.4%) | **11,484 (68.5%)** |
+| Unique GT labels | 2,276 | 91 |
+| Values classified | 2,716,301 | 282,278 |
+| Classification time | 1,406s | 469s |
+
+**Key insight:** SOTAB has higher format-detectability (68.5% vs 19.4%) but slightly lower accuracy on those types. This is because SOTAB web data is messier than GitTables GitHub data — phone numbers have diverse international formats, addresses mix city/region/country fields, and many "text" columns contain HTML fragments or long-form web content.
+
+### Key Findings
+
+1. **Currency and URL detection is strong across both benchmarks** (>87% label accuracy). These are FineType's most reliable types.
+
+2. **Geography accuracy is near-zero on SOTAB** (0.7%). Web-scraped addresses are far more diverse than GitHub data — mixed languages, inconsistent formatting, abbreviated regions. This is a significant weakness.
+
+3. **Phone number accuracy is moderate** (33.3% label, 43.0% domain). International format diversity (E.164, national, local) challenges the model.
+
+4. **SOTAB's higher format-detectability** means more of the benchmark is in FineType's wheelhouse, making it a better signal-to-noise ratio for measuring format classification quality.
+
+5. **The `Text` catch-all label** (826 columns) is mapped to `representation.text.plain_text` but FineType predicts specific subtypes (sentence, word, etc.) — label accuracy is low but the predictions are arguably more useful.
 
 ---
 
