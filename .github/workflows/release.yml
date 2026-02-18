@@ -83,7 +83,12 @@ jobs:
         shell: bash
         run: |
           ARCHIVE="finetype-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive }}"
-          shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          # shasum is macOS/Linux; sha256sum is available in Git Bash on Windows
+          if command -v shasum &>/dev/null; then
+            shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          else
+            sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
