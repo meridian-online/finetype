@@ -24,10 +24,10 @@ identity.person.email
 - **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
 - **DuckDB integration** — 5 scalar functions: `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_version()`
-- **Fast inference** — Character-level CNN model (600+ classifications/sec, 8.5 MB memory)
+- **Tiered inference** — 34 specialized CharCNN models in a T0→T1→T2 hierarchy (600+ classifications/sec, 8.5 MB memory)
 - **Real-world validated** — 85-100% accuracy on format-detectable types in [GitTables benchmark](https://zenodo.org/record/5706316) (2,363 columns)
 - **Pure Rust** — no Python runtime, Candle ML framework
-- **213 tests** — taxonomy validation, model inference, column disambiguation, data generation
+- **187 tests** — taxonomy validation, model inference, column disambiguation, data generation
 
 ## Installation
 
@@ -78,7 +78,10 @@ finetype generate --samples 1000 --output training.ndjson
 finetype train --data data/train.ndjson --epochs 10 --batch-size 64
 
 # Evaluate model accuracy
-finetype eval --data data/test.ndjson --model models/char-cnn-v6
+finetype eval --data data/test.ndjson --model models/tiered-v2
+
+# Use a specific model type (default: tiered)
+finetype infer -i "hello@example.com" --model-type char-cnn --model models/char-cnn-v6
 
 # Evaluate on GitTables benchmark (column-mode vs row-mode)
 finetype eval-gittables --dir eval/gittables
@@ -155,11 +158,12 @@ See [`labels/`](labels/) for the complete taxonomy (YAML definitions with valida
 
 ### Model Accuracy
 
-| Model | Accuracy | Classes |
-|-------|----------|---------|
-| CharCNN v6 | **89.15%** | 169 |
-| CharCNN v5 | 90.09% | 168 |
-| CharCNN v4 | 91.62% | 159 |
+| Model | Architecture | Accuracy | Classes |
+|-------|-------------|----------|---------|
+| Tiered v2 | **34 CharCNNs (T0→T1→T2)** | **default** | 169 |
+| CharCNN v6 | Flat (single model) | 89.15% | 169 |
+| CharCNN v5 | Flat (single model) | 90.09% | 168 |
+| CharCNN v4 | Flat (single model) | 91.62% | 159 |
 
 ### Real-World Evaluation (GitTables)
 
@@ -218,9 +222,13 @@ flowchart TB
         direction TB
         A["Input string"] --> B["Character tokenizer
         (per-char integer encoding)"]
-        B --> C["CharCNN model
-        (softmax → 169 types)"]
-        C --> D{"Post-process rules
+        B --> C["Tier 0: Broad type
+        (15 DuckDB types)"]
+        C --> C1["Tier 1: Category
+        (e.g. DATE → date)"]
+        C1 --> C2["Tier 2: Specific type
+        (e.g. date → iso, us_slash, ...)"]
+        C2 --> D{"Post-process rules
         (6 format checks)"}
         D -->|corrected| E["Predicted type
         + confidence"]
@@ -265,7 +273,7 @@ flowchart TB
 | Stage | What it does | Where |
 |---|---|---|
 | **Character tokenizer** | Encodes each character as an integer (0-127 ASCII + padding). Fixed-length input to the CNN. | `finetype-core` |
-| **CharCNN** | 3-layer character-level CNN with max-pooling → softmax over 169 types. Trained on synthetic data from taxonomy generators. ~340 KB model. | `finetype-model` |
+| **Tiered CharCNN** | 34 specialized character-level CNNs in a T0→T1→T2 hierarchy. Tier 0 classifies into 15 broad DuckDB types, Tier 1 resolves categories, Tier 2 picks specific types. Each model is a 3-layer CNN with max-pooling. Trained on synthetic data from taxonomy generators. | `finetype-model` |
 | **Post-processing** | 6 deterministic rules that correct known model confusions using format signals the model struggles with (e.g., `T` vs space in timestamps, `@` for email rescue, hash length check). | `finetype-model` |
 | **Vote aggregation** | In column mode, runs single-value inference on a sample of up to 100 values, then counts votes per type. | `finetype-model` |
 | **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length), gender detection, categorical (low cardinality), boolean override (integer spread). | `finetype-model` |
@@ -276,7 +284,7 @@ flowchart TB
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
 | `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation (73 tests) | `serde_yaml`, `fake`, `chrono`, `uuid` |
-| `finetype-model` | Candle CharCNN inference, column-mode disambiguation (109 tests) | `candle-core`, `candle-nn` |
+| `finetype-model` | Tiered CharCNN inference, column-mode disambiguation (114 tests) | `candle-core`, `candle-nn` |
 | `finetype-cli` | Binary: 11 CLI commands | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
 
@@ -290,15 +298,17 @@ finetype/
 │   ├── finetype-cli/         # CLI binary
 │   └── finetype-duckdb/      # DuckDB extension (5 scalar functions)
 ├── labels/                   # Taxonomy definitions (169 types, 6 domains, YAML)
-├── models/char-cnn-v6/       # Pre-trained model weights, config, label mapping
+├── models/tiered-v2/         # Default tiered model (34 CharCNNs, T0→T1→T2)
 ├── eval/gittables/           # GitTables real-world benchmark evaluation
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
 └── .github/workflows/        # CI/CD: fmt, clippy, test, finetype check; release cross-compile
 ```
 
-### Why Character-Level CNN?
+### Why Tiered CharCNNs?
 
 Format types are defined by character patterns (colons in MACs/IPv6, `@` in emails, dashes in UUIDs, `T` separator in ISO 8601). Character-level models capture these patterns directly without tokenization overhead.
+
+The tiered architecture decomposes the 169-class problem into a cascade of smaller, specialized classifiers. Tier 0 determines the broad DuckDB type (15 classes — DATE, TIMESTAMP, VARCHAR, etc.), Tier 1 narrows to a category, and Tier 2 picks the specific type. Each tier's model only needs to distinguish a handful of classes, making individual decisions more reliable than a single flat 169-way classifier.
 
 ### Why Candle?
 
@@ -310,7 +320,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 # Build
 cargo build --release
 
-# Run all tests (213)
+# Run all tests (187)
 cargo test --all
 
 # Validate taxonomy (generator ↔ definition alignment)
@@ -329,7 +339,7 @@ cargo run --release -- generate --samples 500 --output data/train.ndjson
 cargo run --release -- train --data data/train.ndjson --epochs 10
 
 # Evaluate model
-cargo run --release -- eval --data data/test.ndjson --model models/char-cnn-v6
+cargo run --release -- eval --data data/test.ndjson --model models/tiered-v2
 ```
 
 Project tasks are tracked in [`backlog/`](backlog/) using [Backlog.md](https://backlog.md).
