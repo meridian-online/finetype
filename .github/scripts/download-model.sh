@@ -5,7 +5,10 @@
 set -euo pipefail
 
 REPO="https://huggingface.co/noon-org/finetype-char-cnn/resolve/main"
-MODEL_DIR=$(readlink models/default)
+# readlink works on Linux/macOS; fall back to cat for Windows where
+# git may check out symlinks as plain text files.
+MODEL_DIR=$(readlink models/default 2>/dev/null || cat models/default)
+MODEL_DIR=$(echo "${MODEL_DIR}" | tr -d '\r')
 
 echo "Active model: ${MODEL_DIR}"
 mkdir -p "models/${MODEL_DIR}"

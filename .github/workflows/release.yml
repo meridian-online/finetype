@@ -31,6 +31,9 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
 
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +47,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Download model from HuggingFace
+        shell: bash
         run: .github/scripts/download-model.sh
 
       - name: Install cross
@@ -51,6 +55,7 @@ jobs:
         run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Build
+        shell: bash
         run: |
           if [ "${{ matrix.cross }}" = "true" ]; then
             cross build --release --target ${{ matrix.target }} -p finetype-cli
@@ -63,16 +68,22 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release
           BINARY=finetype
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            BINARY="${BINARY}.exe"
+          fi
+          ARCHIVE="finetype-${{ github.ref_name }}-${{ matrix.target }}"
           if [ "${{ matrix.archive }}" = "tar.gz" ]; then
-            tar czf ../../../${BINARY}-${{ github.ref_name }}-${{ matrix.target }}.tar.gz ${BINARY}
+            tar czf "../../../${ARCHIVE}.tar.gz" "${BINARY}"
+          elif [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a "../../../${ARCHIVE}.zip" "${BINARY}"
           fi
           cd ../../..
 
       - name: Generate SHA256
         shell: bash
         run: |
-          shasum -a 256 finetype-${{ github.ref_name }}-${{ matrix.target }}.tar.gz \
-            > finetype-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
+          ARCHIVE="finetype-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive }}"
+          shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -80,6 +91,7 @@ jobs:
           name: finetype-${{ matrix.target }}
           path: |
             finetype-*.tar.gz
+            finetype-*.zip
             finetype-*.sha256
 
   release:
@@ -101,6 +113,7 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/finetype-*.tar.gz
+            artifacts/finetype-*.zip
             artifacts/finetype-*.sha256
 
   update-homebrew:
