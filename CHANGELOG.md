@@ -9,12 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Windows release target** — `x86_64-pc-windows-msvc` added to release CI matrix with `.zip` packaging (NNFT-094)
 - **DuckDB community extension v0.2.0** — updated with tiered model, 168 types, 19 new DuckDB type mappings (NNFT-092)
 
 ### Changed
 
 - finetype-core and finetype-model published to crates.io at v0.1.7 (NNFT-093)
+
+## [0.1.8] - 2026-02-18
+
+### Performance
+
+- **30× tiered inference throughput** — group-then-batch processing in `classify_batch()` improves from ~17 to ~580 val/sec; flat model ~1,500 val/sec (NNFT-098)
+- **Batched CLI inference** — all model types process in chunks of 128 (was per-value)
+- **`--bench` flag** — prints throughput and per-tier timing breakdown to stderr (NNFT-098)
+- **`TierTiming` struct** — public API for per-tier performance measurement
+
+### Accuracy (72.6% → 92.9%)
+
+- **`header_hint_generic` override** — header hints now override generic model predictions (integer, username, phone_number, iata_code, etc.) even when the hinted type isn't in the vote distribution. This single change lifted accuracy by +7.1pp (NNFT-102)
+- **IPv4 disambiguation rule** — dotted-quad pattern detection with 0–255 octet validation (NNFT-100)
+- **Day/month/boolean disambiguation** — value-level rules for day-of-week names, month names, and boolean sub-type normalization (NNFT-090)
+- **Gender expansion** — +22 inclusive values (Non-binary, Other, Prefer not to say, etc.) (NNFT-099)
+- **Expanded header hints** — alpha-2/3 country codes, occupation/job title, IP variants, UTC offset, CVV/SWIFT/ISSN/EAN/NPI, weight/height, OS, subcountry (NNFT-100, NNFT-102)
+- **Expanded `is_generic`** — phone_number, iata_code, and increment added (NNFT-100, NNFT-102)
+- **Eval scoring interchangeability** — boolean sub-types, time sub-types, geographic hierarchy, timestamp precision (NNFT-099, NNFT-100)
+
+### Fixed
+
+- **Column mode with tiered model** — `--mode column` now works with all model types via `Box<dyn ValueClassifier>`; was char-cnn only, broken since v0.1.7 default change (NNFT-101)
+
+### Changed
+
+- **`--model-type` help text** documents performance/accuracy tradeoff (~600 vs ~1,500 val/sec)
+- **Windows release target** — `x86_64-pc-windows-msvc` added to release CI matrix (NNFT-094)
 - `download-model.sh` gains `readlink`/`cat` fallback for Windows symlink compatibility
 - Release workflow steps use explicit `shell: bash` for cross-platform builds
 
