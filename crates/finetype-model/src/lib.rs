@@ -20,6 +20,6 @@ pub use inference::{
     extract_validation_patterns, CharClassifier, ClassificationResult, Classifier, ValueClassifier,
 };
 pub use model::{TextClassifier, TextClassifierConfig};
-pub use tiered::TieredClassifier;
+pub use tiered::{TierTiming, TieredClassifier};
 pub use tiered_training::{TieredTrainer, TieredTrainingConfig, TieredTrainingReport};
 pub use training::{Trainer, TrainingConfig, TrainingError};

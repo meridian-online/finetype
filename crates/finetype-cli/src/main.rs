@@ -58,7 +58,9 @@ enum Commands {
         #[arg(short, long)]
         value: bool,
 
-        /// Model type (tiered, char-cnn, transformer)
+        /// Model type: tiered (168 types, ~600 val/sec) or char-cnn (168 types, ~1500 val/sec).
+        /// Tiered uses 34 models in a T0→T1→T2 cascade for higher accuracy.
+        /// Use char-cnn for maximum throughput on large datasets.
         #[arg(long, default_value = "tiered")]
         model_type: ModelType,
 
@@ -69,6 +71,10 @@ enum Commands {
         /// Sample size for column mode (default 100)
         #[arg(long, default_value = "100")]
         sample_size: usize,
+
+        /// Print throughput statistics to stderr after inference
+        #[arg(long)]
+        bench: bool,
     },
 
     /// Generate synthetic training data
@@ -355,6 +361,7 @@ fn main() -> Result<()> {
             model_type,
             mode,
             sample_size,
+            bench,
         } => cmd_infer(
             input,
             file,
@@ -365,6 +372,7 @@ fn main() -> Result<()> {
             model_type,
             mode,
             sample_size,
+            bench,
         ),
 
         Commands::Generate {
@@ -470,8 +478,10 @@ fn cmd_infer(
     model_type: ModelType,
     mode: InferenceMode,
     sample_size: usize,
+    bench: bool,
 ) -> Result<()> {
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
+    use std::time::Instant;
 
     // Collect inputs
     let inputs: Vec<String> = if let Some(text) = input {
@@ -496,6 +506,9 @@ fn cmd_infer(
         eprintln!("No input provided");
         return Ok(());
     }
+
+    let total_values = inputs.len();
+    let t_start = Instant::now();
 
     // Helper to output result
     fn output_result(
@@ -544,75 +557,71 @@ fn cmd_infer(
 
     // Column mode: treat all inputs as one column, return single prediction
     if matches!(mode, InferenceMode::Column) {
-        match model_type {
-            ModelType::CharCnn => {
-                let classifier = load_char_classifier(&model)?;
-                let config = ColumnConfig {
-                    sample_size,
-                    ..Default::default()
-                };
-                let column_classifier = ColumnClassifier::new(Box::new(classifier), config);
-                let result = column_classifier.classify_column(&inputs)?;
+        let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
+            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+        };
+        let config = ColumnConfig {
+            sample_size,
+            ..Default::default()
+        };
+        let column_classifier = ColumnClassifier::new(classifier, config);
+        let result = column_classifier.classify_column(&inputs)?;
 
-                match output {
-                    OutputFormat::Plain => {
-                        println!("{}", result.label);
-                        if show_confidence {
-                            println!(
-                                "  confidence: {:.4} ({} samples)",
-                                result.confidence, result.samples_used
-                            );
+        match output {
+            OutputFormat::Plain => {
+                println!("{}", result.label);
+                if show_confidence {
+                    println!(
+                        "  confidence: {:.4} ({} samples)",
+                        result.confidence, result.samples_used
+                    );
+                }
+                if result.disambiguation_applied {
+                    println!(
+                        "  disambiguation: {}",
+                        result.disambiguation_rule.as_deref().unwrap_or("unknown")
+                    );
+                }
+                if show_value {
+                    println!("  vote distribution:");
+                    for (label, frac) in &result.vote_distribution {
+                        if *frac >= 0.01 {
+                            println!("    {:.1}%  {}", frac * 100.0, label);
                         }
-                        if result.disambiguation_applied {
-                            println!(
-                                "  disambiguation: {}",
-                                result.disambiguation_rule.as_deref().unwrap_or("unknown")
-                            );
-                        }
-                        if show_value {
-                            println!("  vote distribution:");
-                            for (label, frac) in &result.vote_distribution {
-                                if *frac >= 0.01 {
-                                    println!("    {:.1}%  {}", frac * 100.0, label);
-                                }
-                            }
-                        }
-                    }
-                    OutputFormat::Json => {
-                        let mut obj = serde_json::Map::new();
-                        obj.insert("class".to_string(), json!(result.label));
-                        obj.insert("confidence".to_string(), json!(result.confidence));
-                        obj.insert("samples_used".to_string(), json!(result.samples_used));
-                        obj.insert(
-                            "disambiguation_applied".to_string(),
-                            json!(result.disambiguation_applied),
-                        );
-                        if let Some(rule) = &result.disambiguation_rule {
-                            obj.insert("disambiguation_rule".to_string(), json!(rule));
-                        }
-                        let votes: Vec<serde_json::Value> = result
-                            .vote_distribution
-                            .iter()
-                            .filter(|(_, f)| *f >= 0.01)
-                            .map(|(l, f)| json!({"label": l, "fraction": f}))
-                            .collect();
-                        obj.insert("vote_distribution".to_string(), json!(votes));
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&serde_json::Value::Object(obj))?
-                        );
-                    }
-                    OutputFormat::Csv => {
-                        println!(
-                            "{},{:.4},{}",
-                            result.label, result.confidence, result.samples_used
-                        );
                     }
                 }
             }
-            _ => {
-                eprintln!("Column mode is currently only supported with --model-type char-cnn");
-                std::process::exit(1);
+            OutputFormat::Json => {
+                let mut obj = serde_json::Map::new();
+                obj.insert("class".to_string(), json!(result.label));
+                obj.insert("confidence".to_string(), json!(result.confidence));
+                obj.insert("samples_used".to_string(), json!(result.samples_used));
+                obj.insert(
+                    "disambiguation_applied".to_string(),
+                    json!(result.disambiguation_applied),
+                );
+                if let Some(rule) = &result.disambiguation_rule {
+                    obj.insert("disambiguation_rule".to_string(), json!(rule));
+                }
+                let votes: Vec<serde_json::Value> = result
+                    .vote_distribution
+                    .iter()
+                    .filter(|(_, f)| *f >= 0.01)
+                    .map(|(l, f)| json!({"label": l, "fraction": f}))
+                    .collect();
+                obj.insert("vote_distribution".to_string(), json!(votes));
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::Value::Object(obj))?
+                );
+            }
+            OutputFormat::Csv => {
+                println!(
+                    "{},{:.4},{}",
+                    result.label, result.confidence, result.samples_used
+                );
             }
         }
         return Ok(());
@@ -644,8 +653,57 @@ fn cmd_infer(
         }
         ModelType::Tiered => {
             let classifier = load_tiered_classifier(&model)?;
-            // Batch inference: process in chunks for efficiency
             let batch_size = 128;
+            if bench {
+                // Use timed variant for tier-level breakdown
+                let mut total_timing = finetype_model::TierTiming {
+                    encode_ms: 0.0,
+                    tier0_ms: 0.0,
+                    tier1_ms: 0.0,
+                    tier1_models: 0,
+                    tier2_ms: 0.0,
+                    tier2_models: 0,
+                    total_ms: 0.0,
+                };
+                for chunk in inputs.chunks(batch_size) {
+                    let batch_texts: Vec<String> = chunk.to_vec();
+                    let (results, timing) = classifier.classify_batch_timed(&batch_texts)?;
+                    total_timing.encode_ms += timing.encode_ms;
+                    total_timing.tier0_ms += timing.tier0_ms;
+                    total_timing.tier1_ms += timing.tier1_ms;
+                    total_timing.tier1_models = total_timing.tier1_models.max(timing.tier1_models);
+                    total_timing.tier2_ms += timing.tier2_ms;
+                    total_timing.tier2_models = total_timing.tier2_models.max(timing.tier2_models);
+                    total_timing.total_ms += timing.total_ms;
+                    for (text, result) in chunk.iter().zip(results.iter()) {
+                        output_result(text, result, output, show_value, show_confidence);
+                    }
+                }
+                let elapsed = t_start.elapsed();
+                let secs = elapsed.as_secs_f64();
+                let vps = total_values as f64 / secs;
+                eprintln!(
+                    "[bench] model=Tiered  values={}  elapsed={:.3}s  throughput={:.0} val/sec",
+                    total_values, secs, vps
+                );
+                eprintln!(
+                    "[bench] breakdown: encode={:.1}ms  T0={:.1}ms  T1={:.1}ms ({} models)  T2={:.1}ms ({} models)",
+                    total_timing.encode_ms, total_timing.tier0_ms,
+                    total_timing.tier1_ms, total_timing.tier1_models,
+                    total_timing.tier2_ms, total_timing.tier2_models
+                );
+                let inference_ms =
+                    total_timing.tier0_ms + total_timing.tier1_ms + total_timing.tier2_ms;
+                if inference_ms > 0.0 {
+                    eprintln!(
+                        "[bench] tier share: T0={:.1}%  T1={:.1}%  T2={:.1}%",
+                        total_timing.tier0_ms / inference_ms * 100.0,
+                        total_timing.tier1_ms / inference_ms * 100.0,
+                        total_timing.tier2_ms / inference_ms * 100.0
+                    );
+                }
+                return Ok(());
+            }
             for chunk in inputs.chunks(batch_size) {
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
@@ -654,6 +712,16 @@ fn cmd_infer(
                 }
             }
         }
+    }
+
+    if bench {
+        let elapsed = t_start.elapsed();
+        let secs = elapsed.as_secs_f64();
+        let vps = total_values as f64 / secs;
+        eprintln!(
+            "[bench] model={:?}  values={}  elapsed={:.3}s  throughput={:.0} val/sec",
+            model_type, total_values, secs, vps
+        );
     }
 
     Ok(())

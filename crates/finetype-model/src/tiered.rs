@@ -67,6 +67,25 @@ struct LoadedModel {
     label_to_index: HashMap<String, usize>,
 }
 
+/// Timing breakdown for tiered inference.
+#[derive(Debug, Clone)]
+pub struct TierTiming {
+    /// Time spent encoding inputs (ms)
+    pub encode_ms: f64,
+    /// Time spent on Tier 0 — broad type classification (ms)
+    pub tier0_ms: f64,
+    /// Time spent on Tier 1 — category classification (ms)
+    pub tier1_ms: f64,
+    /// Number of Tier 1 models invoked
+    pub tier1_models: usize,
+    /// Time spent on Tier 2 — specific type classification (ms)
+    pub tier2_ms: f64,
+    /// Number of Tier 2 models invoked
+    pub tier2_models: usize,
+    /// Total wall time (ms)
+    pub total_ms: f64,
+}
+
 /// Tiered classifier that chains multiple models.
 pub struct TieredClassifier {
     /// Tier 0 broad type model
@@ -273,6 +292,118 @@ impl TieredClassifier {
         }
 
         Ok(final_results)
+    }
+
+    /// Classify a batch of texts with per-tier timing breakdown.
+    ///
+    /// Same logic as `classify_batch` but returns timing alongside results.
+    pub fn classify_batch_timed(
+        &self,
+        texts: &[String],
+    ) -> Result<(Vec<ClassificationResult>, TierTiming), InferenceError> {
+        use std::time::Instant;
+
+        let total_start = Instant::now();
+        let batch_size = texts.len();
+
+        // Encode
+        let t = Instant::now();
+        let input_ids = self.encode_batch(texts)?;
+        let encode_ms = t.elapsed().as_secs_f64() * 1000.0;
+
+        // Tier 0
+        let t = Instant::now();
+        let tier0_results = self.run_model(&self.tier0, &input_ids)?;
+        let tier0_ms = t.elapsed().as_secs_f64() * 1000.0;
+
+        let mut broad_types: Vec<String> = Vec::with_capacity(batch_size);
+        let mut t0_confs: Vec<f32> = Vec::with_capacity(batch_size);
+        let mut categories: Vec<String> = vec![String::new(); batch_size];
+        let mut t1_confs: Vec<f32> = vec![0.0; batch_size];
+        let mut final_labels: Vec<String> = vec![String::new(); batch_size];
+        let mut t2_confs: Vec<f32> = vec![0.0; batch_size];
+
+        for (bt, conf) in &tier0_results {
+            broad_types.push(bt.clone());
+            t0_confs.push(*conf);
+        }
+
+        // Tier 1
+        let t = Instant::now();
+        let mut t1_groups: HashMap<String, Vec<usize>> = HashMap::new();
+        for (i, bt) in broad_types.iter().enumerate() {
+            if self.tier1.contains_key(bt) {
+                t1_groups.entry(bt.clone()).or_default().push(i);
+            } else if let Some(direct) = self.tier1_direct.get(bt) {
+                categories[i] = direct.clone();
+                t1_confs[i] = 1.0;
+            } else {
+                categories[i] = "unknown".to_string();
+                t1_confs[i] = 0.0;
+            }
+        }
+        let tier1_models = t1_groups.len();
+        for (bt, indices) in &t1_groups {
+            let model = &self.tier1[bt];
+            let group_input = self.gather_rows(&input_ids, indices)?;
+            let results = self.run_model(model, &group_input)?;
+            for (j, idx) in indices.iter().enumerate() {
+                categories[*idx] = results[j].0.clone();
+                t1_confs[*idx] = results[j].1;
+            }
+        }
+        let tier1_ms = t.elapsed().as_secs_f64() * 1000.0;
+
+        // Tier 2
+        let t = Instant::now();
+        let mut t2_groups: HashMap<String, Vec<usize>> = HashMap::new();
+        for i in 0..batch_size {
+            let key = format!("{}_{}", broad_types[i], categories[i]);
+            if self.tier2.contains_key(&key) {
+                t2_groups.entry(key).or_default().push(i);
+            } else if let Some(direct) = self.tier2_direct.get(&key) {
+                final_labels[i] = direct.clone();
+                t2_confs[i] = 1.0;
+            } else {
+                final_labels[i] = format!("{}.{}", broad_types[i], categories[i]);
+                t2_confs[i] = 0.0;
+            }
+        }
+        let tier2_models = t2_groups.len();
+        for (key, indices) in &t2_groups {
+            let model = &self.tier2[key];
+            let group_input = self.gather_rows(&input_ids, indices)?;
+            let results = self.run_model(model, &group_input)?;
+            for (j, idx) in indices.iter().enumerate() {
+                final_labels[*idx] = results[j].0.clone();
+                t2_confs[*idx] = results[j].1;
+            }
+        }
+        let tier2_ms = t.elapsed().as_secs_f64() * 1000.0;
+
+        // Assemble results
+        let mut final_results = Vec::with_capacity(batch_size);
+        for i in 0..batch_size {
+            let combined_confidence = t0_confs[i] * t1_confs[i] * t2_confs[i];
+            final_results.push(ClassificationResult {
+                label: final_labels[i].clone(),
+                confidence: combined_confidence,
+                all_scores: vec![],
+            });
+        }
+
+        let total_ms = total_start.elapsed().as_secs_f64() * 1000.0;
+        let timing = TierTiming {
+            encode_ms,
+            tier0_ms,
+            tier1_ms,
+            tier1_models,
+            tier2_ms,
+            tier2_models,
+            total_ms,
+        };
+
+        Ok((final_results, timing))
     }
 
     /// Gather specific rows from a 2D tensor by indices.
