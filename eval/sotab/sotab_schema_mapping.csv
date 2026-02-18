@@ -1,0 +1,93 @@
+sotab_label,finetype_label,finetype_domain,match_quality,notes
+Text,representation.text.plain_text,representation,close,Free-form text content
+Number,representation.numeric.decimal_number,representation,close,Generic numeric values
+Mass,identity.person.weight,identity,partial,Weight/mass values — FineType has weight but not generic mass
+DateTime,datetime.timestamp.iso_8601,datetime,close,Various datetime formats
+Date,datetime.date.iso,datetime,close,Date values in various formats
+Duration,datetime.duration.iso_8601,datetime,direct,ISO 8601 duration strings
+currency,identity.payment.currency_code,identity,direct,Currency codes (USD/GBP/EUR)
+telephone,identity.person.phone_number,identity,direct,Phone numbers in various formats
+price,representation.numeric.decimal_number,representation,close,Price values without currency symbol
+Integer,representation.numeric.integer_number,representation,direct,Integer values
+Organization,identity.person.full_name,identity,partial,Organization names — no dedicated org type
+addressLocality,geography.location.city,geography,direct,City/locality names
+IdentifierAT,representation.code.alphanumeric_id,representation,close,Identifier strings (alphanumeric)
+Place,geography.location.city,geography,close,Place names — closest is city
+Country,geography.location.country,geography,direct,Country names
+addressRegion,geography.location.region,geography,direct,State/region/province names
+Person,identity.person.full_name,identity,direct,Person names
+CoordinateAT,geography.coordinate.coordinates,geography,direct,Coordinate pairs (lat/lon)
+URL,technology.internet.url,technology,direct,Web URLs
+streetAddress,geography.address.full_address,geography,close,Street addresses
+postalCode,geography.address.postal_code,geography,direct,Postal/zip codes
+ItemAvailability,,representation,semantic_only,Schema.org availability enum (InStock/OutOfStock)
+MusicArtistAT,identity.person.full_name,identity,close,Music artist names
+Person/name,identity.person.full_name,identity,direct,Person names (qualified)
+MusicAlbum,representation.text.word,representation,semantic_only,Album titles — semantic concept
+MusicRecording/name,representation.text.plain_text,representation,semantic_only,Song/recording titles
+priceRange,representation.text.word,representation,partial,Price range strings ($$ or 10-50)
+Event/name,representation.text.plain_text,representation,semantic_only,Event titles
+weight,identity.person.weight,identity,close,Weight values
+LocalBusiness/name,identity.person.full_name,identity,close,Business names
+QuantitativeValue,representation.numeric.decimal_number,representation,close,Numeric quantities
+Place/name,geography.location.city,geography,close,Place names (qualified)
+Book/name,representation.text.plain_text,representation,semantic_only,Book titles
+Recipe/name,representation.text.plain_text,representation,semantic_only,Recipe titles
+email,identity.person.email,identity,direct,Email addresses
+identifierNameAP,representation.code.alphanumeric_id,representation,close,Named identifiers
+Movie/name,representation.text.plain_text,representation,semantic_only,Movie titles
+Distance,representation.numeric.decimal_number,representation,partial,Distance measurements
+category,representation.discrete.categorical,representation,close,Category labels
+Product/name,representation.text.plain_text,representation,semantic_only,Product names
+unitCode,representation.text.word,representation,partial,Unit codes (kg/m/etc)
+ItemList,,representation,semantic_only,List items — no format signal
+Hotel/name,identity.person.full_name,identity,close,Hotel names
+faxNumber,identity.person.phone_number,identity,direct,Fax numbers (same format as phone)
+Restaurant/name,identity.person.full_name,identity,close,Restaurant/business names
+Brand,representation.text.word,representation,semantic_only,Brand names
+Time,datetime.time.hms_24h,datetime,close,Time values
+PostalAddress,geography.address.full_address,geography,close,Full postal addresses
+Energy,representation.numeric.decimal_number,representation,partial,Energy measurements
+EducationalOccupationalCredential,representation.text.word,representation,semantic_only,Credential labels
+Review,representation.text.plain_text,representation,semantic_only,Review text
+OfferItemCondition,,representation,semantic_only,Item condition enum (New/Used)
+CategoryCode,representation.code.alphanumeric_id,representation,close,Category code identifiers
+EventStatusType,,representation,semantic_only,Event status enum
+SportsEvent/name,representation.text.plain_text,representation,semantic_only,Sports event names
+BookFormatType,,representation,semantic_only,Book format enum (Hardcover/Paperback)
+CreativeWork/name,representation.text.plain_text,representation,semantic_only,Creative work titles
+Language,representation.text.word,representation,partial,Language names
+Thing,representation.text.plain_text,representation,semantic_only,Generic thing — no format signal
+GenderType,identity.person.gender,identity,direct,Gender values
+openingHours,datetime.time.hms_24h,datetime,close,Opening hours (time ranges)
+ProductModel,representation.text.word,representation,semantic_only,Product model identifiers
+EventAttendanceModeEnumeration,,representation,semantic_only,Attendance mode enum
+OccupationalExperienceRequirements,representation.text.plain_text,representation,semantic_only,Experience requirement text
+workHours,datetime.duration.iso_8601,datetime,partial,Work hours — time duration
+unitText,representation.text.word,representation,partial,Unit text labels
+SportsTeam,representation.text.word,representation,semantic_only,Team names
+DayOfWeek,datetime.component.day_of_week,datetime,direct,Day of week names
+TVEpisode/name,representation.text.plain_text,representation,semantic_only,TV episode titles
+Boolean,representation.boolean.terms,representation,direct,Boolean values (true/false)
+paymentAccepted,representation.text.word,representation,semantic_only,Payment method labels
+Photograph,,representation,semantic_only,Photo references — URLs or filenames
+Offer,,representation,semantic_only,Offer details
+MusicAlbum/name,representation.text.plain_text,representation,semantic_only,Album names (qualified)
+MonetaryAmount,representation.numeric.decimal_number,representation,close,Monetary values
+Action,,representation,semantic_only,Action type labels
+DeliveryMethod,,representation,semantic_only,Delivery method enum
+CreativeWorkSeries,,representation,semantic_only,Series names
+Rating,representation.numeric.decimal_number,representation,close,Rating values (1-5 scale)
+RestrictedDiet,,representation,semantic_only,Diet restriction labels
+LocationFeatureSpecification,,representation,semantic_only,Location feature labels
+Product,,representation,semantic_only,Product references
+typicalAgeRange,identity.person.age,identity,close,Age range strings
+audience,representation.text.word,representation,semantic_only,Audience labels
+Museum/name,identity.person.full_name,identity,close,Museum names
+MusicRecording,,representation,semantic_only,Recording references
+JobPosting/name,representation.text.plain_text,representation,semantic_only,Job posting titles
+MusicGroup,representation.text.word,representation,semantic_only,Music group names
+EducationalOrganization,representation.text.word,representation,semantic_only,Education org names
+WarrantyPromise,,representation,semantic_only,Warranty terms
+CreativeWork,,representation,semantic_only,Creative work references
+label,representation.text.word,representation,semantic_only,Generic labels
