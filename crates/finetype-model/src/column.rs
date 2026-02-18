@@ -207,6 +207,9 @@ impl ColumnClassifier {
                     | "representation.numeric.decimal_number"
                     | "representation.discrete.categorical"
                     | "datetime.component.day_of_month"
+                    // Username is a common catch-all for short unrecognized text
+                    | "identity.person.username"
+                    | "identity.person.first_name"
             ) || BOOLEAN_LABELS.contains(&result.label.as_str());
 
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
@@ -547,8 +550,49 @@ fn disambiguate_boolean_subtype(
 /// Rule: If ALL non-empty values are in the gender set → identity.person.gender
 fn disambiguate_gender(values: &[String]) -> Option<String> {
     const GENDER_VALUES: &[&str] = &[
-        "male", "female", "m", "f", "Male", "Female", "M", "F", "MALE", "FEMALE", "man", "woman",
-        "Man", "Woman", "MAN", "WOMAN", "boy", "girl", "Boy", "Girl",
+        "male",
+        "female",
+        "m",
+        "f",
+        "Male",
+        "Female",
+        "M",
+        "F",
+        "MALE",
+        "FEMALE",
+        "man",
+        "woman",
+        "Man",
+        "Woman",
+        "MAN",
+        "WOMAN",
+        "boy",
+        "girl",
+        "Boy",
+        "Girl",
+        // Inclusive gender values
+        "non-binary",
+        "Non-binary",
+        "Non-Binary",
+        "NON-BINARY",
+        "nonbinary",
+        "Nonbinary",
+        "other",
+        "Other",
+        "OTHER",
+        "prefer not to say",
+        "Prefer not to say",
+        "unknown",
+        "Unknown",
+        "UNKNOWN",
+        "x",
+        "X",
+        "genderqueer",
+        "Genderqueer",
+        "agender",
+        "Agender",
+        "transgender",
+        "Transgender",
     ];
 
     let non_empty: Vec<&str> = values
@@ -1886,6 +1930,52 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(result, Some("identity.person.gender".to_string()));
+    }
+
+    #[test]
+    fn test_gender_detection_with_nonbinary() {
+        // People directory: Male, Female, Non-binary
+        let values: Vec<String> = vec![
+            "Male",
+            "Female",
+            "Male",
+            "Non-binary",
+            "Female",
+            "Male",
+            "Female",
+            "Male",
+            "Non-binary",
+            "Female",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(
+            result,
+            Some("identity.person.gender".to_string()),
+            "Non-binary should be recognized as a valid gender value"
+        );
+    }
+
+    #[test]
+    fn test_gender_detection_with_other_inclusive() {
+        let values: Vec<String> = vec![
+            "Male",
+            "Female",
+            "Other",
+            "Male",
+            "Female",
+            "Prefer not to say",
+            "Male",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = disambiguate_gender(&values);
         assert_eq!(result, Some("identity.person.gender".to_string()));

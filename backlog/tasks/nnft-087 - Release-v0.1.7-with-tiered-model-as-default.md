@@ -1,11 +1,11 @@
 ---
 id: NNFT-087
 title: Release v0.1.7 with tiered model as default
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-17 22:44'
-updated_date: '2026-02-17 22:57'
+updated_date: '2026-02-17 23:06'
 labels:
   - release
   - model
@@ -32,8 +32,8 @@ Key changes since v0.1.6:
 - [x] #2 tiered-v2 uploaded to HuggingFace and download-model.sh updated
 - [x] #3 Default model switched from char-cnn-v5 (flat) to tiered-v2
 - [x] #4 Release binary embeds tiered-v2 model and uses tiered inference by default
-- [ ] #5 GitHub release created with CI-built binaries for all platforms
-- [ ] #6 Homebrew formula updated to v0.1.7
+- [x] #5 GitHub release created with CI-built binaries for all platforms
+- [x] #6 Homebrew formula updated to v0.1.7
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -64,4 +64,29 @@ AC#1-4 complete:
 - Binary size: 21MB (was 12MB with flat model)
 
 Remaining: AC#5 (GitHub release) and AC#6 (Homebrew) — need to commit, push, tag
+
+Committed b328379, pushed to main, tagged v0.1.7. Release CI running (run 22119089208). Waiting for builds + Homebrew auto-update.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Released v0.1.7 with tiered model as default inference engine.
+
+## Changes
+- **Default model**: Switched from flat CharCNN v7 to tiered-v2 (72.6% format-detectable label accuracy, +4.5pp over flat baseline)
+- **build.rs**: Auto-detects tiered model via tier_graph.json, generates embedded lookup function for all 34 tier subdirectories
+- **CLI**: Defaults to `--model-type tiered` on infer, train, eval, profile commands
+- **download-model.sh**: Supports tiered models via manifest.txt file listing
+- **Binary size**: ~21MB (up from ~12MB due to 34 embedded models)
+
+## Infrastructure
+- tiered-v2 uploaded to HuggingFace noon-org/finetype-char-cnn (commit 42de626)
+- GitHub release created with binaries for all 4 platforms
+- Homebrew formula auto-updated to v0.1.7
+- All 187 tests pass, clippy + fmt clean
+
+## Commits
+- b328379: v0.1.7 release commit (build.rs, main.rs, download-model.sh, version bump, backlog)
+- v0.1.7 tag → CI release run 22119089208 (all 6 jobs succeeded)"
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -99,6 +99,24 @@ SELECT
         WHEN sm.finetype_label LIKE 'representation.boolean.%'
              AND pr.predicted_type LIKE 'representation.boolean.%'
         THEN true
+        -- Time sub-types are interchangeable: hm_24h ≈ hms_24h (GT "time 24h"
+        -- doesn't distinguish whether seconds are present)
+        WHEN sm.finetype_label LIKE 'datetime.time.%'
+             AND pr.predicted_type LIKE 'datetime.time.%'
+        THEN true
+        -- Geographic hierarchy: continent ≈ region ≈ state are interchangeable
+        -- (GT "region" covers continent-level through state-level subdivisions)
+        WHEN sm.finetype_label IN (
+                 'geography.location.region',
+                 'geography.location.state',
+                 'geography.location.continent'
+             )
+             AND pr.predicted_type IN (
+                 'geography.location.region',
+                 'geography.location.state',
+                 'geography.location.continent'
+             )
+        THEN true
         ELSE false
     END AS label_match,
     -- Scoring: domain-level match
