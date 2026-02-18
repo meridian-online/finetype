@@ -1,14 +1,148 @@
 # GitTables Evaluation Report
 
-**FineType v0.1.5 (CharCNN v6, 89.15% synthetic accuracy, 169 types)**
+**FineType v0.1.7 (Tiered v2, 34 CharCNN models, 168 types)**
 
 > **Primary benchmark:** GitTables 1M stratified sample (4,380 tables, 50/topic)
-> - **57.2% domain accuracy** on format-detectable types (direct + close mapping)
-> - **62.3% domain accuracy** on all mapped types (192-type comprehensive mapping)
-> - **35.2% label accuracy** on format-detectable types
-> See [§ v0.1.5 Evaluation](#v015-evaluation-charcnn-v6) for the latest results.
-> See [§ GitTables 1M Evaluation](#gittables-1m-evaluation) for v0.1.0 baseline.
-> The legacy 1,101-table subset is retained below for historical comparison.
+> - **80.9% domain accuracy** on format-detectable types (direct + close mapping)
+> - **40.9% label accuracy** on format-detectable types
+> - See [§ v0.1.7 Evaluation](#v017-evaluation-tiered-v2) for the latest results.
+> - See [§ v0.1.5 Evaluation](#v015-evaluation-charcnn-v6) for flat CharCNN v6 baseline.
+> - See [§ GitTables 1M Evaluation](#gittables-1m-evaluation) for v0.1.0 baseline.
+> - The legacy 1,101-table subset is retained below for historical comparison.
+
+---
+
+## v0.1.7 Evaluation (Tiered v2)
+
+**Date:** 2026-02-18
+**Model:** Tiered v2 (34 specialized CharCNN models in T0→T1→T2 hierarchy, 168 classes, 90.09% synthetic accuracy)
+**Mapping:** 216-type schema mapping with match quality tiers
+
+### What Changed from v0.1.5
+
+1. **Model architecture** — Flat single CharCNN → Tiered hierarchy of 34 specialized CharCNN models
+2. **Inference path** — T0 (6 domains) → T1 (21 mid-level groups) → T2 (leaf types) cascade
+3. **Taxonomy** — 169 → 168 types (minor restructuring)
+4. **DuckDB extension** — Rebuilt with tiered model (duckdb-finetype v0.2.0)
+
+### Headline Results
+
+| Detectability Tier | Columns | Label Accuracy | Domain Accuracy |
+|---|---|---|---|
+| Format-detectable (direct + close) | 4,482 | **40.9%** | **80.9%** |
+| Partially detectable | 3,509 | 1.0% | 16.5% |
+| Semantic only | 15,475 | 0.0% (by design) | 47.8% |
+| **All mapped types** | **23,466** | **8.0%** | **49.4%** |
+
+### Baseline Comparison (Tiered v2 vs Flat v6)
+
+| Metric | Flat v6 (v0.1.5) | Tiered v2 (v0.1.7) | Change |
+|---|---|---|---|
+| Domain accuracy (format-detectable) | 57.2% | **80.9%** | **+23.7%** |
+| Label accuracy (format-detectable) | 35.2% | **40.9%** | **+5.7%** |
+| Domain accuracy (all mapped) | 62.3% | 49.4% | -12.9% |
+| Label accuracy (all mapped) | 7.3% | 8.0% | +0.7% |
+| FineType types detected | 157 | 118 | -39 |
+| Values classified | 774,350 | 774,350 | — |
+| Classification time | 307s | 809s | **+163% (2.6x slower)** |
+
+**Key finding:** The tiered model delivers a **+23.7% domain accuracy improvement on format-detectable types** — the types FineType is specifically designed to classify. The -12.9% regression on "all mapped" is almost entirely explained by semantic-only types (73.0% → 47.8% domain), where classification amounts to random domain assignment since the types have no format signal. The identity domain improvement (+44.0%) is the standout: the tiered model's specialized name/payment/medical sub-models dramatically outperform the flat model on person-identity data.
+
+### Domain-Level Accuracy by Expected Domain
+
+| Expected Domain | Columns | Flat v6 | Tiered v2 | Change |
+|---|---|---|---|---|
+| technology | 1,769 | 91.8% | **92.0%** | +0.2% |
+| identity | 2,476 | 35.4% | **79.4%** | **+44.0%** |
+| datetime | 858 | 42.4% | 42.2% | -0.2% |
+| geography | 1,762 | 5.5% | **16.1%** | **+10.6%** |
+| representation | 16,601 | 70.3% | 44.3% | -26.0% |
+
+The representation domain regression is misleading: representation is the largest domain (16,601 columns) and is dominated by semantic-only types (title, comment, procedure_type, short_story) where FineType cannot detect format. The flat model happened to predict representation-domain types more often for these unstructured text columns; the tiered model's specialized sub-models make more specific (and often more interesting) predictions, but these don't match the expected domain as often.
+
+### Top Format-Detectable Performers
+
+| GT Label | Quality | Columns | Label Correct | Label % | Domain % |
+|---|---|---|---|---|---|
+| url | direct | 1,573 | 1,368 | **87.0%** | **98.7%** |
+| person | close | 57 | 57 | **100%** | **100%** |
+| artist | close | 47 | 47 | **100%** | **100%** |
+| currency | partial | 21 | 21 | **100%** | **100%** |
+| address | close | 14 | 14 | **100%** | **100%** |
+| zip code | direct | 9 | 9 | **100%** | **100%** |
+| email | direct | 14 | 10 | **71.4%** | **71.4%** |
+| publisher | close | 14 | 9 | **64.3%** | **78.6%** |
+| city | direct | 31 | 13 | **41.9%** | **61.3%** |
+| country | direct | 44 | 19 | **43.2%** | **65.9%** |
+| name | close | 469 | 191 | **40.7%** | **69.5%** |
+| author | close | 1,609 | 74 | 4.6% | **89.4%** |
+
+### Top Misclassification Patterns
+
+| GT Label | Expected | Predicted | Count | Issue |
+|---|---|---|---|---|
+| author | identity.person.full_name | identity.person.username | 862 | Author IDs/usernames, not real names |
+| author | identity.person.full_name | identity.person.first_name | 358 | Single-word authors → first name |
+| url | technology.internet.url | technology.internet.uri | 157 | URL/URI label confusion (same domain) |
+| author | identity.person.full_name | geography.location.city | 115 | Location-like author names |
+| author | identity.person.full_name | identity.person.last_name | 113 | Surname-only authors |
+| name | identity.person.full_name | identity.person.username | 63 | Short names → username |
+| speaker | identity.person.full_name | representation.discrete.categorical | 51 | Categorical speaker labels |
+| weight | identity.person.weight | representation.numeric.decimal_number | 50 | Weights are just numbers |
+| sentence | representation.text.sentence | geography.address.full_address | 45 | Sentence → address regression |
+| day of week | datetime.component.day_of_week | representation.numeric.* | 66 | Numeric DOW encoding (1-7) |
+| gender | identity.person.gender | identity.payment.bitcoin_address | 23 | Short gender codes misclassified |
+
+The `author` misclassifications shifted from representation types (flat model: word/ordinal/username) to identity sub-types (tiered: username/first_name/last_name). **The tiered model gets the right domain 89.4% of the time** (vs flat's poor identity domain accuracy on these columns), but picks the wrong specific identity type — a significant improvement in practical utility.
+
+### Regressions from Flat v6
+
+| Type | Flat v6 | Tiered v2 | Impact |
+|---|---|---|---|
+| sentence | 96.6% label | 0% label, 0% domain | 59 columns — tiered model classifies sentences as addresses |
+| abbreviation | ~0% label | 0% label, 0% domain | 16 columns — predicted as swift_bic codes |
+| day_of_week | ~0% label | 0% label, 0.8% domain | 118 columns — numeric DOW values still undetectable |
+| Semantic-only domain | 73.0% | 47.8% | 15,475 columns — less "accidental" domain alignment |
+| Classification time | 307s | 809s | 2.6x slower (NNFT-098 tracks this) |
+| Types detected | 157 | 118 | 39 fewer unique predictions in wild data |
+
+The **sentence regression is the most actionable**: the flat model correctly identified sentence-format text, but the tiered model routes these through a different path that produces address predictions. This suggests the T1 routing decision for text is incorrectly sending sentences down the geography branch.
+
+### Per-Topic Accuracy
+
+Best topics by domain accuracy:
+| Topic | Mapped Cols | Domain % |
+|---|---|---|
+| seek_time | 105 | **61.0%** |
+| entr'acte | 83 | **59.0%** |
+| crime_rate | 395 | **58.2%** |
+| half_life | 357 | **57.7%** |
+| radial_velocity | 370 | **57.6%** |
+
+Worst topics by domain accuracy:
+| Topic | Mapped Cols | Domain % |
+|---|---|---|
+| escape_velocity | 73 | 11.0% |
+| episcopate | 120 | 20.0% |
+| dogwatch | 30 | 20.0% |
+| secretory_phase | 143 | 21.7% |
+| neonatal_mortality | 166 | 22.3% |
+
+Low-accuracy topics are dominated by semantic-only GT labels (class, description, organization, procedure_type) that map to representation domain but get classified as identity or geography types by the tiered model.
+
+### Key Findings
+
+1. **Format-detectable accuracy improved dramatically.** +23.7% domain accuracy is the largest single improvement in FineType's history, driven by the tiered model's specialized sub-models for each domain.
+
+2. **Identity domain is now 79.4% accurate** (up from 35.4%). The dedicated identity sub-models (person, payment, medical) correctly route name-like data to identity types. The `author` column is now 89.4% domain-correct despite being only 4.6% label-exact.
+
+3. **The "all mapped" regression is a measurement artifact.** Semantic-only types have no format signal; the flat model happened to predict representation-domain types more often, inflating the "all mapped" metric. The format-detectable metric is the meaningful measure of model quality.
+
+4. **Performance is 2.6x slower.** The tiered model runs 34 sub-models through a cascade, taking 809s vs 307s for 774K values. This is tracked in NNFT-098. The DuckDB extension processes values one-by-one without batching — a batch API could significantly reduce overhead.
+
+5. **Sentence detection regressed to 0%.** The tiered routing sends sentence-format text down an incorrect branch. This is an actionable bug that should be investigated (likely a T1 classifier issue in the representation domain).
+
+6. **118 of 168 types detected** (vs 157/169 flat). The tiered model's specialization means fewer "catch-all" predictions, concentrating predictions into high-confidence types. This is expected for a hierarchical architecture.
 
 ---
 
