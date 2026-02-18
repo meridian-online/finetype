@@ -208,9 +208,12 @@ impl ColumnClassifier {
                     | "representation.numeric.increment"
                     | "representation.discrete.categorical"
                     | "datetime.component.day_of_month"
-                    // Username is a common catch-all for short unrecognized text
+                    // Username/phone are common catch-alls for unrecognized text
                     | "identity.person.username"
                     | "identity.person.first_name"
+                    | "identity.person.phone_number"
+                    // IATA is the model's default for uppercase 3-letter codes
+                    | "geography.transportation.iata_code"
             ) || BOOLEAN_LABELS.contains(&result.label.as_str());
 
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
@@ -225,6 +228,15 @@ impl ColumnClassifier {
                 result.confidence = hint_fraction.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
+            } else if is_generic && !hint_in_votes {
+                // Generic prediction (integer, username, etc.) + header hint:
+                // trust the header even when the model doesn't vote for the
+                // hinted type — the header name is a strong enough signal
+                result.label = hinted_type.to_string();
+                result.confidence = 0.5;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_generic:{}", header.to_lowercase()));
             } else if result.confidence < 0.3 && !hint_in_votes {
                 // Very low confidence and hint type not even in votes —
                 // still apply hint but with low confidence
@@ -866,8 +878,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "longitude" | "lng" | "lon" | "long" => {
             return Some("geography.coordinate.longitude");
         }
-        "country" | "country name" | "country code" => {
+        "country" | "country name" => {
             return Some("geography.location.country");
+        }
+        "country code" | "alpha 2" | "alpha 3" | "iso country" | "iso alpha 2" | "iso alpha 3"
+        | "country iso" => {
+            return Some("geography.location.country_code");
         }
         "city" | "city name" => {
             return Some("geography.location.city");
@@ -924,6 +940,10 @@ fn header_hint(header: &str) -> Option<&'static str> {
         // Operating system
         "os" | "operating system" | "platform" => {
             return Some("technology.development.os");
+        }
+        // Occupation / job title
+        "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role" | "position" => {
+            return Some("identity.person.occupation");
         }
         // Subcountry / subregion → state/province level
         "subcountry" | "subregion" | "sub region" | "sub country" => {
