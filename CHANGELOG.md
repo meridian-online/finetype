@@ -2,7 +2,51 @@
 
 All notable changes to FineType will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
 ## [Unreleased]
+
+### Added
+
+- **Windows release target** — `x86_64-pc-windows-msvc` added to release CI matrix with `.zip` packaging (NNFT-094)
+- **DuckDB community extension v0.2.0** — updated with tiered model, 168 types, 19 new DuckDB type mappings (NNFT-092)
+
+### Changed
+
+- finetype-core and finetype-model published to crates.io at v0.1.7 (NNFT-093)
+- `download-model.sh` gains `readlink`/`cat` fallback for Windows symlink compatibility
+- Release workflow steps use explicit `shell: bash` for cross-platform builds
+
+## [0.1.7] - 2026-02-18
+
+### Added
+
+- **Tiered model graph** as default inference engine — 34 specialized CharCNN models in a hierarchical T0→T1→T2 architecture (NNFT-084, NNFT-087)
+- **`ValueClassifier` trait** — polymorphic dispatch enabling both flat `CharClassifier` and `TieredClassifier` through a single interface (NNFT-084)
+- **SI number disambiguation** — improved handling of values with SI prefixes in tiered profile evaluation (NNFT-084)
+
+### Changed
+
+- Default model: `models/default` → `char-cnn-v5` tiered (was `char-cnn-v6` flat)
+- Profile evaluation improved by +4.5 percentage points with tiered model
+- Inference engine: single flat classifier replaced by tiered graph dispatch
+
+## [0.1.6] - 2026-02-17
+
+### Added
+
+- **Automated profile-and-compare evaluation pipeline** — benchmark column detection across model versions (NNFT-080)
+- **20 curated benchmark datasets** with 206 ground truth column annotations (NNFT-081)
+- **Machine-readable type mapping** — schema.org/DBpedia → FineType crosswalk for external taxonomy alignment (NNFT-079)
+
+### Fixed
+
+- **Numeric type disambiguation** — fixed training label mapping bug causing incorrect type resolution (NNFT-083)
+
+### Changed
+
+- Expanded GitTables 1M evaluation with CharCNN v6 (NNFT-082)
 
 ## [0.1.5] - 2026-02-16
 
@@ -39,6 +83,39 @@ All notable changes to FineType will be documented in this file.
 - DuckDB normalization: all three boolean subtypes routed to `normalize_boolean()`
 - JSON boolean literals now annotated as `representation.boolean.terms` (was `technology.development.boolean`)
 
+## [0.1.4] - 2026-02-16
+
+### Added
+
+- **17 new taxonomy types** expanding coverage to 168 types:
+  - Medical identifiers: DEA number, NDC, NPI (NNFT-053)
+  - SI-prefix numbers: `representation.numeric.si_number` (NNFT-057)
+  - Excel custom number format detection: `representation.file.excel_format` (NNFT-059)
+  - Expanded phone number generator with NATIONAL/INTL/E164 formats (NNFT-055)
+  - Expanded address generator with locale-specific format templates (NNFT-056)
+  - Categorical, ordinal, and alphanumeric_id types (NNFT-063)
+  - Name format diversity and designation audit (NNFT-066, NNFT-070)
+- **Pattern-gated post-processing** using taxonomy validation patterns for deterministic corrections (NNFT-064)
+- **Column-name header hints** as soft inference signal for ambiguous types (NNFT-067)
+- **Cardinality disambiguation** for low-cardinality columns (NNFT-065)
+- **Per-topic evaluation harnesses** for GitTables 1M (NNFT-041)
+- **GitTables 1M formalized** as standard evaluation benchmark (NNFT-040)
+- **Pre-commit hook** infrastructure with `.githooks/pre-commit` and Makefile setup target
+- Embedded taxonomy in binary; developer-only CLI commands hidden from help
+
+### Fixed
+
+- **Port disambiguation false positive** on age/count columns (NNFT-062)
+- Windows build.rs: normalized backslash paths in `include_bytes!()` macros
+- Smoke test URL assertion for v5 taxonomy label changes
+
+### Changed
+
+- Taxonomy expanded: 159 → 168 types
+- CharCNN v5 model trained on 168 types, 90.09% accuracy
+- Default model: `models/default` → `char-cnn-v5` (was char-cnn-v4)
+- Dynamic model download from HuggingFace in CI/release workflows
+
 ## [0.1.3] - 2026-02-15
 
 ### Added
@@ -62,7 +139,7 @@ All notable changes to FineType will be documented in this file.
 - `currency_symbol` type has low recall (2.5%) — single Unicode characters ($ € £) are confused with `emoji` by the character-level model. Post-processing rule planned.
 - `isin` recall is 49.5% — 12-char ISINs starting with 2-letter country code confused with SWIFT/BIC codes
 
-## [0.1.2] - 2026-02-13
+## [0.1.2] - 2026-02-14
 
 ### Added
 
@@ -81,6 +158,7 @@ All notable changes to FineType will be documented in this file.
 - **`models/default`** symlink — CLI now works with default `--model models/default` path out of the box
 - **DuckDB extension functions**: `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_version()` (NNFT-016, NNFT-017)
 - Real-world evaluation against GitTables benchmark: 85-100% accuracy on format-detectable types (2,363 columns, 883 tables)
+- **DOI type** — `technology.code.doi` with regex validation and Crossref decompose expression
 
 ### Fixed
 
@@ -88,6 +166,7 @@ All notable changes to FineType will be documented in this file.
 - Year detection threshold relaxed from 100% to 80% to handle outliers (NNFT-032)
 - Fixed accuracy number in documentation (91.97%, matching eval_results.json) (NNFT-031)
 - Regenerated training/test data with corrected RFC 3339 format (space separator, not T) (NNFT-033)
+- Profile command output formatting and edge cases
 
 ### Improved
 
@@ -103,6 +182,22 @@ All notable changes to FineType will be documented in this file.
 - DEVELOPMENT.md deprecated in favour of README + backlog tasks (NNFT-030)
 - Column-mode disambiguation rules: date slash, coordinate, numeric types (port, increment, postal code, street number, year)
 - Test suite expanded: 155 tests (65 core + 62 model + 28 CLI)
+- Homebrew formula auto-updated on release via CI workflow
+
+## [0.1.1] - 2026-02-13
+
+### Added
+
+- **Embedded model** in CLI binary — `finetype infer` works standalone without external model files (NNFT-020)
+- **Published to crates.io** — finetype-core and finetype-model available as Rust library crates
+- **Published to HuggingFace** — model weights hosted at noon-org/finetype-char-cnn
+- **CI model download** — release and CI workflows fetch model from HuggingFace instead of bundling in git
+- **CLI smoke tests** for release validation (NNFT-047)
+
+### Changed
+
+- Build system: model weights embedded via `include_bytes!()` in build.rs
+- CI/release workflows updated to download model before build
 
 ## [0.1.0] - 2026-02-11
 
