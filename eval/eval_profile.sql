@@ -117,6 +117,11 @@ SELECT
                  'geography.location.continent'
              )
         THEN true
+        -- Timestamp sub-types are interchangeable: iso_8601 ≈ iso_8601_microseconds
+        -- (GT "timestamp" doesn't distinguish microsecond precision)
+        WHEN sm.finetype_label LIKE 'datetime.timestamp.%'
+             AND pr.predicted_type LIKE 'datetime.timestamp.%'
+        THEN true
         ELSE false
     END AS label_match,
     -- Scoring: domain-level match

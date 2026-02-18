@@ -205,6 +205,7 @@ impl ColumnClassifier {
                     | "representation.text.plain_text"
                     | "representation.numeric.integer_number"
                     | "representation.numeric.decimal_number"
+                    | "representation.numeric.increment"
                     | "representation.discrete.categorical"
                     | "datetime.component.day_of_month"
                     // Username is a common catch-all for short unrecognized text
@@ -291,48 +292,53 @@ fn disambiguate(
         }
     }
 
-    // Rule 4: Day-of-week name detection (Monday, Tuesday, etc.)
+    // Rule 4: IPv4 address detection (dotted-quad pattern)
+    if let Some(label) = disambiguate_ipv4(values) {
+        return Some((label, "ipv4_detection".to_string()));
+    }
+
+    // Rule 5: Day-of-week name detection (Monday, Tuesday, etc.)
     if let Some(label) = disambiguate_day_of_week(values) {
         return Some((label, "day_of_week_name_detection".to_string()));
     }
 
-    // Rule 5: Month name detection (January, February, etc.)
+    // Rule 6: Month name detection (January, February, etc.)
     if let Some(label) = disambiguate_month_name(values) {
         return Some((label, "month_name_detection".to_string()));
     }
 
-    // Rule 6: Boolean sub-type normalization (binary/terms/initials)
+    // Rule 7: Boolean sub-type normalization (binary/terms/initials)
     if let Some((label, rule)) = disambiguate_boolean_subtype(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 7: Gender detection (must be before generic categorical)
+    // Rule 8: Gender detection (must be before generic categorical)
     if let Some(label) = disambiguate_gender(values) {
         return Some((label, "gender_detection".to_string()));
     }
 
-    // Rule 8: Boolean override — prevent boolean classification for small integer spreads
+    // Rule 9: Boolean override — prevent boolean classification for small integer spreads
     if let Some((label, rule)) = disambiguate_boolean_override(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 9: Small-integer ordinal detection — override day_of_month for
+    // Rule 10: Small-integer ordinal detection — override day_of_month for
     // columns where all values are small positive integers (e.g. Pclass: 1,2,3)
     if let Some((label, rule)) = disambiguate_small_integer_ordinal(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 10: Categorical detection — low cardinality string columns
+    // Rule 11: Categorical detection — low cardinality string columns
     if let Some((label, rule)) = disambiguate_categorical(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 11: Numeric type disambiguation
+    // Rule 12: Numeric type disambiguation
     if let Some((label, rule)) = disambiguate_numeric(values, results, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 12: SI number override — if the top vote is si_number but no sampled
+    // Rule 13: SI number override — if the top vote is si_number but no sampled
     // values contain an SI suffix (K, M, B, T, G, etc.), the model confused
     // plain decimals for SI numbers. Override to decimal_number.
     if top_labels
@@ -841,7 +847,8 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "url" | "uri" | "link" | "href" | "website" | "homepage" => {
             return Some("technology.internet.url");
         }
-        "ip" | "ip address" | "ipaddress" | "ip addr" => {
+        "ip" | "ip address" | "ipaddress" | "ip addr" | "source ip" | "destination ip"
+        | "src ip" | "dst ip" | "server ip" | "client ip" | "remote ip" | "local ip" => {
             return Some("technology.internet.ip_v4");
         }
         "uuid" | "guid" => {
@@ -892,6 +899,36 @@ fn header_hint(header: &str) -> Option<&'static str> {
         | "deleted" | "verified" | "approved" | "flagged" => {
             return Some("representation.boolean.binary");
         }
+        // UTC / timezone offset columns
+        "utc offset" | "gmt offset" | "timezone offset" | "tz offset" | "utcoffset"
+        | "gmtoffset" => {
+            return Some("datetime.offset.utc");
+        }
+        // Financial code columns
+        "cvv" | "cvc" | "security code" | "card security" => {
+            return Some("identity.payment.cvv");
+        }
+        "swift" | "swift code" | "bic" | "bic code" | "swiftcode" | "biccode" => {
+            return Some("identity.payment.swift_bic");
+        }
+        "issn" => {
+            return Some("technology.code.issn");
+        }
+        // Medical identifiers
+        "npi" | "npi number" => {
+            return Some("identity.medical.npi");
+        }
+        "ean" | "barcode" | "gtin" | "upc" => {
+            return Some("technology.code.ean");
+        }
+        // Operating system
+        "os" | "operating system" | "platform" => {
+            return Some("technology.development.os");
+        }
+        // Subcountry / subregion → state/province level
+        "subcountry" | "subregion" | "sub region" | "sub country" => {
+            return Some("geography.location.state");
+        }
         // Embarked / boarding columns — categorical
         "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
             return Some("representation.discrete.categorical");
@@ -916,6 +953,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
     if h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax") {
         return Some("identity.person.phone_number");
+    }
+    // IP address — match " ip" suffix, "ip " prefix, or " ip " infix
+    // (underscores already replaced with spaces, exact "ip" handled above)
+    if h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip ") {
+        return Some("technology.internet.ip_v4");
     }
     if h.contains("zip") || h.contains("postal") || h.contains("postcode") {
         return Some("geography.address.postal_code");
@@ -946,6 +988,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
     if h.contains("year") {
         return Some("datetime.component.year");
+    }
+    if h.contains("weight") {
+        return Some("identity.person.weight");
+    }
+    if h.contains("height") {
+        return Some("identity.person.height");
     }
     if h.contains("password") || h.contains("passwd") {
         return Some("identity.credential.password");
@@ -1076,6 +1124,47 @@ fn disambiguate_coordinates(values: &[String]) -> Option<String> {
     } else if all_parseable {
         // All values within [-90, 90] — likely latitude
         Some("geography.coordinate.latitude".to_string())
+    } else {
+        None
+    }
+}
+
+/// Detect IPv4 addresses via dotted-quad pattern.
+///
+/// Rule: If ≥80% of non-empty values match `\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`
+/// with each octet in 0..255, classify as ip_v4.
+///
+/// This prevents the common confusion between IP addresses and version numbers
+/// (e.g., "10.0.32.113" looks like a semver to the model).
+fn disambiguate_ipv4(values: &[String]) -> Option<String> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let mut ipv4_count = 0;
+    for val in &non_empty {
+        let parts: Vec<&str> = val.split('.').collect();
+        if parts.len() == 4 {
+            let all_valid = parts.iter().all(|p| {
+                p.parse::<u16>()
+                    .map(|n| n <= 255 && !p.is_empty())
+                    .unwrap_or(false)
+            });
+            if all_valid {
+                ipv4_count += 1;
+            }
+        }
+    }
+
+    let fraction = ipv4_count as f64 / non_empty.len() as f64;
+    if fraction >= 0.8 {
+        Some("technology.internet.ip_v4".to_string())
     } else {
         None
     }
@@ -1990,6 +2079,80 @@ mod tests {
 
         let result = disambiguate_gender(&values);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_ipv4_detection_standard_ips() {
+        let values: Vec<String> = vec![
+            "192.168.1.1",
+            "10.0.0.1",
+            "172.16.0.1",
+            "8.8.8.8",
+            "1.2.3.4",
+            "10.0.0.255",
+            "192.168.0.100",
+            "255.255.255.0",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_ipv4(&values);
+        assert_eq!(
+            result,
+            Some("technology.internet.ip_v4".to_string()),
+            "Standard IPv4 addresses should be detected"
+        );
+    }
+
+    #[test]
+    fn test_ipv4_detection_rejects_version_numbers() {
+        // Semantic version numbers have different structure (fewer octets, >255 values)
+        let values: Vec<String> = vec![
+            "1.0.0", "2.1.3", "3.14.159", "0.2.53", "6.27.84", "4.24.59", "7.23.74",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_ipv4(&values);
+        assert_eq!(
+            result, None,
+            "Version numbers should NOT match IPv4 pattern"
+        );
+    }
+
+    #[test]
+    fn test_ipv4_detection_rejects_decimals() {
+        let values: Vec<String> = vec!["151.3", "165.0", "161.2", "169.1", "181.7"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_ipv4(&values);
+        assert_eq!(
+            result, None,
+            "Decimal numbers should NOT match IPv4 pattern"
+        );
+    }
+
+    #[test]
+    fn test_ipv4_detection_mixed_with_some_invalid() {
+        // 80% threshold: 8 valid out of 10 = 80%
+        let values: Vec<String> = vec![
+            "10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4", "10.0.0.5", "10.0.0.6", "10.0.0.7",
+            "10.0.0.8", "N/A", "unknown",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_ipv4(&values);
+        assert_eq!(
+            result,
+            Some("technology.internet.ip_v4".to_string()),
+            "80% valid IPs should trigger detection"
+        );
     }
 
     #[test]

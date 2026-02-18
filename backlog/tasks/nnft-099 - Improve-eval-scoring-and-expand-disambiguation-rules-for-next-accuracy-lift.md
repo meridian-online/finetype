@@ -1,11 +1,11 @@
 ---
 id: NNFT-099
 title: Improve eval scoring and expand disambiguation rules for next accuracy lift
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-18 03:39'
-updated_date: '2026-02-18 03:39'
+updated_date: '2026-02-18 04:51'
 labels:
   - accuracy
   - disambiguation
@@ -34,12 +34,12 @@ Target: ~80% format-detectable label accuracy (90+/113)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Format-detectable label accuracy improves beyond 76.1% (86/113)
-- [ ] #2 Eval SQL treats time sub-types and geographic hierarchy as interchangeable where appropriate
-- [ ] #3 Gender disambiguation rule handles Non-binary and other inclusive gender values
-- [ ] #4 Header hint overrides work for username-predicted columns with matching headers
-- [ ] #5 No regression on existing correct classifications
-- [ ] #6 Unit tests for gender rule expansion
+- [x] #1 Format-detectable label accuracy improves beyond 76.1% (86/113)
+- [x] #2 Eval SQL treats time sub-types and geographic hierarchy as interchangeable where appropriate
+- [x] #3 Gender disambiguation rule handles Non-binary and other inclusive gender values
+- [x] #4 Header hint overrides work for username-predicted columns with matching headers
+- [x] #5 No regression on existing correct classifications
+- [x] #6 Unit tests for gender rule expansion
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -54,3 +54,28 @@ Target: ~80% format-detectable label accuracy (90+/113)
 7. Re-run profile eval to verify improvements and zero regressions
 8. Commit and push
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Profile eval accuracy improved from 76.1% (86/113) to **80.5% (91/113)** format-detectable label accuracy — +5 columns, zero regressions. Domain accuracy at 85.0% (96/113).
+
+**Eval SQL scoring refinements** (`eval/eval_profile.sql`):
+- Time sub-type interchangeability: `datetime.time.*` predictions are now treated as equivalent (hm_24h ≈ hms_24h), since GT "time 24h" doesn't distinguish whether seconds are present
+- Geographic hierarchy interchangeability: continent ≈ region ≈ state are now equivalent, since GT "region" covers continent-level through state-level subdivisions
+
+**Disambiguation improvements** (`crates/finetype-model/src/column.rs`):
+- Expanded `disambiguate_gender()` GENDER_VALUES with 22 inclusive terms: Non-binary, Other, Prefer not to say, Unknown, X, Genderqueer, Agender, Transgender (plus case variants)
+- Added `identity.person.username` and `identity.person.first_name` to header hint `is_generic` type list, allowing header-based overrides for common catch-all predictions
+
+**Columns fixed (verified in profile_results.csv)**:
+- people_directory.gender → identity.person.gender (0.9 conf) ✅ gender expansion
+- sports_events.start_time → datetime.time.hm_24h (1.0 conf) ✅ time interchangeability
+- countries.region → geography.location.continent (0.8 conf) ✅ geo hierarchy
+- countries.sub-region → geography.location.continent (0.35 conf) ✅ geo hierarchy
+- geography_data.region → geography.location.state (0.4 conf) ✅ geo hierarchy
+- medical_records.npi → identity.medical.npi (0.108 conf) ✅ bonus from is_generic expansion
+
+**Tests**: 209 pass (87 column + 73 core + 49 model), including 2 new gender tests.
+**Commit**: a365fdb, pushed to main.
+<!-- SECTION:FINAL_SUMMARY:END -->
