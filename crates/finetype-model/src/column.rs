@@ -288,33 +288,48 @@ fn disambiguate(
         }
     }
 
-    // Rule 4: Gender detection (must be before generic categorical)
+    // Rule 4: Day-of-week name detection (Monday, Tuesday, etc.)
+    if let Some(label) = disambiguate_day_of_week(values) {
+        return Some((label, "day_of_week_name_detection".to_string()));
+    }
+
+    // Rule 5: Month name detection (January, February, etc.)
+    if let Some(label) = disambiguate_month_name(values) {
+        return Some((label, "month_name_detection".to_string()));
+    }
+
+    // Rule 6: Boolean sub-type normalization (binary/terms/initials)
+    if let Some((label, rule)) = disambiguate_boolean_subtype(values, &top_labels) {
+        return Some((label, rule));
+    }
+
+    // Rule 7: Gender detection (must be before generic categorical)
     if let Some(label) = disambiguate_gender(values) {
         return Some((label, "gender_detection".to_string()));
     }
 
-    // Rule 5: Boolean override — prevent boolean classification for small integer spreads
+    // Rule 8: Boolean override — prevent boolean classification for small integer spreads
     if let Some((label, rule)) = disambiguate_boolean_override(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 6: Small-integer ordinal detection — override day_of_month for
+    // Rule 9: Small-integer ordinal detection — override day_of_month for
     // columns where all values are small positive integers (e.g. Pclass: 1,2,3)
     if let Some((label, rule)) = disambiguate_small_integer_ordinal(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 7: Categorical detection — low cardinality string columns
+    // Rule 10: Categorical detection — low cardinality string columns
     if let Some((label, rule)) = disambiguate_categorical(values, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 8: Numeric type disambiguation
+    // Rule 11: Numeric type disambiguation
     if let Some((label, rule)) = disambiguate_numeric(values, results, &top_labels) {
         return Some((label, rule));
     }
 
-    // Rule 9: SI number override — if the top vote is si_number but no sampled
+    // Rule 12: SI number override — if the top vote is si_number but no sampled
     // values contain an SI suffix (K, M, B, T, G, etc.), the model confused
     // plain decimals for SI numbers. Override to decimal_number.
     if top_labels
@@ -332,6 +347,199 @@ fn disambiguate(
 /// Check if two labels are both present in the top candidates.
 fn contains_pair(labels: &[&str], a: &str, b: &str) -> bool {
     labels.contains(&a) && labels.contains(&b)
+}
+
+/// Detect day-of-week columns where values are day names (Monday, Tuesday, etc.).
+///
+/// Rule: If ≥80% of non-empty values are recognized day names → datetime.component.day_of_week
+fn disambiguate_day_of_week(values: &[String]) -> Option<String> {
+    const DAY_NAMES: &[&str] = &[
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun",
+        "mo",
+        "tu",
+        "we",
+        "th",
+        "fr",
+        "sa",
+        "su",
+    ];
+
+    let non_empty: Vec<String> = values
+        .iter()
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let matching = non_empty
+        .iter()
+        .filter(|v| DAY_NAMES.contains(&v.as_str()))
+        .count();
+    let fraction = matching as f64 / non_empty.len() as f64;
+
+    if fraction >= 0.8 {
+        Some("datetime.component.day_of_week".to_string())
+    } else {
+        None
+    }
+}
+
+/// Detect month-name columns where values are month names (January, February, etc.).
+///
+/// Rule: If ≥80% of non-empty values are recognized month names → datetime.component.month_name
+fn disambiguate_month_name(values: &[String]) -> Option<String> {
+    const MONTH_NAMES: &[&str] = &[
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
+    ];
+
+    let non_empty: Vec<String> = values
+        .iter()
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let matching = non_empty
+        .iter()
+        .filter(|v| MONTH_NAMES.contains(&v.as_str()))
+        .count();
+    let fraction = matching as f64 / non_empty.len() as f64;
+
+    if fraction >= 0.8 {
+        Some("datetime.component.month_name".to_string())
+    } else {
+        None
+    }
+}
+
+/// Normalize boolean sub-types based on actual value content.
+///
+/// When the top prediction or any boolean label appears in the top 3 votes,
+/// examine the actual values to determine the correct boolean sub-type:
+/// - 0/1 integers → `representation.boolean.binary`
+/// - true/false/yes/no/on/off text → `representation.boolean.terms`
+/// - T/F/Y/N single characters → `representation.boolean.initials`
+///
+/// Also detects boolean-valued columns that were misclassified as non-boolean
+/// types (e.g., categorical), overriding when ≥80% of values match.
+fn disambiguate_boolean_subtype(
+    values: &[String],
+    top_labels: &[&str],
+) -> Option<(String, String)> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    // Check if values are boolean-like
+    let binary_values: &[&str] = &["0", "1"];
+    let terms_values: &[&str] = &[
+        "true", "false", "True", "False", "TRUE", "FALSE", "yes", "no", "Yes", "No", "YES", "NO",
+        "on", "off", "On", "Off", "ON", "OFF",
+    ];
+    let initials_values: &[&str] = &["T", "F", "t", "f", "Y", "N", "y", "n"];
+
+    let binary_count = non_empty
+        .iter()
+        .filter(|v| binary_values.contains(v))
+        .count();
+    let terms_count = non_empty
+        .iter()
+        .filter(|v| terms_values.contains(v))
+        .count();
+    let initials_count = non_empty
+        .iter()
+        .filter(|v| initials_values.contains(v))
+        .count();
+
+    let n = non_empty.len() as f64;
+    let binary_frac = binary_count as f64 / n;
+    let terms_frac = terms_count as f64 / n;
+    let initials_frac = initials_count as f64 / n;
+
+    // Only fire if a boolean type is in the top predictions, OR if the values
+    // themselves are overwhelmingly boolean (catches cases where model predicted
+    // categorical/other for True/False columns)
+    let has_boolean_vote = top_labels.iter().any(|l| BOOLEAN_LABELS.contains(l));
+    let max_frac = binary_frac.max(terms_frac).max(initials_frac);
+
+    if !has_boolean_vote && max_frac < 0.8 {
+        return None;
+    }
+
+    // Pick the best matching sub-type (must have ≥80% of values matching)
+    //
+    // For binary (0/1), also require ≤2 unique values to avoid false positives
+    // on skewed integer columns (e.g. SibSp: mostly 0s and 1s, but range 0-8).
+    if terms_frac >= 0.8 {
+        Some((
+            "representation.boolean.terms".to_string(),
+            "boolean_subtype_terms".to_string(),
+        ))
+    } else if initials_frac >= 0.8 {
+        Some((
+            "representation.boolean.initials".to_string(),
+            "boolean_subtype_initials".to_string(),
+        ))
+    } else if binary_frac >= 0.8 {
+        let unique_values: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
+        if unique_values.len() <= 2 {
+            Some((
+                "representation.boolean.binary".to_string(),
+                "boolean_subtype_binary".to_string(),
+            ))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 /// Detect gender columns by checking if all values match a known gender value set.
@@ -2286,5 +2494,309 @@ mod tests {
                 "si_number_override_no_suffix".to_string()
             ))
         );
+    }
+
+    // ── NNFT-090: Day-of-week / month name / boolean sub-type tests ─────
+
+    #[test]
+    fn test_day_of_week_full_names() {
+        let values: Vec<String> = vec![
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+            "Monday",
+            "Friday",
+            "Wednesday",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_day_of_week(&values);
+        assert_eq!(result, Some("datetime.component.day_of_week".to_string()));
+    }
+
+    #[test]
+    fn test_day_of_week_abbreviated() {
+        let values: Vec<String> = vec![
+            "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon", "Fri", "Wed",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_day_of_week(&values);
+        assert_eq!(result, Some("datetime.component.day_of_week".to_string()));
+    }
+
+    #[test]
+    fn test_day_of_week_two_letter() {
+        let values: Vec<String> = vec!["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_day_of_week(&values);
+        assert_eq!(result, Some("datetime.component.day_of_week".to_string()));
+    }
+
+    #[test]
+    fn test_day_of_week_not_triggered_for_names() {
+        let values: Vec<String> = vec!["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_day_of_week(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_day_of_week_too_few_values() {
+        let values: Vec<String> = vec!["Monday", "Tuesday"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_day_of_week(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_day_of_week_below_threshold() {
+        // Only 2 of 10 are day names (20% < 80%)
+        let values: Vec<String> = vec![
+            "Monday", "Apple", "Banana", "Cherry", "Date", "Fig", "Grape", "Tuesday", "Kiwi",
+            "Lemon",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_day_of_week(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_month_name_full_names() {
+        let values: Vec<String> = vec![
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_month_name(&values);
+        assert_eq!(result, Some("datetime.component.month_name".to_string()));
+    }
+
+    #[test]
+    fn test_month_name_abbreviated() {
+        let values: Vec<String> = vec![
+            "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_month_name(&values);
+        assert_eq!(result, Some("datetime.component.month_name".to_string()));
+    }
+
+    #[test]
+    fn test_month_name_mixed_case() {
+        let values: Vec<String> = vec![
+            "january", "FEBRUARY", "March", "april", "MAY", "June", "july", "AUGUST",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_month_name(&values);
+        assert_eq!(result, Some("datetime.component.month_name".to_string()));
+    }
+
+    #[test]
+    fn test_month_name_not_triggered_for_names() {
+        // "May" overlaps with month name, but others don't
+        let values: Vec<String> = vec![
+            "Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Helen", "Ivan", "Jack",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_month_name(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_month_name_too_few_values() {
+        let values: Vec<String> = vec!["January", "February"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_month_name(&values);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_boolean_subtype_terms() {
+        let values: Vec<String> = vec![
+            "True", "False", "True", "True", "False", "True", "False", "False", "True", "False",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let top_labels = vec!["representation.boolean.terms"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.boolean.terms");
+        assert_eq!(rule, "boolean_subtype_terms");
+    }
+
+    #[test]
+    fn test_boolean_subtype_binary() {
+        let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1", "0", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.boolean.binary");
+        assert_eq!(rule, "boolean_subtype_binary");
+    }
+
+    #[test]
+    fn test_boolean_subtype_initials() {
+        let values: Vec<String> = vec!["T", "F", "T", "F", "T", "T", "F", "F", "T", "F"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.initials"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.boolean.initials");
+        assert_eq!(rule, "boolean_subtype_initials");
+    }
+
+    #[test]
+    fn test_boolean_subtype_yes_no() {
+        let values: Vec<String> = vec!["yes", "no", "yes", "yes", "no", "no", "yes", "no"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.terms"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "representation.boolean.terms");
+    }
+
+    #[test]
+    fn test_boolean_subtype_override_categorical() {
+        // True/False column misclassified as categorical — boolean detection fires
+        // because ≥80% of values are boolean-like terms
+        let values: Vec<String> = vec![
+            "True", "False", "True", "True", "False", "True", "False", "False",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let top_labels = vec!["representation.discrete.categorical"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(
+            result.is_some(),
+            "Should override categorical for True/False column"
+        );
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "representation.boolean.terms");
+    }
+
+    #[test]
+    fn test_boolean_subtype_not_triggered_for_mixed() {
+        // Mixed values that aren't clearly boolean
+        let values: Vec<String> = vec!["yes", "no", "maybe", "yes", "unknown", "no"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.text.word"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_boolean_subtype_too_few_values() {
+        let values: Vec<String> = vec!["True", "False"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.terms"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_boolean_subtype_skewed_integers_not_binary() {
+        // SibSp-like column: mostly 0s and 1s but with values up to 8
+        // Should NOT be classified as binary despite >80% being 0/1
+        let values: Vec<String> = vec![
+            "0", "1", "0", "1", "0", "0", "1", "0", "0", "1", "2", "0", "3", "0", "1", "0", "0",
+            "1", "4", "0",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let top_labels = vec![
+            "representation.numeric.integer_number",
+            "representation.boolean.binary",
+        ];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        // >2 unique values (0,1,2,3,4) → should NOT fire for binary
+        assert!(
+            result.is_none(),
+            "Skewed integer column (SibSp-like) should not be classified as boolean"
+        );
+    }
+
+    #[test]
+    fn test_boolean_subtype_pure_binary_still_works() {
+        // Pure 0/1 column with exactly 2 unique values → should still be binary
+        let values: Vec<String> = vec!["0", "1", "1", "0", "0", "1", "0", "1", "1", "0"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        assert!(result.is_some());
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "representation.boolean.binary");
     }
 }

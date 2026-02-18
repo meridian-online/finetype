@@ -94,6 +94,11 @@ SELECT
         WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
              AND pr.predicted_type = sm.finetype_label
         THEN true
+        -- Boolean sub-types are interchangeable: binary/terms/initials all satisfy
+        -- a generic "boolean" GT label (the GT doesn't distinguish sub-types)
+        WHEN sm.finetype_label LIKE 'representation.boolean.%'
+             AND pr.predicted_type LIKE 'representation.boolean.%'
+        THEN true
         ELSE false
     END AS label_match,
     -- Scoring: domain-level match
