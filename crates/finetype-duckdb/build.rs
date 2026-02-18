@@ -36,27 +36,100 @@ fn main() {
 }
 
 #[cfg(feature = "embed-models")]
-fn generate_embedded_models(models_base: &std::path::Path) {
-    // Follow the models/default symlink to find the active model
+fn resolve_flat_model(models_base: &Path) -> PathBuf {
+    // 1. Explicit override via env var
+    if let Ok(path) = env::var("FINETYPE_FLAT_MODEL") {
+        let p = PathBuf::from(path);
+        if p.join("model.safetensors").exists() {
+            return p;
+        }
+        panic!(
+            "FINETYPE_FLAT_MODEL={:?} does not contain model.safetensors",
+            p
+        );
+    }
+
+    // 2. Try models/default — works if it points to a flat model
     let default_link = models_base.join("default");
-    let flat_dir = if default_link.exists() {
-        std::fs::read_link(&default_link)
-            .map(|target| {
-                if target.is_relative() {
-                    models_base.join(target)
-                } else {
-                    target
-                }
+    let default_target = fs::read_link(&default_link)
+        .map(|target| {
+            if target.is_relative() {
+                models_base.join(target)
+            } else {
+                target
+            }
+        })
+        .or_else(|_| {
+            // Windows fallback: symlink stored as text file
+            fs::read_to_string(&default_link).map(|s| models_base.join(s.trim()))
+        })
+        .ok();
+
+    if let Some(ref dir) = default_target {
+        if dir.join("model.safetensors").exists() {
+            return dir.clone();
+        }
+        // Default points to a tiered model — fall through to auto-discover
+    }
+
+    // 3. Auto-discover latest char-cnn-v* model
+    if let Ok(entries) = fs::read_dir(models_base) {
+        let mut candidates: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name().to_string_lossy().starts_with("char-cnn-v")
+                    && e.path().join("model.safetensors").exists()
             })
-            .unwrap_or_else(|_| models_base.join("char-cnn-v2"))
-    } else {
-        models_base.join("char-cnn-v2")
-    };
+            .map(|e| e.path())
+            .collect();
+
+        // Sort by version number descending (char-cnn-v7 > char-cnn-v5)
+        candidates.sort_by(|a, b| {
+            let va = a
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| n.strip_prefix("char-cnn-v"))
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            let vb = b
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| n.strip_prefix("char-cnn-v"))
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            vb.cmp(&va)
+        });
+
+        if let Some(best) = candidates.first() {
+            println!(
+                "cargo:warning=DuckDB extension: using flat model {:?} \
+                 (default points to tiered model)",
+                best.file_name().unwrap()
+            );
+            return best.clone();
+        }
+    }
+
+    // Nothing found — use default target anyway and let the assert catch it
+    default_target.unwrap_or_else(|| models_base.join("char-cnn-v2"))
+}
+
+#[cfg(feature = "embed-models")]
+fn generate_embedded_models(models_base: &std::path::Path) {
+    // Resolve the flat CharCNN model to embed.
+    //
+    // Priority:
+    //  1. FINETYPE_FLAT_MODEL env var (explicit override)
+    //  2. models/default symlink (if it points to a flat model)
+    //  3. Latest char-cnn-v* directory (auto-discover)
+    let flat_dir = resolve_flat_model(models_base);
 
     // Verify model exists
     assert!(
         flat_dir.join("model.safetensors").exists(),
-        "Model not found at {:?}. Run from workspace root or disable embed-models feature.",
+        "Flat model not found at {:?}. Need a directory with model.safetensors, \
+         labels.json, config.yaml. Set FINETYPE_FLAT_MODEL or ensure a char-cnn-v* \
+         model exists.",
         flat_dir
     );
 
