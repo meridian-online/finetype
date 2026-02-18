@@ -4,9 +4,22 @@ SHELL := /bin/bash
 
 TAXONOMY_DIR   := labels
 EXTENSION      := target/release/finetype_duckdb.duckdb_extension
+
+# ─── Dataset paths (override via env vars or eval/config.env) ────
+# These defaults match eval/config.env. Export env vars to override.
+GITTABLES_DIR  ?= $(HOME)/datasets/gittables
+EVAL_OUTPUT    ?= $(GITTABLES_DIR)/eval_output
+SOTAB_DATA     ?= $(HOME)/datasets/sotab/cta
+SOTAB_SPLIT    ?= validation
 EVAL_DIR       := eval/gittables
-GT_DIR         := $(HOME)/git-tables
-EVAL_OUTPUT    := $(GT_DIR)/eval_output
+SOTAB_EVAL_DIR := eval/sotab
+VENV_PYTHON    ?= $(HOME)/.venvs/finetype-eval/bin/python3
+
+# Absolute extension path for DuckDB LOAD
+EXTENSION_PATH ?= $(CURDIR)/$(EXTENSION)
+
+# Variables to substitute in SQL templates
+ENVSUBST_VARS  := '$$EXTENSION_PATH $$EVAL_OUTPUT $$SOTAB_DIR $$SOTAB_SPLIT'
 
 # ─── Setup ───────────────────────────────────
 .PHONY: setup
@@ -57,36 +70,66 @@ test:
 generate:
 	cargo run -- generate --localized -s 100 -o training.ndjson
 
-# ─── Evaluation ───────────────────────────────
+# ─── GitTables Evaluation ────────────────────
 # Prerequisites:
-#   1. GitTables 1M corpus at ~/git-tables/topics/
+#   1. GitTables 1M corpus at $(GITTABLES_DIR)/topics/
 #   2. DuckDB extension built: make build-release
 #   3. Pre-extracted metadata: make eval-extract
 #
 # Full pipeline: make eval-extract eval-values eval-1m
+# Override paths: GITTABLES_DIR=~/my-data/gittables make eval-1m
 
-.PHONY: eval-extract eval-values eval-1m eval-benchmark
+.PHONY: eval-extract eval-values eval-1m eval-benchmark eval-all
 
 eval-extract:
 	@echo "═══ Extracting metadata from GitTables 1M corpus ═══"
-	python3 $(EVAL_DIR)/extract_metadata_1m.py
+	GITTABLES_DIR="$(GITTABLES_DIR)" EVAL_OUTPUT="$(EVAL_OUTPUT)" \
+		$(VENV_PYTHON) $(EVAL_DIR)/extract_metadata_1m.py
 
 eval-values:
 	@echo "═══ Extracting column values from sampled tables ═══"
-	python3 $(EVAL_DIR)/prepare_1m_values.py
+	GITTABLES_DIR="$(GITTABLES_DIR)" EVAL_OUTPUT="$(EVAL_OUTPUT)" \
+		$(VENV_PYTHON) $(EVAL_DIR)/prepare_1m_values.py
 
 eval-1m: $(EXTENSION)
 	@echo "═══ Running GitTables 1M evaluation ═══"
-	@echo "Extension: $(EXTENSION)"
+	@echo "Extension: $(EXTENSION_PATH)"
 	@echo "Eval output: $(EVAL_OUTPUT)"
-	duckdb -unsigned < $(EVAL_DIR)/eval_1m.sql
+	export EXTENSION_PATH="$(EXTENSION_PATH)" EVAL_OUTPUT="$(EVAL_OUTPUT)" && \
+		envsubst $(ENVSUBST_VARS) < $(EVAL_DIR)/eval_1m.sql | duckdb -unsigned
 
 eval-benchmark: $(EXTENSION)
 	@echo "═══ Running GitTables benchmark (1,101 tables) ═══"
-	duckdb -unsigned < $(EVAL_DIR)/eval.sql
+	export EXTENSION_PATH="$(EXTENSION_PATH)" && \
+		envsubst $(ENVSUBST_VARS) < $(EVAL_DIR)/eval.sql | duckdb -unsigned
 
 eval-all: eval-extract eval-values eval-1m
 	@echo "═══ Full evaluation pipeline complete ═══"
+
+# ─── SOTAB Evaluation ─────────────────────────
+# Prerequisites:
+#   1. SOTAB CTA data at $(SOTAB_DATA)/{validation,test}/
+#   2. DuckDB extension built: make build-release
+#   3. Pre-extracted values: make eval-sotab-values
+#
+# Full pipeline: make eval-sotab-values eval-sotab
+# Override paths: SOTAB_DATA=~/my-data/sotab/cta make eval-sotab
+# Switch split:  SOTAB_SPLIT=test make eval-sotab
+
+.PHONY: eval-sotab-values eval-sotab eval-sotab-all
+
+eval-sotab-values:
+	@echo "═══ Extracting SOTAB $(SOTAB_SPLIT) column values ═══"
+	SOTAB_DIR="$(SOTAB_DATA)" \
+		$(VENV_PYTHON) $(SOTAB_EVAL_DIR)/prepare_values.py --split $(SOTAB_SPLIT)
+
+eval-sotab: $(EXTENSION)
+	@echo "═══ Running SOTAB CTA evaluation ($(SOTAB_SPLIT)) ═══"
+	export EXTENSION_PATH="$(EXTENSION_PATH)" SOTAB_DIR="$(SOTAB_DATA)" SOTAB_SPLIT="$(SOTAB_SPLIT)" && \
+		envsubst $(ENVSUBST_VARS) < $(SOTAB_EVAL_DIR)/eval_sotab.sql | duckdb -unsigned
+
+eval-sotab-all: eval-sotab-values eval-sotab
+	@echo "═══ SOTAB evaluation pipeline complete ═══"
 
 # ─── Profile Evaluation ─────────────────────
 # Evaluate finetype profile against annotated CSVs.

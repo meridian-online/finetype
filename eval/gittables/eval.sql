@@ -3,7 +3,7 @@
 -- Evaluates FineType format detection against real-world column data from the
 -- GitTables benchmark (1,101 tables, ~3,200 annotated columns).
 
-LOAD '/home/hugh/github/noon-org/finetype/target/release/finetype_duckdb.duckdb_extension';
+LOAD '${EXTENSION_PATH}';
 
 .mode box
 .timer on
@@ -18,7 +18,7 @@ SELECT
     target_column AS col_idx,
     annotation_label AS gt_label,
     'schema.org' AS ontology
-FROM read_csv('/home/hugh/github/noon-org/finetype/eval/gittables/schema_gt.csv', auto_detect=true);
+FROM read_csv('eval/gittables/schema_gt.csv', auto_detect=true);
 
 CREATE OR REPLACE TABLE dbpedia_gt AS
 SELECT
@@ -26,7 +26,7 @@ SELECT
     target_column AS col_idx,
     annotation_label AS gt_label,
     'dbpedia' AS ontology
-FROM read_csv('/home/hugh/github/noon-org/finetype/eval/gittables/dbpedia_gt.csv', auto_detect=true);
+FROM read_csv('eval/gittables/dbpedia_gt.csv', auto_detect=true);
 
 -- Prefer schema.org annotations, fall back to dbpedia
 CREATE OR REPLACE TABLE ground_truth AS
@@ -69,9 +69,9 @@ LIMIT 20;
 -- First, create a file list
 CREATE OR REPLACE TABLE csv_files AS
 SELECT
-    replace(replace(file, '/home/hugh/github/noon-org/finetype/eval/gittables/tables/tables/', ''), '.csv', '') AS table_file,
+    replace(replace(file, 'eval/gittables/tables/tables/', ''), '.csv', '') AS table_file,
     file AS file_path
-FROM glob('/home/hugh/github/noon-org/finetype/eval/gittables/tables/tables/GitTables_*.csv');
+FROM glob('eval/gittables/tables/tables/GitTables_*.csv');
 
 SELECT count(*) AS csv_files_found FROM csv_files;
 
@@ -95,7 +95,7 @@ SELECT count(*) AS csv_files_found FROM csv_files;
 -- Let's process in batches. Start by reading a sample to validate:
 CREATE OR REPLACE TABLE sample_unpivoted AS
 WITH raw AS (
-    SELECT * FROM read_csv('/home/hugh/github/noon-org/finetype/eval/gittables/tables/tables/GitTables_1501.csv',
+    SELECT * FROM read_csv('eval/gittables/tables/tables/GitTables_1501.csv',
                            header=true, all_varchar=true)
 )
 UNPIVOT raw ON COLUMNS(* EXCLUDE column00)
@@ -118,7 +118,7 @@ WITH raw AS (
     SELECT
         filename AS src_file,
         * EXCLUDE (filename)
-    FROM read_csv('/home/hugh/github/noon-org/finetype/eval/gittables/tables/tables/GitTables_*.csv',
+    FROM read_csv('eval/gittables/tables/tables/GitTables_*.csv',
                   header=true, all_varchar=true, union_by_name=true, filename=true)
 ),
 unpivoted AS (
@@ -126,7 +126,7 @@ unpivoted AS (
     INTO NAME col_name VALUE col_value
 )
 SELECT
-    replace(replace(src_file, '/home/hugh/github/noon-org/finetype/eval/gittables/tables/tables/', ''), '.csv', '') AS table_file,
+    replace(replace(src_file, 'eval/gittables/tables/tables/', ''), '.csv', '') AS table_file,
     CAST(regexp_extract(col_name, 'col(\d+)', 1) AS INTEGER) AS col_idx,
     col_value
 FROM unpivoted
