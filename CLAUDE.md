@@ -25,11 +25,11 @@ Every decision in this repo should reflect these principles:
 - **v0.1.8** — 30x tiered inference throughput, accuracy 72.6% -> 92.9% on profile eval, Windows release target, header-hint override system
 - **v0.1.7** — Tiered model graph as default inference engine, `ValueClassifier` trait for polymorphic dispatch
 - **v0.1.6** — CharCNN v7, evaluation infrastructure, GitTables/SOTAB benchmarks
-- **DuckDB extension v0.2.0** — Tiered model, 168 types, 19 new DuckDB type mappings (NNFT-092, awaiting community CI)
+- **DuckDB extension v0.2.0** — Tiered model, 168 types, 19 new DuckDB type mappings. Merged into community extensions (NNFT-092)
 
 ### What's in progress
 
-- **NNFT-092** — DuckDB community extension update (AC#4 pending: community CI rebuild)
+(No active tasks)
 
 ## Architecture
 
@@ -152,12 +152,11 @@ All eval pipelines use `eval/config.env` for dataset paths with `envsubst` subst
 
 Current priorities, in order:
 
-1. **DuckDB community extension** — Get v0.2.0 through community CI (NNFT-092)
-2. **Accuracy lift** — Address top misclassification patterns, expand disambiguation rules (NNFT-090, NNFT-099, NNFT-100)
-4. **Documentation** — README update with tiered architecture (NNFT-096), CHANGELOG maintenance (NNFT-095)
-5. **Distribution** — Homebrew tap update (NNFT-086), crates.io keep current (NNFT-093 done)
-6. **Training data quality** — Name diversity (NNFT-066), phone formats (NNFT-055), address locales (NNFT-056)
-7. **New domains** — Medical identifiers (NNFT-053), SI-prefix numbers (NNFT-057), CLDR locale data (NNFT-058/060)
+1. **Accuracy lift** — Address top misclassification patterns, expand disambiguation rules (NNFT-090, NNFT-099, NNFT-100)
+2. **Documentation** — README update with tiered architecture (NNFT-096), CHANGELOG maintenance (NNFT-095)
+3. **Distribution** — Homebrew tap update (NNFT-086), crates.io keep current (NNFT-093 done)
+4. **Training data quality** — Name diversity (NNFT-066), phone formats (NNFT-055), address locales (NNFT-056)
+5. **New domains** — Medical identifiers (NNFT-053), SI-prefix numbers (NNFT-057), CLDR locale data (NNFT-058/060)
 
 ## Decided Items
 

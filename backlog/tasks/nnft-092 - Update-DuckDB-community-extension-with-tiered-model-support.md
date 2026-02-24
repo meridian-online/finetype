@@ -1,11 +1,11 @@
 ---
 id: NNFT-092
 title: Update DuckDB community extension with tiered model support
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-17 22:44'
-updated_date: '2026-02-18 00:48'
+updated_date: '2026-02-24 04:50'
 labels:
   - release
   - duckdb
@@ -32,7 +32,7 @@ No new PR to duckdb/community-extensions needed — the CI rebuilds from the noo
 - [x] #1 finetype-core and finetype-model published to crates.io with tiered support
 - [x] #2 duckdb-finetype repo updated with new crate versions
 - [x] #3 Extension builds and passes SQL tests with tiered model
-- [ ] #4 INSTALL finetype FROM community installs updated extension
+- [x] #4 INSTALL finetype FROM community installs updated extension
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -68,6 +68,8 @@ AC#3: make release + make test_release both pass, cargo test passes (28 tests)
 
 AC#4: PR #1328 created on duckdb/community-extensions to update ref and version.
 Commit 0c79f5e pushed to noon-org/duckdb-finetype main."
+
+AC#4 confirmed complete: PR #1328 merged by taniabogatsch on 2026-02-18. `INSTALL finetype FROM community` now installs v0.2.0 with tiered model and 168 types.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
