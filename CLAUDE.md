@@ -21,7 +21,7 @@ Every decision in this repo should reflect these principles:
 
 ### Recent milestones
 
-- **NNFT-110** — Model2Vec semantic column name classifier: replaces hardcoded header hints with learned embeddings (potion-base-4M). Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions)
+- **v0.1.9** — Model2Vec semantic column name classifier (NNFT-110), unified column-level disambiguation (NNFT-109). Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions). Homebrew tap auto-updated.
 - **v0.1.8** — 30x tiered inference throughput, accuracy 72.6% -> 92.9% on profile eval, Windows release target, header-hint override system
 - **v0.1.7** — Tiered model graph as default inference engine, `ValueClassifier` trait for polymorphic dispatch
 - **v0.1.6** — CharCNN v7, evaluation infrastructure, GitTables/SOTAB benchmarks
