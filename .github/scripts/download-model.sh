@@ -40,3 +40,27 @@ fi
 
 echo "Model files:"
 find "models/${MODEL_DIR}" -type f | sort
+
+# ── Model2Vec semantic hint classifier (optional) ──────────────────────────
+# Download the Model2Vec artifacts for the semantic column name classifier.
+# The build gracefully degrades if these are absent (HAS_MODEL2VEC=false).
+echo ""
+echo "Downloading Model2Vec semantic hint classifier..."
+mkdir -p models/model2vec
+M2V_OK=true
+for file in model.safetensors type_embeddings.safetensors tokenizer.json label_index.json; do
+  echo "  Downloading model2vec/${file}..."
+  if ! curl -sfL "${REPO}/model2vec/${file}" -o "models/model2vec/${file}"; then
+    echo "  WARNING: Failed to download model2vec/${file} — semantic hints will be disabled"
+    M2V_OK=false
+    break
+  fi
+done
+
+if [ "${M2V_OK}" = true ]; then
+  echo "Model2Vec files:"
+  find models/model2vec -type f | sort
+else
+  echo "Model2Vec download failed — continuing without semantic hints"
+  rm -rf models/model2vec
+fi

@@ -12,12 +12,12 @@ Every decision in this repo should reflect these principles:
 
 ## Current State
 
-**Version:** 0.1.8 (latest tag: `v0.1.8`)
+**Version:** 0.1.9 (latest tag: `v0.1.9`)
 **Taxonomy:** 169 definitions across 6 domains — all generators pass, 100% alignment
-**Default model:** tiered-v2 (CLI), char-cnn-v7 flat (DuckDB extension)
+**Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check, smoke tests)
-**Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (PR pending for v0.2.0)
+**Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
