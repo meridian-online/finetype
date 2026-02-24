@@ -29,7 +29,7 @@ Every decision in this repo should reflect these principles:
 
 ### What's in progress
 
-(No active tasks)
+- **NNFT-115** — Multi-signal attractor demotion (Rule 14). Demotes over-eager specific type predictions (postal_code, cvv, first_name, icao_code) to generic types using validation, confidence, and cardinality signals. 17 predictions improved, 0 format-detectable regressions.
 
 ## Architecture
 
@@ -72,9 +72,10 @@ The inference system has two modes:
 **2. Column-level inference** — Vector of strings -> single column type
 - Runs value-level inference on each value
 - Aggregates predictions via majority vote
-- Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection)
+- Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection, attractor demotion)
+- **Attractor demotion** (Rule 14): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not validation-confirmed), and cardinality mismatch (1-20 unique values for text attractors). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override.
 - **Semantic header hints** (Model2Vec): embeds column name → cosine similarity against 169 pre-computed type embeddings → overrides generic predictions above 0.70 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable.
-- `is_generic` flag marks types that should yield to header hints
+- `is_generic` flag marks types that should yield to header hints (includes attractor-demoted predictions)
 
 Both classifiers implement the `ValueClassifier` trait for polymorphic dispatch.
 
@@ -183,6 +184,8 @@ Key architectural decisions that should not be revisited without good reason:
 9. **Pre-commit hook in `.githooks/`** — Runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`. Activated via `make setup`. (NNFT-072)
 
 10. **Evaluation paths via config.env** — All eval scripts use `eval/config.env` + `envsubst` for dataset paths. No hardcoded absolute paths. (NNFT-108)
+
+11. **Attractor demotion (Rule 14)** — Multi-signal disambiguation rule that demotes over-eager specific type predictions (postal_code, cvv, first_name, icao_code, etc.) to generic `representation.*` types. Three signals: validation failure (>50% fail type's regex), confidence threshold (<0.85 when not validation-confirmed), cardinality mismatch (1-20 unique values for text attractors). Taxonomy is wired into `ColumnClassifier` via `set_taxonomy()`. Demoted predictions treated as generic for header hint override. `full_name` deliberately excluded from attractor list — too many legitimate uses. (NNFT-115)
 
 ## Build & Test
 

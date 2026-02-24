@@ -566,7 +566,14 @@ fn cmd_infer(
             sample_size,
             ..Default::default()
         };
-        let column_classifier = ColumnClassifier::new(classifier, config);
+        let mut column_classifier = ColumnClassifier::new(classifier, config);
+
+        // Load taxonomy for validation-based attractor demotion (Rule 14)
+        let taxonomy_path = std::path::PathBuf::from("labels");
+        if let Ok(taxonomy) = load_taxonomy(&taxonomy_path) {
+            column_classifier.set_taxonomy(taxonomy);
+        }
+
         let result = column_classifier.classify_column(&inputs)?;
 
         match output {
@@ -1576,12 +1583,22 @@ fn cmd_profile(
         sample_size,
         ..Default::default()
     };
-    let column_classifier = if let Some(semantic) = load_semantic_hint() {
+    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
         eprintln!("Loaded semantic hint classifier (Model2Vec)");
         ColumnClassifier::with_semantic_hint(classifier, config, semantic)
     } else {
         ColumnClassifier::new(classifier, config)
     };
+
+    // Load taxonomy for validation-based attractor demotion (Rule 14)
+    let taxonomy_path = std::path::PathBuf::from("labels");
+    if let Ok(taxonomy) = load_taxonomy(&taxonomy_path) {
+        eprintln!(
+            "Loaded taxonomy for attractor demotion ({} types)",
+            taxonomy.labels().len()
+        );
+        column_classifier.set_taxonomy(taxonomy);
+    }
 
     eprintln!("Reading {:?}", file);
 

@@ -12,6 +12,7 @@
 
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::semantic::SemanticHintClassifier;
+use finetype_core::Taxonomy;
 use std::collections::HashMap;
 
 /// All known boolean type labels (current and legacy).
@@ -72,6 +73,10 @@ pub struct ColumnClassifier {
     /// When present, used as the primary header hint source before falling
     /// back to the hardcoded `header_hint()` dictionary.
     semantic_hint: Option<SemanticHintClassifier>,
+    /// Optional taxonomy for validation-based attractor demotion.
+    /// When present, enables Signal 1 (validation failure) in the
+    /// attractor demotion disambiguation rule (Rule 14).
+    taxonomy: Option<Taxonomy>,
 }
 
 impl ColumnClassifier {
@@ -81,6 +86,7 @@ impl ColumnClassifier {
             classifier,
             config,
             semantic_hint: None,
+            taxonomy: None,
         }
     }
 
@@ -103,12 +109,22 @@ impl ColumnClassifier {
             classifier,
             config,
             semantic_hint: Some(semantic),
+            taxonomy: None,
         }
     }
 
     /// Attach a semantic hint classifier to an existing ColumnClassifier.
     pub fn set_semantic_hint(&mut self, semantic: SemanticHintClassifier) {
         self.semantic_hint = Some(semantic);
+    }
+
+    /// Attach a taxonomy for validation-based attractor demotion.
+    ///
+    /// When the taxonomy is present, the attractor demotion rule (Rule 14)
+    /// can validate predicted type values against their validation schemas,
+    /// enabling Signal 1 (validation failure) to catch over-eager predictions.
+    pub fn set_taxonomy(&mut self, taxonomy: Taxonomy) {
+        self.taxonomy = Some(taxonomy);
     }
 
     /// Classify a column of values, returning a single type prediction.
@@ -167,12 +183,19 @@ impl ColumnClassifier {
         let majority_fraction = majority_count as f32 / n_samples as f32;
 
         // Step 4: Apply disambiguation rules
-        let disambiguation = disambiguate(&sample, &results, &votes, n_samples);
+        let disambiguation =
+            disambiguate(&sample, &results, &votes, n_samples, self.taxonomy.as_ref());
 
         if let Some((label, rule_name)) = disambiguation {
+            // Attractor demotion rules get moderate confidence; all others get high confidence
+            let confidence = if rule_name.starts_with("attractor_demotion") {
+                majority_fraction.max(0.5)
+            } else {
+                majority_fraction.max(0.8) // Disambiguation rules are high-confidence
+            };
             Ok(ColumnResult {
                 label,
-                confidence: majority_fraction.max(0.8), // Disambiguation rules are high-confidence
+                confidence,
                 vote_distribution,
                 disambiguation_applied: true,
                 disambiguation_rule: Some(rule_name),
@@ -252,7 +275,11 @@ impl ColumnClassifier {
                     | "identity.person.phone_number"
                     // IATA is the model's default for uppercase 3-letter codes
                     | "geography.transportation.iata_code"
-            ) || BOOLEAN_LABELS.contains(&result.label.as_str());
+            ) || BOOLEAN_LABELS.contains(&result.label.as_str())
+                // Attractor-demoted predictions are inherently uncertain —
+                // they should yield to header hints the same way generic types do.
+                || result.disambiguation_rule.as_ref()
+                    .is_some_and(|r| r.starts_with("attractor_demotion"));
 
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
                 let hint_fraction = result
@@ -309,6 +336,31 @@ const COORDINATE_PAIR: (&str, &str) = (
     "geography.coordinate.longitude",
 );
 
+/// Attractor types — types the CharCNN over-confidently assigns to generic data.
+/// Numeric attractors catch integers misclassified as postal codes, CVVs, etc.
+const NUMERIC_ATTRACTORS: &[&str] = &[
+    "geography.address.postal_code",
+    "geography.address.street_number",
+    "identity.payment.cvv",
+];
+
+/// Text attractors catch short words/phrases misclassified as identity types.
+/// Note: full_name is NOT included — its false positives are rare (2 in eval)
+/// and the header hint system handles them. Including full_name causes more
+/// regressions (company, venue, publisher columns whose GT maps to "name"→full_name).
+const TEXT_ATTRACTORS: &[&str] = &[
+    "identity.person.first_name",
+    "identity.person.username",
+    "geography.address.street_name",
+];
+
+/// Code attractors catch alphanumeric codes misclassified as specific identifiers.
+const CODE_ATTRACTORS: &[&str] = &[
+    "geography.transportation.icao_code",
+    "identity.medical.ndc",
+    "identity.payment.cusip",
+];
+
 /// Apply disambiguation rules when the vote distribution contains known ambiguous pairs.
 ///
 /// Returns Some((resolved_label, rule_name)) if a rule was applied, None otherwise.
@@ -316,7 +368,8 @@ fn disambiguate(
     values: &[String],
     results: &[ClassificationResult],
     votes: &[(String, usize)],
-    _n_samples: usize,
+    n_samples: usize,
+    taxonomy: Option<&Taxonomy>,
 ) -> Option<(String, String)> {
     // Get the top labels in the vote
     let top_labels: Vec<&str> = votes.iter().take(3).map(|(l, _)| l.as_str()).collect();
@@ -398,6 +451,15 @@ fn disambiguate(
         if let Some((label, rule)) = disambiguate_si_number(values) {
             return Some((label, rule));
         }
+    }
+
+    // Rule 14: Attractor type demotion — demote over-eager specific type
+    // predictions (postal_code, cvv, first_name, etc.) when evidence doesn't
+    // support the specific prediction. Three signals: validation failure,
+    // confidence threshold, and cardinality mismatch.
+    if let Some((label, rule)) = disambiguate_attractor_demotion(values, votes, n_samples, taxonomy)
+    {
+        return Some((label, rule));
     }
 
     None
@@ -1435,6 +1497,150 @@ fn disambiguate_si_number(values: &[String]) -> Option<(String, String)> {
         ))
     } else {
         None
+    }
+}
+
+/// Demote "attractor" types back to generic representation.* types when
+/// the evidence doesn't support the specific prediction.
+///
+/// Three independent signals, checked in order of strength:
+/// 1. Validation failure: >50% of sample values fail the type's validation schema
+/// 2. Confidence threshold: top vote fraction < 0.85 (true positives cluster >0.9)
+/// 3. Cardinality mismatch: text attractor + 3-20 unique values → categorical
+///
+/// This rule runs AFTER all other disambiguation rules and BEFORE header hint
+/// override, so header hints can still rescue legitimate predictions that were
+/// demoted (e.g., model says postal_code at 0.7, header is "zip_code").
+fn disambiguate_attractor_demotion(
+    values: &[String],
+    votes: &[(String, usize)],
+    n_samples: usize,
+    taxonomy: Option<&Taxonomy>,
+) -> Option<(String, String)> {
+    let (top_label, top_count) = votes.first()?;
+    let majority_fraction = *top_count as f32 / n_samples as f32;
+
+    let is_numeric = NUMERIC_ATTRACTORS.contains(&top_label.as_str());
+    let is_text = TEXT_ATTRACTORS.contains(&top_label.as_str());
+    let is_code = CODE_ATTRACTORS.contains(&top_label.as_str());
+
+    if !is_numeric && !is_text && !is_code {
+        return None;
+    }
+
+    // Signal 1: Validation failure (strongest signal)
+    // If taxonomy available and predicted type has a validation schema with a
+    // regex pattern, check sample values against it. Demote if >50% fail.
+    // Also track whether validation CONFIRMED the type (pattern exists and
+    // values mostly pass) — this is used to gate Signal 2.
+    let mut validation_confirmed = false;
+    if let Some(taxonomy) = taxonomy {
+        if let Some(def) = taxonomy.get(top_label) {
+            if let Some(validation) = &def.validation {
+                let has_pattern = validation.pattern.is_some();
+                let non_empty: Vec<&str> = values
+                    .iter()
+                    .map(|v| v.trim())
+                    .filter(|v| !v.is_empty())
+                    .collect();
+                if non_empty.len() >= 3 {
+                    let fail_count = non_empty
+                        .iter()
+                        .filter(|v| {
+                            finetype_core::validate_value(v, validation)
+                                .map(|r| !r.is_valid)
+                                .unwrap_or(false)
+                        })
+                        .count();
+                    let fail_rate = fail_count as f32 / non_empty.len() as f32;
+                    if fail_rate > 0.5 {
+                        let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
+                        return Some((
+                            fallback,
+                            format!("attractor_demotion_validation:{}", top_label),
+                        ));
+                    }
+                    // If validation has a regex pattern and values mostly pass
+                    // (≤30% fail), that's positive evidence FOR the type.
+                    if has_pattern && fail_rate <= 0.3 {
+                        validation_confirmed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Signal 2: Confidence threshold
+    // True positives for attractor types cluster at >0.9 confidence.
+    // False positives cluster at 0.3–0.8.
+    // SKIP if validation with a regex pattern confirmed the type — pattern
+    // match is stronger evidence than confidence alone.
+    if !validation_confirmed && majority_fraction < 0.85 {
+        let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
+        return Some((
+            fallback,
+            format!("attractor_demotion_confidence:{}", top_label),
+        ));
+    }
+
+    // Signal 3: Cardinality mismatch (text attractors only)
+    // Low cardinality columns (1-20 unique values) predicted as identity
+    // types → demote to categorical. A column with 1–2 unique values is the
+    // strongest possible signal (e.g., "airport" repeated 7k times is NOT a
+    // person's first_name).
+    if is_text {
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        let mut unique: Vec<&str> = non_empty.clone();
+        unique.sort();
+        unique.dedup();
+        if (1..=20).contains(&unique.len()) {
+            return Some((
+                "representation.discrete.categorical".to_string(),
+                format!("attractor_demotion_cardinality:{}", top_label),
+            ));
+        }
+    }
+
+    None
+}
+
+/// Select the best fallback type when demoting an attractor prediction.
+///
+/// Priority:
+/// 1. Use an existing representation.* type from the vote distribution
+/// 2. Default: numeric → integer/decimal, text → categorical, code → alphanumeric_id
+fn select_fallback(
+    votes: &[(String, usize)],
+    is_numeric: bool,
+    is_text: bool,
+    is_code: bool,
+    values: &[String],
+) -> String {
+    // Check if a representation.* type exists in votes (skip the attractor at [0])
+    for (label, _) in votes.iter().skip(1) {
+        if label.starts_with("representation.") {
+            return label.clone();
+        }
+    }
+
+    // Default fallback by attractor category
+    if is_numeric {
+        let has_decimal = values.iter().any(|v| v.contains('.'));
+        if has_decimal {
+            "representation.numeric.decimal_number".to_string()
+        } else {
+            "representation.numeric.integer_number".to_string()
+        }
+    } else if is_text {
+        "representation.discrete.categorical".to_string()
+    } else if is_code {
+        "representation.alphanumeric.alphanumeric_id".to_string()
+    } else {
+        "representation.text.word".to_string()
     }
 }
 
@@ -3164,6 +3370,274 @@ mod tests {
         assert_eq!(
             result2.label, "representation.numeric.decimal_number",
             "Generic 'col1' should not trigger semantic override"
+        );
+    }
+
+    // ── Attractor demotion tests (Rule 14) ──────────────────────────────
+
+    #[test]
+    fn test_attractor_validation_demotion() {
+        // Values that fail CVV validation (^[0-9]{3,4}$): negative numbers and
+        // 5+ digit integers — should demote to integer_number
+        let values: Vec<String> = vec![
+            "-200", "15000", "3500", "-50", "12000", "800", "25000", "-100", "45000", "600",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("identity.payment.cvv".to_string(), 9),
+            ("representation.numeric.integer_number".to_string(), 1),
+        ];
+
+        let yaml = r#"
+identity.payment.cvv:
+  title: "CVV"
+  validation:
+    type: string
+    pattern: "^[0-9]{3,4}$"
+    minLength: 3
+    maxLength: 4
+  tier: [VARCHAR, identity, payment]
+  release_priority: 5
+  samples: ["123"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_some(),
+            "Should demote CVV when values fail validation"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert!(rule.starts_with("attractor_demotion_validation:"));
+    }
+
+    #[test]
+    fn test_attractor_confidence_demotion() {
+        // Low confidence postal_code prediction (0.6) — should demote
+        let values: Vec<String> = vec![
+            "1500", "2300", "45000", "800", "99", "12", "5600", "340", "78", "4100",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 6),
+            ("representation.numeric.integer_number".to_string(), 4),
+        ];
+
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, None);
+        assert!(
+            result.is_some(),
+            "Should demote postal_code at 0.6 confidence"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert!(rule.starts_with("attractor_demotion_confidence:"));
+    }
+
+    #[test]
+    fn test_attractor_cardinality_demotion() {
+        // 4 unique short words classified as first_name at high confidence — categorical
+        let values: Vec<String> = vec![
+            "Soccer", "Baseball", "Tennis", "Hockey", "Soccer", "Baseball", "Tennis", "Hockey",
+            "Soccer", "Baseball",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("identity.person.first_name".to_string(), 9),
+            ("representation.text.word".to_string(), 1),
+        ];
+
+        // High confidence (0.9) — Signal 2 won't fire, but Signal 3 (cardinality) should
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, None);
+        assert!(
+            result.is_some(),
+            "Should demote first_name with 4 unique values"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert!(rule.starts_with("attractor_demotion_cardinality:"));
+    }
+
+    #[test]
+    fn test_attractor_cardinality_single_value() {
+        // Single unique value (e.g., airports.type = "airport" repeated) — categorical
+        let values: Vec<String> = vec![
+            "airport", "airport", "airport", "airport", "airport", "airport", "airport", "airport",
+            "airport", "airport",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![("identity.person.first_name".to_string(), 10)];
+
+        // Cardinality 1 — strongest signal that this is NOT a person's name
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, None);
+        assert!(
+            result.is_some(),
+            "Should demote first_name with 1 unique value"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert!(rule.starts_with("attractor_demotion_cardinality:"));
+    }
+
+    #[test]
+    fn test_attractor_validation_confirmed_skips_signal2() {
+        // ICAO code at low confidence (0.6) but values pass validation → no demotion
+        // This tests that validation confirmation gates Signal 2.
+        let values: Vec<String> = vec!["EGLL", "KJFK", "LFPG", "EDDF", "RJTT", "VHHH"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let votes = vec![
+            ("geography.transportation.icao_code".to_string(), 6),
+            ("representation.alphanumeric.alphanumeric_id".to_string(), 4),
+        ];
+
+        let yaml = r#"
+geography.transportation.icao_code:
+  title: "ICAO Code"
+  validation:
+    type: string
+    pattern: "^[A-Z]{4}$"
+    minLength: 4
+    maxLength: 4
+  tier: [VARCHAR, geography, transportation]
+  release_priority: 5
+  samples: ["EGLL"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        // Confidence 0.6 < 0.85 → Signal 2 would fire, BUT validation
+        // pattern passes → validation_confirmed = true → Signal 2 skipped
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote ICAO codes when validation confirms them"
+        );
+    }
+
+    #[test]
+    fn test_attractor_no_demotion_true_positive() {
+        // Actual CVV values at high confidence (>0.85) — should NOT demote
+        let values: Vec<String> = vec![
+            "123", "456", "789", "012", "345", "678", "901", "234", "567", "890",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![("identity.payment.cvv".to_string(), 10)];
+
+        let yaml = r#"
+identity.payment.cvv:
+  title: "CVV"
+  validation:
+    type: string
+    pattern: "^[0-9]{3,4}$"
+    minLength: 3
+    maxLength: 4
+  tier: [VARCHAR, identity, payment]
+  release_priority: 5
+  samples: ["123"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        // All pass validation AND confidence is 1.0 → no demotion
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote actual CVVs at high confidence"
+        );
+    }
+
+    #[test]
+    fn test_attractor_no_demotion_high_confidence() {
+        // Attractor at >0.85 with valid values — should NOT demote
+        let values: Vec<String> = vec![
+            "10001", "90210", "30301", "60601", "02101", "75001", "33101", "94102", "20001",
+            "98101",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 9),
+            ("representation.numeric.integer_number".to_string(), 1),
+        ];
+
+        let yaml = r#"
+geography.address.postal_code:
+  title: "Postal Code"
+  validation:
+    type: string
+    pattern: "^[0-9]{3,10}$"
+    minLength: 3
+    maxLength: 10
+  tier: [VARCHAR, geography, address]
+  release_priority: 5
+  samples: ["10001"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        // All pass validation AND confidence is 0.9 → no demotion
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote real postal codes at 0.9 confidence"
+        );
+    }
+
+    #[test]
+    fn test_select_fallback_numeric() {
+        // All integer values, no representation.* in votes
+        let values: Vec<String> = vec!["100", "200", "300"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 8),
+            ("geography.address.street_number".to_string(), 2),
+        ];
+
+        let result = select_fallback(&votes, true, false, false, &values);
+        assert_eq!(result, "representation.numeric.integer_number");
+    }
+
+    #[test]
+    fn test_select_fallback_text() {
+        let values: Vec<String> = vec!["Soccer", "Tennis"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let votes = vec![
+            ("identity.person.first_name".to_string(), 8),
+            ("identity.person.username".to_string(), 2),
+        ];
+
+        let result = select_fallback(&votes, false, true, false, &values);
+        assert_eq!(result, "representation.discrete.categorical");
+    }
+
+    #[test]
+    fn test_select_fallback_from_votes() {
+        // representation.* type exists in the vote distribution → use it
+        let values: Vec<String> = vec!["100", "200"].into_iter().map(String::from).collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 6),
+            ("representation.numeric.decimal_number".to_string(), 3),
+            ("geography.address.street_number".to_string(), 1),
+        ];
+
+        let result = select_fallback(&votes, true, false, false, &values);
+        assert_eq!(
+            result, "representation.numeric.decimal_number",
+            "Should use representation.* type from votes when available"
         );
     }
 }
