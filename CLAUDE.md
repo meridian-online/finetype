@@ -21,6 +21,7 @@ Every decision in this repo should reflect these principles:
 
 ### Recent milestones
 
+- **NNFT-110** — Model2Vec semantic column name classifier: replaces hardcoded header hints with learned embeddings (potion-base-4M). Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions)
 - **v0.1.8** — 30x tiered inference throughput, accuracy 72.6% -> 92.9% on profile eval, Windows release target, header-hint override system
 - **v0.1.7** — Tiered model graph as default inference engine, `ValueClassifier` trait for polymorphic dispatch
 - **v0.1.6** — CharCNN v7, evaluation infrastructure, GitTables/SOTAB benchmarks
@@ -29,7 +30,6 @@ Every decision in this repo should reflect these principles:
 ### What's in progress
 
 - **NNFT-092** — DuckDB community extension update (AC#4 pending: community CI rebuild)
-- **NNFT-110** — Token-based header hint decomposition for column name classification
 
 ## Architecture
 
@@ -43,7 +43,7 @@ finetype/
     finetype-cli/      # CLI binary (infer, profile, generate, check, train)
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
   labels/              # Taxonomy YAML definitions (6 domain files)
-  models/              # Pre-trained model directories (char-cnn-v1..v7, tiered-v1..v2)
+  models/              # Pre-trained model directories (char-cnn-v1..v7, tiered-v1..v2, model2vec)
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
   tests/               # CLI smoke tests
   docs/                # Taxonomy comparison, architecture docs
@@ -73,7 +73,7 @@ The inference system has two modes:
 - Runs value-level inference on each value
 - Aggregates predictions via majority vote
 - Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection)
-- Header hint system overrides generic predictions when column name matches known patterns
+- **Semantic header hints** (Model2Vec): embeds column name → cosine similarity against 169 pre-computed type embeddings → overrides generic predictions above 0.70 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable.
 - `is_generic` flag marks types that should yield to header hints
 
 Both classifiers implement the `ValueClassifier` trait for polymorphic dispatch.
@@ -153,8 +153,7 @@ All eval pipelines use `eval/config.env` for dataset paths with `envsubst` subst
 Current priorities, in order:
 
 1. **DuckDB community extension** — Get v0.2.0 through community CI (NNFT-092)
-2. **Header hint improvements** — Token-based decomposition for better column name matching (NNFT-110)
-3. **Accuracy lift** — Address top misclassification patterns, expand disambiguation rules (NNFT-090, NNFT-099, NNFT-100)
+2. **Accuracy lift** — Address top misclassification patterns, expand disambiguation rules (NNFT-090, NNFT-099, NNFT-100)
 4. **Documentation** — README update with tiered architecture (NNFT-096), CHANGELOG maintenance (NNFT-095)
 5. **Distribution** — Homebrew tap update (NNFT-086), crates.io keep current (NNFT-093 done)
 6. **Training data quality** — Name diversity (NNFT-066), phone formats (NNFT-055), address locales (NNFT-056)
@@ -173,6 +172,8 @@ Key architectural decisions that should not be revisited without good reason:
 4. **CharCNN architecture** — Character-level CNN for text classification. Candle (Rust) for both training and inference. No Python dependency at runtime. (NNFT-003)
 
 5. **Column-mode disambiguation** — Majority vote + rule-based disambiguation. Rules are hardcoded in `column.rs`, not learned. Header hints override generic predictions. (NNFT-065, NNFT-091, NNFT-102)
+
+5a. **Model2Vec semantic header hints** — Column name classification uses Model2Vec static embeddings (potion-base-4M, 7.4MB float16) with cosine similarity against pre-computed type embeddings. Threshold 0.70 tuned for zero false positives on generics. Falls back to hardcoded `header_hint()` when Model2Vec unavailable. Model artifacts in `models/model2vec/`, embedded at build time. No new Rust dependencies — uses existing candle-core + tokenizers. (NNFT-110)
 
 6. **DuckDB extension uses flat model** — Embedding 34 tiered models is feasible (11MB binary) but the flat model is simpler and faster for batch SQL workloads. The extension uses chunk-aware column classification instead. (NNFT-092)
 
@@ -218,6 +219,9 @@ make eval-sotab         # SOTAB CTA (requires corpus)
 | Tiered model graph | `models/tiered-v2/tier_graph.json` |
 | Column disambiguation | `crates/finetype-model/src/column.rs` |
 | Header hint overrides | `crates/finetype-model/src/column.rs` (search `header_hint`) |
+| Semantic hint classifier | `crates/finetype-model/src/semantic.rs` |
+| Model2Vec artifacts | `models/model2vec/` (tokenizer, embeddings, type_embeddings, label_index) |
+| Model2Vec prep script | `scripts/prepare_model2vec.py` |
 | DuckDB type mappings | `crates/finetype-duckdb/src/type_mapping.rs` |
 | Value normalization | `crates/finetype-duckdb/src/normalize.rs` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |

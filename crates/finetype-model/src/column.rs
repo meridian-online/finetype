@@ -11,6 +11,7 @@
 //! - Numeric types (port, increment, postal_code, integer_number)
 
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
+use crate::semantic::SemanticHintClassifier;
 use std::collections::HashMap;
 
 /// All known boolean type labels (current and legacy).
@@ -67,17 +68,47 @@ pub struct ColumnResult {
 pub struct ColumnClassifier {
     classifier: Box<dyn ValueClassifier>,
     config: ColumnConfig,
+    /// Optional semantic column name classifier (Model2Vec embeddings).
+    /// When present, used as the primary header hint source before falling
+    /// back to the hardcoded `header_hint()` dictionary.
+    semantic_hint: Option<SemanticHintClassifier>,
 }
 
 impl ColumnClassifier {
     /// Create a new column classifier wrapping any ValueClassifier.
     pub fn new(classifier: Box<dyn ValueClassifier>, config: ColumnConfig) -> Self {
-        Self { classifier, config }
+        Self {
+            classifier,
+            config,
+            semantic_hint: None,
+        }
     }
 
     /// Create with default configuration.
     pub fn with_defaults(classifier: Box<dyn ValueClassifier>) -> Self {
         Self::new(classifier, ColumnConfig::default())
+    }
+
+    /// Create a column classifier with a semantic hint classifier.
+    ///
+    /// The semantic classifier uses Model2Vec embeddings to map column names
+    /// to type labels, replacing the hardcoded header_hint() dictionary.
+    /// Falls back to header_hint() when the semantic classifier doesn't match.
+    pub fn with_semantic_hint(
+        classifier: Box<dyn ValueClassifier>,
+        config: ColumnConfig,
+        semantic: SemanticHintClassifier,
+    ) -> Self {
+        Self {
+            classifier,
+            config,
+            semantic_hint: Some(semantic),
+        }
+    }
+
+    /// Attach a semantic hint classifier to an existing ColumnClassifier.
+    pub fn set_semantic_hint(&mut self, semantic: SemanticHintClassifier) {
+        self.semantic_hint = Some(semantic);
     }
 
     /// Classify a column of values, returning a single type prediction.
@@ -183,8 +214,15 @@ impl ColumnClassifier {
     ) -> Result<ColumnResult, InferenceError> {
         let mut result = self.classify_column(values)?;
 
-        // Apply header hint
-        if let Some(hinted_type) = header_hint(header) {
+        // Apply header hint: try semantic classifier first, fall back to hardcoded
+        let hinted_type: Option<String> = self
+            .semantic_hint
+            .as_ref()
+            .and_then(|sh| sh.classify_header(header))
+            .map(|r| r.label)
+            .or_else(|| header_hint(header).map(String::from));
+
+        if let Some(hinted_type) = hinted_type.as_deref() {
             // If the model already predicts the hinted type, just boost confidence
             if result.label == hinted_type {
                 result.confidence = (result.confidence + 0.1).min(1.0);
@@ -3071,5 +3109,61 @@ mod tests {
         assert!(result.is_some());
         let (label, _) = result.unwrap();
         assert_eq!(label, "representation.boolean.binary");
+    }
+
+    /// Integration test: verify that semantic hint classifier influences column classification.
+    /// Skips if Model2Vec model files are not present.
+    #[test]
+    fn test_classify_column_with_semantic_hint() {
+        use crate::semantic::SemanticHintClassifier;
+
+        let model_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("models")
+            .join("model2vec");
+
+        if !model_dir.join("model.safetensors").exists() {
+            eprintln!("Skipping semantic column integration test: models/model2vec not found");
+            return;
+        }
+
+        let semantic = SemanticHintClassifier::load(&model_dir).unwrap();
+
+        // Create a mock classifier that delegates value-level inference
+        // We use a simple stub here — the semantic hint should override generic
+        // value predictions when the header name is semantically clear.
+        let base_classifier =
+            crate::inference::MockClassifier::new("representation.numeric.decimal_number");
+        let column_classifier = ColumnClassifier::with_semantic_hint(
+            Box::new(base_classifier),
+            ColumnConfig::default(),
+            semantic,
+        );
+
+        // The base classifier always returns decimal_number, but the semantic hint
+        // for "weight_kg" should override to identity.person.weight
+        let values: Vec<String> = vec!["72.5", "85.0", "63.2", "90.1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = column_classifier
+            .classify_column_with_header(&values, "weight_kg")
+            .unwrap();
+        assert_eq!(
+            result.label, "identity.person.weight",
+            "Semantic hint for 'weight_kg' should override generic decimal_number"
+        );
+
+        // Generic column names should NOT override (semantic hint returns None)
+        let result2 = column_classifier
+            .classify_column_with_header(&values, "col1")
+            .unwrap();
+        assert_eq!(
+            result2.label, "representation.numeric.decimal_number",
+            "Generic 'col1' should not trigger semantic override"
+        );
     }
 }

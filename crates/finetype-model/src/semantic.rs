@@ -1,0 +1,480 @@
+//! Semantic column name classifier using Model2Vec static embeddings.
+//!
+//! Replaces the hardcoded `header_hint()` match table with a learned embedding
+//! lookup: tokenize column name → index into embedding matrix → mean pool →
+//! L2 normalize → cosine similarity against pre-computed type embeddings.
+//!
+//! The model artifacts (tokenizer, embeddings, type embeddings, label index)
+//! are prepared by `scripts/prepare_model2vec.py` and stored in `models/model2vec/`.
+//! At build time they can be embedded into the binary via `build.rs`.
+
+use crate::inference::InferenceError;
+use candle_core::{DType, Device, Tensor};
+use std::path::Path;
+
+/// Result of a semantic header classification.
+#[derive(Debug, Clone)]
+pub struct SemanticHintResult {
+    /// The predicted type label (e.g., "identity.person.email").
+    pub label: String,
+    /// Cosine similarity between the column name embedding and the best-match type embedding.
+    pub similarity: f32,
+}
+
+/// Semantic column name classifier using Model2Vec static embeddings.
+///
+/// Inference is trivially simple: tokenize → index into embedding matrix →
+/// mean pool → L2 normalize → cosine similarity against pre-computed type
+/// embeddings. Sub-millisecond latency per column name.
+pub struct SemanticHintClassifier {
+    tokenizer: tokenizers::Tokenizer,
+    /// Token embedding matrix: [vocab_size, embed_dim]
+    embeddings: Tensor,
+    /// Pre-computed, L2-normalised type embeddings: [n_types, embed_dim]
+    type_embeddings: Tensor,
+    /// Ordered label index: type_embeddings[i] corresponds to label_index[i]
+    label_index: Vec<String>,
+    /// Minimum cosine similarity to accept a match (tuned to avoid false positives)
+    threshold: f32,
+    device: Device,
+}
+
+/// Default similarity threshold.
+///
+/// Calibrated against a test set of ~30 column names using potion-base-4M:
+///
+/// True positives (semantically clear column names):
+///   email=0.898, zip_code=0.899, phone_number=0.901, gender=0.907,
+///   country=0.904, first_name=0.900, age=0.875, latitude=0.853,
+///   city=0.826, uuid=0.820, url=0.809, birth_date=0.799,
+///   user_email=0.771
+///
+/// True negatives (generic or ambiguous names):
+///   data=0.687, type=0.656, status=0.628, description=0.582,
+///   x=0.569, category=0.541, value=0.496, column=0.426,
+///   col1=0.287, foo=0.228, xyz=0.377
+///
+/// Threshold 0.70 achieves zero false positives on the generic set while
+/// capturing all semantically unambiguous column names (lowest TP: user_email=0.771).
+/// Generic names that happen to partially match a type (data→form_data=0.687)
+/// are correctly rejected.
+const DEFAULT_THRESHOLD: f32 = 0.70;
+
+impl SemanticHintClassifier {
+    /// Load from a directory containing the 4 model artifacts.
+    pub fn load<P: AsRef<Path>>(model_dir: P) -> Result<Self, InferenceError> {
+        let dir = model_dir.as_ref();
+
+        let tokenizer_bytes = std::fs::read(dir.join("tokenizer.json"))?;
+        let model_bytes = std::fs::read(dir.join("model.safetensors"))?;
+        let type_emb_bytes = std::fs::read(dir.join("type_embeddings.safetensors"))?;
+        let label_bytes = std::fs::read(dir.join("label_index.json"))?;
+
+        Self::from_bytes(
+            &tokenizer_bytes,
+            &model_bytes,
+            &type_emb_bytes,
+            &label_bytes,
+        )
+    }
+
+    /// Load from in-memory byte slices (for compile-time embedding).
+    pub fn from_bytes(
+        tokenizer_bytes: &[u8],
+        model_bytes: &[u8],
+        type_emb_bytes: &[u8],
+        label_bytes: &[u8],
+    ) -> Result<Self, InferenceError> {
+        let device = Device::Cpu;
+
+        // Load tokenizer
+        let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes).map_err(|e| {
+            InferenceError::InvalidPath(format!("Failed to load Model2Vec tokenizer: {}", e))
+        })?;
+
+        // Load token embeddings — stored as float16, convert to float32 for computation
+        let model_tensors = candle_core::safetensors::load_buffer(model_bytes, &device)?;
+        let embeddings = model_tensors
+            .get("embeddings")
+            .ok_or_else(|| {
+                InferenceError::InvalidPath(
+                    "Missing 'embeddings' tensor in model.safetensors".into(),
+                )
+            })?
+            .to_dtype(DType::F32)?;
+
+        // Load type embeddings (already float32, already L2-normalised)
+        let type_tensors = candle_core::safetensors::load_buffer(type_emb_bytes, &device)?;
+        let type_embeddings = type_tensors
+            .get("type_embeddings")
+            .ok_or_else(|| {
+                InferenceError::InvalidPath(
+                    "Missing 'type_embeddings' tensor in type_embeddings.safetensors".into(),
+                )
+            })?
+            .to_dtype(DType::F32)?;
+
+        // Load label index
+        let label_index: Vec<String> = serde_json::from_slice(label_bytes).map_err(|e| {
+            InferenceError::InvalidPath(format!("Failed to parse label_index.json: {}", e))
+        })?;
+
+        Ok(Self {
+            tokenizer,
+            embeddings,
+            type_embeddings,
+            label_index,
+            threshold: DEFAULT_THRESHOLD,
+            device,
+        })
+    }
+
+    /// Set a custom similarity threshold.
+    pub fn with_threshold(mut self, threshold: f32) -> Self {
+        self.threshold = threshold;
+        self
+    }
+
+    /// Get the current threshold.
+    pub fn threshold(&self) -> f32 {
+        self.threshold
+    }
+
+    /// Classify a column header name, returning the best-matching type label
+    /// if above the similarity threshold.
+    ///
+    /// Returns `None` for generic names like "data", "col1", "V1", etc.
+    pub fn classify_header(&self, header: &str) -> Option<SemanticHintResult> {
+        // 1. Normalize: lowercase, replace separators with spaces, trim
+        let normalized = header
+            .to_lowercase()
+            .replace(['_', '-', '.'], " ")
+            .trim()
+            .to_string();
+
+        if normalized.is_empty() {
+            return None;
+        }
+
+        // 2. Tokenize (add_special_tokens=false — no CLS/SEP added)
+        let encoding = self.tokenizer.encode(normalized, false).ok()?;
+        let ids = encoding.get_ids();
+
+        if ids.is_empty() {
+            return None;
+        }
+
+        // Filter out PAD tokens (id=0) only.
+        // We encode with add_special_tokens=false, so CLS/SEP are not present.
+        let valid_ids: Vec<u32> = ids.iter().copied().filter(|&id| id != 0).collect();
+
+        if valid_ids.is_empty() {
+            return None;
+        }
+
+        // 3. Look up token embeddings: index_select
+        let id_tensor = Tensor::new(valid_ids.as_slice(), &self.device).ok()?;
+        let token_embeds = self.embeddings.index_select(&id_tensor, 0).ok()?; // [n_tokens, dim]
+
+        // 4. Mean pool over tokens → [dim]
+        let mean_embed = token_embeds.mean(0).ok()?; // [dim]
+
+        // 5. L2 normalize
+        let norm = mean_embed
+            .sqr()
+            .ok()?
+            .sum_all()
+            .ok()?
+            .sqrt()
+            .ok()?
+            .to_scalar::<f32>()
+            .ok()?;
+        if norm < 1e-8 {
+            return None;
+        }
+        let query = (mean_embed / norm as f64).ok()?; // [dim]
+
+        // 6. Cosine similarity: type_embeddings @ query → [n_types]
+        let query_2d = query.unsqueeze(1).ok()?; // [dim, 1]
+        let similarities = self.type_embeddings.matmul(&query_2d).ok()?; // [n_types, 1]
+        let similarities = similarities.squeeze(1).ok()?; // [n_types]
+
+        // 7. Argmax
+        let sim_vec: Vec<f32> = similarities.to_vec1().ok()?;
+        let (best_idx, best_sim) = sim_vec
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))?;
+
+        if *best_sim >= self.threshold {
+            Some(SemanticHintResult {
+                label: self.label_index[best_idx].clone(),
+                similarity: *best_sim,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a tiny synthetic classifier for unit testing.
+    ///
+    /// Vocab: [PAD]=0, [UNK]=1, email=2, phone=3, number=4, data=5
+    /// embed_dim = 4, 2 type labels.
+    ///
+    /// Token embeddings:
+    ///   0: [0, 0, 0, 0]  ([PAD])
+    ///   1: [0, 0, 0, 0]  ([UNK])
+    ///   2: [0, 1, 0, 0]  ("email")
+    ///   3: [0, 0, 1, 0]  ("phone")
+    ///   4: [0, 0, 0.5, 0.5]  ("number")
+    ///   5: [0.1, 0.1, 0.1, 0.1]  ("data" — generic, low sim to all types)
+    ///
+    /// Type embeddings (pre-normalised):
+    ///   "identity.person.email":        [0, 1, 0, 0]
+    ///   "identity.person.phone_number": [0, 0, 1, 0]
+    fn make_test_classifier() -> Result<SemanticHintClassifier, InferenceError> {
+        let device = Device::Cpu;
+
+        // Build a minimal WordPiece tokenizer via JSON (avoids programmatic builder API issues)
+        let tokenizer_json = r###"{
+            "version": "1.0",
+            "model": {
+                "type": "WordPiece",
+                "unk_token": "[UNK]",
+                "continuing_subword_prefix": "##",
+                "max_input_chars_per_word": 100,
+                "vocab": {
+                    "[PAD]": 0,
+                    "[UNK]": 1,
+                    "email": 2,
+                    "phone": 3,
+                    "number": 4,
+                    "data": 5
+                }
+            },
+            "normalizer": {
+                "type": "BertNormalizer",
+                "clean_text": true,
+                "handle_chinese_chars": true,
+                "strip_accents": null,
+                "lowercase": true
+            },
+            "pre_tokenizer": { "type": "BertPreTokenizer" }
+        }"###;
+        let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_json.as_bytes())
+            .map_err(|e| InferenceError::InvalidPath(format!("test tokenizer: {e}")))?;
+
+        // Token embeddings [6, 4]
+        let emb_data: Vec<f32> = vec![
+            0.0, 0.0, 0.0, 0.0, // [PAD] = 0
+            0.0, 0.0, 0.0, 0.0, // [UNK] = 1
+            0.0, 1.0, 0.0, 0.0, // "email" = 2
+            0.0, 0.0, 1.0, 0.0, // "phone" = 3
+            0.0, 0.0, 0.5, 0.5, // "number" = 4
+            0.1, 0.1, 0.1, 0.1, // "data" = 5 — generic
+        ];
+        let embeddings = Tensor::from_vec(emb_data, (6, 4), &device)?;
+
+        // Type embeddings [2, 4] — already L2-normalised
+        let type_data: Vec<f32> = vec![
+            0.0, 1.0, 0.0, 0.0, // identity.person.email
+            0.0, 0.0, 1.0, 0.0, // identity.person.phone_number
+        ];
+        let type_embeddings = Tensor::from_vec(type_data, (2, 4), &device)?;
+
+        let label_index = vec![
+            "identity.person.email".to_string(),
+            "identity.person.phone_number".to_string(),
+        ];
+
+        Ok(SemanticHintClassifier {
+            tokenizer,
+            embeddings,
+            type_embeddings,
+            label_index,
+            threshold: DEFAULT_THRESHOLD,
+            device,
+        })
+    }
+
+    #[test]
+    fn test_cosine_similarity_math() {
+        // Direct cosine similarity: [0,1,0,0] · [0,1,0,0] = 1.0
+        let device = Device::Cpu;
+        let a = Tensor::new(&[0.0f32, 1.0, 0.0, 0.0], &device).unwrap();
+        let b = Tensor::new(&[0.0f32, 1.0, 0.0, 0.0], &device).unwrap();
+        let sim = (&a * &b)
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        assert!((sim - 1.0).abs() < 1e-5);
+
+        // Orthogonal vectors: similarity = 0
+        let c = Tensor::new(&[0.0f32, 0.0, 1.0, 0.0], &device).unwrap();
+        let sim2 = (&a * &c)
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        assert!(sim2.abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_classify_header_known_types() {
+        let classifier = make_test_classifier().unwrap();
+
+        // "email" should match identity.person.email with high similarity
+        let result = classifier.classify_header("email");
+        assert!(result.is_some(), "Expected match for 'email'");
+        let r = result.unwrap();
+        assert_eq!(r.label, "identity.person.email");
+        assert!(
+            r.similarity > 0.9,
+            "Expected high similarity, got {}",
+            r.similarity
+        );
+
+        // "phone" should match identity.person.phone_number
+        let result = classifier.classify_header("phone");
+        assert!(result.is_some(), "Expected match for 'phone'");
+        let r = result.unwrap();
+        assert_eq!(r.label, "identity.person.phone_number");
+        assert!(
+            r.similarity > 0.9,
+            "Expected high similarity, got {}",
+            r.similarity
+        );
+    }
+
+    #[test]
+    fn test_classify_header_no_match() {
+        let classifier = make_test_classifier().unwrap();
+
+        // "data" should have low similarity to both types and return None
+        let result = classifier.classify_header("data");
+        // The "data" token embedding [0.1, 0.1, 0.1, 0.1] normalised is [0.5, 0.5, 0.5, 0.5]
+        // Dot with [0, 1, 0, 0] = 0.5. This is below the default threshold of 0.70.
+        assert!(
+            result.is_none(),
+            "Expected no match for 'data', got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_classify_header_empty() {
+        let classifier = make_test_classifier().unwrap();
+        assert!(classifier.classify_header("").is_none());
+    }
+
+    #[test]
+    fn test_classify_header_normalisation() {
+        let classifier = make_test_classifier().unwrap();
+
+        // Underscores, dashes, dots should be replaced with spaces
+        // "user_email" → "user email" → tokens [UNK=1, email=2]
+        // UNK has zero embedding, so it's just email's embedding → should match email
+        let result = classifier.classify_header("user_email");
+        assert!(result.is_some(), "Expected match for 'user_email'");
+        let r = result.unwrap();
+        assert_eq!(r.label, "identity.person.email");
+    }
+
+    #[test]
+    fn test_threshold_boundary() {
+        // With threshold = 0.0, even weak matches should pass
+        let low_threshold = SemanticHintClassifier {
+            threshold: 0.0,
+            ..make_test_classifier().unwrap()
+        };
+        let result = low_threshold.classify_header("data");
+        assert!(result.is_some(), "With threshold=0, 'data' should match");
+
+        // With threshold = 0.99, only exact matches pass
+        let high_threshold = SemanticHintClassifier {
+            threshold: 0.99,
+            ..make_test_classifier().unwrap()
+        };
+        let result = high_threshold.classify_header("email");
+        assert!(
+            result.is_some(),
+            "With threshold=0.99, exact 'email' should still match"
+        );
+    }
+
+    /// Integration test: load real model artifacts from disk (skip if not present).
+    #[test]
+    fn test_from_files_if_available() {
+        let model_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("models")
+            .join("model2vec");
+
+        if !model_dir.join("model.safetensors").exists() {
+            eprintln!("Skipping integration test: models/model2vec not found");
+            return;
+        }
+
+        let classifier = SemanticHintClassifier::load(&model_dir).unwrap();
+
+        // Test known column names from header_hint()
+        let test_cases = vec![
+            ("email", "identity.person.email"),
+            ("phone_number", "identity.person.phone_number"),
+            ("zip_code", "geography.address.postal_code"),
+            ("latitude", "geography.coordinate.latitude"),
+            ("longitude", "geography.coordinate.longitude"),
+            ("first_name", "identity.person.first_name"),
+            ("country", "geography.location.country"),
+            ("gender", "identity.person.gender"),
+            ("age", "identity.person.age"),
+            ("url", "technology.internet.url"),
+        ];
+
+        for (header, expected_label) in &test_cases {
+            let result = classifier.classify_header(header);
+            assert!(
+                result.is_some(),
+                "Expected match for '{}' -> '{}', got None",
+                header,
+                expected_label
+            );
+            let r = result.unwrap();
+            assert_eq!(
+                r.label, *expected_label,
+                "For '{}': expected '{}', got '{}' (sim={:.3})",
+                header, expected_label, r.label, r.similarity
+            );
+        }
+
+        // Test generic names return None (all below 0.70 threshold)
+        let generic_names = vec![
+            "foo", "col1", "column_a", "V1", "field_3", "xyz", "data", "value", "col", "column",
+            "result", "output", "input", "var1",
+        ];
+        for name in &generic_names {
+            let result = classifier.classify_header(name);
+            assert!(
+                result.is_none(),
+                "Expected no match for generic name '{}', got {:?}",
+                name,
+                result
+            );
+        }
+    }
+}

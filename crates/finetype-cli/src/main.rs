@@ -798,6 +798,39 @@ fn load_tiered_classifier(model: &PathBuf) -> Result<finetype_model::TieredClass
     }
 }
 
+/// Load the semantic hint classifier for column name classification.
+///
+/// Resolution order:
+///  1. models/model2vec directory on disk (development)
+///  2. Embedded Model2Vec bytes (release binaries)
+///  3. None — falls back to hardcoded header_hint()
+fn load_semantic_hint() -> Option<finetype_model::SemanticHintClassifier> {
+    // Try disk-based model first (development workflow)
+    let model_dir = std::path::PathBuf::from("models/model2vec");
+    if model_dir.join("model.safetensors").exists() {
+        return finetype_model::SemanticHintClassifier::load(&model_dir)
+            .map_err(|e| eprintln!("Warning: Failed to load Model2Vec from disk: {e}"))
+            .ok();
+    }
+
+    // Try embedded model bytes (release binary)
+    #[cfg(feature = "embed-models")]
+    {
+        if embedded::HAS_MODEL2VEC {
+            return finetype_model::SemanticHintClassifier::from_bytes(
+                embedded::M2V_TOKENIZER,
+                embedded::M2V_MODEL,
+                embedded::M2V_TYPE_EMBEDDINGS,
+                embedded::M2V_LABEL_INDEX,
+            )
+            .map_err(|e| eprintln!("Warning: Failed to load embedded Model2Vec: {e}"))
+            .ok();
+        }
+    }
+
+    None
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERATE — Create synthetic training data
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1543,7 +1576,12 @@ fn cmd_profile(
         sample_size,
         ..Default::default()
     };
-    let column_classifier = ColumnClassifier::new(classifier, config);
+    let column_classifier = if let Some(semantic) = load_semantic_hint() {
+        eprintln!("Loaded semantic hint classifier (Model2Vec)");
+        ColumnClassifier::with_semantic_hint(classifier, config, semantic)
+    } else {
+        ColumnClassifier::new(classifier, config)
+    };
 
     eprintln!("Reading {:?}", file);
 

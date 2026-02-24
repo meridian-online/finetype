@@ -191,27 +191,3 @@ time of day,dbpedia,,datetime,partial,false
 published on,dbpedia,,datetime,partial,false
 dec,dbpedia,,representation,semantic_only,false
 filename,dbpedia,,representation,semantic_only,true
-ip_v4,eval,technology.internet.ip_v4,technology,direct,false
-mac address,eval,technology.internet.mac_address,technology,direct,false
-uuid,eval,technology.cryptographic.uuid,technology,direct,false
-hash,eval,technology.cryptographic.hash,technology,direct,false
-user agent,eval,technology.internet.user_agent,technology,close,false
-port,eval,technology.internet.port,technology,direct,false
-credit card number,eval,identity.payment.credit_card_number,identity,direct,false
-swift code,eval,identity.payment.swift_bic,identity,direct,false
-ean,eval,technology.code.ean,technology,direct,false
-cvv,eval,identity.payment.cvv,identity,direct,false
-first name,eval,identity.person.first_name,identity,direct,false
-last name,eval,identity.person.last_name,identity,direct,false
-occupation,eval,identity.person.occupation,identity,close,false
-http status code,eval,technology.internet.http_status_code,technology,direct,false
-timestamp,eval,datetime.timestamp.iso_8601,datetime,partial,false
-sql timestamp,eval,datetime.timestamp.sql_standard,datetime,direct,false
-time 24h,eval,datetime.time.hms_24h,datetime,direct,false
-month name,eval,datetime.component.month_name,datetime,direct,false
-street number,eval,geography.address.street_number,geography,close,false
-iata,eval,geography.transportation.iata_code,geography,direct,false
-icao,eval,geography.transportation.icao_code,geography,direct,false
-npi,eval,identity.medical.npi,identity,direct,false
-measurement unit,eval,representation.scientific.measurement_unit,representation,partial,false
-decimal number,eval,representation.numeric.decimal_number,representation,direct,false

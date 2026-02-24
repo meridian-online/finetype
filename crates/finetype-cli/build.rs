@@ -123,6 +123,47 @@ fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::pa
     }
     code.push_str("];\n");
 
+    // ── Model2Vec semantic hint classifier ──────────────────────────────────
+    // Embeds the Model2Vec artifacts (tokenizer, embeddings, type embeddings,
+    // label index) for semantic column name classification. Optional — the
+    // classifier falls back to the hardcoded header_hint() when unavailable.
+    let model2vec_dir = models_base.join("model2vec");
+    println!("cargo:rerun-if-changed={}", model2vec_dir.display());
+
+    if model2vec_dir.join("model.safetensors").exists() {
+        let tok_path = portable_path(&model2vec_dir.join("tokenizer.json"));
+        let emb_path = portable_path(&model2vec_dir.join("model.safetensors"));
+        let type_path = portable_path(&model2vec_dir.join("type_embeddings.safetensors"));
+        let label_path = portable_path(&model2vec_dir.join("label_index.json"));
+
+        code.push_str("\n// Model2Vec semantic hint classifier\n");
+        code.push_str("pub const HAS_MODEL2VEC: bool = true;\n");
+        code.push_str(&format!(
+            "pub const M2V_TOKENIZER: &[u8] = include_bytes!(\"{tok_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const M2V_MODEL: &[u8] = include_bytes!(\"{emb_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const M2V_TYPE_EMBEDDINGS: &[u8] = include_bytes!(\"{type_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const M2V_LABEL_INDEX: &[u8] = include_bytes!(\"{label_path}\");\n"
+        ));
+
+        println!(
+            "cargo:warning=Embedding Model2Vec from {}",
+            model2vec_dir.display()
+        );
+    } else {
+        code.push_str("\n// Model2Vec not available — semantic hint classifier disabled\n");
+        code.push_str("pub const HAS_MODEL2VEC: bool = false;\n");
+        code.push_str("pub const M2V_TOKENIZER: &[u8] = &[];\n");
+        code.push_str("pub const M2V_MODEL: &[u8] = &[];\n");
+        code.push_str("pub const M2V_TYPE_EMBEDDINGS: &[u8] = &[];\n");
+        code.push_str("pub const M2V_LABEL_INDEX: &[u8] = &[];\n");
+    }
+
     fs::write(&dest, code).unwrap_or_else(|e| panic!("Failed to write {}: {}", dest.display(), e));
 }
 

@@ -760,6 +760,50 @@ pub fn extract_validation_patterns(taxonomy: &Taxonomy) -> HashMap<String, Strin
         .collect()
 }
 
+/// A mock classifier for testing column-level inference.
+///
+/// Always returns the same label with 0.8 confidence, regardless of input.
+/// Used in integration tests to verify that header hints and semantic hints
+/// properly override the base classifier's output.
+#[cfg(test)]
+pub struct MockClassifier {
+    label: String,
+}
+
+#[cfg(test)]
+impl MockClassifier {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl ValueClassifier for MockClassifier {
+    fn classify(&self, _text: &str) -> Result<ClassificationResult, InferenceError> {
+        Ok(ClassificationResult {
+            label: self.label.clone(),
+            confidence: 0.8,
+            all_scores: vec![(self.label.clone(), 0.8)],
+        })
+    }
+
+    fn classify_batch(
+        &self,
+        texts: &[String],
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        Ok(texts
+            .iter()
+            .map(|_| ClassificationResult {
+                label: self.label.clone(),
+                confidence: 0.8,
+                all_scores: vec![(self.label.clone(), 0.8)],
+            })
+            .collect())
+    }
+}
+
 #[cfg(test)]
 mod post_process_tests {
     use super::*;

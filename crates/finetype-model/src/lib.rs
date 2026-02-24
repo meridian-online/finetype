@@ -9,6 +9,7 @@ pub mod char_training;
 pub mod column;
 pub mod inference;
 pub mod model;
+pub mod semantic;
 pub mod tiered;
 pub mod tiered_training;
 pub mod training;
@@ -20,6 +21,7 @@ pub use inference::{
     extract_validation_patterns, CharClassifier, ClassificationResult, Classifier, ValueClassifier,
 };
 pub use model::{TextClassifier, TextClassifierConfig};
+pub use semantic::SemanticHintClassifier;
 pub use tiered::{TierTiming, TieredClassifier};
 pub use tiered_training::{TieredTrainer, TieredTrainingConfig, TieredTrainingReport};
 pub use training::{Trainer, TrainingConfig, TrainingError};
