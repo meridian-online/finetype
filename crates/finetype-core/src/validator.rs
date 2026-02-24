@@ -1094,4 +1094,69 @@ datetime.timestamp.iso_8601:
         assert!(obj.get("minimum").is_none());
         assert!(obj.get("maximum").is_none());
     }
+
+    #[test]
+    fn test_postal_code_maximum_rejects_salary_range() {
+        // NNFT-117: maximum: 99999 on postal_code rejects salary-range values
+        // while preserving valid postal codes (including 6-digit Indian codes
+        // which fail individually but don't trigger column-level demotion
+        // because <50% of a real postal code column would exceed 99999).
+        let postal_code_schema = Validation {
+            schema_type: Some("string".to_string()),
+            pattern: None,
+            min_length: Some(3),
+            max_length: Some(10),
+            minimum: None,
+            maximum: Some(99999.0),
+            enum_values: None,
+        };
+        let compiled = CompiledValidator::new(&postal_code_schema).unwrap();
+
+        // Valid postal codes
+        assert!(compiled.is_valid("10001")); // US ZIP
+        assert!(compiled.is_valid("75004")); // French
+        assert!(compiled.is_valid("W1C 1AX")); // UK — non-numeric, skips max check
+        assert!(compiled.is_valid("EC1A 1BB")); // UK
+        assert!(compiled.is_valid("100-0001")); // Japanese — non-numeric, skips max check
+
+        // Salary-range values rejected by maximum
+        assert!(!compiled.is_valid("102000")); // > 99999
+        assert!(!compiled.is_valid("245486")); // salary high end
+
+        // Edge cases
+        assert!(compiled.is_valid("99999")); // exactly at maximum — valid
+        assert!(!compiled.is_valid("100000")); // just over — invalid
+        assert!(!compiled.is_valid("3101295")); // Titanic ticket number
+
+        // Short codes still pass length check
+        assert!(compiled.is_valid("1000")); // 4-digit
+        assert!(!compiled.is_valid("12")); // too short (minLength: 3)
+    }
+
+    #[test]
+    fn test_street_number_maximum_rejects_large_values() {
+        // NNFT-117: maximum: 99999 on street_number rejects implausibly
+        // large numbers while preserving real street numbers.
+        let street_number_schema = Validation {
+            schema_type: Some("string".to_string()),
+            pattern: Some(r"^[0-9]+[A-Z]?(/[A-Z])?(-[0-9]+[A-Z]?)?( 1/2)?$".to_string()),
+            min_length: None,
+            max_length: None,
+            minimum: None,
+            maximum: Some(99999.0),
+            enum_values: None,
+        };
+        let compiled = CompiledValidator::new(&street_number_schema).unwrap();
+
+        // Valid street numbers
+        assert!(compiled.is_valid("123"));
+        assert!(compiled.is_valid("456B"));
+        assert!(compiled.is_valid("100-102"));
+        assert!(compiled.is_valid("12 1/2"));
+        assert!(compiled.is_valid("9999"));
+
+        // Large values rejected
+        assert!(!compiled.is_valid("100000"));
+        assert!(!compiled.is_valid("986233")); // payload_size_bytes range
+    }
 }

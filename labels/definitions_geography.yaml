@@ -236,6 +236,7 @@ geography.address.street_number:
   validation:
     type: string
     pattern: "^[0-9]+[A-Z]?(/[A-Z])?(-[0-9]+[A-Z]?)?( 1/2)?$"
+    maximum: 99999
   tier: [VARCHAR, address]
   release_priority: 3
   aliases: [house_number]
@@ -343,6 +344,7 @@ geography.address.postal_code:
     type: string
     minLength: 3
     maxLength: 10
+    maximum: 99999
   tier: [VARCHAR, address]
   release_priority: 4
   aliases: [zip_code, postcode]
