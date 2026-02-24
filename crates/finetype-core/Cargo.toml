@@ -26,6 +26,7 @@ glob = { workspace = true }
 luhn = { workspace = true }
 phonenumber = { workspace = true }
 regex = { workspace = true }
+jsonschema = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

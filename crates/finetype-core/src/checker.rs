@@ -9,7 +9,7 @@
 
 use crate::generator::Generator;
 use crate::taxonomy::{Definition, Taxonomy};
-use regex::Regex;
+use crate::validator::CompiledValidator;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -248,6 +248,11 @@ impl Checker {
             None => (false, 0),
         };
 
+        // Pre-compile validator once for this definition (NNFT-116)
+        let compiled = definition
+            .and_then(|d| d.validation.as_ref())
+            .and_then(|v| CompiledValidator::new_for_label(v, key).ok());
+
         let mut samples_generated = 0usize;
         let mut samples_passed = 0usize;
         let mut samples_failed = 0usize;
@@ -260,7 +265,7 @@ impl Checker {
                     generator_exists = true;
                     samples_generated += 1;
 
-                    match self.validate_sample(&sample, definition) {
+                    match self.validate_sample(&sample, definition, compiled.as_ref()) {
                         Ok(()) => {
                             samples_passed += 1;
                         }
@@ -311,10 +316,14 @@ impl Checker {
     }
 
     /// Validate a single sample against its definition's constraints.
+    ///
+    /// Uses `CompiledValidator` for JSON Schema-compliant validation, then
+    /// maps errors back to `FailureReason` variants for reporting.
     fn validate_sample(
         &self,
         sample: &str,
         definition: Option<&Definition>,
+        compiled: Option<&CompiledValidator>,
     ) -> Result<(), FailureReason> {
         let def = match definition {
             Some(d) => d,
@@ -326,53 +335,70 @@ impl Checker {
             None => return Ok(()), // No validation constraints
         };
 
-        // Check minLength
-        if let Some(min) = validation.min_length {
-            if sample.len() < min as usize {
-                return Err(FailureReason::TooShort {
-                    actual: sample.len(),
-                    min,
-                });
+        // Use pre-compiled validator if available
+        if let Some(compiled) = compiled {
+            let result = compiled.validate(sample);
+            if !result.is_valid {
+                return Err(map_first_error(&result, validation, sample));
             }
+            return Ok(());
         }
 
-        // Check maxLength
-        if let Some(max) = validation.max_length {
-            if sample.len() > max as usize {
-                return Err(FailureReason::TooLong {
-                    actual: sample.len(),
-                    max,
-                });
-            }
-        }
-
-        // Check regex pattern
-        if let Some(pattern) = &validation.pattern {
-            match Regex::new(pattern) {
-                Ok(re) => {
-                    if !re.is_match(sample) {
-                        return Err(FailureReason::PatternMismatch {
-                            pattern: pattern.clone(),
-                        });
-                    }
+        // Fallback: compile per-call (shouldn't happen with taxonomy pre-compiled)
+        match CompiledValidator::new(validation) {
+            Ok(compiled) => {
+                let result = compiled.validate(sample);
+                if !result.is_valid {
+                    return Err(map_first_error(&result, validation, sample));
                 }
-                Err(_) => {
-                    // Invalid regex in the YAML — that's a definition bug, not a sample bug.
-                    // We still report it as a pattern mismatch so it surfaces.
-                    return Err(FailureReason::PatternMismatch {
-                        pattern: format!("INVALID REGEX: {}", pattern),
-                    });
-                }
+                Ok(())
             }
+            Err(_) => Err(FailureReason::PatternMismatch {
+                pattern: format!(
+                    "INVALID SCHEMA: {}",
+                    validation.pattern.as_deref().unwrap_or("(no pattern)")
+                ),
+            }),
         }
-
-        Ok(())
     }
 }
 
 impl Default for Checker {
     fn default() -> Self {
         Self::new(50)
+    }
+}
+
+/// Map the first error from a `ValidationResult` to a `FailureReason` for reporting.
+fn map_first_error(
+    result: &crate::validator::ValidationResult,
+    validation: &crate::taxonomy::Validation,
+    sample: &str,
+) -> FailureReason {
+    if let Some(error) = result.errors.first() {
+        match error.check {
+            crate::validator::ValidationCheck::MinLength => FailureReason::TooShort {
+                actual: sample.len(),
+                min: validation.min_length.unwrap_or(0),
+            },
+            crate::validator::ValidationCheck::MaxLength => FailureReason::TooLong {
+                actual: sample.len(),
+                max: validation.max_length.unwrap_or(0),
+            },
+            crate::validator::ValidationCheck::Pattern => FailureReason::PatternMismatch {
+                pattern: validation.pattern.clone().unwrap_or_default(),
+            },
+            _ => {
+                // Minimum, Maximum, Enum — report with error message
+                FailureReason::PatternMismatch {
+                    pattern: error.message.clone(),
+                }
+            }
+        }
+    } else {
+        FailureReason::PatternMismatch {
+            pattern: "(unknown error)".to_string(),
+        }
     }
 }
 

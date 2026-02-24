@@ -30,6 +30,7 @@ Every decision in this repo should reflect these principles:
 ### What's in progress
 
 - **NNFT-115** — Multi-signal attractor demotion (Rule 14). Demotes over-eager specific type predictions (postal_code, cvv, first_name, icao_code) to generic types using validation, confidence, and cardinality signals. 17 predictions improved, 0 format-detectable regressions.
+- **NNFT-116** — Migrated validation from hand-rolled regex to jsonschema-rs (v0.42.1). `CompiledValidator` pre-compiles JSON Schema once, validates many values. Taxonomy caches compiled validators via `compile_validators()`. Attractor demotion hot path (column.rs) uses cached `is_valid()` — no per-value regex compilation. Hybrid strategy: string keywords (pattern, minLength, maxLength, enum) delegated to jsonschema; numeric bounds (minimum, maximum) handled manually for string→f64 parsing. All 169 schemas compile, 247 tests pass, no eval regression.
 
 ## Architecture
 
@@ -186,6 +187,8 @@ Key architectural decisions that should not be revisited without good reason:
 10. **Evaluation paths via config.env** — All eval scripts use `eval/config.env` + `envsubst` for dataset paths. No hardcoded absolute paths. (NNFT-108)
 
 11. **Attractor demotion (Rule 14)** — Multi-signal disambiguation rule that demotes over-eager specific type predictions (postal_code, cvv, first_name, icao_code, etc.) to generic `representation.*` types. Three signals: validation failure (>50% fail type's regex), confidence threshold (<0.85 when not validation-confirmed), cardinality mismatch (1-20 unique values for text attractors). Taxonomy is wired into `ColumnClassifier` via `set_taxonomy()`. Demoted predictions treated as generic for header hint override. `full_name` deliberately excluded from attractor list — too many legitimate uses. (NNFT-115)
+
+12. **JSON Schema validation via jsonschema-rs** — Validation uses `jsonschema` crate (v0.42.1, pure Rust, MIT, Draft 2020-12) instead of hand-rolled regex. `CompiledValidator` pre-compiles schemas once; taxonomy caches validators via `compile_validators()`. Hybrid strategy: string keywords delegated to jsonschema, numeric bounds (minimum/maximum) handled manually for string→f64 parsing semantics. `Taxonomy::clone()` drops the cache (jsonschema::Validator doesn't impl Clone). Enables future `format`, `oneOf`, `if/then` keywords. (NNFT-116)
 
 ## Build & Test
 

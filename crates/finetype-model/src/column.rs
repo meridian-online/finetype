@@ -1535,37 +1535,54 @@ fn disambiguate_attractor_demotion(
     // values mostly pass) — this is used to gate Signal 2.
     let mut validation_confirmed = false;
     if let Some(taxonomy) = taxonomy {
-        if let Some(def) = taxonomy.get(top_label) {
-            if let Some(validation) = &def.validation {
-                let has_pattern = validation.pattern.is_some();
-                let non_empty: Vec<&str> = values
-                    .iter()
-                    .map(|v| v.trim())
-                    .filter(|v| !v.is_empty())
-                    .collect();
-                if non_empty.len() >= 3 {
-                    let fail_count = non_empty
+        // Use pre-compiled validator from taxonomy cache (NNFT-116).
+        // Falls back to compile-per-call if cache not populated.
+        let has_pattern = taxonomy
+            .get(top_label)
+            .and_then(|d| d.validation.as_ref())
+            .and_then(|v| v.pattern.as_ref())
+            .is_some();
+
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+
+        if non_empty.len() >= 3 {
+            let fail_count = if let Some(compiled) = taxonomy.get_validator(top_label) {
+                // Fast path: pre-compiled validator (no per-value regex compilation)
+                non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+            } else if let Some(def) = taxonomy.get(top_label) {
+                if let Some(validation) = &def.validation {
+                    // Fallback: compile per-call (shouldn't happen with cache populated)
+                    non_empty
                         .iter()
                         .filter(|v| {
                             finetype_core::validate_value(v, validation)
                                 .map(|r| !r.is_valid)
                                 .unwrap_or(false)
                         })
-                        .count();
-                    let fail_rate = fail_count as f32 / non_empty.len() as f32;
-                    if fail_rate > 0.5 {
-                        let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
-                        return Some((
-                            fallback,
-                            format!("attractor_demotion_validation:{}", top_label),
-                        ));
-                    }
-                    // If validation has a regex pattern and values mostly pass
-                    // (≤30% fail), that's positive evidence FOR the type.
-                    if has_pattern && fail_rate <= 0.3 {
-                        validation_confirmed = true;
-                    }
+                        .count()
+                } else {
+                    0
                 }
+            } else {
+                0
+            };
+
+            let fail_rate = fail_count as f32 / non_empty.len() as f32;
+            if fail_rate > 0.5 {
+                let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
+                return Some((
+                    fallback,
+                    format!("attractor_demotion_validation:{}", top_label),
+                ));
+            }
+            // If validation has a regex pattern and values mostly pass
+            // (≤30% fail), that's positive evidence FOR the type.
+            if has_pattern && fail_rate <= 0.3 {
+                validation_confirmed = true;
             }
         }
     }

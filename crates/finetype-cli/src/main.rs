@@ -570,7 +570,8 @@ fn cmd_infer(
 
         // Load taxonomy for validation-based attractor demotion (Rule 14)
         let taxonomy_path = std::path::PathBuf::from("labels");
-        if let Ok(taxonomy) = load_taxonomy(&taxonomy_path) {
+        if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
+            taxonomy.compile_validators();
             column_classifier.set_taxonomy(taxonomy);
         }
 
@@ -1591,11 +1592,14 @@ fn cmd_profile(
     };
 
     // Load taxonomy for validation-based attractor demotion (Rule 14)
+    // Pre-compile validators for the hot path (NNFT-116)
     let taxonomy_path = std::path::PathBuf::from("labels");
-    if let Ok(taxonomy) = load_taxonomy(&taxonomy_path) {
+    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
+        taxonomy.compile_validators();
         eprintln!(
-            "Loaded taxonomy for attractor demotion ({} types)",
-            taxonomy.labels().len()
+            "Loaded taxonomy for attractor demotion ({} types, {} validators cached)",
+            taxonomy.labels().len(),
+            taxonomy.validator_count()
         );
         column_classifier.set_taxonomy(taxonomy);
     }

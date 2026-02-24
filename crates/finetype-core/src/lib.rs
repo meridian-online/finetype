@@ -16,10 +16,12 @@ pub mod validator;
 
 pub use checker::{format_report, CheckReport, Checker};
 pub use generator::{Generator, Sample};
-pub use taxonomy::{Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary};
+pub use taxonomy::{
+    Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary, Validation,
+};
 pub use tokenizer::Tokenizer;
 pub use validator::{
     validate_column, validate_column_for_label, validate_value, validate_value_for_label,
-    ColumnStats, ColumnValidationResult, InvalidStrategy, QuarantinedValue, ValidationCheck,
-    ValidationError, ValidationResult, ValidatorError,
+    ColumnStats, ColumnValidationResult, CompiledValidator, InvalidStrategy, QuarantinedValue,
+    ValidationCheck, ValidationError, ValidationResult, ValidatorError,
 };
