@@ -311,6 +311,7 @@ geography.address.street_suffix:
       - Drive
       - Dr
       - Circle
+      - Place
       - Plaza
       - Square
   tier: [VARCHAR, address]

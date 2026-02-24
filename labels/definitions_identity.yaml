@@ -994,8 +994,16 @@ identity.academic.degree:
     enum:
       - "High School Diploma"
       - "Associate Degree"
+      - "Bachelor of Science"
+      - "Bachelor of Arts"
       - "Bachelor Degree"
+      - "Master of Science"
+      - "Master of Arts"
+      - "Master of Business Administration"
       - "Master Degree"
+      - "Doctor of Philosophy"
+      - "Doctor of Medicine"
+      - "Juris Doctor"
       - "PhD"
       - "Professional Certificate"
   tier: [VARCHAR, academic]

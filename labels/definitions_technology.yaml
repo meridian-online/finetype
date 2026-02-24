@@ -814,26 +814,28 @@ technology.development.programming_language:
   validation:
     type: string
     enum:
-      - python
-      - javascript
-      - typescript
-      - java
-      - cpp
-      - csharp
-      - go
-      - rust
-      - php
-      - ruby
-      - kotlin
-      - swift
-      - clojure
-      - elixir
-      - erlang
-      - scala
-      - haskell
-      - r
-      - julia
-      - matlab
+      - Python
+      - JavaScript
+      - TypeScript
+      - Java
+      - "C++"
+      - "C#"
+      - Go
+      - Rust
+      - PHP
+      - Ruby
+      - Kotlin
+      - Swift
+      - Clojure
+      - Elixir
+      - Erlang
+      - Scala
+      - Haskell
+      - R
+      - Julia
+      - MATLAB
+      - Perl
+      - Lua
   tier: [VARCHAR, development]
   release_priority: 1
   aliases: null
@@ -863,18 +865,19 @@ technology.development.software_license:
     type: string
     enum:
       - MIT
-      - APACHE-2.0
+      - Apache-2.0
       - GPL-2.0
       - GPL-3.0
       - AGPL-3.0
-      - BSD-2-CLAUSE
-      - BSD-3-CLAUSE
+      - BSD-2-Clause
+      - BSD-3-Clause
       - ISC
       - MPL-2.0
       - LGPL-2.1
       - LGPL-3.0
-      - UNLICENSE
-      - PROPRIETARY
+      - Unlicense
+      - CC0-1.0
+      - Proprietary
   tier: [VARCHAR, development]
   release_priority: 1
   aliases: null
@@ -903,13 +906,14 @@ technology.development.stage:
   validation:
     type: string
     enum:
-      - alpha
-      - beta
-      - release_candidate
-      - released
-      - stable
-      - deprecated
-      - archived
+      - Alpha
+      - Beta
+      - Release Candidate
+      - Released
+      - Stable
+      - LTS
+      - Deprecated
+      - Archived
   tier: [VARCHAR, development]
   release_priority: 1
   aliases: null
@@ -938,8 +942,15 @@ technology.development.os:
     type: string
     enum:
       - Windows
+      - "Windows 10"
+      - "Windows 11"
       - macOS
       - Linux
+      - Ubuntu
+      - Fedora
+      - Debian
+      - Arch Linux
+      - CentOS
       - iOS
       - Android
       - FreeBSD

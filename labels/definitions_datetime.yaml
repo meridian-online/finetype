@@ -1231,7 +1231,7 @@ datetime.component.year:
   validation:
     type: string
     pattern: "^\\d{4}$"
-    minimum: 1900
+    minimum: 1000
     maximum: 2100
   tier: [INTEGER, component]
   release_priority: 1
