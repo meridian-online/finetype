@@ -7,13 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
+## [0.2.0] - 2026-02-24
 
-- **DuckDB community extension v0.2.0** — updated with tiered model, 168 types, 19 new DuckDB type mappings (NNFT-092)
+### Accuracy
+
+- **Multi-signal attractor demotion** — Rule 14 demotes over-eager specific type predictions (postal_code, cvv, first_name, icao_code) to generic types using validation failure, confidence threshold, and cardinality signals. 17 predictions improved, 0 format-detectable regressions (NNFT-115)
+- **Numeric range validation** — added `maximum: 99999` constraint to postal_code and street_number validation schemas, eliminating false positives on salary, ticket number, and byte count columns (NNFT-117)
 
 ### Changed
 
-- finetype-core and finetype-model published to crates.io at v0.1.7 (NNFT-093)
+- **JSON Schema validation engine** — migrated from hand-rolled regex to `jsonschema` crate (v0.42.1, pure Rust, Draft 2020-12). `CompiledValidator` pre-compiles schemas once; taxonomy caches validators via `compile_validators()`. Hybrid strategy: string keywords delegated to jsonschema, numeric bounds handled manually for string→f64 parsing. Enables future `format`, `oneOf`, `if/then` keywords (NNFT-116)
+
+## [0.1.9] - 2026-02-24
+
+### Added
+
+- **Model2Vec semantic header hints** — column name classification using Model2Vec static embeddings (potion-base-4M, 7.4MB float16) with cosine similarity against pre-computed type embeddings. Threshold 0.70 tuned for zero false positives on generics (NNFT-110)
+- **Unified column-level disambiguation** — consolidated all column disambiguation rules into a single pipeline. Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions) (NNFT-109)
+
+### Changed
+
+- **DuckDB community extension v0.2.0** — updated with tiered model, 168 types, 19 new DuckDB type mappings (NNFT-092)
+- finetype-core and finetype-model published to crates.io at v0.1.9 (NNFT-114)
 
 ## [0.1.8] - 2026-02-18
 
