@@ -572,6 +572,7 @@ fn cmd_infer(
         let taxonomy_path = std::path::PathBuf::from("labels");
         if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
             taxonomy.compile_validators();
+            taxonomy.compile_locale_validators();
             column_classifier.set_taxonomy(taxonomy);
         }
 
@@ -1596,10 +1597,12 @@ fn cmd_profile(
     let taxonomy_path = std::path::PathBuf::from("labels");
     if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
         taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
         eprintln!(
-            "Loaded taxonomy for attractor demotion ({} types, {} validators cached)",
+            "Loaded taxonomy for attractor demotion ({} types, {} validators cached, {} with locale validators)",
             taxonomy.labels().len(),
-            taxonomy.validator_count()
+            taxonomy.validator_count(),
+            taxonomy.locale_validator_count()
         );
         column_classifier.set_taxonomy(taxonomy);
     }

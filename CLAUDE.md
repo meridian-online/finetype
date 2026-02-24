@@ -30,7 +30,7 @@ Every decision in this repo should reflect these principles:
 
 ### What's in progress
 
-- **NNFT-118** — Discovery: locale-specific type labels for postal codes, phone numbers, and addresses. Spike to evaluate whether locale-aware inference improves disambiguation accuracy.
+- **NNFT-118** — Locale-specific type validation. Phase 1 delivered: per-locale postal code validation (14 locales) integrated into attractor demotion Signal 1. Phone number locale patterns and CLDR date/time patterns deferred to Phase 2-3.
 
 ## Architecture
 
@@ -48,7 +48,7 @@ finetype/
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
   tests/               # CLI smoke tests
   docs/                # Taxonomy comparison, architecture docs
-  data/                # Reference data files
+  data/                # Reference data files + locale data sources (data/cldr/)
 ```
 
 ### Crate dependency graph
@@ -74,7 +74,7 @@ The inference system has two modes:
 - Runs value-level inference on each value
 - Aggregates predictions via majority vote
 - Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection, attractor demotion)
-- **Attractor demotion** (Rule 14): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not validation-confirmed), and cardinality mismatch (1-20 unique values for text attractors). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override.
+- **Attractor demotion** (Rule 14): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not validation-confirmed), and cardinality mismatch (1-20 unique values for text attractors). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override. **Locale-aware validation** (NNFT-118): For types with `validation_by_locale`, Signal 1 first checks all locale patterns — if any locale achieves >50% pass rate, the prediction is locale-confirmed (skips demotion and Signal 2). Only falls through to universal validation when no locale matches.
 - **Semantic header hints** (Model2Vec): embeds column name → cosine similarity against 169 pre-computed type embeddings → overrides generic predictions above 0.70 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable.
 - `is_generic` flag marks types that should yield to header hints (includes attractor-demoted predictions)
 
@@ -190,6 +190,8 @@ Key architectural decisions that should not be revisited without good reason:
 
 12. **JSON Schema validation via jsonschema-rs** — Validation uses `jsonschema` crate (v0.42.1, pure Rust, MIT, Draft 2020-12) instead of hand-rolled regex. `CompiledValidator` pre-compiles schemas once; taxonomy caches validators via `compile_validators()`. Hybrid strategy: string keywords delegated to jsonschema, numeric bounds (minimum/maximum) handled manually for string→f64 parsing semantics. `Taxonomy::clone()` drops the cache (jsonschema::Validator doesn't impl Clone). Enables future `format`, `oneOf`, `if/then` keywords. (NNFT-116)
 
+13. **Locale-specific validation via `validation_by_locale`** — Taxonomy definitions can include per-locale validation schemas alongside the universal `validation` block. `compile_locale_validators()` pre-compiles locale patterns into a nested cache (label → locale → CompiledValidator). Attractor demotion Signal 1 checks locale patterns first — if any locale achieves >50% pass rate on sample values, the prediction is locale-confirmed (skips demotion). Currently used for postal_code (14 locales sourced from Google libaddressinput, Apache 2.0). Patterns embedded in YAML, not downloaded at runtime. (NNFT-118)
+
 ## Build & Test
 
 ```bash
@@ -235,6 +237,7 @@ make eval-sotab         # SOTAB CTA (requires corpus)
 | Eval config | `eval/config.env` |
 | Schema mapping | `eval/schema_mapping.yaml` |
 | Smoke tests | `tests/smoke.sh` |
+| Locale data attribution | `data/cldr/README.md` |
 
 ## Backlog Discipline
 

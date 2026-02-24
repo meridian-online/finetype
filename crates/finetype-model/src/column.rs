@@ -1533,6 +1533,11 @@ fn disambiguate_attractor_demotion(
     // regex pattern, check sample values against it. Demote if >50% fail.
     // Also track whether validation CONFIRMED the type (pattern exists and
     // values mostly pass) — this is used to gate Signal 2.
+    //
+    // For types with locale-specific validation (validation_by_locale),
+    // first try each locale's pattern. If ANY locale achieves >50% pass rate,
+    // accept the prediction (locale-aware confirmation). Only demote if
+    // ALL locales fail AND the universal validation fails.
     let mut validation_confirmed = false;
     if let Some(taxonomy) = taxonomy {
         // Use pre-compiled validator from taxonomy cache (NNFT-116).
@@ -1550,39 +1555,61 @@ fn disambiguate_attractor_demotion(
             .collect();
 
         if non_empty.len() >= 3 {
-            let fail_count = if let Some(compiled) = taxonomy.get_validator(top_label) {
-                // Fast path: pre-compiled validator (no per-value regex compilation)
-                non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
-            } else if let Some(def) = taxonomy.get(top_label) {
-                if let Some(validation) = &def.validation {
-                    // Fallback: compile per-call (shouldn't happen with cache populated)
-                    non_empty
-                        .iter()
-                        .filter(|v| {
-                            finetype_core::validate_value(v, validation)
-                                .map(|r| !r.is_valid)
-                                .unwrap_or(false)
-                        })
-                        .count()
+            // Check locale-specific validators first (if available).
+            // If any locale passes >50%, the type is locale-confirmed.
+            let mut locale_confirmed = false;
+            if let Some(locale_validators) = taxonomy.get_locale_validators(top_label) {
+                let mut best_pass_rate: f32 = 0.0;
+                for compiled in locale_validators.values() {
+                    let pass_count = non_empty.iter().filter(|v| compiled.is_valid(v)).count();
+                    let pass_rate = pass_count as f32 / non_empty.len() as f32;
+                    if pass_rate > best_pass_rate {
+                        best_pass_rate = pass_rate;
+                    }
+                }
+                if best_pass_rate > 0.5 {
+                    // A locale pattern matched well — accept this prediction.
+                    locale_confirmed = true;
+                    validation_confirmed = true;
+                }
+            }
+
+            // If locale validators didn't confirm, fall through to universal validation.
+            if !locale_confirmed {
+                let fail_count = if let Some(compiled) = taxonomy.get_validator(top_label) {
+                    // Fast path: pre-compiled validator (no per-value regex compilation)
+                    non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+                } else if let Some(def) = taxonomy.get(top_label) {
+                    if let Some(validation) = &def.validation {
+                        // Fallback: compile per-call (shouldn't happen with cache populated)
+                        non_empty
+                            .iter()
+                            .filter(|v| {
+                                finetype_core::validate_value(v, validation)
+                                    .map(|r| !r.is_valid)
+                                    .unwrap_or(false)
+                            })
+                            .count()
+                    } else {
+                        0
+                    }
                 } else {
                     0
-                }
-            } else {
-                0
-            };
+                };
 
-            let fail_rate = fail_count as f32 / non_empty.len() as f32;
-            if fail_rate > 0.5 {
-                let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
-                return Some((
-                    fallback,
-                    format!("attractor_demotion_validation:{}", top_label),
-                ));
-            }
-            // If validation has a regex pattern and values mostly pass
-            // (≤30% fail), that's positive evidence FOR the type.
-            if has_pattern && fail_rate <= 0.3 {
-                validation_confirmed = true;
+                let fail_rate = fail_count as f32 / non_empty.len() as f32;
+                if fail_rate > 0.5 {
+                    let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
+                    return Some((
+                        fallback,
+                        format!("attractor_demotion_validation:{}", top_label),
+                    ));
+                }
+                // If validation has a regex pattern and values mostly pass
+                // (≤30% fail), that's positive evidence FOR the type.
+                if has_pattern && fail_rate <= 0.3 {
+                    validation_confirmed = true;
+                }
             }
         }
     }
@@ -3655,6 +3682,218 @@ geography.address.postal_code:
         assert_eq!(
             result, "representation.numeric.decimal_number",
             "Should use representation.* type from votes when available"
+        );
+    }
+
+    // ── Locale-aware attractor demotion tests ───────────────────────────
+
+    #[test]
+    fn test_attractor_demotion_locale_validation_demotes_salary() {
+        // Salary column predicted as postal_code: 6-digit values fail ALL locale
+        // patterns. Using values clearly in salary range (>99999) that cannot
+        // be valid postal codes in any locale.
+        let values: Vec<String> = vec![
+            "102000", "245000", "112000", "350000", "178000", "195000", "267000", "188000",
+            "103000", "272000",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 9),
+            ("representation.numeric.integer_number".to_string(), 1),
+        ];
+
+        let yaml = r#"
+geography.address.postal_code:
+  title: "Postal Code"
+  validation:
+    type: string
+    minLength: 3
+    maxLength: 10
+    maximum: 99999
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\d{5})(?:[ \\-](\\d{4}))?$"
+      minLength: 5
+      maxLength: 10
+    EN_GB:
+      type: string
+      pattern: "^[A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2}$"
+      minLength: 5
+      maxLength: 8
+    DE:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+  tier: [VARCHAR, address]
+  release_priority: 4
+  samples: ["10001"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_some(),
+            "Should demote salary values despite matching universal validation"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert!(
+            rule.starts_with("attractor_demotion_validation:"),
+            "Should demote via validation signal, got: {}",
+            rule
+        );
+    }
+
+    #[test]
+    fn test_attractor_accepts_real_us_postal_codes() {
+        // Real US ZIP codes: match EN_US locale pattern → locale-confirmed, no demotion
+        let values: Vec<String> = vec![
+            "10001", "90210", "30301", "60601", "02101", "75001", "33101", "94102", "20001",
+            "98101",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 9),
+            ("representation.numeric.integer_number".to_string(), 1),
+        ];
+
+        let yaml = r#"
+geography.address.postal_code:
+  title: "Postal Code"
+  validation:
+    type: string
+    minLength: 3
+    maxLength: 10
+    maximum: 99999
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\d{5})(?:[ \\-](\\d{4}))?$"
+      minLength: 5
+      maxLength: 10
+    EN_GB:
+      type: string
+      pattern: "^[A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2}$"
+      minLength: 5
+      maxLength: 8
+    DE:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+  tier: [VARCHAR, address]
+  release_priority: 4
+  samples: ["10001"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        // US ZIPs match EN_US locale at >50% → locale-confirmed → no demotion
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote real US ZIP codes (locale-confirmed by EN_US)"
+        );
+    }
+
+    #[test]
+    fn test_attractor_accepts_real_uk_postcodes() {
+        // Real UK postcodes: match EN_GB locale pattern → locale-confirmed, no demotion
+        let values: Vec<String> = vec![
+            "EC1A 1BB", "W1C 1AX", "M2 5BQ", "SW1A 1AA", "B1 1BB", "LS1 1BA",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![("geography.address.postal_code".to_string(), 6)];
+
+        let yaml = r#"
+geography.address.postal_code:
+  title: "Postal Code"
+  validation:
+    type: string
+    minLength: 3
+    maxLength: 10
+    maximum: 99999
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\d{5})(?:[ \\-](\\d{4}))?$"
+      minLength: 5
+      maxLength: 10
+    EN_GB:
+      type: string
+      pattern: "^[A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2}$"
+      minLength: 5
+      maxLength: 8
+  tier: [VARCHAR, address]
+  release_priority: 4
+  samples: ["10001"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        let result = disambiguate_attractor_demotion(&values, &votes, 6, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote real UK postcodes (locale-confirmed by EN_GB)"
+        );
+    }
+
+    #[test]
+    fn test_attractor_locale_low_confidence_accepted() {
+        // US ZIP codes at low confidence (0.6) — normally Signal 2 would demote,
+        // but locale validation confirms the type → no demotion
+        let values: Vec<String> = vec![
+            "10001", "90210", "30301", "60601", "02101", "75001", "33101", "94102", "20001",
+            "98101",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let votes = vec![
+            ("geography.address.postal_code".to_string(), 6),
+            ("representation.numeric.integer_number".to_string(), 4),
+        ];
+
+        let yaml = r#"
+geography.address.postal_code:
+  title: "Postal Code"
+  validation:
+    type: string
+    minLength: 3
+    maxLength: 10
+    maximum: 99999
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\d{5})(?:[ \\-](\\d{4}))?$"
+      minLength: 5
+      maxLength: 10
+  tier: [VARCHAR, address]
+  release_priority: 4
+  samples: ["10001"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        // Confidence 0.6 < 0.85 → Signal 2 would fire, BUT locale validation
+        // confirms the type → validation_confirmed = true → Signal 2 skipped
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote real US ZIPs at low confidence when locale confirms them"
         );
     }
 }

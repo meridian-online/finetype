@@ -128,6 +128,12 @@ pub struct Definition {
     pub decompose: Option<serde_yaml::Value>,
     /// JSON Schema fragment for data quality checks
     pub validation: Option<Validation>,
+    /// Per-locale validation schemas for locale-specific types.
+    /// When present, attractor demotion can validate values against
+    /// locale-specific patterns (e.g., US ZIP code vs UK postcode)
+    /// instead of only the universal fallback schema.
+    #[serde(default)]
+    pub validation_by_locale: Option<HashMap<String, Validation>>,
     /// Path from root to parent in the inference graph
     #[serde(default)]
     pub tier: Vec<String>,
@@ -199,6 +205,10 @@ pub struct Taxonomy {
     /// Pre-compiled validators keyed by label. Populated lazily via
     /// `compile_validators()`. `None` until first call.
     compiled_validators: Option<HashMap<String, crate::validator::CompiledValidator>>,
+    /// Pre-compiled locale-specific validators keyed by label → locale.
+    /// Populated via `compile_locale_validators()`. `None` until first call.
+    compiled_locale_validators:
+        Option<HashMap<String, HashMap<String, crate::validator::CompiledValidator>>>,
 }
 
 // Manual Debug: jsonschema::Validator doesn't implement Debug
@@ -214,6 +224,13 @@ impl std::fmt::Debug for Taxonomy {
                     .as_ref()
                     .map(|m| format!("{} cached", m.len())),
             )
+            .field(
+                "compiled_locale_validators",
+                &self
+                    .compiled_locale_validators
+                    .as_ref()
+                    .map(|m| format!("{} labels with locale validators", m.len())),
+            )
             .finish()
     }
 }
@@ -227,6 +244,7 @@ impl Clone for Taxonomy {
             definitions: self.definitions.clone(),
             labels: self.labels.clone(),
             compiled_validators: None,
+            compiled_locale_validators: None,
         }
     }
 }
@@ -267,6 +285,7 @@ impl Taxonomy {
             definitions: all_definitions,
             labels,
             compiled_validators: None,
+            compiled_locale_validators: None,
         })
     }
 
@@ -281,6 +300,7 @@ impl Taxonomy {
             definitions: raw,
             labels,
             compiled_validators: None,
+            compiled_locale_validators: None,
         })
     }
 
@@ -300,6 +320,7 @@ impl Taxonomy {
             definitions: all_definitions,
             labels,
             compiled_validators: None,
+            compiled_locale_validators: None,
         })
     }
 
@@ -433,6 +454,55 @@ impl Taxonomy {
     /// Number of cached compiled validators.
     pub fn validator_count(&self) -> usize {
         self.compiled_validators
+            .as_ref()
+            .map(|c| c.len())
+            .unwrap_or(0)
+    }
+
+    /// Pre-compile locale-specific JSON Schema validators for all definitions
+    /// that have a `validation_by_locale` block.
+    ///
+    /// Call after `compile_validators()`. Produces a nested cache:
+    /// label → locale → CompiledValidator. Definitions or locales whose
+    /// schemas fail to compile are silently skipped.
+    pub fn compile_locale_validators(&mut self) {
+        let mut cache: HashMap<String, HashMap<String, crate::validator::CompiledValidator>> =
+            HashMap::new();
+        for (label, def) in &self.definitions {
+            if let Some(locale_map) = &def.validation_by_locale {
+                let mut locale_cache = HashMap::new();
+                for (locale, validation) in locale_map {
+                    if let Ok(compiled) =
+                        crate::validator::CompiledValidator::new_for_label(validation, label)
+                    {
+                        locale_cache.insert(locale.clone(), compiled);
+                    }
+                }
+                if !locale_cache.is_empty() {
+                    cache.insert(label.clone(), locale_cache);
+                }
+            }
+        }
+        self.compiled_locale_validators = Some(cache);
+    }
+
+    /// Get pre-compiled locale validators for a label.
+    ///
+    /// Returns `None` if locale validators haven't been compiled or if the
+    /// label has no `validation_by_locale` block. Returns a map of
+    /// locale → CompiledValidator.
+    pub fn get_locale_validators(
+        &self,
+        label: &str,
+    ) -> Option<&HashMap<String, crate::validator::CompiledValidator>> {
+        self.compiled_locale_validators
+            .as_ref()
+            .and_then(|cache| cache.get(label))
+    }
+
+    /// Number of labels with cached locale validators.
+    pub fn locale_validator_count(&self) -> usize {
+        self.compiled_locale_validators
             .as_ref()
             .map(|c| c.len())
             .unwrap_or(0)
@@ -937,6 +1007,158 @@ representation.discrete.categorical:
         } else {
             // In CI/release builds, labels/ may not exist — skip gracefully
             eprintln!("Skipping full taxonomy test (labels/ not found)");
+        }
+    }
+
+    // ── Locale validator cache tests ────────────────────────────────────
+
+    const LOCALE_YAML: &str = r#"
+geography.address.postal_code:
+  title: "Postal Code"
+  validation:
+    type: string
+    minLength: 3
+    maxLength: 10
+    maximum: 99999
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\d{5})(?:[ \\-](\\d{4}))?$"
+      minLength: 5
+      maxLength: 10
+    EN_GB:
+      type: string
+      pattern: "^[A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2}$"
+      minLength: 5
+      maxLength: 8
+    DE:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+  tier: [VARCHAR, address]
+  release_priority: 4
+  samples: ["10001"]
+"#;
+
+    #[test]
+    fn test_compile_locale_validators() {
+        let mut taxonomy = Taxonomy::from_yaml(LOCALE_YAML).unwrap();
+        assert_eq!(taxonomy.locale_validator_count(), 0);
+
+        taxonomy.compile_locale_validators();
+        assert_eq!(
+            taxonomy.locale_validator_count(),
+            1,
+            "Should have 1 label with locale validators"
+        );
+
+        let locale_validators = taxonomy
+            .get_locale_validators("geography.address.postal_code")
+            .unwrap();
+        assert_eq!(locale_validators.len(), 3, "Should have 3 locales compiled");
+        assert!(locale_validators.contains_key("EN_US"));
+        assert!(locale_validators.contains_key("EN_GB"));
+        assert!(locale_validators.contains_key("DE"));
+    }
+
+    #[test]
+    fn test_locale_postal_code_us() {
+        let mut taxonomy = Taxonomy::from_yaml(LOCALE_YAML).unwrap();
+        taxonomy.compile_locale_validators();
+        let locales = taxonomy
+            .get_locale_validators("geography.address.postal_code")
+            .unwrap();
+
+        let us = locales.get("EN_US").unwrap();
+        assert!(us.is_valid("10001"));
+        assert!(us.is_valid("90210"));
+        assert!(us.is_valid("85000")); // 5-digit US ZIP is valid
+        assert!(us.is_valid("95014-1234")); // ZIP+4
+        assert!(!us.is_valid("EC1A 1BB")); // UK postcode fails US
+        assert!(!us.is_valid("112000")); // 6-digit salary fails US
+        assert!(!us.is_valid("1234")); // too short
+    }
+
+    #[test]
+    fn test_locale_postal_code_gb() {
+        let mut taxonomy = Taxonomy::from_yaml(LOCALE_YAML).unwrap();
+        taxonomy.compile_locale_validators();
+        let locales = taxonomy
+            .get_locale_validators("geography.address.postal_code")
+            .unwrap();
+
+        let gb = locales.get("EN_GB").unwrap();
+        assert!(gb.is_valid("EC1A 1BB"));
+        assert!(gb.is_valid("W1C 1AX"));
+        assert!(gb.is_valid("M2 5BQ"));
+        assert!(gb.is_valid("SW1A 1AA"));
+        assert!(!gb.is_valid("10001")); // US ZIP fails UK
+        assert!(!gb.is_valid("85000")); // numeric fails UK
+    }
+
+    #[test]
+    fn test_locale_postal_code_cross_rejection() {
+        // 6+ digit salary values fail ALL locale patterns
+        // (5-digit values like "85000" ARE valid US/DE postal codes,
+        // so we only test clearly-salary-range values here)
+        let mut taxonomy = Taxonomy::from_yaml(LOCALE_YAML).unwrap();
+        taxonomy.compile_locale_validators();
+        let locales = taxonomy
+            .get_locale_validators("geography.address.postal_code")
+            .unwrap();
+
+        let salary_values = ["112000", "245000", "350000", "102500"];
+        for value in &salary_values {
+            for (locale, compiled) in locales {
+                assert!(
+                    !compiled.is_valid(value),
+                    "Salary {} should fail locale {} validation",
+                    value,
+                    locale
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_locale_validators_no_block() {
+        // Definitions without validation_by_locale should return None
+        let mut taxonomy = Taxonomy::from_yaml(SAMPLE_YAML).unwrap();
+        taxonomy.compile_locale_validators();
+        assert_eq!(taxonomy.locale_validator_count(), 0);
+        assert!(taxonomy
+            .get_locale_validators("datetime.timestamp.iso_8601")
+            .is_none());
+    }
+
+    #[test]
+    fn test_clone_drops_locale_cache() {
+        let mut taxonomy = Taxonomy::from_yaml(LOCALE_YAML).unwrap();
+        taxonomy.compile_locale_validators();
+        assert_eq!(taxonomy.locale_validator_count(), 1);
+
+        let cloned = taxonomy.clone();
+        assert_eq!(cloned.locale_validator_count(), 0);
+    }
+
+    #[test]
+    fn test_all_taxonomy_locale_schemas_compile() {
+        // Try loading from labels/ directory — verifies real YAML locale patterns compile
+        let taxonomy_result = Taxonomy::from_directory("labels");
+        if let Ok(mut taxonomy) = taxonomy_result {
+            taxonomy.compile_locale_validators();
+            assert!(
+                taxonomy.locale_validator_count() >= 1,
+                "Expected ≥1 label with locale validators, got {}",
+                taxonomy.locale_validator_count()
+            );
+            eprintln!(
+                "{} labels with locale validators compiled successfully",
+                taxonomy.locale_validator_count()
+            );
+        } else {
+            eprintln!("Skipping full taxonomy locale test (labels/ not found)");
         }
     }
 }

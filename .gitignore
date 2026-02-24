@@ -22,7 +22,8 @@ models/**/labels.json
 
 # Generated training data
 *.ndjson
-data/
+data/*
+!data/cldr/
 
 # DuckDB extension build
 extension/build/
