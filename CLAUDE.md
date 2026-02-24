@@ -1,9 +1,21 @@
+# FineType
+
+FineType is a type inference engine that detects and classifies data types in tabular datasets. It's the core analytical engine of the Noon project.
+
+## The Noon Pillars
+
+Every decision in this repo should reflect these principles:
+
+1. **Spark joy for analysts** — Type inference should feel magical, not tedious. Clear output, helpful error messages, sensible defaults.
+2. **Write programs that do one thing and do it well** — FineType infers types. It doesn't validate, transform, or visualise. Those are separate concerns for separate tools.
+3. **Design for the future, for it will be here sooner than you think** — The type taxonomy, model architecture, and extension interfaces should accommodate new data types and formats without breaking existing behaviour.
 
 ## Backlog Discipline
 
 **Every bug fix, feature, and release MUST have a corresponding backlog task.**
 
 This includes:
+
 - **Bug fixes** — Create a task (status: Done if already fixed) with root cause, fix description, and affected files
 - **Releases** — Tag releases should reference the backlog tasks included
 - **Investigations** — Even exploratory work that produces findings gets a task
