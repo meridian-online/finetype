@@ -3,7 +3,14 @@ Text,representation.text.plain_text,representation,close,Free-form text content
 Number,representation.numeric.decimal_number,representation,close,Generic numeric values
 Mass,identity.person.weight,identity,partial,Weight/mass values — FineType has weight but not generic mass
 DateTime,datetime.timestamp.iso_8601,datetime,close,Various datetime formats
+DateTime,datetime.timestamp.iso_8601_offset,datetime,close,ISO 8601 with timezone offset
+DateTime,datetime.timestamp.sql_standard,datetime,close,SQL standard timestamp format
 Date,datetime.date.iso,datetime,close,Date values in various formats
+Date,datetime.date.long_full_month,datetime,close,Full month name date format (August 28 2020)
+Date,datetime.date.us_slash,datetime,close,US date format with slashes (MM/DD/YYYY)
+Date,datetime.date.eu_slash,datetime,close,EU date format with slashes (DD/MM/YYYY)
+Date,datetime.date.short_mdy,datetime,close,Short month-day-year format
+Date,datetime.date.short_dmy,datetime,close,Short day-month-year format
 Duration,datetime.duration.iso_8601,datetime,direct,ISO 8601 duration strings
 currency,identity.payment.currency_code,identity,direct,Currency codes (USD/GBP/EUR)
 telephone,identity.person.phone_number,identity,direct,Phone numbers in various formats

@@ -430,6 +430,7 @@ const CODE_ATTRACTORS: &[&str] = &[
     "geography.transportation.icao_code",
     "identity.medical.ndc",
     "identity.payment.cusip",
+    "technology.internet.top_level_domain",
 ];
 
 /// Apply disambiguation rules when the vote distribution contains known ambiguous pairs.
@@ -524,7 +525,20 @@ fn disambiguate(
         }
     }
 
-    // Rule 14: Attractor type demotion — demote over-eager specific type
+    // Rule 14: Duration override — ISO 8601 durations (PT20M, P1DT12H)
+    // misclassified as SEDOL stock codes because both are 5-8 char alphanumeric
+    // strings starting with uppercase letters. Check for duration pattern before
+    // attractor demotion would demote SEDOL to alphanumeric_id (losing duration).
+    if top_labels
+        .first()
+        .is_some_and(|l| *l == "identity.payment.sedol")
+    {
+        if let Some((label, rule)) = disambiguate_duration_override(values) {
+            return Some((label, rule));
+        }
+    }
+
+    // Rule 15: Attractor type demotion — demote over-eager specific type
     // predictions (postal_code, cvv, first_name, etc.) when evidence doesn't
     // support the specific prediction. Three signals: validation failure,
     // confidence threshold, and cardinality mismatch.
@@ -1565,6 +1579,57 @@ fn disambiguate_si_number(values: &[String]) -> Option<(String, String)> {
         Some((
             "representation.numeric.decimal_number".to_string(),
             "si_number_override_no_suffix".to_string(),
+        ))
+    } else {
+        None
+    }
+}
+
+/// Duration override: ISO 8601 durations misclassified as SEDOL codes.
+///
+/// ISO 8601 durations (PT20M, P1DT12H, PD1TH0M0) start with 'P' followed
+/// by time component letters (Y, M, D, T, H, S) and digits. SEDOL codes are
+/// exactly 7 alphanumeric chars but exclude certain letters. The CharCNN sees
+/// 5-8 char alphanumeric strings starting with P and predicts SEDOL.
+///
+/// Rule: If the top vote is SEDOL and ≥50% of non-empty values start with 'P'
+/// followed by at least one duration component letter, override to iso_8601 duration.
+fn disambiguate_duration_override(values: &[String]) -> Option<(String, String)> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    // ISO 8601 duration pattern: starts with P, then contains digits and
+    // time component designators (Y=years, M=months, W=weeks, D=days,
+    // T=time separator, H=hours, S=seconds). Also handles non-standard
+    // variants like PD1TH0M0 found in SOTAB data.
+    let duration_count = non_empty
+        .iter()
+        .filter(|v| {
+            let s = v.as_bytes();
+            if s.is_empty() || s[0] != b'P' {
+                return false;
+            }
+            // After the P, must contain at least one duration component letter
+            let after_p = &s[1..];
+            after_p
+                .iter()
+                .any(|&b| matches!(b, b'Y' | b'M' | b'W' | b'D' | b'T' | b'H' | b'S'))
+        })
+        .count();
+
+    let fraction = duration_count as f64 / non_empty.len() as f64;
+
+    if fraction >= 0.5 {
+        Some((
+            "datetime.duration.iso_8601".to_string(),
+            "duration_override_sedol".to_string(),
         ))
     } else {
         None
@@ -3966,5 +4031,105 @@ geography.address.postal_code:
             result.is_none(),
             "Should NOT demote real US ZIPs at low confidence when locale confirms them"
         );
+    }
+
+    // ── Duration override tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_duration_override_standard_durations() {
+        // Standard ISO 8601 durations like PT20M (20 minutes), PT1H (1 hour)
+        let values: Vec<String> = vec![
+            "PT20M", "PT30M", "PT10M", "PT15M", "PT1H", "PT45M", "PT5M", "PT60M",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_duration_override(&values);
+        assert!(result.is_some(), "Should detect ISO 8601 durations");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.duration.iso_8601");
+        assert_eq!(rule, "duration_override_sedol");
+    }
+
+    #[test]
+    fn test_duration_override_complex_durations() {
+        // Complex durations with multiple components: P1DT12H, P2Y3M, PT1H30M
+        let values: Vec<String> = vec!["P1DT12H", "P2Y3M", "PT1H30M", "P30D", "P1Y", "PT2H15M30S"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_duration_override(&values);
+        assert!(result.is_some(), "Should detect complex ISO 8601 durations");
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "datetime.duration.iso_8601");
+    }
+
+    #[test]
+    fn test_duration_override_malformed_sotab_durations() {
+        // Non-standard durations found in SOTAB: PD1TH0M0, PD3TH0M0
+        let values: Vec<String> = vec![
+            "PD1TH0M0", "PD3TH0M0", "PT30M", "PT20M", "PD1TH0M0", "PT10M",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_duration_override(&values);
+        assert!(
+            result.is_some(),
+            "Should detect non-standard duration variants"
+        );
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "datetime.duration.iso_8601");
+    }
+
+    #[test]
+    fn test_duration_override_not_triggered_for_sedol() {
+        // Real SEDOL codes: 7 alphanumeric chars, restricted charset
+        let values: Vec<String> = vec![
+            "B0YBKJ7", "B1YW440", "B39J2S1", "B0JNMQ2", "BWFGQN3", "B082RF1",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_duration_override(&values);
+        assert!(
+            result.is_none(),
+            "Should NOT trigger for real SEDOL codes (no duration pattern)"
+        );
+    }
+
+    #[test]
+    fn test_duration_override_not_triggered_below_threshold() {
+        // Mixed column: mostly non-duration with a few durations
+        let values: Vec<String> = vec![
+            "ABC1234", "DEF5678", "GHI9012", "PT20M", "JKL3456", "MNO7890", "PQR1234", "STU5678",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_duration_override(&values);
+        assert!(
+            result.is_none(),
+            "Should NOT trigger when <50% of values are durations"
+        );
+    }
+
+    #[test]
+    fn test_duration_override_week_durations() {
+        // Week-based durations: P1W, P2W
+        let values: Vec<String> = vec!["P1W", "P2W", "P3W", "P4W", "P1W", "P2W"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_duration_override(&values);
+        assert!(result.is_some(), "Should detect week-based durations");
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "datetime.duration.iso_8601");
     }
 }

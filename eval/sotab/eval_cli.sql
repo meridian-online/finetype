@@ -90,41 +90,91 @@ SELECT
     count(*) FILTER (match_quality = 'semantic_only') AS semantic_only
 FROM schema_mapping;
 
+-- Best-match logic: for GT labels with multiple accepted finetype variants,
+-- pick the variant that matches the prediction (if any), otherwise use the
+-- first (primary) mapping. This handles DateTime→{iso_8601, iso_8601_offset}
+-- and Date→{iso, long_full_month, us_slash, eu_slash, ...} correctly.
 CREATE OR REPLACE TABLE eval_results AS
+WITH
+-- Find exact label matches between prediction and any accepted variant
+exact_matches AS (
+    SELECT
+        cp.table_name,
+        cp.col_index,
+        sm.finetype_label,
+        sm.finetype_domain,
+        sm.match_quality
+    FROM column_predictions cp
+    JOIN schema_mapping sm
+        ON cp.gt_label = sm.sotab_label
+        AND sm.finetype_label IS NOT NULL
+        AND sm.finetype_label != ''
+        AND cp.predicted_label = sm.finetype_label
+),
+-- Primary mapping: first row per GT label (fallback when no exact match)
+primary_mapping AS (
+    SELECT DISTINCT ON (sotab_label)
+        sotab_label,
+        finetype_label,
+        finetype_domain,
+        match_quality
+    FROM schema_mapping
+    ORDER BY sotab_label, rowid
+),
+-- Best match: prefer exact match, fall back to primary mapping
+best_match AS (
+    SELECT
+        cp.table_name,
+        cp.col_index,
+        cp.predicted_label,
+        cp.confidence,
+        cp.disambiguation_rule,
+        cp.gt_label,
+        split_part(cp.predicted_label, '.', 1) AS ft_domain,
+        COALESCE(em.finetype_label, pm.finetype_label) AS expected_ft_label,
+        COALESCE(em.finetype_domain, pm.finetype_domain) AS expected_ft_domain,
+        COALESCE(em.match_quality, pm.match_quality) AS match_quality,
+        em.finetype_label IS NOT NULL AS has_exact_match
+    FROM column_predictions cp
+    LEFT JOIN exact_matches em
+        ON cp.table_name = em.table_name AND cp.col_index = em.col_index
+    LEFT JOIN primary_mapping pm
+        ON cp.gt_label = pm.sotab_label
+)
 SELECT
-    cp.table_name,
-    cp.col_index,
-    cp.predicted_label,
-    cp.confidence,
-    cp.disambiguation_rule,
-    cp.gt_label,
-    split_part(cp.predicted_label, '.', 1) AS ft_domain,
-    sm.finetype_label AS expected_ft_label,
-    sm.finetype_domain AS expected_ft_domain,
-    sm.match_quality,
-    -- Label-level match
+    table_name,
+    col_index,
+    predicted_label,
+    confidence,
+    disambiguation_rule,
+    gt_label,
+    ft_domain,
+    expected_ft_label,
+    expected_ft_domain,
+    match_quality,
+    -- Label-level match: exact variant match OR primary label match
     CASE
-        WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
-             AND cp.predicted_label = sm.finetype_label
+        WHEN has_exact_match THEN true
+        WHEN expected_ft_label IS NOT NULL AND expected_ft_label != ''
+             AND predicted_label = expected_ft_label
         THEN true
         ELSE false
     END AS label_match,
     -- Domain-level match
     CASE
-        WHEN sm.finetype_domain IS NOT NULL AND sm.finetype_domain != ''
-             AND split_part(cp.predicted_label, '.', 1) = sm.finetype_domain
+        WHEN expected_ft_domain IS NOT NULL AND expected_ft_domain != ''
+             AND ft_domain = expected_ft_domain
         THEN true
         ELSE false
     END AS domain_match,
     -- Detectability tier
     CASE
-        WHEN sm.match_quality IN ('direct', 'close') THEN 'format_detectable'
-        WHEN sm.match_quality = 'partial' THEN 'partially_detectable'
-        WHEN sm.match_quality = 'semantic_only' THEN 'semantic_only'
+        WHEN match_quality IN ('direct', 'close') THEN 'format_detectable'
+        WHEN match_quality = 'partial' THEN 'partially_detectable'
+        WHEN match_quality = 'semantic_only' THEN 'semantic_only'
         ELSE 'unmapped'
     END AS detectability
-FROM column_predictions cp
-LEFT JOIN schema_mapping sm ON cp.gt_label = sm.sotab_label;
+FROM best_match;
 
 SELECT
     count(*) AS total_columns,
