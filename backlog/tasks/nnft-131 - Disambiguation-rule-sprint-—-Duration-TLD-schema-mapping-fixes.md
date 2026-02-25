@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-25 09:16'
-updated_date: '2026-02-25 09:52'
+updated_date: '2026-02-25 09:53'
 labels:
   - accuracy
   - disambiguation
@@ -107,7 +107,7 @@ Disambiguation rule sprint targeting 3 accuracy improvements identified by NNFT-
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

@@ -1641,8 +1641,15 @@ fn disambiguate_duration_override(values: &[String]) -> Option<(String, String)>
 ///
 /// Three independent signals, checked in order of strength:
 /// 1. Validation failure: >50% of sample values fail the type's validation schema
-/// 2. Confidence threshold: top vote fraction < 0.85 (true positives cluster >0.9)
-/// 3. Cardinality mismatch: text attractor + 3-20 unique values → categorical
+/// 2. Confidence threshold: top vote fraction < 0.85 (skipped when confirmed)
+/// 3. Cardinality mismatch: text attractor + 1-20 unique values → categorical
+///    (skipped when locale-confirmed)
+///
+/// **Validation Precision (NNFT-132):** For locale-specific types (those with
+/// `validation_by_locale`), only locale-level confirmation gates Signals 2 and 3.
+/// Universal validation can reject (Signal 1) but cannot confirm — passing a
+/// permissive universal pattern like `^[+]?[0-9\s()\-\.]+$` is not evidence.
+/// For types without locale validation, universal confirmation still gates Signal 2.
 ///
 /// This rule runs AFTER all other disambiguation rules and BEFORE header hint
 /// override, so header hints can still rescue legitimate predictions that were
@@ -1667,14 +1674,19 @@ fn disambiguate_attractor_demotion(
     // Signal 1: Validation failure (strongest signal)
     // If taxonomy available and predicted type has a validation schema with a
     // regex pattern, check sample values against it. Demote if >50% fail.
-    // Also track whether validation CONFIRMED the type (pattern exists and
-    // values mostly pass) — this is used to gate Signal 2.
     //
-    // For types with locale-specific validation (validation_by_locale),
-    // first try each locale's pattern. If ANY locale achieves >50% pass rate,
-    // accept the prediction (locale-aware confirmation). Only demote if
-    // ALL locales fail AND the universal validation fails.
+    // Tracks two independent confirmation signals (NNFT-132 Precision Principle):
+    // - locale_confirmed: locale-specific pattern matched >50% (strong evidence)
+    // - validation_confirmed: universal validation pattern passed (weaker evidence)
+    //
+    // For locale-specific types (those with validation_by_locale), only
+    // locale_confirmed gates Signals 2 and 3. Universal validation can reject
+    // (Signal 1) but cannot confirm — a permissive universal pattern is not
+    // evidence of type identity. For types without locale validation, universal
+    // validation_confirmed still gates Signal 2.
+    let mut locale_confirmed = false;
     let mut validation_confirmed = false;
+    let mut has_locale_validators = false;
     if let Some(taxonomy) = taxonomy {
         // Use pre-compiled validator from taxonomy cache (NNFT-116).
         // Falls back to compile-per-call if cache not populated.
@@ -1693,8 +1705,8 @@ fn disambiguate_attractor_demotion(
         if non_empty.len() >= 3 {
             // Check locale-specific validators first (if available).
             // If any locale passes >50%, the type is locale-confirmed.
-            let mut locale_confirmed = false;
             if let Some(locale_validators) = taxonomy.get_locale_validators(top_label) {
+                has_locale_validators = true;
                 let mut best_pass_rate: f32 = 0.0;
                 for compiled in locale_validators.values() {
                     let pass_count = non_empty.iter().filter(|v| compiled.is_valid(v)).count();
@@ -1704,9 +1716,8 @@ fn disambiguate_attractor_demotion(
                     }
                 }
                 if best_pass_rate > 0.5 {
-                    // A locale pattern matched well — accept this prediction.
+                    // A locale pattern matched well — strong confirmation.
                     locale_confirmed = true;
-                    validation_confirmed = true;
                 }
             }
 
@@ -1743,6 +1754,8 @@ fn disambiguate_attractor_demotion(
                 }
                 // If validation has a regex pattern and values mostly pass
                 // (≤30% fail), that's positive evidence FOR the type.
+                // NOTE: For locale-specific types this is "format-compatible but
+                // unconfirmed" — it does NOT gate Signals 2/3 (see below).
                 if has_pattern && fail_rate <= 0.3 {
                     validation_confirmed = true;
                 }
@@ -1753,9 +1766,13 @@ fn disambiguate_attractor_demotion(
     // Signal 2: Confidence threshold
     // True positives for attractor types cluster at >0.9 confidence.
     // False positives cluster at 0.3–0.8.
-    // SKIP if validation with a regex pattern confirmed the type — pattern
-    // match is stronger evidence than confidence alone.
-    if !validation_confirmed && majority_fraction < 0.85 {
+    //
+    // Confirmation gating (NNFT-132 Precision Principle):
+    // - Locale-specific types: only locale_confirmed skips this signal.
+    //   Universal validation passing is "format-compatible" not "confirmed".
+    // - Other types: validation_confirmed (universal pattern match) suffices.
+    let confirmed = locale_confirmed || (!has_locale_validators && validation_confirmed);
+    if !confirmed && majority_fraction < 0.85 {
         let fallback = select_fallback(votes, is_numeric, is_text, is_code, values);
         return Some((
             fallback,
@@ -1768,7 +1785,13 @@ fn disambiguate_attractor_demotion(
     // types → demote to categorical. A column with 1–2 unique values is the
     // strongest possible signal (e.g., "airport" repeated 7k times is NOT a
     // person's first_name).
-    if is_text {
+    //
+    // SKIP if locale-confirmed (NNFT-132): locale-specific patterns are
+    // strong structural evidence that overcomes low cardinality. Small tables
+    // (common in web-scraped datasets like SOTAB) legitimately have few unique
+    // phone numbers or postal codes — cardinality alone shouldn't override
+    // locale-level format confirmation.
+    if is_text && !locale_confirmed {
         let non_empty: Vec<&str> = values
             .iter()
             .map(|v| v.trim())
@@ -4025,11 +4048,147 @@ geography.address.postal_code:
         taxonomy.compile_locale_validators();
 
         // Confidence 0.6 < 0.85 → Signal 2 would fire, BUT locale validation
-        // confirms the type → validation_confirmed = true → Signal 2 skipped
+        // confirms the type → locale_confirmed = true → Signal 2 skipped
         let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
         assert!(
             result.is_none(),
             "Should NOT demote real US ZIPs at low confidence when locale confirms them"
+        );
+    }
+
+    #[test]
+    fn test_attractor_locale_confirmed_skips_cardinality() {
+        // NNFT-132: Phone numbers with locale confirmation should NOT be demoted
+        // by Signal 3 (cardinality), even with few unique values. Small tables
+        // with legitimate phone numbers are common in web-scraped datasets.
+        let values: Vec<String> = vec![
+            "(805) 638-3078",
+            "(650) 440-2450",
+            "(805) 638-3078",
+            "(805) 638-3078",
+            "(650) 440-2450",
+            "(650) 440-2450",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        // 2 unique values, 6 total — classic cardinality demotion target
+        let votes = vec![("identity.person.phone_number".to_string(), 6)];
+
+        let yaml = r#"
+identity.person.phone_number:
+  title: "Phone Number"
+  validation:
+    type: string
+    minLength: 7
+    maxLength: 20
+    pattern: "^[+]?[0-9\\s()\\-\\.]+$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\+?1[\\s\\-\\.]*)?\\(?\\d{3}\\)?[\\s\\-\\.]*\\d{3}[\\s\\-\\.]*\\d{4}$"
+      minLength: 10
+      maxLength: 18
+  tier: [VARCHAR, person]
+  release_priority: 4
+  samples: ["+1 (555) 123-4567"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        let result = disambiguate_attractor_demotion(&values, &votes, 6, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "Should NOT demote phone numbers when locale-confirmed, even with 2 unique values"
+        );
+    }
+
+    #[test]
+    fn test_attractor_universal_only_does_not_confirm_locale_type() {
+        // NNFT-132 Precision Principle: For locale-specific types, passing the
+        // universal validation pattern does NOT count as confirmation. Only locale
+        // patterns can confirm. These values pass universal phone validation
+        // (digits + formatting chars) but don't match any locale pattern.
+        let values: Vec<String> = vec![
+            "123-456", "789-012", "345-678", "123-456", "789-012", "345-678",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        // Low confidence — Signal 2 would fire if not confirmed
+        let votes = vec![
+            ("identity.person.phone_number".to_string(), 4),
+            ("representation.discrete.categorical".to_string(), 2),
+        ];
+
+        let yaml = r#"
+identity.person.phone_number:
+  title: "Phone Number"
+  validation:
+    type: string
+    minLength: 7
+    maxLength: 20
+    pattern: "^[+]?[0-9\\s()\\-\\.]+$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\+?1[\\s\\-\\.]*)?\\(?\\d{3}\\)?[\\s\\-\\.]*\\d{3}[\\s\\-\\.]*\\d{4}$"
+      minLength: 10
+      maxLength: 18
+  tier: [VARCHAR, person]
+  release_priority: 4
+  samples: ["+1 (555) 123-4567"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        // Confidence 0.67 < 0.85 AND no locale confirmation → should demote
+        // despite universal pattern matching (precision principle)
+        let result = disambiguate_attractor_demotion(&values, &votes, 6, Some(&taxonomy));
+        assert!(
+            result.is_some(),
+            "Should demote phone_number at low confidence when only universal validates (no locale)"
+        );
+        let (_, rule) = result.unwrap();
+        assert!(
+            rule.starts_with("attractor_demotion_confidence:"),
+            "Should demote via confidence signal, got: {}",
+            rule
+        );
+    }
+
+    #[test]
+    fn test_attractor_first_name_cardinality_unchanged() {
+        // NNFT-132: first_name has no locale validators, so cardinality demotion
+        // still works exactly as before — this is a regression guard.
+        let values: Vec<String> = vec![
+            "John", "Jane", "Bob", "John", "Jane", "Bob", "John", "Jane", "Bob", "John",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let votes = vec![
+            ("identity.person.first_name".to_string(), 9),
+            ("representation.text.word".to_string(), 1),
+        ];
+
+        // 3 unique values, text attractor, no locale validators → must still demote
+        let result = disambiguate_attractor_demotion(&values, &votes, 10, None);
+        assert!(
+            result.is_some(),
+            "first_name with 3 unique values should still be demoted (no locale validators)"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert!(
+            rule.starts_with("attractor_demotion_cardinality:"),
+            "Should demote via cardinality signal, got: {}",
+            rule
         );
     }
 
