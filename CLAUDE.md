@@ -12,7 +12,7 @@ Every decision in this repo should reflect these principles:
 
 ## Current State
 
-**Version:** 0.2.0 (latest tag: `v0.2.0`)
+**Version:** 0.2.1 (latest tag: `v0.2.1`)
 **Taxonomy:** 169 definitions across 6 domains — all generators pass, 100% alignment
 **Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
@@ -21,6 +21,7 @@ Every decision in this repo should reflect these principles:
 
 ### Recent milestones
 
+- **v0.2.1** — Locale-aware postal code validation (NNFT-118), max-sim semantic matching with K=3 FPS representatives (NNFT-124), threshold tuning (NNFT-122), targeted synonyms (NNFT-123). Smarter column classification with reduced false positives.
 - **v0.2.0** — Multi-signal attractor demotion (NNFT-115), JSON Schema validation engine (NNFT-116), numeric range validation (NNFT-117). Reduces false positives on generic numeric data and modernises the validation engine.
 - **v0.1.9** — Model2Vec semantic column name classifier (NNFT-110), unified column-level disambiguation (NNFT-109). Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions). Homebrew tap auto-updated.
 - **v0.1.8** — 30x tiered inference throughput, accuracy 72.6% -> 92.9% on profile eval, Windows release target, header-hint override system
