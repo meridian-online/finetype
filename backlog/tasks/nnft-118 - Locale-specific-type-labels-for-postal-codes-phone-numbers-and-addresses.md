@@ -1,11 +1,11 @@
 ---
 id: NNFT-118
 title: 'Locale-specific type labels for postal codes, phone numbers, and addresses'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-24 08:35'
-updated_date: '2026-02-24 13:11'
+updated_date: '2026-02-25 01:20'
 labels:
   - accuracy
   - locale
@@ -61,6 +61,7 @@ Bring back 4-level locale labels (domain.category.type.LOCALE) for the 21 locale
 - [x] #6 postal_code false positives reduced on profile eval
 - [x] #7 No regressions on format-detectable accuracy (68/74 baseline)
 - [x] #8 Data source attribution documented (libphonenumber, libaddressinput)
+- [x] #9 Phase 1 scope delivered — ACs #2-5 deferred to follow-up task
 <!-- AC:END -->
 
 ## Implementation Plan
