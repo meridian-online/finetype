@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-25
+
+### Accuracy
+
+- **Geography-aware header hint** — when Model2Vec maps a "name" column to full_name, new geography protection checks prevent overriding correct location predictions. Two cases: (1) keep model prediction when it's already a location type, (2) rescue attractor-demoted predictions when geography votes exist. Fixes world_cities.name → city. Profile eval 68/74 → 69/74 (NNFT-127)
+- **Measurement disambiguation** — age, height, and weight are numerically indistinguishable (small integers in overlapping ranges). When the header provides a specific measurement hint but the model predicts a different measurement type, the header now wins. Fixes medical_records.height_in → height. Profile eval 69/74 → 70/74 (NNFT-128)
+
 ## [0.2.2] - 2026-02-25
 
 ### Accuracy

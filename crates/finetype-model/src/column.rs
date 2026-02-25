@@ -252,6 +252,26 @@ impl ColumnClassifier {
                 return Ok(result);
             }
 
+            // Measurement disambiguation: age, height, and weight values are
+            // numerically indistinguishable (all small integers in overlapping
+            // ranges). When the header provides a specific measurement hint,
+            // trust it over the model prediction.
+            const MEASUREMENT_TYPES: &[&str] = &[
+                "identity.person.age",
+                "identity.person.height",
+                "identity.person.weight",
+            ];
+            if MEASUREMENT_TYPES.contains(&hinted_type)
+                && MEASUREMENT_TYPES.contains(&result.label.as_str())
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.9;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_measurement:{}", header.to_lowercase()));
+                return Ok(result);
+            }
+
             // Check if the hinted type is in the vote distribution
             let hint_in_votes = result
                 .vote_distribution
@@ -280,6 +300,53 @@ impl ColumnClassifier {
                 // they should yield to header hints the same way generic types do.
                 || result.disambiguation_rule.as_ref()
                     .is_some_and(|r| r.starts_with("attractor_demotion"));
+
+            // Geography protection: when the hint is full_name, check if the
+            // model sees geography.location signal. Many geographic datasets
+            // use "name" as a header for city, country, or region columns.
+            // The model often correctly identifies the geography type but the
+            // full_name hint would override it.
+            if hinted_type == "identity.person.full_name" {
+                const LOCATION_TYPES: &[&str] = &[
+                    "geography.location.city",
+                    "geography.location.country",
+                    "geography.location.region",
+                    "geography.location.state",
+                    "geography.location.continent",
+                ];
+
+                // Case 1: Model already predicts a location type — keep it
+                // rather than overriding to full_name.
+                if LOCATION_TYPES.contains(&result.label.as_str()) {
+                    result.confidence = result.confidence.max(0.5);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_location_keep:{}",
+                        header.to_lowercase()
+                    ));
+                    return Ok(result);
+                }
+
+                // Case 2: Prediction was demoted to generic but geography
+                // votes exist — pick the top geography type.
+                if is_generic {
+                    let top_location = result
+                        .vote_distribution
+                        .iter()
+                        .filter(|(label, _)| LOCATION_TYPES.contains(&label.as_str()))
+                        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    if let Some((loc_label, loc_frac)) = top_location {
+                        if *loc_frac >= 0.10 {
+                            result.label = loc_label.clone();
+                            result.confidence = loc_frac.max(0.5);
+                            result.disambiguation_applied = true;
+                            result.disambiguation_rule =
+                                Some(format!("header_hint_location:{}", header.to_lowercase()));
+                            return Ok(result);
+                        }
+                    }
+                }
+            }
 
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
                 let hint_fraction = result

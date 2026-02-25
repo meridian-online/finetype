@@ -15,7 +15,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/noon-org/finetype"
@@ -70,8 +70,8 @@ duckdb = { version = "=1.4.4", features = ["loadable-extension", "vscalar"] }
 libduckdb-sys = "=1.4.4"
 
 # Internal crates
-finetype-core = { version = "0.2.2", path = "crates/finetype-core" }
-finetype-model = { version = "0.2.2", path = "crates/finetype-model" }
+finetype-core = { version = "0.3.0", path = "crates/finetype-core" }
+finetype-model = { version = "0.3.0", path = "crates/finetype-model" }
 
 [profile.release]
 lto = true

@@ -12,7 +12,7 @@ Every decision in this repo should reflect these principles:
 
 ## Current State
 
-**Version:** 0.2.2 (latest tag: `v0.2.2`)
+**Version:** 0.3.0 (latest tag: `v0.3.0`)
 **Taxonomy:** 169 definitions across 6 domains — all generators pass, 100% alignment
 **Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
@@ -21,6 +21,7 @@ Every decision in this repo should reflect these principles:
 
 ### Recent milestones
 
+- **v0.3.0** — Accuracy release: geography-aware header hints (NNFT-127) and measurement disambiguation (NNFT-128). Profile eval 68/74 → 70/74 (94.6%). world_cities.name now correctly predicts city; medical_records.height_in now correctly predicts height.
 - **v0.2.2** — Locale-aware phone number validation (NNFT-121) with 14 locale patterns derived from libphonenumber. phone_number added to TEXT_ATTRACTORS for demotion of false positives. Infrastructure hardening, no eval score change (68/74).
 - **v0.2.1** — Locale-aware postal code validation (NNFT-118), max-sim semantic matching with K=3 FPS representatives (NNFT-124), threshold tuning (NNFT-122), targeted synonyms (NNFT-123). Smarter column classification with reduced false positives.
 - **v0.2.0** — Multi-signal attractor demotion (NNFT-115), JSON Schema validation engine (NNFT-116), numeric range validation (NNFT-117). Reduces false positives on generic numeric data and modernises the validation engine.
@@ -32,7 +33,7 @@ Every decision in this repo should reflect these principles:
 
 ### What's in progress
 
-- **v0.3.0 accuracy release** — Targeting ≥70/74 on profile eval. Two fixes: context-aware name header hint (NNFT-127, +2) and height/age disambiguation (NNFT-128, +1). CLDR date/time patterns deferred.
+- **Next accuracy targets** — 4 remaining misses at 70/74: countries.name (intractable without cross-column context), books_catalog.publisher, people_directory.company, tech_systems.server_hostname (GT mapping issue). CLDR date/time patterns and 4-level locale labels (NNFT-126) are next infrastructure pieces.
 
 ## Architecture
 
@@ -77,7 +78,7 @@ The inference system has two modes:
 - Aggregates predictions via majority vote
 - Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection, attractor demotion)
 - **Attractor demotion** (Rule 14): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not validation-confirmed), and cardinality mismatch (1-20 unique values for text attractors). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override. **Locale-aware validation** (NNFT-118): For types with `validation_by_locale`, Signal 1 first checks all locale patterns — if any locale achieves >50% pass rate, the prediction is locale-confirmed (skips demotion and Signal 2). Only falls through to universal validation when no locale matches.
-- **Semantic header hints** (Model2Vec): embeds column name → max-sim matching against 169 types × K=3 representative embeddings → overrides generic predictions above 0.65 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable.
+- **Semantic header hints** (Model2Vec): embeds column name → max-sim matching against 169 types × K=3 representative embeddings → overrides generic predictions above 0.65 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable. **Geography protection** (NNFT-127): when hint is `full_name`, checks if model sees geography signal — keeps location predictions rather than overriding, and rescues attractor-demoted predictions when geography votes exist. **Measurement disambiguation** (NNFT-128): when both hint and prediction are measurement types (age/height/weight), trusts the header since values are numerically indistinguishable.
 - `is_generic` flag marks types that should yield to header hints (includes attractor-demoted predictions)
 
 Both classifiers implement the `ValueClassifier` trait for polymorphic dispatch.
@@ -174,7 +175,7 @@ Key architectural decisions that should not be revisited without good reason:
 
 4. **CharCNN architecture** — Character-level CNN for text classification. Candle (Rust) for both training and inference. No Python dependency at runtime. (NNFT-003)
 
-5. **Column-mode disambiguation** — Majority vote + rule-based disambiguation. Rules are hardcoded in `column.rs`, not learned. Header hints override generic predictions. (NNFT-065, NNFT-091, NNFT-102)
+5. **Column-mode disambiguation** — Majority vote + rule-based disambiguation. Rules are hardcoded in `column.rs`, not learned. Header hints override generic predictions. Two specialised hint guards: geography protection prevents `full_name` hints from overriding correct location predictions (NNFT-127), and measurement disambiguation trusts headers over model predictions when both are in the {age, height, weight} group (NNFT-128). (NNFT-065, NNFT-091, NNFT-102, NNFT-127, NNFT-128)
 
 5a. **Model2Vec semantic header hints with max-sim matching** — Column name classification uses Model2Vec static embeddings (potion-base-4M, 7.4MB float16) with max-sim matching against pre-computed type embeddings. Each type stores K=3 representative embeddings selected via Farthest Point Sampling (FPS), avoiding centroid dilution from mean-pooling diverse synonyms. `type_embeddings.safetensors` uses interleaved layout `[n_types*K, embed_dim]`; K is inferred at load time from shape ratio (`type_embeddings.rows / label_index.len()`), so K=1 old artifacts are backward-compatible. Threshold 0.65 balances precision and recall with one known borderline FP (data→form_data at 0.687). Falls back to hardcoded `header_hint()` when Model2Vec unavailable. Model artifacts in `models/model2vec/`, embedded at build time. `prepare_model2vec.py` supports `--max-k N` (default 3) and `--legacy` (force K=1 mean-pool). No new Rust dependencies — uses existing candle-core + tokenizers. (NNFT-110, NNFT-122, NNFT-124)
 
