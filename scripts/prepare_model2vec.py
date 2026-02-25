@@ -59,6 +59,10 @@ def build_header_hint_entries() -> dict[str, str]:
         "href": "technology.internet.url",
         "website": "technology.internet.url",
         "homepage": "technology.internet.url",
+        "tracking url": "technology.internet.url",
+        "callback url": "technology.internet.url",
+        "redirect url": "technology.internet.url",
+        "api url": "technology.internet.url",
         # IP
         "ip": "technology.internet.ip_v4",
         "ip address": "technology.internet.ip_v4",
@@ -123,6 +127,9 @@ def build_header_hint_entries() -> dict[str, str]:
         "postal code": "geography.address.postal_code",
         "postalcode": "geography.address.postal_code",
         "postcode": "geography.address.postal_code",
+        "shipping postal code": "geography.address.postal_code",
+        "billing postal code": "geography.address.postal_code",
+        "mailing zip": "geography.address.postal_code",
         # Names
         "name": "identity.person.full_name",
         "full name": "identity.person.full_name",
@@ -196,6 +203,11 @@ def build_header_hint_entries() -> dict[str, str]:
         "tz offset": "datetime.offset.utc",
         "utcoffset": "datetime.offset.utc",
         "gmtoffset": "datetime.offset.utc",
+        # IANA timezone (NNFT-123: targeted synonym for column name matching)
+        "timezone": "datetime.offset.iana",
+        "tz": "datetime.offset.iana",
+        "time zone": "datetime.offset.iana",
+        "iana timezone": "datetime.offset.iana",
         # Financial codes
         "cvv": "identity.payment.cvv",
         "cvc": "identity.payment.cvv",
@@ -250,6 +262,14 @@ def build_header_hint_entries() -> dict[str, str]:
         # Weight/Height
         "weight": "identity.person.weight",
         "height": "identity.person.height",
+        # HTTP status code (NNFT-123: targeted synonym for column name matching)
+        "status code": "technology.internet.http_status_code",
+        "response code": "technology.internet.http_status_code",
+        "http status": "technology.internet.http_status_code",
+        # MIME type (NNFT-123: targeted synonym for column name matching)
+        "content type": "representation.file.mime_type",
+        "media type": "representation.file.mime_type",
+        "mime": "representation.file.mime_type",
     }
 
 
