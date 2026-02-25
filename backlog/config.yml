@@ -2,7 +2,7 @@ project_name: "Noon FineType"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 labels: []
-milestones: []
+definition_of_done: ["Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions", "Final Summary written (PR-quality — what changed / why / impact / tests)", "CLAUDE.md updated if Current State / Architecture / Priority Order affected", "Decision record created if plan involved choosing between approaches", "Daily memory log updated with session outcomes", "Changes committed with task ID in commit message"]
 date_format: yyyy-mm-dd
 max_column_width: 20
 default_editor: "hx"
