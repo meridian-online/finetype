@@ -7,11 +7,17 @@ hint entries. Outputs 4 files into models/model2vec/:
 
   tokenizer.json          — wordpiece tokenizer (copied from potion model)
   model.safetensors       — token embedding matrix [vocab_size, embed_dim]
-  type_embeddings.safetensors — pre-computed label embeddings [N_types, embed_dim]
+  type_embeddings.safetensors — pre-computed label embeddings [N_types * K, embed_dim]
   label_index.json        — ordered list mapping row index to label string
 
+Max-sim matching (default): stores K representative embeddings per type using
+Farthest Point Sampling. Layout is interleaved: rows 0..K are type 0's K
+embeddings, rows K..2K are type 1's, etc. K is inferred at load time from
+type_embeddings.shape[0] / len(label_index).
+
 Usage:
-    python scripts/prepare_model2vec.py [--model minishlab/potion-base-4M]
+    python scripts/prepare_model2vec.py [--model minishlab/potion-base-4M] [--max-k 3]
+    python scripts/prepare_model2vec.py --legacy  # Force K=1 mean-pool (old behavior)
 """
 
 import argparse
@@ -324,15 +330,72 @@ def build_synonym_texts(
     return synonyms
 
 
-def embed_type_labels(
-    model: StaticModel, synonyms: dict[str, list[str]]
-) -> tuple[np.ndarray, list[str]]:
-    """Compute one embedding per type label by averaging its synonym embeddings.
+def farthest_point_sampling(
+    vectors: np.ndarray, k: int
+) -> np.ndarray:
+    """Select K representative vectors via Farthest Point Sampling.
 
-    Returns (embeddings [N, dim], label_index [N]).
+    Seed: the vector closest to the mean (most "central" representative).
+    Then greedily add the vector farthest from all already-selected points
+    (maximize min-distance). O(N*K), trivial for K=3 and N≈20.
+
+    Args:
+        vectors: L2-normalised embeddings [N, dim]
+        k: number of representatives to select
+
+    Returns:
+        Selected representative vectors [K, dim]
+    """
+    n = vectors.shape[0]
+    assert n >= k, f"Need at least {k} vectors, got {n}"
+
+    # Seed: closest to mean
+    mean_vec = np.mean(vectors, axis=0)
+    mean_norm = np.linalg.norm(mean_vec)
+    if mean_norm > 0:
+        mean_vec = mean_vec / mean_norm
+    dists_to_mean = 1.0 - vectors @ mean_vec  # cosine distance
+    seed_idx = int(np.argmin(dists_to_mean))
+
+    selected = [seed_idx]
+    # min_dists[i] = min distance from point i to any selected point
+    # Using cosine distance: 1 - cos_sim
+    min_dists = 1.0 - vectors @ vectors[seed_idx]  # [N]
+
+    for _ in range(k - 1):
+        # Pick the point with the largest min-distance to selected set
+        # Mask already-selected points
+        min_dists_masked = min_dists.copy()
+        for idx in selected:
+            min_dists_masked[idx] = -1.0
+        next_idx = int(np.argmax(min_dists_masked))
+        selected.append(next_idx)
+
+        # Update min distances
+        new_dists = 1.0 - vectors @ vectors[next_idx]
+        min_dists = np.minimum(min_dists, new_dists)
+
+    return vectors[selected]  # [K, dim]
+
+
+def embed_type_labels(
+    model: StaticModel, synonyms: dict[str, list[str]], max_k: int = 1
+) -> tuple[np.ndarray, list[str]]:
+    """Compute type label embeddings.
+
+    When max_k=1 (legacy mode): mean-pools all synonym embeddings into one
+    centroid per type. Returns [N_types, dim].
+
+    When max_k>1 (max-sim mode): selects K representative embeddings per type
+    via Farthest Point Sampling. Returns [N_types * K, dim] with interleaved
+    layout: rows 0..K are type 0's representatives, K..2K are type 1's, etc.
+    Types with fewer than K synonyms are zero-padded.
+
+    Returns (embeddings [N_types * K, dim], label_index [N_types]).
     """
     label_index = sorted(synonyms.keys())
-    embeddings = []
+    dim = None
+    all_type_embeddings = []
 
     for label in label_index:
         texts = synonyms[label]
@@ -340,18 +403,35 @@ def embed_type_labels(
             # Fallback: use the label itself
             texts = [label.replace(".", " ")]
 
-        # Embed all synonym texts
+        # Embed all synonym texts and L2-normalise each
         vecs = model.encode(texts)  # [n_texts, dim]
+        norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+        norms = np.maximum(norms, 1e-8)
+        vecs = vecs / norms  # L2-normalised [n_texts, dim]
 
-        # Mean pool and L2 normalize
-        mean_vec = np.mean(vecs, axis=0)
-        norm = np.linalg.norm(mean_vec)
-        if norm > 0:
-            mean_vec = mean_vec / norm
+        if dim is None:
+            dim = vecs.shape[1]
 
-        embeddings.append(mean_vec)
+        if max_k == 1:
+            # Legacy: mean pool and L2 normalize
+            mean_vec = np.mean(vecs, axis=0)
+            norm = np.linalg.norm(mean_vec)
+            if norm > 0:
+                mean_vec = mean_vec / norm
+            all_type_embeddings.append(mean_vec.reshape(1, dim))
+        else:
+            # Max-sim: select K representatives
+            n_synonyms = vecs.shape[0]
+            if n_synonyms <= max_k:
+                # Use all available, zero-pad the rest
+                reps = np.zeros((max_k, dim), dtype=np.float32)
+                reps[:n_synonyms] = vecs
+            else:
+                # Farthest Point Sampling
+                reps = farthest_point_sampling(vecs, max_k)
+            all_type_embeddings.append(reps)
 
-    return np.stack(embeddings).astype(np.float32), label_index
+    return np.concatenate(all_type_embeddings, axis=0).astype(np.float32), label_index
 
 
 def main():
@@ -366,7 +446,23 @@ def main():
         default=None,
         help="Output directory (default: models/model2vec)",
     )
+    parser.add_argument(
+        "--max-k",
+        type=int,
+        default=3,
+        help="Number of representative embeddings per type (default: 3). "
+        "K=1 is equivalent to mean-pool (legacy behavior).",
+    )
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Force K=1 mean-pool (reproduces old single-centroid behavior)",
+    )
     args = parser.parse_args()
+
+    max_k = 1 if args.legacy else args.max_k
+    if max_k < 1:
+        parser.error("--max-k must be >= 1")
 
     # Resolve paths relative to workspace root
     script_dir = Path(__file__).parent
@@ -387,9 +483,11 @@ def main():
     total_synonyms = sum(len(v) for v in synonyms.values())
     print(f"  {len(synonyms)} types, {total_synonyms} total synonym texts")
 
-    print("Computing type label embeddings")
-    type_embeddings, label_index = embed_type_labels(model, synonyms)
-    print(f"  Shape: {type_embeddings.shape}")
+    print(f"Computing type label embeddings (K={max_k})")
+    type_embeddings, label_index = embed_type_labels(model, synonyms, max_k=max_k)
+    print(f"  Shape: {type_embeddings.shape} ({'max-sim' if max_k > 1 else 'legacy mean-pool'})")
+    if max_k > 1:
+        print(f"  {len(label_index)} types × {max_k} representatives = {len(label_index) * max_k} rows")
 
     # Save outputs
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -425,18 +523,21 @@ def main():
     label_path.write_text(json.dumps(label_index, indent=2) + "\n")
     print(f"  Saved label_index.json ({len(label_index)} labels)")
 
-    # Quick verification
+    # Quick verification — uses max-sim matching when K > 1
     print("\nVerification — test embeddings:")
     test_names = ["email", "zip_code", "latitude", "phone_number", "first_name", "created_at"]
+    n_types = len(label_index)
     for name in test_names:
         # Normalize like our Rust code will
         normalized = name.lower().replace("_", " ").replace("-", " ").strip()
         query_vec = model.encode([normalized])  # [1, dim]
         query_vec = query_vec / np.linalg.norm(query_vec, axis=1, keepdims=True)
-        similarities = type_embeddings @ query_vec.T  # [N, 1]
-        best_idx = np.argmax(similarities)
-        best_sim = similarities[best_idx, 0]
-        print(f"  '{name}' -> {label_index[best_idx]} (sim={best_sim:.3f})")
+        all_sims = type_embeddings @ query_vec.T  # [N_types * K, 1]
+        all_sims = all_sims.reshape(n_types, max_k)  # [N_types, K]
+        max_sims = np.max(all_sims, axis=1)  # [N_types] — best rep per type
+        best_type = np.argmax(max_sims)
+        best_sim = max_sims[best_type]
+        print(f"  '{name}' -> {label_index[best_type]} (sim={best_sim:.3f})")
 
     print(f"\nDone! Output in {output_dir}")
 
