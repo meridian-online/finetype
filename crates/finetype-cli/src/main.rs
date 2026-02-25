@@ -75,6 +75,16 @@ enum Commands {
         /// Print throughput statistics to stderr after inference
         #[arg(long)]
         bench: bool,
+
+        /// Column name for header hint (used with --mode column)
+        #[arg(long)]
+        header: Option<String>,
+
+        /// Read JSONL from stdin: {"header":"col_name","values":["v1","v2",...]}
+        /// Outputs one JSON line per input with classification results.
+        /// Requires --mode column.
+        #[arg(long)]
+        batch: bool,
     },
 
     /// Generate synthetic training data
@@ -362,6 +372,8 @@ fn main() -> Result<()> {
             mode,
             sample_size,
             bench,
+            header,
+            batch,
         } => cmd_infer(
             input,
             file,
@@ -373,6 +385,8 @@ fn main() -> Result<()> {
             mode,
             sample_size,
             bench,
+            header,
+            batch,
         ),
 
         Commands::Generate {
@@ -479,9 +493,19 @@ fn cmd_infer(
     mode: InferenceMode,
     sample_size: usize,
     bench: bool,
+    header: Option<String>,
+    batch: bool,
 ) -> Result<()> {
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
     use std::time::Instant;
+
+    // Batch mode: read JSONL from stdin, classify each column group
+    if batch {
+        if !matches!(mode, InferenceMode::Column) {
+            anyhow::bail!("--batch requires --mode column");
+        }
+        return cmd_infer_batch(model, model_type, sample_size);
+    }
 
     // Collect inputs
     let inputs: Vec<String> = if let Some(text) = input {
@@ -566,7 +590,11 @@ fn cmd_infer(
             sample_size,
             ..Default::default()
         };
-        let mut column_classifier = ColumnClassifier::new(classifier, config);
+        let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
+            ColumnClassifier::with_semantic_hint(classifier, config, semantic)
+        } else {
+            ColumnClassifier::new(classifier, config)
+        };
 
         // Load taxonomy for validation-based attractor demotion (Rule 14)
         let taxonomy_path = std::path::PathBuf::from("labels");
@@ -576,7 +604,11 @@ fn cmd_infer(
             column_classifier.set_taxonomy(taxonomy);
         }
 
-        let result = column_classifier.classify_column(&inputs)?;
+        let result = if let Some(ref hdr) = header {
+            column_classifier.classify_column_with_header(&inputs, hdr)?
+        } else {
+            column_classifier.classify_column(&inputs)?
+        };
 
         match output {
             OutputFormat::Plain => {
@@ -732,6 +764,156 @@ fn cmd_infer(
             model_type, total_values, secs, vps
         );
     }
+
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INFER BATCH — JSONL column-mode batch classification (NNFT-130)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Batch column-mode inference: reads JSONL from stdin, classifies each column
+/// group using the full pipeline (tiered model + Model2Vec + disambiguation +
+/// attractor demotion), and writes one JSON line per input to stdout.
+///
+/// Input JSONL format:
+///   {"header": "col_name", "values": ["v1", "v2", ...]}
+///   {"values": ["v1", "v2", ...]}
+///
+/// Output JSONL format:
+///   {"label": "identity.person.email", "confidence": 0.95, ...}
+fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+    use std::time::Instant;
+
+    let t_start = Instant::now();
+
+    // Load value-level classifier
+    let classifier: Box<dyn ValueClassifier> = match model_type {
+        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+    };
+
+    let config = ColumnConfig {
+        sample_size,
+        ..Default::default()
+    };
+
+    // Wire up semantic hint (Model2Vec) — same as profile command
+    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
+        eprintln!("Loaded semantic hint classifier (Model2Vec)");
+        ColumnClassifier::with_semantic_hint(classifier, config, semantic)
+    } else {
+        ColumnClassifier::new(classifier, config)
+    };
+
+    // Load taxonomy for validation-based attractor demotion (Rule 14)
+    let taxonomy_path = std::path::PathBuf::from("labels");
+    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+        eprintln!(
+            "Loaded taxonomy ({} types, {} validators, {} locale validators)",
+            taxonomy.labels().len(),
+            taxonomy.validator_count(),
+            taxonomy.locale_validator_count()
+        );
+        column_classifier.set_taxonomy(taxonomy);
+    }
+
+    let load_elapsed = t_start.elapsed();
+    eprintln!("Model loaded in {:.2}s", load_elapsed.as_secs_f64());
+
+    let stdout = io::stdout();
+    let mut out = io::BufWriter::new(stdout.lock());
+    let stdin = io::stdin();
+
+    let mut n_columns = 0u64;
+    let mut n_values = 0u64;
+    let mut n_errors = 0u64;
+
+    for line in stdin.lock().lines() {
+        let line = line?;
+        if line.is_empty() {
+            continue;
+        }
+
+        // Parse JSONL input
+        let input: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(e) => {
+                let err_obj = json!({"error": format!("invalid JSON: {e}")});
+                writeln!(out, "{}", err_obj)?;
+                n_errors += 1;
+                continue;
+            }
+        };
+
+        let values: Vec<String> = match input.get("values").and_then(|v| v.as_array()) {
+            Some(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
+            None => {
+                let err_obj = json!({"error": "missing or invalid 'values' array"});
+                writeln!(out, "{}", err_obj)?;
+                n_errors += 1;
+                continue;
+            }
+        };
+
+        if values.is_empty() {
+            let err_obj = json!({"error": "empty values array"});
+            writeln!(out, "{}", err_obj)?;
+            n_errors += 1;
+            continue;
+        }
+
+        n_values += values.len() as u64;
+
+        let header_str = input.get("header").and_then(|h| h.as_str()).unwrap_or("");
+
+        let result = if !header_str.is_empty() {
+            column_classifier.classify_column_with_header(&values, header_str)?
+        } else {
+            column_classifier.classify_column(&values)?
+        };
+
+        let mut obj = serde_json::Map::new();
+        obj.insert("label".to_string(), json!(result.label));
+        obj.insert("confidence".to_string(), json!(result.confidence));
+        obj.insert("samples_used".to_string(), json!(result.samples_used));
+        if result.disambiguation_applied {
+            obj.insert(
+                "disambiguation_rule".to_string(),
+                json!(result.disambiguation_rule),
+            );
+        }
+
+        writeln!(out, "{}", serde_json::Value::Object(obj))?;
+        n_columns += 1;
+
+        // Progress indicator every 1000 columns
+        if n_columns.is_multiple_of(1000) {
+            eprintln!(
+                "  classified {} columns ({} values)...",
+                n_columns, n_values
+            );
+        }
+    }
+
+    out.flush()?;
+
+    let total_elapsed = t_start.elapsed();
+    eprintln!(
+        "Batch complete: {} columns, {} values, {} errors in {:.2}s ({:.0} cols/sec)",
+        n_columns,
+        n_values,
+        n_errors,
+        total_elapsed.as_secs_f64(),
+        n_columns as f64 / total_elapsed.as_secs_f64()
+    );
 
     Ok(())
 }

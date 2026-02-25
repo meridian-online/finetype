@@ -136,7 +136,7 @@ Each definition in `labels/definitions_*.yaml` is a **transformation contract** 
 
 | Command | Purpose |
 |---|---|
-| `finetype infer` | Classify values from stdin (single or column mode) |
+| `finetype infer` | Classify values from stdin (single or column mode). `--header` adds header hint, `--batch` reads JSONL for bulk column classification. |
 | `finetype profile <file>` | Profile all columns in a CSV/Parquet file |
 | `finetype check` | Validate taxonomy <-> generator alignment |
 | `finetype generate` | Generate synthetic training data |
@@ -151,7 +151,7 @@ Three evaluation benchmarks, all in `eval/`:
 2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.1.8: 57.8% domain accuracy on format-detectable types (14,850 tables, 2.7M values).
 3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. v0.1.8: 53.7% domain accuracy (5,728 tables, 16,765 columns).
 
-All eval pipelines use `eval/config.env` for dataset paths with `envsubst` substitution in SQL templates.
+All eval pipelines use `eval/config.env` for dataset paths with `envsubst` substitution in SQL templates. CLI-based eval pipelines (`eval-1m-cli`, `eval-sotab-cli`) use Python scripts to pipe columns through `finetype infer --mode column --batch`, then score with adapted SQL.
 
 ## Priority Order
 

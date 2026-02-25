@@ -106,6 +106,22 @@ eval-benchmark: $(EXTENSION)
 eval-all: eval-extract eval-values eval-1m
 	@echo "═══ Full evaluation pipeline complete ═══"
 
+# ─── GitTables CLI Evaluation (NNFT-130) ──────
+# Uses CLI batch mode (tiered + Model2Vec + disambiguation) instead of DuckDB extension.
+# Prerequisites: make eval-extract eval-values eval-mapping
+# Full pipeline: make eval-extract eval-values eval-1m-cli
+
+.PHONY: eval-1m-cli
+
+eval-1m-cli: eval-mapping
+	@echo "═══ Running GitTables 1M CLI evaluation ═══"
+	@echo "Eval output: $(EVAL_OUTPUT)"
+	GITTABLES_DIR="$(GITTABLES_DIR)" EVAL_OUTPUT="$(EVAL_OUTPUT)" \
+		FINETYPE_BIN="cargo run --release --" \
+		$(VENV_PYTHON) $(EVAL_DIR)/eval_cli.py
+	export EVAL_OUTPUT="$(EVAL_OUTPUT)" && \
+		envsubst $(ENVSUBST_VARS) < $(EVAL_DIR)/eval_cli.sql | duckdb
+
 # ─── SOTAB Evaluation ─────────────────────────
 # Prerequisites:
 #   1. SOTAB CTA data at $(SOTAB_DATA)/{validation,test}/
@@ -130,6 +146,22 @@ eval-sotab: $(EXTENSION)
 
 eval-sotab-all: eval-sotab-values eval-sotab
 	@echo "═══ SOTAB evaluation pipeline complete ═══"
+
+# ─── SOTAB CLI Evaluation (NNFT-130) ─────────
+# Uses CLI batch mode (tiered + disambiguation) instead of DuckDB extension.
+# No header hints — SOTAB uses integer column indices.
+# Prerequisites: make eval-sotab-values
+# Full pipeline: make eval-sotab-values eval-sotab-cli
+
+.PHONY: eval-sotab-cli
+
+eval-sotab-cli:
+	@echo "═══ Running SOTAB CTA CLI evaluation ($(SOTAB_SPLIT)) ═══"
+	SOTAB_DIR="$(SOTAB_DATA)" \
+		FINETYPE_BIN="cargo run --release --" \
+		$(VENV_PYTHON) $(SOTAB_EVAL_DIR)/eval_cli.py --split $(SOTAB_SPLIT)
+	export SOTAB_DIR="$(SOTAB_DATA)" SOTAB_SPLIT="$(SOTAB_SPLIT)" && \
+		envsubst $(ENVSUBST_VARS) < $(SOTAB_EVAL_DIR)/eval_cli.sql | duckdb
 
 # ─── Profile Evaluation ─────────────────────
 # Evaluate finetype profile against annotated CSVs.
