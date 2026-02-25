@@ -348,8 +348,12 @@ const NUMERIC_ATTRACTORS: &[&str] = &[
 /// Note: full_name is NOT included — its false positives are rare (2 in eval)
 /// and the header hint system handles them. Including full_name causes more
 /// regressions (company, venue, publisher columns whose GT maps to "name"→full_name).
+/// phone_number is included here (not NUMERIC) because phone strings contain
+/// formatting characters (+, parens, hyphens, spaces). Locale validation via
+/// validation_by_locale confirms real phone columns; non-phone data is demoted.
 const TEXT_ATTRACTORS: &[&str] = &[
     "identity.person.first_name",
+    "identity.person.phone_number",
     "identity.person.username",
     "geography.address.street_name",
 ];

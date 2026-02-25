@@ -1,11 +1,11 @@
 ---
 id: NNFT-125
 title: 'Release v0.2.1: locale-aware validation, max-sim semantic matching'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-25 03:11'
-updated_date: '2026-02-25 03:13'
+updated_date: '2026-02-25 03:14'
 labels:
   - release
 dependencies: []
@@ -32,8 +32,29 @@ Profile eval: 68/74 format-detectable correct (91.9%). 263 tests passing.
 - [x] #3 CLAUDE.md version and milestones updated
 - [x] #4 cargo build succeeds
 - [x] #5 cargo test passes
-- [ ] #6 Tagged v0.2.1 and pushed to origin
+- [x] #6 Tagged v0.2.1 and pushed to origin
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Released FineType v0.2.1 with four changes since v0.2.0:
+
+**Accuracy:**
+- NNFT-118: Locale-aware postal code validation (14 locales) in attractor demotion Signal 1
+- NNFT-122: Model2Vec threshold 0.70→0.65 (+12 correct semantic matches)
+- NNFT-123: Targeted synonyms for 5 high-value types
+
+**Changed:**
+- NNFT-124: Max-sim matching with K=3 FPS representatives replaces mean-pooled centroids
+
+**Verification:**
+- cargo build/test: 263 tests pass
+- Profile eval: 68/74 format-detectable correct (91.9%)
+- Tagged v0.2.1, pushed to origin
+
+**Post-release TODO:** Publish to crates.io after CI builds complete. Update Homebrew tap.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

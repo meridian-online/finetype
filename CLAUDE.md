@@ -12,7 +12,7 @@ Every decision in this repo should reflect these principles:
 
 ## Current State
 
-**Version:** 0.2.1 (latest tag: `v0.2.1`)
+**Version:** 0.2.2 (latest tag: `v0.2.2`)
 **Taxonomy:** 169 definitions across 6 domains — all generators pass, 100% alignment
 **Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
@@ -21,6 +21,7 @@ Every decision in this repo should reflect these principles:
 
 ### Recent milestones
 
+- **v0.2.2** — Locale-aware phone number validation (NNFT-121) with 14 locale patterns derived from libphonenumber. phone_number added to TEXT_ATTRACTORS for demotion of false positives. Infrastructure hardening, no eval score change (68/74).
 - **v0.2.1** — Locale-aware postal code validation (NNFT-118), max-sim semantic matching with K=3 FPS representatives (NNFT-124), threshold tuning (NNFT-122), targeted synonyms (NNFT-123). Smarter column classification with reduced false positives.
 - **v0.2.0** — Multi-signal attractor demotion (NNFT-115), JSON Schema validation engine (NNFT-116), numeric range validation (NNFT-117). Reduces false positives on generic numeric data and modernises the validation engine.
 - **v0.1.9** — Model2Vec semantic column name classifier (NNFT-110), unified column-level disambiguation (NNFT-109). Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions). Homebrew tap auto-updated.
@@ -31,7 +32,7 @@ Every decision in this repo should reflect these principles:
 
 ### What's in progress
 
-- **NNFT-118** — Locale-specific type validation. Phase 1 delivered: per-locale postal code validation (14 locales) integrated into attractor demotion Signal 1. Phone number locale patterns and CLDR date/time patterns deferred to Phase 2-3.
+- **v0.3.0 accuracy release** — Targeting ≥70/74 on profile eval. Two fixes: context-aware name header hint (NNFT-127, +2) and height/age disambiguation (NNFT-128, +1). CLDR date/time patterns deferred.
 
 ## Architecture
 
@@ -191,7 +192,7 @@ Key architectural decisions that should not be revisited without good reason:
 
 12. **JSON Schema validation via jsonschema-rs** — Validation uses `jsonschema` crate (v0.42.1, pure Rust, MIT, Draft 2020-12) instead of hand-rolled regex. `CompiledValidator` pre-compiles schemas once; taxonomy caches validators via `compile_validators()`. Hybrid strategy: string keywords delegated to jsonschema, numeric bounds (minimum/maximum) handled manually for string→f64 parsing semantics. `Taxonomy::clone()` drops the cache (jsonschema::Validator doesn't impl Clone). Enables future `format`, `oneOf`, `if/then` keywords. (NNFT-116)
 
-13. **Locale-specific validation via `validation_by_locale`** — Taxonomy definitions can include per-locale validation schemas alongside the universal `validation` block. `compile_locale_validators()` pre-compiles locale patterns into a nested cache (label → locale → CompiledValidator). Attractor demotion Signal 1 checks locale patterns first — if any locale achieves >50% pass rate on sample values, the prediction is locale-confirmed (skips demotion). Currently used for postal_code (14 locales sourced from Google libaddressinput, Apache 2.0). Patterns embedded in YAML, not downloaded at runtime. (NNFT-118)
+13. **Locale-specific validation via `validation_by_locale`** — Taxonomy definitions can include per-locale validation schemas alongside the universal `validation` block. `compile_locale_validators()` pre-compiles locale patterns into a nested cache (label → locale → CompiledValidator). Attractor demotion Signal 1 checks locale patterns first — if any locale achieves >50% pass rate on sample values, the prediction is locale-confirmed (skips demotion). Currently used for postal_code (14 locales sourced from Google libaddressinput, Apache 2.0) and phone_number (14 locales derived from Google libphonenumber, Apache 2.0). Patterns embedded in YAML, not downloaded at runtime. (NNFT-118, NNFT-121)
 
 ## Build & Test
 
