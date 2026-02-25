@@ -148,8 +148,8 @@ Each definition in `labels/definitions_*.yaml` is a **transformation contract** 
 Three evaluation benchmarks, all in `eval/`:
 
 1. **Profile eval** (`eval/profile_eval.sh`) — Runs `finetype profile` on annotated CSVs, scores against `schema_mapping.yaml`. Current: 92.9% accuracy.
-2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.1.8: 57.8% domain accuracy on format-detectable types (14,850 tables, 2.7M values).
-3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. v0.1.8: 53.7% domain accuracy (5,728 tables, 16,765 columns).
+2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.3.0 CLI: 47.1% label / 56.5% domain accuracy on format-detectable types (4,481 columns, 45,428 total). v0.1.8 DuckDB: 57.8% domain (14,850 tables, 2.7M values).
+3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. v0.3.0 CLI: 30.5% label / 54.8% domain accuracy on format-detectable types (11,484 columns, 16,765 total). v0.1.8 DuckDB: 53.7% domain (5,728 tables, 16,765 columns).
 
 All eval pipelines use `eval/config.env` for dataset paths with `envsubst` substitution in SQL templates. CLI-based eval pipelines (`eval-1m-cli`, `eval-sotab-cli`) use Python scripts to pipe columns through `finetype infer --mode column --batch`, then score with adapted SQL.
 
@@ -217,8 +217,10 @@ make build-release
 
 # Evaluation
 make eval-profile       # Profile eval (annotated CSVs)
-make eval-1m            # GitTables 1M (requires corpus)
-make eval-sotab         # SOTAB CTA (requires corpus)
+make eval-1m            # GitTables 1M via DuckDB extension (requires corpus)
+make eval-sotab         # SOTAB CTA via DuckDB extension (requires corpus)
+make eval-1m-cli        # GitTables 1M via CLI batch mode (requires corpus)
+make eval-sotab-cli     # SOTAB CTA via CLI batch mode (requires corpus)
 ```
 
 ## Key File Reference

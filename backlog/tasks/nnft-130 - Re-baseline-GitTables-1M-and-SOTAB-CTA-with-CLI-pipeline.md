@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-25 08:01'
-updated_date: '2026-02-25 08:08'
+updated_date: '2026-02-25 08:51'
 labels:
   - eval
   - accuracy
@@ -82,6 +82,32 @@ Tests:
 - cargo run -- check: all 169 types pass
 - cargo clippy: clean
 - Manual verification: batch mode, --header flag, and existing behaviour all work correctly"
+
+## Evaluation Results (v0.3.0 CLI pipeline)
+
+### GitTables 1M
+- **Format-detectable domain: 56.5%** (v0.1.8 DuckDB: 57.8%, -1.3pp)
+- Format-detectable label: 47.1%
+- All mapped domain: 49.4% (23,465 columns)
+- 45,428 columns, 774,350 values, 32 cols/sec (1,418s)
+- 153 unique predicted labels, 46.6% disambiguated
+- Top domain: technology 93.5%, datetime 83.5%, identity 60.5%
+
+### SOTAB CTA
+- **Format-detectable domain: 54.8%** (v0.1.8 DuckDB: 53.7%, +1.1pp)
+- Format-detectable label: 30.5%
+- Direct matches domain: 58.2% (5,075 columns)
+- All mapped domain: 44.8% (16,765 columns)
+- 16,765 columns, 282,278 values, 37 cols/sec (451s)
+- 109 unique predicted labels, 22.4% disambiguated
+- Top domain: technology 97.3%, datetime 70.0%, geography 62.2%
+
+### Key Findings
+1. Domain accuracy roughly comparable — tiered model + disambiguation ≈ flat model at macro level
+2. GitTables slight regression (-1.3pp) may be from disambiguation rules overcorrecting some flat-model-correct predictions
+3. SOTAB gained +1.1pp purely from disambiguation rules (no header hints available)
+4. Biggest accuracy gaps: telephone→categorical (phone validation failures), Duration→sedol, DateTime variant confusion
+5. Header hints on GitTables semantic_only tier achieve 51.1% domain — significant value
 <!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
@@ -89,7 +115,7 @@ Tests:
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
