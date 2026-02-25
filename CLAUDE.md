@@ -75,7 +75,7 @@ The inference system has two modes:
 - Aggregates predictions via majority vote
 - Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection, attractor demotion)
 - **Attractor demotion** (Rule 14): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not validation-confirmed), and cardinality mismatch (1-20 unique values for text attractors). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override. **Locale-aware validation** (NNFT-118): For types with `validation_by_locale`, Signal 1 first checks all locale patterns — if any locale achieves >50% pass rate, the prediction is locale-confirmed (skips demotion and Signal 2). Only falls through to universal validation when no locale matches.
-- **Semantic header hints** (Model2Vec): embeds column name → cosine similarity against 169 pre-computed type embeddings → overrides generic predictions above 0.70 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable.
+- **Semantic header hints** (Model2Vec): embeds column name → cosine similarity against 169 pre-computed type embeddings → overrides generic predictions above 0.65 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable.
 - `is_generic` flag marks types that should yield to header hints (includes attractor-demoted predictions)
 
 Both classifiers implement the `ValueClassifier` trait for polymorphic dispatch.
@@ -174,7 +174,7 @@ Key architectural decisions that should not be revisited without good reason:
 
 5. **Column-mode disambiguation** — Majority vote + rule-based disambiguation. Rules are hardcoded in `column.rs`, not learned. Header hints override generic predictions. (NNFT-065, NNFT-091, NNFT-102)
 
-5a. **Model2Vec semantic header hints** — Column name classification uses Model2Vec static embeddings (potion-base-4M, 7.4MB float16) with cosine similarity against pre-computed type embeddings. Threshold 0.70 tuned for zero false positives on generics. Falls back to hardcoded `header_hint()` when Model2Vec unavailable. Model artifacts in `models/model2vec/`, embedded at build time. No new Rust dependencies — uses existing candle-core + tokenizers. (NNFT-110)
+5a. **Model2Vec semantic header hints** — Column name classification uses Model2Vec static embeddings (potion-base-4M, 7.4MB float16) with cosine similarity against pre-computed type embeddings. Threshold 0.65 balances precision (93.1%) and recall (74.0%), recovering 12 additional correct matches vs the original 0.70 with one borderline FP (data→form_data). Falls back to hardcoded `header_hint()` when Model2Vec unavailable. Model artifacts in `models/model2vec/`, embedded at build time. No new Rust dependencies — uses existing candle-core + tokenizers. (NNFT-110, NNFT-122)
 
 6. **DuckDB extension uses flat model** — Embedding 34 tiered models is feasible (11MB binary) but the flat model is simpler and faster for batch SQL workloads. The extension uses chunk-aware column classification instead. (NNFT-092)
 

@@ -54,11 +54,12 @@ pub struct SemanticHintClassifier {
 ///   x=0.569, category=0.541, value=0.496, column=0.426,
 ///   col1=0.287, foo=0.228, xyz=0.377
 ///
-/// Threshold 0.70 achieves zero false positives on the generic set while
-/// capturing all semantically unambiguous column names (lowest TP: user_email=0.771).
-/// Generic names that happen to partially match a type (data→form_data=0.687)
-/// are correctly rejected.
-const DEFAULT_THRESHOLD: f32 = 0.70;
+/// Threshold 0.65 balances precision (93.1%) and recall (74.0%), recovering
+/// 12 additional correct matches vs 0.70 (timezone, ean, postal codes, status
+/// codes, price variants, tracking URLs). One borderline false positive on
+/// generics (data→form_data at 0.687). See discovery/model2vec-specialisation/
+/// FINDING.md for the full threshold sweep analysis.
+const DEFAULT_THRESHOLD: f32 = 0.65;
 
 impl SemanticHintClassifier {
     /// Load from a directory containing the 4 model artifacts.
@@ -462,10 +463,10 @@ mod tests {
             );
         }
 
-        // Test generic names return None (all below 0.70 threshold)
+        // Test generic names return None (all below 0.65 threshold)
         let generic_names = vec![
-            "foo", "col1", "column_a", "V1", "field_3", "xyz", "data", "value", "col", "column",
-            "result", "output", "input", "var1",
+            "foo", "col1", "column_a", "V1", "field_3", "xyz", "value", "col", "column", "result",
+            "output", "input", "var1",
         ];
         for name in &generic_names {
             let result = classifier.classify_header(name);
@@ -476,5 +477,14 @@ mod tests {
                 result
             );
         }
+
+        // "data" is a known borderline match at 0.687 (→ form_data). Accepted
+        // trade-off at 0.65 threshold — see FINDING.md false positive assessment.
+        let data_result = classifier.classify_header("data");
+        assert!(
+            data_result.is_some(),
+            "Expected borderline match for 'data' at 0.65 threshold"
+        );
+        assert_eq!(data_result.unwrap().label, "container.key_value.form_data");
     }
 }
