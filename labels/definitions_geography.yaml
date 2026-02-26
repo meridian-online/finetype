@@ -624,6 +624,61 @@ geography.contact.calling_code:
   validation:
     type: string
     pattern: "^\\+?[0-9]{1,4}$"
+  validation_by_locale:
+    # Source: ITU-T E.164 country calling codes (public domain)
+    # Each locale validates the specific calling code(s) for that country/region.
+    # Optional + prefix, exact digit match. (NNFT-141)
+    EN:
+      type: string
+      pattern: "^\\+?1$"
+    EN_US:
+      type: string
+      pattern: "^\\+?1$"
+    EN_CA:
+      type: string
+      pattern: "^\\+?1$"
+    EN_GB:
+      type: string
+      pattern: "^\\+?44$"
+    EN_AU:
+      type: string
+      pattern: "^\\+?61$"
+    DE:
+      type: string
+      pattern: "^\\+?49$"
+    FR:
+      type: string
+      pattern: "^\\+?33$"
+    ES:
+      type: string
+      pattern: "^\\+?34$"
+    IT:
+      type: string
+      pattern: "^\\+?39$"
+    NL:
+      type: string
+      pattern: "^\\+?31$"
+    PL:
+      type: string
+      pattern: "^\\+?48$"
+    RU:
+      type: string
+      pattern: "^\\+?7$"
+    JA:
+      type: string
+      pattern: "^\\+?81$"
+    ZH:
+      type: string
+      pattern: "^\\+?86$"
+    KO:
+      type: string
+      pattern: "^\\+?82$"
+    AR:
+      type: string
+      pattern: "^\\+?966$"
+    ZA:
+      type: string
+      pattern: "^\\+?27$"
   tier: [VARCHAR, contact]
   release_priority: 3
   aliases: [isd_code, country_code]

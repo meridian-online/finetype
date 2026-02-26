@@ -133,15 +133,27 @@ architecture**. It should be revisited if:
 
 ## Current Locale Coverage
 
-As of v0.3.0, `validation_by_locale` patterns exist for:
+As of NNFT-141, `validation_by_locale` patterns exist for 5 types:
 
 | Type | Locales | Source |
 |---|---|---|
 | phone_number | 15 (EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA) | libphonenumber (Apache 2.0) |
 | postal_code | 14 (US, GB, CA, DE, FR, AU, JP, BR, IN, IT, NL, ES, CH, SE) | Google libaddressinput (Apache 2.0) |
+| calling_code | 17 (EN, EN_US, EN_CA, EN_GB, EN_AU, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA) | ITU-T E.164 (public domain) |
+| month_name | 6 (EN, FR, DE, ES, IT, PT) | Unicode CLDR (Unicode License) |
+| day_of_week | 6 (EN, FR, DE, ES, IT, PT) | Unicode CLDR (Unicode License) |
 
 The old prototype supported 36 Mimesis locales. The full locale list serves as a
-roadmap for expanding validation coverage to more types (NNFT-141).
+roadmap for expanding validation coverage to more types and locales.
+
+### Expansion Roadmap
+
+22 types are designated `locale_specific` in the taxonomy. Of these, 5 now have
+`validation_by_locale` patterns. Priority candidates for future expansion:
+
+- **Addresses** (full_address, street_name) — complex, locale-specific ordering
+- **Date formats with month names** (abbreviated_month, long_full_month) — CLDR abbreviated month names
+- **Names** (full_name, first_name, last_name) — requires name databases, not structural patterns
 
 ## References
 
@@ -149,4 +161,4 @@ roadmap for expanding validation coverage to more types (NNFT-141).
 - **Old prototype:** `hughcameron/finetype` (Python + Burn Transformer)
 - **Tiered-v3 training log:** NNFT-126 implementation notes
 - **Precision Principle:** NNFT-132, decision-001
-- **Locale validation infrastructure:** NNFT-118, NNFT-121, NNFT-136
+- **Locale validation infrastructure:** NNFT-118, NNFT-121, NNFT-136, NNFT-141

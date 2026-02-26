@@ -577,14 +577,15 @@ impl ColumnClassifier {
                     Some(format!("header_hint_fallback:{}", header.to_lowercase()));
             }
 
-            // If header hint changed the label, clear stale locale detection
-            // (NNFT-140). The detected_locale from classify_column was for the
-            // original label — it's invalid for the new label. We can't re-detect
-            // here because we don't have the raw sample values; locale will be
-            // None for header-hint-overridden types. This is conservative and
-            // correct: better no locale than a wrong locale.
+            // If header hint changed the label, re-detect locale for the new type
+            // (NNFT-140, NNFT-141). The detected_locale from classify_column was
+            // for the original label — re-run detection against the new label's
+            // validation_by_locale patterns.
             if result.label != original_label {
-                result.detected_locale = None;
+                result.detected_locale = self
+                    .taxonomy
+                    .as_ref()
+                    .and_then(|t| detect_locale_from_validation(values, &result.label, t));
             }
         }
 
@@ -5025,6 +5026,213 @@ identity.person.phone_number:
         assert_eq!(
             locale, None,
             "All-empty values should not detect any locale"
+        );
+    }
+
+    // ==========================================================================
+    // NNFT-141: Locale detection tests for calling_code, month_name, day_of_week
+    // ==========================================================================
+
+    #[test]
+    fn test_detect_locale_calling_code_uk() {
+        let yaml = r#"
+geography.contact.calling_code:
+  title: International Calling Code
+  designation: locale_specific
+  tier: [VARCHAR, contact]
+  release_priority: 3
+  samples: ["+1"]
+  validation:
+    type: string
+    pattern: "^\\+?[0-9]{1,4}$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^\\+?1$"
+    EN_GB:
+      type: string
+      pattern: "^\\+?44$"
+    DE:
+      type: string
+      pattern: "^\\+?49$"
+    FR:
+      type: string
+      pattern: "^\\+?33$"
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec!["+44", "44", "+44", "+44", "44"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "geography.contact.calling_code", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("EN_GB".to_string()),
+            "+44 calling codes should detect EN_GB"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_calling_code_de() {
+        let yaml = r#"
+geography.contact.calling_code:
+  title: International Calling Code
+  designation: locale_specific
+  tier: [VARCHAR, contact]
+  release_priority: 3
+  samples: ["+1"]
+  validation:
+    type: string
+    pattern: "^\\+?[0-9]{1,4}$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^\\+?1$"
+    EN_GB:
+      type: string
+      pattern: "^\\+?44$"
+    DE:
+      type: string
+      pattern: "^\\+?49$"
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec!["+49", "49", "+49"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "geography.contact.calling_code", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("DE".to_string()),
+            "+49 calling codes should detect DE"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_month_name_french() {
+        let yaml = r#"
+datetime.component.month_name:
+  title: Full Month Name
+  designation: locale_specific
+  tier: [VARCHAR, component]
+  release_priority: 1
+  samples: ["January"]
+  validation:
+    type: string
+    enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  validation_by_locale:
+    EN:
+      type: string
+      enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    FR:
+      type: string
+      enum: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+    DE:
+      type: string
+      enum: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec!["janvier", "mars", "juin", "décembre", "août"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "datetime.component.month_name", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("FR".to_string()),
+            "French month names should detect FR"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_month_name_german() {
+        let yaml = r#"
+datetime.component.month_name:
+  title: Full Month Name
+  designation: locale_specific
+  tier: [VARCHAR, component]
+  release_priority: 1
+  samples: ["January"]
+  validation:
+    type: string
+    enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  validation_by_locale:
+    EN:
+      type: string
+      enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    FR:
+      type: string
+      enum: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+    DE:
+      type: string
+      enum: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec!["März", "Oktober", "Dezember", "Januar"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "datetime.component.month_name", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("DE".to_string()),
+            "German month names should detect DE"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_day_of_week_spanish() {
+        let yaml = r#"
+datetime.component.day_of_week:
+  title: Day of Week Name
+  designation: locale_specific
+  tier: [VARCHAR, component]
+  release_priority: 1
+  samples: ["Monday"]
+  validation:
+    type: string
+    enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+  validation_by_locale:
+    EN:
+      type: string
+      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    ES:
+      type: string
+      enum: ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    IT:
+      type: string
+      enum: ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec!["lunes", "miércoles", "viernes", "domingo"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "datetime.component.day_of_week", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("ES".to_string()),
+            "Spanish day names should detect ES"
         );
     }
 }

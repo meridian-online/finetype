@@ -1296,6 +1296,28 @@ datetime.component.day_of_week:
       - "Friday"
       - "Saturday"
       - "Sunday"
+  validation_by_locale:
+    # Source: Unicode CLDR (cldr-dates-full, wide day names)
+    # License: Unicode License (permissive, attribution)
+    # Each locale lists the 7 full weekday names in that language. (NNFT-141)
+    EN:
+      type: string
+      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    FR:
+      type: string
+      enum: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+    DE:
+      type: string
+      enum: ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+    ES:
+      type: string
+      enum: ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    IT:
+      type: string
+      enum: ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+    PT:
+      type: string
+      enum: ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"]
   tier: [VARCHAR, component]
   release_priority: 1
   aliases: []
@@ -1338,6 +1360,28 @@ datetime.component.month_name:
       - "October"
       - "November"
       - "December"
+  validation_by_locale:
+    # Source: Unicode CLDR (cldr-dates-full, wide month names)
+    # License: Unicode License (permissive, attribution)
+    # Each locale lists the 12 full month names in that language. (NNFT-141)
+    EN:
+      type: string
+      enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    FR:
+      type: string
+      enum: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+    DE:
+      type: string
+      enum: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+    ES:
+      type: string
+      enum: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    IT:
+      type: string
+      enum: ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+    PT:
+      type: string
+      enum: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
   tier: [VARCHAR, component]
   release_priority: 1
   aliases: [month]

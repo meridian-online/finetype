@@ -1,11 +1,11 @@
 ---
 id: NNFT-126
 title: 4-level locale labels with model retraining
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-25 03:31'
-updated_date: '2026-02-26 00:01'
+updated_date: '2026-02-26 01:41'
 labels:
   - accuracy
   - locale
@@ -119,6 +119,21 @@ Reverted default symlink to tiered-v2.
 
 Created decision-002 for locale detection strategy. Three options: (A) more training, (B) post-hoc validation-based locale, (C) hybrid tier. Awaiting decision before proceeding with AC #2 and #4.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Resolved via decision-002: 4-level locale-in-label training attempted but caused profile eval regression (70/74 → 67/74). CharCNN capacity ceiling at ~20 labels per T2 model makes locale-expanded label spaces unviable.
+
+Outcome: Option B (post-hoc locale detection) accepted. Implemented in NNFT-140. The tiered-v3 model artifacts remain in models/tiered-v3/ for reference.
+
+Infrastructure shipped during this investigation:
+- strip_locale_suffix() for 4-level → 3-level label collapsing
+- detected_locale field in ColumnResult
+- Locale-aware vote aggregation in column.rs
+- Tiered training locale suffix handling in tiered_training.rs
+- docs/LOCALE_DETECTION_ARCHITECTURE.md documenting the architecture gap
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
