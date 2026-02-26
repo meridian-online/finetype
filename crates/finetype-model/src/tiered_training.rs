@@ -10,7 +10,7 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarBuilder, VarMap};
 use finetype_core::{Sample, Taxonomy, TierGraph};
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use thiserror::Error;
 
@@ -94,37 +94,58 @@ impl TieredTrainer {
         let graph = taxonomy.tier_graph();
         let mut report = TieredTrainingReport::default();
 
-        // Normalize sample labels: strip locale suffixes (.UNIVERSAL, .en_US, etc.)
-        // Generated labels are 4-level (domain.category.type.LOCALE) but the taxonomy
-        // uses 3-level keys (domain.category.type).
-        let samples: Vec<Sample> = samples
-            .iter()
-            .map(|s| {
-                let label = if graph.tier_path(&s.label).is_some() {
-                    s.label.clone()
-                } else if let Some((prefix, _)) = s.label.rsplit_once('.') {
-                    if graph.tier_path(prefix).is_some() {
-                        prefix.to_string()
-                    } else {
-                        s.label.clone()
-                    }
+        // Helper: resolve any label (3-level or 4-level) to its 3-level taxonomy key.
+        // For 4-level labels (domain.category.type.LOCALE), strips the locale suffix.
+        // Returns None if the label can't be resolved to a known taxonomy key.
+        let resolve_3level = |label: &str| -> Option<String> {
+            if graph.tier_path(label).is_some() {
+                Some(label.to_string())
+            } else if let Some((prefix, _)) = label.rsplit_once('.') {
+                if graph.tier_path(prefix).is_some() {
+                    Some(prefix.to_string())
                 } else {
-                    s.label.clone()
-                };
-                Sample {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        // Normalize sample labels to 3-level for T0 and T1 training.
+        // T0 and T1 don't need locale info — they route by broad_type and category.
+        let samples_3level: Vec<Sample> = samples
+            .iter()
+            .filter_map(|s| {
+                resolve_3level(&s.label).map(|label| Sample {
                     text: s.text.clone(),
                     label,
-                }
+                })
             })
             .collect();
+
+        // Detect whether samples contain 4-level (localized) labels
+        let has_4level = samples
+            .iter()
+            .any(|s| resolve_3level(&s.label).as_deref() != Some(&s.label));
+        if has_4level {
+            let n_4level = samples
+                .iter()
+                .filter(|s| resolve_3level(&s.label).as_deref() != Some(&s.label))
+                .count();
+            eprintln!(
+                "Localized training: {} of {} samples have 4-level locale labels",
+                n_4level,
+                samples.len()
+            );
+        }
 
         eprintln!("=== Tiered Training ===");
         eprintln!("{}", graph.summary());
 
-        // --- Tier 0: Broad type classification ---
+        // --- Tier 0: Broad type classification (uses 3-level labels) ---
         eprintln!("\n--- Training Tier 0 (broad type) ---");
         let tier0_dir = output_dir.join("tier0");
-        let tier0_accuracy = self.train_tier0(&graph, &samples, &tier0_dir)?;
+        let tier0_accuracy = self.train_tier0(&graph, &samples_3level, &tier0_dir)?;
         report.tier0_accuracy = tier0_accuracy;
         report.tier0_classes = graph.num_broad_types();
         eprintln!(
@@ -133,7 +154,7 @@ impl TieredTrainer {
             graph.num_broad_types()
         );
 
-        // --- Tier 1: Per-broad-type category models ---
+        // --- Tier 1: Per-broad-type category models (uses 3-level labels) ---
         for broad_type in graph.broad_types() {
             let categories = graph.categories_for(broad_type);
             if categories.len() <= 1 {
@@ -153,7 +174,7 @@ impl TieredTrainer {
                 categories.len()
             );
             let tier1_dir = output_dir.join(format!("tier1_{}", broad_type));
-            match self.train_tier1(&graph, broad_type, &samples, &tier1_dir) {
+            match self.train_tier1(&graph, broad_type, &samples_3level, &tier1_dir) {
                 Ok(tier1_accuracy) => {
                     report.tier1_results.push(TierModelResult {
                         name: broad_type.clone(),
@@ -176,32 +197,67 @@ impl TieredTrainer {
         }
 
         // --- Tier 2: Per-category type models ---
+        // Uses ORIGINAL samples to preserve 4-level locale labels at the leaf tier.
+        // Each sample's label is resolved to 3-level for tier path routing, but the
+        // original label (possibly 4-level) is kept as the T2 class name.
+        let mut t2_label_map: HashMap<String, Vec<String>> = HashMap::new();
         for broad_type in graph.broad_types() {
             for category in graph.categories_for(broad_type) {
-                let n_types = graph.num_types(broad_type, category);
-                if n_types <= self.config.tier2_min_types {
-                    // Too few types — resolved directly by Tier 1
+                let key = format!("{}_{}", broad_type, category);
+
+                // Collect samples for this T2 group, keeping original (possibly 4-level) labels.
+                // Route via 3-level prefix: resolve_3level → tier_path → (broad_type, category).
+                let filtered: Vec<Sample> = samples
+                    .iter()
+                    .filter(|s| {
+                        resolve_3level(&s.label)
+                            .and_then(|r| graph.tier_path(&r))
+                            .map(|(bt, cat)| bt == broad_type && cat == category)
+                            .unwrap_or(false)
+                    })
+                    .cloned()
+                    .collect();
+
+                if filtered.is_empty() {
+                    continue;
+                }
+
+                // Build label set from unique labels in this group (may be 4-level)
+                let mut labels: Vec<String> = filtered
+                    .iter()
+                    .map(|s| s.label.clone())
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect();
+                labels.sort();
+
+                t2_label_map.insert(key.clone(), labels.clone());
+
+                if labels.len() <= self.config.tier2_min_types {
+                    // Too few labels — resolved directly by Tier 1
                     continue;
                 }
 
                 eprintln!(
-                    "\n--- Training Tier 2 [{}/{}] ({} types) ---",
-                    broad_type, category, n_types
+                    "\n--- Training Tier 2 [{}/{}] ({} labels) ---",
+                    broad_type,
+                    category,
+                    labels.len()
                 );
                 let tier2_dir = output_dir.join(format!("tier2_{}_{}", broad_type, category));
-                match self.train_tier2(&graph, broad_type, category, &samples, &tier2_dir) {
+                match self.train_model(&labels, &filtered, &tier2_dir) {
                     Ok(tier2_accuracy) => {
                         report.tier2_results.push(TierModelResult {
                             name: format!("{}/{}", broad_type, category),
-                            classes: n_types,
+                            classes: labels.len(),
                             accuracy: tier2_accuracy,
                         });
                         eprintln!(
-                            "Tier 2 [{}/{}]: {:.2}% accuracy ({} types)",
+                            "Tier 2 [{}/{}]: {:.2}% accuracy ({} labels)",
                             broad_type,
                             category,
                             tier2_accuracy * 100.0,
-                            n_types
+                            labels.len()
                         );
                     }
                     Err(TieredTrainingError::EmptyGroup { .. }) => {
@@ -218,8 +274,8 @@ impl TieredTrainer {
             }
         }
 
-        // Save tier graph metadata (only reference models that were actually trained)
-        let graph_meta = self.build_graph_metadata(&graph, &report, output_dir);
+        // Save tier graph metadata with 4-level labels at T2
+        let graph_meta = self.build_graph_metadata(&graph, &report, output_dir, &t2_label_map);
         let graph_json =
             serde_json::to_string_pretty(&graph_meta).unwrap_or_else(|_| "{}".to_string());
         std::fs::create_dir_all(output_dir)?;
@@ -300,39 +356,10 @@ impl TieredTrainer {
         self.train_model(&labels, &relabeled, output_dir)
     }
 
-    /// Train Tier 2: type classification within a (broad_type, category).
-    fn train_tier2(
-        &self,
-        graph: &TierGraph,
-        broad_type: &str,
-        category: &str,
-        samples: &[Sample],
-        output_dir: &Path,
-    ) -> Result<f64, TieredTrainingError> {
-        // Filter samples for this (broad_type, category), keep original label
-        let filtered: Vec<Sample> = samples
-            .iter()
-            .filter(|s| {
-                graph
-                    .tier_path(&s.label)
-                    .map(|(bt, cat)| bt == broad_type && cat == category)
-                    .unwrap_or(false)
-            })
-            .cloned()
-            .collect();
-
-        if filtered.is_empty() {
-            return Err(TieredTrainingError::EmptyGroup {
-                tier: "2".into(),
-                group: format!("{}/{}", broad_type, category),
-            });
-        }
-
-        let mut labels: Vec<String> = graph.types_for(broad_type, category).to_vec();
-        labels.sort();
-
-        self.train_model(&labels, &filtered, output_dir)
-    }
+    // Note: Tier 2 training is now done inline in train_all() to support
+    // 4-level locale labels. The original train_tier2() was removed because
+    // T2 needs access to the original (possibly 4-level) samples, not the
+    // 3-level normalized versions used by T0/T1.
 
     /// Train a single CharCNN model with the given labels and samples.
     /// Returns the final epoch accuracy.
@@ -490,11 +517,15 @@ impl TieredTrainer {
     ///
     /// Only references models that were actually trained (have directories on disk).
     /// Skipped groups use "direct" resolution to first type.
+    ///
+    /// `t2_label_map` provides the actual labels used at T2 (may be 4-level locale labels).
+    /// If empty, falls back to the 3-level taxonomy labels.
     fn build_graph_metadata(
         &self,
         graph: &TierGraph,
         _report: &TieredTrainingReport,
         output_dir: &Path,
+        t2_label_map: &HashMap<String, Vec<String>>,
     ) -> serde_json::Value {
         use serde_json::json;
 
@@ -523,28 +554,33 @@ impl TieredTrainer {
         let mut tier2_models = serde_json::Map::new();
         for broad_type in graph.broad_types() {
             for category in graph.categories_for(broad_type) {
-                let n_types = graph.num_types(broad_type, category);
                 let key = format!("{}_{}", broad_type, category);
                 let tier2_dir = format!("tier2_{}_{}", broad_type, category);
 
-                if n_types > self.config.tier2_min_types && output_dir.join(&tier2_dir).exists() {
+                // Use actual labels from training (may be 4-level) or fall back to 3-level
+                let labels = t2_label_map
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_else(|| graph.types_for(broad_type, category).to_vec());
+                let n_labels = labels.len();
+
+                if n_labels > self.config.tier2_min_types && output_dir.join(&tier2_dir).exists() {
                     // Model was trained — reference its directory
                     tier2_models.insert(
                         key,
                         json!({
                             "dir": tier2_dir,
-                            "types": graph.types_for(broad_type, category),
-                            "count": n_types,
+                            "types": labels,
+                            "count": n_labels,
                         }),
                     );
                 } else {
-                    // Single type or skipped training — resolve directly to first type
-                    let types = graph.types_for(broad_type, category);
+                    // Single label or skipped training — resolve directly to first label
                     tier2_models.insert(
                         key,
                         json!({
-                            "direct": types.first(),
-                            "count": n_types,
+                            "direct": labels.first(),
+                            "count": n_labels,
                         }),
                     );
                 }

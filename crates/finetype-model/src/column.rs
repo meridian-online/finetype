@@ -12,8 +12,36 @@
 
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::semantic::SemanticHintClassifier;
-use finetype_core::Taxonomy;
+use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
+
+/// Strip a locale suffix from a 4-level label to get the 3-level taxonomy key.
+///
+/// Examples:
+///   "geography.address.postal_code.EN_US" → ("geography.address.postal_code", Some("EN_US"))
+///   "geography.address.postal_code.UNIVERSAL" → ("geography.address.postal_code", Some("UNIVERSAL"))
+///   "geography.address.postal_code" → ("geography.address.postal_code", None)
+///   "representation.boolean.binary" → ("representation.boolean.binary", None)
+///
+/// Detection heuristic: if the label has 4+ dot-separated parts and the last part
+/// is ALL_UPPERCASE (locale code or UNIVERSAL), treat it as a locale suffix.
+fn strip_locale_suffix(label: &str) -> (&str, Option<&str>) {
+    if let Some((prefix, suffix)) = label.rsplit_once('.') {
+        // Check if suffix looks like a locale code: all uppercase, 2-5 chars
+        // (e.g., EN, EN_US, UNIVERSAL, FR_FR, DE, AR)
+        let is_locale = !suffix.is_empty()
+            && suffix.len() <= 10
+            && suffix.chars().all(|c| c.is_ascii_uppercase() || c == '_')
+            && prefix.contains('.'); // Must have at least domain.category.type before suffix
+        if is_locale {
+            (prefix, Some(suffix))
+        } else {
+            (label, None)
+        }
+    } else {
+        (label, None)
+    }
+}
 
 /// All known boolean type labels (current and legacy).
 /// Centralised to avoid label mismatches across disambiguation rules.
@@ -25,6 +53,133 @@ const BOOLEAN_LABELS: &[&str] = &[
     "representation.logical.boolean",  // legacy interim label
     "technology.data.boolean",         // legacy
 ];
+
+/// Hardcoded list of labels known to be generic catch-all predictions.
+/// Used as a fallback when taxonomy is not available for designation lookup.
+const HARDCODED_GENERIC_LABELS: &[&str] = &[
+    "representation.text.word",
+    "representation.text.plain_text",
+    "representation.numeric.integer_number",
+    "representation.numeric.decimal_number",
+    "representation.numeric.increment",
+    "representation.discrete.categorical",
+    "datetime.component.day_of_month",
+    // Username/phone are common catch-alls for unrecognized text
+    "identity.person.username",
+    "identity.person.first_name",
+    "identity.person.phone_number",
+    // IATA is the model's default for uppercase 3-letter codes
+    "geography.transportation.iata_code",
+];
+
+/// Determine whether a prediction should be treated as "generic" — i.e.,
+/// a type the CharCNN cannot reliably distinguish from character patterns,
+/// so it should defer to header hints when available.
+///
+/// Uses four signals — any match returns `true`:
+/// 1. Attractor-demoted predictions are always generic (already uncertain).
+/// 2. Boolean types are always generic.
+/// 3. Hardcoded list of known catch-all labels (always applies).
+/// 4. When taxonomy is available, broad designations (BroadWords, BroadCharacters,
+///    BroadNumbers, BroadObject) are additionally generic — the CharCNN cannot
+///    reliably distinguish these types from character patterns (NNFT-139).
+///
+/// Signal 4 is **additive**: it expands the generic set beyond the hardcoded
+/// list (e.g., `gender`, `occupation` become generic via their `broad_words`
+/// designation) but never removes types that are already in the hardcoded list.
+fn is_generic_prediction(
+    label: &str,
+    disambiguation_rule: &Option<String>,
+    taxonomy: Option<&Taxonomy>,
+) -> bool {
+    // Signal 1: Attractor-demoted predictions are inherently uncertain —
+    // they should yield to header hints the same way generic types do.
+    if disambiguation_rule
+        .as_ref()
+        .is_some_and(|r| r.starts_with("attractor_demotion"))
+    {
+        return true;
+    }
+
+    // Signal 2: Boolean types are always generic.
+    if BOOLEAN_LABELS.contains(&label) {
+        return true;
+    }
+
+    // Signal 3: Hardcoded list — always applies regardless of taxonomy.
+    if HARDCODED_GENERIC_LABELS.contains(&label) {
+        return true;
+    }
+
+    // Signal 4: Designation-aware expansion (NNFT-139).
+    // When the taxonomy is available, broad designations mark types that the
+    // CharCNN cannot reliably distinguish from character patterns alone.
+    // This is ADDITIVE — it catches types like gender, occupation, nationality
+    // that aren't in the hardcoded list but are still too ambiguous.
+    if let Some(taxonomy) = taxonomy {
+        if let Some(def) = taxonomy.get(label) {
+            return matches!(
+                def.designation,
+                Designation::BroadWords
+                    | Designation::BroadCharacters
+                    | Designation::BroadNumbers
+                    | Designation::BroadObject
+            );
+        }
+    }
+
+    false
+}
+
+/// Detect the most likely locale for a column by running sample values against
+/// each locale's validation pattern from `validation_by_locale` (NNFT-140).
+///
+/// Returns the locale code with the highest pass rate above 50%, or None if
+/// no locale patterns exist or none reach the threshold.
+///
+/// This implements post-hoc locale detection (decision-002, Option B):
+/// the type classifier determines WHAT the data is (phone_number, postal_code),
+/// then validation patterns determine WHERE it's from (EN_US, EN_GB, DE).
+fn detect_locale_from_validation(
+    values: &[String],
+    label: &str,
+    taxonomy: &Taxonomy,
+) -> Option<String> {
+    let locale_validators = taxonomy.get_locale_validators(label)?;
+
+    // Count non-empty values for calculating pass rates
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if non_empty.is_empty() {
+        return None;
+    }
+
+    let mut best_locale: Option<String> = None;
+    let mut best_pass_rate: f32 = 0.0;
+
+    for (locale, validator) in locale_validators {
+        let pass_count = non_empty
+            .iter()
+            .filter(|v| validator.validate(v).is_valid)
+            .count();
+        let pass_rate = pass_count as f32 / non_empty.len() as f32;
+
+        if pass_rate > best_pass_rate {
+            best_pass_rate = pass_rate;
+            best_locale = Some(locale.clone());
+        }
+    }
+
+    // Only report locale if >50% of values match the pattern
+    if best_pass_rate > 0.5 {
+        best_locale
+    } else {
+        None
+    }
+}
 
 /// Configuration for column-mode inference.
 #[derive(Debug, Clone)]
@@ -48,11 +203,12 @@ impl Default for ColumnConfig {
 /// Result of column-mode inference.
 #[derive(Debug, Clone)]
 pub struct ColumnResult {
-    /// The predicted type label for the column.
+    /// The predicted type label for the column (3-level: domain.category.type).
     pub label: String,
     /// Confidence score (0.0 to 1.0).
     pub confidence: f32,
     /// Vote distribution: label → fraction of samples classified as this type.
+    /// Labels are 3-level (locale suffixes collapsed).
     pub vote_distribution: Vec<(String, f32)>,
     /// Whether a disambiguation rule was applied to override the majority vote.
     pub disambiguation_applied: bool,
@@ -60,6 +216,10 @@ pub struct ColumnResult {
     pub disambiguation_rule: Option<String>,
     /// Number of values actually classified.
     pub samples_used: usize,
+    /// Detected locale for the column, if the winning type is locale-specific.
+    /// e.g., "EN_US", "FR_FR", "UNIVERSAL". None if the model was trained
+    /// without locale labels or the type has no locale variants.
+    pub detected_locale: Option<String>,
 }
 
 /// Column-mode classifier that wraps a single-value classifier.
@@ -144,6 +304,7 @@ impl ColumnClassifier {
                 disambiguation_applied: false,
                 disambiguation_rule: None,
                 samples_used: 0,
+                detected_locale: None,
             });
         }
 
@@ -163,14 +324,26 @@ impl ColumnClassifier {
         // Step 2: Run batch inference
         let results = self.classifier.classify_batch(&sample)?;
 
-        // Step 3: Aggregate votes
-        let mut vote_counts: HashMap<String, usize> = HashMap::new();
+        // Step 3: Aggregate votes — collapse 4-level locale labels to 3-level
+        // Track both 3-level type votes and locale distribution within each type.
+        let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
+        let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new(); // 3-level → locale → count
         for result in &results {
-            *vote_counts.entry(result.label.clone()).or_default() += 1;
+            let (base_label, locale) = strip_locale_suffix(&result.label);
+            *vote_counts_3level
+                .entry(base_label.to_string())
+                .or_default() += 1;
+            if let Some(loc) = locale {
+                *locale_votes
+                    .entry(base_label.to_string())
+                    .or_default()
+                    .entry(loc.to_string())
+                    .or_default() += 1;
+            }
         }
 
-        // Sort by count descending
-        let mut votes: Vec<(String, usize)> = vote_counts.into_iter().collect();
+        // Sort by count descending (3-level labels)
+        let mut votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
         votes.sort_by(|a, b| b.1.cmp(&a.1));
 
         let vote_distribution: Vec<(String, f32)> = votes
@@ -178,29 +351,47 @@ impl ColumnClassifier {
             .map(|(label, count)| (label.clone(), *count as f32 / n_samples as f32))
             .collect();
 
-        // Majority winner
+        // Majority winner (3-level)
         let (majority_label, majority_count) = votes.first().cloned().unwrap_or_default();
         let majority_fraction = majority_count as f32 / n_samples as f32;
 
-        // Step 4: Apply disambiguation rules
+        // Determine dominant locale for the winning type
+        let detected_locale = locale_votes.get(&majority_label).and_then(|locales| {
+            locales
+                .iter()
+                .max_by_key(|(_, count)| *count)
+                .map(|(locale, _)| locale.clone())
+                .filter(|l| l != "UNIVERSAL") // Don't report UNIVERSAL as a locale
+        });
+
+        // Step 4: Apply disambiguation rules (operates on 3-level labels)
         let disambiguation =
             disambiguate(&sample, &results, &votes, n_samples, self.taxonomy.as_ref());
 
-        if let Some((label, rule_name)) = disambiguation {
+        let mut result = if let Some((label, rule_name)) = disambiguation {
+            // Disambiguation may change the winning label — re-derive locale if needed
+            let disambig_locale = locale_votes.get(&label).and_then(|locales| {
+                locales
+                    .iter()
+                    .max_by_key(|(_, count)| *count)
+                    .map(|(locale, _)| locale.clone())
+                    .filter(|l| l != "UNIVERSAL")
+            });
             // Attractor demotion rules get moderate confidence; all others get high confidence
             let confidence = if rule_name.starts_with("attractor_demotion") {
                 majority_fraction.max(0.5)
             } else {
                 majority_fraction.max(0.8) // Disambiguation rules are high-confidence
             };
-            Ok(ColumnResult {
+            ColumnResult {
                 label,
                 confidence,
                 vote_distribution,
                 disambiguation_applied: true,
                 disambiguation_rule: Some(rule_name),
                 samples_used: n_samples,
-            })
+                detected_locale: disambig_locale,
+            }
         } else {
             // No disambiguation needed — use majority vote
             let confidence = if majority_fraction >= self.config.min_agreement {
@@ -209,15 +400,29 @@ impl ColumnClassifier {
                 majority_fraction * 0.5 // Low agreement → low confidence
             };
 
-            Ok(ColumnResult {
+            ColumnResult {
                 label: majority_label,
                 confidence,
                 vote_distribution,
                 disambiguation_applied: false,
                 disambiguation_rule: None,
                 samples_used: n_samples,
-            })
+                detected_locale,
+            }
+        };
+
+        // Step 5: Post-hoc locale detection via validation patterns (NNFT-140).
+        // When taxonomy is available, run sample values against validation_by_locale
+        // patterns to detect the most likely locale. This takes priority over any
+        // model-derived locale from vote aggregation, because validation patterns
+        // are precise structural rules (see Precision Principle, decision-002).
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
         }
+
+        Ok(result)
     }
 
     /// Get a reference to the underlying classifier.
@@ -279,27 +484,18 @@ impl ColumnClassifier {
                 .any(|(label, _)| label == hinted_type);
 
             // Only override if model confidence is low (< 0.5)
-            // or the result is a generic type AND the hint matches a candidate
-            let is_generic = matches!(
-                result.label.as_str(),
-                "representation.text.word"
-                    | "representation.text.plain_text"
-                    | "representation.numeric.integer_number"
-                    | "representation.numeric.decimal_number"
-                    | "representation.numeric.increment"
-                    | "representation.discrete.categorical"
-                    | "datetime.component.day_of_month"
-                    // Username/phone are common catch-alls for unrecognized text
-                    | "identity.person.username"
-                    | "identity.person.first_name"
-                    | "identity.person.phone_number"
-                    // IATA is the model's default for uppercase 3-letter codes
-                    | "geography.transportation.iata_code"
-            ) || BOOLEAN_LABELS.contains(&result.label.as_str())
-                // Attractor-demoted predictions are inherently uncertain —
-                // they should yield to header hints the same way generic types do.
-                || result.disambiguation_rule.as_ref()
-                    .is_some_and(|r| r.starts_with("attractor_demotion"));
+            // or the result is a generic type AND the hint matches a candidate.
+            //
+            // Designation-aware gating (NNFT-139): when taxonomy is available,
+            // types with broad designations (broad_words, broad_characters,
+            // broad_numbers, broad_object) are treated as generic because the
+            // CharCNN cannot reliably distinguish them from character patterns
+            // alone. Falls back to a hardcoded list when taxonomy is unavailable.
+            let is_generic = is_generic_prediction(
+                &result.label,
+                &result.disambiguation_rule,
+                self.taxonomy.as_ref(),
+            );
 
             // Geography protection: when the hint is full_name, check if the
             // model sees geography.location signal. Many geographic datasets
@@ -348,6 +544,8 @@ impl ColumnClassifier {
                 }
             }
 
+            let original_label = result.label.clone();
+
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
                 let hint_fraction = result
                     .vote_distribution
@@ -377,6 +575,16 @@ impl ColumnClassifier {
                 result.disambiguation_applied = true;
                 result.disambiguation_rule =
                     Some(format!("header_hint_fallback:{}", header.to_lowercase()));
+            }
+
+            // If header hint changed the label, clear stale locale detection
+            // (NNFT-140). The detected_locale from classify_column was for the
+            // original label — it's invalid for the new label. We can't re-detect
+            // here because we don't have the raw sample values; locale will be
+            // None for header-hint-overridden types. This is conservative and
+            // correct: better no locale than a wrong locale.
+            if result.label != original_label {
+                result.detected_locale = None;
             }
         }
 
@@ -2514,9 +2722,57 @@ mod tests {
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 0,
+            detected_locale: None,
         };
         assert_eq!(result.label, "unknown");
         assert_eq!(result.samples_used, 0);
+        assert_eq!(result.detected_locale, None);
+    }
+
+    // ── Locale suffix stripping tests ────────────────────────────────────
+
+    #[test]
+    fn test_strip_locale_suffix_4level_country() {
+        let (base, locale) = strip_locale_suffix("geography.address.postal_code.EN_US");
+        assert_eq!(base, "geography.address.postal_code");
+        assert_eq!(locale, Some("EN_US"));
+    }
+
+    #[test]
+    fn test_strip_locale_suffix_4level_universal() {
+        let (base, locale) = strip_locale_suffix("representation.boolean.binary.UNIVERSAL");
+        assert_eq!(base, "representation.boolean.binary");
+        assert_eq!(locale, Some("UNIVERSAL"));
+    }
+
+    #[test]
+    fn test_strip_locale_suffix_3level_unchanged() {
+        let (base, locale) = strip_locale_suffix("geography.address.postal_code");
+        assert_eq!(base, "geography.address.postal_code");
+        assert_eq!(locale, None);
+    }
+
+    #[test]
+    fn test_strip_locale_suffix_short_locale() {
+        let (base, locale) = strip_locale_suffix("geography.location.city.EN");
+        assert_eq!(base, "geography.location.city");
+        assert_eq!(locale, Some("EN"));
+    }
+
+    #[test]
+    fn test_strip_locale_suffix_no_false_positive_on_type() {
+        // "iso" is lowercase — should NOT be treated as a locale suffix
+        let (base, locale) = strip_locale_suffix("datetime.date.iso");
+        assert_eq!(base, "datetime.date.iso");
+        assert_eq!(locale, None);
+    }
+
+    #[test]
+    fn test_strip_locale_suffix_no_false_positive_on_short_label() {
+        // Only two parts — the last part should not be treated as locale
+        let (base, locale) = strip_locale_suffix("representation.EN");
+        assert_eq!(base, "representation.EN");
+        assert_eq!(locale, None);
     }
 
     // ── Cardinality & categorical rule tests ────────────────────────────
@@ -4429,6 +4685,346 @@ identity.person.phone_number:
         assert!(
             result.is_none(),
             "Should NOT demote borderline addresses (median ~95 chars)"
+        );
+    }
+
+    // ==========================================================================
+    // NNFT-139: Designation-aware is_generic_prediction tests
+    // ==========================================================================
+
+    #[test]
+    fn test_is_generic_attractor_demoted_always_generic() {
+        // Attractor-demoted predictions are always generic, regardless of designation
+        let rule = Some("attractor_demotion_validation:something".to_string());
+        assert!(
+            is_generic_prediction("identity.person.email", &rule, None),
+            "Attractor-demoted predictions should always be generic"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_boolean_always_generic() {
+        // Boolean types are always generic
+        assert!(
+            is_generic_prediction("representation.boolean.binary", &None, None),
+            "Boolean types should always be generic"
+        );
+        assert!(
+            is_generic_prediction("representation.boolean.terms", &None, None),
+            "Boolean types should always be generic"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_broad_words_with_taxonomy() {
+        // broad_words designation should make a prediction generic when taxonomy is available
+        let yaml = r#"
+identity.person.gender:
+  title: Gender
+  designation: broad_words
+  tier: [VARCHAR, identity, person]
+  release_priority: 1
+  samples: ["Male"]
+identity.person.email:
+  title: Email
+  designation: universal
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["test@example.com"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        // broad_words → generic
+        assert!(
+            is_generic_prediction("identity.person.gender", &None, Some(&taxonomy)),
+            "broad_words types should be generic when taxonomy is available"
+        );
+
+        // universal → not generic (not in hardcoded list either)
+        assert!(
+            !is_generic_prediction("identity.person.email", &None, Some(&taxonomy)),
+            "universal types should NOT be generic (unless in hardcoded list)"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_broad_characters_with_taxonomy() {
+        let yaml = r#"
+identity.person.password:
+  title: Password
+  designation: broad_characters
+  tier: [VARCHAR, identity, person]
+  release_priority: 1
+  samples: ["p@ssw0rd"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        assert!(
+            is_generic_prediction("identity.person.password", &None, Some(&taxonomy)),
+            "broad_characters types should be generic when taxonomy is available"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_broad_numbers_with_taxonomy() {
+        let yaml = r#"
+representation.numeric.increment:
+  title: Increment
+  designation: broad_numbers
+  tier: [INTEGER, representation, numeric]
+  release_priority: 1
+  samples: ["42"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        assert!(
+            is_generic_prediction("representation.numeric.increment", &None, Some(&taxonomy)),
+            "broad_numbers types should be generic when taxonomy is available"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_fallback_without_taxonomy() {
+        // Without taxonomy, falls back to hardcoded list
+        assert!(
+            is_generic_prediction("representation.text.word", &None, None),
+            "Hardcoded generic label should be generic without taxonomy"
+        );
+        assert!(
+            is_generic_prediction("identity.person.phone_number", &None, None),
+            "Hardcoded generic label should be generic without taxonomy"
+        );
+        assert!(
+            !is_generic_prediction("identity.person.email", &None, None),
+            "Non-hardcoded label should NOT be generic without taxonomy"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_locale_specific_not_generic() {
+        // locale_specific designation should NOT be generic (when not in hardcoded list)
+        let yaml = r#"
+geography.address.postal_code:
+  title: Postal Code
+  designation: locale_specific
+  tier: [VARCHAR, geography, address]
+  release_priority: 5
+  samples: ["90210"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        // postal_code is locale_specific and NOT in the hardcoded list → not generic
+        assert!(
+            !is_generic_prediction("geography.address.postal_code", &None, Some(&taxonomy)),
+            "locale_specific types not in hardcoded list should NOT be generic"
+        );
+    }
+
+    #[test]
+    fn test_is_generic_hardcoded_overrides_taxonomy() {
+        // phone_number is in the hardcoded list AND has locale_specific designation.
+        // Hardcoded list (Signal 3) takes precedence — the type stays generic so
+        // header hints can still override when the model uses it as a catch-all.
+        let yaml = r#"
+identity.person.phone_number:
+  title: Phone Number
+  designation: locale_specific
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["+1 (202) 555-0100"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        assert!(
+            is_generic_prediction("identity.person.phone_number", &None, Some(&taxonomy)),
+            "phone_number is in hardcoded list — stays generic regardless of designation"
+        );
+    }
+
+    // ==========================================================================
+    // NNFT-140: Post-hoc locale detection tests
+    // ==========================================================================
+
+    #[test]
+    fn test_detect_locale_us_phone_numbers() {
+        // US phone numbers should detect EN_US locale
+        let yaml = r#"
+identity.person.phone_number:
+  title: Phone Number
+  designation: locale_specific
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["+1 (202) 555-0100"]
+  validation:
+    type: string
+    pattern: "^[+]?[0-9\\s()\\-\\.]+$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\+?1[\\s\\-./]*)?\\(?\\d{3}\\)?[\\s\\-./]*\\d{3}[\\s\\-./]*\\d{4}$"
+      minLength: 10
+      maxLength: 30
+    EN_GB:
+      type: string
+      pattern: "^(\\+?44[\\s\\-./]*(\\(0\\))?)?0?\\d{2,5}([\\s\\-./]*\\d{1,8}){1,3}$"
+      minLength: 10
+      maxLength: 30
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec![
+            "+1 (202) 555-0100",
+            "+1 (415) 555-0199",
+            "(312) 555-0142",
+            "1-800-555-0123",
+            "(617) 555-0187",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "identity.person.phone_number", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("EN_US".to_string()),
+            "US phone numbers should detect EN_US"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_uk_phone_numbers() {
+        let yaml = r#"
+identity.person.phone_number:
+  title: Phone Number
+  designation: locale_specific
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["+44 20 7946 0958"]
+  validation:
+    type: string
+    pattern: "^[+]?[0-9\\s()\\-\\.]+$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\+?1[\\s\\-./]*)?\\(?\\d{3}\\)?[\\s\\-./]*\\d{3}[\\s\\-./]*\\d{4}$"
+      minLength: 10
+      maxLength: 30
+    EN_GB:
+      type: string
+      pattern: "^(\\+?44[\\s\\-./]*(\\(0\\))?)?0?\\d{2,5}([\\s\\-./]*\\d{1,8}){1,3}$"
+      minLength: 10
+      maxLength: 30
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec![
+            "+44 20 7946 0958",
+            "020 7946 0123",
+            "+44 121 496 0987",
+            "0161 496 0654",
+            "+44 131 496 0321",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "identity.person.phone_number", &taxonomy);
+        assert_eq!(
+            locale,
+            Some("EN_GB".to_string()),
+            "UK phone numbers should detect EN_GB"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_no_validators() {
+        // Types without validation_by_locale should return None
+        let yaml = r#"
+identity.person.email:
+  title: Email
+  designation: universal
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["test@example.com"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+
+        let values: Vec<String> = vec!["test@example.com", "user@domain.org"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale = detect_locale_from_validation(&values, "identity.person.email", &taxonomy);
+        assert_eq!(
+            locale, None,
+            "Types without locale validators should return None"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_no_match_above_threshold() {
+        // Values that don't match any locale pattern well enough should return None
+        let yaml = r#"
+identity.person.phone_number:
+  title: Phone Number
+  designation: locale_specific
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["+1 (202) 555-0100"]
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\+?1[\\s\\-./]*)?\\(?\\d{3}\\)?[\\s\\-./]*\\d{3}[\\s\\-./]*\\d{4}$"
+      minLength: 10
+      maxLength: 30
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        // Random strings that don't match any phone pattern
+        let values: Vec<String> = vec!["abc", "hello world", "12345", "not-a-phone"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "identity.person.phone_number", &taxonomy);
+        assert_eq!(
+            locale, None,
+            "Non-matching values should not detect any locale"
+        );
+    }
+
+    #[test]
+    fn test_detect_locale_empty_values() {
+        let yaml = r#"
+identity.person.phone_number:
+  title: Phone Number
+  designation: locale_specific
+  tier: [VARCHAR, identity, person]
+  release_priority: 5
+  samples: ["+1 (202) 555-0100"]
+  validation_by_locale:
+    EN_US:
+      type: string
+      pattern: "^(\\+?1[\\s\\-./]*)?\\(?\\d{3}\\)?[\\s\\-./]*\\d{3}[\\s\\-./]*\\d{4}$"
+      minLength: 10
+      maxLength: 30
+"#;
+        let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        taxonomy.compile_locale_validators();
+
+        let values: Vec<String> = vec!["", "", ""].into_iter().map(String::from).collect();
+
+        let locale =
+            detect_locale_from_validation(&values, "identity.person.phone_number", &taxonomy);
+        assert_eq!(
+            locale, None,
+            "All-empty values should not detect any locale"
         );
     }
 }

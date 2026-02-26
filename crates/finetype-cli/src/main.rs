@@ -619,6 +619,9 @@ fn cmd_infer(
                         result.confidence, result.samples_used
                     );
                 }
+                if let Some(locale) = &result.detected_locale {
+                    println!("  locale: {}", locale);
+                }
                 if result.disambiguation_applied {
                     println!(
                         "  disambiguation: {}",
@@ -645,6 +648,9 @@ fn cmd_infer(
                 );
                 if let Some(rule) = &result.disambiguation_rule {
                     obj.insert("disambiguation_rule".to_string(), json!(rule));
+                }
+                if let Some(locale) = &result.detected_locale {
+                    obj.insert("locale".to_string(), json!(locale));
                 }
                 let votes: Vec<serde_json::Value> = result
                     .vote_distribution
@@ -889,6 +895,9 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
                 "disambiguation_rule".to_string(),
                 json!(result.disambiguation_rule),
             );
+        }
+        if let Some(locale) = &result.detected_locale {
+            obj.insert("locale".to_string(), json!(locale));
         }
 
         writeln!(out, "{}", serde_json::Value::Object(obj))?;
@@ -1843,6 +1852,7 @@ fn cmd_profile(
         null_count: usize,
         disambiguation_applied: bool,
         disambiguation_rule: Option<String>,
+        detected_locale: Option<String>,
     }
 
     let mut profiles: Vec<ColProfile> = Vec::new();
@@ -1864,6 +1874,7 @@ fn cmd_profile(
                 null_count,
                 disambiguation_applied: false,
                 disambiguation_rule: None,
+                detected_locale: None,
             });
             continue;
         }
@@ -1883,6 +1894,7 @@ fn cmd_profile(
             null_count,
             disambiguation_applied: result.disambiguation_applied,
             disambiguation_rule: result.disambiguation_rule,
+            detected_locale: result.detected_locale,
         });
     }
 
@@ -1939,6 +1951,9 @@ fn cmd_profile(
                             obj.insert("disambiguation_rule".to_string(), json!(rule));
                         }
                     }
+                    if let Some(locale) = &p.detected_locale {
+                        obj.insert("locale".to_string(), json!(locale));
+                    }
                     serde_json::Value::Object(obj)
                 })
                 .collect();
@@ -1951,17 +1966,18 @@ fn cmd_profile(
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         OutputFormat::Csv => {
-            println!("column,type,confidence,samples_used,non_null,null,disambiguation");
+            println!("column,type,confidence,samples_used,non_null,null,disambiguation,locale");
             for p in &profiles {
                 println!(
-                    "\"{}\",\"{}\",{:.4},{},{},{},\"{}\"",
+                    "\"{}\",\"{}\",{:.4},{},{},{},\"{}\",\"{}\"",
                     p.name,
                     p.label,
                     p.confidence,
                     p.samples_used,
                     p.non_null_count,
                     p.null_count,
-                    p.disambiguation_rule.as_deref().unwrap_or("")
+                    p.disambiguation_rule.as_deref().unwrap_or(""),
+                    p.detected_locale.as_deref().unwrap_or("")
                 );
             }
         }
