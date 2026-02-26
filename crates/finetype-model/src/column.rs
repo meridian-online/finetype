@@ -747,6 +747,18 @@ fn disambiguate(
         }
     }
 
+    // Rule 17: UTC offset override — standalone UTC offset values like "+05:30"
+    // misclassified as time formats (hm_24h, hms_24h) because the HH:MM pattern
+    // matches. The mandatory leading +/- sign distinguishes offsets from times.
+    if top_labels
+        .first()
+        .is_some_and(|l| l.starts_with("datetime.time.") || *l == "datetime.timestamp.rfc_3339")
+    {
+        if let Some((label, rule)) = disambiguate_utc_offset_override(values) {
+            return Some((label, rule));
+        }
+    }
+
     // Rule 15: Attractor type demotion — demote over-eager specific type
     // predictions (postal_code, cvv, first_name, etc.) when evidence doesn't
     // support the specific prediction. Three signals: validation failure,
@@ -1848,6 +1860,60 @@ fn disambiguate_duration_override(values: &[String]) -> Option<(String, String)>
         Some((
             "datetime.duration.iso_8601".to_string(),
             "duration_override_sedol".to_string(),
+        ))
+    } else {
+        None
+    }
+}
+
+/// UTC offset override: standalone offsets misclassified as time values.
+///
+/// UTC offsets like "+05:30", "-08:00", "+00:00" follow the pattern [+-]HH:MM.
+/// The CharCNN sees the HH:MM structure and predicts time types (hm_24h,
+/// hms_24h) since those share the same colon-separated digit format. The
+/// mandatory leading sign (+/-) is the syntactic distinguisher.
+///
+/// Rule: If the top vote is a datetime.time.* type and ≥80% of non-empty
+/// values match ^[+-]HH:MM$, override to datetime.offset.utc.
+fn disambiguate_utc_offset_override(values: &[String]) -> Option<(String, String)> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    // UTC offset pattern: mandatory +/- sign, then exactly HH:MM
+    let offset_count = non_empty
+        .iter()
+        .filter(|v| {
+            let bytes = v.as_bytes();
+            // Must be exactly 6 chars: [+-]HH:MM
+            if bytes.len() != 6 {
+                return false;
+            }
+            // First char must be + or -
+            if bytes[0] != b'+' && bytes[0] != b'-' {
+                return false;
+            }
+            // Then two digits, colon, two digits
+            bytes[1].is_ascii_digit()
+                && bytes[2].is_ascii_digit()
+                && bytes[3] == b':'
+                && bytes[4].is_ascii_digit()
+                && bytes[5].is_ascii_digit()
+        })
+        .count();
+
+    let fraction = offset_count as f64 / non_empty.len() as f64;
+
+    if fraction >= 0.8 {
+        Some((
+            "datetime.offset.utc".to_string(),
+            "utc_offset_override_time".to_string(),
         ))
     } else {
         None
@@ -4601,6 +4667,88 @@ identity.person.phone_number:
         assert!(result.is_some(), "Should detect week-based durations");
         let (label, _) = result.unwrap();
         assert_eq!(label, "datetime.duration.iso_8601");
+    }
+
+    // ── UTC offset override tests ──
+
+    #[test]
+    fn test_utc_offset_override_standard_offsets() {
+        // Standard UTC offsets from the airports dataset
+        let values: Vec<String> = vec![
+            "+05:30", "-08:00", "-05:00", "+05:30", "+01:00", "+10:00", "+10:00", "+09:00",
+            "+01:00", "+00:00",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_utc_offset_override(&values);
+        assert!(result.is_some(), "Should detect UTC offset values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.offset.utc");
+        assert_eq!(rule, "utc_offset_override_time");
+    }
+
+    #[test]
+    fn test_utc_offset_override_all_negative() {
+        // All negative offsets (Americas)
+        let values: Vec<String> = vec!["-05:00", "-06:00", "-07:00", "-08:00", "-04:00", "-03:00"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_utc_offset_override(&values);
+        assert!(result.is_some(), "Should detect negative UTC offsets");
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "datetime.offset.utc");
+    }
+
+    #[test]
+    fn test_utc_offset_override_not_triggered_for_times() {
+        // Actual 24h time values (no leading sign)
+        let values: Vec<String> = vec!["14:30", "08:00", "12:15", "09:45", "16:00", "23:59"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_utc_offset_override(&values);
+        assert!(
+            result.is_none(),
+            "Should NOT trigger for actual time values (no +/- prefix)"
+        );
+    }
+
+    #[test]
+    fn test_utc_offset_override_not_triggered_below_threshold() {
+        // Mixed column: mostly times with a few offsets
+        let values: Vec<String> = vec![
+            "14:30", "08:00", "+05:30", "12:15", "09:45", "16:00", "23:59", "-08:00", "11:00",
+            "07:30",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = disambiguate_utc_offset_override(&values);
+        assert!(
+            result.is_none(),
+            "Should NOT trigger when <80% of values are UTC offsets"
+        );
+    }
+
+    #[test]
+    fn test_utc_offset_override_too_few_values() {
+        // Only 2 values — below minimum threshold
+        let values: Vec<String> = vec!["+05:30", "-08:00"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_utc_offset_override(&values);
+        assert!(
+            result.is_none(),
+            "Should NOT trigger with fewer than 3 values"
+        );
     }
 
     // ── Text length demotion tests ──

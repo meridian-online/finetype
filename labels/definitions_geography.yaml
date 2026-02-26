@@ -157,7 +157,7 @@ geography.location.city:
     Name of a city, town, or municipality. Locale-specific due to city
     name representation in different languages.
   designation: locale_specific
-  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
+  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, PT_BR, RU, JA, ZH, KO, AR, HI, TR]
   broad_type: VARCHAR
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
