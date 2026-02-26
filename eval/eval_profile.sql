@@ -122,12 +122,22 @@ SELECT
         WHEN sm.finetype_label LIKE 'datetime.timestamp.%'
              AND pr.predicted_type LIKE 'datetime.timestamp.%'
         THEN true
+        -- Name types: full_name ≈ entity_name — GT "name" covers both person
+        -- names and entity names (organisations, venues, products). NNFT-137
+        -- added entity_name as a separate type.
+        WHEN sm.finetype_label = 'identity.person.full_name'
+             AND pr.predicted_type = 'representation.text.entity_name'
+        THEN true
         ELSE false
     END AS label_match,
     -- Scoring: domain-level match
     CASE
         WHEN sm.finetype_domain IS NOT NULL AND sm.finetype_domain != ''
              AND split_part(pr.predicted_type, '.', 1) = sm.finetype_domain
+        THEN true
+        -- entity_name in representation domain satisfies identity-domain "name" GT
+        WHEN sm.finetype_label = 'identity.person.full_name'
+             AND pr.predicted_type = 'representation.text.entity_name'
         THEN true
         ELSE false
     END AS domain_match,

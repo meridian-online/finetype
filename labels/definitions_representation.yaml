@@ -400,6 +400,78 @@ representation.text.emoji:
     v1 migration: Was text.emoji. Single emoji or emoji sequence.
     Pattern matches Unicode symbol categories. Emoji width variable.
 
+representation.text.entity_name:
+  title: "Entity Name"
+  description: >
+    Non-person named entity: organisation names, product names, venue names,
+    song/movie/book titles, brand names. Distinguished from full_name by
+    containing business suffixes (Inc, Corp, Ltd), numbers, ampersands, or
+    other non-personal-name patterns.
+  designation: broad_words
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    minLength: 2
+    maxLength: 200
+  tier: [VARCHAR, text]
+  release_priority: 3
+  aliases: [company_name, brand, product_name, venue_name, title]
+  samples:
+    - "The Olive Garden"
+    - "iPhone 15 Pro"
+    - "Game of Thrones"
+    - "Spotify"
+    - "McKinsey & Company"
+    - "Toyota Motor Corp"
+    - "Harvard University"
+    - "Super Bowl LVIII"
+  references: null
+  notes: >
+    NNFT-137. Addresses full_name overcall: 3,086 SOTAB columns misclassified
+    as person names are actually entity names (songs, restaurants, products,
+    venues). CharCNN can learn to distinguish entity_name from full_name via
+    business suffixes, numbers, and mixed-case patterns. broad_words designation
+    means column-level disambiguation can override with header hints.
+
+representation.text.paragraph:
+  title: "Paragraph"
+  description: >
+    Multi-sentence free-form text (descriptions, reviews, recipes, articles).
+    Distinguished from sentence by containing multiple sentences (period
+    followed by space or newline and another capital letter).
+  designation: broad_characters
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    word_count: "CAST(REGEXP_COUNT({col}, '\\s+') + 1 AS SMALLINT)"
+    sentence_count: "CAST(REGEXP_COUNT({col}, '[.!?]\\s') + 1 AS SMALLINT)"
+  validation:
+    type: string
+    minLength: 50
+    maxLength: 65536
+  tier: [VARCHAR, text]
+  release_priority: 1
+  aliases: [description, review, article, body_text]
+  samples:
+    - "This product works great. I would recommend it to anyone looking for quality."
+    - "First, preheat the oven to 350F. Then mix the dry ingredients together. Add the wet ingredients slowly."
+    - "The hotel was located in the city center. Rooms were clean and spacious. Staff was very friendly and helpful."
+  references: null
+  notes: >
+    NNFT-137. Addresses full_address overcall for long text. NNFT-134 found
+    text >100 chars median incorrectly classified as addresses. Rule 16
+    demotes full_address to sentence, but paragraph is the more accurate
+    classification for multi-sentence text. broad_characters designation makes
+    it yield to header hints like sentence and plain_text do.
+
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: file
 #

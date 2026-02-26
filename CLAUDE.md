@@ -22,7 +22,7 @@ Concretely:
 ## Current State
 
 **Version:** 0.3.0 (latest tag: `v0.3.0`)
-**Taxonomy:** 169 definitions across 6 domains — all generators pass, 100% alignment
+**Taxonomy:** 171 definitions across 6 domains — all generators pass, 100% alignment
 **Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check, smoke tests)
@@ -30,6 +30,7 @@ Concretely:
 
 ### Recent milestones
 
+- **Entity name & paragraph taxonomy expansion** (NNFT-137) — Added `representation.text.entity_name` and `representation.text.paragraph` types to address full_name overcall on non-person entities (companies, venues, products). Retrained tiered-v2 model with 1000 samples × 10 epochs. VARCHAR_text T2 accuracy: 99.58% (8 types). Profile eval: 69/74 (93.2%) label, 72/74 (97.3%) domain. entity_name correctly classifies people_directory.company and sports_events.venue. Two retraining regressions (world_cities.name, datetime_formats.utc_offset) offset one fix (people_directory.company). Eval SQL updated with entity_name↔full_name interchangeability for "name" GT labels.
 - **Text overcall investigation** (NNFT-134) — Root cause analysis of 5,243 full_name/full_address overcall columns (86% false positive rate). Added text length demotion rule (Rule 16): full_address predictions with median value length >100 demoted to representation.text.sentence. 441 columns corrected. SOTAB domain: 62.6% → 64.4% (+1.8pp). Finding: full_name overcall (3,086 cols) needs model retraining — no surgical rule available.
 - **Phone validation precision & locale expansion** (NNFT-132, NNFT-136) — Established Precision Principle: locale-only confirmation for locale-specific types. Expanded phone locale patterns with extension suffixes, (0) trunk prefix, ZA locale, slash/en-dash separators. SOTAB format-detectable: 39.5% → 42.5% label (+3.0pp), 59.5% → 62.6% domain (+3.1pp). Telephone cardinality demotions: 254 → 24. Profile eval unchanged at 70/74.
 - **Post-v0.3.0 disambiguation sprint** (NNFT-131) — Duration vs SEDOL override rule (Rule 14), TLD added to CODE_ATTRACTORS, SOTAB schema mapping expanded for DateTime/Date variants. SOTAB format-detectable: 30.5% → 39.5% label (+9.0pp), 54.8% → 59.5% domain (+4.7pp). Profile eval unchanged at 70/74.
@@ -45,7 +46,7 @@ Concretely:
 
 ### What's in progress
 
-- **Next accuracy targets** — 4 remaining misses at 70/74: countries.name (intractable without cross-column context), books_catalog.publisher, people_directory.company, tech_systems.server_hostname (GT mapping issue). CLDR date/time patterns and 4-level locale labels (NNFT-126) are next infrastructure pieces.
+- **Next accuracy targets** — 5 remaining misses at 69/74: countries.name (intractable without cross-column context), books_catalog.publisher (last_name overcall), tech_systems.server_hostname (slug overcall), world_cities.name (retraining regression — full_name overrides city via header hint), datetime_formats.utc_offset (retraining regression — hm_24h confusion). The last two are model boundary shifts from NNFT-137 full retraining — potential fix via targeted disambiguation rules. CLDR date/time patterns and 4-level locale labels (NNFT-126) are next infrastructure pieces.
 
 ## Architecture
 
@@ -82,8 +83,8 @@ finetype-model (depends on core — CharCNN, tiered inference, column mode)
 The inference system has two modes:
 
 **1. Value-level inference** — Single string -> type label
-- `CharClassifier` (flat): Single CharCNN model, 169 classes, ~1,500 val/sec
-- `TieredClassifier` (hierarchical): 34 CharCNN models in T0->T1->T2 graph, ~580 val/sec, higher accuracy on ambiguous types
+- `CharClassifier` (flat): Single CharCNN model, 171 classes, ~1,500 val/sec
+- `TieredClassifier` (hierarchical): 46 CharCNN models in T0->T1->T2 graph (34 trained, 12 direct), ~580 val/sec, higher accuracy on ambiguous types
 
 **2. Column-level inference** — Vector of strings -> single column type
 - Runs value-level inference on each value
@@ -92,7 +93,7 @@ The inference system has two modes:
 - **Duration override** (Rule 14, NNFT-131): When top vote is SEDOL but ≥50% of values match ISO 8601 duration pattern (P prefix + time component letters Y/M/W/D/T/H/S), overrides to `datetime.duration.iso_8601`. Must run before attractor demotion to prevent SEDOL being demoted to `alphanumeric_id` instead of the correct `duration`.
 - **Attractor demotion** (Rule 15): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not locale-confirmed), and cardinality mismatch (1-20 unique values for text attractors, skipped when locale-confirmed). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override. Code attractors: icao_code, ndc, cusip, top_level_domain (NNFT-131). **Locale-aware validation** (NNFT-118, NNFT-132): For types with `validation_by_locale`, Signal 1 first checks all locale patterns — if any locale achieves >50% pass rate, the prediction is locale-confirmed (skips Signals 2 and 3). Universal validation can reject (Signal 1) but cannot confirm — passing universal validation alone leaves the prediction vulnerable to all signals. This prevents permissive universal patterns from giving false confidence (see Precision Principle).
 - **Text length demotion** (Rule 16, NNFT-134): When top vote is `full_address` and the median non-empty value length exceeds 100 characters, demotes to `representation.text.sentence`. Real addresses have median ~23 chars; free-form text (descriptions, recipes, paragraphs) has median ~53+ chars. Threshold 100 gives 0% false demotion on evaluation data.
-- **Semantic header hints** (Model2Vec): embeds column name → max-sim matching against 169 types × K=3 representative embeddings → overrides generic predictions above 0.65 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable. **Geography protection** (NNFT-127): when hint is `full_name`, checks if model sees geography signal — keeps location predictions rather than overriding, and rescues attractor-demoted predictions when geography votes exist. **Measurement disambiguation** (NNFT-128): when both hint and prediction are measurement types (age/height/weight), trusts the header since values are numerically indistinguishable.
+- **Semantic header hints** (Model2Vec): embeds column name → max-sim matching against 171 types × K=3 representative embeddings → overrides generic predictions above 0.65 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable. **Geography protection** (NNFT-127): when hint is `full_name`, checks if model sees geography signal — keeps location predictions rather than overriding, and rescues attractor-demoted predictions when geography votes exist. **Measurement disambiguation** (NNFT-128): when both hint and prediction are measurement types (age/height/weight), trusts the header since values are numerically indistinguishable.
 - **Post-hoc locale detection** (NNFT-140): After type classification and disambiguation, runs sample values against `validation_by_locale` patterns to detect the most likely locale. Returns the locale with the highest pass rate above 50%. Locale is cleared if a header hint changes the label. Works for phone_number (15 locales) and postal_code (14 locales). Implements decision-002 Option B.
 - **`is_generic` determination** (NNFT-139): `is_generic_prediction()` function uses four additive signals to decide if a prediction should yield to header hints: (1) attractor-demoted → always generic, (2) boolean → always generic, (3) hardcoded catch-all list (phone_number, first_name, iata_code, etc.) → always generic, (4) taxonomy designation `broad_words`/`broad_characters`/`broad_numbers`/`broad_object` → additionally generic. Signals are additive — hardcoded list always applies, designation expands the set further.
 
@@ -122,7 +123,7 @@ Labels follow `domain.category.type` hierarchy (e.g., `identity.person.email`, `
 - `datetime` — Date, time, timestamp formats across locales (46 types)
 - `geography` — Addresses, coordinates, country/region codes (16 types)
 - `identity` — Person, organisation, financial, medical identifiers (35 types)
-- `representation` — Boolean, categorical, ordinal, numeric, alphanumeric (27 types)
+- `representation` — Boolean, categorical, ordinal, numeric, text, alphanumeric (29 types)
 - `technology` — Internet, development, cryptographic, file types (34 types)
 
 Each definition in `labels/definitions_*.yaml` is a **transformation contract** specifying:
@@ -162,7 +163,7 @@ Each definition in `labels/definitions_*.yaml` is a **transformation contract** 
 
 Three evaluation benchmarks, all in `eval/`:
 
-1. **Profile eval** (`eval/profile_eval.sh`) — Runs `finetype profile` on annotated CSVs, scores against `schema_mapping.yaml`. Current: 92.9% accuracy.
+1. **Profile eval** (`eval/profile_eval.sh`) — Runs `finetype profile` on annotated CSVs, scores against `schema_mapping.yaml`. Current: 93.2% label accuracy (69/74), 97.3% domain accuracy (72/74).
 2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.3.0 CLI: 47.1% label / 56.5% domain accuracy on format-detectable types (4,481 columns, 45,428 total). v0.1.8 DuckDB: 57.8% domain (14,850 tables, 2.7M values).
 3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. Post-NNFT-134 CLI: 42.5% label / 64.4% domain accuracy on format-detectable types (11,484 columns, 16,765 total). Post-NNFT-131: 39.5% label / 59.5% domain. v0.3.0 baseline: 30.5% label / 54.8% domain. v0.1.8 DuckDB: 53.7% domain (5,728 tables, 16,765 columns).
 

@@ -1651,7 +1651,7 @@ impl Generator {
                 }
             }
 
-            // ── text (5 types) ───────────────────────────────────────────
+            // ── text (8 types) ───────────────────────────────────────────
             ("text", "plain_text") => {
                 let words: Vec<String> = (0..self.rng.gen_range(5..25))
                     .map(|_| self.random_word())
@@ -1693,6 +1693,8 @@ impl Generator {
                     Ok(format!("{}, {}, {}", r, g, b))
                 }
             }
+            ("text", "entity_name") => self.gen_entity_name(),
+            ("text", "paragraph") => self.gen_paragraph(),
             ("text", "emoji") => {
                 let emojis = [
                     "\u{1f600}",
@@ -2412,6 +2414,168 @@ impl Generator {
             "autumn", "winter", "sun", "moon", "star", "cloud",
         ];
         words[self.rng.gen_range(0..words.len())].to_string()
+    }
+
+    /// Generate a non-person entity name (company, product, venue, title).
+    ///
+    /// Produces diverse formats to help CharCNN distinguish entity names from
+    /// personal names: business suffixes, numbers, ampersands, "The" prefix,
+    /// multi-word titles, etc. 10 format variants with weighted probabilities.
+    fn gen_entity_name(&mut self) -> Result<String, GeneratorError> {
+        let company_suffixes = [
+            "Inc",
+            "Corp",
+            "Ltd",
+            "LLC",
+            "Co",
+            "Group",
+            "Holdings",
+            "Partners",
+            "Associates",
+            "Foundation",
+            "Institute",
+            "Solutions",
+            "Systems",
+            "Technologies",
+            "Enterprises",
+            "Industries",
+            "Services",
+        ];
+        let entity_words = [
+            "Global", "Pacific", "Atlantic", "Summit", "Apex", "Crown", "Prime", "Pinnacle",
+            "Horizon", "Pioneer", "Quantum", "Stellar", "Nexus", "Titan", "Phoenix", "Eagle",
+            "Crystal", "Diamond", "Royal", "Metro", "Grand", "Capital", "Liberty", "Heritage",
+            "Emerald", "Silver", "Golden", "Dragon", "Legacy", "Harmony",
+        ];
+        let product_words = [
+            "Pro", "Max", "Ultra", "Plus", "Elite", "Mini", "Air", "Edge", "Prime", "Neo", "Flex",
+            "Core", "Studio", "Duo", "One",
+        ];
+        let venue_types = [
+            "Restaurant",
+            "Cafe",
+            "Bar",
+            "Grill",
+            "Bistro",
+            "Tavern",
+            "Kitchen",
+            "House",
+            "Inn",
+            "Hotel",
+            "Lounge",
+            "Club",
+            "Theater",
+            "Cinema",
+            "Gallery",
+            "Museum",
+            "Park",
+            "Arena",
+            "Stadium",
+            "Center",
+        ];
+
+        let choice = self.rng.gen_range(0..20);
+        let name = if choice < 4 {
+            // 20%: Company with suffix — "Apex Technologies Inc"
+            let w1 = entity_words[self.rng.gen_range(0..entity_words.len())];
+            let w2 = entity_words[self.rng.gen_range(0..entity_words.len())];
+            let suffix = company_suffixes[self.rng.gen_range(0..company_suffixes.len())];
+            if self.rng.gen_bool(0.5) {
+                format!("{} {}", w1, suffix)
+            } else {
+                format!("{} {} {}", w1, w2, suffix)
+            }
+        } else if choice < 7 {
+            // 15%: Product with version/number — "iPhone 15 Pro", "Model X3"
+            let w = entity_words[self.rng.gen_range(0..entity_words.len())];
+            let prod = product_words[self.rng.gen_range(0..product_words.len())];
+            let num = self.rng.gen_range(1..99);
+            if self.rng.gen_bool(0.5) {
+                format!("{} {} {}", w, num, prod)
+            } else {
+                format!("{}{}", w, num)
+            }
+        } else if choice < 10 {
+            // 15%: "The" prefix — "The Olive Garden", "The Grand Hotel"
+            let w = entity_words[self.rng.gen_range(0..entity_words.len())];
+            let vt = venue_types[self.rng.gen_range(0..venue_types.len())];
+            format!("The {} {}", w, vt)
+        } else if choice < 13 {
+            // 15%: Venue-style — "Mario's Kitchen", "Summit Grill"
+            let first = self.random_first_name();
+            let vt = venue_types[self.rng.gen_range(0..venue_types.len())];
+            if self.rng.gen_bool(0.4) {
+                format!("{}'s {}", first, vt)
+            } else {
+                let w = entity_words[self.rng.gen_range(0..entity_words.len())];
+                format!("{} {}", w, vt)
+            }
+        } else if choice < 15 {
+            // 10%: Ampersand style — "Johnson & Johnson", "Barnes & Noble"
+            let w1 = entity_words[self.rng.gen_range(0..entity_words.len())];
+            let w2 = entity_words[self.rng.gen_range(0..entity_words.len())];
+            format!("{} & {}", w1, w2)
+        } else if choice < 17 {
+            // 10%: University/School — "Harvard University", "MIT"
+            let w = entity_words[self.rng.gen_range(0..entity_words.len())];
+            let inst = ["University", "College", "Academy", "School"];
+            format!("{} {}", w, inst[self.rng.gen_range(0..inst.len())])
+        } else if choice < 19 {
+            // 10%: Single brand name (capitalised word) — "Spotify", "Tesla"
+            let brands = [
+                "Spotify",
+                "Tesla",
+                "Netflix",
+                "Amazon",
+                "Microsoft",
+                "Samsung",
+                "Oracle",
+                "Walmart",
+                "Starbucks",
+                "Boeing",
+                "Airbus",
+                "Siemens",
+                "Toyota",
+                "Honda",
+                "Pepsi",
+                "Nestle",
+            ];
+            brands[self.rng.gen_range(0..brands.len())].to_string()
+        } else {
+            // 5%: All-caps acronym/abbreviation — "NASA", "BMW", "HSBC"
+            let acronyms = [
+                "NASA", "BMW", "HSBC", "IBM", "AT&T", "UPS", "BBC", "CNN", "NHL", "UFC", "FIFA",
+                "IKEA", "AMD", "HP", "SAP", "DHL",
+            ];
+            acronyms[self.rng.gen_range(0..acronyms.len())].to_string()
+        };
+        Ok(name)
+    }
+
+    /// Generate a multi-sentence paragraph.
+    ///
+    /// Produces 2-6 sentences joined by spaces. Each sentence starts with a
+    /// capital letter and ends with punctuation. Total length is typically
+    /// 80-500 characters, well above the 50-char minLength validation.
+    fn gen_paragraph(&mut self) -> Result<String, GeneratorError> {
+        let sentence_count = self.rng.gen_range(2..7);
+        let mut sentences = Vec::with_capacity(sentence_count);
+
+        for _ in 0..sentence_count {
+            let word_count = self.rng.gen_range(5..15);
+            let mut words: Vec<String> = (0..word_count).map(|_| self.random_word()).collect();
+            // Capitalise first word
+            if let Some(first) = words.first_mut() {
+                let mut chars = first.chars();
+                if let Some(c) = chars.next() {
+                    *first = c.to_uppercase().collect::<String>() + chars.as_str();
+                }
+            }
+            let ending = [".", ".", ".", "!", "?"][self.rng.gen_range(0..5)];
+            sentences.push(format!("{}{}", words.join(" "), ending));
+        }
+
+        Ok(sentences.join(" "))
     }
 
     fn random_first_name(&mut self) -> String {
