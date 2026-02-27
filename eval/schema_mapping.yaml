@@ -148,6 +148,166 @@ mappings:
     expand: false
     notes: Short text tokens; no distinct abbreviation type in FineType
 
+  - gt_label: credit card number
+    source: profile
+    finetype_label: identity.payment.credit_card_number
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: Credit card number format (Luhn checksum)
+
+  - gt_label: cvv
+    source: profile
+    finetype_label: identity.payment.cvv
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: 3-4 digit card verification value
+
+  - gt_label: ean
+    source: profile
+    finetype_label: technology.code.ean
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: EAN barcode (8 or 13 digit)
+
+  - gt_label: first name
+    source: profile
+    finetype_label: identity.person.first_name
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: Given/first name
+
+  - gt_label: last name
+    source: profile
+    finetype_label: identity.person.last_name
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: Family/last name
+
+  - gt_label: hash
+    source: profile
+    finetype_label: technology.cryptographic.hash
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: Cryptographic hash (SHA-256, MD5, etc.)
+
+  - gt_label: http status code
+    source: profile
+    finetype_label: technology.internet.http_status_code
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: HTTP status codes (200, 404, 500, etc.)
+
+  - gt_label: iata
+    source: profile
+    finetype_label: geography.transportation.iata_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: IATA airport codes (3-letter)
+
+  - gt_label: icao
+    source: profile
+    finetype_label: geography.transportation.icao_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: ICAO airport codes (4-letter)
+
+  - gt_label: ip_v4
+    source: profile
+    finetype_label: technology.internet.ip_v4
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: IPv4 address format
+
+  - gt_label: mac address
+    source: profile
+    finetype_label: technology.internet.mac_address
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: MAC address format (AA:BB:CC:DD:EE:FF)
+
+  - gt_label: measurement unit
+    source: profile
+    finetype_label: representation.scientific.measurement_unit
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+    notes: Scientific measurement units (kg, m, s, etc.)
+
+  - gt_label: month name
+    source: profile
+    finetype_label: datetime.component.month_name
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: Month names (January, February, etc.)
+
+  - gt_label: npi
+    source: profile
+    finetype_label: identity.medical.npi
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: National Provider Identifier (10-digit)
+
+  - gt_label: port
+    source: profile
+    finetype_label: technology.internet.port
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: Network port numbers (0-65535)
+
+  - gt_label: street number
+    source: profile
+    finetype_label: geography.address.street_number
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Street/house numbers
+
+  - gt_label: uuid
+    source: profile
+    finetype_label: technology.cryptographic.uuid
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+
+  - gt_label: user agent
+    source: profile
+    finetype_label: technology.internet.user_agent
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: Browser user agent strings
+
+  - gt_label: decimal number
+    source: profile
+    finetype_label: representation.numeric.decimal_number
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+    notes: Decimal/floating-point numbers
+
+  - gt_label: swift code
+    source: profile
+    finetype_label: identity.payment.swift_code
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+    notes: SWIFT/BIC codes (8 or 11 characters)
+
   # ═══════════════════════════════════════════════════════════════════════════
   # CLOSE MATCHES — Mostly correct with minor semantic gap
   # ═══════════════════════════════════════════════════════════════════════════
@@ -272,9 +432,41 @@ mappings:
     expand: false
     notes: Text sentence format
 
+  - gt_label: occupation
+    source: profile
+    finetype_label: identity.person.occupation
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Job titles / occupations; FineType has occupation type
+
   # ═══════════════════════════════════════════════════════════════════════════
   # PARTIAL MATCHES — Sometimes detectable, depends on data format
   # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: timestamp
+    source: profile
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: "Maps to many FineType timestamp types: iso_8601, sql_standard, etc."
+
+  - gt_label: sql timestamp
+    source: profile
+    finetype_label: datetime.timestamp.sql_standard
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: SQL standard timestamp format (YYYY-MM-DD HH:MM:SS)
+
+  - gt_label: time 24h
+    source: profile
+    finetype_label: null
+    finetype_domain: datetime
+    match_quality: partial
+    expand: false
+    notes: "24-hour time; maps to hms_24h or hm_24h depending on whether seconds present"
 
   - gt_label: date
     source: dbpedia
@@ -1604,3 +1796,68 @@ mappings:
     match_quality: semantic_only
     expand: true
     notes: Filenames have detectable patterns (name.ext); candidate for expansion
+
+  # ── Profile (datetime_formats_extended) ──────────────────────────
+  - gt_label: eu dot date
+    source: profile
+    finetype_label: datetime.date.eu_dot
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: European date with dot separators (dd.mm.yyyy)
+
+  - gt_label: abbreviated month date
+    source: profile
+    finetype_label: datetime.date.abbreviated_month
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: Date with abbreviated month name (Jan 01, 2020)
+
+  - gt_label: long full month date
+    source: profile
+    finetype_label: datetime.date.long_full_month
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: Date with full month name (January 01, 2020)
+
+  - gt_label: time 12h
+    source: profile
+    finetype_label: datetime.time.hm_12h
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: 12-hour time without seconds (HH:MM AM/PM)
+
+  - gt_label: time 12h seconds
+    source: profile
+    finetype_label: datetime.time.hms_12h
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: 12-hour time with seconds (HH:MM:SS AM/PM)
+
+  - gt_label: rfc 2822 timestamp
+    source: profile
+    finetype_label: datetime.timestamp.rfc_2822
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: RFC 2822 email/HTTP datetime format
+
+  - gt_label: american timestamp
+    source: profile
+    finetype_label: datetime.timestamp.american
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: American datetime (MM/DD/YYYY HH:MM AM/PM)
+
+  - gt_label: european timestamp
+    source: profile
+    finetype_label: datetime.timestamp.european
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: European datetime (DD/MM/YYYY HH:MM)

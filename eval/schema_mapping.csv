@@ -13,6 +13,26 @@ year,dbpedia,datetime.component.year,datetime,direct,false
 latitude,schema,geography.coordinate.latitude,geography,direct,false
 longitude,schema,geography.coordinate.longitude,geography,direct,false
 abbreviation,dbpedia,representation.text.word,representation,close,false
+credit card number,profile,identity.payment.credit_card_number,identity,direct,false
+cvv,profile,identity.payment.cvv,identity,direct,false
+ean,profile,technology.code.ean,technology,direct,false
+first name,profile,identity.person.first_name,identity,direct,false
+last name,profile,identity.person.last_name,identity,direct,false
+hash,profile,technology.cryptographic.hash,technology,direct,false
+http status code,profile,technology.internet.http_status_code,technology,direct,false
+iata,profile,geography.transportation.iata_code,geography,direct,false
+icao,profile,geography.transportation.icao_code,geography,direct,false
+ip_v4,profile,technology.internet.ip_v4,technology,direct,false
+mac address,profile,technology.internet.mac_address,technology,direct,false
+measurement unit,profile,representation.scientific.measurement_unit,representation,direct,false
+month name,profile,datetime.component.month_name,datetime,direct,false
+npi,profile,identity.medical.npi,identity,direct,false
+port,profile,technology.internet.port,technology,direct,false
+street number,profile,geography.address.street_number,geography,direct,false
+uuid,profile,technology.cryptographic.uuid,technology,direct,false
+user agent,profile,technology.internet.user_agent,technology,direct,false
+decimal number,profile,representation.numeric.decimal_number,representation,direct,false
+swift code,profile,identity.payment.swift_code,identity,direct,false
 name,both,identity.person.full_name,identity,close,false
 author,both,identity.person.full_name,identity,close,false
 speaker,dbpedia,identity.person.full_name,identity,close,false
@@ -28,6 +48,10 @@ age,dbpedia,identity.person.age,identity,close,false
 height,both,identity.person.height,identity,close,false
 weight,dbpedia,identity.person.weight,identity,close,false
 sentence,dbpedia,representation.text.sentence,representation,close,false
+occupation,profile,identity.person.occupation,identity,close,false
+timestamp,profile,,datetime,partial,false
+sql timestamp,profile,datetime.timestamp.sql_standard,datetime,direct,false
+time 24h,profile,,datetime,partial,false
 date,dbpedia,,datetime,partial,false
 created,dbpedia,,datetime,partial,false
 updated,dbpedia,,datetime,partial,false
@@ -191,3 +215,11 @@ time of day,dbpedia,,datetime,partial,false
 published on,dbpedia,,datetime,partial,false
 dec,dbpedia,,representation,semantic_only,false
 filename,dbpedia,,representation,semantic_only,true
+eu dot date,profile,datetime.date.eu_dot,datetime,direct,false
+abbreviated month date,profile,datetime.date.abbreviated_month,datetime,direct,false
+long full month date,profile,datetime.date.long_full_month,datetime,direct,false
+time 12h,profile,datetime.time.hm_12h,datetime,direct,false
+time 12h seconds,profile,datetime.time.hms_12h,datetime,direct,false
+rfc 2822 timestamp,profile,datetime.timestamp.rfc_2822,datetime,direct,false
+american timestamp,profile,datetime.timestamp.american,datetime,direct,false
+european timestamp,profile,datetime.timestamp.european,datetime,direct,false

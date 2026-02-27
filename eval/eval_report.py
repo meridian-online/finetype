@@ -125,6 +125,7 @@ def compute_profile_accuracy(
     total = 0
     label_correct = 0
     domain_correct = 0
+    datasets_seen = set()
     misses = []
 
     for pred in predictions:
@@ -143,6 +144,7 @@ def compute_profile_accuracy(
             continue
 
         total += 1
+        datasets_seen.add(pred["dataset"])
         predicted = pred["predicted_type"]
         expected_label = mapping.get("finetype_label", "")
         expected_domain = mapping.get("finetype_domain", "")
@@ -167,6 +169,7 @@ def compute_profile_accuracy(
 
     return {
         "total": total,
+        "n_datasets": len(datasets_seen),
         "label_correct": label_correct,
         "domain_correct": domain_correct,
         "label_accuracy": round(label_correct / total * 100, 1) if total > 0 else 0,
@@ -361,7 +364,7 @@ def generate_report(
     w()
     w("| Component | Scope | Target | Status |")
     w("|---|---|---|---|")
-    w(f"| Profile regression | 74 columns, 20 datasets | No regressions | {label_status} |")
+    w(f"| Profile regression | {pa['total']} columns, {pa['n_datasets']} datasets | No regressions | {label_status} |")
     w("| Precision per type | SOTAB/GitTables | 🟢≥95% per type | Run `make eval-sotab-cli` |")
     w("| Overcall analysis | SOTAB/GitTables | <5% FP rate | Run `make eval-sotab-cli` |")
     action_line = f"{action_status}" if actionability else "Not run"

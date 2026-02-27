@@ -167,18 +167,35 @@ Each definition in `labels/definitions_*.yaml` is a **transformation contract** 
 Six evaluation components, all in `eval/`:
 
 **Core benchmarks:**
-1. **Profile eval** (`eval/profile_eval.sh`) — Regression smoke test on 74 annotated columns from 20 datasets. Scores against `schema_mapping.yaml`. Current: 93.2% label accuracy (69/74), 93.2% domain accuracy (69/74) on format-detectable (direct+close) types.
+1. **Profile eval** (`eval/profile_eval.sh`) — Regression smoke test on annotated CSV datasets. Scores against `schema_mapping.yaml`. Current: 94.2% label accuracy (113/120), 95.0% domain accuracy (114/120) on format-detectable (direct+close) types across 21 datasets.
 2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.3.0 CLI: 47.1% label / 56.5% domain accuracy on format-detectable types (4,481 columns, 45,428 total). v0.1.8 DuckDB: 57.8% domain (14,850 tables, 2.7M values).
 3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. Post-NNFT-134 CLI: 42.5% label / 64.4% domain accuracy on format-detectable types (11,484 columns, 16,765 total). Post-NNFT-131: 39.5% label / 59.5% domain. v0.3.0 baseline: 30.5% label / 54.8% domain. v0.1.8 DuckDB: 53.7% domain (5,728 tables, 16,765 columns).
 
 **Analyst-centric metrics (NNFT-147):**
 4. **Precision per type** — SQL sections in SOTAB/GitTables eval scripts. Per-predicted-type precision with thresholds: 🟢≥95% (analyst can act), 🟡80-95% (spot-check), 🔴<80% (untrustworthy). Includes overcall analysis for 10 high-risk types (full_name, entity_name, full_address, URL, geography, postal_code) showing GT label breakdown of false positives.
-5. **Actionability eval** (`eval/eval_actionability.py`) — Tests whether FineType's `format_string` predictions actually parse real data. Runs TRY_STRPTIME via DuckDB on profile eval datasets. Current: 98.3% overall (2350/2390 values), 17/18 columns at 100%. Target: >95% for datetime types.
+5. **Actionability eval** (`eval/eval_actionability.py`) — Tests whether FineType's `format_string` predictions actually parse real data. Runs TRY_STRPTIME via DuckDB on profile eval datasets. Current: 98.7% overall (2990/3030 values), 25/26 columns at 100%, 16 datetime types tested. Target: >95% for datetime types.
 6. **Confidence calibration** — SQL sections in SOTAB/GitTables eval scripts. Bins predictions by confidence decile, compares actual accuracy vs reported confidence. Target: calibration gap <10pp.
 
 **Dashboard:** `make eval-report` runs profile eval + actionability eval and generates `eval/eval_output/report.md` — a unified markdown dashboard with headline metrics, precision per type, actionability by format, and evaluation component status.
 
 All eval pipelines use `eval/config.env` for dataset paths with `envsubst` substitution in SQL templates. CLI-based eval pipelines (`eval-1m-cli`, `eval-sotab-cli`) use Python scripts to pipe columns through `finetype infer --mode column --batch`, then score with adapted SQL.
+
+### Adding regression datasets
+
+When fixing a misclassification or adding new type support, add a regression dataset alongside the code change:
+
+1. **Create or extend a CSV** in `/home/hugh/datasets/` with representative data for the type. Use ~80 rows. Name it descriptively (e.g., `datetime_formats_extended.csv`).
+2. **Add manifest entries** in `eval/datasets/manifest.csv` — one row per column: `dataset,file_path,column_name,gt_label`. Choose GT labels that match schema mapping conventions.
+3. **Add schema mapping entries** in `eval/schema_mapping.yaml` — map each GT label to a FineType label with `match_quality: direct` (1:1 format match), `close` (minor semantic gap), or `partial` (format-dependent). Set `source: profile`.
+4. **Regenerate CSV:** `make eval-mapping` regenerates `eval/schema_mapping.csv` from the YAML.
+5. **Run evaluation:** `make eval-report` runs profile eval + actionability eval + report generation.
+6. **Verify:** New columns should appear in the report with correct classifications and format_string parsing.
+
+**Naming conventions:**
+- GT labels use lowercase with spaces: `eu dot date`, `time 12h seconds`, `rfc 2822 timestamp`
+- Match quality: `direct` when GT label maps 1:1 to a FineType type, `close` for minor gaps, `partial` for format-dependent types (e.g., `timestamp` maps to multiple specific sub-types)
+
+**Current datasets:** 21 CSV files, 120 format-detectable columns across payment, identity, medical, network, geographic, datetime, and person attribute types.
 
 ## Priority Order
 

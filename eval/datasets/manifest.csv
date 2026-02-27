@@ -205,3 +205,11 @@ sports_events,/home/hugh/datasets/sports_events.csv,ticket_price,price
 sports_events,/home/hugh/datasets/sports_events.csv,status,status
 sports_events,/home/hugh/datasets/sports_events.csv,is_broadcast,boolean
 sports_events,/home/hugh/datasets/sports_events.csv,viewer_rating,percentage
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,eu_dot_date,eu dot date
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,abbreviated_month_date,abbreviated month date
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,long_full_month_date,long full month date
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,time_12h,time 12h
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,time_12h_seconds,time 12h seconds
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,rfc_2822_timestamp,rfc 2822 timestamp
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,american_timestamp,american timestamp
+datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,european_timestamp,european timestamp
