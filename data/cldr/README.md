@@ -99,8 +99,62 @@ If CLDR updates month/day names:
 3. Update `validation_by_locale` enum entries in `labels/definitions_datetime.yaml`
 4. Run `cargo test` and `cargo run -- check` to verify alignment
 
+## CLDR Date/Time Format Patterns (NNFT-157)
+
+**Source:** [Unicode CLDR JSON](https://github.com/unicode-org/cldr-json) (`cldr-dates-full` v46.0.0)
+**License:** Unicode License (permissive, attribution)
+**Used for:** Training data enrichment — diversifying datetime format examples
+
+CLDR provides standardised date/time format patterns (LDML) for 700+ locales across
+4 format lengths (short, medium, long, full). These patterns are mapped to FineType
+datetime types and used to enrich synthetic training data generators.
+
+### LDML → FineType Mapping
+
+| CLDR pattern shape | FineType type | Locales | Example |
+|---|---|---|---|
+| `M/d/yy`, `M/d/y` | `datetime.date.us_slash` | 33 | en-US |
+| `dd/MM/y`, `d/M/yy` | `datetime.date.eu_slash` | 468 | en-GB, fr, it |
+| `dd.MM.yy`, `d.M.y` | `datetime.date.eu_dot` | 113 | de, ch, pl |
+| `y-MM-dd` | `datetime.date.iso` | 175 | sv, lt, ISO |
+| `MMM d, y`, `d MMM y` | `datetime.date.abbreviated_month` | 628 | en, fr, de |
+| `MMMM d, y`, `d MMMM y` | `datetime.date.long_full_month` | 706 | all |
+| `EEEE, MMMM d, y` | `datetime.date.weekday_full_month` | 700 | en, fr, de |
+| `h:mm a` | `datetime.time.hm_12h` | 231 | en-US |
+| `HH:mm` | `datetime.time.hm_24h` | 475 | de, fr, es |
+| `h:mm:ss a` | `datetime.time.hms_12h` | 696 | en-US |
+| `HH:mm:ss` | `datetime.time.hms_24h` | 1422 | de, fr, es |
+
+Total: 2823 date patterns, 2824 time patterns — 100% mapped to FineType types.
+
+### CJK Exclusion
+
+CJK date formats (e.g., `y年M月d日` in Japanese/Chinese/Korean) are excluded because
+they require new taxonomy types with CJK structural patterns. 19 CJK locales are
+filtered out. This may be revisited when CJK datetime types are added to the taxonomy.
+
+### Scripts
+
+- `scripts/download_cldr.sh` — Downloads CLDR JSON packages to `data/cldr/json/`
+- `scripts/extract_cldr_patterns.py` — Extracts and maps patterns, produces TSV tables
+
+### Extracted Data Files
+
+- `data/cldr/cldr_date_patterns.tsv` — Date format patterns per locale with FineType mapping
+- `data/cldr/cldr_time_patterns.tsv` — Time format patterns per locale with FineType mapping
+- `data/cldr/cldr_month_names.tsv` — Month names per locale (wide + abbreviated, 706 locales)
+- `data/cldr/cldr_weekday_names.tsv` — Weekday names per locale (wide + abbreviated, 706 locales)
+- `data/cldr/cldr_mapping_report.txt` — Coverage analysis and unmapped pattern report
+
+### Refreshing
+
+```bash
+./scripts/download_cldr.sh          # Download CLDR v46.0.0
+python3 scripts/extract_cldr_patterns.py  # Re-extract and map
+```
+
 ## Future Data Sources
 
 | Source | Purpose | Status |
 |--------|---------|--------|
-| [CLDR JSON](https://github.com/unicode-org/cldr-json) | Date/time format patterns, number formatting | Partially used (month/day names) |
+| [CLDR JSON](https://github.com/unicode-org/cldr-json) `cldr-numbers-full` | Number formatting rules | Downloaded, not yet used |

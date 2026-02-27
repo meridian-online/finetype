@@ -1,0 +1,292 @@
+========================================================================
+CLDR → FineType Pattern Mapping Report
+========================================================================
+
+Locales processed:  706
+CJK locales excluded: 19 (ja, ko, ko-CN, ko-KP, yue, yue-Hans, yue-Hant, yue-Hant-CN, zh, zh-Hans, zh-Hans-HK, zh-Hans-MO, zh-Hans-MY, zh-Hans-SG, zh-Hant, zh-Hant-HK, zh-Hant-MO, zh-Hant-MY, zh-Latn)
+
+────────────────────────────────────────
+DATE FORMAT COVERAGE
+────────────────────────────────────────
+
+FineType type distribution:
+  datetime.date.long_full_month                        706
+  datetime.date.weekday_full_month                     700
+  datetime.date.abbreviated_month                      628
+  datetime.date.eu_slash                               468
+  datetime.date.iso                                    175
+  datetime.date.eu_dot                                 113
+  datetime.date.us_slash                                33
+
+  Total patterns: 2823
+  Mapped:         2823
+  Unmapped:       0
+
+────────────────────────────────────────
+TIME FORMAT COVERAGE
+────────────────────────────────────────
+
+FineType type distribution:
+  datetime.time.hms_24h                               1422
+  datetime.time.hms_12h                                696
+  datetime.time.hm_24h                                 475
+  datetime.time.hm_12h                                 231
+
+  Total patterns: 2824
+
+────────────────────────────────────────
+MONTH & WEEKDAY NAME COVERAGE
+────────────────────────────────────────
+
+Locales with month names (wide):      706
+Locales with month names (abbrev):     706
+Locales with weekday names (wide):     706
+Locales with weekday names (abbrev):   706
+
+────────────────────────────────────────
+FORMAT DIVERSITY PER FINETYPE TYPE
+────────────────────────────────────────
+
+  datetime.date.abbreviated_month:
+    Locales:  625
+    Patterns: 48
+      EEEE, d MMM y
+      EEEE, d MMM, y
+      MMM d 'lia', y
+      MMM d y
+      MMM d, y
+      MMM d. y
+      d 'de' MMM 'de' y
+      d 'de' MMM y
+      d 'ne' MMM, y
+      d MMM 'de' y
+      d MMM y
+      d MMM y 'г'.
+      d MMM y 'р'.
+      d MMM y 'ҫ'.
+      d MMM, y
+      d MMM, y 'ел'
+      d MMM. y
+      d MMM، y
+      d MMM⹁ y
+      d בMMM y
+      d ܒMMM y
+      d'mh' MMM y
+      d'ê' MMM'a' y'an'
+      d, MMM y
+      d-MMM, y
+      d-MMM-y
+      d-MMM، y
+      d. MMM y
+      d. MMM y.
+      d. MMM. y
+      dd MMM y
+      dd MMM y 'аз'
+      dd MMM, y
+      dd MMM, y թ.
+      dd MMM,y
+      dd-MMM-y
+      dטן MMM y
+      y MMM d
+      y ལོའི་MMMཚེས་d
+      y('e')'ko' MMM d('a')
+      y, MMM d
+      y-'ж'., d-MMM
+      y-MMM-dd
+      y. 'gada' d. MMM
+      y. MMM d.
+      y 'ж'. dd MMM
+      y 'оны' MMM'ын' d
+      སྤྱི་ལོ་y ཟླ་MMM ཚེས་dd
+
+  datetime.date.eu_dot:
+    Locales:  84
+    Patterns: 16
+      d. M. y
+      d. M. y.
+      d. M. yy
+      d. M. yy.
+      d.M.y
+      d.M.yy
+      d.M.yy.
+      d.M.y 'г'.
+      d.MM.y
+      d.MM.yy
+      d.MM.yy 'г'.
+      d.MM.y 'г'.
+      dd. MM. y.
+      dd.MM.y
+      dd.MM.y.
+      dd.MM.yy
+
+  datetime.date.eu_slash:
+    Locales:  417
+    Patterns: 16
+      d MM y
+      d-M-y
+      d-M-yy
+      d-MM-y
+      d/M/y
+      d/M/yy
+      d/MM/y
+      d/MM/yy
+      dd,MM,y
+      dd-MM-y
+      dd-MM-yy
+      dd/MM y
+      dd/MM/y
+      dd/MM/yy
+      dd‏/MM‏/y
+      d‏/M‏/y
+
+  datetime.date.iso:
+    Locales:  173
+    Patterns: 7
+      y-MM-dd
+      y. MM. dd.
+      y.MM.dd
+      y/M/d
+      y/MM/dd
+      yy-MM-dd
+      yy/M/d
+
+  datetime.date.long_full_month:
+    Locales:  704
+    Patterns: 52
+      'lyɛ'̌ʼ d 'na' MMMM, y
+      MMMM d 'lia' y
+      MMMM d y
+      MMMM d, y
+      MMMM d. y
+      d 'de' MMMM 'de' 'su' y
+      d 'de' MMMM 'de' y
+      d 'de' MMMM y
+      d 'di' MMMM 'dal' y
+      d 'di' MMMM 'di' y
+      d 'ne' MMMM, y
+      d 'ta'’ MMMM y
+      d MMMM 'de' y
+      d MMMM 'del' y
+      d MMMM G y
+      d MMMM y
+      d MMMM y 'г'.
+      d MMMM y 'р'.
+      d MMMM y 'ҫ'.
+      d MMMM, y
+      d MMMM, y 'аз'
+      d MMMM, y 'ел'
+      d MMMM، y
+      d MMMM⹁ y
+      d בMMMM y
+      d ܒMMMM y
+      d'mh' MMMM y
+      d'ê' MMMM'a' y'an'
+      d, MMMM y
+      d-MMMM, y
+      d-MMMM، y
+      d. MMMM y
+      d. MMMM y.
+      dd 'de' MMMM 'de' y
+      dd MMMM y
+      dd MMMM, y թ.
+      dd. MMMM y.
+      dטן MMMM y
+      dی MMMMی y
+      y 'm'. MMMM d 'd'.
+      y MMMM d
+      y ᠋ᠣᠨ ᠤMMMM᠎᠎ ᠤᠩ d
+      y('e')'ko' MMMM'ren' d('a')
+      y, MMMM d
+      y-'ж'., d-MMMM
+      y-MMMM-dd
+      y. 'gada' d. MMMM
+      y. MMMM d.
+      y 'ж'. d MMMM
+      y 'оны' MMMM'ын' d
+      སྤྱི་ལོ་y MMMM ཚེས་ dd
+      སྤྱི་ལོ་y MMMMའི་ཚེས་d
+
+  datetime.date.us_slash:
+    Locales:  31
+    Patterns: 4
+      M/d/y
+      M/d/yy
+      MM/dd/y
+      MM/dd/yy
+
+  datetime.date.weekday_full_month:
+    Locales:  700
+    Patterns: 72
+      EEE, MMMM d, y
+      EEEE 'den' d. MMMM y
+      EEEE 'le' d 'de' MMMM y
+      EEEE , 'lyɛ'̌ʼ d 'na' MMMM, y
+      EEEE d 'de' MMMM 'de' 'su' y
+      EEEE d 'di' MMMM 'dal' y
+      EEEE d MMMM y
+      EEEE d MMMM, y
+      EEEE d MMMM⹁ y
+      EEEE d. MMMM y
+      EEEE dd 'de' MMMM 'de' y
+      EEEE dd MMMM y
+      EEEE د y د MMMM d
+      EEEE, 'dä' d. MMMM y
+      EEEE, 'ils' d MMMM y
+      EEEE, 'la' d-'a' 'de' MMMM y
+      EEEE, MMMM d 'lia' y
+      EEEE, MMMM d y
+      EEEE, MMMM d, y
+      EEEE, d 'de' MMMM 'de' y
+      EEEE, d 'di' MMMM 'di' y
+      EEEE, d 'ne' MMMM, y
+      EEEE, d 'ta'’ MMMM y
+      EEEE, d MMMM 'de' y
+      EEEE, d MMMM 'del' y
+      EEEE, d MMMM 'dl' y
+      EEEE, d MMMM y
+      EEEE, d MMMM y 'г'.
+      EEEE, d MMMM y 'р'.
+      EEEE, d MMMM y 'ҫ'.
+      EEEE, d MMMM, y
+      EEEE, d MMMM, y 'аз'
+      EEEE, d בMMMM y
+      EEEE, d'mh' MMMM y
+      EEEE, d'ê' MMMM'a' y'an'
+      EEEE, d, MMMM y
+      EEEE, d-MMMM, y
+      EEEE, d. MMMM y
+      EEEE, d. MMMM y.
+      EEEE, dd MMMM y
+      EEEE, dd MMMM, y
+      EEEE, dd. MMMM y.
+      EEEE, dטן MMMM y
+      EEEE, y MMMM dd
+      EEEE, y. 'gada' d. MMMM
+      EEEE, སྤྱི་ལོ་y MMMM ཚེས་dd
+      EEEE، d MMMM y
+      EEEE، d MMMM، y
+      EEEE، d ܒMMMM y
+      EEEEที่ d MMMM G y
+      EEEE፣ d MMMM y
+      MMMM d, y, EEEE
+      cccc d. MMMM y
+      cccc, MMMM d. y
+      d MMMM y EEEE
+      d MMMM y, EEEE
+      d MMMM, y 'ел', EEEE
+      d, MMMM y, EEEE
+      y 'm'. MMMM d 'd'., EEEE
+      y MMMM d EEEE
+      y MMMM d, EEEE
+      y MMMMའི་ཚེས་d, EEEE
+      y d-MMMM، EEEE
+      y թ. MMMM d, EEEE
+      y ᠣᠨ ᠎᠎᠎ᠤ MMMM᠎᠎ᠢᠢᠨd. EEEE ᠋ᠭᠠᠷᠠᠭ
+      y('e')'ko' MMMM'ren' d('a'), EEEE
+      y, MMMM d, EEEE
+      y-'ж'., d-MMMM, EEEE
+      y. MMMM d., EEEE
+      y 'ж'. d MMMM, EEEE
+      y 'оны' MMMM'ын' d, EEEE 'гараг'
+      y 'сыл' MMMM d 'күнэ', EEEE
+

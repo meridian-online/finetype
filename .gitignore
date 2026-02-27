@@ -24,6 +24,7 @@ models/**/labels.json
 *.ndjson
 data/*
 !data/cldr/
+data/cldr/json/
 
 # DuckDB extension build
 extension/build/

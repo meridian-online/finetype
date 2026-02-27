@@ -1,0 +1,2825 @@
+locale	length	ldml_pattern	finetype_type	note
+ar	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+bg	short	H:mm	datetime.time.hm_24h	24h without seconds
+bg	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+bg	long	H:mm:ss 'ч'. z	datetime.time.hms_24h	24h with seconds
+bg	full	H:mm:ss 'ч'. zzzz	datetime.time.hms_24h	24h with seconds
+cs	short	H:mm	datetime.time.hm_24h	24h without seconds
+cs	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+cs	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+cs	full	H:mm:ss, zzzz	datetime.time.hms_24h	24h with seconds
+da	short	HH.mm	datetime.time.hm_24h	24h without seconds
+da	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+da	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+da	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+de	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+de-AT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de-AT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de-AT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de-AT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+de-CH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de-CH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de-CH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de-CH	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+el	short	h:mm a	datetime.time.hm_12h	12h without seconds
+el	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+el	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+el	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-AU	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-AU	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-AU	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-AU	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-CA	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-CA	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-CA	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-CA	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-GB	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-GB	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-GB	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-GB	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-IE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-IE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-IE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-IE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-NZ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-NZ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-NZ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-NZ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-ZA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-ZA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-ZA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-ZA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+es	short	H:mm	datetime.time.hm_24h	24h without seconds
+es	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+es	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+es	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+es-AR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-AR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-AR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-AR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-CO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-CO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-CO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-CO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-MX	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-MX	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-MX	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-MX	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+et	short	HH:mm	datetime.time.hm_24h	24h without seconds
+et	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+et	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+et	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fi	short	H.mm	datetime.time.hm_24h	24h without seconds
+fi	medium	H.mm.ss	datetime.time.hms_24h	24h with seconds
+fi	long	H.mm.ss z	datetime.time.hms_24h	24h with seconds
+fi	full	H.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+fr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-BE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-BE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-BE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-BE	full	H 'h' mm 'min' ss 's' zzzz	datetime.time.hms_24h	24h with seconds
+fr-CA	short	HH 'h' mm	datetime.time.hm_24h	24h without seconds
+fr-CA	medium	HH 'h' mm 'min' ss 's'	datetime.time.hms_24h	24h with seconds
+fr-CA	long	HH 'h' mm 'min' ss 's' z	datetime.time.hms_24h	24h with seconds
+fr-CA	full	HH 'h' mm 'min' ss 's' zzzz	datetime.time.hms_24h	24h with seconds
+fr-CH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-CH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-CH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-CH	full	HH.mm:ss 'h' zzzz	datetime.time.hms_24h	24h with seconds
+hr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+hr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+hr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+hr	full	HH:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+hu	short	H:mm	datetime.time.hm_24h	24h without seconds
+hu	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+hu	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+hu	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+it	short	HH:mm	datetime.time.hm_24h	24h without seconds
+it	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+it	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+it	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+it-CH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+it-CH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+it-CH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+it-CH	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lt	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lt	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lt	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lt	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nb	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nb	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nb	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nb	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nl-BE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl-BE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl-BE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl-BE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nn	full	'kl'. HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ro	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ro	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ro	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ro	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ru	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ru	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ru	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ru	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sk	short	H:mm	datetime.time.hm_24h	24h without seconds
+sk	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+sk	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+sk	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tr	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+uk	short	HH:mm	datetime.time.hm_24h	24h without seconds
+uk	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+uk	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+uk	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+aa	short	h:mm a	datetime.time.hm_12h	12h without seconds
+aa	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+aa	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+aa	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+aa-DJ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+aa-DJ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+aa-DJ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+aa-DJ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+aa-ER	short	h:mm a	datetime.time.hm_12h	12h without seconds
+aa-ER	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+aa-ER	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+aa-ER	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ab	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ab	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ab	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ab	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+af	short	HH:mm	datetime.time.hm_24h	24h without seconds
+af	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+af	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+af	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+af-NA	short	h:mm a	datetime.time.hm_12h	12h without seconds
+af-NA	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+af-NA	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+af-NA	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+agq	short	HH:mm	datetime.time.hm_24h	24h without seconds
+agq	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+agq	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+agq	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ak	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ak	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ak	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ak	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+am	short	h:mm a	datetime.time.hm_12h	12h without seconds
+am	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+am	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+am	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+an	short	HH:mm	datetime.time.hm_24h	24h without seconds
+an	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+an	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+an	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ann	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ann	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ann	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ann	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+apc	short	HH:mm	datetime.time.hm_24h	24h without seconds
+apc	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+apc	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+apc	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ar-AE	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-AE	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-AE	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-AE	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-BH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-BH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-BH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-BH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-DJ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-DJ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-DJ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-DJ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-DZ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-DZ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-DZ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-DZ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-EG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-EG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-EG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-EG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-EH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-EH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-EH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-EH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-ER	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-ER	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-ER	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-ER	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-IL	short	H:mm	datetime.time.hm_24h	24h without seconds
+ar-IL	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ar-IL	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+ar-IL	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ar-IQ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-IQ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-IQ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-IQ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-JO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-JO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-JO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-JO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-KM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ar-KM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ar-KM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ar-KM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ar-KW	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-KW	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-KW	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-KW	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-LB	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-LB	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-LB	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-LB	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-LY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-LY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-LY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-LY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-MA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ar-MA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ar-MA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ar-MA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ar-MR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-MR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-MR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-MR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-OM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-OM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-OM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-OM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-PS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-PS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-PS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-PS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-QA	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-QA	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-QA	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-QA	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-SA	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-SA	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-SA	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-SA	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-SD	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-SD	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-SD	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-SD	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-SO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-SO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-SO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-SO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-SS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-SS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-SS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-SS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-SY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-SY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-SY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-SY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-TD	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-TD	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-TD	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-TD	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-TN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-TN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-TN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-TN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ar-YE	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ar-YE	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ar-YE	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ar-YE	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+arn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+arn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+arn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+arn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+as	short	a h.mm	datetime.time.hm_12h	12h without seconds
+as	medium	a h.mm.ss	datetime.time.hms_12h	12h with seconds
+as	long	a h.mm.ss z	datetime.time.hms_12h	12h with seconds
+as	full	a h.mm.ss zzzz	datetime.time.hms_12h	12h with seconds
+asa	short	HH:mm	datetime.time.hm_24h	24h without seconds
+asa	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+asa	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+asa	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ast	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ast	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ast	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ast	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+az	short	HH:mm	datetime.time.hm_24h	24h without seconds
+az	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+az	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+az	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+az-Arab	short	HH:mm	datetime.time.hm_24h	24h without seconds
+az-Arab	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+az-Arab	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+az-Arab	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+az-Arab-IQ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+az-Arab-IQ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+az-Arab-IQ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+az-Arab-IQ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+az-Arab-TR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+az-Arab-TR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+az-Arab-TR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+az-Arab-TR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+az-Cyrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+az-Cyrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+az-Cyrl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+az-Cyrl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+az-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+az-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+az-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+az-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ba	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ba	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ba	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ba	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bal	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bal	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bal	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bal	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bal-Arab	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bal-Arab	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bal-Arab	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bal-Arab	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bal-Latn	short	hh:mm a	datetime.time.hm_12h	12h without seconds
+bal-Latn	medium	hh:mm:ss a	datetime.time.hms_12h	12h with seconds
+bal-Latn	long	hh:mm:ss a zzz	datetime.time.hms_12h	12h with seconds
+bal-Latn	full	hh:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+bas	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bas	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bas	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bas	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+be	short	HH:mm	datetime.time.hm_24h	24h without seconds
+be	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+be	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+be	full	HH:mm:ss, zzzz	datetime.time.hms_24h	24h with seconds
+be-tarask	short	HH:mm	datetime.time.hm_24h	24h without seconds
+be-tarask	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+be-tarask	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+be-tarask	full	HH:mm:ss, zzzz	datetime.time.hms_24h	24h with seconds
+bem	short	h:mm a	datetime.time.hm_12h	12h without seconds
+bem	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+bem	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+bem	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+bew	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bew	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bew	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bew	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bez	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bez	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bez	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bez	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bgc	short	h:mm a	datetime.time.hm_12h	12h without seconds
+bgc	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+bgc	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+bgc	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+bgn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bgn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bgn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bgn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bgn-AE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bgn-AE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bgn-AE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bgn-AE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bgn-AF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bgn-AF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bgn-AF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bgn-AF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bgn-IR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bgn-IR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bgn-IR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bgn-IR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bgn-OM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bgn-OM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bgn-OM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bgn-OM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bho	short	h:mm a	datetime.time.hm_12h	12h without seconds
+bho	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+bho	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+bho	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+blo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+blo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+blo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+blo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+blt	short	HH:mm	datetime.time.hm_24h	24h without seconds
+blt	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+blt	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+blt	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bm	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bm	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bm	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bm	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bm-Nkoo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bm-Nkoo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bm-Nkoo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bm-Nkoo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bn	short	h:mm a	datetime.time.hm_12h	12h without seconds
+bn	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+bn	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+bn	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+bn-IN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+bn-IN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+bn-IN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+bn-IN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+bo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bo-IN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+bo-IN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+bo-IN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+bo-IN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+br	short	HH:mm	datetime.time.hm_24h	24h without seconds
+br	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+br	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+br	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+brx	short	a नि h:mm	datetime.time.hm_12h	12h without seconds
+brx	medium	a h:mm:ss	datetime.time.hms_12h	12h with seconds
+brx	long	a h:mm:ss z	datetime.time.hms_12h	12h with seconds
+brx	full	a h:mm:ss zzzz	datetime.time.hms_12h	12h with seconds
+bs	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bs	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bs	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bs	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bs-Cyrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bs-Cyrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bs-Cyrl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bs-Cyrl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bs-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bs-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bs-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bs-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+bss	short	HH:mm	datetime.time.hm_24h	24h without seconds
+bss	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+bss	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+bss	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+byn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+byn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+byn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+byn	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ca	short	H:mm	datetime.time.hm_24h	24h without seconds
+ca	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ca	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+ca	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ca-AD	short	H:mm	datetime.time.hm_24h	24h without seconds
+ca-AD	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ca-AD	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+ca-AD	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ca-ES-valencia	short	H:mm	datetime.time.hm_24h	24h without seconds
+ca-ES-valencia	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ca-ES-valencia	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+ca-ES-valencia	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ca-FR	short	H:mm	datetime.time.hm_24h	24h without seconds
+ca-FR	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ca-FR	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+ca-FR	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ca-IT	short	H:mm	datetime.time.hm_24h	24h without seconds
+ca-IT	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ca-IT	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+ca-IT	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+cad	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cad	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cad	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cad	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+cch	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cch	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cch	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cch	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ccp	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ccp	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ccp	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ccp	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ccp-IN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ccp-IN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ccp-IN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ccp-IN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ce	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ce	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ce	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ce	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ceb	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ceb	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ceb	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ceb	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+cgg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cgg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cgg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cgg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+cho	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cho	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cho	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cho	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+chr	short	h:mm a	datetime.time.hm_12h	12h without seconds
+chr	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+chr	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+chr	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+cic	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cic	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cic	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cic	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ckb	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ckb	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ckb	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ckb	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ckb-IR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ckb-IR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ckb-IR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ckb-IR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+co	short	HH:mm	datetime.time.hm_24h	24h without seconds
+co	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+co	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+co	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+csw	short	h:mm a	datetime.time.hm_12h	12h without seconds
+csw	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+csw	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+csw	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+cu	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cu	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cu	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cu	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+cv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+cy	short	HH:mm	datetime.time.hm_24h	24h without seconds
+cy	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+cy	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+cy	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+da-GL	short	HH.mm	datetime.time.hm_24h	24h without seconds
+da-GL	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+da-GL	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+da-GL	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+dav	short	HH:mm	datetime.time.hm_24h	24h without seconds
+dav	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+dav	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+dav	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+de-BE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de-BE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de-BE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de-BE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+de-IT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de-IT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de-IT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de-IT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+de-LI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de-LI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de-LI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de-LI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+de-LU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+de-LU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+de-LU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+de-LU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+dje	short	HH:mm	datetime.time.hm_24h	24h without seconds
+dje	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+dje	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+dje	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+doi	short	h:mm a	datetime.time.hm_12h	12h without seconds
+doi	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+doi	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+doi	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+dsb	short	H:mm	datetime.time.hm_24h	24h without seconds
+dsb	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+dsb	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+dsb	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+dua	short	HH:mm	datetime.time.hm_24h	24h without seconds
+dua	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+dua	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+dua	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+dv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+dv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+dv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+dv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+dyo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+dyo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+dyo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+dyo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+dz	short	ཆུ་ཚོད་ h སྐར་མ་ mm a	datetime.time.hm_12h	12h without seconds
+dz	medium	ཆུ་ཚོད་h:mm:ss a	datetime.time.hms_12h	12h with seconds
+dz	long	ཆུ་ཚོད་ h སྐར་མ་ mm:ss a z	datetime.time.hms_12h	12h with seconds
+dz	full	ཆུ་ཚོད་ h སྐར་མ་ mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ebu	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ebu	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ebu	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ebu	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ee	short	a 'ga' h:mm	datetime.time.hm_12h	12h without seconds
+ee	medium	a 'ga' h:mm:ss	datetime.time.hms_12h	12h with seconds
+ee	long	a 'ga' h:mm:ss z	datetime.time.hms_12h	12h with seconds
+ee	full	a 'ga' h:mm:ss zzzz	datetime.time.hms_12h	12h with seconds
+ee-TG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ee-TG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ee-TG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ee-TG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+el-CY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+el-CY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+el-CY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+el-CY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+el-polyton	short	h:mm a	datetime.time.hm_12h	12h without seconds
+el-polyton	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+el-polyton	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+el-polyton	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-001	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-001	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-001	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-001	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-150	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-150	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-150	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-150	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-AE	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-AE	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-AE	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-AE	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-AG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-AG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-AG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-AG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-AI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-AI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-AI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-AI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-AS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-AS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-AS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-AS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-AT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-AT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-AT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-AT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-BB	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-BB	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-BB	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-BB	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-BE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-BE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-BE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-BE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-BI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-BI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-BI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-BI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-BM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-BM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-BM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-BM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-BS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-BS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-BS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-BS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-BW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-BW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-BW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-BW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-BZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-BZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-BZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-BZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-CC	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-CC	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-CC	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-CC	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-CH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-CH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-CH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-CH	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-CK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-CK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-CK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-CK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-CM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-CM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-CM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-CM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-CX	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-CX	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-CX	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-CX	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-CY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-CY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-CY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-CY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-DE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-DE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-DE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-DE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-DG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-DG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-DG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-DG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-DK	short	HH.mm	datetime.time.hm_24h	24h without seconds
+en-DK	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+en-DK	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+en-DK	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+en-DM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-DM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-DM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-DM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-Dsrt	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-Dsrt	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-Dsrt	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-Dsrt	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-ER	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-ER	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-ER	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-ER	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-FI	short	H.mm	datetime.time.hm_24h	24h without seconds
+en-FI	medium	H.mm.ss	datetime.time.hms_24h	24h with seconds
+en-FI	long	H.mm.ss z	datetime.time.hms_24h	24h with seconds
+en-FI	full	H.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+en-FJ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-FJ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-FJ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-FJ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-FK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-FK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-FK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-FK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-FM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-FM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-FM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-FM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-GD	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-GD	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-GD	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-GD	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-GG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-GG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-GG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-GG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-GH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-GH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-GH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-GH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-GI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-GI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-GI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-GI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-GM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-GM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-GM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-GM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-GU	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-GU	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-GU	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-GU	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-GY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-GY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-GY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-GY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-HK	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-HK	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-HK	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-HK	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-ID	short	HH.mm	datetime.time.hm_24h	24h without seconds
+en-ID	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+en-ID	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+en-ID	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+en-IL	short	H:mm	datetime.time.hm_24h	24h without seconds
+en-IL	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+en-IL	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-IL	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-IM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-IM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-IM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-IM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-IN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-IN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-IN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-IN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-IO	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-IO	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-IO	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-IO	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-JE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-JE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-JE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-JE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-JM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-JM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-JM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-JM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-KE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-KE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-KE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-KE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-KI	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-KI	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-KI	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-KI	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-KN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-KN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-KN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-KN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-KY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-KY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-KY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-KY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-LC	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-LC	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-LC	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-LC	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-LR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-LR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-LR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-LR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-LS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-LS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-LS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-LS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-MG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-MG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-MG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-MG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-MH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-MH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-MH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-MH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-MO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-MO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-MO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-MO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-MP	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-MP	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-MP	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-MP	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-MS	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-MS	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-MS	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-MS	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-MT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-MT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-MT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-MT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-MU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-MU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-MU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-MU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-MV	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-MV	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-MV	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-MV	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-MW	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-MW	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-MW	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-MW	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-MY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-MY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-MY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-MY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-NA	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-NA	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-NA	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-NA	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-NF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-NF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-NF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-NF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-NG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-NG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-NG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-NG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-NL	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-NL	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-NL	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-NL	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-NR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-NR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-NR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-NR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-NU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-NU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-NU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-NU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-PG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-PG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-PG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-PG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-PH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-PH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-PH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-PH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-PK	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-PK	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-PK	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-PK	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-PN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-PN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-PN	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-PN	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-PR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-PR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-PR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-PR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-PW	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-PW	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-PW	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-PW	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-RW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-RW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-RW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-RW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-SB	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-SB	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-SB	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-SB	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-SC	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-SC	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-SC	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-SC	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-SD	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-SD	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-SD	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-SD	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-SE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-SE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-SE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-SE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-SG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-SG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-SG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-SG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-SH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-SH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-SH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-SH	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-SI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-SI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-SI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-SI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-SL	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-SL	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-SL	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-SL	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-SS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-SS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-SS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-SS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-SX	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-SX	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-SX	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-SX	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-SZ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-SZ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-SZ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-SZ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-Shaw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-Shaw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-Shaw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-Shaw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-TC	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-TC	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-TC	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-TC	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-TK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-TK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-TK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-TK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-TO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-TO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-TO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-TO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-TT	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-TT	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-TT	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-TT	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-TV	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-TV	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-TV	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-TV	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-TZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-TZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-TZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-TZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-UG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-UG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-UG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-UG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+en-UM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-UM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-UM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-UM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-VC	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-VC	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-VC	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-VC	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-VG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-VG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-VG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-VG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-VI	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-VI	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-VI	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-VI	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-VU	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-VU	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-VU	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-VU	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-WS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-WS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-WS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-WS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-ZM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+en-ZM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+en-ZM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+en-ZM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+en-ZW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+en-ZW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+en-ZW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+en-ZW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+eo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+eo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+eo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+eo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+es-419	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-419	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-419	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-419	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-BO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-BO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-BO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-BO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-BR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+es-BR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+es-BR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+es-BR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+es-BZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+es-BZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+es-BZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+es-BZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+es-CL	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-CL	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-CL	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-CL	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-CR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-CR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-CR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-CR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-CU	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-CU	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-CU	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-CU	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-DO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-DO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-DO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-DO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-EA	short	H:mm	datetime.time.hm_24h	24h without seconds
+es-EA	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+es-EA	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+es-EA	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+es-EC	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-EC	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-EC	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-EC	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-GQ	short	H:mm	datetime.time.hm_24h	24h without seconds
+es-GQ	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+es-GQ	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+es-GQ	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+es-GT	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-GT	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-GT	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-GT	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-HN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-HN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-HN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-HN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-IC	short	H:mm	datetime.time.hm_24h	24h without seconds
+es-IC	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+es-IC	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+es-IC	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+es-NI	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-NI	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-NI	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-NI	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-PA	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-PA	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-PA	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-PA	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-PE	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-PE	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-PE	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-PE	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-PH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-PH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-PH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-PH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-PR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-PR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-PR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-PR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-PY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-PY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-PY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-PY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-SV	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-SV	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-SV	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-SV	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-US	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-US	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-US	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-US	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-UY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-UY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-UY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-UY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+es-VE	short	h:mm a	datetime.time.hm_12h	12h without seconds
+es-VE	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+es-VE	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+es-VE	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+eu	short	HH:mm	datetime.time.hm_24h	24h without seconds
+eu	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+eu	long	HH:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+eu	full	HH:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ewo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ewo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ewo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ewo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fa	short	H:mm	datetime.time.hm_24h	24h without seconds
+fa	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+fa	long	H:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+fa	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+fa-AF	short	H:mm	datetime.time.hm_24h	24h without seconds
+fa-AF	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+fa-AF	long	H:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+fa-AF	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ff	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm-BF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm-BF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm-BF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm-BF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm-CM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm-CM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm-CM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm-CM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm-GH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Adlm-GH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Adlm-GH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Adlm-GH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Adlm-GM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Adlm-GM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Adlm-GM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Adlm-GM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Adlm-GW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm-GW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm-GW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm-GW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm-LR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Adlm-LR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Adlm-LR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Adlm-LR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Adlm-MR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Adlm-MR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Adlm-MR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Adlm-MR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Adlm-NE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm-NE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm-NE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm-NE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm-NG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm-NG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm-NG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm-NG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Adlm-SL	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Adlm-SL	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Adlm-SL	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Adlm-SL	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Adlm-SN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Adlm-SN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Adlm-SN	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Adlm-SN	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-BF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn-BF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn-BF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn-BF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-CM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn-CM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn-CM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn-CM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-GH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Latn-GH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Latn-GH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Latn-GH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Latn-GM	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Latn-GM	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Latn-GM	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Latn-GM	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Latn-GN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn-GN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn-GN	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn-GN	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-GW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn-GW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn-GW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn-GW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-LR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Latn-LR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Latn-LR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Latn-LR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Latn-MR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Latn-MR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Latn-MR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Latn-MR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ff-Latn-NE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn-NE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn-NE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn-NE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-NG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ff-Latn-NG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ff-Latn-NG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ff-Latn-NG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ff-Latn-SL	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ff-Latn-SL	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ff-Latn-SL	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ff-Latn-SL	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fil	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fil	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fil	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fil	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fo-DK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fo-DK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fo-DK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fo-DK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-BF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-BF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-BF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-BF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-BI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-BI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-BI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-BI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-BJ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-BJ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-BJ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-BJ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-BL	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-BL	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-BL	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-BL	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-CD	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-CD	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-CD	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-CD	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-CF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-CF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-CF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-CF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-CG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-CG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-CG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-CG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-CI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-CI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-CI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-CI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-CM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-CM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-CM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-CM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-DJ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-DJ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-DJ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-DJ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-DZ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-DZ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-DZ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-DZ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-GA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-GA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-GA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-GA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-GF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-GF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-GF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-GF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-GN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-GN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-GN	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-GN	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-GP	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-GP	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-GP	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-GP	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-GQ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-GQ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-GQ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-GQ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-HT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-HT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-HT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-HT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-KM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-KM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-KM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-KM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-LU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-LU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-LU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-LU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-MA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-MA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-MA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-MA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-MC	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-MC	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-MC	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-MC	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-MF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-MF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-MF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-MF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-MG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-MG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-MG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-MG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-ML	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-ML	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-ML	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-ML	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-MQ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-MQ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-MQ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-MQ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-MR	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-MR	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-MR	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-MR	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-MU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-MU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-MU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-MU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-NC	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-NC	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-NC	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-NC	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-NE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-NE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-NE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-NE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-PF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-PF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-PF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-PF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-PM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-PM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-PM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-PM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-RE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-RE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-RE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-RE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-RW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-RW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-RW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-RW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-SC	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-SC	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-SC	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-SC	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-SN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-SN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-SN	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-SN	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-SY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-SY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-SY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-SY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-TD	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-TD	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-TD	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-TD	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-TG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-TG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-TG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-TG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-TN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-TN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-TN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-TN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-VU	short	h:mm a	datetime.time.hm_12h	12h without seconds
+fr-VU	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+fr-VU	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+fr-VU	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+fr-WF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-WF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-WF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-WF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fr-YT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fr-YT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fr-YT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fr-YT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+frr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+frr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+frr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+frr	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fur	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fur	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fur	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fur	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+fy	short	HH:mm	datetime.time.hm_24h	24h without seconds
+fy	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+fy	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+fy	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ga	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ga	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ga	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ga	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ga-GB	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ga-GB	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ga-GB	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ga-GB	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gaa	short	h:mm a	datetime.time.hm_12h	12h without seconds
+gaa	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+gaa	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+gaa	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+gd	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gd	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gd	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gd	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gez	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gez	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gez	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gez	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gez-ER	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gez-ER	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gez-ER	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gez-ER	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gsw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gsw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gsw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gsw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gsw-FR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gsw-FR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gsw-FR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gsw-FR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gsw-LI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gsw-LI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gsw-LI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gsw-LI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gu	short	hh:mm a	datetime.time.hm_12h	12h without seconds
+gu	medium	hh:mm:ss a	datetime.time.hms_12h	12h with seconds
+gu	long	hh:mm:ss a z	datetime.time.hms_12h	12h with seconds
+gu	full	hh:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+guz	short	HH:mm	datetime.time.hm_24h	24h without seconds
+guz	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+guz	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+guz	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+gv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+gv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+gv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+gv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ha	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ha	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ha	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ha	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ha-Arab	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ha-Arab	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ha-Arab	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ha-Arab	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ha-Arab-SD	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ha-Arab-SD	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ha-Arab-SD	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ha-Arab-SD	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ha-GH	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ha-GH	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ha-GH	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ha-GH	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ha-NE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ha-NE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ha-NE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ha-NE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+haw	short	h:mm a	datetime.time.hm_12h	12h without seconds
+haw	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+haw	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+haw	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+he	short	H:mm	datetime.time.hm_24h	24h without seconds
+he	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+he	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+he	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+hi	short	h:mm a	datetime.time.hm_12h	12h without seconds
+hi	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+hi	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+hi	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+hi-Latn	short	h:mm a	datetime.time.hm_12h	12h without seconds
+hi-Latn	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+hi-Latn	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+hi-Latn	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+hnj	short	HH:mm	datetime.time.hm_24h	24h without seconds
+hnj	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+hnj	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+hnj	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+hnj-Hmnp	short	HH:mm	datetime.time.hm_24h	24h without seconds
+hnj-Hmnp	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+hnj-Hmnp	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+hnj-Hmnp	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+hr-BA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+hr-BA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+hr-BA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+hr-BA	full	HH:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+hsb	short	H:mm 'hodź'.	datetime.time.hm_24h	24h without seconds
+hsb	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+hsb	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+hsb	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+hy	short	HH:mm	datetime.time.hm_24h	24h without seconds
+hy	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+hy	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+hy	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ia	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ia	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ia	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ia	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+id	short	HH.mm	datetime.time.hm_24h	24h without seconds
+id	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+id	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+id	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+ie	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ie	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ie	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ie	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ig	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ig	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ig	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ig	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ii	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ii	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ii	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ii	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+io	short	HH:mm	datetime.time.hm_24h	24h without seconds
+io	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+io	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+io	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+is	short	HH:mm	datetime.time.hm_24h	24h without seconds
+is	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+is	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+is	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+it-SM	short	HH:mm	datetime.time.hm_24h	24h without seconds
+it-SM	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+it-SM	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+it-SM	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+it-VA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+it-VA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+it-VA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+it-VA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+iu	short	h:mm a	datetime.time.hm_12h	12h without seconds
+iu	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+iu	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+iu	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+iu-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+iu-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+iu-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+iu-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+jbo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+jbo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+jbo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+jbo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+jgo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+jgo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+jgo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+jgo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+jmc	short	HH:mm	datetime.time.hm_24h	24h without seconds
+jmc	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+jmc	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+jmc	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+jv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+jv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+jv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+jv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ka	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ka	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ka	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ka	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kaa	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kaa	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kaa	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kaa	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kaa-Cyrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kaa-Cyrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kaa-Cyrl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kaa-Cyrl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kaa-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kaa-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kaa-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kaa-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kab	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kab	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kab	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kab	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kaj	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kaj	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kaj	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kaj	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kam	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kam	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kam	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kam	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kcg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kcg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kcg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kcg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kde	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kde	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kde	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kde	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kea	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kea	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kea	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kea	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ken	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ken	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ken	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ken	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kgp	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kgp	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kgp	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kgp	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+khq	short	HH:mm	datetime.time.hm_24h	24h without seconds
+khq	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+khq	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+khq	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ki	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ki	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ki	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ki	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kk	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kk	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kk	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kk	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kk-Arab	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kk-Arab	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kk-Arab	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kk-Arab	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kk-Cyrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kk-Cyrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kk-Cyrl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kk-Cyrl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kk-KZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kk-KZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kk-KZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kk-KZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kkj	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kkj	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kkj	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kkj	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kl	short	HH.mm	datetime.time.hm_24h	24h without seconds
+kl	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+kl	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+kl	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+kln	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kln	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kln	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kln	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+km	short	h:mm a	datetime.time.hm_12h	12h without seconds
+km	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+km	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+km	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kn	short	hh:mm a	datetime.time.hm_12h	12h without seconds
+kn	medium	hh:mm:ss a	datetime.time.hms_12h	12h with seconds
+kn	long	hh:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kn	full	hh:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kok	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kok	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kok	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kok	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kok-Deva	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kok-Deva	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kok-Deva	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kok-Deva	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kok-Latn	short	a h:mm	datetime.time.hm_12h	12h without seconds
+kok-Latn	medium	a h:mm:ss	datetime.time.hms_12h	12h with seconds
+kok-Latn	long	a h:mm:ss z	datetime.time.hms_12h	12h with seconds
+kok-Latn	full	a h:mm:ss zzzz	datetime.time.hms_12h	12h with seconds
+kpe	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kpe	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kpe	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kpe	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kpe-GN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kpe-GN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kpe-GN	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kpe-GN	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ks	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ks	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ks	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ks	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ks-Arab	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ks-Arab	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ks-Arab	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ks-Arab	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ks-Deva	short	a h:mm	datetime.time.hm_12h	12h without seconds
+ks-Deva	medium	a h:mm:ss	datetime.time.hms_12h	12h with seconds
+ks-Deva	long	a h:mm:ss z	datetime.time.hms_12h	12h with seconds
+ks-Deva	full	a h:mm:ss zzzz	datetime.time.hms_12h	12h with seconds
+ksb	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ksb	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ksb	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ksb	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ksf	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ksf	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ksf	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ksf	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ksh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ksh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ksh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ksh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ku	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ku	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ku	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ku	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+kw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+kw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+kw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+kxv	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kxv	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kxv	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kxv	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kxv-Deva	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kxv-Deva	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kxv-Deva	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kxv-Deva	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kxv-Latn	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kxv-Latn	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kxv-Latn	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kxv-Latn	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kxv-Orya	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kxv-Orya	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kxv-Orya	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kxv-Orya	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+kxv-Telu	short	h:mm a	datetime.time.hm_12h	12h without seconds
+kxv-Telu	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+kxv-Telu	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+kxv-Telu	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ky	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ky	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ky	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ky	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+la	short	HH:mm	datetime.time.hm_24h	24h without seconds
+la	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+la	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+la	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lag	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lag	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lag	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lag	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lb	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lb	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lb	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lb	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lij	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lij	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lij	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lij	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lkt	short	h:mm a	datetime.time.hm_12h	12h without seconds
+lkt	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+lkt	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+lkt	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+lld	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lld	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lld	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lld	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lmo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lmo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lmo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lmo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ln	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ln	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ln	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ln	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ln-AO	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ln-AO	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ln-AO	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ln-AO	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ln-CF	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ln-CF	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ln-CF	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ln-CF	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ln-CG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ln-CG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ln-CG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ln-CG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lo	short	H:mm	datetime.time.hm_24h	24h without seconds
+lo	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+lo	long	H ໂມງ m ນາທີ ss ວິນາທີ z	datetime.time.hms_24h	24h with seconds
+lo	full	H ໂມງ m ນາທີ ss ວິນາທີ zzzz	datetime.time.hms_24h	24h with seconds
+lrc	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lrc	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lrc	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lrc	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lrc-IQ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+lrc-IQ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+lrc-IQ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+lrc-IQ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ltg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ltg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ltg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ltg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+lu	short	HH:mm	datetime.time.hm_24h	24h without seconds
+lu	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+lu	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+lu	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+luo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+luo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+luo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+luo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+luy	short	HH:mm	datetime.time.hm_24h	24h without seconds
+luy	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+luy	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+luy	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mai	short	h:mm a	datetime.time.hm_12h	12h without seconds
+mai	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+mai	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+mai	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mas	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mas	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mas	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mas	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mas-TZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mas-TZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mas-TZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mas-TZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mdf	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mdf	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mdf	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mdf	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mer	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mer	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mer	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mer	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mfe	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mfe	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mfe	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mfe	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mgh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mgh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mgh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mgh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mgo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mgo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mgo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mgo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mhn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mhn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mhn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mhn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mi	short	h:mm a	datetime.time.hm_12h	12h without seconds
+mi	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+mi	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+mi	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mic	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mic	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mic	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mic	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mk	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mk	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mk	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mk	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ml	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ml	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ml	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ml	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mn	long	HH:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+mn	full	HH:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+mn-Mong	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mn-Mong	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mn-Mong	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mn-Mong	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mn-Mong-MN	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mn-Mong-MN	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mn-Mong-MN	long	HH:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+mn-Mong-MN	full	HH:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+mni	short	h:mm a	datetime.time.hm_12h	12h without seconds
+mni	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+mni	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+mni	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mni-Beng	short	h:mm a	datetime.time.hm_12h	12h without seconds
+mni-Beng	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+mni-Beng	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+mni-Beng	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mni-Mtei	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mni-Mtei	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mni-Mtei	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mni-Mtei	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+moh	short	h:mm a	datetime.time.hm_12h	12h without seconds
+moh	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+moh	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+moh	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mr	short	h:mm a	datetime.time.hm_12h	12h without seconds
+mr	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+mr	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+mr	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ms	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ms	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ms	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ms	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ms-Arab	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ms-Arab	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ms-Arab	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ms-Arab	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ms-Arab-BN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ms-Arab-BN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ms-Arab-BN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ms-Arab-BN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ms-BN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ms-BN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ms-BN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ms-BN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ms-ID	short	HH.mm	datetime.time.hm_24h	24h without seconds
+ms-ID	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+ms-ID	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+ms-ID	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+ms-SG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ms-SG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ms-SG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ms-SG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+mt	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mt	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mt	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mt	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mua	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mua	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mua	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mua	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mus	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mus	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mus	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mus	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+my	short	H:mm	datetime.time.hm_24h	24h without seconds
+my	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+my	long	z HH:mm:ss	datetime.time.hms_24h	24h with seconds
+my	full	zzzz HH:mm:ss	datetime.time.hms_24h	24h with seconds
+myv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+myv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+myv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+myv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+mzn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+mzn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+mzn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+mzn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+naq	short	h:mm a	datetime.time.hm_12h	12h without seconds
+naq	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+naq	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+naq	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+nb-SJ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nb-SJ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nb-SJ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nb-SJ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nd	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nd	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nd	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nd	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nds	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nds	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nds	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nds	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nds-NL	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nds-NL	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nds-NL	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nds-NL	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ne	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ne	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ne	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ne	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ne-IN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ne-IN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ne-IN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ne-IN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+nl-AW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl-AW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl-AW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl-AW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nl-BQ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl-BQ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl-BQ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl-BQ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nl-CW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl-CW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl-CW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl-CW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nl-SR	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl-SR	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl-SR	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl-SR	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nl-SX	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nl-SX	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nl-SX	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nl-SX	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nmg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nmg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nmg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nmg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nnh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nnh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nnh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nnh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+no	short	HH:mm	datetime.time.hm_24h	24h without seconds
+no	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+no	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+no	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nqo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nqo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nqo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nqo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nr	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nso	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nso	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nso	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nso	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+nus	short	h:mm a	datetime.time.hm_12h	12h without seconds
+nus	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+nus	long	z h:mm:ss a	datetime.time.hms_12h	12h with seconds
+nus	full	zzzz h:mm:ss a	datetime.time.hms_12h	12h with seconds
+nv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ny	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ny	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ny	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ny	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+nyn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+nyn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+nyn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+nyn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+oc	short	HH:mm	datetime.time.hm_24h	24h without seconds
+oc	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+oc	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+oc	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+oc-ES	short	HH:mm	datetime.time.hm_24h	24h without seconds
+oc-ES	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+oc-ES	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+oc-ES	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+om	short	h:mm a	datetime.time.hm_12h	12h without seconds
+om	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+om	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+om	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+om-KE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+om-KE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+om-KE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+om-KE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+or	short	h:mm a	datetime.time.hm_12h	12h without seconds
+or	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+or	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+or	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+os	short	HH:mm	datetime.time.hm_24h	24h without seconds
+os	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+os	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+os	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+os-RU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+os-RU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+os-RU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+os-RU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+osa	short	HH:mm	datetime.time.hm_24h	24h without seconds
+osa	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+osa	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+osa	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pa	short	h:mm a	datetime.time.hm_12h	12h without seconds
+pa	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+pa	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+pa	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+pa-Arab	short	h:mm a	datetime.time.hm_12h	12h without seconds
+pa-Arab	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+pa-Arab	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+pa-Arab	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+pa-Guru	short	h:mm a	datetime.time.hm_12h	12h without seconds
+pa-Guru	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+pa-Guru	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+pa-Guru	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+pap	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pap	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pap	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pap	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pap-AW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pap-AW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pap-AW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pap-AW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pcm	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pcm	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pcm	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+pcm	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pis	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pis	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pis	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pis	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+prg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+prg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+prg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+prg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ps	short	H:mm	datetime.time.hm_24h	24h without seconds
+ps	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+ps	long	H:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+ps	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+ps-PK	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ps-PK	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ps-PK	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ps-PK	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+pt-AO	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-AO	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-AO	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-AO	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-CH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-CH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-CH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-CH	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-CV	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-CV	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-CV	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-CV	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-GQ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-GQ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-GQ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-GQ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-GW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-GW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-GW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-GW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-LU	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-LU	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-LU	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-LU	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-MO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+pt-MO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+pt-MO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+pt-MO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+pt-MZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-MZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-MZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-MZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-PT	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-PT	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-PT	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-PT	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-ST	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-ST	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-ST	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-ST	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+pt-TL	short	HH:mm	datetime.time.hm_24h	24h without seconds
+pt-TL	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+pt-TL	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+pt-TL	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+qu	short	h:mm a	datetime.time.hm_12h	12h without seconds
+qu	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+qu	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+qu	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+qu-BO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+qu-BO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+qu-BO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+qu-BO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+qu-EC	short	h:mm a	datetime.time.hm_12h	12h without seconds
+qu-EC	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+qu-EC	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+qu-EC	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+quc	short	HH:mm	datetime.time.hm_24h	24h without seconds
+quc	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+quc	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+quc	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+raj	short	h:mm a	datetime.time.hm_12h	12h without seconds
+raj	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+raj	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+raj	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+rhg	short	H:mm	datetime.time.hm_24h	24h without seconds
+rhg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rhg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rhg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rhg-Rohg	short	H:mm	datetime.time.hm_24h	24h without seconds
+rhg-Rohg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rhg-Rohg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rhg-Rohg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rhg-Rohg-BD	short	h:mm a	datetime.time.hm_12h	12h without seconds
+rhg-Rohg-BD	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+rhg-Rohg-BD	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+rhg-Rohg-BD	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+rif	short	HH:mm	datetime.time.hm_24h	24h without seconds
+rif	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rif	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rif	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rm	short	HH:mm	datetime.time.hm_24h	24h without seconds
+rm	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rm	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rm	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+rn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ro-MD	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ro-MD	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ro-MD	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ro-MD	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rof	short	HH:mm	datetime.time.hm_24h	24h without seconds
+rof	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rof	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rof	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ru-BY	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ru-BY	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ru-BY	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ru-BY	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ru-KG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ru-KG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ru-KG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ru-KG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ru-KZ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ru-KZ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ru-KZ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ru-KZ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ru-MD	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ru-MD	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ru-MD	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ru-MD	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ru-UA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ru-UA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ru-UA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ru-UA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+rw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+rwk	short	HH:mm	datetime.time.hm_24h	24h without seconds
+rwk	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+rwk	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+rwk	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sa	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sa	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sa	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+sa	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+sah	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sah	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sah	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sah	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+saq	short	HH:mm	datetime.time.hm_24h	24h without seconds
+saq	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+saq	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+saq	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sat	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sat	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sat	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+sat	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+sat-Deva	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sat-Deva	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sat-Deva	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sat-Deva	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sat-Olck	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sat-Olck	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sat-Olck	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+sat-Olck	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+sbp	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sbp	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sbp	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sbp	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sc	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sc	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sc	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sc	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+scn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+scn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+scn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+scn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sd	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sd	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sd	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+sd	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+sd-Arab	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sd-Arab	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sd-Arab	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+sd-Arab	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+sd-Deva	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sd-Deva	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sd-Deva	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+sd-Deva	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+sdh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sdh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sdh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sdh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sdh-IQ	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sdh-IQ	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sdh-IQ	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sdh-IQ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+se	short	HH:mm	datetime.time.hm_24h	24h without seconds
+se	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+se	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+se	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+se-FI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+se-FI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+se-FI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+se-FI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+se-SE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+se-SE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+se-SE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+se-SE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+seh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+seh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+seh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+seh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ses	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ses	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ses	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ses	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+shi	short	HH:mm	datetime.time.hm_24h	24h without seconds
+shi	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+shi	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+shi	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+shi-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+shi-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+shi-Latn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+shi-Latn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+shi-Tfng	short	HH:mm	datetime.time.hm_24h	24h without seconds
+shi-Tfng	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+shi-Tfng	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+shi-Tfng	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+shn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+shn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+shn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+shn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+shn-TH	short	HH:mm	datetime.time.hm_24h	24h without seconds
+shn-TH	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+shn-TH	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+shn-TH	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+si	short	HH.mm	datetime.time.hm_24h	24h without seconds
+si	medium	HH.mm.ss	datetime.time.hms_24h	24h with seconds
+si	long	HH.mm.ss z	datetime.time.hms_24h	24h with seconds
+si	full	HH.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+sid	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sid	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sid	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sid	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+skr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+skr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+skr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+skr	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sma	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sma	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sma	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sma	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sma-NO	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sma-NO	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sma-NO	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sma-NO	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+smj	short	HH:mm	datetime.time.hm_24h	24h without seconds
+smj	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+smj	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+smj	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+smj-NO	short	HH:mm	datetime.time.hm_24h	24h without seconds
+smj-NO	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+smj-NO	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+smj-NO	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+smn	short	H.mm	datetime.time.hm_24h	24h without seconds
+smn	medium	H.mm.ss	datetime.time.hms_24h	24h with seconds
+smn	long	H.mm.ss z	datetime.time.hms_24h	24h with seconds
+smn	full	H.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+sms	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sms	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sms	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sms	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+so	short	h:mm a	datetime.time.hm_12h	12h without seconds
+so	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+so	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+so	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+so-DJ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+so-DJ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+so-DJ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+so-DJ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+so-ET	short	h:mm a	datetime.time.hm_12h	12h without seconds
+so-ET	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+so-ET	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+so-ET	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+so-KE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+so-KE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+so-KE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+so-KE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sq	short	h:mm a	datetime.time.hm_12h	12h without seconds
+sq	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+sq	long	h:mm:ss a, z	datetime.time.hms_12h	12h with seconds
+sq	full	h:mm:ss a, zzzz	datetime.time.hms_12h	12h with seconds
+sq-MK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sq-MK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sq-MK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sq-MK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sq-XK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sq-XK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sq-XK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sq-XK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Cyrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Cyrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Cyrl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Cyrl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-BA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Cyrl-BA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-BA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-BA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-ME	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Cyrl-ME	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-ME	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-ME	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-XK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Cyrl-XK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-XK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Cyrl-XK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Latn-BA	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Latn-BA	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Latn-BA	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Latn-BA	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Latn-ME	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Latn-ME	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Latn-ME	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Latn-ME	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sr-Latn-XK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sr-Latn-XK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sr-Latn-XK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sr-Latn-XK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ss	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ss	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ss	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ss	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ss-SZ	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ss-SZ	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ss-SZ	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ss-SZ	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ssy	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ssy	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ssy	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ssy	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+st	short	HH:mm	datetime.time.hm_24h	24h without seconds
+st	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+st	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+st	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+st-LS	short	h:mm a	datetime.time.hm_12h	12h without seconds
+st-LS	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+st-LS	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+st-LS	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+su	short	H.mm	datetime.time.hm_24h	24h without seconds
+su	medium	H.mm.ss	datetime.time.hms_24h	24h with seconds
+su	long	H.mm.ss z	datetime.time.hms_24h	24h with seconds
+su	full	H.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+su-Latn	short	H.mm	datetime.time.hm_24h	24h without seconds
+su-Latn	medium	H.mm.ss	datetime.time.hms_24h	24h with seconds
+su-Latn	long	H.mm.ss z	datetime.time.hms_24h	24h with seconds
+su-Latn	full	H.mm.ss zzzz	datetime.time.hms_24h	24h with seconds
+sv-AX	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sv-AX	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sv-AX	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sv-AX	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sv-FI	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sv-FI	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sv-FI	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sv-FI	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sw-CD	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sw-CD	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sw-CD	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sw-CD	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sw-KE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sw-KE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sw-KE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sw-KE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+sw-UG	short	HH:mm	datetime.time.hm_24h	24h without seconds
+sw-UG	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+sw-UG	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+sw-UG	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+syr	short	h:mm a	datetime.time.hm_12h	12h without seconds
+syr	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+syr	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+syr	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+syr-SY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+syr-SY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+syr-SY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+syr-SY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+szl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+szl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+szl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+szl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ta	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ta	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ta	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ta	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ta-LK	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ta-LK	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ta-LK	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ta-LK	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ta-MY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ta-MY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ta-MY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ta-MY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ta-SG	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ta-SG	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ta-SG	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ta-SG	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+te	short	h:mm a	datetime.time.hm_12h	12h without seconds
+te	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+te	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+te	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+teo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+teo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+teo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+teo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+teo-KE	short	HH:mm	datetime.time.hm_24h	24h without seconds
+teo-KE	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+teo-KE	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+teo-KE	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tg	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tg	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tg	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tg	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+th	short	HH:mm	datetime.time.hm_24h	24h without seconds
+th	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+th	long	H นาฬิกา mm นาที ss วินาที z	datetime.time.hms_24h	24h with seconds
+th	full	H นาฬิกา mm นาที ss วินาที zzzz	datetime.time.hms_24h	24h with seconds
+ti	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ti	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ti	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ti	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ti-ER	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ti-ER	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ti-ER	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ti-ER	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+tig	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tig	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tig	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tig	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tk	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tk	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tk	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tk	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tn	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tn	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tn-BW	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tn-BW	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tn-BW	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tn-BW	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+to	short	h:mm a	datetime.time.hm_12h	12h without seconds
+to	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+to	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+to	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+tok	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tok	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tok	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tok	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tpi	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tpi	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tpi	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tpi	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tr-CY	short	h:mm a	datetime.time.hm_12h	12h without seconds
+tr-CY	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+tr-CY	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+tr-CY	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+trv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+trv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+trv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+trv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+trw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+trw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+trw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+trw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ts	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ts	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ts	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ts	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tt	short	H:mm	datetime.time.hm_24h	24h without seconds
+tt	medium	H:mm:ss	datetime.time.hms_24h	24h with seconds
+tt	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+tt	full	H:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+twq	short	HH:mm	datetime.time.hm_24h	24h without seconds
+twq	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+twq	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+twq	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tyv	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tyv	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tyv	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tyv	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+tzm	short	HH:mm	datetime.time.hm_24h	24h without seconds
+tzm	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+tzm	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+tzm	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ug	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ug	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ug	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ug	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+und	short	HH:mm	datetime.time.hm_24h	24h without seconds
+und	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+und	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+und	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+ur	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ur	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ur	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ur	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ur-IN	short	h:mm a	datetime.time.hm_12h	12h without seconds
+ur-IN	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+ur-IN	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+ur-IN	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+uz	short	HH:mm	datetime.time.hm_24h	24h without seconds
+uz	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+uz	long	H:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+uz	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+uz-Arab	short	HH:mm	datetime.time.hm_24h	24h without seconds
+uz-Arab	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+uz-Arab	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+uz-Arab	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+uz-Cyrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+uz-Cyrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+uz-Cyrl	long	HH:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+uz-Cyrl	full	HH:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+uz-Latn	short	HH:mm	datetime.time.hm_24h	24h without seconds
+uz-Latn	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+uz-Latn	long	H:mm:ss (z)	datetime.time.hms_24h	24h with seconds
+uz-Latn	full	H:mm:ss (zzzz)	datetime.time.hms_24h	24h with seconds
+vai	short	h:mm a	datetime.time.hm_12h	12h without seconds
+vai	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+vai	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+vai	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+vai-Latn	short	h:mm a	datetime.time.hm_12h	12h without seconds
+vai-Latn	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+vai-Latn	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+vai-Latn	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+vai-Vaii	short	h:mm a	datetime.time.hm_12h	12h without seconds
+vai-Vaii	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+vai-Vaii	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+vai-Vaii	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+ve	short	HH:mm	datetime.time.hm_24h	24h without seconds
+ve	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+ve	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+ve	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+vec	short	HH:mm	datetime.time.hm_24h	24h without seconds
+vec	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+vec	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+vec	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+vi	short	HH:mm	datetime.time.hm_24h	24h without seconds
+vi	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+vi	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+vi	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+vmw	short	HH:mm	datetime.time.hm_24h	24h without seconds
+vmw	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+vmw	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+vmw	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+vo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+vo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+vo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+vo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+vun	short	HH:mm	datetime.time.hm_24h	24h without seconds
+vun	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+vun	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+vun	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+wa	short	HH:mm	datetime.time.hm_24h	24h without seconds
+wa	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+wa	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+wa	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+wae	short	HH:mm	datetime.time.hm_24h	24h without seconds
+wae	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+wae	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+wae	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+wal	short	HH:mm	datetime.time.hm_24h	24h without seconds
+wal	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+wal	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+wal	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+wbp	short	HH:mm	datetime.time.hm_24h	24h without seconds
+wbp	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+wbp	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+wbp	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+wo	short	HH:mm	datetime.time.hm_24h	24h without seconds
+wo	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+wo	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+wo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+xh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+xh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+xh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+xh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+xnr	short	h:mm a	datetime.time.hm_12h	12h without seconds
+xnr	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+xnr	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+xnr	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+xog	short	HH:mm	datetime.time.hm_24h	24h without seconds
+xog	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+xog	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+xog	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+yav	short	HH:mm	datetime.time.hm_24h	24h without seconds
+yav	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+yav	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+yav	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+yi	short	HH:mm	datetime.time.hm_24h	24h without seconds
+yi	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+yi	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+yi	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+yo	short	H:m	datetime.time.hm_24h	24h without seconds
+yo	medium	H:m:s	datetime.time.hms_24h	24h with seconds
+yo	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+yo	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+yo-BJ	short	H:m	datetime.time.hm_24h	24h without seconds
+yo-BJ	medium	H:m:s	datetime.time.hms_24h	24h with seconds
+yo-BJ	long	H:mm:ss z	datetime.time.hms_24h	24h with seconds
+yo-BJ	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+yrl	short	HH:mm	datetime.time.hm_24h	24h without seconds
+yrl	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+yrl	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+yrl	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+yrl-CO	short	h:mm a	datetime.time.hm_12h	12h without seconds
+yrl-CO	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+yrl-CO	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+yrl-CO	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+yrl-VE	short	h:mm a	datetime.time.hm_12h	12h without seconds
+yrl-VE	medium	h:mm:ss a	datetime.time.hms_12h	12h with seconds
+yrl-VE	long	h:mm:ss a z	datetime.time.hms_12h	12h with seconds
+yrl-VE	full	h:mm:ss a zzzz	datetime.time.hms_12h	12h with seconds
+za	short	HH:mm	datetime.time.hm_24h	24h without seconds
+za	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+za	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+za	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+zgh	short	HH:mm	datetime.time.hm_24h	24h without seconds
+zgh	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+zgh	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+zgh	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds
+zu	short	HH:mm	datetime.time.hm_24h	24h without seconds
+zu	medium	HH:mm:ss	datetime.time.hms_24h	24h with seconds
+zu	long	HH:mm:ss z	datetime.time.hms_24h	24h with seconds
+zu	full	HH:mm:ss zzzz	datetime.time.hms_24h	24h with seconds

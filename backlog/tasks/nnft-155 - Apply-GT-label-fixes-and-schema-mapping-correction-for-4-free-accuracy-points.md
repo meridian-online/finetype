@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 21:28'
-updated_date: '2026-02-27 21:31'
+updated_date: '2026-02-27 21:34'
 labels:
   - accuracy
   - eval
@@ -46,5 +46,5 @@ Changes:
 - [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
