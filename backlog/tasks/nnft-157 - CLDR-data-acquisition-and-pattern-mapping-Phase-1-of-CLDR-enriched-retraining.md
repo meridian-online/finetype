@@ -3,11 +3,11 @@ id: NNFT-157
 title: >-
   CLDR data acquisition and pattern mapping (Phase 1 of CLDR-enriched
   retraining)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 22:48'
-updated_date: '2026-02-27 22:52'
+updated_date: '2026-02-27 22:53'
 labels:
   - accuracy
   - cldr
@@ -108,6 +108,6 @@ Added infrastructure to download and extract Unicode CLDR date/time patterns for
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

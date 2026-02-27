@@ -28,6 +28,16 @@ enum PhoneFmt {
     E164,
 }
 
+/// Date component ordering by locale (derived from CLDR dateFormats).
+enum DateOrder {
+    /// Month Day, Year — "January 15, 2024" (en-US, en-CA)
+    Mdy,
+    /// Day Month Year — "15 January 2024" (most of the world)
+    Dmy,
+    /// Year Month Day — "2024. január 15." (hu, lt, lv)
+    Ymd,
+}
+
 /// A generated sample with its label.
 #[derive(Debug, Clone)]
 pub struct Sample {
@@ -63,23 +73,40 @@ impl Generator {
     }
 
     /// Generate samples for all labels at a given priority level.
+    ///
+    /// For locale-specific types, randomly cycles through available locales
+    /// to produce diverse training samples with 3-level labels. This ensures
+    /// the model sees month names, phone formats, etc. from many locales
+    /// without expanding the label space.
     pub fn generate_all(&mut self, min_priority: u8, samples_per_label: usize) -> Vec<Sample> {
-        let keys: Vec<String> = self
+        let entries: Vec<(String, Designation, Vec<String>)> = self
             .taxonomy
             .at_priority(min_priority)
             .into_iter()
-            .map(|(k, _)| k.clone())
+            .map(|(k, d)| (k.clone(), d.designation.clone(), d.locales.clone()))
             .collect();
 
         let mut all_samples = Vec::new();
 
-        for key in keys {
-            for _ in 0..samples_per_label {
-                if let Ok(text) = self.generate_value(&key) {
+        for (key, designation, locales) in &entries {
+            let has_locales =
+                matches!(designation, Designation::LocaleSpecific) && !locales.is_empty();
+
+            for i in 0..samples_per_label {
+                // Cycle through locales for locale-specific types
+                if has_locales {
+                    self.locale = Some(locales[i % locales.len()].clone());
+                }
+
+                if let Ok(text) = self.generate_value(key) {
                     all_samples.push(Sample {
                         text,
                         label: key.clone(),
                     });
+                }
+
+                if has_locales {
+                    self.locale = None;
                 }
             }
         }
@@ -261,18 +288,33 @@ impl Generator {
             ("date", "short_mdy") => Ok(self.random_datetime().format("%m-%d-%y").to_string()),
             ("date", "short_dmy") => Ok(self.random_datetime().format("%d-%m-%y").to_string()),
             ("date", "abbreviated_month") => {
+                // Format: "Month DD, YYYY" or "DD Month YYYY" — locale names, mixed ordering
+                // for training diversity. The CharCNN needs to see month abbreviations from
+                // many locales. Format variations teach the model to recognise abbreviated
+                // month patterns regardless of ordering.
                 let dt = self.random_datetime();
                 let abbrevs = locale_data::month_abbreviations(self.current_locale());
                 let month_abbr = abbrevs[(dt.month0() as usize) % abbrevs.len()];
-                Ok(format!("{} {:02}, {}", month_abbr, dt.day(), dt.year()))
+                Ok(match self.date_order() {
+                    DateOrder::Mdy => format!("{} {:02}, {}", month_abbr, dt.day(), dt.year()),
+                    DateOrder::Dmy => format!("{} {} {}", dt.day(), month_abbr, dt.year()),
+                    DateOrder::Ymd => format!("{} {} {}", dt.year(), month_abbr, dt.day()),
+                })
             }
             ("date", "long_full_month") => {
+                // Same as abbreviated_month but with full month names.
                 let dt = self.random_datetime();
                 let months = locale_data::month_names(self.current_locale());
                 let month_name = months[(dt.month0() as usize) % months.len()];
-                Ok(format!("{} {:02}, {}", month_name, dt.day(), dt.year()))
+                Ok(match self.date_order() {
+                    DateOrder::Mdy => format!("{} {:02}, {}", month_name, dt.day(), dt.year()),
+                    DateOrder::Dmy => format!("{} {} {}", dt.day(), month_name, dt.year()),
+                    DateOrder::Ymd => format!("{} {} {}", dt.year(), month_name, dt.day()),
+                })
             }
             ("date", "weekday_abbreviated_month") => {
+                // Fixed format: "Weekday, DD Abbr YYYY" — matches format_string %A, %d %b %Y.
+                // Locale diversity comes from translated weekday/month names, not reordering.
                 let dt = self.random_datetime();
                 let weekdays = locale_data::weekday_names(self.current_locale());
                 let abbrevs = locale_data::month_abbreviations(self.current_locale());
@@ -288,6 +330,8 @@ impl Generator {
                 ))
             }
             ("date", "weekday_full_month") => {
+                // Fixed format: "Weekday, DD Month YYYY" — matches format_string %A, %d %B %Y.
+                // Locale diversity comes from translated weekday/month names, not reordering.
                 let dt = self.random_datetime();
                 let weekdays = locale_data::weekday_names(self.current_locale());
                 let months = locale_data::month_names(self.current_locale());
@@ -2591,6 +2635,20 @@ impl Generator {
     /// Get the current locale, defaulting to "EN" if not set.
     fn current_locale(&self) -> &str {
         self.locale.as_deref().unwrap_or("EN")
+    }
+
+    /// Get the date component ordering for the current locale.
+    ///
+    /// Based on CLDR dateFormats (long/full patterns):
+    /// - MDY: en, en-US (Month Day, Year — "January 15, 2024")
+    /// - DMY: Most of the world (Day Month Year — "15 January 2024")
+    /// - YMD: hu, lt (Year Month Day — "2024. január 15.")
+    fn date_order(&self) -> DateOrder {
+        match self.current_locale() {
+            "EN" | "EN_US" | "EN_CA" => DateOrder::Mdy,
+            "HU" | "LT" | "LV" => DateOrder::Ymd,
+            _ => DateOrder::Dmy,
+        }
     }
 
     /// Generate a phone number for the current locale.
