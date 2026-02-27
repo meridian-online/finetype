@@ -163,6 +163,17 @@ impl SemanticHintClassifier {
         self.threshold
     }
 
+    /// Get a reference to the tokenizer (shared with EntityClassifier).
+    pub fn tokenizer(&self) -> &tokenizers::Tokenizer {
+        &self.tokenizer
+    }
+
+    /// Get a reference to the token embedding matrix (shared with EntityClassifier).
+    /// Shape: [vocab_size, embed_dim]. Clone is O(1) due to Arc-backed storage.
+    pub fn embeddings(&self) -> &Tensor {
+        &self.embeddings
+    }
+
     /// Classify a column header name, returning the best-matching type label
     /// if above the similarity threshold.
     ///

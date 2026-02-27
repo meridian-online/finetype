@@ -164,6 +164,36 @@ fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::pa
         code.push_str("pub const M2V_LABEL_INDEX: &[u8] = &[];\n");
     }
 
+    // ── Entity classifier (full_name demotion gate) ────────────────────────
+    // Embeds the entity classifier MLP weights and config for the binary
+    // demotion gate. Optional — full_name demotion is disabled when unavailable.
+    let entity_dir = models_base.join("entity-classifier");
+    println!("cargo:rerun-if-changed={}", entity_dir.display());
+
+    if entity_dir.join("model.safetensors").exists() && entity_dir.join("config.json").exists() {
+        let model_path = portable_path(&entity_dir.join("model.safetensors"));
+        let config_path = portable_path(&entity_dir.join("config.json"));
+
+        code.push_str("\n// Entity classifier (full_name demotion gate, NNFT-152)\n");
+        code.push_str("pub const HAS_ENTITY_CLASSIFIER: bool = true;\n");
+        code.push_str(&format!(
+            "pub const ENTITY_MODEL: &[u8] = include_bytes!(\"{model_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const ENTITY_CONFIG: &[u8] = include_bytes!(\"{config_path}\");\n"
+        ));
+
+        println!(
+            "cargo:warning=Embedding entity classifier from {}",
+            entity_dir.display()
+        );
+    } else {
+        code.push_str("\n// Entity classifier not available — full_name demotion disabled\n");
+        code.push_str("pub const HAS_ENTITY_CLASSIFIER: bool = false;\n");
+        code.push_str("pub const ENTITY_MODEL: &[u8] = &[];\n");
+        code.push_str("pub const ENTITY_CONFIG: &[u8] = &[];\n");
+    }
+
     fs::write(&dest, code).unwrap_or_else(|e| panic!("Failed to write {}: {}", dest.display(), e));
 }
 

@@ -16,26 +16,31 @@ currency,identity.payment.currency_code,identity,direct,Currency codes (USD/GBP/
 telephone,identity.person.phone_number,identity,direct,Phone numbers in various formats
 price,representation.numeric.decimal_number,representation,close,Price values without currency symbol
 Integer,representation.numeric.integer_number,representation,direct,Integer values
-Organization,identity.person.full_name,identity,partial,Organization names — no dedicated org type
+Organization,identity.person.full_name,identity,partial,Organization names — full_name overcall
+Organization,representation.text.entity_name,representation,close,Organization names — entity_name via demotion gate
 addressLocality,geography.location.city,geography,direct,City/locality names
 IdentifierAT,representation.code.alphanumeric_id,representation,close,Identifier strings (alphanumeric)
 Place,geography.location.city,geography,close,Place names — closest is city
 Country,geography.location.country,geography,direct,Country names
 addressRegion,geography.location.region,geography,direct,State/region/province names
 Person,identity.person.full_name,identity,direct,Person names
+Person,representation.text.entity_name,representation,close,Person names — entity_name overcall (demotion gate false positive)
 CoordinateAT,geography.coordinate.coordinates,geography,direct,Coordinate pairs (lat/lon)
 URL,technology.internet.url,technology,direct,Web URLs
 streetAddress,geography.address.full_address,geography,close,Street addresses
 postalCode,geography.address.postal_code,geography,direct,Postal/zip codes
 ItemAvailability,,representation,semantic_only,Schema.org availability enum (InStock/OutOfStock)
 MusicArtistAT,identity.person.full_name,identity,close,Music artist names
+MusicArtistAT,representation.text.entity_name,representation,close,Music artist names — entity_name overcall
 Person/name,identity.person.full_name,identity,direct,Person names (qualified)
+Person/name,representation.text.entity_name,representation,close,Person names — entity_name overcall (demotion gate false positive)
 MusicAlbum,representation.text.word,representation,semantic_only,Album titles — semantic concept
 MusicRecording/name,representation.text.plain_text,representation,semantic_only,Song/recording titles
 priceRange,representation.text.word,representation,partial,Price range strings ($$ or 10-50)
 Event/name,representation.text.plain_text,representation,semantic_only,Event titles
 weight,identity.person.weight,identity,close,Weight values
-LocalBusiness/name,identity.person.full_name,identity,close,Business names
+LocalBusiness/name,identity.person.full_name,identity,close,Business names — full_name overcall
+LocalBusiness/name,representation.text.entity_name,representation,close,Business names — entity_name via demotion gate
 QuantitativeValue,representation.numeric.decimal_number,representation,close,Numeric quantities
 Place/name,geography.location.city,geography,close,Place names (qualified)
 Book/name,representation.text.plain_text,representation,semantic_only,Book titles
@@ -48,9 +53,11 @@ category,representation.discrete.categorical,representation,close,Category label
 Product/name,representation.text.plain_text,representation,semantic_only,Product names
 unitCode,representation.text.word,representation,partial,Unit codes (kg/m/etc)
 ItemList,,representation,semantic_only,List items — no format signal
-Hotel/name,identity.person.full_name,identity,close,Hotel names
+Hotel/name,identity.person.full_name,identity,close,Hotel names — full_name overcall
+Hotel/name,representation.text.entity_name,representation,close,Hotel names — entity_name via demotion gate
 faxNumber,identity.person.phone_number,identity,direct,Fax numbers (same format as phone)
-Restaurant/name,identity.person.full_name,identity,close,Restaurant/business names
+Restaurant/name,identity.person.full_name,identity,close,Restaurant/business names — full_name overcall
+Restaurant/name,representation.text.entity_name,representation,close,Restaurant names — entity_name via demotion gate
 Brand,representation.text.word,representation,semantic_only,Brand names
 Time,datetime.time.hms_24h,datetime,close,Time values
 PostalAddress,geography.address.full_address,geography,close,Full postal addresses
@@ -90,7 +97,8 @@ LocationFeatureSpecification,,representation,semantic_only,Location feature labe
 Product,,representation,semantic_only,Product references
 typicalAgeRange,identity.person.age,identity,close,Age range strings
 audience,representation.text.word,representation,semantic_only,Audience labels
-Museum/name,identity.person.full_name,identity,close,Museum names
+Museum/name,identity.person.full_name,identity,close,Museum names — full_name overcall
+Museum/name,representation.text.entity_name,representation,close,Museum names — entity_name via demotion gate
 MusicRecording,,representation,semantic_only,Recording references
 JobPosting/name,representation.text.plain_text,representation,semantic_only,Job posting titles
 MusicGroup,representation.text.word,representation,semantic_only,Music group names

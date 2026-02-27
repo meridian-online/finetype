@@ -615,8 +615,15 @@ fn cmd_infer(
             sample_size,
             ..Default::default()
         };
-        let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
-            ColumnClassifier::with_semantic_hint(classifier, config, semantic)
+        let semantic_hint = load_semantic_hint();
+        let mut column_classifier = if let Some(semantic) = semantic_hint {
+            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+            if let Some(entity) = entity {
+                cc.set_entity_classifier(entity);
+            }
+            cc
         } else {
             ColumnClassifier::new(classifier, config)
         };
@@ -834,7 +841,14 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
     // Wire up semantic hint (Model2Vec) — same as profile command
     let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
         eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        ColumnClassifier::with_semantic_hint(classifier, config, semantic)
+        // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+        let entity = load_entity_classifier(&semantic);
+        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+        if let Some(entity) = entity {
+            eprintln!("Loaded entity classifier (full_name demotion gate)");
+            cc.set_entity_classifier(entity);
+        }
+        cc
     } else {
         ColumnClassifier::new(classifier, config)
     };
@@ -1049,6 +1063,46 @@ fn load_semantic_hint() -> Option<finetype_model::SemanticHintClassifier> {
                 embedded::M2V_LABEL_INDEX,
             )
             .map_err(|e| eprintln!("Warning: Failed to load embedded Model2Vec: {e}"))
+            .ok();
+        }
+    }
+
+    None
+}
+
+/// Load the entity classifier for full_name demotion (NNFT-152).
+///
+/// Requires a loaded SemanticHintClassifier to share the Model2Vec tokenizer
+/// and embeddings. Resolution order:
+///  1. models/entity-classifier directory on disk (development)
+///  2. Embedded entity classifier bytes (release binaries)
+///  3. None — entity demotion disabled
+fn load_entity_classifier(
+    semantic: &finetype_model::SemanticHintClassifier,
+) -> Option<finetype_model::EntityClassifier> {
+    // Try disk-based model first (development workflow)
+    let model_dir = std::path::PathBuf::from("models/entity-classifier");
+    if model_dir.join("model.safetensors").exists() {
+        return finetype_model::EntityClassifier::load(
+            &model_dir,
+            semantic.tokenizer().clone(),
+            semantic.embeddings().clone(),
+        )
+        .map_err(|e| eprintln!("Warning: Failed to load entity classifier from disk: {e}"))
+        .ok();
+    }
+
+    // Try embedded model bytes (release binary)
+    #[cfg(feature = "embed-models")]
+    {
+        if embedded::HAS_ENTITY_CLASSIFIER {
+            return finetype_model::EntityClassifier::from_bytes(
+                embedded::ENTITY_MODEL,
+                embedded::ENTITY_CONFIG,
+                semantic.tokenizer().clone(),
+                semantic.embeddings().clone(),
+            )
+            .map_err(|e| eprintln!("Warning: Failed to load embedded entity classifier: {e}"))
             .ok();
         }
     }
@@ -2015,7 +2069,14 @@ fn cmd_profile(
     };
     let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
         eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        ColumnClassifier::with_semantic_hint(classifier, config, semantic)
+        // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+        let entity = load_entity_classifier(&semantic);
+        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+        if let Some(entity) = entity {
+            eprintln!("Loaded entity classifier (full_name demotion gate)");
+            cc.set_entity_classifier(entity);
+        }
+        cc
     } else {
         ColumnClassifier::new(classifier, config)
     };

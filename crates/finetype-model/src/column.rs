@@ -10,6 +10,7 @@
 //! - `latitude` vs `longitude` coordinates
 //! - Numeric types (port, increment, postal_code, integer_number)
 
+use crate::entity::EntityClassifier;
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::semantic::SemanticHintClassifier;
 use finetype_core::{Designation, Taxonomy};
@@ -237,6 +238,10 @@ pub struct ColumnClassifier {
     /// When present, enables Signal 1 (validation failure) in the
     /// attractor demotion disambiguation rule (Rule 14).
     taxonomy: Option<Taxonomy>,
+    /// Optional entity classifier for full_name demotion (NNFT-152).
+    /// When present and majority vote is full_name, runs a binary demotion
+    /// check: if the column is confidently non-person, demotes to entity_name.
+    entity_classifier: Option<EntityClassifier>,
 }
 
 impl ColumnClassifier {
@@ -247,6 +252,7 @@ impl ColumnClassifier {
             config,
             semantic_hint: None,
             taxonomy: None,
+            entity_classifier: None,
         }
     }
 
@@ -270,6 +276,7 @@ impl ColumnClassifier {
             config,
             semantic_hint: Some(semantic),
             taxonomy: None,
+            entity_classifier: None,
         }
     }
 
@@ -285,6 +292,16 @@ impl ColumnClassifier {
     /// enabling Signal 1 (validation failure) to catch over-eager predictions.
     pub fn set_taxonomy(&mut self, taxonomy: Taxonomy) {
         self.taxonomy = Some(taxonomy);
+    }
+
+    /// Attach an entity classifier for full_name demotion (NNFT-152).
+    ///
+    /// When present and the majority vote is `identity.person.full_name`,
+    /// the entity classifier runs a binary demotion check. If the column
+    /// is confidently non-person (place, organization, creative work),
+    /// the prediction is demoted to `representation.text.entity_name`.
+    pub fn set_entity_classifier(&mut self, entity: EntityClassifier) {
+        self.entity_classifier = Some(entity);
     }
 
     /// Classify a column of values, returning a single type prediction.
@@ -411,7 +428,30 @@ impl ColumnClassifier {
             }
         };
 
-        // Step 5: Post-hoc locale detection via validation patterns (NNFT-140).
+        // Step 5: Entity demotion gate (NNFT-152).
+        // When the majority label is full_name and the entity classifier is loaded,
+        // check whether the column actually contains person names. If confidently
+        // non-person, demote to entity_name. Fires after disambiguation but before
+        // header hints (which may later override this).
+        if result.label == "identity.person.full_name" {
+            if let Some(ref entity_model) = self.entity_classifier {
+                match entity_model.should_demote(&sample) {
+                    Ok(true) => {
+                        result.label = "representation.text.entity_name".to_string();
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule = Some("entity_demotion:nonperson".to_string());
+                        result.detected_locale = None;
+                    }
+                    Ok(false) => {} // Keep full_name — classifier thinks it's person
+                    Err(e) => {
+                        // Log but don't fail — entity classifier is optional
+                        tracing::warn!("Entity classifier error, skipping demotion: {}", e);
+                    }
+                }
+            }
+        }
+
+        // Step 6: Post-hoc locale detection via validation patterns (NNFT-140).
         // When taxonomy is available, run sample values against validation_by_locale
         // patterns to detect the most likely locale. This takes priority over any
         // model-derived locale from vote aggregation, because validation patterns
@@ -441,6 +481,19 @@ impl ColumnClassifier {
         header: &str,
     ) -> Result<ColumnResult, InferenceError> {
         let mut result = self.classify_column(values)?;
+
+        // Entity demotion guard (NNFT-152): when the entity classifier has
+        // made a deliberate data-driven demotion (full_name → entity_name),
+        // skip header hint override. The entity classifier analyzed the actual
+        // column values; header hints are a weaker signal that would undo the
+        // demotion (entity_name is broad_words → generic → header overrides).
+        if result
+            .disambiguation_rule
+            .as_ref()
+            .is_some_and(|r| r.starts_with("entity_demotion"))
+        {
+            return Ok(result);
+        }
 
         // Apply header hint: try semantic classifier first, fall back to hardcoded
         let hinted_type: Option<String> = self
