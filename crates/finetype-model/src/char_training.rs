@@ -4,7 +4,9 @@ use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarBuilder, VarMap};
 use finetype_core::{Sample, Taxonomy};
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use std::path::Path;
 use thiserror::Error;
 
@@ -28,6 +30,9 @@ pub struct CharTrainingConfig {
     pub hidden_dim: usize,
     pub weight_decay: f64,
     pub shuffle: bool,
+    /// Optional seed for deterministic training. When set, uses a seeded RNG
+    /// instead of `thread_rng()` for reproducible shuffle order.
+    pub seed: Option<u64>,
 }
 
 impl Default for CharTrainingConfig {
@@ -42,6 +47,7 @@ impl Default for CharTrainingConfig {
             hidden_dim: 128,
             weight_decay: 1e-4,
             shuffle: true,
+            seed: None,
         }
     }
 }
@@ -82,9 +88,15 @@ impl CharTrainer {
 
         // Shuffle samples if configured
         let mut samples_vec: Vec<&Sample> = samples.iter().collect();
+        let mut rng: Box<dyn rand::RngCore> = match self.config.seed {
+            Some(seed) => {
+                eprintln!("Using deterministic seed: {}", seed);
+                Box::new(StdRng::seed_from_u64(seed))
+            }
+            None => Box::new(rand::thread_rng()),
+        };
         if self.config.shuffle {
-            let mut rng = rand::thread_rng();
-            samples_vec.shuffle(&mut rng);
+            samples_vec.shuffle(&mut *rng);
             eprintln!("Shuffled training data");
         }
 
@@ -126,8 +138,7 @@ impl CharTrainer {
         for epoch in 0..self.config.epochs {
             // Re-shuffle each epoch
             if self.config.shuffle && epoch > 0 {
-                let mut rng = rand::thread_rng();
-                samples_vec.shuffle(&mut rng);
+                samples_vec.shuffle(&mut *rng);
             }
 
             eprintln!("Starting epoch {}/{}", epoch + 1, self.config.epochs);

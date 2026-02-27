@@ -9,7 +9,9 @@ use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarBuilder, VarMap};
 use finetype_core::{Sample, Taxonomy, TierGraph};
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use thiserror::Error;
@@ -38,6 +40,9 @@ pub struct TieredTrainingConfig {
     /// Minimum number of types in a (broad_type, category) group to train a Tier 2 model.
     /// Groups with fewer types are resolved by Tier 1 directly.
     pub tier2_min_types: usize,
+    /// Optional seed for deterministic training. When set, uses a seeded RNG
+    /// instead of `thread_rng()` for reproducible shuffle order.
+    pub seed: Option<u64>,
 }
 
 impl Default for TieredTrainingConfig {
@@ -52,6 +57,7 @@ impl Default for TieredTrainingConfig {
             hidden_dim: 128,
             weight_decay: 1e-4,
             tier2_min_types: 1,
+            seed: None,
         }
     }
 }
@@ -378,8 +384,11 @@ impl TieredTrainer {
 
         // Shuffle samples
         let mut samples_vec: Vec<&Sample> = samples.iter().collect();
-        let mut rng = rand::thread_rng();
-        samples_vec.shuffle(&mut rng);
+        let mut rng: Box<dyn rand::RngCore> = match self.config.seed {
+            Some(seed) => Box::new(StdRng::seed_from_u64(seed)),
+            None => Box::new(rand::thread_rng()),
+        };
+        samples_vec.shuffle(&mut *rng);
 
         // Initialize model
         let varmap = VarMap::new();
@@ -411,7 +420,7 @@ impl TieredTrainer {
 
         for epoch in 0..self.config.epochs {
             if epoch > 0 {
-                samples_vec.shuffle(&mut rng);
+                samples_vec.shuffle(&mut *rng);
             }
 
             let mut total_loss = 0.0;

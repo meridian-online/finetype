@@ -8,7 +8,7 @@ use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
 use finetype_model::Classifier;
 use serde_json::json;
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -144,6 +144,10 @@ enum Commands {
         /// Model type (transformer, char_cnn)
         #[arg(long, default_value = "tiered")]
         model_type: ModelType,
+
+        /// Random seed for deterministic training reproducibility
+        #[arg(long)]
+        seed: Option<u64>,
     },
 
     /// Show taxonomy information
@@ -424,8 +428,9 @@ fn main() -> Result<()> {
             batch_size,
             device,
             model_type,
+            seed,
         } => cmd_train(
-            data, taxonomy, output, epochs, batch_size, device, model_type,
+            data, taxonomy, output, epochs, batch_size, device, model_type, seed,
         ),
 
         Commands::Taxonomy {
@@ -1169,6 +1174,7 @@ fn cmd_generate(
 // TRAIN — Train a classification model
 // ═══════════════════════════════════════════════════════════════════════════════
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_train(
     data: PathBuf,
     taxonomy_path: PathBuf,
@@ -1177,6 +1183,7 @@ fn cmd_train(
     batch_size: usize,
     _device: String,
     model_type: ModelType,
+    seed: Option<u64>,
 ) -> Result<()> {
     use finetype_core::Sample;
     use std::io::BufRead;
@@ -1201,6 +1208,9 @@ fn cmd_train(
         samples.push(Sample { text, label });
     }
     eprintln!("Loaded {} training samples", samples.len());
+
+    // Snapshot: if output directory already contains model files, back it up
+    let snapshot_path = snapshot_model_dir(&output)?;
 
     match model_type {
         ModelType::Transformer => {
@@ -1234,6 +1244,7 @@ fn cmd_train(
                 hidden_dim: 128,
                 weight_decay: 1e-4,
                 shuffle: true,
+                seed,
             };
 
             eprintln!("Training CharCNN model");
@@ -1255,9 +1266,10 @@ fn cmd_train(
                 hidden_dim: 128,
                 weight_decay: 1e-4,
                 tier2_min_types: 1,
+                seed,
             };
 
-            eprintln!("Training Tiered models (Tier 0 → Tier 1 → Tier 2)");
+            eprintln!("Training Tiered models (Tier 0 -> Tier 1 -> Tier 2)");
             eprintln!("Training config: {:?}", config);
 
             let trainer = TieredTrainer::new(config);
@@ -1266,8 +1278,115 @@ fn cmd_train(
         }
     }
 
+    // Write training manifest
+    TrainingManifest {
+        output: &output,
+        data_file: &data,
+        epochs,
+        batch_size,
+        seed,
+        model_type: &model_type,
+        n_classes: taxonomy.len(),
+        n_samples: samples.len(),
+        snapshot_path: snapshot_path.as_deref(),
+    }
+    .write()?;
+
     eprintln!("Training complete! Model saved to {:?}", output);
     Ok(())
+}
+
+/// Snapshot an existing model directory before overwriting.
+///
+/// If the output directory exists and contains model files (model.safetensors
+/// or tier_graph.json), copies it to `{output}.snapshot.{ISO-timestamp}`.
+/// Returns the snapshot path if a snapshot was taken, or None.
+fn snapshot_model_dir(output: &Path) -> Result<Option<PathBuf>> {
+    if !output.exists() {
+        return Ok(None);
+    }
+
+    // Check for model files that indicate a trained model lives here
+    let has_model = output.join("model.safetensors").exists()
+        || output.join("tier_graph.json").exists()
+        || output.join("tier0").join("model.safetensors").exists();
+
+    if !has_model {
+        return Ok(None);
+    }
+
+    let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+    let dir_name = output
+        .file_name()
+        .map(|n: &std::ffi::OsStr| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "model".to_string());
+    let snapshot_name = format!("{}.snapshot.{}", dir_name, timestamp);
+    let snapshot_path = output
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join(&snapshot_name);
+
+    eprintln!("Snapshot: backing up {:?} -> {:?}", output, snapshot_path);
+    copy_dir_recursive(output, &snapshot_path)?;
+    eprintln!("Snapshot complete: {:?}", snapshot_path);
+
+    Ok(Some(snapshot_path))
+}
+
+/// Recursively copy a directory.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+/// Training provenance metadata written alongside model artifacts.
+struct TrainingManifest<'a> {
+    output: &'a Path,
+    data_file: &'a Path,
+    epochs: usize,
+    batch_size: usize,
+    seed: Option<u64>,
+    model_type: &'a ModelType,
+    n_classes: usize,
+    n_samples: usize,
+    snapshot_path: Option<&'a Path>,
+}
+
+impl TrainingManifest<'_> {
+    /// Write manifest.json to the model output directory.
+    fn write(&self) -> Result<()> {
+        let manifest = serde_json::json!({
+            "data_file": self.data_file.to_string_lossy(),
+            "epochs": self.epochs,
+            "batch_size": self.batch_size,
+            "seed": self.seed,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "model_type": format!("{:?}", self.model_type).to_lowercase(),
+            "n_classes": self.n_classes,
+            "n_samples": self.n_samples,
+            "parent_snapshot": self.snapshot_path.map(|p: &Path| p.to_string_lossy().to_string()),
+        });
+
+        let manifest_str = serde_json::to_string_pretty(&manifest)?;
+        std::fs::create_dir_all(self.output)?;
+        std::fs::write(self.output.join("manifest.json"), manifest_str)?;
+        eprintln!(
+            "Training manifest written to {:?}",
+            self.output.join("manifest.json")
+        );
+
+        Ok(())
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3176,5 +3295,174 @@ fn load_taxonomy(path: &PathBuf) -> Result<Taxonomy> {
                 path
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_snapshot_skips_empty_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("new_model");
+        // Directory doesn't exist yet — no snapshot
+        let result = snapshot_model_dir(&output).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_snapshot_skips_dir_without_model_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("empty_model");
+        fs::create_dir_all(&output).unwrap();
+        fs::write(output.join("readme.txt"), "not a model").unwrap();
+        // No model.safetensors or tier_graph.json — no snapshot
+        let result = snapshot_model_dir(&output).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_snapshot_flat_model() {
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("char-cnn");
+        fs::create_dir_all(&output).unwrap();
+        fs::write(output.join("model.safetensors"), "fake-weights").unwrap();
+        fs::write(output.join("config.yaml"), "n_classes: 10").unwrap();
+        fs::write(output.join("labels.json"), "[]").unwrap();
+
+        let snapshot = snapshot_model_dir(&output).unwrap();
+        assert!(snapshot.is_some());
+        let snapshot_path = snapshot.unwrap();
+
+        // Snapshot should contain the same files
+        assert!(snapshot_path.join("model.safetensors").exists());
+        assert!(snapshot_path.join("config.yaml").exists());
+        assert!(snapshot_path.join("labels.json").exists());
+        // Verify content is preserved
+        assert_eq!(
+            fs::read_to_string(snapshot_path.join("model.safetensors")).unwrap(),
+            "fake-weights"
+        );
+        // Original should still exist
+        assert!(output.join("model.safetensors").exists());
+        // Snapshot name should contain "snapshot"
+        let name = snapshot_path.file_name().unwrap().to_string_lossy();
+        assert!(name.contains("snapshot"));
+    }
+
+    #[test]
+    fn test_snapshot_tiered_model() {
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("tiered-v2");
+        let tier0 = output.join("tier0");
+        fs::create_dir_all(&tier0).unwrap();
+        fs::write(tier0.join("model.safetensors"), "tier0-weights").unwrap();
+        fs::write(output.join("tier_graph.json"), "{}").unwrap();
+
+        let snapshot = snapshot_model_dir(&output).unwrap();
+        assert!(snapshot.is_some());
+        let snapshot_path = snapshot.unwrap();
+
+        // Nested structure should be preserved
+        assert!(snapshot_path
+            .join("tier0")
+            .join("model.safetensors")
+            .exists());
+        assert!(snapshot_path.join("tier_graph.json").exists());
+        assert_eq!(
+            fs::read_to_string(snapshot_path.join("tier0").join("model.safetensors")).unwrap(),
+            "tier0-weights"
+        );
+    }
+
+    #[test]
+    fn test_copy_dir_recursive() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("src");
+        let dst = tmp.path().join("dst");
+
+        // Create nested structure
+        fs::create_dir_all(src.join("sub1").join("sub2")).unwrap();
+        fs::write(src.join("a.txt"), "file-a").unwrap();
+        fs::write(src.join("sub1").join("b.txt"), "file-b").unwrap();
+        fs::write(src.join("sub1").join("sub2").join("c.txt"), "file-c").unwrap();
+
+        copy_dir_recursive(&src, &dst).unwrap();
+
+        assert_eq!(fs::read_to_string(dst.join("a.txt")).unwrap(), "file-a");
+        assert_eq!(
+            fs::read_to_string(dst.join("sub1").join("b.txt")).unwrap(),
+            "file-b"
+        );
+        assert_eq!(
+            fs::read_to_string(dst.join("sub1").join("sub2").join("c.txt")).unwrap(),
+            "file-c"
+        );
+    }
+
+    #[test]
+    fn test_training_manifest_write() {
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("model");
+        fs::create_dir_all(&output).unwrap();
+
+        let manifest = TrainingManifest {
+            output: &output,
+            data_file: Path::new("training.ndjson"),
+            epochs: 5,
+            batch_size: 32,
+            seed: Some(42),
+            model_type: &ModelType::Tiered,
+            n_classes: 171,
+            n_samples: 17100,
+            snapshot_path: Some(Path::new("models/tiered-v2.snapshot.20260228T120000Z")),
+        };
+
+        manifest.write().unwrap();
+
+        let manifest_path = output.join("manifest.json");
+        assert!(manifest_path.exists());
+
+        let content: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        assert_eq!(content["epochs"], 5);
+        assert_eq!(content["batch_size"], 32);
+        assert_eq!(content["seed"], 42);
+        assert_eq!(content["model_type"], "tiered");
+        assert_eq!(content["n_classes"], 171);
+        assert_eq!(content["n_samples"], 17100);
+        assert_eq!(content["data_file"], "training.ndjson");
+        assert!(content["timestamp"].is_string());
+        assert!(content["parent_snapshot"].is_string());
+    }
+
+    #[test]
+    fn test_training_manifest_no_seed_no_snapshot() {
+        let tmp = tempfile::tempdir().unwrap();
+        let output = tmp.path().join("model");
+        fs::create_dir_all(&output).unwrap();
+
+        let manifest = TrainingManifest {
+            output: &output,
+            data_file: Path::new("data.ndjson"),
+            epochs: 10,
+            batch_size: 64,
+            seed: None,
+            model_type: &ModelType::CharCnn,
+            n_classes: 169,
+            n_samples: 16900,
+            snapshot_path: None,
+        };
+
+        manifest.write().unwrap();
+
+        let content: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(output.join("manifest.json")).unwrap())
+                .unwrap();
+        assert!(content["seed"].is_null());
+        assert!(content["parent_snapshot"].is_null());
+        assert_eq!(content["model_type"], "charcnn");
     }
 }

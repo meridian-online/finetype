@@ -65,6 +65,9 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Testing
+tempfile = "3"
+
 # DuckDB extension
 duckdb = { version = "=1.4.4", features = ["loadable-extension", "vscalar"] }
 libduckdb-sys = "=1.4.4"

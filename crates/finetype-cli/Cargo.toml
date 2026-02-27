@@ -23,6 +23,7 @@ embed-models = []
 [dependencies]
 finetype-core = { workspace = true }
 finetype-model = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 csv = { workspace = true }
 serde = { workspace = true }
@@ -31,3 +32,6 @@ tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
