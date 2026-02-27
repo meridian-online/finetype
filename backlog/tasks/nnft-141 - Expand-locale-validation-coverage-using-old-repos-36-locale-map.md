@@ -1,11 +1,11 @@
 ---
 id: NNFT-141
 title: Expand locale validation coverage using old repo's 36-locale map
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-26 00:28'
-updated_date: '2026-02-26 02:00'
+updated_date: '2026-02-26 02:01'
 labels:
   - locale
   - taxonomy
@@ -96,7 +96,7 @@ Also fixed locale re-detection on header hint override: when a header hint chang
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

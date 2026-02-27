@@ -1,11 +1,11 @@
 ---
 id: NNFT-149
 title: CLI full taxonomy export and schema command
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 02:55'
-updated_date: '2026-02-27 03:19'
+updated_date: '2026-02-27 03:20'
 labels:
   - cli
   - taxonomy
@@ -106,5 +106,5 @@ Tests: cargo test 305 pass, cargo clippy clean, all 6 AC verified
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

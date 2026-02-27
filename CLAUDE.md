@@ -21,7 +21,7 @@ Concretely:
 
 ## Current State
 
-**Version:** 0.3.0 (latest tag: `v0.3.0`)
+**Version:** 0.4.0 (latest tag: `v0.4.0`)
 **Taxonomy:** 171 definitions across 6 domains — all generators pass, 100% alignment
 **Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates

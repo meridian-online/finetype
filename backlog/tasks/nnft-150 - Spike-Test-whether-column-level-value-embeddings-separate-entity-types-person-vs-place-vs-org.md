@@ -3,11 +3,11 @@ id: NNFT-150
 title: >-
   Spike: Test whether column-level value embeddings separate entity types
   (person vs place vs org)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 08:08'
-updated_date: '2026-02-27 08:52'
+updated_date: '2026-02-27 08:55'
 labels:
   - discovery
   - disambiguation
@@ -82,8 +82,8 @@ Spike scripts: discovery/entity-disambiguation/embedding_spike.py, embedding_spi
 <!-- DOD:BEGIN -->
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
-- [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

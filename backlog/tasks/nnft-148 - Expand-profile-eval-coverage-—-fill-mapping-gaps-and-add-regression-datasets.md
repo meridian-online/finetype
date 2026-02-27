@@ -1,11 +1,11 @@
 ---
 id: NNFT-148
 title: Expand profile eval coverage — fill mapping gaps and add regression datasets
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 02:23'
-updated_date: '2026-02-27 02:41'
+updated_date: '2026-02-27 02:43'
 labels:
   - evaluation
   - infrastructure
@@ -103,5 +103,5 @@ Tests: cargo test 305 pass, taxonomy check 171/171 pass, profile eval 113/120, a
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

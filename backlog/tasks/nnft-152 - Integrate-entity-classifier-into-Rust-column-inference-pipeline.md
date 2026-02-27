@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 10:29'
-updated_date: '2026-02-27 13:05'
+updated_date: '2026-02-27 13:06'
 labels:
   - model
   - disambiguation
@@ -118,7 +118,7 @@ Integrated the Deep Sets MLP entity classifier into FineType's Rust column infer
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
+- [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

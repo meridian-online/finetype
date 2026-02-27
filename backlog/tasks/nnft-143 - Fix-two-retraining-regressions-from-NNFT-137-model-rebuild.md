@@ -1,11 +1,11 @@
 ---
 id: NNFT-143
 title: Fix two retraining regressions from NNFT-137 model rebuild
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-26 11:04'
-updated_date: '2026-02-27 00:56'
+updated_date: '2026-02-27 00:59'
 labels:
   - accuracy
   - disambiguation
@@ -158,5 +158,5 @@ v0.3.0 models restored from HuggingFace. Profile eval: 69/74 (93.2% label, 93.2%
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

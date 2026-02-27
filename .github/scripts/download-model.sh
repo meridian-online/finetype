@@ -64,3 +64,27 @@ else
   echo "Model2Vec download failed — continuing without semantic hints"
   rm -rf models/model2vec
 fi
+
+# ── Entity classifier (optional) ────────────────────────────────────────
+# Download the entity classifier model for entity_name demotion (Rule 18).
+# The build gracefully degrades if these are absent (HAS_ENTITY_CLASSIFIER=false).
+echo ""
+echo "Downloading entity classifier model..."
+mkdir -p models/entity-classifier
+EC_OK=true
+for file in model.safetensors config.json label_index.json; do
+  echo "  Downloading entity-classifier/${file}..."
+  if ! curl -sfL "${REPO}/entity-classifier/${file}" -o "models/entity-classifier/${file}"; then
+    echo "  WARNING: Failed to download entity-classifier/${file} — entity demotion will be disabled"
+    EC_OK=false
+    break
+  fi
+done
+
+if [ "${EC_OK}" = true ]; then
+  echo "Entity classifier files:"
+  find models/entity-classifier -type f | sort
+else
+  echo "Entity classifier download failed — continuing without entity demotion"
+  rm -rf models/entity-classifier
+fi

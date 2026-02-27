@@ -3,11 +3,11 @@ id: NNFT-144
 title: >-
   Discovery: Evaluate whether our benchmarks measure real-world type inference
   quality
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 00:33'
-updated_date: '2026-02-27 01:32'
+updated_date: '2026-02-27 01:33'
 labels:
   - discovery
   - evaluation
@@ -113,10 +113,10 @@ Updated brief with ambitious precision targets and concrete improvement paths:
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
+- [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

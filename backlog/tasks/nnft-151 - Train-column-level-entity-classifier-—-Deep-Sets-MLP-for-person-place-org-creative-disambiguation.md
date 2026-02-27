@@ -3,11 +3,11 @@ id: NNFT-151
 title: >-
   Train column-level entity classifier — Deep Sets MLP for
   person/place/org/creative disambiguation
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 09:07'
-updated_date: '2026-02-27 10:27'
+updated_date: '2026-02-27 10:29'
 labels:
   - model
   - disambiguation
@@ -127,5 +127,5 @@ Trained Deep Sets MLP entity classifier for binary demotion of full_name overcal
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

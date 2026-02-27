@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-27
+
+### Accuracy
+
+- **Entity classifier integration** — Deep Sets MLP classifies columns as person/organization/place/creative_work using Model2Vec value embeddings. When CharCNN votes full_name but column values are non-person entities, demotes to entity_name. Fires as Rule 18 between disambiguation and header hints. Entity demotion guard prevents header hints from overriding data-driven decisions. SOTAB domain: +3.9pp (64.4% → 68.3%), 3,027 columns affected (18.1%). Profile eval unchanged at 113/120 (NNFT-150, NNFT-151, NNFT-152)
+- **Phone validation precision overhaul** — Established Precision Principle: for locale-specific types, only locale-confirmed validation gates confidence signals. Universal validation can reject but cannot confirm. Expanded phone locale patterns with extension suffixes, (0) trunk prefix, ZA locale, slash/en-dash separators. Telephone cardinality demotions: 254 → 24. SOTAB label: +3.0pp (39.5% → 42.5%) (NNFT-132, NNFT-136)
+- **Text length demotion (Rule 16)** — full_address predictions with median value length >100 demoted to sentence. 441 columns corrected. SOTAB domain: +1.8pp (62.6% → 64.4%) (NNFT-134)
+- **Duration/TLD disambiguation (Rule 14)** — SEDOL override when ≥50% of values match ISO 8601 duration pattern. TLD added to CODE_ATTRACTORS. SOTAB label: +9.0pp (30.5% → 39.5%), domain: +4.7pp (54.8% → 59.5%) (NNFT-131)
+- **UTC offset override (Rule 17)** — when ≥80% of values match `[+-]HH:MM` pattern, overrides time predictions to datetime.offset.utc. Distinguishes offsets from plain time values by mandatory leading sign (NNFT-143)
+
+### Added
+
+- **CLI `schema` command** — export JSON Schema for any type, supports glob patterns. `taxonomy --full --output json` exports all 19 fields per type (NNFT-149)
+- **Entity name and paragraph types** — `representation.text.entity_name` and `representation.text.paragraph` added to taxonomy (171 total). Addresses full_name overcall on non-person entities (NNFT-137)
+- **Post-hoc locale detection** — after type classification, runs sample values against `validation_by_locale` patterns. Returns locale with highest pass rate above 50%. CLI JSON output includes `"locale"` field. Works for phone_number (15 locales) and postal_code (14 locales) (NNFT-140)
+- **Expanded locale validation** — added 36 additional locale patterns for day_of_week and month_name (6 locales each). Locale detection re-runs after header hint changes (NNFT-141, NNFT-136)
+- **Designation-aware is_generic** — four additive signals: attractor-demoted, boolean, hardcoded list, and taxonomy designation (broad_words/broad_characters/broad_numbers/broad_object). Hardcoded list always applies; designation expands the set further (NNFT-139)
+- **Richer designation metadata** — added `broad_words`, `broad_characters`, `broad_numbers`, `broad_object` designations to taxonomy definitions for disambiguation confidence gating (NNFT-139)
+
+### Changed
+
+- **Profile eval expanded** — 74 → 120 columns across 21 datasets. 8 new datetime types, improved coverage for geography, identity, and measurement columns. Current: 113/120 label (94.2%), 114/120 domain (95.0%) (NNFT-148)
+- **Evaluation package** — precision per type (🟢≥95%, 🟡80-95%, 🔴<80%), actionability eval (98.7% TRY_STRPTIME success), confidence calibration, overcall analysis for 10 high-risk types. Unified `make eval-report` dashboard (NNFT-147)
+- **CLI batch mode** — `finetype infer --mode column --batch` reads JSONL for bulk column classification. Python eval scripts pipe benchmark columns through CLI for SOTAB/GitTables scoring (NNFT-130)
+- **Retraining regression fix** — restored v0.3.0 models from HuggingFace after non-deterministic retraining caused world_cities.name regression. Snapshot learning safeguards planned (NNFT-143, NNFT-146)
+
 ## [0.3.0] - 2026-02-25
 
 ### Accuracy
