@@ -164,11 +164,19 @@ Each definition in `labels/definitions_*.yaml` is a **transformation contract** 
 
 ### Evaluation infrastructure
 
-Three evaluation benchmarks, all in `eval/`:
+Six evaluation components, all in `eval/`:
 
-1. **Profile eval** (`eval/profile_eval.sh`) — Runs `finetype profile` on annotated CSVs, scores against `schema_mapping.yaml`. Current: 93.2% label accuracy (69/74), 97.3% domain accuracy (72/74).
+**Core benchmarks:**
+1. **Profile eval** (`eval/profile_eval.sh`) — Regression smoke test on 74 annotated columns from 20 datasets. Scores against `schema_mapping.yaml`. Current: 93.2% label accuracy (69/74), 93.2% domain accuracy (69/74) on format-detectable (direct+close) types.
 2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.3.0 CLI: 47.1% label / 56.5% domain accuracy on format-detectable types (4,481 columns, 45,428 total). v0.1.8 DuckDB: 57.8% domain (14,850 tables, 2.7M values).
 3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. Post-NNFT-134 CLI: 42.5% label / 64.4% domain accuracy on format-detectable types (11,484 columns, 16,765 total). Post-NNFT-131: 39.5% label / 59.5% domain. v0.3.0 baseline: 30.5% label / 54.8% domain. v0.1.8 DuckDB: 53.7% domain (5,728 tables, 16,765 columns).
+
+**Analyst-centric metrics (NNFT-147):**
+4. **Precision per type** — SQL sections in SOTAB/GitTables eval scripts. Per-predicted-type precision with thresholds: 🟢≥95% (analyst can act), 🟡80-95% (spot-check), 🔴<80% (untrustworthy). Includes overcall analysis for 10 high-risk types (full_name, entity_name, full_address, URL, geography, postal_code) showing GT label breakdown of false positives.
+5. **Actionability eval** (`eval/eval_actionability.py`) — Tests whether FineType's `format_string` predictions actually parse real data. Runs TRY_STRPTIME via DuckDB on profile eval datasets. Current: 98.3% overall (2350/2390 values), 17/18 columns at 100%. Target: >95% for datetime types.
+6. **Confidence calibration** — SQL sections in SOTAB/GitTables eval scripts. Bins predictions by confidence decile, compares actual accuracy vs reported confidence. Target: calibration gap <10pp.
+
+**Dashboard:** `make eval-report` runs profile eval + actionability eval and generates `eval/eval_output/report.md` — a unified markdown dashboard with headline metrics, precision per type, actionability by format, and evaluation component status.
 
 All eval pipelines use `eval/config.env` for dataset paths with `envsubst` substitution in SQL templates. CLI-based eval pipelines (`eval-1m-cli`, `eval-sotab-cli`) use Python scripts to pipe columns through `finetype infer --mode column --batch`, then score with adapted SQL.
 
@@ -250,6 +258,8 @@ make eval-1m            # GitTables 1M via DuckDB extension (requires corpus)
 make eval-sotab         # SOTAB CTA via DuckDB extension (requires corpus)
 make eval-1m-cli        # GitTables 1M via CLI batch mode (requires corpus)
 make eval-sotab-cli     # SOTAB CTA via CLI batch mode (requires corpus)
+make eval-actionability # Actionability eval (TRY_STRPTIME on profile data)
+make eval-report        # Unified markdown dashboard (profile + actionability)
 ```
 
 ## Key File Reference
@@ -272,6 +282,9 @@ make eval-sotab-cli     # SOTAB CTA via CLI batch mode (requires corpus)
 | Release workflow | `.github/workflows/release.yml` |
 | Eval config | `eval/config.env` |
 | Schema mapping | `eval/schema_mapping.yaml` |
+| Actionability eval | `eval/eval_actionability.py` |
+| Eval report generator | `eval/eval_report.py` |
+| Evaluation discovery brief | `discovery/evaluation-method/BRIEF.md` |
 | Smoke tests | `tests/smoke.sh` |
 | Locale data attribution | `data/cldr/README.md` |
 

@@ -163,6 +163,40 @@ eval-sotab-cli:
 	export SOTAB_DIR="$(SOTAB_DATA)" SOTAB_SPLIT="$(SOTAB_SPLIT)" && \
 		envsubst $(ENVSUBST_VARS) < $(SOTAB_EVAL_DIR)/eval_cli.sql | duckdb
 
+# ─── Actionability Evaluation (NNFT-147) ────
+# Tests whether FineType's format_string predictions work on real data.
+# Runs TRY_STRPTIME on profile eval datasets to measure parse success rates.
+# Prerequisites: make eval-profile (generates profile_results.csv)
+#
+# Usage: make eval-actionability
+
+.PHONY: eval-actionability
+
+eval-actionability:
+	@echo "═══ Running actionability evaluation ═══"
+	$(VENV_PYTHON) eval/eval_actionability.py \
+		--manifest eval/datasets/manifest.csv \
+		--predictions eval/eval_output/profile_results.csv \
+		--labels-dir labels \
+		--output eval/eval_output/actionability_results.csv
+
+# ─── Eval Report (NNFT-147) ─────────────────
+# Generates a unified markdown dashboard from all eval outputs.
+# Prerequisites: make eval-profile eval-actionability
+#
+# Usage: make eval-report
+
+.PHONY: eval-report
+
+eval-report: eval-profile eval-actionability
+	@echo "═══ Generating evaluation report ═══"
+	$(VENV_PYTHON) eval/eval_report.py \
+		--profile-results eval/eval_output/profile_results.csv \
+		--actionability-results eval/eval_output/actionability_results.csv \
+		--labels-dir labels \
+		--output eval/eval_output/report.md
+	@echo "✓ Report written to eval/eval_output/report.md"
+
 # ─── Profile Evaluation ─────────────────────
 # Evaluate finetype profile against annotated CSVs.
 # Uses schema mapping (eval/schema_mapping.csv) for scoring.

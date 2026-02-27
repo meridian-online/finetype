@@ -312,7 +312,174 @@ GROUP BY expected_ft_domain
 ORDER BY total_columns DESC;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 5. MISCLASSIFICATION ANALYSIS
+-- 5. PRECISION PER PREDICTED TYPE (NNFT-147)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- When FineType says "this is type X", how often is it right?
+-- This is the analyst trust metric. Precision > recall for building confidence.
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          PRECISION PER PREDICTED TYPE                            '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 5a. Precision by predicted FineType type (verifiable GT only)
+.print ''
+.print '--- Precision by predicted type (verifiable GT labels only) ---'
+.print '    🟢 >=95%  analyst can act without checking'
+.print '    🟡 80-95% analyst should spot-check'
+.print '    🔴 <80%   untrustworthy — needs fix or confidence caveat'
+.print ''
+WITH precision_data AS (
+    SELECT
+        predicted_label,
+        count(*) AS times_predicted,
+        count(*) FILTER (match_quality IN ('direct', 'close', 'partial')) AS verifiable,
+        sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct,
+        sum(CASE WHEN domain_match THEN 1 ELSE 0 END) AS domain_correct
+    FROM eval_results
+    GROUP BY predicted_label
+)
+SELECT
+    predicted_label,
+    times_predicted,
+    verifiable,
+    label_correct,
+    ROUND(label_correct * 100.0 / NULLIF(verifiable, 0), 1) AS label_precision_pct,
+    domain_correct,
+    ROUND(domain_correct * 100.0 / NULLIF(verifiable, 0), 1) AS domain_precision_pct,
+    CASE
+        WHEN verifiable < 5 THEN '  '
+        WHEN label_correct * 100.0 / verifiable >= 95 THEN '🟢'
+        WHEN label_correct * 100.0 / verifiable >= 80 THEN '🟡'
+        ELSE '🔴'
+    END AS status
+FROM precision_data
+WHERE times_predicted >= 5
+ORDER BY times_predicted DESC;
+
+-- 5b. Precision summary by trust level
+.print ''
+.print '--- Precision summary: how many types at each trust level? ---'
+WITH precision_data AS (
+    SELECT
+        predicted_label,
+        count(*) AS times_predicted,
+        count(*) FILTER (match_quality IN ('direct', 'close', 'partial')) AS verifiable,
+        sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS label_correct
+    FROM eval_results
+    GROUP BY predicted_label
+    HAVING count(*) >= 5
+),
+trust_levels AS (
+    SELECT
+        predicted_label,
+        times_predicted,
+        verifiable,
+        label_correct,
+        CASE
+            WHEN verifiable < 5 THEN 'insufficient_data'
+            WHEN label_correct * 100.0 / verifiable >= 95 THEN 'high_trust'
+            WHEN label_correct * 100.0 / verifiable >= 80 THEN 'verify_first'
+            ELSE 'untrustworthy'
+        END AS trust_level
+    FROM precision_data
+)
+SELECT
+    trust_level,
+    count(*) AS types,
+    sum(times_predicted) AS total_predictions,
+    ROUND(sum(times_predicted) * 100.0 / (SELECT sum(times_predicted) FROM trust_levels), 1) AS pct_of_predictions
+FROM trust_levels
+GROUP BY trust_level
+ORDER BY
+    CASE trust_level
+        WHEN 'high_trust' THEN 1
+        WHEN 'verify_first' THEN 2
+        WHEN 'untrustworthy' THEN 3
+        ELSE 4
+    END;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 6. OVERCALL ANALYSIS (NNFT-147)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- For high-risk types, what are the false positives actually made of?
+-- This directly measures the "don't mislead the analyst" principle.
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          OVERCALL ANALYSIS                                       '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 6a. GT label composition of high-risk predicted types
+.print ''
+.print '--- What does FineType actually call these types? (top GT labels per type) ---'
+SELECT
+    predicted_label,
+    gt_label,
+    count(*) AS columns,
+    ROUND(count(*) * 100.0 / sum(count(*)) OVER (PARTITION BY predicted_label), 1) AS pct_of_type,
+    COALESCE(match_quality, 'unmapped') AS mapping
+FROM eval_results
+WHERE predicted_label IN (
+    'identity.person.full_name',
+    'representation.text.entity_name',
+    'geography.address.full_address',
+    'technology.internet.url',
+    'geography.location.city',
+    'geography.location.country',
+    'geography.location.region',
+    'identity.person.first_name',
+    'identity.person.last_name',
+    'geography.address.postal_code'
+)
+GROUP BY predicted_label, gt_label, match_quality
+HAVING count(*) >= 3
+ORDER BY predicted_label, columns DESC;
+
+-- 6b. False positive rate summary for monitored types
+.print ''
+.print '--- False positive rate for monitored types ---'
+.print '    Target: <5% false positive rate (>=95% precision)'
+.print ''
+WITH type_totals AS (
+    SELECT
+        predicted_label,
+        count(*) AS total_predicted,
+        sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS correct,
+        sum(CASE WHEN NOT label_match AND match_quality IN ('direct', 'close', 'partial') THEN 1 ELSE 0 END) AS verifiable_wrong,
+        sum(CASE WHEN match_quality IS NULL OR match_quality = 'semantic_only' THEN 1 ELSE 0 END) AS unjudgeable
+    FROM eval_results
+    WHERE predicted_label IN (
+        'identity.person.full_name',
+        'representation.text.entity_name',
+        'geography.address.full_address',
+        'technology.internet.url',
+        'geography.location.city',
+        'geography.location.country',
+        'geography.location.region',
+        'geography.address.postal_code'
+    )
+    GROUP BY predicted_label
+)
+SELECT
+    predicted_label,
+    total_predicted,
+    correct,
+    verifiable_wrong,
+    unjudgeable,
+    ROUND(correct * 100.0 / NULLIF(total_predicted - unjudgeable, 0), 1) AS precision_pct,
+    ROUND((total_predicted - unjudgeable - correct) * 100.0 / NULLIF(total_predicted - unjudgeable, 0), 1) AS false_positive_pct,
+    CASE
+        WHEN total_predicted - unjudgeable < 5 THEN '  '
+        WHEN correct * 100.0 / (total_predicted - unjudgeable) >= 95 THEN '🟢'
+        WHEN correct * 100.0 / (total_predicted - unjudgeable) >= 80 THEN '🟡'
+        ELSE '🔴'
+    END AS status
+FROM type_totals
+ORDER BY total_predicted DESC;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 7. MISCLASSIFICATION ANALYSIS
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 .print ''
@@ -320,7 +487,7 @@ ORDER BY total_columns DESC;
 .print '          MISCLASSIFICATION ANALYSIS                              '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- 5a. Top misclassification patterns (format-detectable)
+-- 7a. Top misclassification patterns (format-detectable)
 .print ''
 .print '--- Top misclassification patterns (format-detectable, wrong label) ---'
 SELECT
@@ -339,7 +506,7 @@ GROUP BY gt_label, expected_ft_label, predicted_label, match_quality
 ORDER BY occurrences DESC
 LIMIT 25;
 
--- 5b. Wrong-domain errors (format-detectable)
+-- 7b. Wrong-domain errors (format-detectable)
 .print ''
 .print '--- Wrong domain errors (format-detectable) ---'
 SELECT
@@ -356,7 +523,7 @@ GROUP BY gt_label, expected_ft_domain, ft_domain, predicted_label
 ORDER BY occurrences DESC
 LIMIT 20;
 
--- 5c. Semantic gap summary
+-- 7c. Semantic gap summary
 .print ''
 .print '--- Semantic gap summary (FineType cannot detect by design) ---'
 SELECT
@@ -372,7 +539,62 @@ ORDER BY columns DESC
 LIMIT 20;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 6. DISTRIBUTION & COVERAGE
+-- 8. CONFIDENCE CALIBRATION (NNFT-147)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Does FineType know when it's wrong? A well-calibrated model has
+-- accuracy ≈ confidence. Enables downstream threshold decisions.
+
+.print ''
+.print '═══════════════════════════════════════════════════════════════════'
+.print '          CONFIDENCE CALIBRATION                                  '
+.print '═══════════════════════════════════════════════════════════════════'
+
+-- 8a. Calibration by confidence decile (format-detectable types)
+.print ''
+.print '--- Confidence vs actual accuracy (format-detectable) ---'
+.print '    Target: calibration gap <10pp across all bins'
+.print ''
+SELECT
+    CONCAT(
+        CAST(FLOOR(confidence * 10) * 10 AS INTEGER), '-',
+        CAST(FLOOR(confidence * 10) * 10 + 10 AS INTEGER), '%'
+    ) AS confidence_bin,
+    count(*) AS predictions,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS actual_accuracy_pct,
+    ROUND(avg(confidence) * 100, 1) AS avg_confidence_pct,
+    ROUND(
+        sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*) -
+        avg(confidence) * 100, 1
+    ) AS calibration_gap_pp
+FROM eval_results
+WHERE match_quality IN ('direct', 'close')
+GROUP BY FLOOR(confidence * 10)
+ORDER BY FLOOR(confidence * 10);
+
+-- 8b. Calibration by confidence decile (all mapped types)
+.print ''
+.print '--- Confidence vs actual accuracy (all mapped types) ---'
+SELECT
+    CONCAT(
+        CAST(FLOOR(confidence * 10) * 10 AS INTEGER), '-',
+        CAST(FLOOR(confidence * 10) * 10 + 10 AS INTEGER), '%'
+    ) AS confidence_bin,
+    count(*) AS predictions,
+    sum(CASE WHEN label_match THEN 1 ELSE 0 END) AS correct,
+    ROUND(sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*), 1) AS actual_accuracy_pct,
+    ROUND(avg(confidence) * 100, 1) AS avg_confidence_pct,
+    ROUND(
+        sum(CASE WHEN label_match THEN 1 ELSE 0 END) * 100.0 / count(*) -
+        avg(confidence) * 100, 1
+    ) AS calibration_gap_pp
+FROM eval_results
+WHERE match_quality IS NOT NULL
+GROUP BY FLOOR(confidence * 10)
+ORDER BY FLOOR(confidence * 10);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 9. DISTRIBUTION & COVERAGE
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 .print ''
@@ -380,7 +602,7 @@ LIMIT 20;
 .print '          DISTRIBUTION & COVERAGE                                 '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- 6a. FineType domain distribution
+-- 9a. FineType domain distribution
 .print ''
 .print '--- FineType domain distribution (all predicted columns) ---'
 SELECT
@@ -391,7 +613,7 @@ FROM column_predictions
 GROUP BY ft_domain
 ORDER BY columns DESC;
 
--- 6b. Top 30 FineType predictions
+-- 9b. Top 30 FineType predictions
 .print ''
 .print '--- Top 30 FineType predictions ---'
 SELECT
@@ -404,7 +626,7 @@ GROUP BY predicted_label
 ORDER BY columns DESC
 LIMIT 30;
 
--- 6c. Low confidence predictions
+-- 9c. Low confidence predictions
 .print ''
 .print '--- Low confidence predictions (confidence < 0.6) ---'
 SELECT
@@ -418,7 +640,7 @@ GROUP BY cp.predicted_label, cp.gt_label
 ORDER BY low_conf_columns DESC
 LIMIT 20;
 
--- 6d. Disambiguation rule distribution
+-- 9d. Disambiguation rule distribution
 .print ''
 .print '--- Disambiguation rule distribution ---'
 SELECT
@@ -430,7 +652,7 @@ GROUP BY rule
 ORDER BY columns DESC
 LIMIT 20;
 
--- 6e. Throughput summary
+-- 9e. Throughput summary
 .print ''
 .print '--- Throughput summary ---'
 SELECT
