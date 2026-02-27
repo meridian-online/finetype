@@ -160,7 +160,8 @@ Each definition in `labels/definitions_*.yaml` is a **transformation contract** 
 | `finetype check` | Validate taxonomy <-> generator alignment |
 | `finetype generate` | Generate synthetic training data |
 | `finetype train` | Train CharCNN models (flat or tiered) |
-| `finetype taxonomy` | Print taxonomy summary |
+| `finetype taxonomy` | Print taxonomy summary. `--full --output json` exports all 19 fields per type (description, validation, samples, tier, etc.). |
+| `finetype schema <key>` | Export JSON Schema for a type. `--pretty` for formatted output. Supports glob patterns (`"domain.category.*"`). |
 
 ### Evaluation infrastructure
 

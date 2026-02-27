@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use finetype_core::{format_report, Checker, Generator, Taxonomy};
+use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
 use finetype_model::Classifier;
 use serde_json::json;
 use std::io::{self, BufRead, Write};
@@ -167,6 +167,24 @@ enum Commands {
         /// Output format (plain, json, csv)
         #[arg(short, long, default_value = "plain")]
         output: OutputFormat,
+
+        /// Export all fields (description, validation, samples, etc.)
+        #[arg(long)]
+        full: bool,
+    },
+
+    /// Export JSON Schema for a type
+    Schema {
+        /// Type key (e.g., "identity.person.email") or glob pattern ("identity.person.*")
+        type_key: String,
+
+        /// Taxonomy file or directory
+        #[arg(short, long, default_value = "labels")]
+        file: PathBuf,
+
+        /// Pretty-print JSON output
+        #[arg(long)]
+        pretty: bool,
     },
 
     /// Validate generator ↔ taxonomy alignment
@@ -416,7 +434,14 @@ fn main() -> Result<()> {
             category,
             priority,
             output,
-        } => cmd_taxonomy(file, domain, category, priority, output),
+            full,
+        } => cmd_taxonomy(file, domain, category, priority, output, full),
+
+        Commands::Schema {
+            type_key,
+            file,
+            pretty,
+        } => cmd_schema(type_key, file, pretty),
 
         Commands::Check {
             taxonomy,
@@ -1201,6 +1226,7 @@ fn cmd_taxonomy(
     category: Option<String>,
     priority: Option<u8>,
     output: OutputFormat,
+    full: bool,
 ) -> Result<()> {
     let taxonomy = load_taxonomy(&file)?;
 
@@ -1249,15 +1275,19 @@ fn cmd_taxonomy(
             let labels: Vec<_> = defs
                 .iter()
                 .map(|(key, d)| {
-                    json!({
-                        "key": key,
-                        "title": d.title,
-                        "broad_type": d.broad_type,
-                        "designation": format!("{:?}", d.designation),
-                        "priority": d.release_priority,
-                        "transform": d.transform,
-                        "locales": d.locales,
-                    })
+                    if full {
+                        definition_to_full_json(key, d)
+                    } else {
+                        json!({
+                            "key": key,
+                            "title": d.title,
+                            "broad_type": d.broad_type,
+                            "designation": format!("{:?}", d.designation),
+                            "priority": d.release_priority,
+                            "transform": d.transform,
+                            "locales": d.locales,
+                        })
+                    }
                 })
                 .collect();
             println!("{}", serde_json::to_string_pretty(&labels)?);
@@ -1278,6 +1308,213 @@ fn cmd_taxonomy(
     }
 
     Ok(())
+}
+
+/// Convert a Serialize value to serde_json::Value.
+/// Used for serde_yaml::Value fields (samples, references, decompose) that need JSON output.
+fn to_json_value<T: serde::Serialize>(value: &T) -> serde_json::Value {
+    serde_json::to_value(value).unwrap_or(serde_json::Value::Null)
+}
+
+/// Serialize a Definition with all fields for --full export.
+fn definition_to_full_json(key: &str, d: &finetype_core::Definition) -> serde_json::Value {
+    let label = Label::parse(key);
+
+    let samples: serde_json::Value = to_json_value(&d.samples);
+
+    let validation = d.validation.as_ref().map(|v| v.to_json_schema());
+
+    let validation_by_locale: Option<serde_json::Map<String, serde_json::Value>> =
+        d.validation_by_locale.as_ref().map(|locales| {
+            locales
+                .iter()
+                .map(|(locale, v)| (locale.clone(), v.to_json_schema()))
+                .collect()
+        });
+
+    let decompose = d.decompose.as_ref().map(to_json_value);
+
+    let references = d.references.as_ref().map(to_json_value);
+
+    // Serialize designation as snake_case string via serde
+    let designation = serde_json::to_value(&d.designation).unwrap_or(json!("universal"));
+
+    let mut obj = serde_json::Map::new();
+    obj.insert("key".into(), json!(key));
+    if let Some(ref l) = label {
+        obj.insert("domain".into(), json!(l.domain));
+        obj.insert("category".into(), json!(l.category));
+        obj.insert("type".into(), json!(l.type_name));
+    }
+    obj.insert("title".into(), json!(d.title));
+    obj.insert("description".into(), json!(d.description));
+    obj.insert("designation".into(), designation);
+    obj.insert("broad_type".into(), json!(d.broad_type));
+    obj.insert("format_string".into(), json!(d.format_string));
+    obj.insert("transform".into(), json!(d.transform));
+    obj.insert("transform_ext".into(), json!(d.transform_ext));
+    obj.insert("locales".into(), json!(d.locales));
+    obj.insert("tier".into(), json!(d.tier));
+    obj.insert("release_priority".into(), json!(d.release_priority));
+    obj.insert("aliases".into(), json!(d.aliases));
+    obj.insert("notes".into(), json!(d.notes));
+    obj.insert("samples".into(), json!(samples));
+    obj.insert(
+        "validation".into(),
+        validation.unwrap_or(serde_json::Value::Null),
+    );
+    if let Some(locales) = validation_by_locale {
+        obj.insert(
+            "validation_by_locale".into(),
+            serde_json::Value::Object(locales),
+        );
+    }
+    if let Some(dec) = decompose {
+        obj.insert("decompose".into(), dec);
+    }
+    if let Some(refs) = references {
+        obj.insert("references".into(), refs);
+    }
+
+    serde_json::Value::Object(obj)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCHEMA — Export JSON Schema for types
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn cmd_schema(type_key: String, file: PathBuf, pretty: bool) -> Result<()> {
+    let taxonomy = load_taxonomy(&file)?;
+
+    // Collect matching definitions: exact match or glob
+    let matches: Vec<(&String, &finetype_core::Definition)> = if type_key.contains('*') {
+        // Glob pattern — support "domain.*", "domain.category.*", "*.category.*"
+        let prefix = type_key.trim_end_matches(".*").trim_end_matches('*');
+        let mut matched: Vec<_> = taxonomy
+            .definitions()
+            .filter(|(k, _)| {
+                if prefix.is_empty() {
+                    true // "*" matches all
+                } else {
+                    k.starts_with(prefix)
+                        && (k.len() == prefix.len()
+                            || k.as_bytes().get(prefix.len()) == Some(&b'.'))
+                }
+            })
+            .collect();
+        matched.sort_by_key(|(k, _)| (*k).clone());
+        matched
+    } else {
+        // Exact match
+        match taxonomy.get(&type_key) {
+            Some(_) => taxonomy
+                .definitions()
+                .filter(|(k, _)| k.as_str() == type_key)
+                .collect(),
+            None => {
+                // Suggest similar types by edit distance
+                let mut suggestions: Vec<(&String, usize)> = taxonomy
+                    .definitions()
+                    .map(|(k, _)| (k, levenshtein_distance(&type_key, k)))
+                    .collect();
+                suggestions.sort_by_key(|(_, d)| *d);
+                suggestions.truncate(5);
+
+                eprintln!("Error: unknown type '{}'", type_key);
+                if !suggestions.is_empty() {
+                    eprintln!("\nDid you mean:");
+                    for (s, _) in &suggestions {
+                        eprintln!("  {}", s);
+                    }
+                }
+                std::process::exit(1);
+            }
+        }
+    };
+
+    if matches.is_empty() {
+        eprintln!("No types matching '{}'", type_key);
+        std::process::exit(1);
+    }
+
+    let schemas: Vec<serde_json::Value> = matches
+        .iter()
+        .map(|(key, def)| build_json_schema(key, def))
+        .collect();
+
+    let output = if schemas.len() == 1 {
+        &schemas[0]
+    } else {
+        // Multiple results — wrap in array
+        &serde_json::Value::Array(schemas.clone())
+    };
+
+    let json_str = if pretty {
+        serde_json::to_string_pretty(output)?
+    } else {
+        serde_json::to_string(output)?
+    };
+    println!("{}", json_str);
+
+    Ok(())
+}
+
+/// Build an enriched JSON Schema document for a type definition.
+fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::Value {
+    let mut schema = serde_json::Map::new();
+
+    // Standard JSON Schema metadata
+    schema.insert(
+        "$schema".into(),
+        json!("https://json-schema.org/draft/2020-12/schema"),
+    );
+    schema.insert(
+        "$id".into(),
+        json!(format!("https://noon.sh/schemas/{}", key)),
+    );
+
+    if let Some(title) = &def.title {
+        schema.insert("title".into(), json!(title));
+    }
+    if let Some(desc) = &def.description {
+        schema.insert("description".into(), json!(desc.trim()));
+    }
+
+    // Merge validation keywords from the type's validation schema
+    if let Some(validation) = &def.validation {
+        let val_schema = validation.to_json_schema();
+        if let serde_json::Value::Object(val_obj) = val_schema {
+            for (k, v) in val_obj {
+                schema.insert(k, v);
+            }
+        }
+    } else {
+        // No validation — default to string type
+        schema.insert("type".into(), json!("string"));
+    }
+
+    // Add examples from samples
+    if !def.samples.is_empty() {
+        schema.insert("examples".into(), to_json_value(&def.samples));
+    }
+
+    serde_json::Value::Object(schema)
+}
+
+/// Simple Levenshtein distance for type name suggestions.
+fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let b_len = b.len();
+    let mut prev = (0..=b_len).collect::<Vec<_>>();
+    let mut curr = vec![0; b_len + 1];
+    for (i, ca) in a.chars().enumerate() {
+        curr[0] = i + 1;
+        for (j, cb) in b.chars().enumerate() {
+            let cost = if ca == cb { 0 } else { 1 };
+            curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b_len]
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
