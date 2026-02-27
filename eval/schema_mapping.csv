@@ -22,6 +22,7 @@ hash,profile,technology.cryptographic.hash,technology,direct,false
 http status code,profile,technology.internet.http_status_code,technology,direct,false
 iata,profile,geography.transportation.iata_code,geography,direct,false
 icao,profile,geography.transportation.icao_code,geography,direct,false
+hostname,profile,technology.internet.hostname,technology,direct,false
 ip_v4,profile,technology.internet.ip_v4,technology,direct,false
 mac address,profile,technology.internet.mac_address,technology,direct,false
 measurement unit,profile,representation.scientific.measurement_unit,representation,direct,false
@@ -32,8 +33,9 @@ street number,profile,geography.address.street_number,geography,direct,false
 uuid,profile,technology.cryptographic.uuid,technology,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
 decimal number,profile,representation.numeric.decimal_number,representation,direct,false
-swift code,profile,identity.payment.swift_code,identity,direct,false
+swift code,profile,identity.payment.swift_bic,identity,direct,false
 name,both,identity.person.full_name,identity,close,false
+entity name,profile,representation.text.entity_name,representation,direct,false
 author,both,identity.person.full_name,identity,close,false
 speaker,dbpedia,identity.person.full_name,identity,close,false
 writer,dbpedia,identity.person.full_name,identity,close,false

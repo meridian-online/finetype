@@ -1,7 +1,7 @@
 ---
 id: NNFT-146
 title: Snapshot Learning — prevent model loss during retraining
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 01:02'
@@ -96,5 +96,5 @@ Tests: 316 pass (7 new snapshot/manifest tests + 98 core + 211 model), clippy cl
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

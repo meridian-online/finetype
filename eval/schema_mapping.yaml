@@ -220,6 +220,14 @@ mappings:
     expand: false
     notes: ICAO airport codes (4-letter)
 
+  - gt_label: hostname
+    source: profile
+    finetype_label: technology.internet.hostname
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: Server hostnames (e.g., srv-dev-43.example.com)
+
   - gt_label: ip_v4
     source: profile
     finetype_label: technology.internet.ip_v4
@@ -302,7 +310,7 @@ mappings:
 
   - gt_label: swift code
     source: profile
-    finetype_label: identity.payment.swift_code
+    finetype_label: identity.payment.swift_bic
     finetype_domain: identity
     match_quality: direct
     expand: false
@@ -319,6 +327,14 @@ mappings:
     match_quality: close
     expand: false
     notes: "schema:name is broader (includes org names); FineType detects person name format"
+
+  - gt_label: entity name
+    source: profile
+    finetype_label: representation.text.entity_name
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+    notes: Non-person entity names (companies, publishers, organizations)
 
   - gt_label: author
     source: both

@@ -61,7 +61,7 @@ ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,status,status
 ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,is_gift,boolean
 ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,tracking_url,url
 ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,phone,telephone
-tech_systems,/home/hugh/datasets/tech_systems.csv,server_hostname,name
+tech_systems,/home/hugh/datasets/tech_systems.csv,server_hostname,hostname
 tech_systems,/home/hugh/datasets/tech_systems.csv,ip_address,ip_v4
 tech_systems,/home/hugh/datasets/tech_systems.csv,mac_address,mac address
 tech_systems,/home/hugh/datasets/tech_systems.csv,os,operating system
@@ -82,7 +82,7 @@ people_directory,/home/hugh/datasets/people_directory.csv,age,age
 people_directory,/home/hugh/datasets/people_directory.csv,gender,gender
 people_directory,/home/hugh/datasets/people_directory.csv,ssn,code
 people_directory,/home/hugh/datasets/people_directory.csv,date_of_birth,date
-people_directory,/home/hugh/datasets/people_directory.csv,company,name
+people_directory,/home/hugh/datasets/people_directory.csv,company,entity name
 people_directory,/home/hugh/datasets/people_directory.csv,job_title,occupation
 people_directory,/home/hugh/datasets/people_directory.csv,salary,price
 people_directory,/home/hugh/datasets/people_directory.csv,height_cm,height
@@ -154,7 +154,7 @@ medical_records,/home/hugh/datasets/medical_records.csv,is_admitted,boolean
 books_catalog,/home/hugh/datasets/books_catalog.csv,isbn,isbn
 books_catalog,/home/hugh/datasets/books_catalog.csv,title,title
 books_catalog,/home/hugh/datasets/books_catalog.csv,author,author
-books_catalog,/home/hugh/datasets/books_catalog.csv,publisher,name
+books_catalog,/home/hugh/datasets/books_catalog.csv,publisher,entity name
 books_catalog,/home/hugh/datasets/books_catalog.csv,year_published,year
 books_catalog,/home/hugh/datasets/books_catalog.csv,pages,number
 books_catalog,/home/hugh/datasets/books_catalog.csv,language,language
