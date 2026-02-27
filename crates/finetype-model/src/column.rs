@@ -55,6 +55,27 @@ const BOOLEAN_LABELS: &[&str] = &[
     "technology.data.boolean",         // legacy
 ];
 
+/// Geography location types used by both geography protection (header hints)
+/// and entity demotion geography rescue. Extracted to module level so both
+/// code paths share the same definition. (NNFT-156)
+const LOCATION_TYPES: &[&str] = &[
+    "geography.location.city",
+    "geography.location.country",
+    "geography.location.region",
+    "geography.location.state",
+    "geography.location.continent",
+];
+
+/// Person-name hint types that trigger geography protection.
+/// Model2Vec can return any of these for "name" headers — not just full_name.
+/// All should trigger the geography guard to prevent overriding correct
+/// location predictions. (NNFT-156)
+const PERSON_NAME_HINTS: &[&str] = &[
+    "identity.person.full_name",
+    "identity.person.last_name",
+    "identity.person.first_name",
+];
+
 /// Hardcoded list of labels known to be generic catch-all predictions.
 /// Used as a fallback when taxonomy is not available for designation lookup.
 const HARDCODED_GENERIC_LABELS: &[&str] = &[
@@ -98,6 +119,16 @@ fn is_generic_prediction(
     if disambiguation_rule
         .as_ref()
         .is_some_and(|r| r.starts_with("attractor_demotion"))
+    {
+        return true;
+    }
+
+    // Signal 1b: Numeric postal code heuristic is pattern-based, not model-driven.
+    // It should yield to explicit header hints (e.g., "cvv" column with 3-digit
+    // values). Preserves postal code detection for headerless columns. (NNFT-156)
+    if disambiguation_rule
+        .as_ref()
+        .is_some_and(|r| r == "numeric_postal_code_detection")
     {
         return true;
     }
@@ -550,22 +581,14 @@ impl ColumnClassifier {
                 self.taxonomy.as_ref(),
             );
 
-            // Geography protection: when the hint is full_name, check if the
-            // model sees geography.location signal. Many geographic datasets
-            // use "name" as a header for city, country, or region columns.
-            // The model often correctly identifies the geography type but the
-            // full_name hint would override it.
-            if hinted_type == "identity.person.full_name" {
-                const LOCATION_TYPES: &[&str] = &[
-                    "geography.location.city",
-                    "geography.location.country",
-                    "geography.location.region",
-                    "geography.location.state",
-                    "geography.location.continent",
-                ];
-
+            // Geography protection: when the hint is a person-name type
+            // (full_name, last_name, first_name), check if the model sees
+            // geography.location signal. Many geographic datasets use "name"
+            // as a header for city, country, or region columns. Model2Vec may
+            // return any person-name type for "name" headers. (NNFT-156)
+            if PERSON_NAME_HINTS.contains(&hinted_type) {
                 // Case 1: Model already predicts a location type — keep it
-                // rather than overriding to full_name.
+                // rather than overriding to a person-name type.
                 if LOCATION_TYPES.contains(&result.label.as_str()) {
                     result.confidence = result.confidence.max(0.5);
                     result.disambiguation_applied = true;
@@ -5434,6 +5457,81 @@ datetime.component.day_of_week:
             locale,
             Some("ES".to_string()),
             "Spanish day names should detect ES"
+        );
+    }
+
+    // ==========================================================================
+    // NNFT-156: Rule fixes for 3 profile eval misses
+    // ==========================================================================
+
+    #[test]
+    fn test_is_generic_numeric_postal_code_detection() {
+        // Fix 1: numeric_postal_code_detection should yield to header hints
+        // (e.g., "cvv" column with 3-digit values detected as postal_code)
+        let rule = Some("numeric_postal_code_detection".to_string());
+        assert!(
+            is_generic_prediction("geography.address.postal_code", &rule, None),
+            "numeric_postal_code_detection should be treated as generic to yield to header hints"
+        );
+
+        // Other numeric rules should NOT be generic
+        let port_rule = Some("numeric_port_detection".to_string());
+        assert!(
+            !is_generic_prediction("technology.internet.port", &port_rule, None),
+            "numeric_port_detection should NOT be generic"
+        );
+    }
+
+    #[test]
+    fn test_geography_protection_person_name_hints() {
+        // Fix 2: Geography protection should fire for last_name and first_name,
+        // not just full_name. Verifies PERSON_NAME_HINTS covers all three.
+        assert!(
+            PERSON_NAME_HINTS.contains(&"identity.person.full_name"),
+            "PERSON_NAME_HINTS should include full_name"
+        );
+        assert!(
+            PERSON_NAME_HINTS.contains(&"identity.person.last_name"),
+            "PERSON_NAME_HINTS should include last_name"
+        );
+        assert!(
+            PERSON_NAME_HINTS.contains(&"identity.person.first_name"),
+            "PERSON_NAME_HINTS should include first_name"
+        );
+
+        // Non-person identity types should NOT be in the list
+        assert!(
+            !PERSON_NAME_HINTS.contains(&"identity.person.email"),
+            "email should NOT be in PERSON_NAME_HINTS"
+        );
+        assert!(
+            !PERSON_NAME_HINTS.contains(&"identity.person.phone_number"),
+            "phone_number should NOT be in PERSON_NAME_HINTS"
+        );
+    }
+
+    #[test]
+    fn test_location_types_module_level() {
+        // Verify LOCATION_TYPES extracted to module level contains expected types
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.city"),
+            "LOCATION_TYPES should include city"
+        );
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.country"),
+            "LOCATION_TYPES should include country"
+        );
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.region"),
+            "LOCATION_TYPES should include region"
+        );
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.state"),
+            "LOCATION_TYPES should include state"
+        );
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.continent"),
+            "LOCATION_TYPES should include continent"
         );
     }
 }
