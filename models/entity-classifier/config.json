@@ -1,0 +1,135 @@
+{
+  "architecture": "deep_sets_mlp",
+  "version": "v1",
+  "feature_dim": 300,
+  "embed_dim": 128,
+  "n_stat_features": 44,
+  "hidden_dim": 256,
+  "n_classes": 4,
+  "dropout": 0.2,
+  "classes": [
+    "person",
+    "place",
+    "organization",
+    "creative_work"
+  ],
+  "person_class_index": 0,
+  "demotion_threshold": 0.6,
+  "model2vec": "minishlab/potion-base-4M",
+  "label_map": {
+    "Person": "person",
+    "Person/name": "person",
+    "MusicArtistAT": "person",
+    "Place": "place",
+    "addressLocality": "place",
+    "Organization": "organization",
+    "LocalBusiness/name": "organization",
+    "MusicAlbum": "creative_work",
+    "MusicRecording/name": "creative_work",
+    "Event/name": "creative_work",
+    "CreativeWork": "creative_work"
+  },
+  "stat_feature_names": [
+    "mean_len",
+    "std_len",
+    "median_len",
+    "p25_len",
+    "p75_len",
+    "mean_words",
+    "std_words",
+    "single_word_ratio",
+    "two_word_ratio",
+    "three_plus_ratio",
+    "mean_alpha_ratio",
+    "mean_digit_ratio",
+    "mean_space_ratio",
+    "mean_punct_ratio",
+    "has_digits_ratio",
+    "title_case_ratio",
+    "all_caps_ratio",
+    "has_comma_ratio",
+    "has_parens_ratio",
+    "has_ampersand_ratio",
+    "has_apostrophe_ratio",
+    "has_hyphen_ratio",
+    "has_dot_ratio",
+    "org_suffix_ratio",
+    "person_title_ratio",
+    "place_indicator_ratio",
+    "creative_indicator_ratio",
+    "the_prefix_ratio",
+    "numeric_prefix_ratio",
+    "uniqueness",
+    "token_diversity",
+    "avg_word_len",
+    "cap_words_mean",
+    "cap_word_ratio",
+    "word_density",
+    "short_value_ratio",
+    "long_value_ratio",
+    "cv_length",
+    "preposition_ratio",
+    "contains_number_ratio",
+    "has_quotes_ratio",
+    "column_size",
+    "max_value_len",
+    "max_word_count"
+  ],
+  "feature_layout": {
+    "emb_mean": {
+      "start": 0,
+      "end": 128
+    },
+    "emb_std": {
+      "start": 128,
+      "end": 256
+    },
+    "stat_features": {
+      "start": 256,
+      "end": 300
+    }
+  },
+  "train_size": 2911,
+  "test_size": 2117,
+  "test_accuracy_4class": 0.7576759565422768,
+  "cv_accuracy": null,
+  "demotion_analysis": {
+    "0.3": {
+      "n_demoted": 1557,
+      "coverage": 0.73547472838923,
+      "precision": 0.8946692357096981,
+      "wrong_demotions": 164
+    },
+    "0.4": {
+      "n_demoted": 1518,
+      "coverage": 0.7170524326877658,
+      "precision": 0.9044795783926218,
+      "wrong_demotions": 145
+    },
+    "0.5": {
+      "n_demoted": 1473,
+      "coverage": 0.6957959376476146,
+      "precision": 0.9124236252545825,
+      "wrong_demotions": 129
+    },
+    "0.6": {
+      "n_demoted": 1395,
+      "coverage": 0.6589513462446859,
+      "precision": 0.9218637992831541,
+      "wrong_demotions": 109
+    },
+    "0.7": {
+      "n_demoted": 1330,
+      "coverage": 0.6282475200755786,
+      "precision": 0.9255639097744361,
+      "wrong_demotions": 99
+    },
+    "0.8": {
+      "n_demoted": 1253,
+      "coverage": 0.5918752952290978,
+      "precision": 0.9353551476456504,
+      "wrong_demotions": 81
+    }
+  },
+  "usage": "Binary demotion gate: when CharCNN votes full_name, compute features for the column, run MLP forward pass, if max non-person class probability > 0.6, demote to entity_name."
+}

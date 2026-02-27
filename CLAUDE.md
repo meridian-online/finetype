@@ -47,7 +47,7 @@ Concretely:
 
 ### What's in progress
 
-- **Entity name disambiguation** — NNFT-150 spike confirmed that column-level value embeddings carry entity-type signal (73% 4-class accuracy from off-the-shelf Model2Vec) but are insufficient for production use (silhouette 0.03, 27% error rate). **Decision: build a trained post-vote column-level classifier (Option A)** that fires when CharCNN vote is ambiguous between person/entity name types. Enum-based approaches (NNFT-145) rejected as architecturally unsound. Next step: train a column-level entity classifier on SOTAB data (~3k labelled entity columns). See `discovery/entity-disambiguation/FINDING.md`.
+- **Entity name disambiguation** — NNFT-151: Trained Deep Sets MLP entity classifier (300-dim: 128 emb mean + 128 emb std + 44 statistical features). 4-class accuracy: 75.8% on held-out SOTAB test (2,117 columns). **Shipped as binary demotion gate**: when CharCNN votes full_name, entity classifier confidently says "not person" → demote to entity_name. At 0.6 threshold: 92.2% precision on balanced test, ~99% at production base rates. Model artifacts in `models/entity-classifier/`. Integration spec in `docs/ENTITY_CLASSIFIER.md`. **Next: Rust integration** — load safetensors in Candle, compute features, wire into column.rs post-vote. See decision-003.
 - **Next accuracy targets** — 7 misses at 113/120: countries.name (last_name overcall), world_cities.name (last_name overcall — both need entity disambiguation model), books_catalog.publisher (city overcall, GT expects full_name), tech_systems.server_hostname (hostname prediction, GT expects full_name), people_directory.company (categorical, GT expects full_name — needs entity_name model), codes_and_ids.cvv (postal_code overcall), codes_and_ids.swift_code (sedol overcall). **Model state:** v0.3.0 models (169 types) restored from HuggingFace; taxonomy has 171 types (entity_name + paragraph added but not in model). Rule 17 (UTC offset override) is the only post-v0.3.0 disambiguation rule addition. CLDR date/time patterns and 4-level locale labels (NNFT-126) are next infrastructure pieces.
 - **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval (120-column smoke test) and real-world benchmarks (GitTables 47%, SOTAB 42%) meaningfully measure type inference quality. Time-boxed 4-6 hours.
 
@@ -63,7 +63,7 @@ finetype/
     finetype-cli/      # CLI binary (infer, profile, generate, check, train)
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
   labels/              # Taxonomy YAML definitions (6 domain files)
-  models/              # Pre-trained model directories (char-cnn-v1..v7, tiered-v1..v2, model2vec)
+  models/              # Pre-trained model directories (char-cnn-v1..v7, tiered-v1..v2, model2vec, entity-classifier)
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
   tests/               # CLI smoke tests
   docs/                # Taxonomy comparison, architecture docs
@@ -251,6 +251,8 @@ Key architectural decisions that should not be revisited without good reason:
 
 17. **UTC offset override (Rule 17)** — When top vote is any `datetime.time.*` type or `datetime.timestamp.rfc_3339`, and ≥80% of non-empty values match `^[+-]\d{2}:\d{2}$` (exactly 6 chars), overrides to `datetime.offset.utc`. The CharCNN confuses UTC offsets like "+05:30" with time values like "14:30" because both share the HH:MM structure. The mandatory leading sign (+/-) is the syntactic distinguisher. Runs between Rule 14 (duration override) and Rule 15 (attractor demotion). (NNFT-143)
 
+18. **Entity classifier (binary demotion gate)** — Deep Sets MLP (300 → 256 → 256 → 128 → 4) classifies columns into person/place/organization/creative_work using frozen Model2Vec value embeddings (mean + std, 256-dim) plus 44 statistical features. Trained on 2,911 SOTAB validation entity columns (PyTorch), exported to safetensors for Candle inference. **Used as a binary demotion gate**: when CharCNN votes `full_name` and the entity classifier's max non-person probability exceeds threshold (0.6), demotes to `entity_name`. 4-class test accuracy: 75.8%. Binary demotion precision: 92.2% on balanced test data, ~99% at production base rates (96% of full_name predictions are non-person). Model artifacts: `models/entity-classifier/`. Integration spec: `docs/ENTITY_CLASSIFIER.md`. Training script: `scripts/train_entity_classifier.py`. **Not yet integrated into Rust pipeline** — requires follow-up task for Candle loading and feature computation. (NNFT-150, NNFT-151, decision-003)
+
 ## Build & Test
 
 ```bash
@@ -306,6 +308,10 @@ make eval-report        # Unified markdown dashboard (profile + actionability)
 | Evaluation discovery brief | `discovery/evaluation-method/BRIEF.md` |
 | Smoke tests | `tests/smoke.sh` |
 | Locale data attribution | `data/cldr/README.md` |
+| Entity classifier model | `models/entity-classifier/` (model.safetensors, config.json, label_index.json) |
+| Entity classifier training | `scripts/train_entity_classifier.py` |
+| Entity classifier integration spec | `docs/ENTITY_CLASSIFIER.md` |
+| Entity disambiguation discovery | `discovery/entity-disambiguation/` (FINDING.md, spike scripts) |
 
 ## Backlog Discipline
 
