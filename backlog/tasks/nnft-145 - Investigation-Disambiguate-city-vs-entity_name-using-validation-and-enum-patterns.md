@@ -3,10 +3,11 @@ id: NNFT-145
 title: >-
   Investigation: Disambiguate city vs entity_name using validation and enum
   patterns
-status: To Do
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 00:34'
+updated_date: '2026-02-27 08:08'
 labels:
   - discovery
   - disambiguation
@@ -40,6 +41,12 @@ Time-box: 2-4 hours. Output: finding with recommended approach.
 - [ ] #2 Prototype or feasibility assessment of enum-based city validation
 - [ ] #3 Recommendation: specific disambiguation approach with trade-offs
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded by NNFT-150. The enum-based city disambiguation approach was rejected after discussion — it only covers the geography subset of the full_name overcall problem, creates a maintenance burden (keeping city/state lists current), and doesn't generalise to orgs, creative works, or products. The agreed direction is a column-level entity disambiguation model that classifies based on value distributions rather than individual character patterns. NNFT-150 is a spike to test whether Model2Vec value embeddings carry enough signal to separate entity types, which determines the model approach.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
