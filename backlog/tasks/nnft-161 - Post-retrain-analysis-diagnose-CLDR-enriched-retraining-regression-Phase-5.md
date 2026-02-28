@@ -1,7 +1,7 @@
 ---
 id: NNFT-161
 title: 'Post-retrain analysis: diagnose CLDR-enriched retraining regression (Phase 5)'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-28 01:19'
@@ -210,5 +210,5 @@ Estimated impact of training fixes alone: +5 to +7 of the 9 regressions addressa
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
