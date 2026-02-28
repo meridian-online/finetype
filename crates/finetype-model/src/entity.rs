@@ -15,6 +15,7 @@
 //! in `models/entity-classifier/`. At build time they can be embedded into the binary.
 
 use crate::inference::InferenceError;
+use crate::model2vec_shared::Model2VecResources;
 use candle_core::{DType, Device, Tensor};
 use regex::Regex;
 use std::path::Path;
@@ -251,6 +252,39 @@ impl EntityClassifier {
             patterns: DomainPatterns::new(),
             device,
         })
+    }
+
+    /// Load from shared Model2Vec resources plus entity classifier byte slices.
+    ///
+    /// The tokenizer and embedding matrix are cloned from `resources` (O(1)
+    /// for the Tensor due to Arc-backed storage). The MLP weights and config
+    /// are loaded from the provided bytes.
+    pub fn from_shared(
+        model_bytes: &[u8],
+        config_bytes: &[u8],
+        resources: &Model2VecResources,
+    ) -> Result<Self, InferenceError> {
+        Self::from_bytes(
+            model_bytes,
+            config_bytes,
+            resources.tokenizer().clone(),
+            resources.embeddings().clone(),
+        )
+    }
+
+    /// Load from a directory using shared Model2Vec resources.
+    ///
+    /// Like [`EntityClassifier::load`] but takes shared resources instead of
+    /// requiring a separate tokenizer and embedding clone.
+    pub fn load_shared<P: AsRef<Path>>(
+        model_dir: P,
+        resources: &Model2VecResources,
+    ) -> Result<Self, InferenceError> {
+        let dir = model_dir.as_ref();
+        let model_bytes = std::fs::read(dir.join("model.safetensors"))?;
+        let config_bytes = std::fs::read(dir.join("config.json"))?;
+
+        Self::from_shared(&model_bytes, &config_bytes, resources)
     }
 
     /// Determine whether a column of values should be demoted from full_name to entity_name.
@@ -847,6 +881,74 @@ mod tests {
         assert!(
             demote_org,
             "Organization names should be demoted to entity_name"
+        );
+    }
+
+    /// Integration test: from_shared() produces identical results to load().
+    #[test]
+    fn test_from_shared_matches_load() {
+        let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+
+        let model_dir = workspace_root.join("models").join("entity-classifier");
+        let m2v_dir = workspace_root.join("models").join("model2vec");
+
+        if !model_dir.join("model.safetensors").exists()
+            || !m2v_dir.join("model.safetensors").exists()
+        {
+            eprintln!("Skipping from_shared integration test: model artifacts not found");
+            return;
+        }
+
+        // Load via existing path (SemanticHintClassifier → clone tok/emb)
+        let semantic = crate::semantic::SemanticHintClassifier::load(&m2v_dir).unwrap();
+        let standalone = EntityClassifier::load(
+            &model_dir,
+            semantic.tokenizer().clone(),
+            semantic.embeddings().clone(),
+        )
+        .unwrap();
+
+        // Load via shared resources (new path)
+        let resources = Model2VecResources::load(&m2v_dir).unwrap();
+        let shared = EntityClassifier::load_shared(&model_dir, &resources).unwrap();
+
+        // Both should produce identical demotion decisions
+        let person_values: Vec<String> = vec![
+            "John Smith",
+            "Jane Doe",
+            "Robert Johnson",
+            "Mary Williams",
+            "James Brown",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let org_values: Vec<String> = vec![
+            "Google Inc",
+            "Microsoft Corp",
+            "Amazon LLC",
+            "Apple Inc",
+            "Tesla Inc",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        assert_eq!(
+            standalone.should_demote(&person_values).unwrap(),
+            shared.should_demote(&person_values).unwrap(),
+            "Person demotion mismatch between standalone and shared"
+        );
+        assert_eq!(
+            standalone.should_demote(&org_values).unwrap(),
+            shared.should_demote(&org_values).unwrap(),
+            "Org demotion mismatch between standalone and shared"
         );
     }
 }
