@@ -1,0 +1,62 @@
+{
+  "finetype_broad_accuracy": 0.45216706067769896,
+  "sense_a_broad_accuracy": 0.8849,
+  "finetype_ms_per_column": 73.01202151040754,
+  "sense_a_ms_per_column": 3.6,
+  "n_columns": 6345,
+  "finetype_per_category": {
+    "entity": {
+      "support": 1678,
+      "correct": 906,
+      "precision": 0.5209890741805635,
+      "recall": 0.5399284862932062,
+      "f1": 0.5302897278314311
+    },
+    "format": {
+      "support": 800,
+      "correct": 222,
+      "precision": 0.29133858267716534,
+      "recall": 0.2775,
+      "f1": 0.28425096030729835
+    },
+    "temporal": {
+      "support": 756,
+      "correct": 572,
+      "precision": 0.9517470881863561,
+      "recall": 0.7566137566137566,
+      "f1": 0.843036109064112
+    },
+    "numeric": {
+      "support": 1401,
+      "correct": 459,
+      "precision": 0.85,
+      "recall": 0.32762312633832974,
+      "f1": 0.47295208655332305
+    },
+    "geographic": {
+      "support": 516,
+      "correct": 357,
+      "precision": 0.25850832729905865,
+      "recall": 0.6918604651162791,
+      "f1": 0.37638376383763844
+    },
+    "text": {
+      "support": 1194,
+      "correct": 353,
+      "precision": 0.2670196671709531,
+      "recall": 0.29564489112227804,
+      "f1": 0.28060413354531005
+    }
+  },
+  "sense_a_per_category_f1": {
+    "entity": 0.845,
+    "format": 0.826,
+    "temporal": 0.972,
+    "numeric": 0.954,
+    "geographic": 0.823,
+    "text": 0.874
+  },
+  "entity_total": 1678,
+  "entity_mapped": 526,
+  "entity_correct": 177
+}

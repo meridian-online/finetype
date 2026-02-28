@@ -1,0 +1,29 @@
+{
+  "architecture": "A",
+  "embed_dim": 128,
+  "hidden_dim": 256,
+  "n_heads": 4,
+  "n_layers": 0,
+  "n_broad": 6,
+  "n_entity": 4,
+  "max_values": 50,
+  "header_dropout": 0.5,
+  "n_params": 347146,
+  "best_epoch": 21,
+  "best_val_broad_acc": 0.8849487785657998,
+  "best_val_entity_acc": 0.7800953516090584,
+  "broad_categories": [
+    "entity",
+    "format",
+    "temporal",
+    "numeric",
+    "geographic",
+    "text"
+  ],
+  "entity_subtypes": [
+    "person",
+    "place",
+    "organization",
+    "creative_work"
+  ]
+}
