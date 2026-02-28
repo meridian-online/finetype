@@ -44,6 +44,28 @@ fn strip_locale_suffix(label: &str) -> (&str, Option<&str>) {
     }
 }
 
+/// Remap labels for types collapsed in Phase 0 taxonomy audit (NNFT-162).
+/// The v0.3.0 models still predict these labels; this function maps them
+/// to their new target types before vote aggregation.
+fn remap_collapsed_label(label: &str) -> &str {
+    match label {
+        // Product/technology descriptors → entity_name
+        "technology.hardware.cpu" => "representation.text.entity_name",
+        "technology.hardware.generation" => "representation.text.entity_name",
+        // Named entities
+        "identity.academic.university" => "representation.text.entity_name",
+        // Enumerated categories
+        "identity.academic.degree" => "representation.discrete.categorical",
+        "identity.person.nationality" => "representation.discrete.categorical",
+        "identity.person.occupation" => "representation.discrete.categorical",
+        // Niche format types
+        "technology.internet.slug" => "representation.code.alphanumeric_id",
+        // URI merged into URL (37% training overlap, NNFT-161)
+        "technology.internet.uri" => "technology.internet.url",
+        _ => label,
+    }
+}
+
 /// All known boolean type labels (current and legacy).
 /// Centralised to avoid label mismatches across disambiguation rules.
 const BOOLEAN_LABELS: &[&str] = &[
@@ -373,17 +395,17 @@ impl ColumnClassifier {
         let results = self.classifier.classify_batch(&sample)?;
 
         // Step 3: Aggregate votes — collapse 4-level locale labels to 3-level
+        // Remap labels for types collapsed in Phase 0 (NNFT-162).
         // Track both 3-level type votes and locale distribution within each type.
         let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
         let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new(); // 3-level → locale → count
         for result in &results {
             let (base_label, locale) = strip_locale_suffix(&result.label);
-            *vote_counts_3level
-                .entry(base_label.to_string())
-                .or_default() += 1;
+            let remapped = remap_collapsed_label(base_label);
+            *vote_counts_3level.entry(remapped.to_string()).or_default() += 1;
             if let Some(loc) = locale {
                 *locale_votes
-                    .entry(base_label.to_string())
+                    .entry(remapped.to_string())
                     .or_default()
                     .entry(loc.to_string())
                     .or_default() += 1;
@@ -526,13 +548,14 @@ impl ColumnClassifier {
             return Ok(result);
         }
 
-        // Apply header hint: try semantic classifier first, fall back to hardcoded
+        // Apply header hint: try semantic classifier first, fall back to hardcoded.
+        // Remap collapsed labels (NNFT-162) from both sources.
         let hinted_type: Option<String> = self
             .semantic_hint
             .as_ref()
             .and_then(|sh| sh.classify_header(header))
-            .map(|r| r.label)
-            .or_else(|| header_hint(header).map(String::from));
+            .map(|r| remap_collapsed_label(&r.label).to_string())
+            .or_else(|| header_hint(header).map(|h| remap_collapsed_label(h).to_string()));
 
         if let Some(hinted_type) = hinted_type.as_deref() {
             // If the model already predicts the hinted type, just boost confidence
@@ -1432,9 +1455,9 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "os" | "operating system" | "platform" => {
             return Some("technology.development.os");
         }
-        // Occupation / job title
+        // Occupation / job title — collapsed to categorical (NNFT-162)
         "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role" | "position" => {
-            return Some("identity.person.occupation");
+            return Some("representation.discrete.categorical");
         }
         // Subcountry / subregion → state/province level
         "subcountry" | "subregion" | "sub region" | "sub country" => {

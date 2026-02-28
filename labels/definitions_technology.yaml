@@ -159,7 +159,7 @@ technology.internet.url:
     pattern: "^(?:(?:https?|ftp|file)://)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\\d+)?(?:/[^?#]*)?(?:\\?[^#]*)?(?:#.*)?$"
   tier: [VARCHAR, internet]
   release_priority: 5
-  aliases: [web_url]
+  aliases: [web_url, uri]
   samples:
     - "https://example.com/path/to/resource"
     - "http://www.google.com"
@@ -169,34 +169,9 @@ technology.internet.url:
   notes: >
     v1 migration: Was internet.url. Includes optional decompose for parsing
     scheme, hostname, and path components.
-
-technology.internet.uri:
-  title: "URI"
-  description: >
-    Uniform Resource Identifier (more general than URL, includes URNs and other schemes).
-    Pattern allows any valid scheme but does not require network protocol.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[a-zA-Z][a-zA-Z0-9+\\-.]*:[^\\s]*$"
-  tier: [VARCHAR, internet]
-  release_priority: 4
-  aliases: null
-  samples:
-    - "https://example.com/path"
-    - "mailto:user@example.com"
-    - "urn:isbn:0451450523"
-    - "ftp://ftp.example.org"
-  references: null
-  notes: >
-    v1 migration: Was internet.uri. More permissive than URL — accepts mailto:,
-    urn:, and other schemes.
+    Phase 0 (NNFT-162): Merged technology.internet.uri into this type.
+    URI had 37% training data overlap with URL (both use http/https schemes).
+    Model could not distinguish them (NNFT-161 regression analysis).
 
 technology.internet.hostname:
   title: "Hostname"
@@ -284,32 +259,9 @@ technology.internet.top_level_domain:
     v1 migration: Was internet.tld (aliased to top_level_domain for clarity).
     Pattern allows IDN (xn--) format.
 
-technology.internet.slug:
-  title: "URL Slug"
-  description: >
-    URL-friendly string for use in paths. Only lowercase alphanumerics,
-    hyphens, and underscores. Common in blogs and content management systems.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[a-z0-9]+(?:[-_][a-z0-9]+)*$"
-  tier: [VARCHAR, internet]
-  release_priority: 3
-  aliases: [slug]
-  samples:
-    - "my-blog-post"
-    - "product_name_123"
-    - "hello-world"
-  references: null
-  notes: >
-    v1 migration: Was internet.slug. Patterns like "word-separated" or
-    "word_separated". Typically lowercase.
+# technology.internet.slug: REMOVED in Phase 0 (NNFT-162)
+# Collapsed into representation.code.alphanumeric_id.
+# Rarely analytically important; confused with hostname in CLDR regression.
 
 technology.internet.user_agent:
   title: "User Agent String"
@@ -978,35 +930,8 @@ technology.development.os:
 # These are system/device descriptions typically found in metadata or specs.
 # ═════════════════════════════════════════════════════════════════════
 
-technology.hardware.cpu:
-  title: "CPU Model"
-  description: >
-    CPU processor name/model (e.g., Intel Core i7-11700K, AMD Ryzen 5 5600X).
-    Broad categorization due to name variety.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    manufacturer: "CASE WHEN {col} LIKE 'Intel%' THEN 'Intel' WHEN {col} LIKE 'AMD%' THEN 'AMD' ELSE 'Other' END"
-  validation:
-    type: string
-    minLength: 5
-    maxLength: 100
-  tier: [VARCHAR, hardware]
-  release_priority: 1
-  aliases: [processor]
-  samples:
-    - "Intel Core i7-11700K"
-    - "AMD Ryzen 5 5600X"
-    - "Apple M1"
-    - "Qualcomm Snapdragon 888"
-  references: null
-  notes: >
-    v1 migration: Was hardware.cpu marked broad_words. Decompose infers
-    manufacturer. No strict validation beyond length.
+# technology.hardware.cpu: REMOVED in Phase 0 (NNFT-162)
+# Collapsed into representation.text.entity_name. Product names, not structurally detectable.
 
 technology.hardware.ram_size:
   title: "RAM Size"
@@ -1077,34 +1002,8 @@ technology.hardware.screen_size:
   notes: >
     v1 migration: Was hardware.screen_size. Transform converts to inches.
 
-technology.hardware.generation:
-  title: "Hardware Generation"
-  description: >
-    Generation or revision number for hardware (e.g., "Gen 3", "11th Gen", "v2").
-    Broad categorization.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    generation_number: "CAST(REGEXP_EXTRACT({col}, '([0-9]+)') AS SMALLINT)"
-  validation:
-    type: string
-    pattern: "^(?:[0-9]+(?:st|nd|rd|th)\\s+)?(?:Gen|Generation|Rev|Version|v)\\s*[0-9]*$"
-  tier: [VARCHAR, hardware]
-  release_priority: 1
-  aliases: null
-  samples:
-    - "Gen 3"
-    - "11th Gen"
-    - "v2"
-    - "Rev 4"
-  references: null
-  notes: >
-    v1 migration: Was hardware.generation marked broad_words. Decompose extracts
-    numeric generation number.
+# technology.hardware.generation: REMOVED in Phase 0 (NNFT-162)
+# Collapsed into representation.text.entity_name. Product/technology descriptors, no format signal.
 
 # ═════════════════════════════════════════════════════════════════════
 # Note: file, code extensions, MIME types moved to 'representation' domain

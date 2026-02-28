@@ -50,7 +50,7 @@ age,dbpedia,identity.person.age,identity,close,false
 height,both,identity.person.height,identity,close,false
 weight,dbpedia,identity.person.weight,identity,close,false
 sentence,dbpedia,representation.text.sentence,representation,close,false
-occupation,profile,identity.person.occupation,identity,close,false
+occupation,profile,representation.discrete.categorical,representation,close,false
 timestamp,profile,,datetime,partial,false
 sql timestamp,profile,datetime.timestamp.sql_standard,datetime,direct,false
 time 24h,profile,,datetime,partial,false

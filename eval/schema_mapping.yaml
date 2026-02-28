@@ -450,11 +450,11 @@ mappings:
 
   - gt_label: occupation
     source: profile
-    finetype_label: identity.person.occupation
-    finetype_domain: identity
+    finetype_label: representation.discrete.categorical
+    finetype_domain: representation
     match_quality: close
     expand: false
-    notes: Job titles / occupations; FineType has occupation type
+    notes: Job titles / occupations; collapsed from identity.person.occupation (NNFT-162)
 
   # ═══════════════════════════════════════════════════════════════════════════
   # PARTIAL MATCHES — Sometimes detectable, depends on data format

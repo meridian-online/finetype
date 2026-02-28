@@ -430,36 +430,8 @@ identity.person.gender_symbol:
   notes: >
     v1 migration: Was person.gender_symbol. Single Unicode symbol.
 
-identity.person.nationality:
-  title: "Nationality"
-  description: >
-    Country of citizenship or nationality. May be country name or ISO code.
-    Locale-specific for country name representations.
-  designation: locale_specific
-  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    minLength: 2
-    maxLength: 100
-  tier: [VARCHAR, person]
-  release_priority: 3
-  aliases: [citizenship]
-  samples:
-    - "United States"
-    - "Japan"
-    - "Germany"
-    - "France"
-    - "Canada"
-  references: null
-  notes: >
-    v1 migration: Was person.nationality. Locale-specific for country name
-    representation (e.g., "Deutschland" in German vs "Germany" in English).
-    May also appear as ISO country codes (US, JP, DE, etc.).
+# identity.person.nationality: REMOVED in Phase 0 (NNFT-162)
+# Collapsed into representation.discrete.categorical. Short enumerated list.
 
 identity.person.blood_type:
   title: "Blood Type"
@@ -591,35 +563,8 @@ identity.person.age:
     v1 migration: Not explicitly in v1 but inferred from person data.
     Reasonable range: 0-150 years. Useful for age-based filtering and analytics.
 
-identity.person.occupation:
-  title: "Occupation"
-  description: >
-    Job title or profession (Engineer, Manager, Teacher, etc.).
-    Broad categorization due to variance in naming and standardization.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    minLength: 2
-    maxLength: 100
-  tier: [VARCHAR, person]
-  release_priority: 1
-  aliases: [job_title, profession]
-  samples:
-    - "Software Engineer"
-    - "Data Scientist"
-    - "Product Manager"
-    - "Nurse"
-  references: null
-  notes: >
-    v1 migration: Was person.occupation marked broad_words. No strict validation
-    beyond length. Consider ISCO (International Standard Classification of
-    Occupations) for standardization.
+# identity.person.occupation: REMOVED in Phase 0 (NNFT-162)
+# Collapsed into representation.discrete.categorical. Broad words, no format signal.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: payment
@@ -1062,81 +1007,13 @@ identity.payment.currency_symbol:
     due to ambiguity ($ could be USD, AUD, CAD, etc.).
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: academic
+# CATEGORY: academic — REMOVED in Phase 0 (NNFT-162)
 #
-# Education and academic credentials.
+# identity.academic.degree: Collapsed into representation.discrete.categorical.
+#   Low cardinality enumerated list (BSc, PhD, etc.).
+# identity.academic.university: Collapsed into representation.text.entity_name.
+#   Universities are named entities.
 # ═════════════════════════════════════════════════════════════════════
-
-identity.academic.degree:
-  title: "Academic Degree"
-  description: >
-    University degree (Bachelor's, Master's, PhD, etc.).
-    Broad categorization.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    enum:
-      - "High School Diploma"
-      - "Associate Degree"
-      - "Bachelor of Science"
-      - "Bachelor of Arts"
-      - "Bachelor Degree"
-      - "Master of Science"
-      - "Master of Arts"
-      - "Master of Business Administration"
-      - "Master Degree"
-      - "Doctor of Philosophy"
-      - "Doctor of Medicine"
-      - "Juris Doctor"
-      - "PhD"
-      - "Professional Certificate"
-  tier: [VARCHAR, academic]
-  release_priority: 1
-  aliases: null
-  samples:
-    - "Bachelor Degree"
-    - "Master's"
-    - "PhD"
-    - "Associate"
-  references: null
-  notes: >
-    v1 migration: Was person.academic_degree marked broad_words. Enum is
-    illustrative; actual values depend on data. Consider standardizing to
-    ISCED (International Standard Classification of Education).
-
-identity.academic.university:
-  title: "University / Institution"
-  description: >
-    Name of educational institution (university, college, school).
-    Broad categorization due to name variance.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    minLength: 3
-    maxLength: 200
-  tier: [VARCHAR, academic]
-  release_priority: 1
-  aliases: [school, college, institution]
-  samples:
-    - "Harvard University"
-    - "Stanford University"
-    - "MIT"
-    - "Oxford University"
-  references: null
-  notes: >
-    v1 migration: Was person.university marked broad_words. No strict validation.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: medical
