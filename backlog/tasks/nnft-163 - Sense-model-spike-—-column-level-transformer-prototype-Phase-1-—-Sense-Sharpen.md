@@ -3,11 +3,11 @@ id: NNFT-163
 title: >-
   Sense model spike — column-level transformer prototype (Phase 1 — Sense &
   Sharpen)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-28 03:41'
-updated_date: '2026-02-28 12:53'
+updated_date: '2026-02-28 12:55'
 labels:
   - architecture
   - ml
@@ -188,6 +188,6 @@ Conditional GO for Phase 2 (Integration Design). Architecture A dominates on acc
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
