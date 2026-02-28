@@ -1,11 +1,11 @@
 ---
 id: NNFT-162
 title: Taxonomy audit and simplification (Phase 0 — Sense & Sharpen)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-28 03:41'
-updated_date: '2026-02-28 05:10'
+updated_date: '2026-02-28 05:11'
 labels:
   - architecture
   - taxonomy
@@ -117,5 +117,5 @@ Phase 0 Taxonomy Audit & Simplification — Collapsed 8 niche types (171 → 163
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
