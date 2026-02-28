@@ -29,6 +29,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
+- **Phase 2 Integration Design** (NNFT-164) — Design spec for Sense → Sharpen integration. Key decisions (decision-006): flat CharCNN + output masking over per-category retraining, sample 100/encode 50, Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). All 163 types mapped to 6 Sense categories. 8 Phase 3 implementation tasks created (NNFT-165–172). Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
 - **Sense model spike** (NNFT-163) — Phase 1 of Sense & Sharpen pivot. Architecture A (cross-attention over Model2Vec): 88.5% broad accuracy, 78.0% entity subtype, 3.6ms/column. Dominates FineType (45.2% broad, 73ms). Conditional GO for Phase 2. Finding: `discovery/architectural-pivot/PHASE1_FINDING.md`.
 - **Phase 0 taxonomy audit** (NNFT-162) — Collapsed 8 niche types (171 → 163). Added `remap_collapsed_label()` for v0.3.0 model backward compat. Zero regressions: 116/120 profile, 43.6%/68.6% SOTAB.
 - **Entity classifier integrated** (NNFT-151, NNFT-152) — Deep Sets MLP demotes full_name → entity_name for non-person columns. SOTAB +3.9pp domain. Entity demotion guard prevents header hints from overriding.
@@ -36,7 +37,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. Phase 0 (taxonomy audit) and Phase 1 (model spike) complete. Phase 2 (Integration Design) next: design Sense → Sharpen interface, plan Candle/Rust implementation.
+- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. Phases 0–2 complete (taxonomy audit, model spike, integration design). **Phase 3 (Rust implementation) next:** 8 tasks (NNFT-165–172) covering shared Model2Vec, Sense Candle port, output masking, pipeline integration, build system, eval. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
 - **CLDR retraining rolled back** (NNFT-157–161) — Retrained tiered model regressed 107/120 vs 116/120 baseline. Root causes: URL/URI training overlap (resolved by NNFT-162 merge), T1 routing degradation, training data gaps. Next attempt needs: diversified hostname patterns, bare UTC offset patterns, 1000 samples/type. CLDR infrastructure retained in `scripts/` and `locale_data.rs`.
 - **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
 - **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval + real-world benchmarks meaningfully measure type inference quality.
@@ -150,7 +151,7 @@ GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable c
 
 ## Priority Order
 
-1. **Sense & Sharpen pivot** — Phase 2 Integration Design, then Candle/Rust implementation
+1. **Sense & Sharpen pivot** — Phase 3 Rust implementation (NNFT-165–172): shared Model2Vec, Sense Candle port, output masking, pipeline integration
 2. **Accuracy lift** — Address remaining misclassifications (NNFT-090, NNFT-099, NNFT-100)
 3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
 4. **Distribution** — Homebrew tap, crates.io current
@@ -178,6 +179,7 @@ Key decisions — do not revisit without good reason. See backlog decisions and 
 16. **Entity classifier (Rule 18)** — Deep Sets MLP (300→4 classes). Demotes full_name → entity_name when non-person >0.6. Entity demotion guard skips header hints. (NNFT-150-152, decision-003)
 17. **Snapshot Learning** — Auto-snapshot before overwriting models. `--seed N` deterministic training. `manifest.json` provenance. (NNFT-146)
 18. **Sense Architecture A** — Cross-attention over Model2Vec beats transformer encoder: +1.6pp accuracy, 23.7x faster, simpler Candle port. (NNFT-163, decision-005)
+19. **Sense integration: flat CharCNN + output masking** — Use existing flat model with Sense-guided category masking, not per-category retraining. Sample 100/encode 50. Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). (NNFT-164, decision-006)
 
 ## Build & Test
 
@@ -209,6 +211,7 @@ make eval-report        # Profile eval + actionability + dashboard
 | Schema mapping | `eval/schema_mapping.yaml` |
 | Eval report generator | `eval/eval_report.py` |
 | Smoke tests | `tests/smoke.sh` |
+| Phase 2 integration design | `discovery/architectural-pivot/PHASE2_DESIGN.md` |
 | Architectural pivot | `discovery/architectural-pivot/` |
 | Sense model scripts | `scripts/train_sense_model.py`, `scripts/prepare_sense_data.py` |
 | Sense model artifacts | `models/sense_spike/arch_a/` (winner) |
