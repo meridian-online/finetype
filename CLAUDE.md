@@ -12,12 +12,11 @@ Every decision in this repo should reflect these principles:
 
 ### Precision Principle
 
-Precision is what makes FineType valuable as a tool. A broad pattern that matches everything validates nothing. Every validation pattern, locale rule, and disambiguation heuristic must meaningfully distinguish "is this type" from "is not this type."
+Precision is what makes FineType valuable. Every validation pattern, locale rule, and disambiguation heuristic must meaningfully distinguish "is this type" from "is not this type."
 
-Concretely:
-- **Prefer precise locale-specific validation over permissive universal patterns.** There is no "universal phone number" — there is E.164, and there are locale-specific formats. There is no "universal postal code" — there are country-level formats. If a type is `designation: locale_specific`, its real validation lives in `validation_by_locale`, not the universal `validation` block.
-- **A validation that confirms 90% of random input is not a validation.** It's a format hint at best. Don't let it influence disambiguation decisions as if it were evidence.
-- **Expanding locale coverage is the path to accuracy**, not relaxing heuristics. Each new locale pattern is a precise, measurable, testable improvement. Weakening a gate to compensate for thin coverage is borrowing against future correctness.
+- **Prefer precise locale-specific validation over permissive universal patterns.** If a type is `designation: locale_specific`, its real validation lives in `validation_by_locale`, not the universal `validation` block.
+- **A validation that confirms 90% of random input is not a validation.**
+- **Expanding locale coverage is the path to accuracy**, not relaxing heuristics.
 
 ## Current State
 
@@ -30,29 +29,17 @@ Concretely:
 
 ### Recent milestones
 
-- **Phase 0 taxonomy audit** (NNFT-162) — Collapsed 8 niche types (171 → 163): cpu, generation → entity_name; degree, nationality, occupation → categorical; university → entity_name; slug → alphanumeric_id; uri → merged into url (37% training overlap, NNFT-161). Added `remap_collapsed_label()` in column.rs for v0.3.0 model backward compatibility — intercepts predictions of collapsed types in vote aggregation and semantic header hints. Tier graph simplified: removed VARCHAR_academic and VARCHAR_hardware categories, updated VARCHAR_person (13→11) and VARCHAR_internet (7→5). **Zero regressions**: Profile eval 116/120 (96.7%), SOTAB 43.6% label / 68.6% domain (+0.3pp each). Part of Sense & Sharpen pivot (decision-004).
-- **NNFT-143 retraining regression fix** (NNFT-143) — Added Rule 17: UTC offset disambiguation override (leading +/- sign distinguishes offsets from HH:MM times). Retraining to fix world_cities.name failed (non-deterministic training, no seed support) — models restored to v0.3.0 from HuggingFace. Profile eval with v0.3.0 models + current code: 69/74 (93.2%). world_cities.name regression from post-v0.3.0 code changes (geography protection only guards full_name hints, not last_name from Model2Vec). Investigation deferred to NNFT-145.
-- **Entity name & paragraph taxonomy expansion** (NNFT-137) — Added `representation.text.entity_name` and `representation.text.paragraph` types to address full_name overcall on non-person entities (companies, venues, products). Types are in taxonomy (171 total) and generators, but v0.3.0 models (169 types) remain active — NNFT-137 retraining was reverted. Eval SQL updated with entity_name↔full_name interchangeability for "name" GT labels.
-- **Text overcall investigation** (NNFT-134) — Root cause analysis of 5,243 full_name/full_address overcall columns (86% false positive rate). Added text length demotion rule (Rule 16): full_address predictions with median value length >100 demoted to representation.text.sentence. 441 columns corrected. SOTAB domain: 62.6% → 64.4% (+1.8pp). Finding: full_name overcall (3,086 cols) needs model retraining — no surgical rule available.
-- **Phone validation precision & locale expansion** (NNFT-132, NNFT-136) — Established Precision Principle: locale-only confirmation for locale-specific types. Expanded phone locale patterns with extension suffixes, (0) trunk prefix, ZA locale, slash/en-dash separators. SOTAB format-detectable: 39.5% → 42.5% label (+3.0pp), 59.5% → 62.6% domain (+3.1pp). Telephone cardinality demotions: 254 → 24. Profile eval unchanged at 70/74.
-- **Post-v0.3.0 disambiguation sprint** (NNFT-131) — Duration vs SEDOL override rule (Rule 14), TLD added to CODE_ATTRACTORS, SOTAB schema mapping expanded for DateTime/Date variants. SOTAB format-detectable: 30.5% → 39.5% label (+9.0pp), 54.8% → 59.5% domain (+4.7pp). Profile eval unchanged at 70/74.
-- **v0.3.0** — Accuracy release: geography-aware header hints (NNFT-127) and measurement disambiguation (NNFT-128). Profile eval 68/74 → 70/74 (94.6%). world_cities.name now correctly predicts city; medical_records.height_in now correctly predicts height.
-- **v0.2.2** — Locale-aware phone number validation (NNFT-121) with 14 locale patterns derived from libphonenumber. phone_number added to TEXT_ATTRACTORS for demotion of false positives. Infrastructure hardening, no eval score change (68/74).
-- **v0.2.1** — Locale-aware postal code validation (NNFT-118), max-sim semantic matching with K=3 FPS representatives (NNFT-124), threshold tuning (NNFT-122), targeted synonyms (NNFT-123). Smarter column classification with reduced false positives.
-- **v0.2.0** — Multi-signal attractor demotion (NNFT-115), JSON Schema validation engine (NNFT-116), numeric range validation (NNFT-117). Reduces false positives on generic numeric data and modernises the validation engine.
-- **v0.1.9** — Model2Vec semantic column name classifier (NNFT-110), unified column-level disambiguation (NNFT-109). Profile eval 55/74 → 68/74 format-detectable correct (+13, 0 regressions). Homebrew tap auto-updated.
-- **v0.1.8** — 30x tiered inference throughput, accuracy 72.6% -> 92.9% on profile eval, Windows release target, header-hint override system
-- **v0.1.7** — Tiered model graph as default inference engine, `ValueClassifier` trait for polymorphic dispatch
-- **v0.1.6** — CharCNN v7, evaluation infrastructure, GitTables/SOTAB benchmarks
-- **DuckDB extension v0.2.0** — Tiered model, 168 types, 19 new DuckDB type mappings. Merged into community extensions (NNFT-092)
+- **Sense model spike** (NNFT-163) — Phase 1 of Sense & Sharpen pivot. Architecture A (cross-attention over Model2Vec): 88.5% broad accuracy, 78.0% entity subtype, 3.6ms/column. Dominates FineType (45.2% broad, 73ms). Conditional GO for Phase 2. Finding: `discovery/architectural-pivot/PHASE1_FINDING.md`.
+- **Phase 0 taxonomy audit** (NNFT-162) — Collapsed 8 niche types (171 → 163). Added `remap_collapsed_label()` for v0.3.0 model backward compat. Zero regressions: 116/120 profile, 43.6%/68.6% SOTAB.
+- **Entity classifier integrated** (NNFT-151, NNFT-152) — Deep Sets MLP demotes full_name → entity_name for non-person columns. SOTAB +3.9pp domain. Entity demotion guard prevents header hints from overriding.
+- **v0.3.0** — Accuracy release: geography-aware header hints, measurement disambiguation. Profile eval 68/74 → 70/74. Models still active (169-type label space).
 
 ### What's in progress
 
-- **Entity classifier integrated** (NNFT-151, NNFT-152) — Deep Sets MLP entity classifier now runs in Rust column inference pipeline. When CharCNN votes full_name, the entity classifier checks if column values are non-person entities (organizations, places, creative works) and demotes to entity_name. Architecture: 300-dim features (128 emb_mean + 128 emb_std + 44 statistical features) → BatchNorm → 3×Linear/ReLU → 4-class softmax. Shares Model2Vec tokenizer+embeddings with SemanticHintClassifier. Entity demotion guard prevents header hints from overriding entity demotion decisions. **SOTAB**: 42.5% → 43.3% label (+0.8pp), 64.4% → 68.3% domain (+3.9pp). Entity demotion fires on 3,027 SOTAB columns (18.1%). **Profile eval**: 116/120 (96.7%) after NNFT-156 rule fixes. Model artifacts in `models/entity-classifier/`, Rust code in `crates/finetype-model/src/entity.rs`.
-- **CLDR-enriched retraining attempted and rolled back** (NNFT-157–161) — Five-phase plan to retrain tiered model with CLDR-enriched training data. Phase 1: CLDR data extraction (2,823 date + 2,824 time patterns, 706 locales). Phase 2: Generator enrichment (31 locales with DateOrder enum and locale cycling in locale_data.rs and generator.rs). Phase 3: Generated 84,500 training samples (169 types × 500, seed 42). Phase 4: Retrained tiered model — **regressed 107/120 vs 116/120 baseline**, rolled back to v0.3.0 snapshot. Phase 5: Root cause analysis identified 3 systemic issues: (1) URL/URI training overlap (37% of URI samples use http/https — indistinguishable from URL), (2) T1 VARCHAR routing degradation (3 regressions from changed decision boundaries), (3) training data diversity gaps (hostname lacks hyphens/subdomains, UTC offset lacks bare patterns). **Next attempt requires**: diversify hostname patterns, add bare UTC offset patterns, increase samples to 1000 per type. URI/URL overlap resolved by merging URI into URL (NNFT-162 Phase 0). Infrastructure retained: CLDR extraction scripts in `scripts/`, enriched locale_data.rs with 31 locales.
-- **Next accuracy targets** — 4 misses at 116/120 (NNFT-156 fixed cvv + world_cities.name): codes_and_ids.swift_code (sedol overcall — SEDOL validation should fail on 8-char SWIFT codes), countries.name (entity_name overcall — entity classifier correctly demotes but GT expects geography.location.country; vote-distribution geography rescue attempted in NNFT-156 but reverted due to model voting city>country and entity_name↔full_name eval interchangeability causing regressions on other "name" columns; needs entity classifier class-level output to distinguish place vs org), people_directory.company (categorical vs entity_name — entity demotion doesn't fire because top vote isn't full_name), books_catalog.publisher (city vs entity_name — low-confidence model confusion). **Model state:** v0.3.0 models (169 types) restored from HuggingFace; taxonomy has 163 types (entity_name + paragraph added, 8 niche types collapsed in NNFT-162). `remap_collapsed_label()` bridges the gap between model predictions (169 types) and current taxonomy (163 types). Entity classifier is a separate model (4-class MLP, not part of CharCNN).
-- **Sense model spike completed** (NNFT-163) — Phase 1 of Sense & Sharpen pivot. Trained two architectures on 31,719 SOTAB columns for 6-class broad category routing + 4-class entity subtyping. **Architecture A (winner):** cross-attention over Model2Vec embeddings — 88.5% broad accuracy, 78.0% entity subtype, 3.6ms/column. **Architecture B:** small transformer encoder — 86.9% broad, 77.4% entity, 85.4ms/column (exceeds 50ms target). Compared against FineType: Sense A routes 2x more accurately (88.5% vs 45.2%) and 20x faster (3.6ms vs 73ms). **Conditional GO for Phase 2** — below 95% broad target but architecture is sound. Finding: `discovery/architectural-pivot/PHASE1_FINDING.md`. Model artifacts: `models/sense_spike/arch_a/` (winner), `models/sense_spike/arch_b/`. Training scripts: `scripts/train_sense_model.py`, `scripts/prepare_sense_data.py`.
-- **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval (120-column smoke test) and real-world benchmarks (GitTables 47%, SOTAB 42%) meaningfully measure type inference quality. Time-boxed 4-6 hours.
+- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. Phase 0 (taxonomy audit) and Phase 1 (model spike) complete. Phase 2 (Integration Design) next: design Sense → Sharpen interface, plan Candle/Rust implementation.
+- **CLDR retraining rolled back** (NNFT-157–161) — Retrained tiered model regressed 107/120 vs 116/120 baseline. Root causes: URL/URI training overlap (resolved by NNFT-162 merge), T1 routing degradation, training data gaps. Next attempt needs: diversified hostname patterns, bare UTC offset patterns, 1000 samples/type. CLDR infrastructure retained in `scripts/` and `locale_data.rs`.
+- **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
+- **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval + real-world benchmarks meaningfully measure type inference quality.
 
 ## Architecture
 
@@ -66,10 +53,9 @@ finetype/
     finetype-cli/      # CLI binary (infer, profile, generate, check, train)
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
   labels/              # Taxonomy YAML definitions (6 domain files)
-  models/              # Pre-trained model directories (char-cnn-v1..v7, tiered-v1..v2, model2vec, entity-classifier)
+  models/              # Pre-trained model directories
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
   tests/               # CLI smoke tests
-  docs/                # Taxonomy comparison, architecture docs
   data/                # Reference data files + locale data sources (data/cldr/)
 ```
 
@@ -86,208 +72,123 @@ finetype-model (depends on core — CharCNN, tiered inference, column mode)
 
 ### Inference pipeline
 
-The inference system has two modes:
+**Value-level:** Single string → type label via `CharClassifier` (flat, 169 classes) or `TieredClassifier` (46 CharCNN models in T0→T1→T2 graph). Both implement `ValueClassifier` trait.
 
-**1. Value-level inference** — Single string -> type label
-- `CharClassifier` (flat): Single CharCNN model, 169 classes (v0.3.0 label space), ~1,500 val/sec
-- `TieredClassifier` (hierarchical): 46 CharCNN models in T0->T1->T2 graph (34 trained, 12 direct), ~580 val/sec, higher accuracy on ambiguous types
-
-**2. Column-level inference** — Vector of strings -> single column type
-- Runs value-level inference on each value
-- Remaps collapsed type labels via `remap_collapsed_label()` (NNFT-162): v0.3.0 models predict 169 types; 8 collapsed types are redirected to their targets before vote aggregation (e.g., `identity.person.occupation` → `representation.discrete.categorical`, `technology.internet.uri` → `technology.internet.url`)
-- Aggregates predictions via majority vote
-- Applies disambiguation rules (date formats, coordinates, boolean subtypes, numeric ranges, categorical detection, duration override, attractor demotion, text length demotion, entity demotion)
-- **Duration override** (Rule 14, NNFT-131): When top vote is SEDOL but ≥50% of values match ISO 8601 duration pattern (P prefix + time component letters Y/M/W/D/T/H/S), overrides to `datetime.duration.iso_8601`. Must run before attractor demotion to prevent SEDOL being demoted to `alphanumeric_id` instead of the correct `duration`.
-- **Attractor demotion** (Rule 15): Demotes over-eager specific type predictions using three signals — validation schema failure (>50%), confidence threshold (<0.85 when not locale-confirmed), and cardinality mismatch (1-20 unique values for text attractors, skipped when locale-confirmed). Requires `Taxonomy` to be wired into `ColumnClassifier`. Demoted predictions are treated as generic for header hint override. Code attractors: icao_code, ndc, cusip, top_level_domain (NNFT-131). **Locale-aware validation** (NNFT-118, NNFT-132): For types with `validation_by_locale`, Signal 1 first checks all locale patterns — if any locale achieves >50% pass rate, the prediction is locale-confirmed (skips Signals 2 and 3). Universal validation can reject (Signal 1) but cannot confirm — passing universal validation alone leaves the prediction vulnerable to all signals. This prevents permissive universal patterns from giving false confidence (see Precision Principle).
-- **Text length demotion** (Rule 16, NNFT-134): When top vote is `full_address` and the median non-empty value length exceeds 100 characters, demotes to `representation.text.sentence`. Real addresses have median ~23 chars; free-form text (descriptions, recipes, paragraphs) has median ~53+ chars. Threshold 100 gives 0% false demotion on evaluation data.
-- **UTC offset override** (Rule 17, NNFT-143): When top vote is any `datetime.time.*` type or `datetime.timestamp.rfc_3339`, and ≥80% of non-empty values match the `[+-]HH:MM` pattern (exactly 6 chars), overrides to `datetime.offset.utc`. The mandatory leading sign (+/-) is the syntactic distinguisher from plain time values. Runs between duration override and attractor demotion.
-- **Entity demotion** (Rule 18, NNFT-152): When majority vote is `identity.person.full_name` and the entity classifier is loaded, checks whether column values are person names. Deep Sets MLP (300-dim features: 128 emb_mean + 128 emb_std + 44 statistical features → BatchNorm → 3×Linear/ReLU → 4-class softmax) classifies columns as person/organization/place/creative. If max non-person probability > 0.6, demotes to `representation.text.entity_name`. Shares Model2Vec tokenizer+embeddings with SemanticHintClassifier. Fires after disambiguation rules (Rule 14–17) but before header hints. **Entity demotion guard**: when entity demotion is applied, header hints are skipped entirely — the entity classifier's data-driven decision takes priority over column-name-based hints. Without this guard, entity_name (broad_words designation → generic) would be overridden by header hints, cascading to worse predictions. Model artifacts: `models/entity-classifier/model.safetensors` + `config.json`. Code: `crates/finetype-model/src/entity.rs`.
-- **Semantic header hints** (Model2Vec): embeds column name → max-sim matching against 169 types × K=3 representative embeddings (v0.3.0 label space; collapsed type predictions remapped via `remap_collapsed_label`) → overrides generic predictions above 0.65 threshold. Falls back to hardcoded `header_hint()` when Model2Vec unavailable. **Geography protection** (NNFT-127, NNFT-156): when hint is any person-name type (full_name, last_name, first_name — `PERSON_NAME_HINTS` const), checks if model sees geography signal — keeps location predictions rather than overriding, and rescues attractor-demoted predictions when geography votes exist. Expanded from full_name-only in NNFT-156 because Model2Vec returns last_name for "name" headers on city/country columns. **Measurement disambiguation** (NNFT-128): when both hint and prediction are measurement types (age/height/weight), trusts the header since values are numerically indistinguishable.
-- **Post-hoc locale detection** (NNFT-140): After type classification and disambiguation, runs sample values against `validation_by_locale` patterns to detect the most likely locale. Returns the locale with the highest pass rate above 50%. Locale is cleared if a header hint changes the label. Works for phone_number (15 locales) and postal_code (14 locales). Implements decision-002 Option B.
-- **`is_generic` determination** (NNFT-139, NNFT-156): `is_generic_prediction()` function uses five additive signals to decide if a prediction should yield to header hints: (1) attractor-demoted → always generic, (1b) numeric_postal_code_detection heuristic → always generic (NNFT-156: pattern-based heuristic should yield to explicit headers like "cvv"), (2) boolean → always generic, (3) hardcoded catch-all list (phone_number, first_name, iata_code, etc.) → always generic, (4) taxonomy designation `broad_words`/`broad_characters`/`broad_numbers`/`broad_object` → additionally generic. Signals are additive — hardcoded list always applies, designation expands the set further.
-
-Both classifiers implement the `ValueClassifier` trait for polymorphic dispatch.
+**Column-level:** Vector of strings → single column type:
+1. Run value-level inference on each value
+2. Remap collapsed type labels via `remap_collapsed_label()` (8 types redirected, NNFT-162)
+3. Aggregate via majority vote
+4. Apply disambiguation rules in order:
+   - **Rule 14 — Duration override:** SEDOL + ISO 8601 P-prefix ≥50% → duration. Runs before attractor demotion.
+   - **Rule 15 — Attractor demotion:** Three signals (validation failure >50%, confidence <0.85, cardinality 1-20). Locale-confirmed predictions skip Signals 2-3. Demoted → generic for header hints.
+   - **Rule 16 — Text length demotion:** full_address + median length >100 → sentence.
+   - **Rule 17 — UTC offset override:** `[+-]HH:MM` at ≥80% → `datetime.offset.utc`. Between Rules 14 and 15.
+   - **Rule 18 — Entity demotion:** full_name + entity classifier non-person >0.6 → entity_name. Fires before header hints. **Entity demotion guard:** skips header hints entirely when applied.
+5. **Semantic header hints** (Model2Vec): column name → max-sim K=3 matching at 0.65 threshold → overrides generic predictions. Geography protection for person-name hints (`PERSON_NAME_HINTS`). Measurement disambiguation for age/height/weight.
+6. **Post-hoc locale detection:** Runs sample values against `validation_by_locale` patterns. Returns locale with highest pass rate >50%.
+7. **`is_generic` determination:** Five additive signals — attractor-demoted, numeric_postal_code_detection, boolean, hardcoded list, taxonomy designation.
 
 ### Tiered model architecture
 
 ```
 Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
-  |
-Tier 1: Domain routers per DuckDB type (e.g., VARCHAR -> address/code/person/internet/...)
-  |
-Tier 2: Leaf classifiers per domain (e.g., VARCHAR_person -> email/full_name/username/...)
+  → Tier 1: Domain routers (VARCHAR → address/code/person/internet/...)
+    → Tier 2: Leaf classifiers (VARCHAR_person → email/full_name/username/...)
 ```
 
-- 34 specialised CharCNN models, each trained on its tier's subset
-- `tier_graph.json` defines the routing hierarchy
-- `manifest.txt` lists all model files for embedding
-- Models stored in `models/tiered-v2/` with subdirectories per tier node
+34 specialised CharCNN models. Graph in `models/tiered-v2/tier_graph.json`.
 
 ### Taxonomy structure
 
-Labels follow `domain.category.type` hierarchy (e.g., `identity.person.email`, `datetime.date.iso`).
+Labels: `domain.category.type` (e.g., `identity.person.email`). 6 domains: container (11), datetime (46), geography (16), identity (31), representation (29), technology (30).
 
-**6 domains:**
-- `container` — JSON, XML, YAML, CSV, arrays (11 types, recursive inference)
-- `datetime` — Date, time, timestamp formats across locales (46 types)
-- `geography` — Addresses, coordinates, country/region codes (16 types)
-- `identity` — Person, organisation, financial, medical identifiers (31 types)
-- `representation` — Boolean, categorical, ordinal, numeric, text, alphanumeric (29 types)
-- `technology` — Internet, development, cryptographic, file types (30 types)
+Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB type), `format_string`, `transform` (SQL expression), `validation`, `tier`, `decompose`.
 
-Each definition in `labels/definitions_*.yaml` is a **transformation contract** specifying:
-- `broad_type` — Target DuckDB type
-- `format_string` — DuckDB strptime format (if date/time)
-- `transform` — DuckDB SQL expression (`{col}` placeholder)
-- `validation` — Pattern or constraint for the type
-- `tier` — Path in the inference graph
-- `decompose` — Optional struct expansion
+### DuckDB extension
 
-### DuckDB extension functions
+| Function | Purpose |
+|---|---|
+| `finetype(col)` / `finetype(list, header?)` | Column-level classification |
+| `finetype_detail(col)` / `finetype_detail(list, header?)` | Full detail (JSON) |
+| `finetype_cast(value)` | Normalize value for TRY_CAST |
+| `finetype_unpack(json)` | Recursively classify JSON fields |
+| `finetype_version()` | Version string |
 
-| Function | Signature | Purpose |
-|---|---|---|
-| `finetype(col)` | `VARCHAR -> VARCHAR` | Column-level classification (uses chunk as sample) |
-| `finetype(list, header?)` | `LIST<VARCHAR>[, VARCHAR] -> VARCHAR` | Explicit column classification with optional header hint |
-| `finetype_detail(col)` | `VARCHAR -> VARCHAR (JSON)` | Full classification detail (confidence, votes, DuckDB type) |
-| `finetype_detail(list, header?)` | `LIST<VARCHAR>[, VARCHAR] -> VARCHAR (JSON)` | Explicit column detail |
-| `finetype_cast(value)` | `VARCHAR -> VARCHAR` | Normalize value for safe TRY_CAST |
-| `finetype_unpack(json)` | `VARCHAR -> VARCHAR (JSON)` | Recursively classify JSON fields |
-| `finetype_version()` | `-> VARCHAR` | Extension version string |
-
-**Note:** The DuckDB extension currently embeds the flat CharCNN model (not tiered) for performance. The `finetype()` scalar function uses chunk-aware column classification — each ~2048-row processing chunk is treated as a column sample for disambiguation.
+Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 
 ### CLI commands
 
 | Command | Purpose |
 |---|---|
-| `finetype infer` | Classify values from stdin (single or column mode). `--header` adds header hint, `--batch` reads JSONL for bulk column classification. |
-| `finetype profile <file>` | Profile all columns in a CSV/Parquet file |
-| `finetype check` | Validate taxonomy <-> generator alignment |
+| `finetype infer` | Classify values (single/column/batch mode) |
+| `finetype profile <file>` | Profile all columns in CSV/Parquet |
+| `finetype check` | Validate taxonomy ↔ generator alignment |
 | `finetype generate` | Generate synthetic training data |
-| `finetype train` | Train CharCNN models (flat or tiered). `--seed N` for deterministic training. Auto-snapshots existing model directory before overwriting. Writes `manifest.json` with provenance metadata. |
-| `finetype taxonomy` | Print taxonomy summary. `--full --output json` exports all 19 fields per type (description, validation, samples, tier, etc.). |
-| `finetype schema <key>` | Export JSON Schema for a type. `--pretty` for formatted output. Supports glob patterns (`"domain.category.*"`). |
+| `finetype train` | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
+| `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
+| `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns) |
 
 ### Evaluation infrastructure
 
-Six evaluation components, all in `eval/`:
+**Profile eval** (`eval/profile_eval.sh`) — 96.7% label (116/120), 98.3% domain (118/120) on 21 datasets.
+**GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
+**SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
+**Actionability eval** (`eval/eval_actionability.py`) — 98.7% datetime format_string parse rate.
+**Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
+**Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 
-**Core benchmarks:**
-1. **Profile eval** (`eval/profile_eval.sh`) — Regression smoke test on annotated CSV datasets. Scores against `schema_mapping.yaml`. Current: 96.7% label accuracy (116/120), 98.3% domain accuracy (118/120) on format-detectable (direct+close) types across 21 datasets.
-2. **GitTables 1M** (`eval/gittables/`) — Large-scale benchmark against GitTables corpus. v0.3.0 CLI: 47.1% label / 56.5% domain accuracy on format-detectable types (4,481 columns, 45,428 total). v0.1.8 DuckDB: 57.8% domain (14,850 tables, 2.7M values).
-3. **SOTAB CTA** (`eval/sotab/`) — Schema.org type annotation benchmark. Post-NNFT-162 CLI: 43.6% label / 68.6% domain accuracy on format-detectable types (11,650 columns, 16,765 total). Post-NNFT-152: 43.3% label / 68.3% domain. Post-NNFT-134: 42.5% label / 64.4% domain. Post-NNFT-131: 39.5% label / 59.5% domain. v0.3.0 baseline: 30.5% label / 54.8% domain. v0.1.8 DuckDB: 53.7% domain (5,728 tables, 16,765 columns).
-
-**Analyst-centric metrics (NNFT-147):**
-4. **Precision per type** — SQL sections in SOTAB/GitTables eval scripts. Per-predicted-type precision with thresholds: 🟢≥95% (analyst can act), 🟡80-95% (spot-check), 🔴<80% (untrustworthy). Includes overcall analysis for 10 high-risk types (full_name, entity_name, full_address, URL, geography, postal_code) showing GT label breakdown of false positives.
-5. **Actionability eval** (`eval/eval_actionability.py`) — Tests whether FineType's `format_string` predictions actually parse real data. Runs TRY_STRPTIME via DuckDB on profile eval datasets. Current: 98.7% overall (2990/3030 values), 25/26 columns at 100%, 16 datetime types tested. Target: >95% for datetime types.
-6. **Confidence calibration** — SQL sections in SOTAB/GitTables eval scripts. Bins predictions by confidence decile, compares actual accuracy vs reported confidence. Target: calibration gap <10pp.
-
-**Dashboard:** `make eval-report` runs profile eval + actionability eval and generates `eval/eval_output/report.md` — a unified markdown dashboard with headline metrics, precision per type, actionability by format, and evaluation component status.
-
-All eval pipelines use `eval/config.env` for dataset paths with `envsubst` substitution in SQL templates. CLI-based eval pipelines (`eval-1m-cli`, `eval-sotab-cli`) use Python scripts to pipe columns through `finetype infer --mode column --batch`, then score with adapted SQL.
+All eval pipelines use `eval/config.env` + `envsubst` for dataset paths.
 
 ### Adding regression datasets
 
-When fixing a misclassification or adding new type support, add a regression dataset alongside the code change:
+1. Create/extend CSV in `/home/hugh/datasets/` (~80 rows)
+2. Add entries in `eval/datasets/manifest.csv` (dataset, file_path, column_name, gt_label)
+3. Add schema mapping in `eval/schema_mapping.yaml` (match_quality: direct/close/partial)
+4. `make eval-mapping` → `make eval-report` → verify
 
-1. **Create or extend a CSV** in `/home/hugh/datasets/` with representative data for the type. Use ~80 rows. Name it descriptively (e.g., `datetime_formats_extended.csv`).
-2. **Add manifest entries** in `eval/datasets/manifest.csv` — one row per column: `dataset,file_path,column_name,gt_label`. Choose GT labels that match schema mapping conventions.
-3. **Add schema mapping entries** in `eval/schema_mapping.yaml` — map each GT label to a FineType label with `match_quality: direct` (1:1 format match), `close` (minor semantic gap), or `partial` (format-dependent). Set `source: profile`.
-4. **Regenerate CSV:** `make eval-mapping` regenerates `eval/schema_mapping.csv` from the YAML.
-5. **Run evaluation:** `make eval-report` runs profile eval + actionability eval + report generation.
-6. **Verify:** New columns should appear in the report with correct classifications and format_string parsing.
-
-**Naming conventions:**
-- GT labels use lowercase with spaces: `eu dot date`, `time 12h seconds`, `rfc 2822 timestamp`
-- Match quality: `direct` when GT label maps 1:1 to a FineType type, `close` for minor gaps, `partial` for format-dependent types (e.g., `timestamp` maps to multiple specific sub-types)
-
-**Current datasets:** 21 CSV files, 120 format-detectable columns across payment, identity, medical, network, geographic, datetime, and person attribute types.
+GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable columns.
 
 ## Priority Order
 
-Current priorities, in order:
-
-1. **Accuracy lift** — Address top misclassification patterns, expand disambiguation rules (NNFT-090, NNFT-099, NNFT-100)
-2. **Documentation** — README update with tiered architecture (NNFT-096), CHANGELOG maintenance (NNFT-095)
-3. **Distribution** — Homebrew tap update (NNFT-086), crates.io keep current (NNFT-093 done)
-4. **Training data quality** — Name diversity (NNFT-066), phone formats (NNFT-055), address locales (NNFT-056)
-5. **New domains** — Medical identifiers (NNFT-053), SI-prefix numbers (NNFT-057), CLDR locale data (NNFT-058/060)
+1. **Sense & Sharpen pivot** — Phase 2 Integration Design, then Candle/Rust implementation
+2. **Accuracy lift** — Address remaining misclassifications (NNFT-090, NNFT-099, NNFT-100)
+3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
+4. **Distribution** — Homebrew tap, crates.io current
+5. **Training data quality** — Name diversity, phone formats, address locales
 
 ## Decided Items
 
-Key architectural decisions that should not be revisited without good reason:
+Key decisions — do not revisit without good reason. See backlog decisions and task details for full context.
 
-1. **Tiered model as default** — The T0->T1->T2 hierarchical model is the default for CLI inference. Flat model remains available via `--model-type flat` and is used in the DuckDB extension for throughput. (NNFT-084, NNFT-087, NNFT-089)
-
-2. **Taxonomy label format: `domain.category.type`** — Three-level dotted hierarchy. Locale is a field in the YAML definition, not part of the label. (NNFT-001)
-
-3. **YAML transformation contracts** — Each type definition specifies its DuckDB broad_type, transform SQL, and validation pattern. This is the interface between FineType and downstream tools. (NNFT-001)
-
-4. **CharCNN architecture** — Character-level CNN for text classification. Candle (Rust) for both training and inference. No Python dependency at runtime. (NNFT-003)
-
-5. **Column-mode disambiguation** — Majority vote + rule-based disambiguation. Rules are hardcoded in `column.rs`, not learned. Header hints override generic predictions. Two specialised hint guards: geography protection prevents person-name hints (full_name, last_name, first_name — `PERSON_NAME_HINTS`) from overriding correct location predictions (NNFT-127, NNFT-156), and measurement disambiguation trusts headers over model predictions when both are in the {age, height, weight} group (NNFT-128). (NNFT-065, NNFT-091, NNFT-102, NNFT-127, NNFT-128, NNFT-156)
-
-5a. **Model2Vec semantic header hints with max-sim matching** — Column name classification uses Model2Vec static embeddings (potion-base-4M, 7.4MB float16) with max-sim matching against pre-computed type embeddings. Each type stores K=3 representative embeddings selected via Farthest Point Sampling (FPS), avoiding centroid dilution from mean-pooling diverse synonyms. `type_embeddings.safetensors` uses interleaved layout `[n_types*K, embed_dim]`; K is inferred at load time from shape ratio (`type_embeddings.rows / label_index.len()`), so K=1 old artifacts are backward-compatible. Threshold 0.65 balances precision and recall with one known borderline FP (data→form_data at 0.687). Falls back to hardcoded `header_hint()` when Model2Vec unavailable. Model artifacts in `models/model2vec/`, embedded at build time. `prepare_model2vec.py` supports `--max-k N` (default 3) and `--legacy` (force K=1 mean-pool). No new Rust dependencies — uses existing candle-core + tokenizers. (NNFT-110, NNFT-122, NNFT-124)
-
-6. **DuckDB extension uses flat model** — Embedding 34 tiered models is feasible (11MB binary) but the flat model is simpler and faster for batch SQL workloads. The extension uses chunk-aware column classification instead. (NNFT-092)
-
-7. **Models on HuggingFace** — Pre-trained models hosted at `hughcameron/finetype` on HuggingFace. CI downloads models via `.github/scripts/download-model.sh`. Models are not committed to the git repo. (NNFT-020, NNFT-088)
-
-8. **Boolean taxonomy restructured** — Moved from `technology.development.boolean` to `representation.boolean.{binary,initials,terms}` for semantic clarity. (NNFT-075)
-
-9. **Pre-commit hook in `.githooks/`** — Runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`. Activated via `make setup`. (NNFT-072)
-
-10. **Evaluation paths via config.env** — All eval scripts use `eval/config.env` + `envsubst` for dataset paths. No hardcoded absolute paths. (NNFT-108)
-
-11. **Attractor demotion (Rule 15)** — Multi-signal disambiguation rule that demotes over-eager specific type predictions (postal_code, cvv, first_name, icao_code, top_level_domain, etc.) to generic `representation.*` types. Three signals: validation failure (>50% fail type's regex), confidence threshold (<0.85 when not locale-confirmed), cardinality mismatch (1-20 unique values for text attractors, skipped when locale-confirmed). For locale-specific types, only `locale_confirmed` (from `validation_by_locale`) gates Signals 2 and 3 — universal validation can reject but cannot confirm (see Decided Item 14). Taxonomy is wired into `ColumnClassifier` via `set_taxonomy()`. Demoted predictions treated as generic for header hint override. `full_name` deliberately excluded from attractor list — too many legitimate uses. TLD added to CODE_ATTRACTORS (NNFT-131) — numeric values fail TLD's alphabetic validation pattern. (NNFT-115, NNFT-131, NNFT-132)
-
-11a. **Duration override (Rule 14)** — When top vote is `identity.payment.sedol` and ≥50% of non-empty values start with 'P' and contain ISO 8601 time component letters (Y/M/W/D/T/H/S), overrides to `datetime.duration.iso_8601`. Runs before attractor demotion because SEDOL is in CODE_ATTRACTORS — without this rule, attractor demotion would demote to `alphanumeric_id` instead of the correct `duration`. Pattern handles both standard (PT20M, P1DT12H) and malformed (PD1TH0M0) durations found in SOTAB. (NNFT-131)
-
-12. **JSON Schema validation via jsonschema-rs** — Validation uses `jsonschema` crate (v0.42.1, pure Rust, MIT, Draft 2020-12) instead of hand-rolled regex. `CompiledValidator` pre-compiles schemas once; taxonomy caches validators via `compile_validators()`. Hybrid strategy: string keywords delegated to jsonschema, numeric bounds (minimum/maximum) handled manually for string→f64 parsing semantics. `Taxonomy::clone()` drops the cache (jsonschema::Validator doesn't impl Clone). Enables future `format`, `oneOf`, `if/then` keywords. (NNFT-116)
-
-13. **Locale-specific validation via `validation_by_locale`** — Taxonomy definitions can include per-locale validation schemas alongside the universal `validation` block. `compile_locale_validators()` pre-compiles locale patterns into a nested cache (label → locale → CompiledValidator). Attractor demotion Signal 1 checks locale patterns first — if any locale achieves >50% pass rate on sample values, the prediction is locale-confirmed (skips demotion). Currently used for 5 types: postal_code (14 locales, Google libaddressinput Apache 2.0), phone_number (15 locales, Google libphonenumber Apache 2.0), calling_code (17 locales, ITU-T E.164), month_name (6 locales, Unicode CLDR), day_of_week (6 locales, Unicode CLDR). Phone patterns include optional extension suffixes, (0) trunk prefix notation, and expanded separators. Patterns embedded in YAML, not downloaded at runtime. (NNFT-118, NNFT-121, NNFT-136, NNFT-141)
-
-14. **Validation precision for locale-specific types** — For types marked `designation: locale_specific`, validation has three tiers with distinct semantics. (1) **Locale validation** (`validation_by_locale`): the real confirmation — locale-specific structural patterns (digit counts, grouping rules per country). Sets `locale_confirmed`. (2) **Universal validation** (`validation`): a necessary format check that can reject (Signal 1 demotion) but cannot confirm. Passing universal validation alone means "format-compatible but unconfirmed." (3) **No match**: demote. Only `locale_confirmed` gates Signals 2 and 3 for locale-specific types. Universal validation success without locale confirmation provides no special treatment. This prevents permissive universal patterns (e.g., phone's `^[+]?[0-9\s()\-\.]+$`) from giving false confidence. The path to accuracy is expanding locale coverage, not relaxing gates. (NNFT-132)
-
-15. **Designation-aware `is_generic` determination** — `is_generic_prediction()` function replaces the old inline match block. Uses five additive signals: (1) attractor-demoted → always generic, (1b) numeric_postal_code_detection → always generic (NNFT-156), (2) boolean → always generic, (3) hardcoded catch-all list → always generic, (4) taxonomy designation `broad_words`/`broad_characters`/`broad_numbers`/`broad_object` → additionally generic. **Critical**: hardcoded list (Signal 3) runs before taxonomy lookup (Signal 4) — designation is additive, never removes types from the generic set. This prevents types like `phone_number` (locale_specific designation, but in hardcoded list) from losing their generic status when taxonomy is present. (NNFT-139, NNFT-156)
-
-16. **Post-hoc locale detection** — After type classification and all disambiguation rules, `detect_locale_from_validation()` runs sample values against `validation_by_locale` patterns for the classified type. Returns the locale with the highest pass rate above 50%. Implements decision-002 Option B: locale is a composable add-on, not a classification output. When a header hint changes the label, locale detection is re-run for the new type (NNFT-141 fix — previously locale was cleared to None). CLI JSON output includes `"locale"` field when detected. Works for all types with `validation_by_locale`. (NNFT-140, NNFT-141, decision-002)
-
-17. **UTC offset override (Rule 17)** — When top vote is any `datetime.time.*` type or `datetime.timestamp.rfc_3339`, and ≥80% of non-empty values match `^[+-]\d{2}:\d{2}$` (exactly 6 chars), overrides to `datetime.offset.utc`. The CharCNN confuses UTC offsets like "+05:30" with time values like "14:30" because both share the HH:MM structure. The mandatory leading sign (+/-) is the syntactic distinguisher. Runs between Rule 14 (duration override) and Rule 15 (attractor demotion). (NNFT-143)
-
-18. **Entity classifier (binary demotion gate, Rule 18)** — Deep Sets MLP (300 → 256 → 256 → 128 → 4) classifies columns into person/place/organization/creative_work using frozen Model2Vec value embeddings (mean + std, 256-dim) plus 44 statistical features. Trained on 2,911 SOTAB validation entity columns (PyTorch), exported to safetensors for Candle inference. **Integrated into Rust column inference pipeline** (NNFT-152): loads safetensors via Candle, reuses SemanticHintClassifier's tokenizer+embeddings via pub accessors, computes 300-dim feature vector in Rust (matching Python reference), fires as Rule 18 between disambiguation and header hints. **Entity demotion guard**: when entity demotion is applied, header hints are skipped — prevents entity_name (broad_words → generic) from being overridden by column-name hints. Dual-loading: disk path (`models/entity-classifier/`) or embedded bytes via build.rs. SOTAB impact: +0.8pp label (42.5% → 43.3%), +3.9pp domain (64.4% → 68.3%), 3,027 columns affected (18.1%). Profile eval: 113/120 unchanged. (NNFT-150, NNFT-151, NNFT-152, decision-003)
-
-19. **Snapshot Learning (training safety practice)** — Never overwrite a trained model without snapshotting it first. `finetype train --output models/X` automatically copies the existing `models/X` directory to `models/X.snapshot.{ISO-timestamp}` before writing new model files. Three components: (1) **Auto-snapshot**: `snapshot_model_dir()` detects existing model artifacts (model.safetensors or tier_graph.json) and copies the directory tree recursively. Logged to stderr with snapshot path. (2) **Deterministic training**: `--seed N` flag on `finetype train` threads a seeded `StdRng` through both `CharTrainingConfig` and `TieredTrainingConfig`, replacing `thread_rng()` for reproducible shuffle order. (3) **Training manifest**: `manifest.json` written alongside model artifacts after every training run — records data file, epochs, batch size, seed, timestamp, model type, class/sample counts, and parent snapshot path. This practice was established after losing the NNFT-137 retrained model (69/74 accuracy) during an unrelated retraining run — three recovery attempts with the same data produced inconsistent results due to non-deterministic training. (NNFT-146)
+1. **Tiered model as default** — T0→T1→T2 for CLI; flat for DuckDB extension throughput. (NNFT-084/087/089)
+2. **Taxonomy labels** — `domain.category.type` dotted hierarchy. Locale is a YAML field, not label. (NNFT-001)
+3. **YAML transformation contracts** — Each type specifies DuckDB broad_type, transform SQL, validation. (NNFT-001)
+4. **CharCNN via Candle** — Rust training and inference. No Python at runtime. (NNFT-003)
+5. **Column-mode disambiguation** — Majority vote + hardcoded rules. Header hints override generic predictions. Geography protection + measurement disambiguation guards. (NNFT-065/091/102/127/128/156)
+6. **Model2Vec semantic hints** — potion-base-4M, max-sim K=3 FPS matching, 0.65 threshold. Falls back to hardcoded `header_hint()`. (NNFT-110/122/124)
+7. **Models on HuggingFace** — `hughcameron/finetype`. CI downloads via script. Not in git. (NNFT-020/088)
+8. **Attractor demotion (Rule 15)** — Three signals: validation failure, confidence, cardinality. Locale-confirmed skips Signals 2-3. Universal validation can reject but cannot confirm. (NNFT-115/131/132)
+9. **Duration override (Rule 14)** — SEDOL + P-prefix → duration. Before attractor demotion. (NNFT-131)
+10. **JSON Schema validation** — `jsonschema` crate, Draft 2020-12. Pre-compiled validators cached. (NNFT-116)
+11. **Locale-specific validation** — `validation_by_locale` for 5 types: postal_code (14 locales), phone_number (15), calling_code (17), month_name (6), day_of_week (6). Embedded in YAML. (NNFT-118/121/136/141)
+12. **Validation precision** — For `locale_specific` types: locale validation confirms, universal validation can only reject. (NNFT-132)
+13. **`is_generic` determination** — Five additive signals. Hardcoded list always applies; taxonomy designation adds more. (NNFT-139/156)
+14. **Post-hoc locale detection** — Composable add-on after classification (decision-002 Option B). (NNFT-140/141)
+15. **UTC offset override (Rule 17)** — `[+-]HH:MM` ≥80% → utc offset. Between Rules 14 and 15. (NNFT-143)
+16. **Entity classifier (Rule 18)** — Deep Sets MLP (300→4 classes). Demotes full_name → entity_name when non-person >0.6. Entity demotion guard skips header hints. (NNFT-150-152, decision-003)
+17. **Snapshot Learning** — Auto-snapshot before overwriting models. `--seed N` deterministic training. `manifest.json` provenance. (NNFT-146)
+18. **Sense Architecture A** — Cross-attention over Model2Vec beats transformer encoder: +1.6pp accuracy, 23.7x faster, simpler Candle port. (NNFT-163, decision-005)
 
 ## Build & Test
 
 ```bash
-# First time setup
-make setup              # Install git hooks
-
-# Development cycle
-cargo build             # Build default members (core, model, cli)
+make setup              # Install git hooks (first time)
+cargo build             # Build core, model, cli
 cargo test              # Run test suite
 cargo run -- check      # Validate taxonomy/generator alignment
-
-# Full CI locally
 make ci                 # fmt + clippy + test + check
-
-# DuckDB extension (separate, needs model files)
-cargo build -p finetype_duckdb --release
-
-# Release build (all targets)
-make build-release
-
-# Evaluation
-make eval-profile       # Profile eval (annotated CSVs)
-make eval-1m            # GitTables 1M via DuckDB extension (requires corpus)
-make eval-sotab         # SOTAB CTA via DuckDB extension (requires corpus)
-make eval-1m-cli        # GitTables 1M via CLI batch mode (requires corpus)
-make eval-sotab-cli     # SOTAB CTA via CLI batch mode (requires corpus)
-make eval-actionability # Actionability eval (TRY_STRPTIME on profile data)
-make eval-report        # Unified markdown dashboard (profile + actionability)
+cargo build -p finetype_duckdb --release  # DuckDB extension
+make eval-report        # Profile eval + actionability + dashboard
 ```
 
 ## Key File Reference
@@ -297,73 +198,22 @@ make eval-report        # Unified markdown dashboard (profile + actionability)
 | Taxonomy definitions | `labels/definitions_*.yaml` (6 files) |
 | Tiered model graph | `models/tiered-v2/tier_graph.json` |
 | Column disambiguation | `crates/finetype-model/src/column.rs` |
-| Header hint overrides | `crates/finetype-model/src/column.rs` (search `header_hint`) |
-| Locale detection | `crates/finetype-model/src/column.rs` (search `detect_locale_from_validation`) |
-| Locale detection architecture | `docs/LOCALE_DETECTION_ARCHITECTURE.md` |
 | Semantic hint classifier | `crates/finetype-model/src/semantic.rs` |
-| Model2Vec artifacts | `models/model2vec/` (tokenizer, embeddings, type_embeddings, label_index) |
-| Model2Vec prep script | `scripts/prepare_model2vec.py` |
+| Entity classifier (Rust) | `crates/finetype-model/src/entity.rs` |
+| Model2Vec artifacts | `models/model2vec/` |
+| Entity classifier model | `models/entity-classifier/` |
 | DuckDB type mappings | `crates/finetype-duckdb/src/type_mapping.rs` |
-| Value normalization | `crates/finetype-duckdb/src/normalize.rs` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |
 | CI workflow | `.github/workflows/ci.yml` |
-| Release workflow | `.github/workflows/release.yml` |
 | Eval config | `eval/config.env` |
 | Schema mapping | `eval/schema_mapping.yaml` |
-| Actionability eval | `eval/eval_actionability.py` |
 | Eval report generator | `eval/eval_report.py` |
-| Evaluation discovery brief | `discovery/evaluation-method/BRIEF.md` |
 | Smoke tests | `tests/smoke.sh` |
-| Locale data attribution | `data/cldr/README.md` |
-| Entity classifier (Rust) | `crates/finetype-model/src/entity.rs` |
-| Entity classifier model | `models/entity-classifier/` (model.safetensors, config.json, label_index.json) |
-| Entity classifier training | `scripts/train_entity_classifier.py` |
-| Entity classifier integration spec | `docs/ENTITY_CLASSIFIER.md` |
-| Entity disambiguation discovery | `discovery/entity-disambiguation/` (FINDING.md, spike scripts) |
-| Architectural pivot discovery | `discovery/architectural-pivot/` (BRIEF.md, REVIEW.md, PHASE0_FINDING.md, PHASE1_FINDING.md) |
-| Sense model spike scripts | `scripts/train_sense_model.py`, `scripts/prepare_sense_data.py`, `scripts/compare_sense_vs_finetype.py` |
-| Sense model artifacts | `models/sense_spike/arch_a/` (winner), `models/sense_spike/arch_b/` |
-| Sense training data | `data/sense_spike/` (train.jsonl, val.jsonl, meta.json) |
-| Collapsed type label remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
+| Architectural pivot | `discovery/architectural-pivot/` |
+| Sense model scripts | `scripts/train_sense_model.py`, `scripts/prepare_sense_data.py` |
+| Sense model artifacts | `models/sense_spike/arch_a/` (winner) |
+| Collapsed type remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
 
 ## Backlog Discipline
 
-**Every bug fix, feature, and release MUST have a corresponding backlog task.**
-
-This includes:
-
-- **Bug fixes** — Create a task (status: Done if already fixed) with root cause, fix description, and affected files
-- **Releases** — Tag releases should reference the backlog tasks included
-- **Investigations** — Even exploratory work that produces findings gets a task
-- **Infrastructure changes** — CI, build system, deployment changes
-
-If the work is already done, create the task retroactively with status `Done`, check all ACs, and write a final summary. No exceptions — this is how we maintain an audit trail.
-
-<!-- BACKLOG.MD MCP GUIDELINES START -->
-
-<CRITICAL_INSTRUCTION>
-
-## BACKLOG WORKFLOW INSTRUCTIONS
-
-This project uses Backlog.md MCP for all task and project management activities.
-
-**CRITICAL GUIDANCE**
-
-- If your client supports MCP resources, read `backlog://workflow/overview` to understand when and how to use Backlog for this project.
-- If your client only supports tools or the above request fails, call `backlog.get_workflow_overview()` tool to load the tool-oriented overview (it lists the matching guide tools).
-
-- **First time working here?** Read the overview resource IMMEDIATELY to learn the workflow
-- **Already familiar?** You should have the overview cached ("## Backlog.md Overview (MCP)")
-- **When to read it**: BEFORE creating tasks, or when you're unsure whether to track work
-
-These guides cover:
-- Decision framework for when to create tasks
-- Search-first workflow to avoid duplicates
-- Links to detailed guides for task creation, execution, and finalization
-- MCP tools reference
-
-You MUST read the overview resource to understand the complete workflow. The information is NOT summarized here.
-
-</CRITICAL_INSTRUCTION>
-
-<!-- BACKLOG.MD MCP GUIDELINES END -->
+**Every bug fix, feature, and release MUST have a corresponding backlog task.** Create retroactively with status `Done` if already complete.
