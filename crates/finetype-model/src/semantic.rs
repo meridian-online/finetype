@@ -9,6 +9,7 @@
 //! At build time they can be embedded into the binary via `build.rs`.
 
 use crate::inference::InferenceError;
+use crate::model2vec_shared::Model2VecResources;
 use candle_core::{DType, Device, Tensor};
 use std::path::Path;
 
@@ -94,26 +95,44 @@ impl SemanticHintClassifier {
         type_emb_bytes: &[u8],
         label_bytes: &[u8],
     ) -> Result<Self, InferenceError> {
+        let resources = Model2VecResources::from_bytes(tokenizer_bytes, model_bytes)?;
+        Self::from_shared(&resources, type_emb_bytes, label_bytes)
+    }
+
+    /// Load from shared Model2Vec resources plus type-embedding byte slices.
+    ///
+    /// The tokenizer and embedding matrix are cloned from `resources` (O(1)
+    /// for the Tensor due to Arc-backed storage). Only the type embeddings
+    /// and label index are loaded from the provided bytes.
+    pub fn from_shared(
+        resources: &Model2VecResources,
+        type_emb_bytes: &[u8],
+        label_bytes: &[u8],
+    ) -> Result<Self, InferenceError> {
         let device = Device::Cpu;
+        let (type_embeddings, label_index, k) =
+            Self::load_type_embeddings(type_emb_bytes, label_bytes, &device)?;
 
-        // Load tokenizer
-        let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes).map_err(|e| {
-            InferenceError::InvalidPath(format!("Failed to load Model2Vec tokenizer: {}", e))
-        })?;
+        Ok(Self {
+            tokenizer: resources.tokenizer().clone(),
+            embeddings: resources.embeddings().clone(),
+            type_embeddings,
+            label_index,
+            k,
+            threshold: DEFAULT_THRESHOLD,
+            device,
+        })
+    }
 
-        // Load token embeddings — stored as float16, convert to float32 for computation
-        let model_tensors = candle_core::safetensors::load_buffer(model_bytes, &device)?;
-        let embeddings = model_tensors
-            .get("embeddings")
-            .ok_or_else(|| {
-                InferenceError::InvalidPath(
-                    "Missing 'embeddings' tensor in model.safetensors".into(),
-                )
-            })?
-            .to_dtype(DType::F32)?;
-
-        // Load type embeddings (already float32, already L2-normalised)
-        let type_tensors = candle_core::safetensors::load_buffer(type_emb_bytes, &device)?;
+    /// Load type embeddings and label index from byte slices.
+    ///
+    /// Returns (type_embeddings tensor, label_index vec, K representatives per type).
+    fn load_type_embeddings(
+        type_emb_bytes: &[u8],
+        label_bytes: &[u8],
+        device: &Device,
+    ) -> Result<(Tensor, Vec<String>, usize), InferenceError> {
+        let type_tensors = candle_core::safetensors::load_buffer(type_emb_bytes, device)?;
         let type_embeddings = type_tensors
             .get("type_embeddings")
             .ok_or_else(|| {
@@ -123,14 +142,10 @@ impl SemanticHintClassifier {
             })?
             .to_dtype(DType::F32)?;
 
-        // Load label index
         let label_index: Vec<String> = serde_json::from_slice(label_bytes).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to parse label_index.json: {}", e))
         })?;
 
-        // Infer K (representatives per type) from the type_embeddings shape.
-        // Old artifacts: [n_types, dim] → K=1 (backward compatible).
-        // New artifacts: [n_types * K, dim] → K>1 (max-sim matching).
         let n_labels = label_index.len();
         let n_rows = type_embeddings.dim(0)?;
         if n_labels == 0 || n_rows % n_labels != 0 {
@@ -141,15 +156,7 @@ impl SemanticHintClassifier {
         }
         let k = n_rows / n_labels;
 
-        Ok(Self {
-            tokenizer,
-            embeddings,
-            type_embeddings,
-            label_index,
-            k,
-            threshold: DEFAULT_THRESHOLD,
-            device,
-        })
+        Ok((type_embeddings, label_index, k))
     }
 
     /// Set a custom similarity threshold.
@@ -658,5 +665,67 @@ mod tests {
             "Expected borderline match for 'data' at 0.65 threshold"
         );
         assert_eq!(data_result.unwrap().label, "container.key_value.form_data");
+    }
+
+    /// Integration test: from_shared() produces identical results to load().
+    #[test]
+    fn test_from_shared_matches_load() {
+        let model_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("models")
+            .join("model2vec");
+
+        if !model_dir.join("model.safetensors").exists() {
+            eprintln!("Skipping from_shared integration test: models/model2vec not found");
+            return;
+        }
+
+        // Load standalone (existing path)
+        let standalone = SemanticHintClassifier::load(&model_dir).unwrap();
+
+        // Load via shared resources (new path)
+        let resources = Model2VecResources::load(&model_dir).unwrap();
+        let type_emb_bytes = std::fs::read(model_dir.join("type_embeddings.safetensors")).unwrap();
+        let label_bytes = std::fs::read(model_dir.join("label_index.json")).unwrap();
+        let shared =
+            SemanticHintClassifier::from_shared(&resources, &type_emb_bytes, &label_bytes).unwrap();
+
+        // Both should produce identical results for the same inputs
+        let test_headers = vec![
+            "email",
+            "phone_number",
+            "zip_code",
+            "data",
+            "foo",
+            "country",
+        ];
+        for header in test_headers {
+            let r1 = standalone.classify_header(header);
+            let r2 = shared.classify_header(header);
+            match (&r1, &r2) {
+                (Some(a), Some(b)) => {
+                    assert_eq!(
+                        a.label, b.label,
+                        "Label mismatch for '{}': standalone='{}' vs shared='{}'",
+                        header, a.label, b.label
+                    );
+                    assert!(
+                        (a.similarity - b.similarity).abs() < 1e-5,
+                        "Similarity mismatch for '{}': {:.5} vs {:.5}",
+                        header,
+                        a.similarity,
+                        b.similarity
+                    );
+                }
+                (None, None) => {} // Both correctly returned None
+                _ => panic!(
+                    "Mismatch for '{}': standalone={:?}, shared={:?}",
+                    header, r1, r2
+                ),
+            }
+        }
     }
 }
