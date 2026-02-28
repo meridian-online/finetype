@@ -3,11 +3,11 @@ id: NNFT-158
 title: >-
   Generator enrichment with CLDR locale data (Phase 2 of CLDR-enriched
   retraining)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-27 22:53'
-updated_date: '2026-02-27 23:03'
+updated_date: '2026-02-27 23:04'
 labels:
   - accuracy
   - cldr
@@ -88,6 +88,6 @@ Label space remains 171 types. Same 3-level taxonomy labels. Diversity comes fro
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
