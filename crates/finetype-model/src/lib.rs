@@ -12,6 +12,7 @@ pub mod inference;
 pub mod model;
 pub mod model2vec_shared;
 pub mod semantic;
+pub mod sense;
 pub mod tiered;
 pub mod tiered_training;
 pub mod training;
@@ -26,6 +27,7 @@ pub use inference::{
 pub use model::{TextClassifier, TextClassifierConfig};
 pub use model2vec_shared::Model2VecResources;
 pub use semantic::SemanticHintClassifier;
+pub use sense::{BroadCategory, EntitySubtype, SenseClassifier, SenseResult};
 pub use tiered::{TierTiming, TieredClassifier};
 pub use tiered_training::{TieredTrainer, TieredTrainingConfig, TieredTrainingReport};
 pub use training::{Trainer, TrainingConfig, TrainingError};
