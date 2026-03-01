@@ -1,26 +1,34 @@
 #!/usr/bin/env python3
-"""NNFT-163: Prepare training data for Sense model spike.
+"""Prepare training data for Sense model.
 
-Extracts column-level features from SOTAB column_values.parquet:
-- Samples up to N values per column (stratified by frequency)
-- Maps 91 Schema.org GT labels → 6 broad categories
-- Maps entity columns → 4 entity subtypes
-- Splits train/val (80/20, stratified)
-- Outputs Parquet files ready for training
+Combines SOTAB columns (web tables) with profile eval columns (real-world
+datasets with descriptive headers) to train a production Sense model that
+handles diverse column headers.
+
+Data sources:
+  1. SOTAB CTA — ~31k columns, no meaningful headers (integer indices)
+  2. Profile eval — ~120 columns with real headers (city, country, latitude, ...)
+  3. Synthetic headers — plausible column names generated from SOTAB GT labels
 
 Usage:
-    python3 scripts/prepare_sense_data.py
-    python3 scripts/prepare_sense_data.py --max-values 20 --output data/sense_spike/
+    # Spike mode (SOTAB only, original behaviour)
+    python3 scripts/prepare_sense_data.py --output data/sense_spike
+
+    # Production mode (SOTAB + profile eval + synthetic headers)
+    python3 scripts/prepare_sense_data.py --include-profile --synthetic-headers \
+        --output data/sense_prod
+
+Requires: duckdb, numpy, pyyaml
 """
 
 import argparse
+import csv
 import json
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
 
 import duckdb
-import numpy as np
 
 # ── Label mappings ──────────────────────────────────────────────────
 
@@ -94,6 +102,249 @@ ENTITY_SUBTYPE_MAP = {
 
 BROAD_CATEGORIES = ["entity", "format", "temporal", "numeric", "geographic", "text"]
 ENTITY_SUBTYPES = ["person", "place", "organization", "creative_work"]
+
+
+# ── FineType label → broad category (mirrors Rust LabelCategoryMap) ──
+# This is the authoritative mapping from label_category_map.rs.
+# The domain-based heuristic in the spike was approximate and incorrect
+# for ~20 types (e.g. identity.person.email should be FORMAT not ENTITY).
+
+FINETYPE_TO_BROAD = {}
+
+_TEMPORAL_LABELS = [
+    "datetime.component.century", "datetime.component.day_of_month",
+    "datetime.component.day_of_week", "datetime.component.month_name",
+    "datetime.component.periodicity", "datetime.component.year",
+    "datetime.date.abbreviated_month", "datetime.date.compact_dmy",
+    "datetime.date.compact_mdy", "datetime.date.compact_ymd",
+    "datetime.date.eu_dot", "datetime.date.eu_slash", "datetime.date.iso",
+    "datetime.date.iso_week", "datetime.date.julian",
+    "datetime.date.long_full_month", "datetime.date.ordinal",
+    "datetime.date.short_dmy", "datetime.date.short_mdy",
+    "datetime.date.short_ymd", "datetime.date.us_slash",
+    "datetime.date.weekday_abbreviated_month",
+    "datetime.date.weekday_full_month", "datetime.duration.iso_8601",
+    "datetime.epoch.unix_microseconds", "datetime.epoch.unix_milliseconds",
+    "datetime.epoch.unix_seconds", "datetime.offset.iana",
+    "datetime.offset.utc", "datetime.time.hm_12h", "datetime.time.hm_24h",
+    "datetime.time.hms_12h", "datetime.time.hms_24h", "datetime.time.iso",
+    "datetime.timestamp.american", "datetime.timestamp.american_24h",
+    "datetime.timestamp.european", "datetime.timestamp.iso_8601",
+    "datetime.timestamp.iso_8601_compact",
+    "datetime.timestamp.iso_8601_microseconds",
+    "datetime.timestamp.iso_8601_offset",
+    "datetime.timestamp.iso_microseconds", "datetime.timestamp.rfc_2822",
+    "datetime.timestamp.rfc_2822_ordinal", "datetime.timestamp.rfc_3339",
+    "datetime.timestamp.sql_standard",
+]
+_NUMERIC_LABELS = [
+    "identity.person.age", "identity.person.height", "identity.person.weight",
+    "representation.file.file_size", "representation.numeric.decimal_number",
+    "representation.numeric.increment", "representation.numeric.integer_number",
+    "representation.numeric.percentage",
+    "representation.numeric.scientific_notation",
+    "representation.numeric.si_number", "technology.hardware.ram_size",
+    "technology.hardware.screen_size", "technology.internet.http_status_code",
+    "technology.internet.port",
+]
+_GEOGRAPHIC_LABELS = [
+    "geography.address.full_address", "geography.address.postal_code",
+    "geography.address.street_name", "geography.address.street_number",
+    "geography.address.street_suffix", "geography.contact.calling_code",
+    "geography.coordinate.coordinates", "geography.coordinate.latitude",
+    "geography.coordinate.longitude", "geography.location.city",
+    "geography.location.continent", "geography.location.country",
+    "geography.location.country_code", "geography.location.region",
+    "geography.transportation.iata_code", "geography.transportation.icao_code",
+]
+_ENTITY_LABELS = [
+    "identity.person.blood_type", "identity.person.first_name",
+    "identity.person.full_name", "identity.person.gender",
+    "identity.person.gender_code", "identity.person.gender_symbol",
+    "identity.person.last_name", "identity.person.username",
+    "representation.text.entity_name",
+]
+_FORMAT_LABELS = [
+    "container.array.comma_separated", "container.array.pipe_separated",
+    "container.array.semicolon_separated",
+    "container.array.whitespace_separated", "container.key_value.form_data",
+    "container.key_value.query_string", "container.object.csv",
+    "container.object.json", "container.object.json_array",
+    "container.object.xml", "container.object.yaml",
+    "identity.medical.dea_number", "identity.medical.ndc",
+    "identity.medical.npi", "identity.payment.bitcoin_address",
+    "identity.payment.credit_card_expiration_date",
+    "identity.payment.credit_card_number", "identity.payment.cusip",
+    "identity.payment.cvv", "identity.payment.ethereum_address",
+    "identity.payment.isin", "identity.payment.lei",
+    "identity.payment.paypal_email", "identity.payment.sedol",
+    "identity.payment.swift_bic", "identity.person.email",
+    "identity.person.password", "identity.person.phone_number",
+    "representation.code.alphanumeric_id",
+    "representation.scientific.dna_sequence",
+    "representation.scientific.protein_sequence",
+    "representation.scientific.rna_sequence",
+    "representation.text.color_hex", "representation.text.color_rgb",
+    "technology.code.doi", "technology.code.ean", "technology.code.imei",
+    "technology.code.isbn", "technology.code.issn",
+    "technology.code.locale_code", "technology.code.pin",
+    "technology.internet.hostname", "technology.internet.ip_v4",
+    "technology.internet.ip_v4_with_port", "technology.internet.ip_v6",
+    "technology.internet.mac_address", "technology.internet.url",
+    "technology.internet.user_agent",
+]
+_TEXT_LABELS = [
+    "identity.payment.credit_card_network",
+    "identity.payment.currency_code", "identity.payment.currency_symbol",
+    "representation.boolean.binary", "representation.boolean.initials",
+    "representation.boolean.terms", "representation.discrete.categorical",
+    "representation.discrete.ordinal", "representation.file.excel_format",
+    "representation.file.extension", "representation.file.mime_type",
+    "representation.scientific.measurement_unit",
+    "representation.scientific.metric_prefix", "representation.text.emoji",
+    "representation.text.paragraph", "representation.text.plain_text",
+    "representation.text.sentence", "representation.text.word",
+    "technology.cryptographic.hash", "technology.cryptographic.token_hex",
+    "technology.cryptographic.token_urlsafe",
+    "technology.cryptographic.uuid", "technology.development.calver",
+    "technology.development.os", "technology.development.programming_language",
+    "technology.development.software_license",
+    "technology.development.stage", "technology.development.version",
+    "technology.internet.http_method", "technology.internet.top_level_domain",
+]
+
+for _l in _TEMPORAL_LABELS:
+    FINETYPE_TO_BROAD[_l] = "temporal"
+for _l in _NUMERIC_LABELS:
+    FINETYPE_TO_BROAD[_l] = "numeric"
+for _l in _GEOGRAPHIC_LABELS:
+    FINETYPE_TO_BROAD[_l] = "geographic"
+for _l in _ENTITY_LABELS:
+    FINETYPE_TO_BROAD[_l] = "entity"
+for _l in _FORMAT_LABELS:
+    FINETYPE_TO_BROAD[_l] = "format"
+for _l in _TEXT_LABELS:
+    FINETYPE_TO_BROAD[_l] = "text"
+
+# Entity subtype for profile eval person columns
+PROFILE_ENTITY_SUBTYPES = {
+    "identity.person.full_name": "person",
+    "identity.person.first_name": "person",
+    "identity.person.last_name": "person",
+    "identity.person.username": "person",
+    "identity.person.gender": "person",
+    "identity.person.gender_code": "person",
+    "identity.person.gender_symbol": "person",
+    "identity.person.blood_type": "person",
+    "representation.text.entity_name": "organization",  # conservative default
+}
+
+
+# ── Synthetic header templates for SOTAB GT labels ──────────────────
+# Maps each SOTAB Schema.org GT label to plausible column name variations.
+# Used to teach the model diverse header → category associations.
+
+SYNTHETIC_HEADERS = {
+    # ENTITY
+    "Person": ["name", "full_name", "person_name", "person", "contact", "contact_name"],
+    "Person/name": ["name", "full_name", "person_name", "person", "Name"],
+    "MusicArtistAT": ["artist", "artist_name", "performer", "musician", "singer"],
+    "Organization": ["organization", "org_name", "company", "company_name", "org"],
+    "LocalBusiness/name": ["business_name", "company", "store", "shop_name", "business"],
+    "Hotel/name": ["hotel", "hotel_name", "accommodation", "lodging", "property"],
+    "Restaurant/name": ["restaurant", "restaurant_name", "dining", "eatery"],
+    "Brand": ["brand", "brand_name", "manufacturer", "make"],
+    "SportsTeam": ["team", "team_name", "club", "squad"],
+    "EducationalOrganization": ["school", "university", "institution", "college"],
+    "MusicGroup": ["band", "group", "band_name", "ensemble"],
+    "Museum/name": ["museum", "museum_name", "gallery", "exhibit"],
+    "MusicAlbum": ["album", "album_name", "album_title", "release"],
+    "MusicAlbum/name": ["album", "album_name", "album_title", "release"],
+    "MusicRecording/name": ["song", "track", "track_name", "song_name", "recording"],
+    "Event/name": ["event", "event_name", "activity", "occasion"],
+    "Book/name": ["book", "book_title", "title", "publication"],
+    "Recipe/name": ["recipe", "recipe_name", "dish", "meal"],
+    "Movie/name": ["movie", "movie_title", "film", "film_name"],
+    "CreativeWork/name": ["work", "title", "creative_work", "work_name"],
+    "CreativeWork": ["work", "title", "creative_work", "content"],
+    "CreativeWorkSeries": ["series", "series_name", "show", "franchise"],
+    "SportsEvent/name": ["match", "game", "event", "fixture", "competition"],
+    "TVEpisode/name": ["episode", "episode_name", "show", "program"],
+    "JobPosting/name": ["job", "job_title", "position", "role", "vacancy"],
+    "Product/name": ["product", "product_name", "item", "article"],
+    "ProductModel": ["model", "model_name", "product_model", "variant"],
+    "Place": ["place", "place_name", "venue", "site"],
+    "Place/name": ["place", "place_name", "venue", "location_name"],
+    # FORMAT
+    "URL": ["url", "website", "link", "web_address", "homepage", "URL"],
+    "email": ["email", "email_address", "contact_email", "Email", "e_mail"],
+    "telephone": ["phone", "telephone", "phone_number", "contact_phone", "tel", "mobile"],
+    "faxNumber": ["fax", "fax_number", "fax_no"],
+    "postalCode": ["postal_code", "zip", "zip_code", "postcode", "ZipCode"],
+    "IdentifierAT": ["id", "identifier", "code", "ID", "ref"],
+    "identifierNameAP": ["identifier_name", "id_name", "ref_name"],
+    "unitCode": ["unit_code", "unit", "units", "uom"],
+    "CategoryCode": ["category_code", "cat_code", "code", "classification"],
+    # TEMPORAL
+    "Date": ["date", "created_date", "event_date", "Date", "start_date", "end_date",
+             "birth_date", "due_date", "publish_date"],
+    "DateTime": ["datetime", "timestamp", "created_at", "updated_at", "date_time",
+                 "modified_at", "last_updated"],
+    "Duration": ["duration", "length", "time_span", "runtime", "elapsed"],
+    "Time": ["time", "start_time", "end_time", "Time", "clock_time"],
+    "DayOfWeek": ["day", "day_of_week", "weekday", "day_name"],
+    "openingHours": ["hours", "opening_hours", "business_hours", "schedule"],
+    "workHours": ["work_hours", "shift", "working_hours"],
+    # NUMERIC
+    "Number": ["number", "count", "quantity", "amount", "total", "value", "num"],
+    "Integer": ["integer", "count", "number", "qty", "int"],
+    "Mass": ["mass", "weight", "weight_kg", "mass_kg", "grams"],
+    "Distance": ["distance", "length", "distance_km", "range", "miles"],
+    "Energy": ["energy", "calories", "energy_kj", "power", "watts"],
+    "weight": ["weight", "weight_kg", "weight_lbs", "mass", "wt"],
+    "QuantitativeValue": ["value", "quantity", "amount", "measurement", "metric"],
+    "price": ["price", "cost", "amount", "Price", "unit_price", "total_price"],
+    "priceRange": ["price_range", "cost_range", "pricing", "price_bracket"],
+    "currency": ["currency", "currency_code", "curr", "monetary_unit"],
+    "MonetaryAmount": ["amount", "monetary_amount", "payment", "total", "sum"],
+    "CoordinateAT": ["coordinate", "lat", "lng", "coord", "latitude", "longitude"],
+    "Rating": ["rating", "score", "stars", "review_score", "rank"],
+    "typicalAgeRange": ["age_range", "age", "target_age", "age_group"],
+    # GEOGRAPHIC
+    "addressLocality": ["city", "locality", "town", "City", "municipality", "place"],
+    "addressRegion": ["region", "state", "province", "Region", "area", "district"],
+    "Country": ["country", "nation", "Country", "country_name", "state"],
+    "streetAddress": ["address", "street_address", "street", "Address", "location"],
+    "PostalAddress": ["postal_address", "mailing_address", "full_address", "address"],
+    # TEXT
+    "Text": ["text", "description", "content", "notes", "details", "info"],
+    "category": ["category", "type", "class", "group", "Category", "kind"],
+    "ItemAvailability": ["availability", "in_stock", "status", "stock_status"],
+    "ItemList": ["items", "list", "item_list", "entries"],
+    "Review": ["review", "feedback", "comment", "Review", "testimonial"],
+    "EventStatusType": ["status", "event_status", "state"],
+    "BookFormatType": ["format", "book_format", "edition_type"],
+    "Language": ["language", "lang", "Language", "locale"],
+    "Thing": ["thing", "item", "object", "entity"],
+    "GenderType": ["gender", "sex", "Gender"],
+    "EventAttendanceModeEnumeration": ["attendance_mode", "event_type", "format"],
+    "OccupationalExperienceRequirements": ["experience", "requirements", "qualifications"],
+    "unitText": ["unit", "unit_text", "measurement_unit", "uom"],
+    "OfferItemCondition": ["condition", "item_condition", "quality"],
+    "Boolean": ["is_active", "flag", "enabled", "active", "boolean"],
+    "paymentAccepted": ["payment", "payment_method", "pay_type"],
+    "Photograph": ["photo", "image", "picture", "photograph"],
+    "Offer": ["offer", "deal", "promotion", "discount"],
+    "Action": ["action", "activity", "operation", "task"],
+    "DeliveryMethod": ["delivery", "shipping_method", "delivery_type"],
+    "RestrictedDiet": ["diet", "dietary", "restriction", "food_preference"],
+    "Product": ["product", "item", "Product", "goods"],
+    "LocationFeatureSpecification": ["feature", "amenity", "facility"],
+    "audience": ["audience", "target_audience", "demographic"],
+    "MusicRecording": ["recording", "track", "song", "audio"],
+    "WarrantyPromise": ["warranty", "guarantee", "coverage"],
+    "EducationalOccupationalCredential": ["credential", "certification", "qualification"],
+}
 
 
 def sample_values(values: list[str], max_n: int, seed: int = 42) -> list[str]:
@@ -181,41 +432,22 @@ def load_profile_columns(
     manifest_path: Path,
     schema_mapping_path: Path,
 ) -> list[dict]:
-    """Load profile eval columns as additional training/test data."""
-    import csv
+    """Load profile eval columns with real headers and authoritative category mapping.
+
+    Uses FINETYPE_TO_BROAD (mirrors Rust LabelCategoryMap) for accurate
+    broad category assignment instead of the approximate domain-based heuristic.
+    """
     import yaml
 
-    # Load schema mapping for broad category inference
+    # Load schema mapping for gt_label → finetype_label lookup
     with open(schema_mapping_path) as f:
-        mappings = yaml.safe_load(f)
+        data = yaml.safe_load(f)
 
-    # Build gt_label → finetype_label lookup
     label_to_ft = {}
-    for entry in mappings:
-        label_to_ft[entry["gt_label"]] = entry["finetype_label"]
-
-    # Map FineType labels to broad categories
-    def ft_to_broad(ft_label: str) -> str:
-        domain = ft_label.split(".")[0] if "." in ft_label else ""
-        if domain == "datetime":
-            return "temporal"
-        elif domain == "geography":
-            return "geographic"
-        elif domain == "identity":
-            return "entity"  # person names, emails, etc.
-        elif domain == "technology":
-            return "format"  # URLs, codes, etc.
-        elif domain == "representation":
-            cat = ft_label.split(".")[1] if ft_label.count(".") >= 1 else ""
-            if cat in ("numeric", "scientific"):
-                return "numeric"
-            elif cat in ("boolean", "discrete"):
-                return "text"
-            else:
-                return "text"
-        elif domain == "container":
-            return "format"
-        return "text"
+    for entry in data["mappings"]:
+        ft = entry.get("finetype_label")
+        if ft:
+            label_to_ft[entry["gt_label"]] = ft
 
     # Load manifest
     manifest_rows = []
@@ -225,6 +457,7 @@ def load_profile_columns(
             manifest_rows.append(row)
 
     result = []
+    skipped = []
     for row in manifest_rows:
         dataset = row["dataset"]
         file_path = Path(row["file_path"])
@@ -236,6 +469,7 @@ def load_profile_columns(
             file_path = datasets_dir / file_path
 
         if not file_path.exists():
+            skipped.append(f"{dataset}.{col_name}: file not found ({file_path})")
             continue
 
         # Read column values
@@ -248,26 +482,74 @@ def load_profile_columns(
             ).fetchall()
             con.close()
             values = [str(v[0]) for v in values if v[0] is not None]
-        except Exception:
+        except Exception as e:
+            skipped.append(f"{dataset}.{col_name}: read error ({e})")
             continue
 
         if not values:
+            skipped.append(f"{dataset}.{col_name}: no values")
             continue
 
+        # Map gt_label → finetype_label → broad category (authoritative)
         ft_label = label_to_ft.get(gt_label, "")
-        broad_cat = ft_to_broad(ft_label) if ft_label else "text"
+        broad_cat = FINETYPE_TO_BROAD.get(ft_label)
+        if broad_cat is None:
+            # Fallback: conservative domain-based guess
+            if ft_label:
+                domain = ft_label.split(".")[0]
+                broad_cat = {
+                    "datetime": "temporal", "geography": "geographic",
+                    "container": "format",
+                }.get(domain, "text")
+            else:
+                broad_cat = "text"
+
+        # Entity subtype for person columns
+        entity_subtype = PROFILE_ENTITY_SUBTYPES.get(ft_label)
 
         result.append({
             "table_name": f"profile_{dataset}",
             "col_index": 0,
             "gt_label": gt_label,
             "broad_category": broad_cat,
-            "entity_subtype": None,
+            "entity_subtype": entity_subtype,
             "header": col_name,  # Profile eval has real column names!
             "values": values,
         })
 
+    if skipped:
+        print(f"  Skipped {len(skipped)} columns:")
+        for s in skipped[:5]:
+            print(f"    {s}")
+        if len(skipped) > 5:
+            print(f"    ... and {len(skipped) - 5} more")
+
     return result
+
+
+def assign_synthetic_headers(
+    columns: list[dict],
+    header_fraction: float,
+    rng: random.Random,
+) -> int:
+    """Assign synthetic headers to a fraction of headerless columns.
+
+    Returns the number of columns that received a synthetic header.
+    """
+    assigned = 0
+    for col in columns:
+        if col.get("header") is not None:
+            continue  # Already has a header (e.g. profile eval)
+
+        if rng.random() >= header_fraction:
+            continue  # Leave headerless (maintains no-header capacity)
+
+        templates = SYNTHETIC_HEADERS.get(col["gt_label"])
+        if templates:
+            col["header"] = rng.choice(templates)
+            assigned += 1
+
+    return assigned
 
 
 def main():
@@ -286,12 +568,44 @@ def main():
     )
     parser.add_argument(
         "--val-fraction", type=float, default=0.2,
-        help="Validation fraction (default: 0.2)",
+        help="Validation fraction for SOTAB (default: 0.2)",
     )
     parser.add_argument(
         "--sotab-dir", type=str,
         default=str(Path.home() / "datasets/sotab/cta"),
         help="SOTAB CTA directory",
+    )
+    # Production mode flags
+    parser.add_argument(
+        "--include-profile", action="store_true",
+        help="Include profile eval columns with real headers",
+    )
+    parser.add_argument(
+        "--profile-repeat", type=int, default=50,
+        help="Repeat profile eval columns N times (default: 50)",
+    )
+    parser.add_argument(
+        "--synthetic-headers", action="store_true",
+        help="Generate synthetic headers for SOTAB columns",
+    )
+    parser.add_argument(
+        "--header-fraction", type=float, default=0.5,
+        help="Fraction of SOTAB columns to give synthetic headers (default: 0.5)",
+    )
+    parser.add_argument(
+        "--datasets-dir", type=str,
+        default=str(Path.home() / "datasets"),
+        help="Datasets directory for profile eval (default: ~/datasets)",
+    )
+    parser.add_argument(
+        "--manifest", type=str,
+        default="eval/datasets/manifest.csv",
+        help="Profile eval manifest (default: eval/datasets/manifest.csv)",
+    )
+    parser.add_argument(
+        "--schema-mapping", type=str,
+        default="eval/schema_mapping.yaml",
+        help="Schema mapping YAML (default: eval/schema_mapping.yaml)",
     )
     args = parser.parse_args()
 
@@ -301,13 +615,12 @@ def main():
     sotab_dir = Path(args.sotab_dir)
     rng = random.Random(args.seed)
 
-    # ── Load SOTAB validation columns ──
+    # ── Load SOTAB columns ──
     val_parquet = sotab_dir / "validation" / "column_values.parquet"
     print(f"Loading SOTAB validation from {val_parquet}...")
     columns = load_sotab_columns(val_parquet)
     print(f"  Loaded {len(columns)} columns")
 
-    # Also load SOTAB test set if available
     test_parquet = sotab_dir / "test" / "column_values.parquet"
     if test_parquet.exists():
         print(f"Loading SOTAB test from {test_parquet}...")
@@ -315,9 +628,33 @@ def main():
         print(f"  Loaded {len(test_cols)} columns")
         columns.extend(test_cols)
 
-    # ── Category distribution ──
+    # ── Assign synthetic headers to SOTAB ──
+    if args.synthetic_headers:
+        n_assigned = assign_synthetic_headers(columns, args.header_fraction, rng)
+        n_with_header = sum(1 for c in columns if c.get("header") is not None)
+        print(f"\nSynthetic headers: assigned {n_assigned} headers "
+              f"({n_with_header}/{len(columns)} columns now have headers)")
+
+    # ── Load profile eval columns ──
+    profile_cols = []
+    if args.include_profile:
+        print(f"\nLoading profile eval columns...")
+        profile_cols = load_profile_columns(
+            Path(args.datasets_dir),
+            Path(args.manifest),
+            Path(args.schema_mapping),
+        )
+        print(f"  Loaded {len(profile_cols)} columns with real headers")
+
+        # Show profile category distribution
+        profile_cats = Counter(c["broad_category"] for c in profile_cols)
+        print("  Category distribution:")
+        for cat in BROAD_CATEGORIES:
+            print(f"    {cat:12s}: {profile_cats.get(cat, 0):3d}")
+
+    # ── Category distribution (SOTAB) ──
     cat_counts = Counter(c["broad_category"] for c in columns)
-    print(f"\nBroad category distribution ({len(columns)} total):")
+    print(f"\nSOTAB broad category distribution ({len(columns)} total):")
     for cat in BROAD_CATEGORIES:
         print(f"  {cat:12s}: {cat_counts.get(cat, 0):5d}")
 
@@ -329,18 +666,20 @@ def main():
 
     # ── Sample values ──
     print(f"\nSampling up to {args.max_values} values per column...")
-    for col in columns:
+    all_cols = columns + profile_cols
+    for col in all_cols:
         col["sampled_values"] = sample_values(
             col["values"], args.max_values, seed=args.seed
         )
-        # SOTAB has integer column indices — no meaningful header
         if "header" not in col:
             col["header"] = None
 
-    # ── Train/val split (stratified by broad category) ──
-    print(f"Splitting train/val ({1-args.val_fraction:.0%}/{args.val_fraction:.0%})...")
+    # ── Train/val split ──
+    # SOTAB: stratified 80/20 split (val set monitors training progress)
+    # Profile eval: ALL go into training (repeated N times)
+    # Real acceptance test is profile_eval.sh on the Rust pipeline
+    print(f"\nSplitting SOTAB train/val ({1-args.val_fraction:.0%}/{args.val_fraction:.0%})...")
 
-    # Group by category for stratified split
     by_category: dict[str, list[dict]] = defaultdict(list)
     for col in columns:
         by_category[col["broad_category"]].append(col)
@@ -353,10 +692,26 @@ def main():
         train_cols.extend(cat_cols[:split_idx])
         val_cols.extend(cat_cols[split_idx:])
 
+    # Add profile eval columns to training (repeated N times)
+    if profile_cols and args.profile_repeat > 0:
+        n_profile_added = len(profile_cols) * args.profile_repeat
+        for _ in range(args.profile_repeat):
+            train_cols.extend(profile_cols)
+        print(f"  Added {n_profile_added} profile eval rows "
+              f"({len(profile_cols)} columns × {args.profile_repeat} repeats)")
+
     rng.shuffle(train_cols)
     rng.shuffle(val_cols)
 
     print(f"  Train: {len(train_cols)}, Val: {len(val_cols)}")
+
+    # ── Header coverage stats ──
+    train_with_header = sum(1 for c in train_cols if c.get("header") is not None)
+    val_with_header = sum(1 for c in val_cols if c.get("header") is not None)
+    print(f"  Headers in train: {train_with_header}/{len(train_cols)} "
+          f"({train_with_header * 100 / max(len(train_cols), 1):.1f}%)")
+    print(f"  Headers in val: {val_with_header}/{len(val_cols)} "
+          f"({val_with_header * 100 / max(len(val_cols), 1):.1f}%)")
 
     # ── Write output ──
     def write_jsonl(path: Path, data: list[dict]):
@@ -386,7 +741,7 @@ def main():
     write_jsonl(train_path, train_cols)
     write_jsonl(val_path, val_cols)
 
-    # Write label indices
+    # Write metadata
     meta = {
         "broad_categories": BROAD_CATEGORIES,
         "entity_subtypes": ENTITY_SUBTYPES,
@@ -394,6 +749,11 @@ def main():
         "seed": args.seed,
         "n_train": len(train_cols),
         "n_val": len(val_cols),
+        "include_profile": args.include_profile,
+        "profile_repeat": args.profile_repeat if args.include_profile else 0,
+        "n_profile_columns": len(profile_cols),
+        "synthetic_headers": args.synthetic_headers,
+        "header_fraction": args.header_fraction if args.synthetic_headers else 0,
         "broad_category_map": BROAD_CATEGORY_MAP,
         "entity_subtype_map": ENTITY_SUBTYPE_MAP,
     }

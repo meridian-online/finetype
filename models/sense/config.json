@@ -10,8 +10,8 @@
   "header_dropout": 0.5,
   "n_params": 347146,
   "best_epoch": 21,
-  "best_val_broad_acc": 0.8849487785657998,
-  "best_val_entity_acc": 0.7800953516090584,
+  "best_val_broad_acc": 0.8824271079590229,
+  "best_val_entity_acc": 0.7836710369487485,
   "broad_categories": [
     "entity",
     "format",

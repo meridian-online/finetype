@@ -329,8 +329,8 @@ impl SenseClassifier {
     ) -> Result<SenseResult, InferenceError> {
         let max_values = 50; // Matches training config
 
-        // Encode header (unnormalised — Sense was trained on raw Model2Vec embeddings).
-        // We use encode_batch (unnormalised) rather than encode_one (L2-normalised).
+        // Encode header — encode_batch returns L2-normalised vectors matching
+        // Python model2vec.encode() which is what the Sense model was trained on.
         let (header_emb, has_header) = if let Some(h) = header {
             let batch = resources.encode_batch(&[h])?; // [1, D]
             let emb = batch.squeeze(0)?; // [D]

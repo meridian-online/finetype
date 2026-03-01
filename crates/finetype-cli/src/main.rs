@@ -86,9 +86,9 @@ enum Commands {
         #[arg(long)]
         batch: bool,
 
-        /// Disable Sense classifier (force legacy header-hint pipeline)
+        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
         #[arg(long)]
-        no_sense: bool,
+        sharp_only: bool,
     },
 
     /// Generate synthetic training data
@@ -283,9 +283,9 @@ enum Commands {
         #[arg(long, default_value = "tiered")]
         model_type: ModelType,
 
-        /// Disable Sense classifier (force legacy header-hint pipeline)
+        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
         #[arg(long)]
-        no_sense: bool,
+        sharp_only: bool,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -404,7 +404,7 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
-            no_sense,
+            sharp_only,
         } => cmd_infer(
             input,
             file,
@@ -418,7 +418,7 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
-            no_sense,
+            sharp_only,
         ),
 
         Commands::Generate {
@@ -493,7 +493,7 @@ fn main() -> Result<()> {
             delimiter,
             no_header_hint,
             model_type,
-            no_sense,
+            sharp_only,
         } => cmd_profile(
             file,
             model,
@@ -502,7 +502,7 @@ fn main() -> Result<()> {
             delimiter,
             no_header_hint,
             model_type,
-            no_sense,
+            sharp_only,
         ),
 
         Commands::EvalGittables {
@@ -537,7 +537,7 @@ fn cmd_infer(
     bench: bool,
     header: Option<String>,
     batch: bool,
-    no_sense: bool,
+    sharp_only: bool,
 ) -> Result<()> {
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
     use std::time::Instant;
@@ -547,7 +547,7 @@ fn cmd_infer(
         if !matches!(mode, InferenceMode::Column) {
             anyhow::bail!("--batch requires --mode column");
         }
-        return cmd_infer_batch(model, model_type, sample_size, no_sense);
+        return cmd_infer_batch(model, model_type, sample_size, sharp_only);
     }
 
     // Collect inputs
@@ -655,7 +655,7 @@ fn cmd_infer(
         }
 
         // Wire up Sense classifier (Sense → Sharpen pipeline)
-        if !no_sense {
+        if !sharp_only {
             wire_sense(&mut column_classifier);
         }
 
@@ -847,7 +847,7 @@ fn cmd_infer_batch(
     model: PathBuf,
     model_type: ModelType,
     sample_size: usize,
-    no_sense: bool,
+    sharp_only: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
     use std::time::Instant;
@@ -896,7 +896,7 @@ fn cmd_infer_batch(
     }
 
     // Wire up Sense classifier (Sense → Sharpen pipeline)
-    if !no_sense {
+    if !sharp_only {
         wire_sense(&mut column_classifier);
     }
 
@@ -2284,7 +2284,7 @@ fn cmd_profile(
     delimiter: Option<char>,
     no_header_hint: bool,
     model_type: ModelType,
-    no_sense: bool,
+    sharp_only: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
@@ -2329,7 +2329,7 @@ fn cmd_profile(
     }
 
     // Wire up Sense classifier (Sense → Sharpen pipeline)
-    if !no_sense {
+    if !sharp_only {
         wire_sense(&mut column_classifier);
     }
 

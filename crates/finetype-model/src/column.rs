@@ -816,6 +816,7 @@ impl ColumnClassifier {
         // Step 5: Masked vote aggregation — only count votes for types
         // eligible under the Sense-predicted category.
         let category = sense_result.broad_category;
+
         let mut masked_votes: Vec<(String, usize)> = vote_counts_3level
             .iter()
             .filter(|(label, _)| label_map.is_eligible(label, category))
@@ -823,9 +824,22 @@ impl ColumnClassifier {
             .collect();
         masked_votes.sort_by(|a, b| b.1.cmp(&a.1));
 
-        // Safety valve: if all votes were masked out (Sense routed to wrong
-        // category), fall back to unmasked aggregation.
-        let (votes, mask_applied) = if masked_votes.is_empty() || masked_votes[0].1 == 0 {
+        // Safety valve: fall back to unmasked aggregation when Sense routing
+        // is likely wrong:
+        // 1. All votes masked out (category completely wrong)
+        // 2. Low Sense confidence (<0.75) AND masking removes >40% of total
+        //    votes — Sense is uncertain and masking discards too much signal
+        let total_unmasked: usize = vote_counts_3level.values().sum();
+        let total_masked: usize = masked_votes.iter().map(|(_, c)| *c).sum();
+        let masked_out_frac = if total_unmasked > 0 {
+            1.0 - (total_masked as f64 / total_unmasked as f64)
+        } else {
+            0.0
+        };
+        let should_fallback = masked_votes.is_empty()
+            || masked_votes[0].1 == 0
+            || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4);
+        let (votes, mask_applied) = if should_fallback {
             let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
             all_votes.sort_by(|a, b| b.1.cmp(&a.1));
             (all_votes, false)
@@ -923,7 +937,146 @@ impl ColumnClassifier {
             }
         }
 
-        // Step 8: Post-hoc locale detection (unchanged from legacy pipeline)
+        // Step 8: Header hint application (complements Sense masking).
+        // Sense narrows the broad category, but header hints resolve
+        // within-category ambiguity. Skipped when Sense entity demotion
+        // was applied (the entity classifier's decision is authoritative).
+        let entity_demoted = result
+            .disambiguation_rule
+            .as_ref()
+            .is_some_and(|r| r.starts_with("sense_entity_demotion"));
+        if !entity_demoted && !header.is_empty() {
+            let hinted_type: Option<String> = self
+                .semantic_hint
+                .as_ref()
+                .and_then(|sh| sh.classify_header(header))
+                .map(|r| remap_collapsed_label(&r.label).to_string())
+                .or_else(|| header_hint(header).map(|h| remap_collapsed_label(h).to_string()));
+
+            if let Some(hinted_type) = hinted_type.as_deref() {
+                // Already predicts the hinted type — boost confidence
+                if result.label == hinted_type {
+                    result.confidence = (result.confidence + 0.1).min(1.0);
+                } else {
+                    // Measurement disambiguation: age/height/weight
+                    const MEASUREMENT_TYPES: &[&str] = &[
+                        "identity.person.age",
+                        "identity.person.height",
+                        "identity.person.weight",
+                    ];
+                    if MEASUREMENT_TYPES.contains(&hinted_type)
+                        && MEASUREMENT_TYPES.contains(&result.label.as_str())
+                    {
+                        result.label = hinted_type.to_string();
+                        result.confidence = 0.9;
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule = Some(format!(
+                            "sense_header_hint_measurement:{}",
+                            header.to_lowercase()
+                        ));
+                    } else {
+                        // Check hint in votes and generic status
+                        let hint_in_votes = result
+                            .vote_distribution
+                            .iter()
+                            .any(|(label, _)| label == hinted_type);
+
+                        let is_generic = is_generic_prediction(
+                            &result.label,
+                            &result.disambiguation_rule,
+                            self.taxonomy.as_ref(),
+                        );
+
+                        // Geography protection: person-name hints don't override
+                        // location types (NNFT-156). Uses early-continue pattern
+                        // so non-location cases fall through to general logic.
+                        let mut geo_handled = false;
+                        if PERSON_NAME_HINTS.contains(&hinted_type) {
+                            if LOCATION_TYPES.contains(&result.label.as_str()) {
+                                result.confidence = result.confidence.max(0.5);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_location_keep:{}",
+                                    header.to_lowercase()
+                                ));
+                                geo_handled = true;
+                            } else if is_generic {
+                                // Generic + person-name hint → check for location votes
+                                let top_location = result
+                                    .vote_distribution
+                                    .iter()
+                                    .filter(|(label, _)| LOCATION_TYPES.contains(&label.as_str()))
+                                    .max_by(|a, b| {
+                                        a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                                    });
+                                if let Some((loc_label, loc_frac)) = top_location {
+                                    if *loc_frac >= 0.10 {
+                                        result.label = loc_label.clone();
+                                        result.confidence = loc_frac.max(0.5);
+                                        result.disambiguation_applied = true;
+                                        result.disambiguation_rule = Some(format!(
+                                            "sense_header_hint_location:{}",
+                                            header.to_lowercase()
+                                        ));
+                                        geo_handled = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        // General hint logic (runs for all non-person hints,
+                        // and also for person hints not handled by geography protection)
+                        if !geo_handled {
+                            let original_label = result.label.clone();
+
+                            if (result.confidence < 0.5 || is_generic) && hint_in_votes {
+                                let hint_fraction = result
+                                    .vote_distribution
+                                    .iter()
+                                    .find(|(label, _)| label == hinted_type)
+                                    .map(|(_, frac)| *frac)
+                                    .unwrap_or(0.0);
+
+                                result.label = hinted_type.to_string();
+                                result.confidence = hint_fraction.max(0.6);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule =
+                                    Some(format!("sense_header_hint:{}", header.to_lowercase()));
+                            } else if is_generic && !hint_in_votes {
+                                result.label = hinted_type.to_string();
+                                result.confidence = 0.5;
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_generic:{}",
+                                    header.to_lowercase()
+                                ));
+                            } else if result.confidence < 0.3 && !hint_in_votes {
+                                result.label = hinted_type.to_string();
+                                result.confidence = 0.4;
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_fallback:{}",
+                                    header.to_lowercase()
+                                ));
+                            }
+
+                            // Re-detect locale if label changed
+                            if result.label != original_label {
+                                if let Some(taxonomy) = self.taxonomy.as_ref() {
+                                    result.detected_locale = detect_locale_from_validation(
+                                        &sample,
+                                        &result.label,
+                                        taxonomy,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 9: Post-hoc locale detection (unchanged from legacy pipeline)
         if let Some(taxonomy) = self.taxonomy.as_ref() {
             if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
                 result.detected_locale = Some(locale);
@@ -1011,9 +1164,24 @@ fn disambiguate(
     }
 
     // Rule 3: Coordinate disambiguation (latitude vs longitude)
+    // Only fire when coordinate labels are competitive — if a non-coordinate label
+    // dominates (>3x combined coordinate votes), skip disambiguation to avoid
+    // false-positive coordinate detection on generic decimal columns.
     if contains_pair(&top_labels, COORDINATE_PAIR.0, COORDINATE_PAIR.1) {
-        if let Some(label) = disambiguate_coordinates(values) {
-            return Some((label, "coordinate_disambiguation".to_string()));
+        let coord_votes: usize = votes
+            .iter()
+            .filter(|(l, _)| l == COORDINATE_PAIR.0 || l == COORDINATE_PAIR.1)
+            .map(|(_, c)| c)
+            .sum();
+        let top_votes = votes.first().map(|(_, c)| *c).unwrap_or(0);
+        let top_is_coord = votes
+            .first()
+            .map(|(l, _)| l == COORDINATE_PAIR.0 || l == COORDINATE_PAIR.1)
+            .unwrap_or(false);
+        if top_is_coord || coord_votes * 3 >= top_votes {
+            if let Some(label) = disambiguate_coordinates(values) {
+                return Some((label, "coordinate_disambiguation".to_string()));
+            }
         }
     }
 

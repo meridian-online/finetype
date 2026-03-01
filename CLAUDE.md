@@ -22,22 +22,23 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.4.0 (latest tag: `v0.4.0`)
 **Taxonomy:** 163 definitions across 6 domains — all generators pass, 100% alignment
-**Default model:** tiered-v2 (CLI) + Model2Vec semantic hints, char-cnn-v7 flat (DuckDB extension)
+**Default model:** Sense→Sharpen pipeline (CLI), tiered-v2 fallback via `--sharp-only`, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check, smoke tests)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
-- **Phase 2 Integration Design** (NNFT-164) — Design spec for Sense → Sharpen integration. Key decisions (decision-006): flat CharCNN + output masking over per-category retraining, sample 100/encode 50, Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). All 163 types mapped to 6 Sense categories. 8 Phase 3 implementation tasks created (NNFT-165–172). Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
-- **Sense model spike** (NNFT-163) — Phase 1 of Sense & Sharpen pivot. Architecture A (cross-attention over Model2Vec): 88.5% broad accuracy, 78.0% entity subtype, 3.6ms/column. Dominates FineType (45.2% broad, 73ms). Conditional GO for Phase 2. Finding: `discovery/architectural-pivot/PHASE1_FINDING.md`.
-- **Phase 0 taxonomy audit** (NNFT-162) — Collapsed 8 niche types (171 → 163). Added `remap_collapsed_label()` for v0.3.0 model backward compat. Zero regressions: 116/120 profile, 43.6%/68.6% SOTAB.
-- **Entity classifier integrated** (NNFT-151, NNFT-152) — Deep Sets MLP demotes full_name → entity_name for non-person columns. SOTAB +3.9pp domain. Entity demotion guard prevents header hints from overriding.
-- **v0.3.0** — Accuracy release: geography-aware header hints, measurement disambiguation. Profile eval 68/74 → 70/74. Models still active (169-type label space).
+- **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Fixed L2-normalisation mismatch in Model2Vec, integrated header hints into Sense pipeline, added coordinate disambiguation guard and low-confidence safety valve. Result: 116/120 (96.7%) label, 120/120 (100%) domain. Net +4 wins, 0 regressions vs legacy. Sense is now the default pipeline.
+- **Phase 3 Rust implementation** (NNFT-165–172) — Full Sense→Sharpen pipeline: shared Model2Vec, Candle-ported SenseClassifier, LabelCategoryMap, pipeline integration, build system + CLI loading, A/B evaluation infrastructure.
+- **Phase 2 Integration Design** (NNFT-164) — Design spec. Key decisions (decision-006): flat CharCNN + output masking, sample 100/encode 50, Sense absorbs 6 behaviours. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
+- **Sense model spike** (NNFT-163) — Architecture A (cross-attention over Model2Vec): 88.5% broad accuracy, 78.0% entity subtype, 3.6ms/column.
+- **Phase 0 taxonomy audit** (NNFT-162) — Collapsed 8 niche types (171 → 163). Zero regressions.
+- **Entity classifier** (NNFT-151/152) — Deep Sets MLP demotes full_name → entity_name for non-person columns.
 
 ### What's in progress
 
-- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. **Phases 0–3 complete.** Phase 3 (NNFT-165–172): full Rust implementation including shared Model2Vec, Sense Candle port, LabelCategoryMap, pipeline integration, build system + CLI loading, A/B evaluation. **Pipeline infrastructure works but spike model regresses profile eval** (78/120 vs 116/120 baseline) due to SOTAB-only training data. `--no-sense` flag restores baseline accuracy. **Next:** Train production Sense model on diverse headers (profile eval + SOTAB + synthetic) to meet ≥116/120 threshold before enabling as default. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
+- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. **Phases 0–3 complete + production model deployed (NNFT-173).** Sense is now the **default pipeline**: 116/120 (96.7%) label, 120/120 (100%) domain on profile eval. Net +4 wins, 0 regressions vs legacy. SOTAB: 39.6%/62.8% (matches legacy). Key fixes: L2-normalised Model2Vec embeddings, header hints integrated into Sense pipeline, improved safety valve (low-confidence fallback) and coordinate disambiguation guard. `--sharp-only` flag disables Sense for legacy pipeline. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
 - **CLDR retraining rolled back** (NNFT-157–161) — Retrained tiered model regressed 107/120 vs 116/120 baseline. Root causes: URL/URI training overlap (resolved by NNFT-162 merge), T1 routing degradation, training data gaps. Next attempt needs: diversified hostname patterns, bare UTC offset patterns, 1000 samples/type. CLDR infrastructure retained in `scripts/` and `locale_data.rs`.
 - **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
 - **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval + real-world benchmarks meaningfully measure type inference quality.
@@ -75,15 +76,15 @@ finetype-model (depends on core — CharCNN, tiered inference, column mode)
 
 **Value-level:** Single string → type label via `CharClassifier` (flat, 169 classes) or `TieredClassifier` (46 CharCNN models in T0→T1→T2 graph). Both implement `ValueClassifier` trait.
 
-**Column-level (Sense→Sharpen, when active):** Vector of strings + header → single column type:
+**Column-level (Sense→Sharpen, default):** Vector of strings + header → single column type:
 1. Sample 100 values, encode header + first 50 with Model2Vec
 2. Sense classify → broad category (temporal/numeric/geographic/entity/format/text) + entity subtype
 3. Run flat CharCNN batch on all 100 values, remap collapsed labels
-4. **Masked vote aggregation:** filter to category-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when all votes filtered
-5. Apply disambiguation rules (same rules, votes already scoped)
+4. **Masked vote aggregation:** filter to category-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when all votes filtered OR when Sense confidence <0.75 and masking removes >40% of votes
+5. Apply disambiguation rules (same rules, votes already scoped). Coordinate disambiguation requires competitive vote share (prevents false-positive on decimal columns)
 6. Entity demotion: non-person Sense subtype + full_name → entity_name (replaces Rule 18 + EntityClassifier)
-7. Post-hoc locale detection (unchanged)
-8. Header hints, geography protection, measurement disambiguation subsumed by Sense (header is a Sense input)
+7. **Header hints** (Model2Vec semantic + hardcoded): override generic/low-confidence predictions. Geography protection for person-name hints. Measurement disambiguation for age/height/weight
+8. Post-hoc locale detection (unchanged)
 
 **Column-level (legacy, when Sense absent):** Vector of strings → single column type:
 1. Run value-level inference on each value

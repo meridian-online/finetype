@@ -125,14 +125,13 @@ impl Model2VecResources {
         (mean_embed / norm as f64).ok()
     }
 
-    /// Encode multiple strings → unnormalised mean-pooled embeddings `[N, embed_dim]`.
+    /// Encode multiple strings → L2-normalised mean-pooled embeddings `[N, embed_dim]`.
     ///
-    /// Each row is the mean of token embeddings for the corresponding input string.
-    /// Rows for empty/untokenizable strings are zero vectors.
+    /// Each row is the mean of token embeddings for the corresponding input string,
+    /// then L2-normalised to unit length. This matches the output of Python's
+    /// `model2vec.StaticModel.encode()` which always returns normalised vectors.
     ///
-    /// The output is **not** L2-normalised — consumers that need normalisation
-    /// (e.g. cosine similarity) should normalise per-row afterwards.
-    /// This matches the entity classifier's existing encoding pattern.
+    /// Rows for empty/untokenizable strings are zero vectors (norm=0).
     pub fn encode_batch(&self, texts: &[&str]) -> Result<Tensor, InferenceError> {
         let embed_dim = self.embeddings.dim(1)?;
 
@@ -159,7 +158,16 @@ impl Model2VecResources {
             let id_tensor = Tensor::new(valid_ids.as_slice(), &self.device)?;
             let token_embeds = self.embeddings.index_select(&id_tensor, 0)?;
             let mean_embed = token_embeds.mean(0)?;
-            let row: Vec<f32> = mean_embed.to_vec1()?;
+            let mut row: Vec<f32> = mean_embed.to_vec1()?;
+
+            // L2-normalise to match Python model2vec.encode() output
+            let norm: f32 = row.iter().map(|v| v * v).sum::<f32>().sqrt();
+            if norm > 1e-8 {
+                for v in &mut row {
+                    *v /= norm;
+                }
+            }
+
             all_embeddings.extend_from_slice(&row);
         }
 
@@ -338,25 +346,30 @@ mod tests {
     fn test_encode_batch_values_match_individual() {
         let res = make_test_resources();
 
-        // encode_batch should produce the same (unnormalised) mean-pool as
-        // manual tokenize → index_select → mean for each input.
+        // encode_batch should produce L2-normalised mean-pool for each input,
+        // matching Python model2vec.encode() output.
         let texts = &["email", "phone number"];
         let batch = res.encode_batch(texts).unwrap();
 
-        // Row 0: "email" → token 2 → [0, 1, 0, 0]
+        // Row 0: "email" → token 2 → [0, 1, 0, 0] → L2-norm → [0, 1, 0, 0]
         let row0: Vec<f32> = batch.get(0).unwrap().to_vec1().unwrap();
         assert!((row0[1] - 1.0).abs() < 1e-5);
 
         // Row 1: "phone number" → tokens [3, 4] → mean([0,0,1,0], [0,0,0.5,0.5]) = [0, 0, 0.75, 0.25]
+        // L2-norm of [0, 0, 0.75, 0.25] = sqrt(0.75^2 + 0.25^2) = sqrt(0.625) ≈ 0.7906
+        // Normalised: [0, 0, 0.75/0.7906, 0.25/0.7906] ≈ [0, 0, 0.9487, 0.3162]
         let row1: Vec<f32> = batch.get(1).unwrap().to_vec1().unwrap();
+        let norm: f32 = (0.75f32.powi(2) + 0.25f32.powi(2)).sqrt();
         assert!(
-            (row1[2] - 0.75).abs() < 1e-5,
-            "expected 0.75, got {}",
+            (row1[2] - 0.75 / norm).abs() < 1e-4,
+            "expected {}, got {}",
+            0.75 / norm,
             row1[2]
         );
         assert!(
-            (row1[3] - 0.25).abs() < 1e-5,
-            "expected 0.25, got {}",
+            (row1[3] - 0.25 / norm).abs() < 1e-4,
+            "expected {}, got {}",
+            0.25 / norm,
             row1[3]
         );
     }
@@ -376,21 +389,23 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_batch_not_normalised() {
+    fn test_encode_batch_normalised() {
         let res = make_test_resources();
 
         // "data" → token 5 → [0.1, 0.1, 0.1, 0.1]
-        // encode_batch should return this unnormalised
+        // encode_batch returns L2-normalised vectors matching Python model2vec.encode()
         let batch = res.encode_batch(&["data"]).unwrap();
         let row: Vec<f32> = batch.get(0).unwrap().to_vec1().unwrap();
         let norm: f32 = row.iter().map(|x| x * x).sum::<f32>().sqrt();
 
-        // [0.1, 0.1, 0.1, 0.1] has norm ≈ 0.2, not 1.0
+        // [0.1, 0.1, 0.1, 0.1] → L2-norm → [0.5, 0.5, 0.5, 0.5], norm = 1.0
         assert!(
-            (norm - 0.2).abs() < 1e-4,
-            "encode_batch should NOT normalise; norm = {}",
+            (norm - 1.0).abs() < 1e-4,
+            "encode_batch should L2-normalise; norm = {}",
             norm
         );
+        // Each component should be 0.5 (= 0.1 / 0.2)
+        assert!((row[0] - 0.5).abs() < 1e-4, "expected 0.5, got {}", row[0]);
     }
 
     /// Integration test: load real model artifacts from disk (skip if not present).
