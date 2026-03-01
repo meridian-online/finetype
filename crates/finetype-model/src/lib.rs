@@ -9,6 +9,7 @@ pub mod char_training;
 pub mod column;
 pub mod entity;
 pub mod inference;
+pub mod label_category_map;
 pub mod model;
 pub mod model2vec_shared;
 pub mod semantic;
@@ -24,6 +25,7 @@ pub use entity::EntityClassifier;
 pub use inference::{
     extract_validation_patterns, CharClassifier, ClassificationResult, Classifier, ValueClassifier,
 };
+pub use label_category_map::LabelCategoryMap;
 pub use model::{TextClassifier, TextClassifierConfig};
 pub use model2vec_shared::Model2VecResources;
 pub use semantic::SemanticHintClassifier;
