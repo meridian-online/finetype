@@ -20,7 +20,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.4.0 (latest tag: `v0.4.0`)
+**Version:** 0.5.0 (latest tag: `v0.5.0`)
 **Taxonomy:** 163 definitions across 6 domains — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI), tiered-v2 fallback via `--sharp-only`, char-cnn-v7 flat (DuckDB extension)
 **Codebase:** ~20k lines of Rust across 4 crates
