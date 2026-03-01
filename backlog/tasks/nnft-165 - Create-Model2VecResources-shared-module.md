@@ -1,11 +1,11 @@
 ---
 id: NNFT-165
 title: Create Model2VecResources shared module
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-28 23:06'
-updated_date: '2026-02-28 23:39'
+updated_date: '2026-02-28 23:40'
 labels:
   - sense-sharpen
   - refactor
@@ -72,6 +72,6 @@ Tests:
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

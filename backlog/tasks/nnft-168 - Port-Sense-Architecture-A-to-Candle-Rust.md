@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-02-28 23:06'
-updated_date: '2026-02-28 23:59'
+updated_date: '2026-03-01 00:00'
 labels:
   - sense-sharpen
   - feature
@@ -75,6 +75,6 @@ Key discovery: encode_one() L2-normalises (designed for semantic hint cosine sim
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

@@ -194,6 +194,37 @@ fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::pa
         code.push_str("pub const ENTITY_CONFIG: &[u8] = &[];\n");
     }
 
+    // ── Sense classifier (broad category prediction, NNFT-171) ──────────
+    // Embeds the Sense model (Architecture A cross-attention) for broad
+    // semantic category prediction. Optional — when absent, the legacy
+    // header-hint pipeline is used.
+    let sense_dir = models_base.join("sense");
+    println!("cargo:rerun-if-changed={}", sense_dir.display());
+
+    if sense_dir.join("model.safetensors").exists() && sense_dir.join("config.json").exists() {
+        let model_path = portable_path(&sense_dir.join("model.safetensors"));
+        let config_path = portable_path(&sense_dir.join("config.json"));
+
+        code.push_str("\n// Sense classifier (broad category prediction, NNFT-171)\n");
+        code.push_str("pub const HAS_SENSE_CLASSIFIER: bool = true;\n");
+        code.push_str(&format!(
+            "pub const SENSE_MODEL: &[u8] = include_bytes!(\"{model_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const SENSE_CONFIG: &[u8] = include_bytes!(\"{config_path}\");\n"
+        ));
+
+        println!(
+            "cargo:warning=Embedding Sense classifier from {}",
+            sense_dir.display()
+        );
+    } else {
+        code.push_str("\n// Sense classifier not available — legacy pipeline used\n");
+        code.push_str("pub const HAS_SENSE_CLASSIFIER: bool = false;\n");
+        code.push_str("pub const SENSE_MODEL: &[u8] = &[];\n");
+        code.push_str("pub const SENSE_CONFIG: &[u8] = &[];\n");
+    }
+
     fs::write(&dest, code).unwrap_or_else(|e| panic!("Failed to write {}: {}", dest.display(), e));
 }
 

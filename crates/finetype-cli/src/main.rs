@@ -85,6 +85,10 @@ enum Commands {
         /// Requires --mode column.
         #[arg(long)]
         batch: bool,
+
+        /// Disable Sense classifier (force legacy header-hint pipeline)
+        #[arg(long)]
+        no_sense: bool,
     },
 
     /// Generate synthetic training data
@@ -278,6 +282,10 @@ enum Commands {
         /// Model type (char-cnn, tiered, transformer)
         #[arg(long, default_value = "tiered")]
         model_type: ModelType,
+
+        /// Disable Sense classifier (force legacy header-hint pipeline)
+        #[arg(long)]
+        no_sense: bool,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -396,6 +404,7 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
+            no_sense,
         } => cmd_infer(
             input,
             file,
@@ -409,6 +418,7 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
+            no_sense,
         ),
 
         Commands::Generate {
@@ -483,6 +493,7 @@ fn main() -> Result<()> {
             delimiter,
             no_header_hint,
             model_type,
+            no_sense,
         } => cmd_profile(
             file,
             model,
@@ -491,6 +502,7 @@ fn main() -> Result<()> {
             delimiter,
             no_header_hint,
             model_type,
+            no_sense,
         ),
 
         Commands::EvalGittables {
@@ -525,6 +537,7 @@ fn cmd_infer(
     bench: bool,
     header: Option<String>,
     batch: bool,
+    no_sense: bool,
 ) -> Result<()> {
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
     use std::time::Instant;
@@ -534,7 +547,7 @@ fn cmd_infer(
         if !matches!(mode, InferenceMode::Column) {
             anyhow::bail!("--batch requires --mode column");
         }
-        return cmd_infer_batch(model, model_type, sample_size);
+        return cmd_infer_batch(model, model_type, sample_size, no_sense);
     }
 
     // Collect inputs
@@ -639,6 +652,11 @@ fn cmd_infer(
             taxonomy.compile_validators();
             taxonomy.compile_locale_validators();
             column_classifier.set_taxonomy(taxonomy);
+        }
+
+        // Wire up Sense classifier (Sense → Sharpen pipeline)
+        if !no_sense {
+            wire_sense(&mut column_classifier);
         }
 
         let result = if let Some(ref hdr) = header {
@@ -825,7 +843,12 @@ fn cmd_infer(
 ///
 /// Output JSONL format:
 ///   {"label": "identity.person.email", "confidence": 0.95, ...}
-fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) -> Result<()> {
+fn cmd_infer_batch(
+    model: PathBuf,
+    model_type: ModelType,
+    sample_size: usize,
+    no_sense: bool,
+) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
     use std::time::Instant;
 
@@ -870,6 +893,11 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
             taxonomy.locale_validator_count()
         );
         column_classifier.set_taxonomy(taxonomy);
+    }
+
+    // Wire up Sense classifier (Sense → Sharpen pipeline)
+    if !no_sense {
+        wire_sense(&mut column_classifier);
     }
 
     let load_elapsed = t_start.elapsed();
@@ -1113,6 +1141,89 @@ fn load_entity_classifier(
     }
 
     None
+}
+
+/// Load the Sense classifier for broad category prediction (NNFT-171).
+///
+/// Resolution order:
+///  1. models/sense directory on disk (development)
+///  2. Embedded Sense bytes (release binaries)
+///  3. None — Sense pipeline disabled, uses legacy header hints
+fn load_sense() -> Option<finetype_model::SenseClassifier> {
+    // Try disk-based model first (development workflow)
+    let model_dir = std::path::PathBuf::from("models/sense");
+    if model_dir.join("model.safetensors").exists() {
+        return finetype_model::SenseClassifier::load(&model_dir)
+            .map_err(|e| eprintln!("Warning: Failed to load Sense classifier from disk: {e}"))
+            .ok();
+    }
+
+    // Try embedded model bytes (release binary)
+    #[cfg(feature = "embed-models")]
+    {
+        if embedded::HAS_SENSE_CLASSIFIER {
+            return finetype_model::SenseClassifier::from_bytes(
+                embedded::SENSE_MODEL,
+                embedded::SENSE_CONFIG,
+            )
+            .map_err(|e| eprintln!("Warning: Failed to load embedded Sense classifier: {e}"))
+            .ok();
+        }
+    }
+
+    None
+}
+
+/// Load shared Model2Vec resources (tokenizer + embeddings).
+///
+/// Resolution order:
+///  1. models/model2vec directory on disk (development)
+///  2. Embedded Model2Vec bytes (release binaries)
+///  3. None — no shared resources available
+fn load_model2vec_resources() -> Option<finetype_model::Model2VecResources> {
+    // Try disk-based model first (development workflow)
+    let model_dir = std::path::PathBuf::from("models/model2vec");
+    if model_dir.join("model.safetensors").exists() {
+        return finetype_model::Model2VecResources::load(&model_dir)
+            .map_err(|e| eprintln!("Warning: Failed to load Model2Vec resources from disk: {e}"))
+            .ok();
+    }
+
+    // Try embedded model bytes (release binary)
+    #[cfg(feature = "embed-models")]
+    {
+        if embedded::HAS_MODEL2VEC {
+            return finetype_model::Model2VecResources::from_bytes(
+                embedded::M2V_TOKENIZER,
+                embedded::M2V_MODEL,
+            )
+            .map_err(|e| eprintln!("Warning: Failed to load embedded Model2Vec resources: {e}"))
+            .ok();
+        }
+    }
+
+    None
+}
+
+/// Wire up the Sense classifier into a ColumnClassifier.
+///
+/// Loads Model2VecResources + SenseClassifier + LabelCategoryMap and calls
+/// `set_sense()`. Silently skips if any component is unavailable.
+fn wire_sense(cc: &mut finetype_model::ColumnClassifier) {
+    let sense = match load_sense() {
+        Some(s) => s,
+        None => return,
+    };
+    let m2v = match load_model2vec_resources() {
+        Some(r) => r,
+        None => {
+            eprintln!("Warning: Sense classifier loaded but Model2Vec resources unavailable — Sense disabled");
+            return;
+        }
+    };
+    let label_map = finetype_model::LabelCategoryMap::new();
+    eprintln!("Loaded Sense classifier (broad category prediction)");
+    cc.set_sense(sense, m2v, label_map);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2164,6 +2275,7 @@ fn cmd_validate(
 // PROFILE — Detect column types in a CSV file
 // ═══════════════════════════════════════════════════════════════════════════════
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_profile(
     file: PathBuf,
     model: PathBuf,
@@ -2172,6 +2284,7 @@ fn cmd_profile(
     delimiter: Option<char>,
     no_header_hint: bool,
     model_type: ModelType,
+    no_sense: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
@@ -2213,6 +2326,11 @@ fn cmd_profile(
             taxonomy.locale_validator_count()
         );
         column_classifier.set_taxonomy(taxonomy);
+    }
+
+    // Wire up Sense classifier (Sense → Sharpen pipeline)
+    if !no_sense {
+        wire_sense(&mut column_classifier);
     }
 
     eprintln!("Reading {:?}", file);
