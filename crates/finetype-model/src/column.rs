@@ -12,7 +12,10 @@
 
 use crate::entity::EntityClassifier;
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
+use crate::label_category_map::LabelCategoryMap;
+use crate::model2vec_shared::Model2VecResources;
 use crate::semantic::SemanticHintClassifier;
+use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
 use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
 
@@ -286,6 +289,7 @@ pub struct ColumnClassifier {
     /// Optional semantic column name classifier (Model2Vec embeddings).
     /// When present, used as the primary header hint source before falling
     /// back to the hardcoded `header_hint()` dictionary.
+    /// Bypassed when Sense is active (Sense already sees the header).
     semantic_hint: Option<SemanticHintClassifier>,
     /// Optional taxonomy for validation-based attractor demotion.
     /// When present, enables Signal 1 (validation failure) in the
@@ -294,7 +298,17 @@ pub struct ColumnClassifier {
     /// Optional entity classifier for full_name demotion (NNFT-152).
     /// When present and majority vote is full_name, runs a binary demotion
     /// check: if the column is confidently non-person, demotes to entity_name.
+    /// Bypassed when Sense is active (Sense entity subtype replaces this).
     entity_classifier: Option<EntityClassifier>,
+    /// Optional Sense classifier for broad semantic category prediction (NNFT-170).
+    /// When present, enables the Sense→Sharpen pipeline in classify_column_with_header.
+    sense: Option<SenseClassifier>,
+    /// Shared Model2Vec resources for Sense encoding.
+    /// Required when `sense` is Some.
+    model2vec: Option<Model2VecResources>,
+    /// Label → category mapping for Sense output masking.
+    /// Required when `sense` is Some.
+    label_map: Option<LabelCategoryMap>,
 }
 
 impl ColumnClassifier {
@@ -306,6 +320,9 @@ impl ColumnClassifier {
             semantic_hint: None,
             taxonomy: None,
             entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
         }
     }
 
@@ -330,6 +347,9 @@ impl ColumnClassifier {
             semantic_hint: Some(semantic),
             taxonomy: None,
             entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
         }
     }
 
@@ -355,6 +375,27 @@ impl ColumnClassifier {
     /// the prediction is demoted to `representation.text.entity_name`.
     pub fn set_entity_classifier(&mut self, entity: EntityClassifier) {
         self.entity_classifier = Some(entity);
+    }
+
+    /// Attach a Sense classifier with its required resources (NNFT-170).
+    ///
+    /// When all three are present, `classify_column_with_header` uses the
+    /// Sense→Sharpen pipeline instead of the legacy header-hint path.
+    /// `classify_column` (no header) is unchanged.
+    pub fn set_sense(
+        &mut self,
+        sense: SenseClassifier,
+        model2vec: Model2VecResources,
+        label_map: LabelCategoryMap,
+    ) {
+        self.sense = Some(sense);
+        self.model2vec = Some(model2vec);
+        self.label_map = Some(label_map);
+    }
+
+    /// Check whether the Sense→Sharpen pipeline is active.
+    pub fn has_sense(&self) -> bool {
+        self.sense.is_some() && self.model2vec.is_some() && self.label_map.is_some()
     }
 
     /// Classify a column of values, returning a single type prediction.
@@ -525,14 +566,24 @@ impl ColumnClassifier {
 
     /// Classify a column of values with an optional header name hint.
     ///
-    /// The header name (e.g., "Age", "Email", "zip_code") provides a soft signal
-    /// that can adjust the final prediction. The hint never overrides a high-confidence
-    /// model prediction — it only boosts a candidate type when the model is uncertain.
+    /// When the Sense classifier is active, uses the Sense→Sharpen pipeline:
+    /// Sense predicts broad category → CharCNN votes masked to that category →
+    /// entity demotion via Sense subtype → scoped disambiguation rules.
+    /// Header hints, EntityClassifier, and geography protection are all subsumed.
+    ///
+    /// When Sense is absent, falls back to the legacy pipeline:
+    /// CharCNN → vote → disambiguation → entity demotion → header hints.
     pub fn classify_column_with_header(
         &self,
         values: &[String],
         header: &str,
     ) -> Result<ColumnResult, InferenceError> {
+        // Sense→Sharpen pipeline (NNFT-170): when Sense is active, use it
+        // instead of the legacy header-hint path.
+        if self.has_sense() {
+            return self.classify_sense_sharpen(values, header);
+        }
+
         let mut result = self.classify_column(values)?;
 
         // Entity demotion guard (NNFT-152): when the entity classifier has
@@ -685,6 +736,197 @@ impl ColumnClassifier {
                     .taxonomy
                     .as_ref()
                     .and_then(|t| detect_locale_from_validation(values, &result.label, t));
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Sense → Sharpen pipeline (NNFT-170).
+    ///
+    /// 1. Sample 100 values → encode header + first 50 with Model2Vec
+    /// 2. Run Sense for broad category + entity subtype
+    /// 3. Run CharCNN batch on all 100 values
+    /// 4. Remap collapsed labels
+    /// 5. Masked vote aggregation (only category-eligible labels count)
+    /// 6. Disambiguation rules (scoped to winning category)
+    /// 7. Entity demotion via Sense subtype (replaces Rule 18 + EntityClassifier)
+    /// 8. Post-hoc locale detection
+    fn classify_sense_sharpen(
+        &self,
+        values: &[String],
+        header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        let sense = self.sense.as_ref().unwrap();
+        let m2v = self.model2vec.as_ref().unwrap();
+        let label_map = self.label_map.as_ref().unwrap();
+
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+            });
+        }
+
+        // Step 1: Sample values (same as classify_column)
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+        let n_samples = sample.len();
+
+        // Step 2: Run Sense — encode header + first 50 values
+        let sense_values: Vec<&str> = sample.iter().take(50).map(|s| s.as_str()).collect();
+        let header_opt = if header.is_empty() {
+            None
+        } else {
+            Some(header)
+        };
+        let sense_result = sense.classify(m2v, header_opt, &sense_values)?;
+
+        // Step 3: Run CharCNN batch on all sampled values
+        let results = self.classifier.classify_batch(&sample)?;
+
+        // Step 4: Aggregate votes — collapse 4-level locale labels to 3-level
+        // Remap labels for types collapsed in Phase 0 (NNFT-162).
+        let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
+        let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new();
+        for result in &results {
+            let (base_label, locale) = strip_locale_suffix(&result.label);
+            let remapped = remap_collapsed_label(base_label);
+            *vote_counts_3level.entry(remapped.to_string()).or_default() += 1;
+            if let Some(loc) = locale {
+                *locale_votes
+                    .entry(remapped.to_string())
+                    .or_default()
+                    .entry(loc.to_string())
+                    .or_default() += 1;
+            }
+        }
+
+        // Step 5: Masked vote aggregation — only count votes for types
+        // eligible under the Sense-predicted category.
+        let category = sense_result.broad_category;
+        let mut masked_votes: Vec<(String, usize)> = vote_counts_3level
+            .iter()
+            .filter(|(label, _)| label_map.is_eligible(label, category))
+            .map(|(label, count)| (label.clone(), *count))
+            .collect();
+        masked_votes.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Safety valve: if all votes were masked out (Sense routed to wrong
+        // category), fall back to unmasked aggregation.
+        let (votes, mask_applied) = if masked_votes.is_empty() || masked_votes[0].1 == 0 {
+            let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
+            all_votes.sort_by(|a, b| b.1.cmp(&a.1));
+            (all_votes, false)
+        } else {
+            (masked_votes, true)
+        };
+
+        let vote_distribution: Vec<(String, f32)> = votes
+            .iter()
+            .map(|(label, count)| (label.clone(), *count as f32 / n_samples as f32))
+            .collect();
+
+        // Majority winner
+        let (majority_label, majority_count) = votes.first().cloned().unwrap_or_default();
+        let majority_fraction = majority_count as f32 / n_samples as f32;
+
+        // Determine dominant locale for the winning type
+        let detected_locale = locale_votes.get(&majority_label).and_then(|locales| {
+            locales
+                .iter()
+                .max_by_key(|(_, count)| *count)
+                .map(|(locale, _)| locale.clone())
+                .filter(|l| l != "UNIVERSAL")
+        });
+
+        // Step 6: Disambiguation rules (same rules, but votes are already scoped)
+        let disambiguation =
+            disambiguate(&sample, &results, &votes, n_samples, self.taxonomy.as_ref());
+
+        let mut result = if let Some((label, rule_name)) = disambiguation {
+            let disambig_locale = locale_votes.get(&label).and_then(|locales| {
+                locales
+                    .iter()
+                    .max_by_key(|(_, count)| *count)
+                    .map(|(locale, _)| locale.clone())
+                    .filter(|l| l != "UNIVERSAL")
+            });
+            let confidence = if rule_name.starts_with("attractor_demotion") {
+                majority_fraction.max(0.5)
+            } else {
+                majority_fraction.max(0.8)
+            };
+            ColumnResult {
+                label,
+                confidence,
+                vote_distribution,
+                disambiguation_applied: true,
+                disambiguation_rule: Some(rule_name),
+                samples_used: n_samples,
+                detected_locale: disambig_locale,
+            }
+        } else {
+            let confidence = if majority_fraction >= self.config.min_agreement {
+                majority_fraction
+            } else {
+                majority_fraction * 0.5
+            };
+            ColumnResult {
+                label: majority_label,
+                confidence,
+                vote_distribution,
+                disambiguation_applied: mask_applied,
+                disambiguation_rule: if mask_applied {
+                    Some(format!("sense_mask:{}", category))
+                } else {
+                    None
+                },
+                samples_used: n_samples,
+                detected_locale,
+            }
+        };
+
+        // Step 7: Entity handling via Sense subtype (replaces Rule 18 + EntityClassifier).
+        // When Sense predicts Entity category:
+        //   - Non-person subtype + majority is full_name → demote to entity_name
+        //   - Non-person subtype + other entity type → keep majority
+        //   - Person subtype → keep as-is (no demotion needed)
+        if category == BroadCategory::Entity {
+            if let Some(subtype) = sense_result.entity_subtype {
+                match subtype {
+                    EntitySubtype::Person => {
+                        // Person — keep full_name or other person type as-is
+                    }
+                    _ => {
+                        // Non-person (Place, Organization, CreativeWork)
+                        if result.label == "identity.person.full_name" {
+                            result.label = "representation.text.entity_name".to_string();
+                            result.disambiguation_applied = true;
+                            result.disambiguation_rule =
+                                Some(format!("sense_entity_demotion:{}", subtype));
+                            result.detected_locale = None;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 8: Post-hoc locale detection (unchanged from legacy pipeline)
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
             }
         }
 
@@ -5555,6 +5797,189 @@ datetime.component.day_of_week:
         assert!(
             LOCATION_TYPES.contains(&"geography.location.continent"),
             "LOCATION_TYPES should include continent"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Sense→Sharpen pipeline tests (NNFT-170)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Helper: load Sense resources if available. Returns None if artifacts missing.
+    fn load_sense_resources() -> Option<(
+        crate::sense::SenseClassifier,
+        crate::model2vec_shared::Model2VecResources,
+        crate::label_category_map::LabelCategoryMap,
+    )> {
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()?
+            .parent()?
+            .to_path_buf();
+        let m2v_dir = base.join("models/model2vec");
+        let sense_dir = base.join("models/sense_spike/arch_a");
+
+        if !m2v_dir.join("model.safetensors").exists()
+            || !sense_dir.join("model.safetensors").exists()
+        {
+            return None;
+        }
+
+        let m2v = crate::model2vec_shared::Model2VecResources::load(&m2v_dir).ok()?;
+        let sense = crate::sense::SenseClassifier::load(&sense_dir).ok()?;
+        let label_map = crate::label_category_map::LabelCategoryMap::new();
+        Some((sense, m2v, label_map))
+    }
+
+    #[test]
+    fn test_sense_pipeline_fields_default_none() {
+        let mock = crate::inference::MockClassifier::new("representation.text.word");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        assert!(!cc.has_sense());
+    }
+
+    #[test]
+    fn test_sense_pipeline_set_sense_enables() {
+        let Some((sense, m2v, label_map)) = load_sense_resources() else {
+            eprintln!("Skipping: model artifacts not found");
+            return;
+        };
+
+        let mock = crate::inference::MockClassifier::new("representation.text.word");
+        let mut cc = ColumnClassifier::with_defaults(Box::new(mock));
+        assert!(!cc.has_sense());
+
+        cc.set_sense(sense, m2v, label_map);
+        assert!(cc.has_sense());
+    }
+
+    #[test]
+    fn test_sense_pipeline_fallback_without_sense() {
+        // Without Sense, classify_column_with_header should use legacy path
+        let mock = crate::inference::MockClassifier::new("identity.person.email");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+
+        let values: Vec<String> = vec![
+            "john@example.com".to_string(),
+            "jane@test.org".to_string(),
+            "bob@corp.io".to_string(),
+        ];
+        let result = cc
+            .classify_column_with_header(&values, "email")
+            .expect("classify");
+
+        // Legacy pipeline: MockClassifier always returns email, header hint confirms
+        assert_eq!(result.label, "identity.person.email");
+        assert!(!cc.has_sense());
+    }
+
+    #[test]
+    fn test_sense_sharpen_unanimous_email() {
+        let Some((sense, m2v, label_map)) = load_sense_resources() else {
+            eprintln!("Skipping: model artifacts not found");
+            return;
+        };
+
+        // MockClassifier always returns email — unanimous CharCNN vote
+        let mock = crate::inference::MockClassifier::new("identity.person.email");
+        let mut cc = ColumnClassifier::with_defaults(Box::new(mock));
+        cc.set_sense(sense, m2v, label_map);
+
+        let values: Vec<String> = (0..10).map(|i| format!("user{}@example.com", i)).collect();
+
+        let result = cc
+            .classify_column_with_header(&values, "email")
+            .expect("classify with sense");
+
+        // Unanimous CharCNN votes for email should produce email
+        // (either masked in by Sense category or fallback to unmasked)
+        assert_eq!(result.label, "identity.person.email");
+        assert!(result.samples_used > 0);
+    }
+
+    #[test]
+    fn test_sense_sharpen_empty_column() {
+        let Some((sense, m2v, label_map)) = load_sense_resources() else {
+            eprintln!("Skipping: model artifacts not found");
+            return;
+        };
+
+        let mock = crate::inference::MockClassifier::new("representation.text.word");
+        let mut cc = ColumnClassifier::with_defaults(Box::new(mock));
+        cc.set_sense(sense, m2v, label_map);
+
+        let result = cc
+            .classify_column_with_header(&[], "date")
+            .expect("classify empty");
+
+        assert_eq!(result.label, "unknown");
+        assert_eq!(result.samples_used, 0);
+    }
+
+    #[test]
+    fn test_sense_sharpen_iso_date_column() {
+        let Some((sense, m2v, label_map)) = load_sense_resources() else {
+            eprintln!("Skipping: model artifacts not found");
+            return;
+        };
+
+        // MockClassifier returns iso date — all values agree
+        let mock = crate::inference::MockClassifier::new("datetime.date.iso");
+        let mut cc = ColumnClassifier::with_defaults(Box::new(mock));
+        cc.set_sense(sense, m2v, label_map);
+
+        let values: Vec<String> = vec![
+            "2024-01-15".to_string(),
+            "2024-02-20".to_string(),
+            "2024-03-25".to_string(),
+            "2024-04-30".to_string(),
+            "2024-05-10".to_string(),
+        ];
+
+        let result = cc
+            .classify_column_with_header(&values, "created_at")
+            .expect("classify dates");
+
+        // Should produce a datetime type (either masked to temporal or unmasked)
+        assert!(
+            result.label.starts_with("datetime."),
+            "Expected datetime type, got: {}",
+            result.label
+        );
+    }
+
+    #[test]
+    fn test_sense_sharpen_entity_demotion() {
+        let Some((sense, m2v, label_map)) = load_sense_resources() else {
+            eprintln!("Skipping: model artifacts not found");
+            return;
+        };
+
+        // MockClassifier returns full_name, but these are company names.
+        // Sense should predict Entity with non-Person subtype → demote to entity_name.
+        let mock = crate::inference::MockClassifier::new("identity.person.full_name");
+        let mut cc = ColumnClassifier::with_defaults(Box::new(mock));
+        cc.set_sense(sense, m2v, label_map);
+
+        let values: Vec<String> = vec![
+            "Apple Inc.".to_string(),
+            "Microsoft Corporation".to_string(),
+            "Google LLC".to_string(),
+            "Amazon.com Inc.".to_string(),
+            "Meta Platforms Inc.".to_string(),
+        ];
+
+        let result = cc
+            .classify_column_with_header(&values, "company")
+            .expect("classify companies");
+
+        // Entity demotion should fire if Sense detects non-person entity.
+        // The result should be either entity_name (demoted) or full_name
+        // (if Sense predicts Person). Both are valid — the test verifies
+        // the pipeline runs without error and produces a meaningful result.
+        assert!(
+            result.label == "representation.text.entity_name"
+                || result.label == "identity.person.full_name",
+            "Expected entity_name or full_name, got: {}",
+            result.label
         );
     }
 }

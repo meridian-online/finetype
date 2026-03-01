@@ -37,7 +37,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. Phases 0–2 complete (taxonomy audit, model spike, integration design). **Phase 3 (Rust implementation) next:** 8 tasks (NNFT-165–172) covering shared Model2Vec, Sense Candle port, output masking, pipeline integration, build system, eval. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
+- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. Phases 0–2 complete. **Phase 3 (Rust implementation) in progress:** NNFT-165–170 done (shared Model2Vec, Sense Candle port, LabelCategoryMap, pipeline integration). **Remaining:** NNFT-171 (build system: embed Sense model + CLI loading), NNFT-172 (eval: A/B comparison). Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
 - **CLDR retraining rolled back** (NNFT-157–161) — Retrained tiered model regressed 107/120 vs 116/120 baseline. Root causes: URL/URI training overlap (resolved by NNFT-162 merge), T1 routing degradation, training data gaps. Next attempt needs: diversified hostname patterns, bare UTC offset patterns, 1000 samples/type. CLDR infrastructure retained in `scripts/` and `locale_data.rs`.
 - **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
 - **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval + real-world benchmarks meaningfully measure type inference quality.
@@ -75,7 +75,17 @@ finetype-model (depends on core — CharCNN, tiered inference, column mode)
 
 **Value-level:** Single string → type label via `CharClassifier` (flat, 169 classes) or `TieredClassifier` (46 CharCNN models in T0→T1→T2 graph). Both implement `ValueClassifier` trait.
 
-**Column-level:** Vector of strings → single column type:
+**Column-level (Sense→Sharpen, when active):** Vector of strings + header → single column type:
+1. Sample 100 values, encode header + first 50 with Model2Vec
+2. Sense classify → broad category (temporal/numeric/geographic/entity/format/text) + entity subtype
+3. Run flat CharCNN batch on all 100 values, remap collapsed labels
+4. **Masked vote aggregation:** filter to category-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when all votes filtered
+5. Apply disambiguation rules (same rules, votes already scoped)
+6. Entity demotion: non-person Sense subtype + full_name → entity_name (replaces Rule 18 + EntityClassifier)
+7. Post-hoc locale detection (unchanged)
+8. Header hints, geography protection, measurement disambiguation subsumed by Sense (header is a Sense input)
+
+**Column-level (legacy, when Sense absent):** Vector of strings → single column type:
 1. Run value-level inference on each value
 2. Remap collapsed type labels via `remap_collapsed_label()` (8 types redirected, NNFT-162)
 3. Aggregate via majority vote
@@ -202,6 +212,9 @@ make eval-report        # Profile eval + actionability + dashboard
 | Column disambiguation | `crates/finetype-model/src/column.rs` |
 | Semantic hint classifier | `crates/finetype-model/src/semantic.rs` |
 | Entity classifier (Rust) | `crates/finetype-model/src/entity.rs` |
+| Sense classifier (Rust) | `crates/finetype-model/src/sense.rs` |
+| Shared Model2Vec resources | `crates/finetype-model/src/model2vec_shared.rs` |
+| Label → category map | `crates/finetype-model/src/label_category_map.rs` |
 | Model2Vec artifacts | `models/model2vec/` |
 | Entity classifier model | `models/entity-classifier/` |
 | DuckDB type mappings | `crates/finetype-duckdb/src/type_mapping.rs` |
