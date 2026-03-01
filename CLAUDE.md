@@ -37,7 +37,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. Phases 0–2 complete. **Phase 3 (Rust implementation) in progress:** NNFT-165–171 done (shared Model2Vec, Sense Candle port, LabelCategoryMap, pipeline integration, build system + CLI loading). **Remaining:** NNFT-172 (eval: A/B comparison + regression testing). Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
+- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. **Phases 0–3 complete.** Phase 3 (NNFT-165–172): full Rust implementation including shared Model2Vec, Sense Candle port, LabelCategoryMap, pipeline integration, build system + CLI loading, A/B evaluation. **Pipeline infrastructure works but spike model regresses profile eval** (78/120 vs 116/120 baseline) due to SOTAB-only training data. `--no-sense` flag restores baseline accuracy. **Next:** Train production Sense model on diverse headers (profile eval + SOTAB + synthetic) to meet ≥116/120 threshold before enabling as default. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
 - **CLDR retraining rolled back** (NNFT-157–161) — Retrained tiered model regressed 107/120 vs 116/120 baseline. Root causes: URL/URI training overlap (resolved by NNFT-162 merge), T1 routing degradation, training data gaps. Next attempt needs: diversified hostname patterns, bare UTC offset patterns, 1000 samples/type. CLDR infrastructure retained in `scripts/` and `locale_data.rs`.
 - **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
 - **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval + real-world benchmarks meaningfully measure type inference quality.
@@ -227,7 +227,8 @@ make eval-report        # Profile eval + actionability + dashboard
 | Phase 2 integration design | `discovery/architectural-pivot/PHASE2_DESIGN.md` |
 | Architectural pivot | `discovery/architectural-pivot/` |
 | Sense model scripts | `scripts/train_sense_model.py`, `scripts/prepare_sense_data.py` |
-| Sense model artifacts | `models/sense_spike/arch_a/` (winner) |
+| Sense model artifacts | `models/sense/` (production), `models/sense_spike/arch_a/` (spike winner) |
+| Sense A/B eval report | `eval/eval_output/sense_ab_diff.json` |
 | Collapsed type remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
 
 ## Backlog Discipline
