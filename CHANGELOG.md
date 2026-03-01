@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-01
+
+### Accuracy
+
+- **Sense & Sharpen pipeline** — two-stage column classification. Model2Vec cross-attention predicts broad category (temporal/numeric/geographic/entity/format/text) + entity subtype, then CharCNN votes are masked to category-eligible labels. Safety valve falls back to unmasked when confidence is low. 116/120 label (96.7%), 120/120 domain (100%), 0 regressions vs legacy. (NNFT-163–173)
+- **Taxonomy consolidation** — collapsed 8 niche types (171→163) with backward-compatible `remap_collapsed_label()`. Zero regressions. (NNFT-162)
+
+### Added
+
+- **`SenseClassifier`** — Candle port of Architecture A (cross-attention over Model2Vec). 6 broad categories + 4 entity subtypes. ~3.6ms/column. (NNFT-168)
+- **`Model2VecResources`** — shared tokenizer/embedding loading across Sense, semantic hints, and entity classifier. Net memory increase: 1.4MB (Sense weights only). (NNFT-165–167)
+- **`LabelCategoryMap`** — maps all 163 types to Sense categories for output masking. (NNFT-169)
+- **Snapshot learning** — auto-backup before model overwrite, `--seed N` for deterministic training, `manifest.json` provenance. (NNFT-146)
+- **`--sharp-only` CLI flag** — opt into legacy tiered-only pipeline (disables Sense). (NNFT-173)
+- **A/B evaluation infrastructure** — `eval/eval_output/sense_ab_diff.json` comparing Sense vs legacy per-column. (NNFT-172)
+
+### Changed
+
+- Default CLI pipeline: Sense→Sharpen replaces direct tiered cascade. Falls back to tiered when Sense model absent. (NNFT-170)
+- Taxonomy: 171 → 163 types. 8 niche types collapsed. (NNFT-162)
+- Profile eval expanded: 116/120 label (96.7%), 120/120 domain (100%). (NNFT-173)
+- Test suite: 388 tests (7 core + 98 model + 252 CLI + 31 DuckDB). (was 187 at v0.1.0)
+
+### Fixed
+
+- Model2Vec `encode_batch` L2-normalisation mismatch — batch path now matches individual encoding. (NNFT-173)
+- Geography protection fall-through in Sense pipeline — person-name hints no longer block general hint logic. (NNFT-173)
+- Coordinate disambiguation guard — only fires when coordinate labels have competitive vote share (≥1/3 of top). (NNFT-173)
+
 ## [0.4.0] - 2026-02-27
 
 ### Accuracy

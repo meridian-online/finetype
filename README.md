@@ -4,7 +4,7 @@
 
 > **Early Development** — FineType is under active development. Expect breaking changes to taxonomy labels, CLI arguments, library APIs, and model formats between releases. Pin to a specific version if stability matters for your use case.
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 169 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 163 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 $ finetype infer -i "192.168.1.1"
@@ -19,15 +19,16 @@ identity.person.email
 
 ## Features
 
-- **169 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
+- **163 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing
 - **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
+- **Sense→Sharpen pipeline** — Model2Vec cross-attention predicts broad category, then CharCNN votes are masked to category-eligible labels. 96.7% label accuracy on profile eval.
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
 - **DuckDB integration** — 5 scalar functions: `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_version()`
 - **Tiered inference** — 34 specialized CharCNN models in a T0→T1→T2 hierarchy (600+ classifications/sec, 8.5 MB memory)
 - **Real-world validated** — 85-100% accuracy on format-detectable types in [GitTables benchmark](https://zenodo.org/record/5706316) (2,363 columns)
 - **Pure Rust** — no Python runtime, Candle ML framework
-- **187 tests** — taxonomy validation, model inference, column disambiguation, data generation
+- **388 tests** — taxonomy validation, model inference, column disambiguation, data generation
 
 ## Installation
 
@@ -137,14 +138,14 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **169 types** across **6 domains**:
+FineType recognizes **163 types** across **6 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
 | `datetime` | 46 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
-| `technology` | 34 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
-| `identity` | 35 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
-| `representation` | 27 | Integers, floats, booleans (binary/initials/terms), categorical, ordinal, hex colors, JSON |
+| `technology` | 30 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
+| `identity` | 31 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
+| `representation` | 29 | Integers, floats, booleans (binary/initials/terms), categorical, ordinal, hex colors, JSON |
 | `geography` | 16 | Latitude, longitude, countries, cities, postal codes |
 | `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
 
@@ -160,10 +161,10 @@ See [`labels/`](labels/) for the complete taxonomy (YAML definitions with valida
 
 | Model | Architecture | Accuracy | Classes |
 |-------|-------------|----------|---------|
-| Tiered v2 | **34 CharCNNs (T0→T1→T2)** | **default** | 169 |
+| Sense→Sharpen | **Model2Vec + 34 CharCNNs** | **default** (96.7% profile eval) | 163 |
+| Tiered v2 | 34 CharCNNs (T0→T1→T2) | `--sharp-only` fallback | 163 |
+| CharCNN v7 | Flat (single model) | used by Sense pipeline | 163 |
 | CharCNN v6 | Flat (single model) | 89.15% | 169 |
-| CharCNN v5 | Flat (single model) | 90.09% | 168 |
-| CharCNN v4 | Flat (single model) | 91.62% | 159 |
 
 ### Real-World Evaluation (GitTables)
 
@@ -192,7 +193,7 @@ See [`eval/gittables/REPORT.md`](eval/gittables/REPORT.md) for the full evaluati
 
 Single-value classification can be ambiguous: is `01/02/2024` a US date (Jan 2) or EU date (Feb 1)? Is `1995` a year, postal code, or plain number?
 
-Column-mode inference resolves this by analyzing the distribution of values in a column and applying disambiguation rules:
+Column-mode inference resolves this by analyzing the distribution of values in a column. The default **Sense→Sharpen** pipeline uses Model2Vec to pre-classify the column's broad category, then scopes CharCNN voting to category-eligible types. Disambiguation rules further refine the result:
 
 - **Date format disambiguation** — US vs EU slash dates, short vs long dates
 - **Year detection** — 4-digit integers predominantly in 1900-2100 range
@@ -297,7 +298,7 @@ finetype/
 │   ├── finetype-model/       # Candle CNN model, column-mode inference
 │   ├── finetype-cli/         # CLI binary
 │   └── finetype-duckdb/      # DuckDB extension (5 scalar functions)
-├── labels/                   # Taxonomy definitions (169 types, 6 domains, YAML)
+├── labels/                   # Taxonomy definitions (163 types, 6 domains, YAML)
 ├── models/tiered-v2/         # Default tiered model (34 CharCNNs, T0→T1→T2)
 ├── eval/gittables/           # GitTables real-world benchmark evaluation
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
@@ -308,7 +309,7 @@ finetype/
 
 Format types are defined by character patterns (colons in MACs/IPv6, `@` in emails, dashes in UUIDs, `T` separator in ISO 8601). Character-level models capture these patterns directly without tokenization overhead.
 
-The tiered architecture decomposes the 169-class problem into a cascade of smaller, specialized classifiers. Tier 0 determines the broad DuckDB type (15 classes — DATE, TIMESTAMP, VARCHAR, etc.), Tier 1 narrows to a category, and Tier 2 picks the specific type. Each tier's model only needs to distinguish a handful of classes, making individual decisions more reliable than a single flat 169-way classifier.
+The tiered architecture decomposes the 163-class problem into a cascade of smaller, specialized classifiers. Tier 0 determines the broad DuckDB type (15 classes — DATE, TIMESTAMP, VARCHAR, etc.), Tier 1 narrows to a category, and Tier 2 picks the specific type. Each tier's model only needs to distinguish a handful of classes, making individual decisions more reliable than a single flat 163-way classifier.
 
 ### Why Candle?
 
@@ -320,7 +321,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 # Build
 cargo build --release
 
-# Run all tests (187)
+# Run all tests (388)
 cargo test --all
 
 # Validate taxonomy (generator ↔ definition alignment)
@@ -346,7 +347,7 @@ Project tasks are tracked in [`backlog/`](backlog/) using [Backlog.md](https://b
 
 ### Taxonomy Definitions
 
-Each of the 169 types is defined in YAML under `labels/`:
+Each of the 163 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -436,7 +437,7 @@ println!("Valid: {}, Invalid: {}", result.stats.valid_count, result.stats.invali
 
 ### Locale Support
 
-FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (169 types) and does not distinguish between locales at inference time.
+FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (163 types) and does not distinguish between locales at inference time.
 
 **DuckDB `strptime` locale limitation:** DuckDB's `strptime` function only accepts English month and day names. Non-English dates like `6 janvier 2025` will fail with `strptime(col, '%d %B %Y')`. There is no DuckDB locale setting to change this behavior.
 

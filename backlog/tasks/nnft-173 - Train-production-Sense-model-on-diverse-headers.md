@@ -1,11 +1,11 @@
 ---
 id: NNFT-173
 title: Train production Sense model on diverse headers
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-01 02:58'
-updated_date: '2026-03-01 08:24'
+updated_date: '2026-03-01 08:26'
 labels:
   - model-training
   - sense
@@ -175,5 +175,5 @@ Trained and deployed the production Sense model, fixing critical issues that pre
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
