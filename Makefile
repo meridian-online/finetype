@@ -219,6 +219,60 @@ eval-profile: eval-mapping
 	@echo "═══ Running profile evaluation ═══"
 	./eval/profile_eval.sh $(MANIFEST)
 
+# ─── Training (Pure Rust / Candle) ────────────
+# All training uses the finetype-train crate (no Python required).
+# Prerequisites: SOTAB data at $(SOTAB_DATA), Model2Vec at models/model2vec/
+#
+# Full pipeline: make train-prepare-sense train-sense train-entity
+# Eval after training: make eval-report
+
+TRAIN_RUN      := cargo run --release -p finetype-train --bin
+SENSE_DATA_DIR ?= data/sense_prod
+SENSE_MODEL_DIR ?= models/sense_prod/arch_a
+ENTITY_MODEL_DIR ?= models/entity-classifier
+
+.PHONY: train-prepare-sense train-prepare-model2vec train-sense train-entity train-all
+
+train-prepare-sense:
+	@echo "═══ Preparing Sense training data ═══"
+	$(TRAIN_RUN) prepare-sense-data -- \
+		--sotab-dir $(SOTAB_DATA) \
+		--output $(SENSE_DATA_DIR) \
+		--include-profile \
+		--synthetic-headers \
+		--model2vec-dir models/model2vec
+	@echo "✓ Training data written to $(SENSE_DATA_DIR)"
+
+train-prepare-model2vec:
+	@echo "═══ Generating Model2Vec type embeddings ═══"
+	$(TRAIN_RUN) prepare-model2vec -- \
+		--labels-dir labels \
+		--model2vec-dir models/model2vec \
+		--output models/model2vec
+	@echo "✓ Type embeddings written to models/model2vec/"
+
+train-sense:
+	@echo "═══ Training Sense model ═══"
+	$(TRAIN_RUN) train-sense-model -- \
+		--data $(SENSE_DATA_DIR) \
+		--output $(SENSE_MODEL_DIR) \
+		--epochs 50 \
+		--batch-size 64 \
+		--lr 5e-4 \
+		--patience 10
+	@echo "✓ Sense model saved to $(SENSE_MODEL_DIR)"
+
+train-entity:
+	@echo "═══ Training Entity classifier ═══"
+	$(TRAIN_RUN) train-entity-classifier -- \
+		--sotab-dir $(SOTAB_DATA) \
+		--model2vec-dir models/model2vec \
+		--output $(ENTITY_MODEL_DIR)
+	@echo "✓ Entity model saved to $(ENTITY_MODEL_DIR)"
+
+train-all: train-prepare-sense train-prepare-model2vec train-sense train-entity
+	@echo "═══ All training complete ═══"
+
 # ─── Taxonomy stats ───────────────────────────
 .PHONY: stats taxonomy
 

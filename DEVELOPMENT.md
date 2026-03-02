@@ -1,13 +1,105 @@
 # FineType Development
 
-> **Note:** This document has been deprecated. Project documentation is now consolidated in:
->
-> - **[README.md](README.md)** — Architecture, taxonomy reference, CLI commands, DuckDB extension, performance benchmarks
-> - **[backlog/](backlog/)** — Project tasks, roadmap, and architectural decisions ([Backlog.md](https://backlog.md) format)
-> - **[labels/](labels/)** — Complete taxonomy definitions (151 types, YAML with validation schemas and transforms)
-> - **[eval/gittables/REPORT.md](eval/gittables/REPORT.md)** — Real-world evaluation against GitTables benchmark
+## Training (Pure Rust)
+
+All model training uses the `finetype-train` crate. No Python required.
+
+### Prerequisites
+
+- SOTAB CTA data at `~/datasets/sotab/cta/` (validation + test splits)
+- Model2Vec artifacts at `models/model2vec/` (model.safetensors, tokenizer.json)
+- Profile eval datasets listed in `eval/datasets/manifest.csv`
+
+### Full training pipeline
+
+```bash
+# 1. Prepare training data (SOTAB + profile eval + synthetic headers)
+make train-prepare-sense
+
+# 2. Generate Model2Vec type embeddings from taxonomy
+make train-prepare-model2vec
+
+# 3. Train Sense classifier (cross-attention over Model2Vec)
+make train-sense
+
+# 4. Train Entity classifier (Deep Sets MLP)
+make train-entity
+
+# Or run everything:
+make train-all
+```
+
+### Individual binaries
+
+```bash
+# Data preparation with custom options
+cargo run --release -p finetype-train --bin prepare-sense-data -- \
+    --sotab-dir ~/datasets/sotab/cta \
+    --output data/sense_prod \
+    --include-profile \
+    --synthetic-headers \
+    --header-fraction 0.5 \
+    --val-fraction 0.2
+
+# Sense model training with custom hyperparameters
+cargo run --release -p finetype-train --bin train-sense-model -- \
+    --data data/sense_prod \
+    --output models/sense_prod/arch_a \
+    --epochs 50 \
+    --batch-size 64 \
+    --lr 5e-4 \
+    --patience 10 \
+    --header-dropout 0.5
+
+# Entity classifier training
+cargo run --release -p finetype-train --bin train-entity-classifier -- \
+    --sotab-dir ~/datasets/sotab/cta \
+    --model2vec-dir models/model2vec \
+    --output models/entity-classifier
+
+# Model2Vec type embedding generation
+cargo run --release -p finetype-train --bin prepare-model2vec -- \
+    --labels-dir labels \
+    --model2vec-dir models/model2vec \
+    --output models/model2vec
+```
+
+### Validation
+
+After training, verify accuracy on profile eval:
+
+```bash
+make eval-report
+```
+
+Target: ≥116/120 label accuracy (96.7%), 120/120 domain accuracy (100%).
+
+### Architecture
+
+- **Sense model (Architecture A):** Cross-attention over Model2Vec embeddings. Dual heads: broad category (6 classes) + entity subtype (4 classes). ~347k parameters.
+- **Entity classifier:** Deep Sets MLP with 300-dim features (256 Model2Vec + 44 statistical). 4 entity classes. Demotion threshold configurable.
+- **Data pipeline:** SOTAB parquet → DuckDB → frequency-weighted sampling → Model2Vec encoding → JSONL with pre-computed embeddings.
+
+### Crate structure
+
+```
+crates/finetype-train/
+    src/
+        lib.rs              # Module declarations
+        sense.rs            # SenseModelA architecture
+        sense_train.rs      # Sense training loop
+        entity.rs           # Entity classifier + training
+        training.rs         # Shared infrastructure (loss, scheduler, early stopping)
+        data.rs             # Data loading, SOTAB integration, JSONL pipeline
+        model2vec_prep.rs   # FPS algorithm, type embedding generation
+    src/bin/
+        train_sense_model.rs      # CLI: train-sense-model
+        train_entity_classifier.rs # CLI: train-entity-classifier
+        prepare_sense_data.rs     # CLI: prepare-sense-data
+        prepare_model2vec.rs      # CLI: prepare-model2vec
+```
 
 ## Related Repositories
 
 - **noon-org/finetype** (this repo) — Production codebase. Candle-based, DuckDB integration.
-- **hughcameron/finetype** — v1 experiments. Burn+LibTorch training, Python data generation with mimesis, HuggingFace dataset upload pipeline (`hughcameron/finetype_01`).
+- **hughcameron/finetype** — v1 experiments. Burn+LibTorch training, Python data generation with mimesis.

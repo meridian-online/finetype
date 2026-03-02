@@ -163,6 +163,18 @@ struct CrossAttentionWeights {
     out_bias: Tensor,   // [D]
 }
 
+/// Attention mechanism variant — Python vs Rust trained models.
+enum AttentionVariant {
+    /// Python-trained: full multi-head attention (Q,K,V projections + output projection).
+    FullMha {
+        weights: CrossAttentionWeights,
+        n_heads: usize,
+    },
+    /// Rust-trained: simple single-head attention (no K,V,output projections).
+    /// Query attends directly to value embeddings as both keys and values.
+    Simple,
+}
+
 /// MLP head weights: Linear(3D, H) → ReLU → Linear(H, H/2) → ReLU → Linear(H/2, C)
 struct MlpHead {
     fc1_weight: Tensor, // [H, 3D]
@@ -210,13 +222,12 @@ impl MlpHead {
 pub struct SenseClassifier {
     // Architecture parameters
     embed_dim: usize,
-    n_heads: usize,
 
     // Weights
     header_proj_weight: Tensor, // [D, D]
     header_proj_bias: Tensor,   // [D]
     default_query: Tensor,      // [1, 1, D]
-    cross_attn: CrossAttentionWeights,
+    attention: AttentionVariant,
     norm_weight: Tensor, // [D]
     norm_bias: Tensor,   // [D]
     broad_head: MlpHead,
@@ -227,6 +238,14 @@ pub struct SenseClassifier {
 
 impl SenseClassifier {
     /// Load from in-memory byte slices (model.safetensors + config.json).
+    ///
+    /// Supports two model formats:
+    /// - **Python-trained** (PyTorch): full MHA with `cross_attention.in_proj_weight`,
+    ///   MLP keys `broad_head.{0,3,6}`, `entity_head.{0,3,6}`.
+    /// - **Rust-trained** (Candle): simple attention (no K/V projections),
+    ///   MLP keys `broad_fc{1,2,3}`, `entity_fc{1,2,3}`.
+    ///
+    /// Format is auto-detected by checking for `cross_attention.in_proj_weight`.
     pub fn from_bytes(model_bytes: &[u8], config_bytes: &[u8]) -> Result<Self, InferenceError> {
         let device = Device::Cpu;
 
@@ -235,7 +254,6 @@ impl SenseClassifier {
             InferenceError::InvalidPath(format!("Failed to parse Sense config: {}", e))
         })?;
         let embed_dim = config["embed_dim"].as_u64().unwrap_or(128) as usize;
-        let n_heads = config["n_heads"].as_u64().unwrap_or(4) as usize;
 
         // Load all tensors
         let tensors = candle_core::safetensors::load_buffer(model_bytes, &device)?;
@@ -252,55 +270,90 @@ impl SenseClassifier {
                 .and_then(|t| Ok(t.to_dtype(DType::F32)?))
         };
 
-        // Split in_proj_weight [3D, D] into Q, K, V each [D, D]
-        let in_proj_weight = get("cross_attention.in_proj_weight")?;
-        let in_proj_bias = get("cross_attention.in_proj_bias")?;
+        // Auto-detect format: Python models have cross_attention.in_proj_weight
+        let is_python_format = tensors.contains_key("cross_attention.in_proj_weight");
 
-        let d = embed_dim;
-        let wq = in_proj_weight.narrow(0, 0, d)?;
-        let wk = in_proj_weight.narrow(0, d, d)?;
-        let wv = in_proj_weight.narrow(0, 2 * d, d)?;
-        let bq = in_proj_bias.narrow(0, 0, d)?;
-        let bk = in_proj_bias.narrow(0, d, d)?;
-        let bv = in_proj_bias.narrow(0, 2 * d, d)?;
+        // Load attention variant
+        let attention = if is_python_format {
+            let n_heads = config["n_heads"].as_u64().unwrap_or(4) as usize;
 
-        let cross_attn = CrossAttentionWeights {
-            wq,
-            bq,
-            wk,
-            bk,
-            wv,
-            bv,
-            out_weight: get("cross_attention.out_proj.weight")?,
-            out_bias: get("cross_attention.out_proj.bias")?,
+            // Split in_proj_weight [3D, D] into Q, K, V each [D, D]
+            let in_proj_weight = get("cross_attention.in_proj_weight")?;
+            let in_proj_bias = get("cross_attention.in_proj_bias")?;
+
+            let d = embed_dim;
+            let wq = in_proj_weight.narrow(0, 0, d)?;
+            let wk = in_proj_weight.narrow(0, d, d)?;
+            let wv = in_proj_weight.narrow(0, 2 * d, d)?;
+            let bq = in_proj_bias.narrow(0, 0, d)?;
+            let bk = in_proj_bias.narrow(0, d, d)?;
+            let bv = in_proj_bias.narrow(0, 2 * d, d)?;
+
+            AttentionVariant::FullMha {
+                weights: CrossAttentionWeights {
+                    wq,
+                    bq,
+                    wk,
+                    bk,
+                    wv,
+                    bv,
+                    out_weight: get("cross_attention.out_proj.weight")?,
+                    out_bias: get("cross_attention.out_proj.bias")?,
+                },
+                n_heads,
+            }
+        } else {
+            // Rust-trained: simple attention — no separate attention weights to load
+            AttentionVariant::Simple
         };
 
-        // MLP heads: broad_head.{0,3,6}.{weight,bias}, entity_head.{0,3,6}.{weight,bias}
-        let broad_head = MlpHead {
-            fc1_weight: get("broad_head.0.weight")?,
-            fc1_bias: get("broad_head.0.bias")?,
-            fc2_weight: get("broad_head.3.weight")?,
-            fc2_bias: get("broad_head.3.bias")?,
-            fc3_weight: get("broad_head.6.weight")?,
-            fc3_bias: get("broad_head.6.bias")?,
+        // MLP heads: format-dependent key names
+        let broad_head = if is_python_format {
+            MlpHead {
+                fc1_weight: get("broad_head.0.weight")?,
+                fc1_bias: get("broad_head.0.bias")?,
+                fc2_weight: get("broad_head.3.weight")?,
+                fc2_bias: get("broad_head.3.bias")?,
+                fc3_weight: get("broad_head.6.weight")?,
+                fc3_bias: get("broad_head.6.bias")?,
+            }
+        } else {
+            MlpHead {
+                fc1_weight: get("broad_fc1.weight")?,
+                fc1_bias: get("broad_fc1.bias")?,
+                fc2_weight: get("broad_fc2.weight")?,
+                fc2_bias: get("broad_fc2.bias")?,
+                fc3_weight: get("broad_fc3.weight")?,
+                fc3_bias: get("broad_fc3.bias")?,
+            }
         };
 
-        let entity_head = MlpHead {
-            fc1_weight: get("entity_head.0.weight")?,
-            fc1_bias: get("entity_head.0.bias")?,
-            fc2_weight: get("entity_head.3.weight")?,
-            fc2_bias: get("entity_head.3.bias")?,
-            fc3_weight: get("entity_head.6.weight")?,
-            fc3_bias: get("entity_head.6.bias")?,
+        let entity_head = if is_python_format {
+            MlpHead {
+                fc1_weight: get("entity_head.0.weight")?,
+                fc1_bias: get("entity_head.0.bias")?,
+                fc2_weight: get("entity_head.3.weight")?,
+                fc2_bias: get("entity_head.3.bias")?,
+                fc3_weight: get("entity_head.6.weight")?,
+                fc3_bias: get("entity_head.6.bias")?,
+            }
+        } else {
+            MlpHead {
+                fc1_weight: get("entity_fc1.weight")?,
+                fc1_bias: get("entity_fc1.bias")?,
+                fc2_weight: get("entity_fc2.weight")?,
+                fc2_bias: get("entity_fc2.bias")?,
+                fc3_weight: get("entity_fc3.weight")?,
+                fc3_bias: get("entity_fc3.bias")?,
+            }
         };
 
         Ok(Self {
             embed_dim,
-            n_heads,
             header_proj_weight: get("header_proj.weight")?,
             header_proj_bias: get("header_proj.bias")?,
             default_query: get("default_query")?,
-            cross_attn,
+            attention,
             norm_weight: get("norm.weight")?,
             norm_bias: get("norm.bias")?,
             broad_head,
@@ -402,7 +455,12 @@ impl SenseClassifier {
 
         // 2. Cross-attention: query [1, 1, D] attends to value_embs [N, D]
         let values_3d = value_embs.unsqueeze(0)?; // [1, N, D]
-        let attn_out = self.multi_head_attention(&query, &values_3d, mask)?; // [1, 1, D]
+        let attn_out = match &self.attention {
+            AttentionVariant::FullMha { weights, n_heads } => {
+                self.multi_head_attention(&query, &values_3d, mask, weights, *n_heads)?
+            }
+            AttentionVariant::Simple => self.simple_attention(&query, &values_3d, mask)?,
+        }; // [1, 1, D]
         let attn_out = attn_out.squeeze(0)?.squeeze(0)?; // [D]
 
         // 3. LayerNorm
@@ -451,31 +509,33 @@ impl SenseClassifier {
         })
     }
 
-    /// Multi-head attention: query [1, 1, D] × key/value [1, N, D] → [1, 1, D]
+    /// Multi-head attention (Python-trained models): query [1, 1, D] × key/value [1, N, D] → [1, 1, D]
     fn multi_head_attention(
         &self,
         query: &Tensor,
         kv: &Tensor,
         mask: &[bool],
+        weights: &CrossAttentionWeights,
+        n_heads: usize,
     ) -> Result<Tensor, InferenceError> {
         let d = self.embed_dim;
-        let h = self.n_heads;
+        let h = n_heads;
         let head_dim = d / h;
         let n = kv.dim(1)?;
 
         // Project Q, K, V: [1, seq, D] × [D, D] → [1, seq, D]
         let q = query
             .squeeze(0)? // [1, D]
-            .matmul(&self.cross_attn.wq.t()?)?
-            .broadcast_add(&self.cross_attn.bq)?; // [1, D]
+            .matmul(&weights.wq.t()?)?
+            .broadcast_add(&weights.bq)?; // [1, D]
         let k = kv
             .squeeze(0)? // [N, D]
-            .matmul(&self.cross_attn.wk.t()?)?
-            .broadcast_add(&self.cross_attn.bk)?; // [N, D]
+            .matmul(&weights.wk.t()?)?
+            .broadcast_add(&weights.bk)?; // [N, D]
         let v = kv
             .squeeze(0)? // [N, D]
-            .matmul(&self.cross_attn.wv.t()?)?
-            .broadcast_add(&self.cross_attn.bv)?; // [N, D]
+            .matmul(&weights.wv.t()?)?
+            .broadcast_add(&weights.bv)?; // [N, D]
 
         // Reshape to multi-head: [seq, h, head_dim] → [h, seq, head_dim]
         let q = q.reshape((1, h, head_dim))?.transpose(0, 1)?; // [h, 1, head_dim]
@@ -514,10 +574,49 @@ impl SenseClassifier {
 
         // Output projection
         let attn_out = attn_out
-            .matmul(&self.cross_attn.out_weight.t()?)?
-            .broadcast_add(&self.cross_attn.out_bias)?; // [1, D]
+            .matmul(&weights.out_weight.t()?)?
+            .broadcast_add(&weights.out_bias)?; // [1, D]
 
         Ok(attn_out.unsqueeze(0)?) // [1, 1, D]
+    }
+
+    /// Simple single-head attention (Rust-trained models): query [1, 1, D] × kv [1, N, D] → [1, 1, D]
+    ///
+    /// No K/V projections — query attends directly to value embeddings.
+    /// Matches the training architecture in `finetype-train::sense::SenseModelA`.
+    fn simple_attention(
+        &self,
+        query: &Tensor,
+        kv: &Tensor,
+        mask: &[bool],
+    ) -> Result<Tensor, InferenceError> {
+        let n = kv.dim(1)?;
+
+        // Scaled dot-product: Q @ K^T / sqrt(D)
+        let scale = (self.embed_dim as f64).sqrt();
+        let scores = (query.matmul(&kv.transpose(1, 2)?)? / scale)?; // [1, 1, N]
+
+        // Apply mask: set -inf for padding positions
+        let scores = if mask.iter().any(|&m| !m) {
+            let mask_vals: Vec<f32> = mask
+                .iter()
+                .map(|&m| if m { 0.0 } else { f32::NEG_INFINITY })
+                .collect();
+            let mask_tensor = Tensor::from_vec(mask_vals, (1, 1, n), &self.device)?;
+            scores.broadcast_add(&mask_tensor)?
+        } else {
+            scores
+        };
+
+        // Softmax over N dimension
+        let max_val = scores.max(2)?.unsqueeze(2)?;
+        let shifted = scores.broadcast_sub(&max_val)?;
+        let exp = shifted.exp()?;
+        let sum_exp = exp.sum(2)?.unsqueeze(2)?;
+        let attn_probs = exp.broadcast_div(&sum_exp)?; // [1, 1, N]
+
+        // Weighted sum: [1, 1, N] @ [1, N, D] → [1, 1, D]
+        Ok(attn_probs.matmul(kv)?)
     }
 
     /// LayerNorm: (x - mean) / sqrt(var + eps) * weight + bias
@@ -641,20 +740,10 @@ mod tests {
 
         let classifier = SenseClassifier {
             embed_dim: d,
-            n_heads: 1,
             header_proj_weight: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
             header_proj_bias: Tensor::zeros(d, DType::F32, &device).unwrap(),
             default_query: Tensor::zeros((1, 1, d), DType::F32, &device).unwrap(),
-            cross_attn: CrossAttentionWeights {
-                wq: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                bq: Tensor::zeros(d, DType::F32, &device).unwrap(),
-                wk: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                bk: Tensor::zeros(d, DType::F32, &device).unwrap(),
-                wv: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                bv: Tensor::zeros(d, DType::F32, &device).unwrap(),
-                out_weight: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                out_bias: Tensor::zeros(d, DType::F32, &device).unwrap(),
-            },
+            attention: AttentionVariant::Simple,
             norm_weight: Tensor::ones(d, DType::F32, &device).unwrap(),
             norm_bias: Tensor::zeros(d, DType::F32, &device).unwrap(),
             broad_head: MlpHead {
@@ -704,20 +793,10 @@ mod tests {
 
         let classifier = SenseClassifier {
             embed_dim: d,
-            n_heads: 1,
             header_proj_weight: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
             header_proj_bias: Tensor::zeros(d, DType::F32, &device).unwrap(),
             default_query: Tensor::zeros((1, 1, d), DType::F32, &device).unwrap(),
-            cross_attn: CrossAttentionWeights {
-                wq: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                bq: Tensor::zeros(d, DType::F32, &device).unwrap(),
-                wk: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                bk: Tensor::zeros(d, DType::F32, &device).unwrap(),
-                wv: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                bv: Tensor::zeros(d, DType::F32, &device).unwrap(),
-                out_weight: Tensor::zeros((d, d), DType::F32, &device).unwrap(),
-                out_bias: Tensor::zeros(d, DType::F32, &device).unwrap(),
-            },
+            attention: AttentionVariant::Simple,
             norm_weight: Tensor::ones(d, DType::F32, &device).unwrap(),
             norm_bias: Tensor::zeros(d, DType::F32, &device).unwrap(),
             broad_head: MlpHead {
@@ -882,7 +961,7 @@ mod tests {
         assert!(single_result.broad_confidence > 0.0);
 
         eprintln!(
-            "Sense integration: date={} ({:.1}%), email={} ({:.1}%), name={}/{:?} ({:.1}%), num={} ({:.1}%), no_header={}, single={}",
+            "Sense integration (Python model): date={} ({:.1}%), email={} ({:.1}%), name={}/{:?} ({:.1}%), num={} ({:.1}%), no_header={}, single={}",
             date_result.broad_category,
             date_result.broad_confidence * 100.0,
             email_result.broad_category,
@@ -894,6 +973,75 @@ mod tests {
             num_result.broad_confidence * 100.0,
             no_header_result.broad_category,
             single_result.broad_category,
+        );
+    }
+
+    /// Integration test: load Rust-trained Sense model (simple attention variant).
+    ///
+    /// Tests that the dual-format loader correctly handles the Rust-trained model
+    /// with `broad_fc{1,2,3}` keys and simple attention (no cross_attention weights).
+    #[test]
+    fn test_load_rust_trained_model_if_available() {
+        let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+
+        let sense_dir = workspace_root
+            .join("models")
+            .join("sense_rust")
+            .join("arch_a");
+        let m2v_dir = workspace_root.join("models").join("model2vec");
+
+        if !sense_dir.join("model.safetensors").exists()
+            || !m2v_dir.join("model.safetensors").exists()
+        {
+            eprintln!("Skipping Rust-trained Sense test: model artifacts not found");
+            return;
+        }
+
+        let classifier = SenseClassifier::load(&sense_dir).unwrap();
+        let resources = Model2VecResources::load(&m2v_dir).unwrap();
+
+        // Test with various column types
+        let date_values: Vec<&str> = vec![
+            "2024-01-15",
+            "2024-02-20",
+            "2024-03-25",
+            "2024-04-30",
+            "2024-05-05",
+        ];
+        let date_result = classifier
+            .classify(&resources, Some("date"), &date_values)
+            .unwrap();
+        assert!(
+            date_result.broad_confidence > 0.0 && date_result.broad_confidence <= 1.0,
+            "Rust model: date confidence should be valid probability, got {}",
+            date_result.broad_confidence
+        );
+
+        let name_values: Vec<&str> =
+            vec!["John Smith", "Jane Doe", "Robert Johnson", "Mary Williams"];
+        let name_result = classifier
+            .classify(&resources, Some("name"), &name_values)
+            .unwrap();
+        assert!(name_result.broad_confidence > 0.0);
+
+        // No header
+        let no_header = classifier.classify(&resources, None, &date_values).unwrap();
+        assert!(no_header.broad_confidence > 0.0);
+
+        eprintln!(
+            "Sense integration (Rust model): date={} ({:.1}%), name={}/{:?} ({:.1}%), no_header={} ({:.1}%)",
+            date_result.broad_category,
+            date_result.broad_confidence * 100.0,
+            name_result.broad_category,
+            name_result.entity_subtype,
+            name_result.broad_confidence * 100.0,
+            no_header.broad_category,
+            no_header.broad_confidence * 100.0,
         );
     }
 }

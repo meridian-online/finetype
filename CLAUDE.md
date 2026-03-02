@@ -23,7 +23,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 **Version:** 0.5.0 (latest tag: `v0.5.0`)
 **Taxonomy:** 166 definitions across 7 domains (v0.5.1: finance domain, identifier category) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI), tiered-v2 fallback via `--sharp-only`, char-cnn-v7 flat (DuckDB extension)
-**Codebase:** ~20k lines of Rust across 6 crates (+ finetype-candle-spike for ML training)
+**Codebase:** ~20k lines of Rust across 7 crates (including finetype-train for pure Rust ML training)
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check, smoke tests)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
@@ -37,7 +37,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Pure Rust Return** (NNFT-182–187) — Eliminating Python from codebase. Phase 0 spike complete (Path A confirmed). Phase A: build tools Rust (NNFT-183). Phase B: eval infrastructure Rust (NNFT-184, in progress). Phase C: Candle training port (NNFT-185). Phase D: cleanup (NNFT-186). Candle 0.8 with `half = "2.4"` pin.
+- **Pure Rust Return** (NNFT-182–187) — Eliminating Python from codebase. Phase 0 spike complete (Path A confirmed). Phase A: build tools Rust (NNFT-183). Phase B: eval infrastructure Rust (NNFT-184, done). Phase C: Candle training port (NNFT-185, in progress — training binaries implemented, 40 tests pass, awaiting full training run). Phase D: cleanup (NNFT-186). Candle 0.8 with `half = "2.4"` pin. Training scripts deleted, replaced by `finetype-train` crate with 4 Rust binaries.
 - **Model retraining for v0.5.1 taxonomy** (NNFT-181) — Retrain model to include new finance/identifier types from v0.5.1 taxonomy. Not yet started.
 - **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
 
@@ -54,6 +54,7 @@ finetype/
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
     finetype-eval/     # Evaluation binaries (report, actionability, GitTables, SOTAB)
     finetype-candle-spike/  # ML training feasibility spike (Candle 0.8)
+    finetype-train/    # Pure Rust ML training (Sense, Entity, data pipeline)
   labels/              # Taxonomy YAML definitions (6 domain files)
   models/              # Pre-trained model directories
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
@@ -230,7 +231,11 @@ make eval-report        # Profile eval + actionability + dashboard
 | Smoke tests | `tests/smoke.sh` |
 | Phase 2 integration design | `discovery/architectural-pivot/PHASE2_DESIGN.md` |
 | Architectural pivot | `discovery/architectural-pivot/` |
-| Sense model scripts | `scripts/train_sense_model.py`, `scripts/prepare_sense_data.py` |
+| Sense training (Rust) | `crates/finetype-train/src/sense_train.rs`, `crates/finetype-train/src/bin/train_sense.rs` |
+| Entity training (Rust) | `crates/finetype-train/src/entity.rs`, `crates/finetype-train/src/bin/train_entity.rs` |
+| Data pipeline (Rust) | `crates/finetype-train/src/data.rs`, `crates/finetype-train/src/bin/prepare_sense_data.rs` |
+| Model2Vec prep (Rust) | `crates/finetype-train/src/model2vec_prep.rs`, `crates/finetype-train/src/bin/prepare_model2vec.rs` |
+| Training infra (Rust) | `crates/finetype-train/src/training.rs` |
 | Sense model artifacts | `models/sense/` (production), `models/sense_spike/arch_a/` (spike winner) |
 | Sense A/B eval report | `eval/eval_output/sense_ab_diff.json` |
 | Collapsed type remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
