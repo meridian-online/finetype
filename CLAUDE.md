@@ -21,27 +21,25 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ## Current State
 
 **Version:** 0.5.0 (latest tag: `v0.5.0`)
-**Taxonomy:** 163 definitions across 6 domains — all generators pass, 100% alignment
+**Taxonomy:** 166 definitions across 7 domains (v0.5.1: finance domain, identifier category) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI), tiered-v2 fallback via `--sharp-only`, char-cnn-v7 flat (DuckDB extension)
-**Codebase:** ~20k lines of Rust across 4 crates
+**Codebase:** ~20k lines of Rust across 6 crates (+ finetype-candle-spike for ML training)
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check, smoke tests)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
+- **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category, 5 new types (IBAN, currency_amount, html_content, locale_number, alphanumeric_code), 2 removals (cvv, century). 166 types across 7 domains.
+- **Candle feasibility spike** (NNFT-182) — Validated Candle 0.8 for ML training: Sense Architecture A and Entity classifier both work in pure Rust. 10/10 tests pass (forward pass, gradients, optimizer, safetensors round-trip). Path A (Full Rust) confirmed.
 - **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Fixed L2-normalisation mismatch in Model2Vec, integrated header hints into Sense pipeline, added coordinate disambiguation guard and low-confidence safety valve. Result: 116/120 (96.7%) label, 120/120 (100%) domain. Net +4 wins, 0 regressions vs legacy. Sense is now the default pipeline.
 - **Phase 3 Rust implementation** (NNFT-165–172) — Full Sense→Sharpen pipeline: shared Model2Vec, Candle-ported SenseClassifier, LabelCategoryMap, pipeline integration, build system + CLI loading, A/B evaluation infrastructure.
-- **Phase 2 Integration Design** (NNFT-164) — Design spec. Key decisions (decision-006): flat CharCNN + output masking, sample 100/encode 50, Sense absorbs 6 behaviours. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
-- **Sense model spike** (NNFT-163) — Architecture A (cross-attention over Model2Vec): 88.5% broad accuracy, 78.0% entity subtype, 3.6ms/column.
-- **Phase 0 taxonomy audit** (NNFT-162) — Collapsed 8 niche types (171 → 163). Zero regressions.
 - **Entity classifier** (NNFT-151/152) — Deep Sets MLP demotes full_name → entity_name for non-person columns.
 
 ### What's in progress
 
-- **Sense & Sharpen pivot** (decision-004) — Two-stage pipeline replacing tiered CharCNN cascade. **Phases 0–3 complete + production model deployed (NNFT-173).** Sense is now the **default pipeline**: 116/120 (96.7%) label, 120/120 (100%) domain on profile eval. Net +4 wins, 0 regressions vs legacy. SOTAB: 39.6%/62.8% (matches legacy). Key fixes: L2-normalised Model2Vec embeddings, header hints integrated into Sense pipeline, improved safety valve (low-confidence fallback) and coordinate disambiguation guard. `--sharp-only` flag disables Sense for legacy pipeline. Design: `discovery/architectural-pivot/PHASE2_DESIGN.md`.
-- **CLDR retraining rolled back** (NNFT-157–161) — Retrained tiered model regressed 107/120 vs 116/120 baseline. Root causes: URL/URI training overlap (resolved by NNFT-162 merge), T1 routing degradation, training data gaps. Next attempt needs: diversified hostname patterns, bare UTC offset patterns, 1000 samples/type. CLDR infrastructure retained in `scripts/` and `locale_data.rs`.
+- **Pure Rust Return** (NNFT-182–187) — Eliminating Python from codebase. Phase 0 spike complete (Path A confirmed). Phase A: build tools Rust (NNFT-183). Phase B: eval infrastructure Rust (NNFT-184, in progress). Phase C: Candle training port (NNFT-185). Phase D: cleanup (NNFT-186). Candle 0.8 with `half = "2.4"` pin.
+- **Model retraining for v0.5.1 taxonomy** (NNFT-181) — Retrain model to include new finance/identifier types from v0.5.1 taxonomy. Not yet started.
 - **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
-- **Evaluation methodology** — NNFT-144 (discovery): investigate whether profile eval + real-world benchmarks meaningfully measure type inference quality.
 
 ## Architecture
 
@@ -54,6 +52,8 @@ finetype/
     finetype-model/    # CharCNN, tiered classifier, column disambiguation, training
     finetype-cli/      # CLI binary (infer, profile, generate, check, train)
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
+    finetype-eval/     # Evaluation binaries (report, actionability, GitTables, SOTAB)
+    finetype-candle-spike/  # ML training feasibility spike (Candle 0.8)
   labels/              # Taxonomy YAML definitions (6 domain files)
   models/              # Pre-trained model directories
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
@@ -70,6 +70,8 @@ finetype-model (depends on core — CharCNN, tiered inference, column mode)
     |
     +--- finetype-cli   (depends on core + model — CLI binary)
     +--- finetype-duckdb (depends on core + model — DuckDB extension)
+
+finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arrow)
 ```
 
 ### Inference pipeline
@@ -145,7 +147,7 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 **Profile eval** (`eval/profile_eval.sh`) — 96.7% label (116/120), 98.3% domain (118/120) on 21 datasets.
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
-**Actionability eval** (`eval/eval_actionability.py`) — 98.7% datetime format_string parse rate.
+**Actionability eval** (`eval-actionability` binary) — 98.7% datetime format_string parse rate.
 **Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 
@@ -162,11 +164,11 @@ GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable c
 
 ## Priority Order
 
-1. **Sense & Sharpen pivot** — Phase 3 Rust implementation (NNFT-165–172): shared Model2Vec, Sense Candle port, output masking, pipeline integration
-2. **Accuracy lift** — Address remaining misclassifications (NNFT-090, NNFT-099, NNFT-100)
-3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
-4. **Distribution** — Homebrew tap, crates.io current
-5. **Training data quality** — Name diversity, phone formats, address locales
+1. **Pure Rust Return** — Phases A→B→C→D: replace Python build/eval/training with Rust + Candle (NNFT-183–186)
+2. **Model retraining for v0.5.1** — Retrain with new taxonomy types (NNFT-181)
+3. **Accuracy lift** — Address remaining misclassifications (NNFT-090, NNFT-099, NNFT-100)
+4. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
+5. **Distribution** — Homebrew tap, crates.io current
 
 ## Decided Items
 
@@ -191,6 +193,7 @@ Key decisions — do not revisit without good reason. See backlog decisions and 
 17. **Snapshot Learning** — Auto-snapshot before overwriting models. `--seed N` deterministic training. `manifest.json` provenance. (NNFT-146)
 18. **Sense Architecture A** — Cross-attention over Model2Vec beats transformer encoder: +1.6pp accuracy, 23.7x faster, simpler Candle port. (NNFT-163, decision-005)
 19. **Sense integration: flat CharCNN + output masking** — Use existing flat model with Sense-guided category masking, not per-category retraining. Sample 100/encode 50. Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). (NNFT-164, decision-006)
+20. **Pure Rust via Candle (Path A)** — Full Rust migration replacing all Python. Candle 0.8 with `half = "2.4"` pin. Validated: architecture, gradients, optimizer, safetensors round-trip. (NNFT-182/187)
 
 ## Build & Test
 
@@ -223,7 +226,7 @@ make eval-report        # Profile eval + actionability + dashboard
 | CI workflow | `.github/workflows/ci.yml` |
 | Eval config | `eval/config.env` |
 | Schema mapping | `eval/schema_mapping.yaml` |
-| Eval report generator | `eval/eval_report.py` |
+| Eval binaries (report, actionability, GitTables, SOTAB) | `crates/finetype-eval/src/bin/` |
 | Smoke tests | `tests/smoke.sh` |
 | Phase 2 integration design | `discovery/architectural-pivot/PHASE2_DESIGN.md` |
 | Architectural pivot | `discovery/architectural-pivot/` |
@@ -231,6 +234,8 @@ make eval-report        # Profile eval + actionability + dashboard
 | Sense model artifacts | `models/sense/` (production), `models/sense_spike/arch_a/` (spike winner) |
 | Sense A/B eval report | `eval/eval_output/sense_ab_diff.json` |
 | Collapsed type remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
+| Candle training spike | `crates/finetype-candle-spike/` (models, data, training, tests) |
+| Candle spike summary | `discovery/candle-feasibility-spike/SUMMARY.md` |
 
 ## Backlog Discipline
 

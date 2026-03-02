@@ -6,14 +6,14 @@
 //! Rust port of eval/gittables/prepare_1m_values.py.
 
 use anyhow::{Context, Result};
-use arrow::array::StringArray;
+use arrow::array::{Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use clap::Parser;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
-use rand::seq::SliceRandom;
 use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -58,15 +58,12 @@ fn main() -> Result<()> {
     {
         let mut rdr = csv::Reader::from_path(&metadata_path)
             .with_context(|| format!("Failed to open {}", metadata_path.display()))?;
+        let headers: Vec<String> = rdr.headers()?.iter().map(|s| s.to_string()).collect();
         for result in rdr.records() {
             let record = result?;
-            let headers = rdr.headers()?.clone();
             let mut row = std::collections::HashMap::new();
             for (i, header) in headers.iter().enumerate() {
-                row.insert(
-                    header.to_string(),
-                    record.get(i).unwrap_or("").to_string(),
-                );
+                row.insert(header.clone(), record.get(i).unwrap_or("").to_string());
             }
             metadata.push(row);
         }
@@ -80,7 +77,12 @@ fn main() -> Result<()> {
 
     for (i, meta) in metadata.iter().enumerate() {
         if i % 500 == 0 {
-            println!("  {}/{} files processed, {} values collected", i, metadata.len(), rows.len());
+            println!(
+                "  {}/{} files processed, {} values collected",
+                i,
+                metadata.len(),
+                rows.len()
+            );
         }
 
         let file_path = meta.get("file_path").cloned().unwrap_or_default();

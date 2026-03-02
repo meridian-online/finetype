@@ -114,7 +114,7 @@ impl SenseDataset {
         // Convert to tensors
         let value_embeds_tensor = array_to_tensor(&value_embeds)?;
         let mask_tensor = array_to_tensor_bool(&mask)?;
-        let header_embeds_tensor = array_to_tensor(&header_embeds)?;
+        let header_embeds_tensor = array_to_tensor_2d(&header_embeds)?;
         let has_header_tensor = array_to_tensor_1d(&has_header)?;
         let broad_labels_tensor = array_to_tensor_usize(&broad_labels)?;
         let entity_labels_tensor = array_to_tensor_usize(&entity_labels)?;
@@ -143,36 +143,53 @@ pub struct BatchData {
 // ── Tensor conversion helpers ────────────────────────────
 
 fn array_to_tensor(data: &[Vec<Vec<f32>>]) -> Result<Tensor> {
-    let shape = (data.len(), data[0].len(), data[0][0].len());
-    let mut flat = Vec::new();
+    let d0 = data.len();
+    let d1 = data[0].len();
+    let d2 = data[0][0].len();
+    let mut flat = Vec::with_capacity(d0 * d1 * d2);
     for batch in data {
         for row in batch {
             flat.extend_from_slice(row);
         }
     }
-    Tensor::new(&flat, &candle_core::Device::Cpu)?
-        .reshape(shape.0 as u32, shape.1 as u32, shape.2 as u32)
-        .context("Failed to reshape tensor")
+    let t = Tensor::new(flat.as_slice(), &candle_core::Device::Cpu)
+        .context("Failed to create 3D tensor")?;
+    t.reshape((d0, d1, d2))
+        .context("Failed to reshape 3D tensor")
+}
+
+fn array_to_tensor_2d(data: &[Vec<f32>]) -> Result<Tensor> {
+    let d0 = data.len();
+    let d1 = data[0].len();
+    let mut flat = Vec::with_capacity(d0 * d1);
+    for row in data {
+        flat.extend_from_slice(row);
+    }
+    let t = Tensor::new(flat.as_slice(), &candle_core::Device::Cpu)
+        .context("Failed to create 2D tensor")?;
+    t.reshape((d0, d1)).context("Failed to reshape 2D tensor")
 }
 
 fn array_to_tensor_1d(data: &[f32]) -> Result<Tensor> {
-    Tensor::new(data, &candle_core::Device::Cpu)
+    Tensor::new(data, &candle_core::Device::Cpu).context("Failed to create 1D tensor")
 }
 
 fn array_to_tensor_usize(data: &[usize]) -> Result<Tensor> {
-    let data_f32: Vec<f32> = data.iter().map(|&x| x as f32).collect();
-    Tensor::new(&data_f32, &candle_core::Device::Cpu)
+    let data_u32: Vec<u32> = data.iter().map(|&x| x as u32).collect();
+    Tensor::new(data_u32.as_slice(), &candle_core::Device::Cpu)
+        .context("Failed to create label tensor")
 }
 
 fn array_to_tensor_bool(data: &[Vec<bool>]) -> Result<Tensor> {
-    let mut flat = Vec::new();
+    let d0 = data.len();
+    let d1 = data[0].len();
+    let mut flat = Vec::with_capacity(d0 * d1);
     for row in data {
         for &b in row {
-            flat.push(if b { 1.0 } else { 0.0 });
+            flat.push(if b { 1.0f32 } else { 0.0 });
         }
     }
-    let shape = (data.len(), data[0].len());
-    Tensor::new(&flat, &candle_core::Device::Cpu)?
-        .reshape(shape.0 as u32, shape.1 as u32)
-        .context("Failed to reshape boolean tensor")
+    let t = Tensor::new(flat.as_slice(), &candle_core::Device::Cpu)
+        .context("Failed to create mask tensor")?;
+    t.reshape((d0, d1)).context("Failed to reshape mask tensor")
 }

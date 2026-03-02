@@ -1,80 +1,66 @@
 //! Core model architectures for Sense and Entity classification
+//!
+//! Uses Candle 0.8 VarBuilder API for idiomatic parameter management.
 
 use anyhow::Result;
 use candle_core::{DType, Device, Tensor, D};
-use candle_nn::{LayerNorm, Linear, Module};
+use candle_nn::{layer_norm, linear, LayerNorm, Linear, Module, VarBuilder, VarMap};
 
 // ── Configuration ────────────────────────────────────────
 
-pub const EMBED_DIM: usize = 128; // Model2Vec embedding dimension (potion-base-4M)
-pub const N_BROAD: usize = 6; // Broad categories (temporal, numeric, etc.)
-pub const N_ENTITY: usize = 4; // Entity subtypes (person, place, org, creative_work)
-pub const N_HEADS: usize = 4; // Multi-head attention heads
-pub const HIDDEN_DIM: usize = 256; // Hidden layer dimension
+pub const EMBED_DIM: usize = 128;
+pub const N_BROAD: usize = 6;
+pub const N_ENTITY: usize = 4;
+pub const HIDDEN_DIM: usize = 256;
 
 // ── Sense Model A: Cross-Attention over Model2Vec ────────────
 
-/// Sense Architecture A: Lightweight attention over Model2Vec embeddings
+/// Sense Architecture A: Lightweight attention over Model2Vec embeddings.
 ///
-/// Multi-task architecture for semantic routing:
-/// - Broad category classification (6 classes): temporal, numeric, geographic, entity, format, text
-/// - Entity subtype classification (4 classes): person, place, organization, creative_work
-///
-/// Architecture:
-/// 1. Cross-attention: header embedding (query) attends to value embeddings (key/value)
-/// 2. Feature aggregation: attention output + mean/std of value embeddings
-/// 3. Dual classification heads for broad category and entity subtype
-#[derive(Debug)]
+/// Multi-task: broad category (6) + entity subtype (4).
+/// Cross-attention: header embedding queries value embeddings.
 pub struct SenseModelA {
-    device: Device,
-
-    // Query projection: header embedding → attention query space
     header_proj: Linear,
-
-    // Learnable default query (used when header is missing)
     default_query: Tensor,
-
-    // Layer normalization after attention
     norm: LayerNorm,
-
-    // Broad category classifier head
     broad_fc1: Linear,
     broad_fc2: Linear,
     broad_fc3: Linear,
-
-    // Entity subtype classifier head
     entity_fc1: Linear,
     entity_fc2: Linear,
     entity_fc3: Linear,
 }
 
 impl SenseModelA {
-    /// Create a new Sense model with random initialization
-    pub fn new() -> Result<Self> {
-        let device = Device::Cpu; // Use CPU for spike; can enable CUDA later
-
-        // Feature dimension after attention aggregation: attention_out + mean + std
+    /// Create a new Sense model with VarMap for parameter tracking
+    pub fn new(varmap: &VarMap, device: &Device) -> Result<Self> {
+        let vb = VarBuilder::from_varmap(varmap, DType::F32, device);
         let feature_dim = 3 * EMBED_DIM;
 
-        // Initialize linear layers
-        let header_proj = Linear::new(EMBED_DIM, EMBED_DIM, &device)?;
-        let norm = LayerNorm::new(EMBED_DIM, 1e-5, &device)?;
+        let header_proj = linear(EMBED_DIM, EMBED_DIM, vb.pp("header_proj"))?;
+        let norm_config = candle_nn::LayerNormConfig::default();
+        let norm = layer_norm(EMBED_DIM, norm_config, vb.pp("norm"))?;
 
-        // Broad category head: 384 → 256 → 128 → 6
-        let broad_fc1 = Linear::new(feature_dim, HIDDEN_DIM, &device)?;
-        let broad_fc2 = Linear::new(HIDDEN_DIM, HIDDEN_DIM / 2, &device)?;
-        let broad_fc3 = Linear::new(HIDDEN_DIM / 2, N_BROAD, &device)?;
+        let broad_fc1 = linear(feature_dim, HIDDEN_DIM, vb.pp("broad_fc1"))?;
+        let broad_fc2 = linear(HIDDEN_DIM, HIDDEN_DIM / 2, vb.pp("broad_fc2"))?;
+        let broad_fc3 = linear(HIDDEN_DIM / 2, N_BROAD, vb.pp("broad_fc3"))?;
 
-        // Entity subtype head: 384 → 256 → 128 → 4
-        let entity_fc1 = Linear::new(feature_dim, HIDDEN_DIM, &device)?;
-        let entity_fc2 = Linear::new(HIDDEN_DIM, HIDDEN_DIM / 2, &device)?;
-        let entity_fc3 = Linear::new(HIDDEN_DIM / 2, N_ENTITY, &device)?;
+        let entity_fc1 = linear(feature_dim, HIDDEN_DIM, vb.pp("entity_fc1"))?;
+        let entity_fc2 = linear(HIDDEN_DIM, HIDDEN_DIM / 2, vb.pp("entity_fc2"))?;
+        let entity_fc3 = linear(HIDDEN_DIM / 2, N_ENTITY, vb.pp("entity_fc3"))?;
 
-        // Learnable default query: [1, 1, EMBED_DIM]
-        let default_query = Tensor::randn((1, 1, EMBED_DIM), DType::F32, &device)? * 0.02;
+        let default_query = varmap.get(
+            (1, 1, EMBED_DIM),
+            "default_query",
+            candle_nn::Init::Randn {
+                mean: 0.0,
+                stdev: 0.02,
+            },
+            DType::F32,
+            device,
+        )?;
 
         Ok(SenseModelA {
-            device,
             header_proj,
             default_query,
             norm,
@@ -87,88 +73,59 @@ impl SenseModelA {
         })
     }
 
-    /// Forward pass through Sense model
+    /// Forward pass
     ///
-    /// Args:
-    /// - value_embeds: [batch_size, n_values, EMBED_DIM] - Model2Vec embeddings
-    /// - mask: [batch_size, n_values] - True for real values, False for padding
-    /// - header_embed: [batch_size, EMBED_DIM] - Column header embedding
-    /// - has_header: [batch_size] - 1.0 if header exists, 0.0 otherwise
-    ///
-    /// Returns:
-    /// - broad_logits: [batch_size, N_BROAD]
-    /// - entity_logits: [batch_size, N_ENTITY]
+    /// - value_embeds: [B, N, D]
+    /// - mask: [B, N] (1.0 for real, 0.0 for padding)
+    /// - header_embed: [B, D]
+    /// - has_header: [B]
     pub fn forward(
         &self,
-        value_embeds: &Tensor, // [B, N, D]
-        mask: &Tensor,         // [B, N]
-        header_embed: &Tensor, // [B, D]
-        has_header: &Tensor,   // [B]
+        value_embeds: &Tensor,
+        _mask: &Tensor,
+        header_embed: &Tensor,
+        has_header: &Tensor,
     ) -> Result<(Tensor, Tensor)> {
         let batch_size = value_embeds.dim(0)?;
 
-        // Build query: use header when available, default query otherwise
-        // Header projection: [B, D] → [B, D]
+        // Query: project header embedding or use default
         let header_proj = self.header_proj.forward(header_embed)?;
-
-        // Convert to [B, 1, D] for attention
         let query = header_proj.unsqueeze(1)?; // [B, 1, D]
 
-        // Apply header availability mask: when has_header = 0, use default query
-        let has_header_expanded = has_header.unsqueeze(1)?.unsqueeze(2)?; // [B, 1, 1]
-        let query = query * has_header_expanded?;
-
-        // Add default query component (scaled by presence of header)
-        let default_scaled = self
+        // Blend: has_header * projected_header + (1 - has_header) * default_query
+        let has_h = has_header.unsqueeze(1)?.unsqueeze(2)?; // [B, 1, 1]
+        let default_q = self
             .default_query
             .broadcast_as((batch_size, 1, EMBED_DIM))?;
-        let query = (query + &default_scaled)?;
+        let one_minus_h = has_h.affine(-1.0, 1.0)?; // 1 - has_h
+        let query = (query.broadcast_mul(&has_h)? + default_q.broadcast_mul(&one_minus_h)?)?;
 
-        // Cross-attention: query [B, 1, D], values [B, N, D]
-        // Using attention pattern: softmax((query @ values.T) / sqrt(D)) @ values
-
-        // Simplified attention (not multi-head, but captures the pattern):
-        // Compute attention weights: [B, 1, N]
-        let scale = (EMBED_DIM as f32).sqrt();
+        // Cross-attention: softmax(Q @ K^T / sqrt(d)) @ V
+        let scale = (EMBED_DIM as f64).sqrt();
         let scores = query.matmul(&value_embeds.transpose(1, 2)?)?; // [B, 1, N]
         let scores = (scores / scale)?;
+        let attn_weights = candle_nn::ops::softmax(&scores, D::Minus1)?;
+        let attn_out = attn_weights.matmul(value_embeds)?.squeeze(1)?; // [B, D]
+        let attn_out = self.norm.forward(&attn_out)?;
 
-        // Apply mask (set invalid positions to -inf before softmax)
-        // This is simplified for spike; full implementation would need masked softmax
-        let attention_weights = candle_nn::ops::softmax(&scores, D::Minus1)?; // [B, 1, N]
+        // Statistics: mean and std of value embeddings
+        let value_mean = value_embeds.mean(1)?; // [B, D]
+        let centered = value_embeds.broadcast_sub(&value_mean.unsqueeze(1)?)?;
+        let _n_vals = value_embeds.dim(1)? as f64;
+        let value_std = centered.sqr()?.mean(1)?.sqrt()?; // [B, D] — std per dim
 
-        // Apply attention to values: [B, 1, N] @ [B, N, D] → [B, 1, D]
-        let attention_out = attention_weights.matmul(value_embeds)?; // [B, 1, D]
-        let attention_out = attention_out.squeeze(1)?; // [B, D]
-
-        // Apply layer norm
-        let attention_out = self.norm.forward(&attention_out)?;
-
-        // Compute statistics of value embeddings
-        // Mean: [B, D]
-        let value_mean = value_embeds.mean(1)?;
-
-        // Std: simplified as using variance
-        let value_centered = (value_embeds - value_mean.unsqueeze(1)?)?;
-        let value_var = (value_centered.sqr()? / (value_embeds.dim(1)? as f32))?;
-        let value_std = value_var.sqrt()?;
-
-        // Concatenate features: [attention_out, mean, std] → [B, 3*D]
-        let features = Tensor::cat(&[&attention_out, &value_mean, &value_std], 1)?;
+        // Concatenate features: [attn_out, mean, std] → [B, 3*D]
+        let features = Tensor::cat(&[&attn_out, &value_mean, &value_std], 1)?;
 
         // Broad category head
-        let broad_hidden = self.broad_fc1.forward(&features)?;
-        let broad_hidden = broad_hidden.relu()?;
-        let broad_hidden = self.broad_fc2.forward(&broad_hidden)?;
-        let broad_hidden = broad_hidden.relu()?;
-        let broad_logits = self.broad_fc3.forward(&broad_hidden)?;
+        let b = self.broad_fc1.forward(&features)?.relu()?;
+        let b = self.broad_fc2.forward(&b)?.relu()?;
+        let broad_logits = self.broad_fc3.forward(&b)?;
 
         // Entity subtype head
-        let entity_hidden = self.entity_fc1.forward(&features)?;
-        let entity_hidden = entity_hidden.relu()?;
-        let entity_hidden = self.entity_fc2.forward(&entity_hidden)?;
-        let entity_hidden = entity_hidden.relu()?;
-        let entity_logits = self.entity_fc3.forward(&entity_hidden)?;
+        let e = self.entity_fc1.forward(&features)?.relu()?;
+        let e = self.entity_fc2.forward(&e)?.relu()?;
+        let entity_logits = self.entity_fc3.forward(&e)?;
 
         Ok((broad_logits, entity_logits))
     }
@@ -176,13 +133,11 @@ impl SenseModelA {
 
 // ── Entity Classifier: Deep Sets MLP ─────────────────────
 
-/// Entity Classifier: Deep Sets architecture for demotion gating
+/// Entity Classifier: Deep Sets MLP for demotion gating.
 ///
-/// Input: Column-level statistics (44 features) + embeddings (mean/std)
-/// Output: Entity class probabilities (4 classes: person, place, org, creative_work)
-#[derive(Debug)]
+/// Input: 44 statistical features + mean/std of embeddings (300 dims).
+/// Output: 4-class entity logits (person, place, org, creative_work).
 pub struct EntityClassifier {
-    device: Device,
     fc1: Linear,
     fc2: Linear,
     fc3: Linear,
@@ -190,45 +145,22 @@ pub struct EntityClassifier {
 }
 
 impl EntityClassifier {
-    /// Create a new entity classifier
-    pub fn new() -> Result<Self> {
-        let device = Device::Cpu;
+    pub fn new(varmap: &VarMap, device: &Device) -> Result<Self> {
+        let vb = VarBuilder::from_varmap(varmap, DType::F32, device);
+        let input_dim = 44 + 2 * EMBED_DIM; // 300
 
-        // Input: 44 statistical features + 2*128 (mean/std) = 300 dims
-        let input_dim = 44 + 2 * EMBED_DIM;
+        let fc1 = linear(input_dim, 256, vb.pp("ec_fc1"))?;
+        let fc2 = linear(256, 256, vb.pp("ec_fc2"))?;
+        let fc3 = linear(256, 128, vb.pp("ec_fc3"))?;
+        let fc4 = linear(128, N_ENTITY, vb.pp("ec_fc4"))?;
 
-        // MLP: 300 → 256 → 256 → 128 → 4
-        let fc1 = Linear::new(input_dim, 256, &device)?;
-        let fc2 = Linear::new(256, 256, &device)?;
-        let fc3 = Linear::new(256, 128, &device)?;
-        let fc4 = Linear::new(128, N_ENTITY, &device)?;
-
-        Ok(EntityClassifier {
-            device,
-            fc1,
-            fc2,
-            fc3,
-            fc4,
-        })
+        Ok(EntityClassifier { fc1, fc2, fc3, fc4 })
     }
 
-    /// Forward pass through entity classifier
-    ///
-    /// Args:
-    /// - features: [batch_size, 300] - concatenated statistical features + embeddings
-    ///
-    /// Returns:
-    /// - logits: [batch_size, N_ENTITY]
     pub fn forward(&self, features: &Tensor) -> Result<Tensor> {
-        let x = self.fc1.forward(features)?;
-        let x = x.relu()?;
-
-        let x = self.fc2.forward(&x)?;
-        let x = x.relu()?;
-
-        let x = self.fc3.forward(&x)?;
-        let x = x.relu()?;
-
-        self.fc4.forward(&x)
+        let x = self.fc1.forward(features)?.relu()?;
+        let x = self.fc2.forward(&x)?.relu()?;
+        let x = self.fc3.forward(&x)?.relu()?;
+        Ok(self.fc4.forward(&x)?)
     }
 }

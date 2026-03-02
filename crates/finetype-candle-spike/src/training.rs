@@ -64,11 +64,10 @@ fn cross_entropy_loss(logits: &Tensor, targets: &Tensor) -> Result<Tensor> {
 
     // Simplified version for proof-of-concept:
     let probs = candle_nn::ops::softmax(logits, candle_core::D::Minus1)?;
-    let num_classes = probs.dim(probs.dims().len() - 1)?;
+    let _num_classes = probs.dim(probs.dims().len() - 1)?;
 
     // One-hot encode targets
-    let batch_size = targets.dim(0)?;
-    let mut loss_sum = 0.0;
+    let _batch_size = targets.dim(0)?;
 
     // This is a simplified loss computation; real implementation would be more efficient
     // For now, we compute a scalar loss for demonstration
@@ -79,8 +78,8 @@ fn cross_entropy_loss(logits: &Tensor, targets: &Tensor) -> Result<Tensor> {
 
 /// Training loop for Sense model
 pub async fn train_sense(
-    model: &SenseModelA,
-    dataset: &SenseDataset,
+    _model: &SenseModelA,
+    _dataset: &SenseDataset,
     config: &TrainingConfig,
 ) -> Result<TrainingMetrics> {
     tracing::info!("Starting training with config: {:?}", config);
@@ -144,7 +143,7 @@ pub async fn train_sense(
 }
 
 /// Evaluate model on validation set
-pub fn evaluate(model: &SenseModelA, dataset: &SenseDataset) -> Result<(f32, f32)> {
+pub fn evaluate(_model: &SenseModelA, _dataset: &SenseDataset) -> Result<(f32, f32)> {
     // Returns (broad_accuracy, entity_accuracy)
 
     // In a real implementation, compute accuracy on validation set
