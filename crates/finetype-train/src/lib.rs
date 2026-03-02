@@ -10,4 +10,5 @@ pub mod data;
 pub mod entity;
 pub mod model2vec_prep;
 pub mod sense;
+pub mod sense_train;
 pub mod training;

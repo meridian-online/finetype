@@ -3,9 +3,11 @@
 //! Computes type label embeddings from the FineType taxonomy using
 //! Farthest Point Sampling over Model2Vec-encoded synonyms.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
+
+use finetype_train::model2vec_prep::{compute_type_embeddings, write_type_embeddings};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -32,15 +34,67 @@ struct Args {
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
-    let _args = Args::parse();
+    let args = Args::parse();
 
-    // TODO: Implement in Step 6
-    // 1. Load taxonomy from YAML (via finetype_core::Taxonomy)
-    // 2. For each type: collect synonyms (title + aliases + label components)
-    // 3. Encode synonyms with Model2VecResources::encode_batch()
-    // 4. FPS: select K representatives per type
-    // 5. Write type_embeddings.safetensors + label_index.json
+    if args.max_k < 1 {
+        anyhow::bail!("--max-k must be >= 1");
+    }
 
-    eprintln!("prepare-model2vec: not yet implemented (NNFT-185 Step 6)");
-    std::process::exit(1);
+    eprintln!("=== prepare-model2vec ===");
+    eprintln!("  Model2Vec dir: {}", args.model2vec_dir.display());
+    eprintln!("  Labels dir:    {}", args.labels_dir.display());
+    eprintln!("  Output:        {}", args.output.display());
+    eprintln!("  K (reps/type): {}", args.max_k);
+    eprintln!();
+
+    // 1. Load taxonomy
+    eprintln!("Loading taxonomy from {}...", args.labels_dir.display());
+    let taxonomy = finetype_core::Taxonomy::from_directory(&args.labels_dir)
+        .context("Failed to load taxonomy")?;
+    let n_types = taxonomy.labels().len();
+    eprintln!("  Found {} type definitions", n_types);
+
+    // 2. Load Model2Vec
+    eprintln!("Loading Model2Vec from {}...", args.model2vec_dir.display());
+    let model2vec = finetype_model::Model2VecResources::load(&args.model2vec_dir)
+        .context("Failed to load Model2Vec resources")?;
+    let dim = model2vec.embed_dim().context("Failed to get embed dim")?;
+    eprintln!("  Embedding dimension: {}", dim);
+
+    // 3. Compute type embeddings
+    eprintln!(
+        "Computing type embeddings ({} types x {} reps)...",
+        n_types, args.max_k
+    );
+    let (embeddings, labels) = compute_type_embeddings(&model2vec, &taxonomy, args.max_k)?;
+
+    let total_rows = labels.len() * args.max_k;
+    eprintln!(
+        "  Shape: [{}, {}] ({} types x {} reps)",
+        total_rows,
+        dim,
+        labels.len(),
+        args.max_k,
+    );
+
+    // 4. Write output
+    eprintln!("Writing to {}...", args.output.display());
+    write_type_embeddings(
+        &embeddings,
+        labels.len(),
+        args.max_k,
+        dim,
+        &labels,
+        &args.output,
+    )?;
+
+    eprintln!();
+    eprintln!("=== Done ===");
+    eprintln!(
+        "  type_embeddings.safetensors: {} rows x {} dim",
+        total_rows, dim
+    );
+    eprintln!("  label_index.json: {} labels", labels.len());
+
+    Ok(())
 }
