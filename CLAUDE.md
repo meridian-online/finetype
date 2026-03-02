@@ -29,17 +29,17 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
+- **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries: train-sense-model, train-entity-classifier, prepare-sense-data, prepare-model2vec. Dual-format SenseClassifier supports both Python-trained (MHA) and Rust-trained (simple attention) models. Rust model achieves 100% accuracy parity with Python. 253 tests pass.
 - **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category, 5 new types (IBAN, currency_amount, html_content, locale_number, alphanumeric_code), 2 removals (cvv, century). 166 types across 7 domains.
-- **Candle feasibility spike** (NNFT-182) — Validated Candle 0.8 for ML training: Sense Architecture A and Entity classifier both work in pure Rust. 10/10 tests pass (forward pass, gradients, optimizer, safetensors round-trip). Path A (Full Rust) confirmed.
-- **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Fixed L2-normalisation mismatch in Model2Vec, integrated header hints into Sense pipeline, added coordinate disambiguation guard and low-confidence safety valve. Result: 116/120 (96.7%) label, 120/120 (100%) domain. Net +4 wins, 0 regressions vs legacy. Sense is now the default pipeline.
+- **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Fixed L2-normalisation mismatch in Model2Vec, integrated header hints into Sense pipeline, added coordinate disambiguation guard and low-confidence safety valve. Sense is now the default pipeline.
 - **Phase 3 Rust implementation** (NNFT-165–172) — Full Sense→Sharpen pipeline: shared Model2Vec, Candle-ported SenseClassifier, LabelCategoryMap, pipeline integration, build system + CLI loading, A/B evaluation infrastructure.
 - **Entity classifier** (NNFT-151/152) — Deep Sets MLP demotes full_name → entity_name for non-person columns.
 
 ### What's in progress
 
-- **Pure Rust Return** (NNFT-182–187) — Eliminating Python from codebase. Phase 0 spike complete (Path A confirmed). Phase A: build tools Rust (NNFT-183). Phase B: eval infrastructure Rust (NNFT-184, done). Phase C: Candle training port (NNFT-185, in progress — training binaries implemented, 40 tests pass, awaiting full training run). Phase D: cleanup (NNFT-186). Candle 0.8 with `half = "2.4"` pin. Training scripts deleted, replaced by `finetype-train` crate with 4 Rust binaries.
-- **Model retraining for v0.5.1 taxonomy** (NNFT-181) — Retrain model to include new finance/identifier types from v0.5.1 taxonomy. Not yet started.
-- **Next accuracy targets** — 4 misses at 116/120: swift_code (SEDOL overcall), countries.name (entity classifier demotes but GT expects geography), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 163-type taxonomy.
+- **Pure Rust Return** (NNFT-182–187) — Eliminating Python from codebase. Phase 0 spike ✅. Phase A: build tools ✅ (NNFT-183). Phase B: eval infrastructure ✅ (NNFT-184). Phase C: Candle training ✅ (NNFT-185). Phase D: cleanup (NNFT-186, not started). Candle 0.8 with `half = "2.4"` pin.
+- **Model retraining for v0.5.1 taxonomy** (NNFT-181) — Retrain model to include new finance/identifier types from v0.5.1 taxonomy. Not yet started. Current profile eval: 109/119 (91.6%) — regression from 116/120 caused by taxonomy changes, not model.
+- **Next accuracy targets** — Profile eval 109/119 after taxonomy v0.5.1. Known misses: swift_code (SEDOL overcall), countries.name (entity demotion), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). Additional misses from taxonomy v0.5.1 schema mapping drift. **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 166-type taxonomy.
 
 ## Architecture
 
