@@ -1,11 +1,11 @@
 ---
 id: NNFT-184
 title: 'Phase B: Evaluation Rust - Replace 7 Python eval scripts with Rust binaries'
-status: In Progress
+status: Done
 assignee:
   - '@eval-engineer'
 created_date: '2026-03-02 07:23'
-updated_date: '2026-03-02 08:38'
+updated_date: '2026-03-02 08:57'
 labels:
   - phase-b
   - evaluation
@@ -174,5 +174,5 @@ Port all 7 Python evaluation scripts to pure Rust via a new `crates/finetype-eva
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - nightingale
 created_date: '2026-03-02 07:23'
-updated_date: '2026-03-02 08:50'
+updated_date: '2026-03-02 08:53'
 labels:
   - phase-0
   - spike
@@ -233,5 +233,5 @@ Path A confirmed. Phases A (build tools) and B (eval) proceed as planned. Phase 
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
