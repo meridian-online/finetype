@@ -7,15 +7,14 @@ zip code,dbpedia,geography.address.postal_code,geography,direct,false
 country,both,geography.location.country,geography,direct,false
 state,both,geography.location.region,geography,direct,false
 city,both,geography.location.city,geography,direct,false
-issn,dbpedia,technology.code.issn,technology,direct,false
+issn,dbpedia,identity.commerce.issn,identity,direct,false
 percentage,dbpedia,representation.numeric.percentage,representation,direct,false
 year,dbpedia,datetime.component.year,datetime,direct,false
 latitude,schema,geography.coordinate.latitude,geography,direct,false
 longitude,schema,geography.coordinate.longitude,geography,direct,false
 abbreviation,dbpedia,representation.text.word,representation,close,false
-credit card number,profile,identity.payment.credit_card_number,identity,direct,false
-cvv,profile,identity.payment.cvv,identity,direct,false
-ean,profile,technology.code.ean,technology,direct,false
+credit card number,profile,finance.payment.credit_card_number,finance,direct,false
+ean,profile,identity.commerce.ean,identity,direct,false
 first name,profile,identity.person.first_name,identity,direct,false
 last name,profile,identity.person.last_name,identity,direct,false
 hash,profile,technology.cryptographic.hash,technology,direct,false
@@ -30,10 +29,10 @@ month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
 port,profile,technology.internet.port,technology,direct,false
 street number,profile,geography.address.street_number,geography,direct,false
-uuid,profile,technology.cryptographic.uuid,technology,direct,false
+uuid,profile,representation.identifier.uuid,representation,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
 decimal number,profile,representation.numeric.decimal_number,representation,direct,false
-swift code,profile,identity.payment.swift_bic,identity,direct,false
+swift code,profile,finance.banking.swift_bic,finance,direct,false
 name,both,identity.person.full_name,identity,close,false
 entity name,profile,representation.text.entity_name,representation,direct,false
 author,both,identity.person.full_name,identity,close,false
@@ -65,15 +64,15 @@ time,both,,datetime,partial,false
 date issued,schema,,datetime,partial,false
 purchase date,schema,,datetime,partial,false
 duration,both,datetime.duration.iso_8601,datetime,partial,false
-id,both,representation.numeric.increment,representation,partial,false
-code,both,representation.code.alphanumeric_id,representation,partial,false
+id,both,representation.identifier.increment,representation,partial,false
+code,both,representation.identifier.alphanumeric_id,representation,partial,false
 number,dbpedia,representation.numeric.integer_number,representation,partial,false
 file format,schema,representation.file.mime_type,representation,partial,false
 content type,schema,representation.file.mime_type,representation,partial,false
 color,schema,representation.text.color_hex,representation,partial,false
 version,both,technology.development.version,technology,partial,false
 language,both,technology.code.locale_code,technology,partial,true
-isbn,schema,technology.code.isbn,technology,partial,false
+isbn,schema,identity.commerce.isbn,identity,partial,false
 sex,dbpedia,identity.person.gender,identity,partial,false
 coordinates,schema,geography.coordinate.coordinates,geography,partial,false
 long name,dbpedia,identity.person.full_name,identity,partial,false
@@ -125,7 +124,7 @@ step,schema,,representation,semantic_only,false
 interaction type,schema,,representation,semantic_only,false
 members,schema,,representation,semantic_only,false
 brand,schema,,representation,semantic_only,false
-currency,schema,identity.payment.currency_code,identity,partial,false
+currency,schema,finance.currency.currency_code,finance,partial,false
 tool,schema,,representation,semantic_only,false
 serial number,schema,,representation,semantic_only,true
 order number,schema,,representation,semantic_only,true
@@ -143,7 +142,7 @@ dam,dbpedia,,representation,semantic_only,false
 definition,dbpedia,,representation,semantic_only,false
 department,dbpedia,,representation,semantic_only,false
 discontinued,dbpedia,,representation,semantic_only,false
-facility id,dbpedia,representation.code.alphanumeric_id,representation,partial,false
+facility id,dbpedia,representation.identifier.alphanumeric_id,representation,partial,false
 family,dbpedia,,representation,semantic_only,false
 fc,dbpedia,,representation,semantic_only,false
 field,dbpedia,,representation,semantic_only,false

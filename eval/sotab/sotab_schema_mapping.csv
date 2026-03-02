@@ -12,14 +12,14 @@ Date,datetime.date.eu_slash,datetime,close,EU date format with slashes (DD/MM/YY
 Date,datetime.date.short_mdy,datetime,close,Short month-day-year format
 Date,datetime.date.short_dmy,datetime,close,Short day-month-year format
 Duration,datetime.duration.iso_8601,datetime,direct,ISO 8601 duration strings
-currency,identity.payment.currency_code,identity,direct,Currency codes (USD/GBP/EUR)
+currency,finance.currency.currency_code,finance,direct,Currency codes (USD/GBP/EUR)
 telephone,identity.person.phone_number,identity,direct,Phone numbers in various formats
 price,representation.numeric.decimal_number,representation,close,Price values without currency symbol
 Integer,representation.numeric.integer_number,representation,direct,Integer values
 Organization,identity.person.full_name,identity,partial,Organization names — full_name overcall
 Organization,representation.text.entity_name,representation,close,Organization names — entity_name via demotion gate
 addressLocality,geography.location.city,geography,direct,City/locality names
-IdentifierAT,representation.code.alphanumeric_id,representation,close,Identifier strings (alphanumeric)
+IdentifierAT,representation.identifier.alphanumeric_id,representation,close,Identifier strings (alphanumeric)
 Place,geography.location.city,geography,close,Place names — closest is city
 Country,geography.location.country,geography,direct,Country names
 addressRegion,geography.location.region,geography,direct,State/region/province names
@@ -46,7 +46,7 @@ Place/name,geography.location.city,geography,close,Place names (qualified)
 Book/name,representation.text.plain_text,representation,semantic_only,Book titles
 Recipe/name,representation.text.plain_text,representation,semantic_only,Recipe titles
 email,identity.person.email,identity,direct,Email addresses
-identifierNameAP,representation.code.alphanumeric_id,representation,close,Named identifiers
+identifierNameAP,representation.identifier.alphanumeric_id,representation,close,Named identifiers
 Movie/name,representation.text.plain_text,representation,semantic_only,Movie titles
 Distance,representation.numeric.decimal_number,representation,partial,Distance measurements
 category,representation.discrete.categorical,representation,close,Category labels
@@ -65,7 +65,7 @@ Energy,representation.numeric.decimal_number,representation,partial,Energy measu
 EducationalOccupationalCredential,representation.text.word,representation,semantic_only,Credential labels
 Review,representation.text.plain_text,representation,semantic_only,Review text
 OfferItemCondition,,representation,semantic_only,Item condition enum (New/Used)
-CategoryCode,representation.code.alphanumeric_id,representation,close,Category code identifiers
+CategoryCode,representation.identifier.alphanumeric_id,representation,close,Category code identifiers
 EventStatusType,,representation,semantic_only,Event status enum
 SportsEvent/name,representation.text.plain_text,representation,semantic_only,Sports event names
 BookFormatType,,representation,semantic_only,Book format enum (Hardcover/Paperback)

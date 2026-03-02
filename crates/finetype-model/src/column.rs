@@ -62,7 +62,7 @@ fn remap_collapsed_label(label: &str) -> &str {
         "identity.person.nationality" => "representation.discrete.categorical",
         "identity.person.occupation" => "representation.discrete.categorical",
         // Niche format types
-        "technology.internet.slug" => "representation.code.alphanumeric_id",
+        "technology.internet.slug" => "representation.identifier.alphanumeric_id",
         // URI merged into URL (37% training overlap, NNFT-161)
         "technology.internet.uri" => "technology.internet.url",
         _ => label,
@@ -108,7 +108,7 @@ const HARDCODED_GENERIC_LABELS: &[&str] = &[
     "representation.text.plain_text",
     "representation.numeric.integer_number",
     "representation.numeric.decimal_number",
-    "representation.numeric.increment",
+    "representation.identifier.increment",
     "representation.discrete.categorical",
     "datetime.component.day_of_month",
     // Username/phone are common catch-alls for unrecognized text
@@ -149,8 +149,8 @@ fn is_generic_prediction(
     }
 
     // Signal 1b: Numeric postal code heuristic is pattern-based, not model-driven.
-    // It should yield to explicit header hints (e.g., "cvv" column with 3-digit
-    // values). Preserves postal code detection for headerless columns. (NNFT-156)
+    // It should yield to explicit header hints (e.g., a column with 3-digit
+    // values detected as postal_code). Preserves postal code detection for headerless columns. (NNFT-156)
     if disambiguation_rule
         .as_ref()
         .is_some_and(|r| r == "numeric_postal_code_detection")
@@ -1107,11 +1107,10 @@ const COORDINATE_PAIR: (&str, &str) = (
 );
 
 /// Attractor types — types the CharCNN over-confidently assigns to generic data.
-/// Numeric attractors catch integers misclassified as postal codes, CVVs, etc.
+/// Numeric attractors catch integers misclassified as postal codes, etc.
 const NUMERIC_ATTRACTORS: &[&str] = &[
     "geography.address.postal_code",
     "geography.address.street_number",
-    "identity.payment.cvv",
 ];
 
 /// Text attractors catch short words/phrases misclassified as identity types.
@@ -1132,7 +1131,7 @@ const TEXT_ATTRACTORS: &[&str] = &[
 const CODE_ATTRACTORS: &[&str] = &[
     "geography.transportation.icao_code",
     "identity.medical.ndc",
-    "identity.payment.cusip",
+    "finance.securities.cusip",
     "technology.internet.top_level_domain",
 ];
 
@@ -1249,7 +1248,7 @@ fn disambiguate(
     // attractor demotion would demote SEDOL to alphanumeric_id (losing duration).
     if top_labels
         .first()
-        .is_some_and(|l| *l == "identity.payment.sedol")
+        .is_some_and(|l| *l == "finance.securities.sedol")
     {
         if let Some((label, rule)) = disambiguate_duration_override(values) {
             return Some((label, rule));
@@ -1269,7 +1268,7 @@ fn disambiguate(
     }
 
     // Rule 15: Attractor type demotion — demote over-eager specific type
-    // predictions (postal_code, cvv, first_name, etc.) when evidence doesn't
+    // predictions (postal_code, first_name, etc.) when evidence doesn't
     // support the specific prediction. Three signals: validation failure,
     // confidence threshold, and cardinality mismatch.
     if let Some((label, rule)) = disambiguate_attractor_demotion(values, votes, n_samples, taxonomy)
@@ -1647,7 +1646,7 @@ fn disambiguate_small_integer_ordinal(
     let misfit_types = [
         "datetime.component.day_of_month",
         "representation.numeric.integer_number",
-        "representation.numeric.increment",
+        "representation.identifier.increment",
     ];
     let top_is_misfit = top_labels
         .first()
@@ -1822,7 +1821,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("technology.internet.port");
         }
         "id" | "identifier" => {
-            return Some("representation.numeric.increment");
+            return Some("representation.identifier.increment");
         }
         // Count / frequency columns — small integers representing quantities
         "sibsp" | "parch" | "siblings" | "parents" | "children" | "dependents" | "qty"
@@ -1844,22 +1843,19 @@ fn header_hint(header: &str) -> Option<&'static str> {
         | "gmtoffset" => {
             return Some("datetime.offset.utc");
         }
-        // Financial code columns
-        "cvv" | "cvc" | "security code" | "card security" => {
-            return Some("identity.payment.cvv");
-        }
+        // Financial code columns (cvv removed in v0.5.1)
         "swift" | "swift code" | "bic" | "bic code" | "swiftcode" | "biccode" => {
-            return Some("identity.payment.swift_bic");
+            return Some("finance.banking.swift_bic");
         }
         "issn" => {
-            return Some("technology.code.issn");
+            return Some("identity.commerce.issn");
         }
         // Medical identifiers
         "npi" | "npi number" => {
             return Some("identity.medical.npi");
         }
         "ean" | "barcode" | "gtin" | "upc" => {
-            return Some("technology.code.ean");
+            return Some("identity.commerce.ean");
         }
         // Operating system
         "os" | "operating system" | "platform" => {
@@ -2125,7 +2121,7 @@ fn disambiguate_numeric(
     // Only trigger for numeric-looking columns
     let numeric_types = [
         "technology.internet.port",
-        "representation.numeric.increment",
+        "representation.identifier.increment",
         "representation.numeric.integer_number",
         "representation.numeric.decimal_number",
         "geography.address.postal_code",
@@ -2241,7 +2237,7 @@ fn disambiguate_numeric(
     if is_sequential && min >= 0 && range > 0 {
         // Sequential integers → increment
         return Some((
-            "representation.numeric.increment".to_string(),
+            "representation.identifier.increment".to_string(),
             "numeric_sequential_detection".to_string(),
         ));
     }
@@ -2798,14 +2794,14 @@ mod tests {
         let results: Vec<ClassificationResult> = values
             .iter()
             .map(|_| ClassificationResult {
-                label: "representation.numeric.increment".to_string(),
+                label: "representation.identifier.increment".to_string(),
                 confidence: 0.8,
                 all_scores: vec![],
             })
             .collect();
 
         let votes = vec![
-            ("representation.numeric.increment".to_string(), 8),
+            ("representation.identifier.increment".to_string(), 8),
             ("representation.numeric.integer_number".to_string(), 2),
         ];
         let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
@@ -2813,7 +2809,7 @@ mod tests {
         let result = disambiguate_numeric(&values, &results, &top_labels);
         assert!(result.is_some());
         let (label, _rule) = result.unwrap();
-        assert_eq!(label, "representation.numeric.increment");
+        assert_eq!(label, "representation.identifier.increment");
     }
 
     #[test]
@@ -2985,14 +2981,14 @@ mod tests {
         let results: Vec<ClassificationResult> = values
             .iter()
             .map(|_| ClassificationResult {
-                label: "representation.numeric.increment".to_string(),
+                label: "representation.identifier.increment".to_string(),
                 confidence: 0.7,
                 all_scores: vec![],
             })
             .collect();
 
         let votes = vec![
-            ("representation.numeric.increment".to_string(), 7),
+            ("representation.identifier.increment".to_string(), 7),
             ("representation.numeric.integer_number".to_string(), 3),
         ];
         let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
@@ -3015,14 +3011,14 @@ mod tests {
         let results: Vec<ClassificationResult> = values
             .iter()
             .map(|_| ClassificationResult {
-                label: "representation.numeric.increment".to_string(),
+                label: "representation.identifier.increment".to_string(),
                 confidence: 0.8,
                 all_scores: vec![],
             })
             .collect();
 
         let votes = vec![
-            ("representation.numeric.increment".to_string(), 8),
+            ("representation.identifier.increment".to_string(), 8),
             ("representation.numeric.integer_number".to_string(), 2),
         ];
         let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
@@ -3030,7 +3026,7 @@ mod tests {
         let result = disambiguate_numeric(&values, &results, &top_labels);
         assert!(result.is_some());
         let (label, _) = result.unwrap();
-        assert_eq!(label, "representation.numeric.increment");
+        assert_eq!(label, "representation.identifier.increment");
     }
 
     #[test]
@@ -3755,7 +3751,10 @@ mod tests {
             header_hint("count"),
             Some("representation.numeric.integer_number")
         );
-        assert_eq!(header_hint("id"), Some("representation.numeric.increment"));
+        assert_eq!(
+            header_hint("id"),
+            Some("representation.identifier.increment")
+        );
     }
 
     #[test]
@@ -4466,28 +4465,28 @@ mod tests {
 
     #[test]
     fn test_attractor_validation_demotion() {
-        // Values that fail CVV validation (^[0-9]{3,4}$): negative numbers and
-        // 5+ digit integers — should demote to integer_number
+        // Values that fail street_number validation (^[0-9]{1,5}$):
+        // negative numbers fail pattern — need >50% fail rate to trigger demotion
         let values: Vec<String> = vec![
-            "-200", "15000", "3500", "-50", "12000", "800", "25000", "-100", "45000", "600",
+            "-200", "-15000", "-3500", "-50", "-12000", "-800", "25000", "-100", "45000", "600",
         ]
         .into_iter()
         .map(String::from)
         .collect();
         let votes = vec![
-            ("identity.payment.cvv".to_string(), 9),
+            ("geography.address.street_number".to_string(), 9),
             ("representation.numeric.integer_number".to_string(), 1),
         ];
 
         let yaml = r#"
-identity.payment.cvv:
-  title: "CVV"
+geography.address.street_number:
+  title: "Street Number"
   validation:
     type: string
-    pattern: "^[0-9]{3,4}$"
-    minLength: 3
-    maxLength: 4
-  tier: [VARCHAR, identity, payment]
+    pattern: "^[0-9]{1,5}$"
+    minLength: 1
+    maxLength: 5
+  tier: [VARCHAR, geography, address]
   release_priority: 5
   samples: ["123"]
 "#;
@@ -4496,7 +4495,7 @@ identity.payment.cvv:
         let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
         assert!(
             result.is_some(),
-            "Should demote CVV when values fail validation"
+            "Should demote street_number when values fail validation"
         );
         let (label, rule) = result.unwrap();
         assert_eq!(label, "representation.numeric.integer_number");
@@ -4614,24 +4613,24 @@ geography.transportation.icao_code:
 
     #[test]
     fn test_attractor_no_demotion_true_positive() {
-        // Actual CVV values at high confidence (>0.85) — should NOT demote
+        // Actual street_number values at high confidence (>0.85) — should NOT demote
         let values: Vec<String> = vec![
-            "123", "456", "789", "012", "345", "678", "901", "234", "567", "890",
+            "123", "456", "789", "12", "345", "678", "901", "234", "567", "890",
         ]
         .into_iter()
         .map(String::from)
         .collect();
-        let votes = vec![("identity.payment.cvv".to_string(), 10)];
+        let votes = vec![("geography.address.street_number".to_string(), 10)];
 
         let yaml = r#"
-identity.payment.cvv:
-  title: "CVV"
+geography.address.street_number:
+  title: "Street Number"
   validation:
     type: string
-    pattern: "^[0-9]{3,4}$"
-    minLength: 3
-    maxLength: 4
-  tier: [VARCHAR, identity, payment]
+    pattern: "^[0-9]{1,5}$"
+    minLength: 1
+    maxLength: 5
+  tier: [VARCHAR, geography, address]
   release_priority: 5
   samples: ["123"]
 "#;
@@ -4641,7 +4640,7 @@ identity.payment.cvv:
         let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
         assert!(
             result.is_none(),
-            "Should NOT demote actual CVVs at high confidence"
+            "Should NOT demote actual street numbers at high confidence"
         );
     }
 
@@ -5426,17 +5425,21 @@ identity.person.password:
     #[test]
     fn test_is_generic_broad_numbers_with_taxonomy() {
         let yaml = r#"
-representation.numeric.increment:
+representation.identifier.increment:
   title: Increment
   designation: broad_numbers
-  tier: [INTEGER, representation, numeric]
+  tier: [BIGINT, identifier]
   release_priority: 1
   samples: ["42"]
 "#;
         let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
 
         assert!(
-            is_generic_prediction("representation.numeric.increment", &None, Some(&taxonomy)),
+            is_generic_prediction(
+                "representation.identifier.increment",
+                &None,
+                Some(&taxonomy)
+            ),
             "broad_numbers types should be generic when taxonomy is available"
         );
     }

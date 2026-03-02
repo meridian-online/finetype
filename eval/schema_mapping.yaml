@@ -102,8 +102,8 @@ mappings:
 
   - gt_label: issn
     source: dbpedia
-    finetype_label: technology.code.issn
-    finetype_domain: technology
+    finetype_label: identity.commerce.issn
+    finetype_domain: identity
     match_quality: direct
     expand: false
     notes: ISSN identifier format (XXXX-XXXX)
@@ -150,24 +150,18 @@ mappings:
 
   - gt_label: credit card number
     source: profile
-    finetype_label: identity.payment.credit_card_number
-    finetype_domain: identity
+    finetype_label: finance.payment.credit_card_number
+    finetype_domain: finance
     match_quality: direct
     expand: false
     notes: Credit card number format (Luhn checksum)
 
-  - gt_label: cvv
-    source: profile
-    finetype_label: identity.payment.cvv
-    finetype_domain: identity
-    match_quality: direct
-    expand: false
-    notes: 3-4 digit card verification value
+  # cvv removed in NNFT-177 (taxonomy revision v0.5.1)
 
   - gt_label: ean
     source: profile
-    finetype_label: technology.code.ean
-    finetype_domain: technology
+    finetype_label: identity.commerce.ean
+    finetype_domain: identity
     match_quality: direct
     expand: false
     notes: EAN barcode (8 or 13 digit)
@@ -286,8 +280,8 @@ mappings:
 
   - gt_label: uuid
     source: profile
-    finetype_label: technology.cryptographic.uuid
-    finetype_domain: technology
+    finetype_label: representation.identifier.uuid
+    finetype_domain: representation
     match_quality: direct
     expand: false
     notes: UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
@@ -310,8 +304,8 @@ mappings:
 
   - gt_label: swift code
     source: profile
-    finetype_label: identity.payment.swift_bic
-    finetype_domain: identity
+    finetype_label: finance.banking.swift_bic
+    finetype_domain: finance
     match_quality: direct
     expand: false
     notes: SWIFT/BIC codes (8 or 11 characters)
@@ -574,7 +568,7 @@ mappings:
 
   - gt_label: id
     source: both
-    finetype_label: representation.numeric.increment
+    finetype_label: representation.identifier.increment
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -582,7 +576,7 @@ mappings:
 
   - gt_label: code
     source: both
-    finetype_label: representation.code.alphanumeric_id
+    finetype_label: representation.identifier.alphanumeric_id
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -638,8 +632,8 @@ mappings:
 
   - gt_label: isbn
     source: schema
-    finetype_label: technology.code.isbn
-    finetype_domain: technology
+    finetype_label: identity.commerce.isbn
+    finetype_domain: identity
     match_quality: partial
     expand: false
     notes: ISBN when present in proper format; sometimes just a number
@@ -1058,8 +1052,8 @@ mappings:
 
   - gt_label: currency
     source: schema
-    finetype_label: identity.payment.currency_code
-    finetype_domain: identity
+    finetype_label: finance.currency.currency_code
+    finetype_domain: finance
     match_quality: partial
     expand: false
     notes: ISO 4217 codes detectable; full currency names are text
@@ -1206,7 +1200,7 @@ mappings:
 
   - gt_label: facility id
     source: dbpedia
-    finetype_label: representation.code.alphanumeric_id
+    finetype_label: representation.identifier.alphanumeric_id
     finetype_domain: representation
     match_quality: partial
     expand: false

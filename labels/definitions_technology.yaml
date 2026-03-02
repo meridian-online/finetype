@@ -353,33 +353,8 @@ technology.internet.http_status_code:
 # random tokens used for security purposes.
 # ═════════════════════════════════════════════════════════════════════
 
-technology.cryptographic.uuid:
-  title: "UUID"
-  description: >
-    Universally Unique Identifier (RFC 4122). Standard formats include
-    UUID v1 (timestamp-based), v4 (random), and v5 (name-based).
-    Canonical format: 8-4-4-4-12 hex groups with hyphens.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: UUID
-  format_string: null
-  transform: "CAST({col} AS UUID)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-  tier: [UUID, cryptographic]
-  release_priority: 5
-  aliases: [guid]
-  samples:
-    - "550e8400-e29b-41d4-a716-446655440000"
-    - "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-    - "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-  references: null
-  notes: >
-    v1 migration: Was cryptographic.uuid. DuckDB UUID type accepts standard
-    8-4-4-4-12 format. Also accepts without hyphens via UPPER() or normalization.
+# technology.cryptographic.uuid: MOVED to representation.identifier.uuid in v0.5.1 (NNFT-178)
+# UUID is a universal identifier, not crypto-specific.
 
 technology.cryptographic.hash:
   title: "Cryptographic Hash"
@@ -475,34 +450,7 @@ technology.cryptographic.token_urlsafe:
 # These have formal specifications and may include check digits.
 # ═════════════════════════════════════════════════════════════════════
 
-technology.code.isbn:
-  title: "ISBN"
-  description: >
-    International Standard Book Number. ISBN-10 (10 digits with check digit)
-    or ISBN-13 (13 digits with check digit). Also accepts with hyphens.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    isbn_version: "CASE WHEN LENGTH(REGEXP_REPLACE({col}, '-', '')) = 10 THEN 'ISBN-10' ELSE 'ISBN-13' END"
-  validation:
-    type: string
-    pattern: "^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$"
-  tier: [VARCHAR, code]
-  release_priority: 3
-  aliases: null
-  samples:
-    - "978-0-13-110362-7"
-    - "0-13-110362-9"
-    - "9780131103627"
-  references: null
-  notes: >
-    v1 migration: Was code.isbn. Pattern accepts ISBN-10 and ISBN-13 with or
-    without hyphens. Decompose infers version based on length. Check digit
-    validation should be done in application code, not in SQL.
+# technology.code.isbn: MOVED to identity.commerce.isbn in v0.5.1 (NNFT-179)
 
 technology.code.imei:
   title: "IMEI"
@@ -531,61 +479,9 @@ technology.code.imei:
     v1 migration: Was code.imei. 15 numeric digits. Check digit (last digit)
     uses Luhn algorithm but validation is done via crate, not regex.
 
-technology.code.ean:
-  title: "EAN"
-  description: >
-    European Article Number (also called Universal Product Code / UPC).
-    Standard versions: EAN-8 (8 digits) and EAN-13 (13 digits).
-    Last digit is check digit.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    ean_version: "CASE WHEN LENGTH({col}) = 8 THEN 'EAN-8' WHEN LENGTH({col}) = 13 THEN 'EAN-13' ELSE 'UNKNOWN' END"
-  validation:
-    type: string
-    pattern: "^[0-9]{8}$|^[0-9]{13}$"
-  tier: [VARCHAR, code]
-  release_priority: 3
-  aliases: [upc]
-  samples:
-    - "5901234123457"
-    - "96385074"
-    - "4006381333931"
-  references: null
-  notes: >
-    v1 migration: Was code.ean. EAN-13 is most common. EAN-8 used for small
-    packages. Check digit via Luhn algorithm (validated in crate).
+# technology.code.ean: MOVED to identity.commerce.ean in v0.5.1 (NNFT-179)
 
-technology.code.issn:
-  title: "ISSN"
-  description: >
-    International Standard Serial Number. 8-digit identifier for periodicals
-    (magazines, journals, newspapers). Format: XXXX-XXXX. Last digit is check character.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[0-9]{4}-[0-9]{3}[0-9X]$"
-  tier: [VARCHAR, code]
-  release_priority: 3
-  aliases: null
-  samples:
-    - "0028-0836"
-    - "1234-567X"
-    - "0003-7516"
-  references: null
-  notes: >
-    v1 migration: Was code.issn. 8 characters including hyphens: XXXX-XXXX.
-    Last character can be digit or X (for check digit 10).
+# technology.code.issn: MOVED to identity.commerce.issn in v0.5.1 (NNFT-179)
 
 technology.code.doi:
   title: "DOI"

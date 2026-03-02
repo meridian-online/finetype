@@ -1,16 +1,16 @@
 //! Label → Sense BroadCategory mapping for output masking (NNFT-169).
 //!
-//! Maps all 163 FineType type labels to their primary `BroadCategory`.
+//! Maps all 161 FineType type labels to their primary `BroadCategory`.
 //! Used during column classification to mask CharCNN predictions to
 //! the Sense-predicted category.
 //!
 //! Categories:
-//!   temporal (46) — all `datetime.*`
-//!   numeric (14) — numeric values, measurements, small integers
+//!   temporal (45) — all `datetime.*`
+//!   numeric (13) — numeric values, measurements, small integers
 //!   geographic (16) — all `geography.*`
 //!   entity (9) — person names, entity names
-//!   format (48) — structured identifiers, codes, sequences
-//!   text (30) — free text, low-cardinality enums, categorical
+//!   format (49) — structured identifiers, codes, sequences
+//!   text (29) — free text, low-cardinality enums, categorical
 
 use crate::sense::BroadCategory;
 
@@ -19,7 +19,6 @@ use crate::sense::BroadCategory;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const TEMPORAL_LABELS: &[&str] = &[
-    "datetime.component.century",
     "datetime.component.day_of_month",
     "datetime.component.day_of_week",
     "datetime.component.month_name",
@@ -73,7 +72,6 @@ const NUMERIC_LABELS: &[&str] = &[
     "identity.person.weight",
     "representation.file.file_size",
     "representation.numeric.decimal_number",
-    "representation.numeric.increment",
     "representation.numeric.integer_number",
     "representation.numeric.percentage",
     "representation.numeric.scientific_notation",
@@ -128,28 +126,33 @@ const FORMAT_LABELS: &[&str] = &[
     "container.object.json_array",
     "container.object.xml",
     "container.object.yaml",
+    // finance.* (moved from identity.payment in v0.5.1, NNFT-179)
+    "finance.banking.swift_bic",
+    "finance.crypto.bitcoin_address",
+    "finance.crypto.ethereum_address",
+    "finance.payment.credit_card_expiration_date",
+    "finance.payment.credit_card_number",
+    "finance.payment.paypal_email",
+    "finance.securities.cusip",
+    "finance.securities.isin",
+    "finance.securities.lei",
+    "finance.securities.sedol",
+    // identity.commerce.* (moved from technology.code in v0.5.1, NNFT-179)
+    "identity.commerce.ean",
+    "identity.commerce.isbn",
+    "identity.commerce.issn",
     // identity.medical.*
     "identity.medical.dea_number",
     "identity.medical.ndc",
     "identity.medical.npi",
-    // identity.payment (11, excluding credit_card_network → text)
-    "identity.payment.bitcoin_address",
-    "identity.payment.credit_card_expiration_date",
-    "identity.payment.credit_card_number",
-    "identity.payment.cusip",
-    "identity.payment.cvv",
-    "identity.payment.ethereum_address",
-    "identity.payment.isin",
-    "identity.payment.lei",
-    "identity.payment.paypal_email",
-    "identity.payment.sedol",
-    "identity.payment.swift_bic",
     // identity.person (structured formats)
     "identity.person.email",
     "identity.person.password",
     "identity.person.phone_number",
-    // representation.code
-    "representation.code.alphanumeric_id",
+    // representation.identifier (moved from code/numeric/cryptographic in v0.5.1)
+    "representation.identifier.alphanumeric_id",
+    "representation.identifier.increment",
+    "representation.identifier.uuid",
     // representation.scientific (bio sequences — structured alphabet)
     "representation.scientific.dna_sequence",
     "representation.scientific.protein_sequence",
@@ -159,10 +162,7 @@ const FORMAT_LABELS: &[&str] = &[
     "representation.text.color_rgb",
     // technology.code.*
     "technology.code.doi",
-    "technology.code.ean",
     "technology.code.imei",
-    "technology.code.isbn",
-    "technology.code.issn",
     "technology.code.locale_code",
     "technology.code.pin",
     // technology.internet (structured network formats)
@@ -176,10 +176,10 @@ const FORMAT_LABELS: &[&str] = &[
 ];
 
 const TEXT_LABELS: &[&str] = &[
-    // identity.payment (low-cardinality enums)
-    "identity.payment.credit_card_network",
-    "identity.payment.currency_code",
-    "identity.payment.currency_symbol",
+    // finance.* (low-cardinality enums, moved from identity.payment in v0.5.1)
+    "finance.currency.currency_code",
+    "finance.currency.currency_symbol",
+    "finance.payment.credit_card_network",
     // representation.boolean.*
     "representation.boolean.binary",
     "representation.boolean.initials",
@@ -200,11 +200,10 @@ const TEXT_LABELS: &[&str] = &[
     "representation.text.plain_text",
     "representation.text.sentence",
     "representation.text.word",
-    // technology.cryptographic.* (random/opaque strings)
+    // technology.cryptographic.* (random/opaque strings; uuid moved to representation.identifier)
     "technology.cryptographic.hash",
     "technology.cryptographic.token_hex",
     "technology.cryptographic.token_urlsafe",
-    "technology.cryptographic.uuid",
     // technology.development.* (low-cardinality enums + version strings)
     "technology.development.calver",
     "technology.development.os",
@@ -235,10 +234,7 @@ const ALSO_ELIGIBLE: &[(&str, BroadCategory)] = &[
     ("identity.person.email", BroadCategory::Entity),
     ("identity.person.phone_number", BroadCategory::Entity),
     // text ↔ format (credit card network is low-cardinality but CharCNN can detect)
-    (
-        "identity.payment.credit_card_network",
-        BroadCategory::Format,
-    ),
+    ("finance.payment.credit_card_network", BroadCategory::Format),
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -359,23 +355,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_163() {
+    fn test_total_is_161() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 163, "Map should contain exactly 163 types");
+        assert_eq!(map.len(), 161, "Map should contain exactly 161 types");
     }
 
     #[test]
     fn test_category_counts() {
-        assert_eq!(TEMPORAL_LABELS.len(), 46, "temporal should have 46 types");
-        assert_eq!(NUMERIC_LABELS.len(), 14, "numeric should have 14 types");
+        assert_eq!(TEMPORAL_LABELS.len(), 45, "temporal should have 45 types");
+        assert_eq!(NUMERIC_LABELS.len(), 13, "numeric should have 13 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
             16,
             "geographic should have 16 types"
         );
         assert_eq!(ENTITY_LABELS.len(), 9, "entity should have 9 types");
-        assert_eq!(FORMAT_LABELS.len(), 48, "format should have 48 types");
-        assert_eq!(TEXT_LABELS.len(), 30, "text should have 30 types");
+        assert_eq!(FORMAT_LABELS.len(), 49, "format should have 49 types");
+        assert_eq!(TEXT_LABELS.len(), 29, "text should have 29 types");
     }
 
     #[test]
@@ -454,11 +450,8 @@ mod tests {
         assert!(map.is_eligible("geography.coordinate.latitude", BroadCategory::Numeric));
 
         // Credit card network: primary=text, also=format
-        assert!(map.is_eligible("identity.payment.credit_card_network", BroadCategory::Text));
-        assert!(map.is_eligible(
-            "identity.payment.credit_card_network",
-            BroadCategory::Format
-        ));
+        assert!(map.is_eligible("finance.payment.credit_card_network", BroadCategory::Text));
+        assert!(map.is_eligible("finance.payment.credit_card_network", BroadCategory::Format));
     }
 
     #[test]
@@ -469,8 +462,8 @@ mod tests {
         let temporal = map.eligible_labels(BroadCategory::Temporal);
         assert_eq!(
             temporal.len(),
-            46,
-            "temporal eligible should be 46 (no overlaps)"
+            45,
+            "temporal eligible should be 45 (no overlaps)"
         );
 
         let geographic = map.eligible_labels(BroadCategory::Geographic);
@@ -481,22 +474,22 @@ mod tests {
         );
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);
-        // 14 primary + 3 incoming (coordinates, latitude, longitude)
-        assert_eq!(numeric.len(), 17, "numeric eligible should be 14+3=17");
+        // 13 primary + 3 incoming (coordinates, latitude, longitude)
+        assert_eq!(numeric.len(), 16, "numeric eligible should be 13+3=16");
 
         let entity = map.eligible_labels(BroadCategory::Entity);
         // 9 primary + 2 incoming (email, phone_number)
         assert_eq!(entity.len(), 11, "entity eligible should be 9+2=11");
 
         let format = map.eligible_labels(BroadCategory::Format);
-        // 48 primary + 3 incoming (postal_code, calling_code, credit_card_network)
-        assert_eq!(format.len(), 51, "format eligible should be 48+3=51");
+        // 49 primary + 3 incoming (postal_code, calling_code, credit_card_network)
+        assert_eq!(format.len(), 52, "format eligible should be 49+3=52");
 
         let text = map.eligible_labels(BroadCategory::Text);
         assert_eq!(
             text.len(),
-            30,
-            "text eligible should be 30 (no incoming overlaps)"
+            29,
+            "text eligible should be 29 (no incoming overlaps)"
         );
     }
 

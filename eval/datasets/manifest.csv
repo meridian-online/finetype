@@ -129,7 +129,6 @@ codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,issn,issn
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,ean,ean
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,uuid,uuid
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,credit_card,credit card number
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,cvv,cvv
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,swift_code,swift code
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,iban,code
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,hex_color,color

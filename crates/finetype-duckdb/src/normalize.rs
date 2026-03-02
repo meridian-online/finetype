@@ -23,8 +23,11 @@ pub fn normalize(value: &str, label: &str) -> Option<String> {
             normalize_boolean(value)
         }
         ("representation", "boolean") => normalize_boolean(value),
-        ("technology", "cryptographic") if label == "technology.cryptographic.uuid" => {
+        ("representation", "identifier") if label == "representation.identifier.uuid" => {
             normalize_uuid(value)
+        }
+        ("representation", "identifier") if label == "representation.identifier.increment" => {
+            normalize_numeric(value, label)
         }
         ("technology", "internet") => normalize_internet(value, label),
         ("representation", "numeric") => normalize_numeric(value, label),
@@ -418,7 +421,7 @@ fn normalize_internet(value: &str, label: &str) -> Option<String> {
 fn normalize_numeric(value: &str, label: &str) -> Option<String> {
     let v = value.trim();
     match label {
-        "representation.numeric.integer_number" | "representation.numeric.increment" => {
+        "representation.numeric.integer_number" | "representation.identifier.increment" => {
             // Strip commas and whitespace
             let clean: String = v
                 .chars()
@@ -680,7 +683,7 @@ mod tests {
         assert_eq!(
             normalize(
                 "550E8400-E29B-41D4-A716-446655440000",
-                "technology.cryptographic.uuid"
+                "representation.identifier.uuid"
             ),
             Some("550e8400-e29b-41d4-a716-446655440000".to_string())
         );
@@ -689,7 +692,7 @@ mod tests {
     #[test]
     fn test_uuid_invalid() {
         assert_eq!(
-            normalize("not-a-uuid", "technology.cryptographic.uuid"),
+            normalize("not-a-uuid", "representation.identifier.uuid"),
             None
         );
     }

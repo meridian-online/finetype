@@ -84,6 +84,47 @@ representation.numeric.decimal_number:
     v1 migration: Was numeric.decimal_number. Transforms to DOUBLE.
     Decompose extracts integer and fractional parts.
 
+representation.numeric.decimal_number_eu:
+  title: "Decimal Number (EU Format)"
+  description: >
+    Number with European formatting: period as thousands separator and comma
+    as decimal separator (e.g., 1.234,56, 999,99, -42,5). The inverse of
+    US format where period is decimal and comma is thousands. Silent corruption
+    risk: "1.234" is either 1234 (European thousands) or 1.234 (US decimal).
+    Transforms to DOUBLE after swapping separators.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DOUBLE
+  format_string: null
+  transform: "CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE)"
+  transform_ext: null
+  decompose:
+    integer_part: "CAST(FLOOR(CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE)) AS BIGINT)"
+    fractional_part: "CAST((CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE) - FLOOR(CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE))) * 1000000 AS BIGINT)"
+  validation:
+    type: string
+    pattern: "^-?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]+)?$|^-?[0-9]+,[0-9]+$"
+  tier: [DOUBLE, numeric]
+  release_priority: 3
+  aliases: [eu_decimal, european_number, decimal_eu]
+  samples:
+    - "1.234,56"
+    - "999,99"
+    - "1.000.000,00"
+    - "-42,5"
+    - "0,75"
+    - "12.345,678"
+    - "100,00"
+    - "-1.234,00"
+  references: null
+  notes: >
+    New in v0.5.1 (NNFT-180). European decimal format uses period for thousands
+    and comma for decimal — the exact inverse of US format. Transform removes
+    period thousands separators, replaces comma with period, then casts to DOUBLE.
+    Column-level detection is important since single values like "1.234" are
+    ambiguous between EU (=1234) and US (=1.234). The Sense model's locale
+    awareness may help disambiguation.
+
 representation.numeric.scientific_notation:
   title: "Scientific Notation"
   description: >
@@ -144,34 +185,8 @@ representation.numeric.percentage:
     v1 migration: New for v2. Percentage as string representation.
     Transform extracts numeric value (0-100 range expected).
 
-representation.numeric.increment:
-  title: "Increment / Counter"
-  description: >
-    Counter value that increases by fixed steps (often 1). May appear as
-    row numbers, sequence IDs, or generation numbers.
-    Broad categorization.
-  designation: broad_numbers
-  locales: [UNIVERSAL]
-  broad_type: BIGINT
-  format_string: null
-  transform: "CAST({col} AS BIGINT)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[0-9]+$"
-  tier: [BIGINT, numeric]
-  release_priority: 1
-  aliases: [counter, sequence, id]
-  samples:
-    - "1"
-    - "2"
-    - "3"
-  references: null
-  notes: >
-    v1 migration: Was numeric.increment marked broad_numbers. Often appears as
-    auto-incrementing primary keys or row numbers. Difficult to distinguish from
-    regular integers without column context.
+# representation.numeric.increment: MOVED to representation.identifier.increment in v0.5.1 (NNFT-178)
+# Increment is an identifier type, not a numeric computation type.
 
 representation.numeric.si_number:
   title: "SI-Prefix Number"
@@ -908,51 +923,11 @@ representation.discrete.ordinal:
     Column-level analysis (NNFT-065) needed for reliable detection.
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: code
+# CATEGORY: code — REMOVED in v0.5.1 (NNFT-178)
 #
-# Structured code/identifier strings that aren't specific enough
-# to match a known format (UUID, ISIN, etc.) but have recognizable
-# alphanumeric patterns.
+# representation.code.alphanumeric_id moved to representation.identifier.alphanumeric_id
+# The code category is now empty and removed.
 # ═════════════════════════════════════════════════════════════════════
-
-representation.code.alphanumeric_id:
-  title: "Alphanumeric Identifier"
-  description: >
-    Mixed letter-and-digit identifier string that doesn't match a known
-    specific format. Examples: product codes ("SKU-12345"), cabin numbers
-    ("C85"), ticket IDs ("A/5 21171"), lot numbers ("LOT-2024-0042"),
-    license plates ("ABC 1234").
-    Format-detectable: contains both alphabetic and numeric characters.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    alpha_part: "REGEXP_EXTRACT({col}, '[A-Za-z]+')"
-    numeric_part: "REGEXP_EXTRACT({col}, '[0-9]+')"
-  validation:
-    type: string
-    pattern: "^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$"
-  tier: [VARCHAR, code]
-  release_priority: 4
-  aliases: [product_code, reference_code, ticket_id, lot_number]
-  samples:
-    - "SKU-12345"
-    - "C85"
-    - "A/5 21171"
-    - "LOT-2024-0042"
-    - "ABC 1234"
-    - "REF-00742"
-    - "B28"
-    - "FL-2087"
-  references: null
-  notes: >
-    New for NNFT-063. Catches mixed letter+digit identifiers that fall through
-    more specific types (UUID, ISIN, IATA, etc.). The validation pattern requires
-    at least one letter AND one digit. This is format-detectable and should train
-    well with the char-CNN model.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: boolean
@@ -1062,3 +1037,108 @@ representation.boolean.terms:
     NNFT-075. Full-word boolean encoding. The most common format in
     application data and user-facing systems. DuckDB natively accepts
     true/false, yes/no, on/off (case-insensitive) for CAST to BOOLEAN.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: identifier
+#
+# Key/identifier columns — types that indicate "this column is a key."
+# Moved here in v0.5.1 (NNFT-178) from various prior locations.
+# ═════════════════════════════════════════════════════════════════════
+
+representation.identifier.uuid:
+  title: "UUID"
+  description: >
+    Universally Unique Identifier (RFC 4122). Standard formats include
+    UUID v1 (timestamp-based), v4 (random), and v5 (name-based).
+    Canonical format: 8-4-4-4-12 hex groups with hyphens.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: UUID
+  format_string: null
+  transform: "CAST({col} AS UUID)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+  tier: [UUID, identifier]
+  release_priority: 5
+  aliases: [guid]
+  samples:
+    - "550e8400-e29b-41d4-a716-446655440000"
+    - "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+    - "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+  references: null
+  notes: >
+    Moved from technology.cryptographic.uuid in v0.5.1 (NNFT-178).
+    UUID is a universal identifier used in database design far beyond
+    technology contexts. DuckDB UUID type accepts standard 8-4-4-4-12
+    format. Also accepts without hyphens via UPPER() or normalization.
+
+representation.identifier.alphanumeric_id:
+  title: "Alphanumeric Identifier"
+  description: >
+    Mixed letter-and-digit identifier string that doesn't match a known
+    specific format. Examples: product codes ("SKU-12345"), cabin numbers
+    ("C85"), ticket IDs ("A/5 21171"), lot numbers ("LOT-2024-0042"),
+    license plates ("ABC 1234").
+    Format-detectable: contains both alphabetic and numeric characters.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    alpha_part: "REGEXP_EXTRACT({col}, '[A-Za-z]+')"
+    numeric_part: "REGEXP_EXTRACT({col}, '[0-9]+')"
+  validation:
+    type: string
+    pattern: "^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9][A-Za-z0-9 /_.#-]*$|^[0-9][A-Za-z0-9 /_.#-]*[A-Za-z][A-Za-z0-9 /_.#-]*$"
+  tier: [VARCHAR, identifier]
+  release_priority: 4
+  aliases: [product_code, reference_code, ticket_id, lot_number]
+  samples:
+    - "SKU-12345"
+    - "C85"
+    - "A/5 21171"
+    - "LOT-2024-0042"
+    - "ABC 1234"
+    - "REF-00742"
+    - "B28"
+    - "FL-2087"
+  references: null
+  notes: >
+    Moved from representation.code.alphanumeric_id in v0.5.1 (NNFT-178).
+    Catches mixed letter+digit identifiers that fall through more specific
+    types (UUID, ISIN, IATA, etc.). The validation pattern requires at
+    least one letter AND one digit. Format-detectable.
+
+representation.identifier.increment:
+  title: "Increment / Counter"
+  description: >
+    Counter value that increases by fixed steps (often 1). May appear as
+    row numbers, sequence IDs, or generation numbers.
+    Broad categorization.
+  designation: broad_numbers
+  locales: [UNIVERSAL]
+  broad_type: BIGINT
+  format_string: null
+  transform: "CAST({col} AS BIGINT)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9]+$"
+  tier: [BIGINT, identifier]
+  release_priority: 1
+  aliases: [counter, sequence, id]
+  samples:
+    - "1"
+    - "2"
+    - "3"
+  references: null
+  notes: >
+    Moved from representation.numeric.increment in v0.5.1 (NNFT-178).
+    Often appears as auto-incrementing primary keys or row numbers.
+    Difficult to distinguish from regular integers without column context.

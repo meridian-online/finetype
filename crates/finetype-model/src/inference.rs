@@ -611,7 +611,7 @@ fn post_process(result: &mut ClassificationResult, text: &str) {
     // Postal codes are typically 5 digits (ZIP), 5-4 (ZIP+4), or other country formats.
     // The model confuses these bidirectionally (24x issn→postal, 23x postal→issn).
     // A regex-free pattern check on the hyphenated format resolves this.
-    if result.label == "technology.code.issn" || result.label == "geography.address.postal_code" {
+    if result.label == "identity.commerce.issn" || result.label == "geography.address.postal_code" {
         let trimmed = text.trim();
         let bytes = trimmed.as_bytes();
         // ISSN pattern: exactly 9 chars, format DDDD-DDD[DX]
@@ -621,7 +621,7 @@ fn post_process(result: &mut ClassificationResult, text: &str) {
             && bytes[5..8].iter().all(|b| b.is_ascii_digit())
             && (bytes[8].is_ascii_digit() || bytes[8] == b'X');
         if is_issn {
-            result.label = "technology.code.issn".to_string();
+            result.label = "identity.commerce.issn".to_string();
         } else {
             result.label = "geography.address.postal_code".to_string();
         }
@@ -974,26 +974,26 @@ mod post_process_tests {
     fn test_issn_format_corrects_postal_code() {
         let mut result = make_result("geography.address.postal_code");
         post_process(&mut result, "0028-0836");
-        assert_eq!(result.label, "technology.code.issn");
+        assert_eq!(result.label, "identity.commerce.issn");
     }
 
     #[test]
     fn test_issn_with_x_check_digit() {
         let mut result = make_result("geography.address.postal_code");
         post_process(&mut result, "1234-567X");
-        assert_eq!(result.label, "technology.code.issn");
+        assert_eq!(result.label, "identity.commerce.issn");
     }
 
     #[test]
     fn test_postal_code_zip5_corrects_issn() {
-        let mut result = make_result("technology.code.issn");
+        let mut result = make_result("identity.commerce.issn");
         post_process(&mut result, "58763");
         assert_eq!(result.label, "geography.address.postal_code");
     }
 
     #[test]
     fn test_postal_code_zip_plus_4() {
-        let mut result = make_result("technology.code.issn");
+        let mut result = make_result("identity.commerce.issn");
         post_process(&mut result, "79262-7606");
         // 10 chars (5-4), not ISSN format (4-3+check = 9 chars)
         assert_eq!(result.label, "geography.address.postal_code");
@@ -1001,9 +1001,9 @@ mod post_process_tests {
 
     #[test]
     fn test_correct_issn_unchanged() {
-        let mut result = make_result("technology.code.issn");
+        let mut result = make_result("identity.commerce.issn");
         post_process(&mut result, "5019-8538");
-        assert_eq!(result.label, "technology.code.issn");
+        assert_eq!(result.label, "identity.commerce.issn");
     }
 
     #[test]
@@ -1094,9 +1094,9 @@ mod post_process_tests {
 
     #[test]
     fn test_paypal_email_not_overridden() {
-        let mut result = make_result("identity.payment.paypal_email");
+        let mut result = make_result("finance.payment.paypal_email");
         post_process(&mut result, "user@paypal.com");
-        assert_eq!(result.label, "identity.payment.paypal_email");
+        assert_eq!(result.label, "finance.payment.paypal_email");
     }
 
     #[test]
@@ -1216,13 +1216,13 @@ mod pattern_validate_tests {
             0.6,
             vec![
                 ("geography.transportation.iata_code", 0.6),
-                ("technology.code.issn", 0.2), // has pattern, will fail
+                ("identity.commerce.issn", 0.2), // has pattern, will fail
                 ("representation.text.word", 0.1), // no pattern → accepted
             ],
         );
         let patterns = make_patterns(vec![
             ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
-            ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
+            ("identity.commerce.issn", r"^\d{4}-\d{3}[\dX]$"),
         ]);
 
         pattern_validate(&mut result, "12AB", &patterns);
@@ -1238,16 +1238,16 @@ mod pattern_validate_tests {
         // Fallback 1 (hash) has a pattern that also fails (wrong length).
         // Fallback 2 (postal_code) has a pattern that matches.
         let mut result = make_result_with_scores(
-            "technology.code.issn",
+            "identity.commerce.issn",
             0.5,
             vec![
-                ("technology.code.issn", 0.5),
+                ("identity.commerce.issn", 0.5),
                 ("technology.cryptographic.hash", 0.3),
                 ("geography.address.postal_code", 0.15),
             ],
         );
         let patterns = make_patterns(vec![
-            ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
+            ("identity.commerce.issn", r"^\d{4}-\d{3}[\dX]$"),
             (
                 "technology.cryptographic.hash",
                 r"^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$",
@@ -1269,12 +1269,12 @@ mod pattern_validate_tests {
             0.6,
             vec![
                 ("geography.transportation.iata_code", 0.6),
-                ("technology.code.issn", 0.3),
+                ("identity.commerce.issn", 0.3),
             ],
         );
         let patterns = make_patterns(vec![
             ("geography.transportation.iata_code", r"^[A-Z]{3}$"),
-            ("technology.code.issn", r"^\d{4}-\d{3}[\dX]$"),
+            ("identity.commerce.issn", r"^\d{4}-\d{3}[\dX]$"),
         ]);
 
         pattern_validate(&mut result, "ZZZZ", &patterns);

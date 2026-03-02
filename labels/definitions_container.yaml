@@ -145,6 +145,46 @@ container.object.xml:
     DuckDB has limited native XML support (xmlparse requires extension).
     Recursive inference may be partial.
 
+container.object.html:
+  title: "HTML Content"
+  description: >
+    HTML (HyperText Markup Language) content stored as VARCHAR.
+    Detected by the presence of HTML tags (<p>, <div>, <a href=, <br>,
+    <img>, etc.). Unlike XML, HTML5 allows unclosed tags, unquoted
+    attributes, optional closing tags, and void elements. Common in
+    CMS exports, email templates, web scraping data, and rich text fields.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "REGEXP_REPLACE({col}, '<[^>]+>', '', 'g')"
+  transform_ext: null
+  decompose:
+    text_content: "REGEXP_REPLACE({col}, '<[^>]+>', '', 'g')"
+    tag_count: "CAST(REGEXP_COUNT({col}, '<[a-zA-Z][^>]*>') AS INTEGER)"
+  validation:
+    type: string
+    pattern: "^.*<(p|div|span|a|br|img|h[1-6]|ul|ol|li|table|tr|td|th|strong|em|b|i|form|input|button|select|textarea|header|footer|nav|section|article|main|aside|figure|figcaption|blockquote|pre|code|script|style|link|meta|head|body|html)[\\s>/ ].*$"
+    minLength: 3
+  tier: [VARCHAR, object]
+  release_priority: 2
+  aliases: [html_content, html_fragment]
+  samples:
+    - '<p>Hello world</p>'
+    - '<div class="test"><a href="url">link</a></div>'
+    - '<br><img src="photo.jpg">'
+    - '<h1>Title</h1><p>Content here.</p>'
+    - '<ul><li>Item 1</li><li>Item 2</li></ul>'
+    - '<table><tr><td>Cell</td></tr></table>'
+  references: null
+  notes: >
+    New in v0.5.1 (NNFT-180). HTML is NOT well-formed XML: HTML5 allows
+    unclosed tags (<br>, <img>), unquoted attributes, optional closing.
+    Transform strips all HTML tags to extract plain text content.
+    Detection relies on recognizing common HTML tag names to distinguish
+    from XML (which requires well-formedness). Common in CMS exports
+    (Shopify, HubSpot), email templates, and web scraping datasets.
+
 container.object.yaml:
   title: "YAML Document"
   description: >

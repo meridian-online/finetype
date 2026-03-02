@@ -62,7 +62,7 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         // ── datetime.component ─────────────────────────────────────────
         "datetime.component.year" => "INTEGER",
         "datetime.component.day_of_month" => "INTEGER",
-        "datetime.component.century" => "VARCHAR",
+        // century removed in NNFT-177
         "datetime.component.day_of_week" => "VARCHAR",
         "datetime.component.month_name" => "VARCHAR",
         "datetime.component.periodicity" => "VARCHAR",
@@ -86,7 +86,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         "technology.internet.port" => "SMALLINT",
 
         // ── technology.cryptographic ───────────────────────────────────
-        "technology.cryptographic.uuid" => "UUID",
         "technology.cryptographic.hash"
         | "technology.cryptographic.token_hex"
         | "technology.cryptographic.token_urlsafe" => "VARCHAR",
@@ -105,13 +104,11 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         "technology.hardware.screen_size" => "DOUBLE",
         "technology.hardware.cpu" | "technology.hardware.generation" => "VARCHAR",
 
+        // ── identity.commerce (moved from technology.code in v0.5.1) ──
+        "identity.commerce.ean" | "identity.commerce.isbn" | "identity.commerce.issn" => "VARCHAR",
+
         // ── technology.code ────────────────────────────────────────────
-        "technology.code.ean"
-        | "technology.code.isbn"
-        | "technology.code.issn"
-        | "technology.code.imei"
-        | "technology.code.locale_code"
-        | "technology.code.pin" => "VARCHAR",
+        "technology.code.imei" | "technology.code.locale_code" | "technology.code.pin" => "VARCHAR",
 
         // ── geography.coordinate ───────────────────────────────────────
         "geography.coordinate.latitude" | "geography.coordinate.longitude" => "DOUBLE",
@@ -155,17 +152,24 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         // ── identity.academic ──────────────────────────────────────────
         "identity.academic.degree" | "identity.academic.university" => "VARCHAR",
 
-        // ── identity.payment ───────────────────────────────────────────
-        "identity.payment.credit_card_number"
-        | "identity.payment.credit_card_network"
-        | "identity.payment.credit_card_expiration_date"
-        | "identity.payment.cvv"
-        | "identity.payment.bitcoin_address"
-        | "identity.payment.ethereum_address"
-        | "identity.payment.paypal_email" => "VARCHAR",
+        // ── finance.* (moved from identity.payment in v0.5.1) ─────────
+        "finance.banking.swift_bic"
+        | "finance.banking.iban"
+        | "finance.payment.credit_card_number"
+        | "finance.payment.credit_card_network"
+        | "finance.payment.credit_card_expiration_date"
+        | "finance.payment.paypal_email"
+        | "finance.securities.cusip"
+        | "finance.securities.isin"
+        | "finance.securities.sedol"
+        | "finance.securities.lei"
+        | "finance.crypto.bitcoin_address"
+        | "finance.crypto.ethereum_address"
+        | "finance.currency.currency_code"
+        | "finance.currency.currency_symbol" => "VARCHAR",
 
         // ── representation.numeric ─────────────────────────────────────
-        "representation.numeric.integer_number" | "representation.numeric.increment" => "BIGINT",
+        "representation.numeric.integer_number" => "BIGINT",
         "representation.numeric.decimal_number"
         | "representation.numeric.percentage"
         | "representation.numeric.scientific_notation" => "DOUBLE",
@@ -194,6 +198,11 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "representation.boolean.initials"
         | "representation.boolean.terms" => "BOOLEAN",
 
+        // ── representation.identifier ────────────────────────────────
+        "representation.identifier.uuid" => "UUID",
+        "representation.identifier.alphanumeric_id" => "VARCHAR",
+        "representation.identifier.increment" => "BIGINT",
+
         // ── container.object ───────────────────────────────────────────
         "container.object.json" | "container.object.json_array" => "JSON",
         "container.object.xml" | "container.object.yaml" | "container.object.csv" => "VARCHAR",
@@ -219,7 +228,7 @@ mod tests {
     #[test]
     fn test_known_types() {
         assert_eq!(to_duckdb_type("technology.internet.ip_v4"), "INET");
-        assert_eq!(to_duckdb_type("technology.cryptographic.uuid"), "UUID");
+        assert_eq!(to_duckdb_type("representation.identifier.uuid"), "UUID");
         assert_eq!(to_duckdb_type("datetime.date.iso"), "DATE");
         assert_eq!(to_duckdb_type("datetime.timestamp.rfc_3339"), "TIMESTAMPTZ");
         assert_eq!(to_duckdb_type("container.object.json"), "JSON");

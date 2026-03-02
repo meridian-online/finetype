@@ -1392,51 +1392,9 @@ datetime.component.month_name:
   references: null
   notes: "v1 name: date.month. Enum shown is EN only — each locale has its own enum."
 
-datetime.component.century:
-  title: Century (Roman Numeral)
-  description: >
-    Century as a Roman numeral. Niche format found in historical data,
-    library cataloging, and academic texts.
-  designation: broad_characters
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "{col}"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    enum:
-      - "I"
-      - "II"
-      - "III"
-      - "IV"
-      - "V"
-      - "VI"
-      - "VII"
-      - "VIII"
-      - "IX"
-      - "X"
-      - "XI"
-      - "XII"
-      - "XIII"
-      - "XIV"
-      - "XV"
-      - "XVI"
-      - "XVII"
-      - "XVIII"
-      - "XIX"
-      - "XX"
-      - "XXI"
-  tier: [VARCHAR, component]
-  release_priority: 1
-  aliases: []
-  samples:
-    - "XIX"
-    - "XX"
-    - "XXI"
-  references: null
-  notes: null
+# datetime.component.century: REMOVED in v0.5.1 (NNFT-177)
+# Roman numerals only. No format_string, no DuckDB transformation contract.
+# Vanishingly rare as a standalone column. Better classified as categorical.
 
 datetime.component.periodicity:
   title: Periodicity

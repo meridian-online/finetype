@@ -184,6 +184,7 @@ impl Generator {
             "geography" => self.gen_geography(category, type_name),
             "representation" => self.gen_representation(category, type_name),
             "container" => self.gen_container(category, type_name),
+            "finance" => self.gen_finance(category, type_name),
             _ => Err(GeneratorError::UnknownLabel(key.to_string())),
         }
     }
@@ -448,10 +449,7 @@ impl Generator {
                 let days = locale_data::weekday_names(self.current_locale());
                 Ok(days[self.rng.gen_range(0..days.len())].to_string())
             }
-            ("component", "century") => {
-                let centuries = ["XVIII", "XIX", "XX", "XXI"];
-                Ok(centuries[self.rng.gen_range(0..4)].to_string())
-            }
+            // century removed in NNFT-177 (taxonomy revision v0.5.1)
             ("component", "periodicity") => {
                 let periods = [
                     "Once",
@@ -607,8 +605,8 @@ impl Generator {
                 Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
             }
 
-            // ── cryptographic (4 types) ──────────────────────────────────
-            ("cryptographic", "uuid") => Ok(Uuid::new_v4().to_string()),
+            // ── cryptographic (3 types) ──────────────────────────────────
+            // uuid moved to representation.identifier in NNFT-178
             ("cryptographic", "hash") => {
                 // Generate MD5 (32), SHA1 (40), or SHA256 (64) length hashes
                 let lengths = [32, 40, 64];
@@ -1185,15 +1183,7 @@ impl Generator {
                 let year = self.rng.gen_range(25..32);
                 Ok(format!("{:02}/{:02}", month, year))
             }
-            ("payment", "cvv") => {
-                if self.rng.gen_bool(0.85) {
-                    // 3-digit CVV (include leading zeros as distinctive signal)
-                    Ok(format!("{:03}", self.rng.gen_range(0..1000)))
-                } else {
-                    // Amex 4-digit CID (include leading zeros)
-                    Ok(format!("{:04}", self.rng.gen_range(0..10000)))
-                }
-            }
+            // cvv removed in NNFT-177 (taxonomy revision v0.5.1)
             ("payment", "credit_card_network") => {
                 let networks = [
                     "Visa",
@@ -1489,6 +1479,11 @@ impl Generator {
                 }
             }
 
+            // ── commerce (3 types, moved from technology.code in v0.5.1) ──
+            ("commerce", "isbn") => self.gen_technology("code", "isbn"),
+            ("commerce", "ean") => self.gen_technology("code", "ean"),
+            ("commerce", "issn") => self.gen_technology("code", "issn"),
+
             _ => Err(GeneratorError::NotImplemented(format!(
                 "identity.{}.{}",
                 category, type_name
@@ -1624,13 +1619,13 @@ impl Generator {
             // ── numeric (5 types) ────────────────────────────────────────
             ("numeric", "integer_number") => {
                 // Wider range with varied magnitudes to distinguish from
-                // street_number (1-2000), cvv (3-4 digits), postal codes, etc.
+                // street_number (1-2000), postal codes, etc.
                 let r = self.rng.gen::<f64>();
                 let val = if r < 0.3 {
                     // Large numbers (thousands to millions)
                     self.rng.gen_range(1000i64..10_000_000)
                 } else if r < 0.5 {
-                    // Negative numbers (distinctive vs street/postal/cvv)
+                    // Negative numbers (distinctive vs street/postal)
                     self.rng.gen_range(-100000i64..-1)
                 } else if r < 0.7 {
                     // Medium range
@@ -1649,6 +1644,53 @@ impl Generator {
                 let precision = self.rng.gen_range(1..8);
                 Ok(format!("{:.prec$}", val, prec = precision))
             }
+            ("numeric", "decimal_number_eu") => {
+                // European format: period thousands separator, comma decimal separator
+                let r = self.rng.gen::<f64>();
+                let (integer_part, decimal_digits) = if r < 0.3 {
+                    // Large with thousands: 1.234 to 9.999.999
+                    (
+                        self.rng.gen_range(1_000i64..10_000_000),
+                        self.rng.gen_range(1..3),
+                    )
+                } else if r < 0.5 {
+                    // Negative
+                    (
+                        -(self.rng.gen_range(1i64..100_000)),
+                        self.rng.gen_range(1..3),
+                    )
+                } else if r < 0.7 {
+                    // Small with decimals only
+                    (self.rng.gen_range(0i64..999), self.rng.gen_range(1..4))
+                } else {
+                    // Medium
+                    (
+                        self.rng.gen_range(1i64..1_000_000),
+                        self.rng.gen_range(1..3),
+                    )
+                };
+                let is_negative = integer_part < 0;
+                let abs_int = integer_part.unsigned_abs();
+                // Format integer part with period thousands separators
+                let int_str = abs_int.to_string();
+                let mut with_sep = String::new();
+                for (i, ch) in int_str.chars().rev().enumerate() {
+                    if i > 0 && i % 3 == 0 {
+                        with_sep.push('.');
+                    }
+                    with_sep.push(ch);
+                }
+                let formatted_int: String = with_sep.chars().rev().collect();
+                // Generate decimal part
+                let decimal_val = self.rng.gen_range(0..10u32.pow(decimal_digits as u32));
+                let decimal_str = format!("{:0>width$}", decimal_val, width = decimal_digits);
+                let result = if is_negative {
+                    format!("-{},{}", formatted_int, decimal_str)
+                } else {
+                    format!("{},{}", formatted_int, decimal_str)
+                };
+                Ok(result)
+            }
             ("numeric", "scientific_notation") => {
                 let mantissa = self.rng.gen::<f64>() * 9.0 + 1.0;
                 let exponent = self.rng.gen_range(-15i32..15);
@@ -1663,7 +1705,7 @@ impl Generator {
                     Ok(format!("{:.2}%", val))
                 }
             }
-            ("numeric", "increment") => Ok(self.rng.gen_range(1..100000).to_string()),
+            // increment moved to representation.identifier in NNFT-178
             ("numeric", "si_number") => {
                 let suffixes = ['K', 'k', 'M', 'm', 'B', 'b', 'T', 't'];
                 let suffix = suffixes[self.rng.gen_range(0..suffixes.len())];
@@ -1977,8 +2019,10 @@ impl Generator {
                 Ok(vocab[self.rng.gen_range(0..vocab.len())].to_string())
             }
 
-            // ── code (1 type) ─────────────────────────────────────────────
-            ("code", "alphanumeric_id") => {
+            // ── identifier (3 types) ─────────────────────────────────────
+            ("identifier", "uuid") => Ok(Uuid::new_v4().to_string()),
+            ("identifier", "increment") => Ok(self.rng.gen_range(1..100000).to_string()),
+            ("identifier", "alphanumeric_id") => {
                 // Generate mixed letter+digit identifier patterns.
                 let pattern_idx = self.rng.gen_range(0..10);
                 match pattern_idx {
@@ -2162,6 +2206,39 @@ impl Generator {
                 ];
                 Ok(templates[self.rng.gen_range(0..templates.len())].clone())
             }
+            ("object", "html") => {
+                let word1 = self.random_word();
+                let word2 = self.random_word();
+                let word3 = self.random_word();
+                let name = self.random_first_name();
+                let num = self.rng.gen_range(1..100);
+                let templates = [
+                    format!("<p>{} {} {}.</p>", word1, word2, word3),
+                    format!(
+                        "<div class=\"{}\"><a href=\"https://{}.com\">{}</a></div>",
+                        word1, word2, word3
+                    ),
+                    format!("<h1>{}</h1><p>{} {} {}.</p>", name, word1, word2, word3),
+                    format!(
+                        "<ul><li>{}</li><li>{}</li><li>{}</li></ul>",
+                        word1, word2, word3
+                    ),
+                    format!(
+                        "<table><tr><td>{}</td><td>{}</td></tr></table>",
+                        word1, num
+                    ),
+                    format!("<br><img src=\"{}.jpg\">", word1),
+                    format!(
+                        "<div id=\"main\"><h2>{}</h2><p>{} {}</p></div>",
+                        name, word1, word2
+                    ),
+                    format!(
+                        "<form action=\"/submit\"><input type=\"text\" name=\"{}\"><button>{}</button></form>",
+                        word1, word2
+                    ),
+                ];
+                Ok(templates[self.rng.gen_range(0..templates.len())].clone())
+            }
             ("object", "yaml") => {
                 let templates = [
                     format!(
@@ -2265,6 +2342,220 @@ impl Generator {
 
             _ => Err(GeneratorError::NotImplemented(format!(
                 "container.{}.{}",
+                category, type_name
+            ))),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DOMAIN: finance (3 new types: iban, amount_us, amount_eu)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    fn gen_finance(&mut self, category: &str, type_name: &str) -> Result<String, GeneratorError> {
+        match (category, type_name) {
+            // ── banking ──────────────────────────────────────────────────
+            ("banking", "iban") => {
+                // IBAN: 2-letter country code + 2 check digits + BBAN
+                // Country-specific BBAN lengths (digits only for simplicity)
+                let iban_specs: &[(&str, usize)] = &[
+                    ("GB", 18), // GB: 4 bank + 14 account
+                    ("DE", 18), // DE: 8 bank + 10 account
+                    ("FR", 23), // FR: 10 bank + 11 account + 2 key
+                    ("NL", 14), // NL: 4 bank + 10 account
+                    ("ES", 20), // ES: 8 bank + 2 check + 10 account
+                    ("IT", 23), // IT: 1 check + 10 bank + 12 account
+                    ("BE", 12), // BE: 3 bank + 7 account + 2 check
+                    ("AT", 16), // AT: 5 bank + 11 account
+                    ("CH", 17), // CH: 5 bank + 12 account
+                    ("PT", 21), // PT: 8 bank + 11 account + 2 check
+                    ("SE", 20), // SE: 3 bank + 17 account
+                    ("NO", 11), // NO: 4 bank + 6 account + 1 check
+                    ("DK", 14), // DK: 4 bank + 10 account
+                    ("FI", 14), // FI: 6 bank + 7 account + 1 check
+                    ("LU", 16), // LU: 3 bank + 13 account
+                    ("IE", 18), // IE: 4 bank + 6 branch + 8 account
+                ];
+                let &(country, bban_len) = &iban_specs[self.rng.gen_range(0..iban_specs.len())];
+                // Generate BBAN (digits, with some countries using letters for bank code)
+                let bban: String = if country == "GB" || country == "IE" {
+                    // UK/Ireland: 4 alpha bank code + rest digits
+                    let bank: String = (0..4)
+                        .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
+                        .collect();
+                    let digits: String = (0..(bban_len - 4))
+                        .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                        .collect();
+                    format!("{}{}", bank, digits)
+                } else {
+                    // Most countries: all digits in BBAN
+                    (0..bban_len)
+                        .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                        .collect()
+                };
+                // Calculate mod-97 check digits
+                let check = self.iban_check_digits(country, &bban);
+                Ok(format!("{}{}{}", country, check, bban))
+            }
+            ("banking", "swift_bic") => {
+                // SWIFT/BIC generator (moved from identity.payment in v0.5.1)
+                let countries = [
+                    "US", "GB", "DE", "FR", "CH", "JP", "AU", "SG", "HK", "NL", "IT", "ES", "CA",
+                    "SE", "NO", "DK", "BE", "AT", "IE", "LU",
+                ];
+                let bank: String = (0..4)
+                    .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
+                    .collect();
+                let country = countries[self.rng.gen_range(0..countries.len())];
+                let location: String = (0..2)
+                    .map(|_| {
+                        if self.rng.gen_bool(0.7) {
+                            (b'A' + self.rng.gen_range(0..26)) as char
+                        } else {
+                            (b'0' + self.rng.gen_range(0..10)) as char
+                        }
+                    })
+                    .collect();
+                if self.rng.gen_bool(0.4) {
+                    let branch: String = (0..3)
+                        .map(|_| {
+                            if self.rng.gen_bool(0.7) {
+                                (b'A' + self.rng.gen_range(0..26)) as char
+                            } else {
+                                (b'0' + self.rng.gen_range(0..10)) as char
+                            }
+                        })
+                        .collect();
+                    Ok(format!("{}{}{}{}", bank, country, location, branch))
+                } else {
+                    Ok(format!("{}{}{}", bank, country, location))
+                }
+            }
+
+            // ── currency ─────────────────────────────────────────────────
+            ("currency", "amount_us") => {
+                // US format: $1,234.56
+                let symbols = ["$", "£", "¥"];
+                let symbol = symbols[self.rng.gen_range(0..symbols.len())];
+                let r = self.rng.gen::<f64>();
+                let (integer_part, cents) = if r < 0.3 {
+                    // Large amounts
+                    (
+                        self.rng.gen_range(1_000i64..10_000_000),
+                        self.rng.gen_range(0..100u32),
+                    )
+                } else if r < 0.5 {
+                    // Small amounts
+                    (self.rng.gen_range(0i64..100), self.rng.gen_range(0..100u32))
+                } else {
+                    // Medium amounts
+                    (
+                        self.rng.gen_range(100i64..100_000),
+                        self.rng.gen_range(0..100u32),
+                    )
+                };
+                // Format integer part with comma thousands separators
+                let int_str = integer_part.to_string();
+                let mut with_sep = String::new();
+                for (i, ch) in int_str.chars().rev().enumerate() {
+                    if i > 0 && i % 3 == 0 {
+                        with_sep.push(',');
+                    }
+                    with_sep.push(ch);
+                }
+                let formatted_int: String = with_sep.chars().rev().collect();
+                let is_negative = self.rng.gen_bool(0.1);
+                if is_negative {
+                    Ok(format!("-{}{}.{:02}", symbol, formatted_int, cents))
+                } else {
+                    Ok(format!("{}{}.{:02}", symbol, formatted_int, cents))
+                }
+            }
+            ("currency", "amount_eu") => {
+                // EU format: €1.234,56
+                let r = self.rng.gen::<f64>();
+                let (integer_part, cents) = if r < 0.3 {
+                    (
+                        self.rng.gen_range(1_000i64..10_000_000),
+                        self.rng.gen_range(0..100u32),
+                    )
+                } else if r < 0.5 {
+                    (self.rng.gen_range(0i64..100), self.rng.gen_range(0..100u32))
+                } else {
+                    (
+                        self.rng.gen_range(100i64..100_000),
+                        self.rng.gen_range(0..100u32),
+                    )
+                };
+                // Format integer part with period thousands separators
+                let int_str = integer_part.to_string();
+                let mut with_sep = String::new();
+                for (i, ch) in int_str.chars().rev().enumerate() {
+                    if i > 0 && i % 3 == 0 {
+                        with_sep.push('.');
+                    }
+                    with_sep.push(ch);
+                }
+                let formatted_int: String = with_sep.chars().rev().collect();
+                let is_negative = self.rng.gen_bool(0.1);
+                let symbol_pos = self.rng.gen_range(0..3); // 0=prefix, 1=suffix, 2=prefix
+                match symbol_pos {
+                    0 | 2 => {
+                        if is_negative {
+                            Ok(format!("-€{},{:02}", formatted_int, cents))
+                        } else {
+                            Ok(format!("€{},{:02}", formatted_int, cents))
+                        }
+                    }
+                    _ => {
+                        if is_negative {
+                            Ok(format!("-{},{:02} €", formatted_int, cents))
+                        } else {
+                            Ok(format!("{},{:02} €", formatted_int, cents))
+                        }
+                    }
+                }
+            }
+
+            // ── currency metadata (moved from identity.payment) ──────────
+            ("currency", "currency_code") => {
+                let codes = [
+                    "USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "CNY", "HKD", "NZD", "SEK",
+                    "NOK", "DKK", "SGD", "KRW", "INR", "BRL", "ZAR", "MXN", "TWD", "THB", "IDR",
+                    "MYR", "PHP", "PLN", "CZK", "HUF", "TRY", "ILS", "AED", "SAR", "RUB", "CLP",
+                    "COP", "PEN", "ARS", "EGP", "NGN", "KES", "GHS",
+                ];
+                Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
+            }
+            ("currency", "currency_symbol") => {
+                let symbols = [
+                    "$", "€", "£", "¥", "₹", "₩", "₿", "₽", "₺", "₴", "₸", "₡", "₵", "₫", "₭", "₮",
+                    "₱", "₲", "₳", "₦", "৳", "฿", "₪", "﷼", "₢", "₣", "₤", "₧", "₯", "₰",
+                ];
+                Ok(symbols[self.rng.gen_range(0..symbols.len())].to_string())
+            }
+
+            // ── payment (moved from identity.payment) ────────────────────
+            ("payment", "credit_card_number") => self.gen_identity("payment", "credit_card_number"),
+            ("payment", "credit_card_expiration_date") => {
+                self.gen_identity("payment", "credit_card_expiration_date")
+            }
+            ("payment", "credit_card_network") => {
+                self.gen_identity("payment", "credit_card_network")
+            }
+            ("payment", "paypal_email") => self.gen_identity("payment", "paypal_email"),
+
+            // ── securities (moved from identity.payment) ─────────────────
+            ("securities", "cusip") => self.gen_identity("payment", "cusip"),
+            ("securities", "isin") => self.gen_identity("payment", "isin"),
+            ("securities", "sedol") => self.gen_identity("payment", "sedol"),
+            ("securities", "lei") => self.gen_identity("payment", "lei"),
+
+            // ── crypto (moved from identity.payment) ─────────────────────
+            ("crypto", "bitcoin_address") => self.gen_identity("payment", "bitcoin_address"),
+            ("crypto", "ethereum_address") => self.gen_identity("payment", "ethereum_address"),
+
+            _ => Err(GeneratorError::NotImplemented(format!(
+                "finance.{}.{}",
                 category, type_name
             ))),
         }
@@ -2418,6 +2709,40 @@ impl Generator {
         // Compute mod 97 on the large number (process in chunks to avoid overflow)
         let mut remainder: u64 = 0;
         for chunk in with_zeros.as_bytes().chunks(9) {
+            let s: String = chunk.iter().map(|&b| b as char).collect();
+            let combined = format!("{}{}", remainder, s);
+            remainder = combined.parse::<u64>().unwrap_or(0) % 97;
+        }
+        let check = 98 - remainder;
+        format!("{:02}", check)
+    }
+
+    /// Compute IBAN check digits using ISO 7064 Mod 97-10.
+    /// Input: country code (2 letters) + BBAN. Returns 2-character check digit string.
+    /// Algorithm: rearrange to BBAN + country_numeric + "00", compute 98 - (mod 97).
+    fn iban_check_digits(&self, country: &str, bban: &str) -> String {
+        // Convert country letters to numbers (A=10..Z=35) and append "00"
+        let country_numeric: String = country
+            .chars()
+            .map(|c| format!("{}", Self::alpha_to_num(c)))
+            .collect();
+        // Rearranged: BBAN + country_numeric + "00"
+        // But BBAN may contain letters too (e.g., GB IBANs), so expand those
+        let bban_expanded: String = bban
+            .chars()
+            .flat_map(|c| {
+                let val = Self::alpha_to_num(c);
+                if val >= 10 {
+                    format!("{}", val).chars().collect::<Vec<_>>()
+                } else {
+                    vec![c]
+                }
+            })
+            .collect();
+        let full = format!("{}{}00", bban_expanded, country_numeric);
+        // Compute mod 97 on the large number (process in chunks to avoid overflow)
+        let mut remainder: u64 = 0;
+        for chunk in full.as_bytes().chunks(9) {
             let s: String = chunk.iter().map(|&b| b as char).collect();
             let combined = format!("{}{}", remainder, s);
             remainder = combined.parse::<u64>().unwrap_or(0) % 97;
@@ -3653,7 +3978,9 @@ test.test.test:
     #[test]
     fn test_technology_uuid() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
-        let val = gen.generate_value("technology.cryptographic.uuid").unwrap();
+        let val = gen
+            .generate_value("representation.identifier.uuid")
+            .unwrap();
         assert_eq!(val.len(), 36);
         assert_eq!(val.split('-').count(), 5);
     }
@@ -3740,7 +4067,7 @@ test.test.test:
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..100 {
             let val = gen
-                .generate_value("identity.payment.credit_card_number")
+                .generate_value("finance.payment.credit_card_number")
                 .unwrap();
             // Verify Luhn validity
             assert!(
@@ -3779,7 +4106,7 @@ test.test.test:
     fn test_ean_check_digit_valid() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..100 {
-            let val = gen.generate_value("technology.code.ean").unwrap();
+            let val = gen.generate_value("identity.commerce.ean").unwrap();
             assert!(
                 val.len() == 8 || val.len() == 13,
                 "EAN length {} unexpected for {}",
@@ -3821,7 +4148,7 @@ test.test.test:
         let mut saw_discover = false;
         for _ in 0..200 {
             let val = gen
-                .generate_value("identity.payment.credit_card_number")
+                .generate_value("finance.payment.credit_card_number")
                 .unwrap();
             if val.starts_with('4') && val.len() == 16 {
                 saw_visa = true;
@@ -4040,7 +4367,7 @@ test.test.test:
     fn test_isin_check_digit_valid() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..100 {
-            let val = gen.generate_value("identity.payment.isin").unwrap();
+            let val = gen.generate_value("finance.securities.isin").unwrap();
             assert_eq!(val.len(), 12, "ISIN should be 12 chars: {}", val);
             assert!(
                 val[..2].chars().all(|c| c.is_ascii_uppercase()),
@@ -4073,7 +4400,7 @@ test.test.test:
     fn test_cusip_check_digit_valid() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..100 {
-            let val = gen.generate_value("identity.payment.cusip").unwrap();
+            let val = gen.generate_value("finance.securities.cusip").unwrap();
             assert_eq!(val.len(), 9, "CUSIP should be 9 chars: {}", val);
             let body = &val[..8];
             let expected = gen.cusip_check_digit(body);
@@ -4090,7 +4417,7 @@ test.test.test:
     fn test_sedol_check_digit_valid() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..100 {
-            let val = gen.generate_value("identity.payment.sedol").unwrap();
+            let val = gen.generate_value("finance.securities.sedol").unwrap();
             assert_eq!(val.len(), 7, "SEDOL should be 7 chars: {}", val);
             // No vowels allowed in SEDOL
             assert!(
@@ -4115,7 +4442,7 @@ test.test.test:
         let mut saw_8char = false;
         let mut saw_11char = false;
         for _ in 0..100 {
-            let val = gen.generate_value("identity.payment.swift_bic").unwrap();
+            let val = gen.generate_value("finance.banking.swift_bic").unwrap();
             assert!(
                 val.len() == 8 || val.len() == 11,
                 "SWIFT/BIC should be 8 or 11 chars: {} (len={})",
@@ -4149,7 +4476,7 @@ test.test.test:
     fn test_lei_check_digits_valid() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..100 {
-            let val = gen.generate_value("identity.payment.lei").unwrap();
+            let val = gen.generate_value("finance.securities.lei").unwrap();
             assert_eq!(val.len(), 20, "LEI should be 20 chars: {}", val);
             // Verify check digits by recomputing
             let body = &val[..18];
@@ -4168,7 +4495,7 @@ test.test.test:
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..50 {
             let val = gen
-                .generate_value("identity.payment.currency_code")
+                .generate_value("finance.currency.currency_code")
                 .unwrap();
             assert_eq!(val.len(), 3, "Currency code should be 3 chars: {}", val);
             assert!(
@@ -4184,7 +4511,7 @@ test.test.test:
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..50 {
             let val = gen
-                .generate_value("identity.payment.currency_symbol")
+                .generate_value("finance.currency.currency_symbol")
                 .unwrap();
             assert!(!val.is_empty(), "Currency symbol should not be empty");
             // Should be short (1-3 chars typically)
