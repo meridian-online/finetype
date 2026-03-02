@@ -13,7 +13,8 @@ SOTAB_DATA     ?= $(HOME)/datasets/sotab/cta
 SOTAB_SPLIT    ?= validation
 EVAL_DIR       := eval/gittables
 SOTAB_EVAL_DIR := eval/sotab
-VENV_PYTHON    ?= $(HOME)/.venvs/finetype-eval/bin/python3
+# Rust eval binaries (finetype-eval crate)
+EVAL_RUN       := cargo run -p finetype-eval --bin
 
 # Absolute extension path for DuckDB LOAD
 EXTENSION_PATH ?= $(CURDIR)/$(EXTENSION)
@@ -84,12 +85,12 @@ generate:
 eval-extract:
 	@echo "═══ Extracting metadata from GitTables 1M corpus ═══"
 	GITTABLES_DIR="$(GITTABLES_DIR)" EVAL_OUTPUT="$(EVAL_OUTPUT)" \
-		$(VENV_PYTHON) $(EVAL_DIR)/extract_metadata_1m.py
+		$(EVAL_RUN) eval-extract --
 
 eval-values:
 	@echo "═══ Extracting column values from sampled tables ═══"
 	GITTABLES_DIR="$(GITTABLES_DIR)" EVAL_OUTPUT="$(EVAL_OUTPUT)" \
-		$(VENV_PYTHON) $(EVAL_DIR)/prepare_1m_values.py
+		$(EVAL_RUN) eval-prepare-values --
 
 eval-1m: $(EXTENSION)
 	@echo "═══ Running GitTables 1M evaluation ═══"
@@ -118,7 +119,7 @@ eval-1m-cli: eval-mapping
 	@echo "Eval output: $(EVAL_OUTPUT)"
 	GITTABLES_DIR="$(GITTABLES_DIR)" EVAL_OUTPUT="$(EVAL_OUTPUT)" \
 		FINETYPE_BIN="cargo run --release --" \
-		$(VENV_PYTHON) $(EVAL_DIR)/eval_cli.py
+		$(EVAL_RUN) eval-gittables-cli --
 	export EVAL_OUTPUT="$(EVAL_OUTPUT)" && \
 		envsubst $(ENVSUBST_VARS) < $(EVAL_DIR)/eval_cli.sql | duckdb
 
@@ -137,7 +138,7 @@ eval-1m-cli: eval-mapping
 eval-sotab-values:
 	@echo "═══ Extracting SOTAB $(SOTAB_SPLIT) column values ═══"
 	SOTAB_DIR="$(SOTAB_DATA)" \
-		$(VENV_PYTHON) $(SOTAB_EVAL_DIR)/prepare_values.py --split $(SOTAB_SPLIT)
+		$(EVAL_RUN) eval-sotab-prepare -- --split $(SOTAB_SPLIT)
 
 eval-sotab: $(EXTENSION)
 	@echo "═══ Running SOTAB CTA evaluation ($(SOTAB_SPLIT)) ═══"
@@ -159,7 +160,7 @@ eval-sotab-cli:
 	@echo "═══ Running SOTAB CTA CLI evaluation ($(SOTAB_SPLIT)) ═══"
 	SOTAB_DIR="$(SOTAB_DATA)" \
 		FINETYPE_BIN="cargo run --release --" \
-		$(VENV_PYTHON) $(SOTAB_EVAL_DIR)/eval_cli.py --split $(SOTAB_SPLIT)
+		$(EVAL_RUN) eval-sotab-cli -- --split $(SOTAB_SPLIT)
 	export SOTAB_DIR="$(SOTAB_DATA)" SOTAB_SPLIT="$(SOTAB_SPLIT)" && \
 		envsubst $(ENVSUBST_VARS) < $(SOTAB_EVAL_DIR)/eval_cli.sql | duckdb
 
@@ -174,7 +175,7 @@ eval-sotab-cli:
 
 eval-actionability:
 	@echo "═══ Running actionability evaluation ═══"
-	$(VENV_PYTHON) eval/eval_actionability.py \
+	$(EVAL_RUN) eval-actionability -- \
 		--manifest eval/datasets/manifest.csv \
 		--predictions eval/eval_output/profile_results.csv \
 		--labels-dir labels \
@@ -190,7 +191,7 @@ eval-actionability:
 
 eval-report: eval-profile eval-actionability
 	@echo "═══ Generating evaluation report ═══"
-	$(VENV_PYTHON) eval/eval_report.py \
+	$(EVAL_RUN) eval-report -- \
 		--profile-results eval/eval_output/profile_results.csv \
 		--actionability-results eval/eval_output/actionability_results.csv \
 		--labels-dir labels \
@@ -211,7 +212,7 @@ MANIFEST ?= eval/datasets/manifest.csv
 
 eval-mapping:
 	@echo "═══ Generating schema_mapping.csv from YAML ═══"
-	python3 -c "import yaml,csv; d=yaml.safe_load(open('eval/schema_mapping.yaml')); w=csv.writer(open('eval/schema_mapping.csv','w')); w.writerow(['gt_label','source','finetype_label','finetype_domain','match_quality','expand']); [w.writerow([m['gt_label'],m['source'],m.get('finetype_label') or '',m.get('finetype_domain',''),m['match_quality'],'true' if m.get('expand') else 'false']) for m in d['mappings']]"
+	$(EVAL_RUN) eval-mapping --
 	@echo "✓ eval/schema_mapping.csv generated"
 
 eval-profile: eval-mapping

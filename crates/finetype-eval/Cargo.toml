@@ -1,0 +1,59 @@
+[package]
+name = "finetype-eval"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Evaluation infrastructure for FineType — report generation, actionability testing, benchmark harnesses"
+
+[[bin]]
+name = "eval-report"
+path = "src/bin/eval_report.rs"
+
+[[bin]]
+name = "eval-mapping"
+path = "src/bin/eval_mapping.rs"
+
+[[bin]]
+name = "eval-actionability"
+path = "src/bin/eval_actionability.rs"
+
+[[bin]]
+name = "eval-extract"
+path = "src/bin/eval_extract.rs"
+
+[[bin]]
+name = "eval-prepare-values"
+path = "src/bin/eval_prepare_values.rs"
+
+[[bin]]
+name = "eval-gittables-cli"
+path = "src/bin/eval_gittables_cli.rs"
+
+[[bin]]
+name = "eval-sotab-prepare"
+path = "src/bin/eval_sotab_prepare.rs"
+
+[[bin]]
+name = "eval-sotab-cli"
+path = "src/bin/eval_sotab_cli.rs"
+
+[dependencies]
+csv = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+clap = { version = "4.5", features = ["derive", "env"] }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+rand = { workspace = true }
+glob = { workspace = true }
+parquet = { version = "54", default-features = false, features = ["arrow", "snap"] }
+arrow = { version = "54", default-features = false, features = ["csv", "json"] }
+flate2 = "1"
+duckdb = { version = "=1.4.4", default-features = true, features = ["bundled"] }
+
+[lib]
+name = "finetype_eval"
+path = "src/lib.rs"

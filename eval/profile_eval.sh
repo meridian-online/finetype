@@ -104,22 +104,11 @@ while IFS=, read -r dataset file_path column_name gt_label; do
     }
 
     # Parse JSON: extract column, type, confidence for each column
-    # Note: Python csv.writer outputs \r\n; tr strips \r for DuckDB compat
-    echo "$PROFILE_JSON" | python3 -c "
-import json, sys, csv
-data = json.load(sys.stdin)
-writer = csv.writer(sys.stdout)
-dataset = '$dataset'
-for col in data.get('columns', []):
-    writer.writerow([
-        dataset,
-        col['column'],
-        col['type'],
-        col.get('confidence', 0)
-    ])
-" | tr -d '\r' >> "$PROFILE_RESULTS"
+    echo "$PROFILE_JSON" | jq -r --arg d "$dataset" \
+        '.columns[] | [$d, .column, .type, (.confidence // 0 | tostring)] | join(",")' \
+        >> "$PROFILE_RESULTS"
 
-    COL_COUNT=$(echo "$PROFILE_JSON" | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('columns',[])))")
+    COL_COUNT=$(echo "$PROFILE_JSON" | jq '.columns | length')
     printf " \033[32m%d columns\033[0m\n" "$COL_COUNT"
     PROFILED=$((PROFILED + 1))
 

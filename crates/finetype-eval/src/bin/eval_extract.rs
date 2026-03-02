@@ -9,9 +9,9 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use parquet::file::reader::{FileReader, SerializedFileReader};
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use rand::rngs::StdRng;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -47,12 +47,10 @@ fn extract_parquet_metadata(filepath: &Path) -> Option<Value> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let gittables_dir = args
-        .gittables_dir
-        .unwrap_or_else(|| {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
-            PathBuf::from(format!("{home}/datasets/gittables"))
-        });
+    let gittables_dir = args.gittables_dir.unwrap_or_else(|| {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+        PathBuf::from(format!("{home}/datasets/gittables"))
+    });
     let topics_dir = gittables_dir.join("topics");
     let output_dir = args
         .output_dir
@@ -84,11 +82,7 @@ fn main() -> Result<()> {
     let mut total_annotated = 0usize;
 
     for topic_dir in &topics {
-        let topic = topic_dir
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+        let topic = topic_dir.file_name().unwrap().to_string_lossy().to_string();
 
         let mut parquet_files: Vec<PathBuf> = std::fs::read_dir(topic_dir)?
             .filter_map(|e| e.ok())
