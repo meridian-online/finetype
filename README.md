@@ -280,14 +280,17 @@ flowchart TB
 | **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length), gender detection, categorical (low cardinality), boolean override (integer spread). | `finetype-model` |
 | **Profile** | CSV parsing with null detection, then column-mode inference on each column. Outputs a type table with confidence scores. | `finetype-cli` |
 
-**Four crates:**
+**Seven crates:**
 
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
-| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation (73 tests) | `serde_yaml`, `fake`, `chrono`, `uuid` |
-| `finetype-model` | Tiered CharCNN inference, column-mode disambiguation (114 tests) | `candle-core`, `candle-nn` |
-| `finetype-cli` | Binary: 11 CLI commands | `clap`, `csv` |
+| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation | `serde_yaml`, `fake`, `chrono`, `uuid` |
+| `finetype-model` | Tiered CharCNN + Sense→Sharpen inference, column-mode disambiguation | `candle-core`, `candle-nn` |
+| `finetype-cli` | Binary: CLI commands (infer, profile, check, generate, train, taxonomy, schema) | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
+| `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
+| `finetype-train` | Pure Rust ML training (Sense, Entity, data pipeline, Model2Vec) | `candle-core`, `candle-nn`, `duckdb` |
+| `finetype-candle-spike` | ML framework feasibility testing | `candle-core`, `candle-nn` |
 
 **Repository structure:**
 
@@ -295,12 +298,14 @@ flowchart TB
 finetype/
 ├── crates/
 │   ├── finetype-core/        # Taxonomy, tokenizer, data generation
-│   ├── finetype-model/       # Candle CNN model, column-mode inference
+│   ├── finetype-model/       # Candle CNN + Sense→Sharpen, column-mode inference
 │   ├── finetype-cli/         # CLI binary
-│   └── finetype-duckdb/      # DuckDB extension (5 scalar functions)
-├── labels/                   # Taxonomy definitions (163 types, 6 domains, YAML)
-├── models/tiered-v2/         # Default tiered model (34 CharCNNs, T0→T1→T2)
-├── eval/gittables/           # GitTables real-world benchmark evaluation
+│   ├── finetype-duckdb/      # DuckDB extension (5 scalar functions)
+│   ├── finetype-eval/        # Evaluation binaries (Rust, no Python)
+│   └── finetype-train/       # Pure Rust ML training (Candle)
+├── labels/                   # Taxonomy definitions (166 types, 7 domains, YAML)
+├── models/                   # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
+├── eval/                     # Evaluation infrastructure (GitTables, SOTAB, profile)
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
 └── .github/workflows/        # CI/CD: fmt, clippy, test, finetype check; release cross-compile
 ```
