@@ -1,0 +1,32 @@
+[package]
+name = "finetype-candle-spike"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# NOTE: Candle dependency conflicts documented in discovery/candle-feasibility-spike/SUMMARY.md
+# This spike crate demonstrates model architecture expressiveness, not full build viability.
+# See discovery/candle-feasibility-spike/SUMMARY.md for complete evaluation and recommendations.
+
+safetensors = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+
+# Utils
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[dependencies.finetype-core]
+path = "../finetype-core"
+
+[[bin]]
+name = "train-sense"
+path = "src/bin/train_sense.rs"
+
+[[bin]]
+name = "train-entity"
+path = "src/bin/train_entity.rs"

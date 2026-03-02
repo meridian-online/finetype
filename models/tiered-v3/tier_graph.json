@@ -1,0 +1,697 @@
+{
+  "tier0": {
+    "broad_types": [
+      "BIGINT",
+      "BOOLEAN",
+      "DATE",
+      "DOUBLE",
+      "INET",
+      "INTEGER",
+      "INTERVAL",
+      "JSON",
+      "POINT",
+      "SMALLINT",
+      "TIME",
+      "TIMESTAMP",
+      "TIMESTAMPTZ",
+      "UUID",
+      "VARCHAR"
+    ],
+    "dir": "tier0"
+  },
+  "tier1": {
+    "BIGINT": {
+      "categories": [
+        "epoch",
+        "file",
+        "hardware",
+        "numeric"
+      ],
+      "dir": "tier1_BIGINT"
+    },
+    "BOOLEAN": {
+      "categories": [
+        "binary",
+        "initials",
+        "terms"
+      ],
+      "dir": "tier1_BOOLEAN"
+    },
+    "DATE": {
+      "categories": [
+        "date",
+        "payment"
+      ],
+      "dir": "tier1_DATE"
+    },
+    "DOUBLE": {
+      "categories": [
+        "coordinate",
+        "hardware",
+        "numeric",
+        "person"
+      ],
+      "dir": "tier1_DOUBLE"
+    },
+    "INET": {
+      "direct": "internet"
+    },
+    "INTEGER": {
+      "direct": "component"
+    },
+    "INTERVAL": {
+      "direct": "duration"
+    },
+    "JSON": {
+      "direct": "object"
+    },
+    "POINT": {
+      "direct": "coordinate"
+    },
+    "SMALLINT": {
+      "categories": [
+        "internet",
+        "person"
+      ],
+      "dir": "tier1_SMALLINT"
+    },
+    "TIME": {
+      "direct": "time"
+    },
+    "TIMESTAMP": {
+      "direct": "timestamp"
+    },
+    "TIMESTAMPTZ": {
+      "direct": "timestamp"
+    },
+    "UUID": {
+      "direct": "cryptographic"
+    },
+    "VARCHAR": {
+      "categories": [
+        "academic",
+        "address",
+        "array",
+        "code",
+        "component",
+        "contact",
+        "cryptographic",
+        "development",
+        "discrete",
+        "file",
+        "hardware",
+        "internet",
+        "key_value",
+        "location",
+        "medical",
+        "object",
+        "offset",
+        "payment",
+        "person",
+        "scientific",
+        "text",
+        "transportation"
+      ],
+      "dir": "tier1_VARCHAR"
+    }
+  },
+  "tier2": {
+    "BIGINT_epoch": {
+      "count": 3,
+      "dir": "tier2_BIGINT_epoch",
+      "types": [
+        "datetime.epoch.unix_microseconds.UNIVERSAL",
+        "datetime.epoch.unix_milliseconds.UNIVERSAL",
+        "datetime.epoch.unix_seconds.UNIVERSAL"
+      ]
+    },
+    "BIGINT_file": {
+      "count": 1,
+      "direct": "representation.file.file_size.UNIVERSAL"
+    },
+    "BIGINT_hardware": {
+      "count": 1,
+      "direct": "technology.hardware.ram_size.UNIVERSAL"
+    },
+    "BIGINT_numeric": {
+      "count": 1,
+      "direct": "representation.numeric.integer_number.UNIVERSAL"
+    },
+    "BOOLEAN_binary": {
+      "count": 1,
+      "direct": "representation.boolean.binary.UNIVERSAL"
+    },
+    "BOOLEAN_initials": {
+      "count": 1,
+      "direct": "representation.boolean.initials.UNIVERSAL"
+    },
+    "BOOLEAN_terms": {
+      "count": 1,
+      "direct": "representation.boolean.terms.UNIVERSAL"
+    },
+    "DATE_date": {
+      "count": 53,
+      "dir": "tier2_DATE_date",
+      "types": [
+        "datetime.date.abbreviated_month.CS",
+        "datetime.date.abbreviated_month.DA",
+        "datetime.date.abbreviated_month.DE",
+        "datetime.date.abbreviated_month.EN",
+        "datetime.date.abbreviated_month.ES",
+        "datetime.date.abbreviated_month.FR",
+        "datetime.date.abbreviated_month.IT",
+        "datetime.date.abbreviated_month.JA",
+        "datetime.date.abbreviated_month.NL",
+        "datetime.date.abbreviated_month.NO",
+        "datetime.date.abbreviated_month.PL",
+        "datetime.date.abbreviated_month.PT",
+        "datetime.date.abbreviated_month.RU",
+        "datetime.date.abbreviated_month.SV",
+        "datetime.date.abbreviated_month.ZH",
+        "datetime.date.compact_dmy.UNIVERSAL",
+        "datetime.date.compact_mdy.UNIVERSAL",
+        "datetime.date.compact_ymd.UNIVERSAL",
+        "datetime.date.eu_dot.UNIVERSAL",
+        "datetime.date.eu_slash.UNIVERSAL",
+        "datetime.date.iso.UNIVERSAL",
+        "datetime.date.iso_week.UNIVERSAL",
+        "datetime.date.julian.UNIVERSAL",
+        "datetime.date.long_full_month.CS",
+        "datetime.date.long_full_month.DA",
+        "datetime.date.long_full_month.DE",
+        "datetime.date.long_full_month.EN",
+        "datetime.date.long_full_month.ES",
+        "datetime.date.long_full_month.FR",
+        "datetime.date.long_full_month.IT",
+        "datetime.date.long_full_month.NL",
+        "datetime.date.long_full_month.NO",
+        "datetime.date.long_full_month.PL",
+        "datetime.date.long_full_month.PT",
+        "datetime.date.long_full_month.RU",
+        "datetime.date.long_full_month.SV",
+        "datetime.date.ordinal.UNIVERSAL",
+        "datetime.date.short_dmy.UNIVERSAL",
+        "datetime.date.short_mdy.UNIVERSAL",
+        "datetime.date.short_ymd.UNIVERSAL",
+        "datetime.date.us_slash.UNIVERSAL",
+        "datetime.date.weekday_abbreviated_month.DE",
+        "datetime.date.weekday_abbreviated_month.EN",
+        "datetime.date.weekday_abbreviated_month.ES",
+        "datetime.date.weekday_abbreviated_month.FR",
+        "datetime.date.weekday_abbreviated_month.IT",
+        "datetime.date.weekday_abbreviated_month.PT",
+        "datetime.date.weekday_full_month.DE",
+        "datetime.date.weekday_full_month.EN",
+        "datetime.date.weekday_full_month.ES",
+        "datetime.date.weekday_full_month.FR",
+        "datetime.date.weekday_full_month.IT",
+        "datetime.date.weekday_full_month.PT"
+      ]
+    },
+    "DATE_payment": {
+      "count": 1,
+      "direct": "identity.payment.credit_card_expiration_date.UNIVERSAL"
+    },
+    "DOUBLE_coordinate": {
+      "count": 2,
+      "dir": "tier2_DOUBLE_coordinate",
+      "types": [
+        "geography.coordinate.latitude.UNIVERSAL",
+        "geography.coordinate.longitude.UNIVERSAL"
+      ]
+    },
+    "DOUBLE_hardware": {
+      "count": 1,
+      "direct": "technology.hardware.screen_size.UNIVERSAL"
+    },
+    "DOUBLE_numeric": {
+      "count": 4,
+      "dir": "tier2_DOUBLE_numeric",
+      "types": [
+        "representation.numeric.decimal_number.UNIVERSAL",
+        "representation.numeric.percentage.UNIVERSAL",
+        "representation.numeric.scientific_notation.UNIVERSAL",
+        "representation.numeric.si_number.UNIVERSAL"
+      ]
+    },
+    "DOUBLE_person": {
+      "count": 2,
+      "direct": "identity.person.height"
+    },
+    "INET_internet": {
+      "count": 4,
+      "dir": "tier2_INET_internet",
+      "types": [
+        "technology.internet.ip_v4.UNIVERSAL",
+        "technology.internet.ip_v4_with_port.UNIVERSAL",
+        "technology.internet.ip_v6.UNIVERSAL",
+        "technology.internet.mac_address.UNIVERSAL"
+      ]
+    },
+    "INTEGER_component": {
+      "count": 2,
+      "direct": "datetime.component.day_of_month"
+    },
+    "INTERVAL_duration": {
+      "count": 1,
+      "direct": "datetime.duration.iso_8601.UNIVERSAL"
+    },
+    "JSON_object": {
+      "count": 1,
+      "direct": "container.object.json.UNIVERSAL"
+    },
+    "POINT_coordinate": {
+      "count": 1,
+      "direct": "geography.coordinate.coordinates.UNIVERSAL"
+    },
+    "SMALLINT_internet": {
+      "count": 2,
+      "dir": "tier2_SMALLINT_internet",
+      "types": [
+        "technology.internet.http_status_code.UNIVERSAL",
+        "technology.internet.port.UNIVERSAL"
+      ]
+    },
+    "SMALLINT_person": {
+      "count": 1,
+      "direct": "identity.person.age.UNIVERSAL"
+    },
+    "TIMESTAMPTZ_timestamp": {
+      "count": 4,
+      "dir": "tier2_TIMESTAMPTZ_timestamp",
+      "types": [
+        "datetime.timestamp.iso_8601_offset.UNIVERSAL",
+        "datetime.timestamp.rfc_2822.UNIVERSAL",
+        "datetime.timestamp.rfc_2822_ordinal.UNIVERSAL",
+        "datetime.timestamp.rfc_3339.UNIVERSAL"
+      ]
+    },
+    "TIMESTAMP_timestamp": {
+      "count": 8,
+      "dir": "tier2_TIMESTAMP_timestamp",
+      "types": [
+        "datetime.timestamp.american.UNIVERSAL",
+        "datetime.timestamp.american_24h.UNIVERSAL",
+        "datetime.timestamp.european.UNIVERSAL",
+        "datetime.timestamp.iso_8601.UNIVERSAL",
+        "datetime.timestamp.iso_8601_compact.UNIVERSAL",
+        "datetime.timestamp.iso_8601_microseconds.UNIVERSAL",
+        "datetime.timestamp.iso_microseconds.UNIVERSAL",
+        "datetime.timestamp.sql_standard.UNIVERSAL"
+      ]
+    },
+    "TIME_time": {
+      "count": 5,
+      "dir": "tier2_TIME_time",
+      "types": [
+        "datetime.time.hm_12h.UNIVERSAL",
+        "datetime.time.hm_24h.UNIVERSAL",
+        "datetime.time.hms_12h.UNIVERSAL",
+        "datetime.time.hms_24h.UNIVERSAL",
+        "datetime.time.iso.UNIVERSAL"
+      ]
+    },
+    "UUID_cryptographic": {
+      "count": 1,
+      "direct": "technology.cryptographic.uuid.UNIVERSAL"
+    },
+    "VARCHAR_academic": {
+      "count": 2,
+      "direct": "identity.academic.degree"
+    },
+    "VARCHAR_address": {
+      "count": 48,
+      "dir": "tier2_VARCHAR_address",
+      "types": [
+        "geography.address.full_address.AR",
+        "geography.address.full_address.DE",
+        "geography.address.full_address.EN",
+        "geography.address.full_address.EN_AU",
+        "geography.address.full_address.EN_CA",
+        "geography.address.full_address.EN_GB",
+        "geography.address.full_address.EN_US",
+        "geography.address.full_address.ES",
+        "geography.address.full_address.FR",
+        "geography.address.full_address.IT",
+        "geography.address.full_address.JA",
+        "geography.address.full_address.KO",
+        "geography.address.full_address.NL",
+        "geography.address.full_address.PL",
+        "geography.address.full_address.RU",
+        "geography.address.full_address.ZH",
+        "geography.address.postal_code.DE",
+        "geography.address.postal_code.EN",
+        "geography.address.postal_code.EN_AU",
+        "geography.address.postal_code.EN_CA",
+        "geography.address.postal_code.EN_GB",
+        "geography.address.postal_code.EN_US",
+        "geography.address.postal_code.ES",
+        "geography.address.postal_code.FR",
+        "geography.address.postal_code.IT",
+        "geography.address.postal_code.JA",
+        "geography.address.postal_code.KO",
+        "geography.address.postal_code.NL",
+        "geography.address.postal_code.PL",
+        "geography.address.postal_code.RU",
+        "geography.address.postal_code.ZH",
+        "geography.address.street_name.AR",
+        "geography.address.street_name.DE",
+        "geography.address.street_name.EN",
+        "geography.address.street_name.EN_AU",
+        "geography.address.street_name.EN_CA",
+        "geography.address.street_name.EN_GB",
+        "geography.address.street_name.EN_US",
+        "geography.address.street_name.ES",
+        "geography.address.street_name.FR",
+        "geography.address.street_name.IT",
+        "geography.address.street_name.JA",
+        "geography.address.street_name.KO",
+        "geography.address.street_name.NL",
+        "geography.address.street_name.PL",
+        "geography.address.street_name.RU",
+        "geography.address.street_name.ZH",
+        "geography.address.street_number.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_array": {
+      "count": 1,
+      "direct": "container.array.comma_separated.UNIVERSAL"
+    },
+    "VARCHAR_code": {
+      "count": 7,
+      "dir": "tier2_VARCHAR_code",
+      "types": [
+        "representation.code.alphanumeric_id.UNIVERSAL",
+        "technology.code.doi.UNIVERSAL",
+        "technology.code.ean.UNIVERSAL",
+        "technology.code.imei.UNIVERSAL",
+        "technology.code.isbn.UNIVERSAL",
+        "technology.code.issn.UNIVERSAL",
+        "technology.code.locale_code.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_component": {
+      "count": 4,
+      "direct": "datetime.component.century"
+    },
+    "VARCHAR_contact": {
+      "count": 16,
+      "dir": "tier2_VARCHAR_contact",
+      "types": [
+        "geography.contact.calling_code.AR",
+        "geography.contact.calling_code.DE",
+        "geography.contact.calling_code.EN",
+        "geography.contact.calling_code.EN_AU",
+        "geography.contact.calling_code.EN_CA",
+        "geography.contact.calling_code.EN_GB",
+        "geography.contact.calling_code.EN_US",
+        "geography.contact.calling_code.ES",
+        "geography.contact.calling_code.FR",
+        "geography.contact.calling_code.IT",
+        "geography.contact.calling_code.JA",
+        "geography.contact.calling_code.KO",
+        "geography.contact.calling_code.NL",
+        "geography.contact.calling_code.PL",
+        "geography.contact.calling_code.RU",
+        "geography.contact.calling_code.ZH"
+      ]
+    },
+    "VARCHAR_cryptographic": {
+      "count": 3,
+      "dir": "tier2_VARCHAR_cryptographic",
+      "types": [
+        "technology.cryptographic.hash.UNIVERSAL",
+        "technology.cryptographic.token_hex.UNIVERSAL",
+        "technology.cryptographic.token_urlsafe.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_development": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_development",
+      "types": [
+        "technology.development.calver.UNIVERSAL",
+        "technology.development.version.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_discrete": {
+      "count": 1,
+      "direct": "representation.discrete.categorical.UNIVERSAL"
+    },
+    "VARCHAR_file": {
+      "count": 1,
+      "direct": "representation.file.excel_format.UNIVERSAL"
+    },
+    "VARCHAR_hardware": {
+      "count": 2,
+      "direct": "technology.hardware.cpu"
+    },
+    "VARCHAR_internet": {
+      "count": 6,
+      "dir": "tier2_VARCHAR_internet",
+      "types": [
+        "technology.internet.hostname.UNIVERSAL",
+        "technology.internet.slug.UNIVERSAL",
+        "technology.internet.top_level_domain.UNIVERSAL",
+        "technology.internet.uri.UNIVERSAL",
+        "technology.internet.url.UNIVERSAL",
+        "technology.internet.user_agent.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_key_value": {
+      "count": 1,
+      "direct": "container.key_value.query_string.UNIVERSAL"
+    },
+    "VARCHAR_location": {
+      "count": 65,
+      "dir": "tier2_VARCHAR_location",
+      "types": [
+        "geography.location.city.AR",
+        "geography.location.city.DE",
+        "geography.location.city.EN",
+        "geography.location.city.EN_AU",
+        "geography.location.city.EN_CA",
+        "geography.location.city.EN_GB",
+        "geography.location.city.EN_US",
+        "geography.location.city.ES",
+        "geography.location.city.FR",
+        "geography.location.city.IT",
+        "geography.location.city.JA",
+        "geography.location.city.KO",
+        "geography.location.city.NL",
+        "geography.location.city.PL",
+        "geography.location.city.RU",
+        "geography.location.city.ZH",
+        "geography.location.continent.AR",
+        "geography.location.continent.DE",
+        "geography.location.continent.EN",
+        "geography.location.continent.EN_AU",
+        "geography.location.continent.EN_CA",
+        "geography.location.continent.EN_GB",
+        "geography.location.continent.EN_US",
+        "geography.location.continent.ES",
+        "geography.location.continent.FR",
+        "geography.location.continent.IT",
+        "geography.location.continent.JA",
+        "geography.location.continent.KO",
+        "geography.location.continent.NL",
+        "geography.location.continent.PL",
+        "geography.location.continent.RU",
+        "geography.location.continent.ZH",
+        "geography.location.country.AR",
+        "geography.location.country.DE",
+        "geography.location.country.EN",
+        "geography.location.country.EN_AU",
+        "geography.location.country.EN_CA",
+        "geography.location.country.EN_GB",
+        "geography.location.country.EN_US",
+        "geography.location.country.ES",
+        "geography.location.country.FR",
+        "geography.location.country.IT",
+        "geography.location.country.JA",
+        "geography.location.country.KO",
+        "geography.location.country.NL",
+        "geography.location.country.PL",
+        "geography.location.country.RU",
+        "geography.location.country.ZH",
+        "geography.location.country_code.UNIVERSAL",
+        "geography.location.region.AR",
+        "geography.location.region.DE",
+        "geography.location.region.EN",
+        "geography.location.region.EN_AU",
+        "geography.location.region.EN_CA",
+        "geography.location.region.EN_GB",
+        "geography.location.region.EN_US",
+        "geography.location.region.ES",
+        "geography.location.region.FR",
+        "geography.location.region.IT",
+        "geography.location.region.JA",
+        "geography.location.region.KO",
+        "geography.location.region.NL",
+        "geography.location.region.PL",
+        "geography.location.region.RU",
+        "geography.location.region.ZH"
+      ]
+    },
+    "VARCHAR_medical": {
+      "count": 3,
+      "dir": "tier2_VARCHAR_medical",
+      "types": [
+        "identity.medical.dea_number.UNIVERSAL",
+        "identity.medical.ndc.UNIVERSAL",
+        "identity.medical.npi.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_object": {
+      "count": 3,
+      "direct": "container.object.csv"
+    },
+    "VARCHAR_offset": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_offset",
+      "types": [
+        "datetime.offset.iana.UNIVERSAL",
+        "datetime.offset.utc.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_payment": {
+      "count": 10,
+      "dir": "tier2_VARCHAR_payment",
+      "types": [
+        "identity.payment.bitcoin_address.UNIVERSAL",
+        "identity.payment.credit_card_number.UNIVERSAL",
+        "identity.payment.currency_code.UNIVERSAL",
+        "identity.payment.cusip.UNIVERSAL",
+        "identity.payment.cvv.UNIVERSAL",
+        "identity.payment.ethereum_address.UNIVERSAL",
+        "identity.payment.isin.UNIVERSAL",
+        "identity.payment.lei.UNIVERSAL",
+        "identity.payment.sedol.UNIVERSAL",
+        "identity.payment.swift_bic.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_person": {
+      "count": 94,
+      "dir": "tier2_VARCHAR_person",
+      "types": [
+        "identity.person.email.UNIVERSAL",
+        "identity.person.first_name.AR",
+        "identity.person.first_name.DE",
+        "identity.person.first_name.EN",
+        "identity.person.first_name.EN_AU",
+        "identity.person.first_name.EN_CA",
+        "identity.person.first_name.EN_GB",
+        "identity.person.first_name.EN_US",
+        "identity.person.first_name.ES",
+        "identity.person.first_name.FR",
+        "identity.person.first_name.IT",
+        "identity.person.first_name.JA",
+        "identity.person.first_name.KO",
+        "identity.person.first_name.NL",
+        "identity.person.first_name.PL",
+        "identity.person.first_name.RU",
+        "identity.person.first_name.ZH",
+        "identity.person.full_name.AR",
+        "identity.person.full_name.DE",
+        "identity.person.full_name.EN",
+        "identity.person.full_name.EN_AU",
+        "identity.person.full_name.EN_CA",
+        "identity.person.full_name.EN_GB",
+        "identity.person.full_name.EN_US",
+        "identity.person.full_name.ES",
+        "identity.person.full_name.FR",
+        "identity.person.full_name.IT",
+        "identity.person.full_name.JA",
+        "identity.person.full_name.KO",
+        "identity.person.full_name.NL",
+        "identity.person.full_name.PL",
+        "identity.person.full_name.RU",
+        "identity.person.full_name.ZH",
+        "identity.person.last_name.AR",
+        "identity.person.last_name.DE",
+        "identity.person.last_name.EN",
+        "identity.person.last_name.EN_AU",
+        "identity.person.last_name.EN_CA",
+        "identity.person.last_name.EN_GB",
+        "identity.person.last_name.EN_US",
+        "identity.person.last_name.ES",
+        "identity.person.last_name.FR",
+        "identity.person.last_name.IT",
+        "identity.person.last_name.JA",
+        "identity.person.last_name.KO",
+        "identity.person.last_name.NL",
+        "identity.person.last_name.PL",
+        "identity.person.last_name.RU",
+        "identity.person.last_name.ZH",
+        "identity.person.nationality.AR",
+        "identity.person.nationality.DE",
+        "identity.person.nationality.EN",
+        "identity.person.nationality.EN_AU",
+        "identity.person.nationality.EN_CA",
+        "identity.person.nationality.EN_GB",
+        "identity.person.nationality.EN_US",
+        "identity.person.nationality.ES",
+        "identity.person.nationality.FR",
+        "identity.person.nationality.IT",
+        "identity.person.nationality.JA",
+        "identity.person.nationality.KO",
+        "identity.person.nationality.NL",
+        "identity.person.nationality.PL",
+        "identity.person.nationality.RU",
+        "identity.person.nationality.ZH",
+        "identity.person.phone_number.AR",
+        "identity.person.phone_number.DE",
+        "identity.person.phone_number.EN",
+        "identity.person.phone_number.EN_AU",
+        "identity.person.phone_number.EN_CA",
+        "identity.person.phone_number.EN_GB",
+        "identity.person.phone_number.EN_US",
+        "identity.person.phone_number.ES",
+        "identity.person.phone_number.FR",
+        "identity.person.phone_number.IT",
+        "identity.person.phone_number.JA",
+        "identity.person.phone_number.KO",
+        "identity.person.phone_number.NL",
+        "identity.person.phone_number.PL",
+        "identity.person.phone_number.RU",
+        "identity.person.phone_number.ZA",
+        "identity.person.phone_number.ZH",
+        "identity.person.username.DE",
+        "identity.person.username.EN",
+        "identity.person.username.EN_AU",
+        "identity.person.username.EN_CA",
+        "identity.person.username.EN_GB",
+        "identity.person.username.EN_US",
+        "identity.person.username.ES",
+        "identity.person.username.FR",
+        "identity.person.username.IT",
+        "identity.person.username.NL",
+        "identity.person.username.PL",
+        "identity.person.username.RU"
+      ]
+    },
+    "VARCHAR_scientific": {
+      "count": 5,
+      "direct": "representation.scientific.dna_sequence"
+    },
+    "VARCHAR_text": {
+      "count": 4,
+      "dir": "tier2_VARCHAR_text",
+      "types": [
+        "representation.text.color_hex.UNIVERSAL",
+        "representation.text.color_rgb.UNIVERSAL",
+        "representation.text.emoji.UNIVERSAL",
+        "representation.text.word.UNIVERSAL"
+      ]
+    },
+    "VARCHAR_transportation": {
+      "count": 2,
+      "dir": "tier2_VARCHAR_transportation",
+      "types": [
+        "geography.transportation.iata_code.UNIVERSAL",
+        "geography.transportation.icao_code.UNIVERSAL"
+      ]
+    }
+  },
+  "tier2_min_types": 1,
+  "version": 1
+}

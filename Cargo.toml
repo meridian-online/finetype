@@ -5,6 +5,7 @@ members = [
     "crates/finetype-model",
     "crates/finetype-cli",
     "crates/finetype-duckdb",
+    "crates/finetype-candle-spike",
 ]
 # DuckDB extension requires model files for embed-models feature (default).
 # Build it explicitly with: cargo build -p finetype_duckdb
