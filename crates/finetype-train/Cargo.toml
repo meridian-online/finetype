@@ -1,0 +1,62 @@
+[package]
+name = "finetype-train"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Training infrastructure for FineType — Sense, Entity, and Model2Vec training via Candle"
+publish = false
+
+[dependencies]
+# ML framework (Candle 0.8 + half pin for dependency resolution)
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+half = "2.4"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+safetensors = "0.4"
+
+# Data loading
+duckdb = { version = "=1.4.4", default-features = true, features = ["bundled"] }
+csv = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+
+# Utilities
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+rand = { workspace = true }
+
+# Internal crates
+finetype-core = { workspace = true }
+finetype-model = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[[bin]]
+name = "train-sense-model"
+path = "src/bin/train_sense.rs"
+
+[[bin]]
+name = "train-entity-classifier"
+path = "src/bin/train_entity.rs"
+
+[[bin]]
+name = "prepare-sense-data"
+path = "src/bin/prepare_sense_data.rs"
+
+[[bin]]
+name = "prepare-model2vec"
+path = "src/bin/prepare_model2vec.rs"
+
+[lib]
+name = "finetype_train"
+path = "src/lib.rs"
