@@ -196,8 +196,9 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
 
         // ── representation.identifier ────────────────────────────────
         "representation.identifier.uuid" => "UUID",
-        "representation.identifier.alphanumeric_id"
-        | "representation.identifier.numeric_code" => "VARCHAR",
+        "representation.identifier.alphanumeric_id" | "representation.identifier.numeric_code" => {
+            "VARCHAR"
+        }
         "representation.identifier.increment" => "BIGINT",
 
         // ── container.object ───────────────────────────────────────────

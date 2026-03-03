@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-03-04
+
+### Accuracy
+
+- **Actionability eval: 98.7%** — 2990/3030 datetime values parse via `TRY_STRPTIME`. Up from 96.0% (NNFT-191). long_full_month_date now correctly classified. (NNFT-192)
+- **Profile eval: 110/116 label (94.8%), 110/116 domain (94.8%)** — regressed from 117/119 (98.3%) due to CharCNN v10 retrain boundary shifts. 6 misclassifications (utc_offset→excel_format, ean→credit_card_number, 3× name disambiguation, countries.name→full_name). Root cause: model retraining, not logic changes. Follow-up investigation planned for v0.5.3. (NNFT-192)
+
+### Changed
+
+- **Taxonomy: 164 → 163 types** — two removals, one addition. Net -1. (NNFT-192)
+  - Removed `geography.address.street_number` — validation pattern indistinguishable from `integer_number`, causing false positives on plain numeric columns. Demotion rules in column.rs cleaned up.
+  - Removed `identity.person.age` — `CAST(col AS SMALLINT)` identical to `integer_number`. 205 SOTAB false positives at 0.995 confidence. Resolves NNFT-135 entirely.
+  - Added `representation.identifier.numeric_code` — all-digit VARCHAR codes with leading zeros and consistent length (ISO country numeric 840/036, NAICS, SIC, FIPS, product codes). Preserves leading zeros where integer cast would lose data. Addresses #2 analyst frustration from taxonomy revision research. (NNFT-192)
+
+- **Model: CharCNN v9 → v10** — retrained on 163-type taxonomy. 161k samples (priority ≥1), 5 epochs, seed 42, 83.6% training accuracy. Model2Vec type embeddings regenerated (489 rows = 163 × 3 FPS). Default symlink updated. (NNFT-192)
+
+### Fixed
+
+- **Sense LabelCategoryMap** — updated for removed (street_number, age) and added (numeric_code) labels. (NNFT-192)
+- **Measurement type detection** — only height/weight remain in MEASUREMENT_TYPES; age removed (NNFT-192).
+- **Numeric attractor demotion** — street_number rules eliminated; postal_code remains only numeric attractor (NNFT-192).
+
+### Known Issues
+
+- **Profile eval regression under investigation** — 6 misclassifications after v10 retrain. Deferred to v0.5.3 follow-up task for accuracy recovery.
+
 ## [0.5.1] - 2026-03-03
 
 ### Accuracy

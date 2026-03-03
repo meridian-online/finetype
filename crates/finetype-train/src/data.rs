@@ -1285,7 +1285,10 @@ mod tests {
             finetype_to_broad_category("representation.numeric.decimal_number"),
             Some(3)
         );
-        assert_eq!(finetype_to_broad_category("identity.person.height"), Some(3));
+        assert_eq!(
+            finetype_to_broad_category("identity.person.height"),
+            Some(3)
+        );
         // Format
         assert_eq!(finetype_to_broad_category("identity.person.email"), Some(1));
         assert_eq!(

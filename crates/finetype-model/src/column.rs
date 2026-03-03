@@ -629,10 +629,8 @@ impl ColumnClassifier {
             // numerically indistinguishable (all small integers in overlapping
             // ranges). When the header provides a specific measurement hint,
             // trust it over the model prediction.
-            const MEASUREMENT_TYPES: &[&str] = &[
-                "identity.person.height",
-                "identity.person.weight",
-            ];
+            const MEASUREMENT_TYPES: &[&str] =
+                &["identity.person.height", "identity.person.weight"];
             const COORDINATE_TYPES: &[&str] = &[
                 "geography.coordinate.latitude",
                 "geography.coordinate.longitude",
@@ -1076,10 +1074,8 @@ impl ColumnClassifier {
                     result.confidence = (result.confidence + 0.1).min(1.0);
                 } else {
                     // Measurement disambiguation: height/weight
-                    const MEASUREMENT_TYPES: &[&str] = &[
-                        "identity.person.height",
-                        "identity.person.weight",
-                    ];
+                    const MEASUREMENT_TYPES: &[&str] =
+                        &["identity.person.height", "identity.person.weight"];
                     // Coordinate types that can be confused with measurement data
                     const COORDINATE_TYPES: &[&str] = &[
                         "geography.coordinate.latitude",
@@ -1265,9 +1261,7 @@ const COORDINATE_PAIR: (&str, &str) = (
 
 /// Attractor types — types the CharCNN over-confidently assigns to generic data.
 /// Numeric attractors catch integers misclassified as postal codes, etc.
-const NUMERIC_ATTRACTORS: &[&str] = &[
-    "geography.address.postal_code",
-];
+const NUMERIC_ATTRACTORS: &[&str] = &["geography.address.postal_code"];
 
 /// Text attractors catch short words/phrases misclassified as identity types.
 /// Note: full_name is NOT included — its false positives are rare (2 in eval)

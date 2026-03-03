@@ -1,11 +1,11 @@
 ---
 id: NNFT-192
 title: 'Taxonomy revision: remove street_number & age, add numeric_code'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-03 10:56'
-updated_date: '2026-03-03 13:02'
+updated_date: '2026-03-03 13:04'
 labels:
   - taxonomy
   - feature
@@ -136,6 +136,6 @@ Taxonomy revision: removed 2 problematic types, added 1 new type, retrained mode
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
