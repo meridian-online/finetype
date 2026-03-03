@@ -168,10 +168,11 @@ GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable c
 
 ## Priority Order
 
-1. **Accuracy lift** — Address remaining 11 misclassifications: iris/percentage overcall, entity/location confusion, timezone misclassification
+1. ✅ **Accuracy lift** — Completed NNFT-188: 117/119 (98.3% label). Remaining 2 ambiguous cases (countries.name, long_full_month_date) deferred to follow-up task.
 2. **DuckDB extension metadata** — Replace last Python script in build chain (NNFT-183)
 3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
 4. **Distribution** — Homebrew tap, crates.io current, v0.5.1 release
+5. **Optional: actionability improvements** — Remaining 92.7% (vs 95% target) requires model fixes or format_string updates
 
 ## Decided Items
 
