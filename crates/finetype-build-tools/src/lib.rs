@@ -38,8 +38,8 @@ pub fn build_metadata(
 
     // WebAssembly custom section header
     buf.push(0x00); // custom section type
-    // LEB128-encoded payload length: 531 = 0x213
-    // 0x93 (1_0010011 = continuation + 0x13), 0x04 (0_0000100 = final + 0x04)
+                    // LEB128-encoded payload length: 531 = 0x213
+                    // 0x93 (1_0010011 = continuation + 0x13), 0x04 (0_0000100 = final + 0x04)
     buf.push(0x93);
     buf.push(0x04);
     // Name length: 16
@@ -204,7 +204,15 @@ mod tests {
         let dummy_content = b"ELF dummy shared library content";
         fs::write(&input, dummy_content).unwrap();
 
-        append_metadata(&input, &output, "linux_amd64", "v1.2.0", "0.5.1", "C_STRUCT").unwrap();
+        append_metadata(
+            &input,
+            &output,
+            "linux_amd64",
+            "v1.2.0",
+            "0.5.1",
+            "C_STRUCT",
+        )
+        .unwrap();
 
         let result = fs::read(&output).unwrap();
 
