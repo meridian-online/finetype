@@ -1,7 +1,7 @@
 ---
 id: NNFT-188
 title: 'Accuracy improvements: address 11 profile eval misclassifications'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-03 03:49'
@@ -109,7 +109,7 @@ These are model accuracy issues rather than timezone classification issues. Impr
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
