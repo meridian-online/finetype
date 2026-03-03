@@ -1,0 +1,17 @@
+[package]
+name = "finetype-build-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Build utilities for FineType (DuckDB extension metadata)"
+publish = false
+
+[[bin]]
+name = "append-duckdb-metadata"
+path = "src/bin/append_duckdb_metadata.rs"
+
+[dependencies]
+clap = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

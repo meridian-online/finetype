@@ -52,15 +52,21 @@ build:
 build-release:
 	cargo build --release
 	cargo build -p finetype_duckdb --release
-	@# Append DuckDB extension metadata to the .so
-	python3 $(HOME)/github/noon-org/duckdb-finetype/extension-ci-tools/scripts/append_extension_metadata.py \
-		-l target/release/libfinetype_duckdb.so \
-		-n finetype_duckdb \
-		-o target/release/finetype_duckdb.duckdb_extension \
-		-p $$(echo "SELECT platform FROM pragma_platform();" | duckdb -noheader -csv 2>/dev/null || echo "linux_amd64") \
-		-dv v1.2.0 \
-		-ev $$(cargo metadata --no-deps --format-version 1 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print([p['version'] for p in d['packages'] if p['name']=='finetype_duckdb'][0])" 2>/dev/null || echo "0.1.5") \
-		--abi-type C_STRUCT
+	cargo build -p finetype-build-tools --release
+	@# Append DuckDB extension metadata to the .so (pure Rust, no Python)
+	@if [ -f target/release/append-duckdb-metadata ]; then \
+		target/release/append-duckdb-metadata \
+			-l target/release/libfinetype_duckdb.so \
+			-n finetype_duckdb \
+			-o target/release/finetype_duckdb.duckdb_extension \
+			-p $$(echo "SELECT platform FROM pragma_platform();" | duckdb -noheader -csv 2>/dev/null || echo "linux_amd64") \
+			--duckdb-version v1.2.0 \
+			--extension-version $$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/') \
+			--abi-type C_STRUCT; \
+	else \
+		echo "⚠ append-duckdb-metadata not found — copying .so without metadata"; \
+		cp target/release/libfinetype_duckdb.so target/release/finetype_duckdb.duckdb_extension; \
+	fi
 
 check:
 	cargo run -- check

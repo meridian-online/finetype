@@ -99,6 +99,29 @@ crates/finetype-train/
         prepare_model2vec.rs      # CLI: prepare-model2vec
 ```
 
+## DuckDB Extension Build
+
+The DuckDB extension requires metadata appended to the compiled shared library. This is handled by the `finetype-build-tools` crate.
+
+```bash
+# Full release build (includes metadata appending)
+make build-release
+
+# The metadata tool can also be used standalone:
+cargo run -p finetype-build-tools --bin append-duckdb-metadata -- \
+    -l target/release/libfinetype_duckdb.so \
+    -n finetype_duckdb \
+    -o target/release/finetype_duckdb.duckdb_extension \
+    -p linux_amd64 \
+    --duckdb-version v1.2.0 \
+    --extension-version 0.5.1 \
+    --abi-type C_STRUCT
+```
+
+The metadata format follows DuckDB's extension specification: a WebAssembly custom section (`duckdb_signature`) containing platform, version, and ABI type fields, plus 256 bytes reserved for signing.
+
+If the build tool is unavailable, `make build-release` falls back to copying the raw `.so` without metadata (the extension will load with `-unsigned` flag only).
+
 ## Related Repositories
 
 - **noon-org/finetype** (this repo) — Production codebase. Candle-based, DuckDB integration.
