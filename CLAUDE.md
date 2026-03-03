@@ -29,7 +29,8 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
-- **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers. Removed `technology.hardware.screen_size` and `technology.hardware.ram_size`. Profile eval: 108/119 (90.8% label, 96.6% domain). `remap_collapsed_label()` eliminated — models now natively produce 164-class outputs.
+- **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination (schema contracts reject impossible types), Rule 19 (percentage without '%' → decimal_number), header hint additions (timezone, publisher, measurement keywords), hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes. Actionability 92.7%.
+- **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers. Removed `technology.hardware.screen_size` and `technology.hardware.ram_size`. `remap_collapsed_label()` eliminated — models now natively produce 164-class outputs.
 - **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries: train-sense-model, train-entity-classifier, prepare-sense-data, prepare-model2vec. Dual-format SenseClassifier supports both Python-trained (MHA) and Rust-trained (simple attention) models. 253 tests pass.
 - **Python cleanup** (NNFT-186) — Removed 11 Python files. Only remaining python3 call: DuckDB extension metadata script.
 - **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category. Net: +3 types (IBAN, currency amounts, html_content, locale_number, alphanumeric_code added; cvv, century, screen_size, ram_size removed). 164 types across 7 domains.
@@ -38,8 +39,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Accuracy improvements** — Profile eval 108/119. Known misses: iris decimals (→percentage), country/city names (→full_name), timezone (→iso_microseconds). Follow-up task pending.
-- **Next accuracy targets** — Profile eval 108/119 (90.8% label, 96.6% domain). Known misses: iris decimals (percentage overcall ×4), countries/world_cities name (full_name vs country/city ×2), airports timezone (iso_microseconds vs iana), pressure_atm (latitude vs decimal_number), publisher (gender vs entity_name), covid Country (city vs country), job_title (entity_name vs categorical). **Model state:** v0.5.1 models (164 types), native label output, no remapping.
+- **Remaining accuracy gaps** — Profile eval 117/119 (98.3% label, 99.2% domain). 2 remaining misclassifications: countries.name (full_name vs country — ambiguous "name" header, CharCNN doesn't see country as plurality), datetime_formats_extended.long_full_month_date (iso_8601 vs long_full_month — datetime format confusion). Actionability at 92.7% (target ≥95%) — 3 columns below target: network_logs.timestamp (0%), long_full_month_date (0%), multilingual.date (33.3%).
 
 ## Architecture
 
@@ -99,9 +99,12 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
    - **Rule 16 — Text length demotion:** full_address + median length >100 → sentence.
    - **Rule 17 — UTC offset override:** `[+-]HH:MM` at ≥80% → `datetime.offset.utc`. Between Rules 14 and 15.
    - **Rule 18 — Entity demotion:** full_name + entity classifier non-person >0.6 → entity_name. Fires before header hints. **Entity demotion guard:** skips header hints entirely when applied.
-5. **Semantic header hints** (Model2Vec): column name → max-sim K=3 matching at 0.65 threshold → overrides generic predictions. Geography protection for person-name hints (`PERSON_NAME_HINTS`). Measurement disambiguation for age/height/weight.
-6. **Post-hoc locale detection:** Runs sample values against `validation_by_locale` patterns. Returns locale with highest pass rate >50%.
-7. **`is_generic` determination:** Five additive signals — attractor-demoted, numeric_postal_code_detection, boolean, hardcoded list, taxonomy designation.
+   - **Rule 19 — Percentage without '%' sign:** percentage winner + no values contain '%' → decimal_number. (NNFT-188)
+5. **Validation-based candidate elimination** (NNFT-188): After vote aggregation, validates all top candidates against JSON Schema contracts. Eliminates candidates where >50% of sample values fail validation. Safety: keeps original votes if ALL eliminated. Runs before disambiguation.
+6. **Header hints** (hardcoded first, then Model2Vec): Hardcoded `header_hint()` takes priority over Model2Vec semantic hints. Includes geography protection, measurement disambiguation, scientific measurement override (pressure/temperature/etc. → decimal_number), same-domain geo override (city↔country at ≤0.90).
+7. **Geography rescue** (NNFT-188): When Sense misroutes location columns, checks unmasked CharCNN votes. Fires only when a location type is the plurality in unmasked distribution at ≥15%. Blocked by non-location, non-person header hints.
+8. **Post-hoc locale detection:** Runs sample values against `validation_by_locale` patterns. Returns locale with highest pass rate >50%.
+9. **`is_generic` determination:** Five additive signals — attractor-demoted, numeric_postal_code_detection, boolean, hardcoded list, taxonomy designation.
 
 ### Tiered model architecture
 
@@ -145,10 +148,10 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 90.8% label (108/119), 96.6% domain (115/119) on 21 datasets.
+**Profile eval** (`eval/profile_eval.sh`) — 98.3% label (117/119), 99.2% domain (117/119) on 21 datasets.
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
-**Actionability eval** (`eval-actionability` binary) — 98.7% datetime format_string parse rate.
+**Actionability eval** (`eval-actionability` binary) — 92.7% datetime format_string parse rate (2810/3030 values). 3 columns below 95%: network_logs.timestamp, long_full_month_date, multilingual.date.
 **Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 

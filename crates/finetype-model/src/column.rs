@@ -435,6 +435,35 @@ impl ColumnClassifier {
         let mut votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
         votes.sort_by(|a, b| b.1.cmp(&a.1));
 
+        // Validation-based candidate elimination (NNFT-188): reject candidates
+        // whose JSON Schema validation contract is violated by >50% of sample
+        // values. Uses pre-compiled validators from taxonomy cache.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            let non_empty_count = sample.iter().filter(|v| !v.trim().is_empty()).count();
+            if non_empty_count >= 3 {
+                let validated: Vec<(String, usize)> = votes
+                    .iter()
+                    .filter(|(label, _)| {
+                        taxonomy
+                            .get_validator(label)
+                            .map(|validator| {
+                                let pass_count = sample
+                                    .iter()
+                                    .filter(|v| validator.is_valid(v.trim()))
+                                    .count();
+                                pass_count as f32 / non_empty_count as f32 >= 0.5
+                            })
+                            .unwrap_or(true) // no validator → keep
+                    })
+                    .cloned()
+                    .collect();
+                // Safety: if ALL eliminated, keep original votes
+                if !validated.is_empty() {
+                    votes = validated;
+                }
+            }
+        }
+
         let vote_distribution: Vec<(String, f32)> = votes
             .iter()
             .map(|(label, count)| (label.clone(), *count as f32 / n_samples as f32))
@@ -577,13 +606,17 @@ impl ColumnClassifier {
             return Ok(result);
         }
 
-        // Apply header hint: try semantic classifier first, fall back to hardcoded.
-        let hinted_type: Option<String> = self
-            .semantic_hint
-            .as_ref()
-            .and_then(|sh| sh.classify_header(header))
-            .map(|r| r.label.clone())
-            .or_else(|| header_hint(header).map(|h| h.to_string()));
+        // Apply header hint: hardcoded first (curated knowledge), then Model2Vec.
+        // Hardcoded hints have been curated through NNFT-065/091/102/127/128/156
+        // and cover known cases precisely. Model2Vec adds value for unknown headers
+        // but can override correct hardcoded mappings (NNFT-188).
+        let hinted_type: Option<String> =
+            header_hint(header).map(|h| h.to_string()).or_else(|| {
+                self.semantic_hint
+                    .as_ref()
+                    .and_then(|sh| sh.classify_header(header))
+                    .map(|r| r.label.clone())
+            });
 
         if let Some(hinted_type) = hinted_type.as_deref() {
             // If the model already predicts the hinted type, just boost confidence
@@ -601,6 +634,10 @@ impl ColumnClassifier {
                 "identity.person.height",
                 "identity.person.weight",
             ];
+            const COORDINATE_TYPES: &[&str] = &[
+                "geography.coordinate.latitude",
+                "geography.coordinate.longitude",
+            ];
             if MEASUREMENT_TYPES.contains(&hinted_type)
                 && MEASUREMENT_TYPES.contains(&result.label.as_str())
             {
@@ -609,6 +646,21 @@ impl ColumnClassifier {
                 result.disambiguation_applied = true;
                 result.disambiguation_rule =
                     Some(format!("header_hint_measurement:{}", header.to_lowercase()));
+                return Ok(result);
+            }
+            // Scientific measurement override (NNFT-188): header contains
+            // measurement keywords (pressure, temperature, etc.) and model
+            // predicts latitude/longitude. Header is authoritative.
+            if hinted_type == "representation.numeric.decimal_number"
+                && COORDINATE_TYPES.contains(&result.label.as_str())
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.8;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_sci_measurement:{}",
+                    header.to_lowercase()
+                ));
                 return Ok(result);
             }
 
@@ -669,6 +721,23 @@ impl ColumnClassifier {
                         }
                     }
                 }
+            }
+
+            // Same-domain geographic override (NNFT-188): when both the hint
+            // and prediction are location types, trust the header name.
+            if LOCATION_TYPES.contains(&hinted_type)
+                && LOCATION_TYPES.contains(&result.label.as_str())
+                && result.label != hinted_type
+                && result.confidence <= 0.90
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_geo_override:{}",
+                    header.to_lowercase()
+                ));
+                return Ok(result);
             }
 
             let original_label = result.label.clone();
@@ -789,6 +858,18 @@ impl ColumnClassifier {
             }
         }
 
+        // Save unmasked vote distribution for geography rescue (Step 6, NNFT-188).
+        // Must be saved BEFORE masking, as masked votes won't contain location
+        // types when Sense routes to Entity category.
+        let unmasked_votes: Vec<(String, usize)> = {
+            let mut v: Vec<(String, usize)> = vote_counts_3level
+                .iter()
+                .map(|(k, v)| (k.clone(), *v))
+                .collect();
+            v.sort_by(|a, b| b.1.cmp(&a.1));
+            v
+        };
+
         // Step 5: Masked vote aggregation — only count votes for types
         // eligible under the Sense-predicted category.
         let category = sense_result.broad_category;
@@ -815,13 +896,44 @@ impl ColumnClassifier {
         let should_fallback = masked_votes.is_empty()
             || masked_votes[0].1 == 0
             || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4);
-        let (votes, mask_applied) = if should_fallback {
+        let (mut votes, mask_applied) = if should_fallback {
             let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
             all_votes.sort_by(|a, b| b.1.cmp(&a.1));
             (all_votes, false)
         } else {
             (masked_votes, true)
         };
+
+        // Validation-based candidate elimination (NNFT-188): reject candidates
+        // whose JSON Schema validation contract is violated by >50% of sample
+        // values. The type's own contract becomes the arbiter — if a type says
+        // its values look like `^\d{4}-\d{2}-\d{2}T...` and 100% of the column's
+        // values fail that pattern, the model is wrong regardless of confidence.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            let non_empty_count = sample.iter().filter(|v| !v.trim().is_empty()).count();
+            if non_empty_count >= 3 {
+                let validated: Vec<(String, usize)> = votes
+                    .iter()
+                    .filter(|(label, _)| {
+                        taxonomy
+                            .get_validator(label)
+                            .map(|validator| {
+                                let pass_count = sample
+                                    .iter()
+                                    .filter(|v| validator.is_valid(v.trim()))
+                                    .count();
+                                pass_count as f32 / non_empty_count as f32 >= 0.5
+                            })
+                            .unwrap_or(true) // no validator → keep
+                    })
+                    .cloned()
+                    .collect();
+                // Safety: if ALL eliminated, keep original votes
+                if !validated.is_empty() {
+                    votes = validated;
+                }
+            }
+        }
 
         let vote_distribution: Vec<(String, f32)> = votes
             .iter()
@@ -913,6 +1025,34 @@ impl ColumnClassifier {
             }
         }
 
+        // Step 7b: Geography rescue from unmasked votes (NNFT-188).
+        // When Sense misroutes (e.g., country names → Temporal or Entity),
+        // location types get masked out. Check unmasked CharCNN votes for
+        // geography signal. Only fire when location types are the PLURALITY
+        // (top vote) in unmasked votes — this ensures CharCNN genuinely sees
+        // geography, not just incidental location votes from text overlap.
+        // Skip when a hardcoded header hint points to a specific non-location,
+        // non-person type (e.g., "publisher" → entity_name should not be
+        // overridden). Person-name hints (full_name, first_name, etc.) are
+        // ambiguous with location names so we still allow rescue for those.
+        let header_hint_blocks_rescue = header_hint(header)
+            .is_some_and(|h| !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h));
+        if !LOCATION_TYPES.contains(&result.label.as_str()) && !header_hint_blocks_rescue {
+            // Check if a location type is the #1 vote in unmasked distribution
+            if let Some((top_label, top_count)) = unmasked_votes.first() {
+                if LOCATION_TYPES.contains(&top_label.as_str()) {
+                    let loc_frac = *top_count as f32 / n_samples as f32;
+                    if loc_frac >= 0.15 {
+                        result.label = top_label.clone();
+                        result.confidence = loc_frac.max(0.5);
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule =
+                            Some(format!("sense_geo_rescue:{}", header.to_lowercase()));
+                    }
+                }
+            }
+        }
+
         // Step 8: Header hint application (complements Sense masking).
         // Sense narrows the broad category, but header hints resolve
         // within-category ambiguity. Skipped when Sense entity demotion
@@ -922,12 +1062,14 @@ impl ColumnClassifier {
             .as_ref()
             .is_some_and(|r| r.starts_with("sense_entity_demotion"));
         if !entity_demoted && !header.is_empty() {
-            let hinted_type: Option<String> = self
-                .semantic_hint
-                .as_ref()
-                .and_then(|sh| sh.classify_header(header))
-                .map(|r| r.label.clone())
-                .or_else(|| header_hint(header).map(|h| h.to_string()));
+            // Hardcoded first (curated knowledge), then Model2Vec (NNFT-188).
+            let hinted_type: Option<String> =
+                header_hint(header).map(|h| h.to_string()).or_else(|| {
+                    self.semantic_hint
+                        .as_ref()
+                        .and_then(|sh| sh.classify_header(header))
+                        .map(|r| r.label.clone())
+                });
 
             if let Some(hinted_type) = hinted_type.as_deref() {
                 // Already predicts the hinted type — boost confidence
@@ -940,6 +1082,11 @@ impl ColumnClassifier {
                         "identity.person.height",
                         "identity.person.weight",
                     ];
+                    // Coordinate types that can be confused with measurement data
+                    const COORDINATE_TYPES: &[&str] = &[
+                        "geography.coordinate.latitude",
+                        "geography.coordinate.longitude",
+                    ];
                     if MEASUREMENT_TYPES.contains(&hinted_type)
                         && MEASUREMENT_TYPES.contains(&result.label.as_str())
                     {
@@ -948,6 +1095,22 @@ impl ColumnClassifier {
                         result.disambiguation_applied = true;
                         result.disambiguation_rule = Some(format!(
                             "sense_header_hint_measurement:{}",
+                            header.to_lowercase()
+                        ));
+                    } else if hinted_type == "representation.numeric.decimal_number"
+                        && COORDINATE_TYPES.contains(&result.label.as_str())
+                    {
+                        // Scientific measurement override (NNFT-188): when the
+                        // header contains measurement keywords (pressure,
+                        // temperature, etc.) and the model predicts latitude/
+                        // longitude, the header is authoritative. Small decimal
+                        // values like pressure_atm (0.685-9.544) are in latitude
+                        // range but the header says "pressure", not "latitude".
+                        result.label = hinted_type.to_string();
+                        result.confidence = 0.8;
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule = Some(format!(
+                            "sense_header_hint_sci_measurement:{}",
                             header.to_lowercase()
                         ));
                     } else {
@@ -998,6 +1161,26 @@ impl ColumnClassifier {
                                     }
                                 }
                             }
+                        }
+
+                        // Same-domain geographic override (NNFT-188): when both
+                        // the hint and prediction are location types (e.g., city vs
+                        // country), allow override at higher confidence (≤0.90) since
+                        // header names like "Country" are authoritative for geo types.
+                        if !geo_handled
+                            && LOCATION_TYPES.contains(&hinted_type)
+                            && LOCATION_TYPES.contains(&result.label.as_str())
+                            && result.label != hinted_type
+                            && result.confidence <= 0.90
+                        {
+                            result.label = hinted_type.to_string();
+                            result.confidence = result.confidence.max(0.6);
+                            result.disambiguation_applied = true;
+                            result.disambiguation_rule = Some(format!(
+                                "sense_header_hint_geo_override:{}",
+                                header.to_lowercase()
+                            ));
+                            geo_handled = true;
                         }
 
                         // General hint logic (runs for all non-person hints,
@@ -1215,6 +1398,23 @@ fn disambiguate(
     {
         if let Some((label, rule)) = disambiguate_si_number(values) {
             return Some((label, rule));
+        }
+    }
+
+    // Rule 19: Percentage without '%' sign → decimal_number (NNFT-188).
+    // When percentage wins the vote but no values contain a '%' character, the
+    // prediction is based purely on numeric range overlap (small decimals look
+    // like percentages). Real percentage columns have explicit "35.36%" values.
+    if top_labels
+        .first()
+        .is_some_and(|l| *l == "representation.numeric.percentage")
+    {
+        let has_pct_sign = values.iter().any(|v| v.contains('%'));
+        if !has_pct_sign {
+            return Some((
+                "representation.numeric.decimal_number".to_string(),
+                "percentage_no_sign".to_string(),
+            ));
         }
     }
 
@@ -1819,6 +2019,14 @@ fn header_hint(header: &str) -> Option<&'static str> {
         | "gmtoffset" => {
             return Some("datetime.offset.utc");
         }
+        // IANA timezone columns (NNFT-188)
+        "timezone" | "tz" | "time zone" | "iana timezone" | "iana tz" | "olson timezone" => {
+            return Some("datetime.offset.iana");
+        }
+        // Publisher / publishing (NNFT-188)
+        "publisher" | "publishing house" | "published by" => {
+            return Some("representation.text.entity_name");
+        }
         // Financial code columns (cvv removed in v0.5.1)
         "swift" | "swift code" | "bic" | "bic code" | "swiftcode" | "biccode" => {
             return Some("finance.banking.swift_bic");
@@ -1930,6 +2138,22 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("representation.alphanumeric.alphanumeric_id");
     }
     if h.contains("fare") || h.contains("fee") || h.contains("charge") || h.contains("toll") {
+        return Some("representation.numeric.decimal_number");
+    }
+    // Scientific / engineering measurement keywords → decimal_number (NNFT-188).
+    // Numeric measurement columns like "pressure_atm" get misclassified as
+    // latitude when values fall in [-90, 90]. Header keywords disambiguate.
+    if h.contains("pressure")
+        || h.contains("temperature")
+        || h.contains("voltage")
+        || h.contains("density")
+        || h.contains("velocity")
+        || h.contains("acceleration")
+        || h.contains("frequency")
+        || h.contains("resistance")
+        || h.contains("capacitance")
+        || h.contains("inductance")
+    {
         return Some("representation.numeric.decimal_number");
     }
 
@@ -6128,5 +6352,152 @@ datetime.component.day_of_week:
             "Expected entity_name or full_name, got: {}",
             result.label
         );
+    }
+
+    // ==========================================================================
+    // NNFT-188: Accuracy improvements — new rule tests
+    // ==========================================================================
+
+    #[test]
+    fn test_rule19_percentage_no_sign_demotes_to_decimal() {
+        // Values that look like percentages by range but have no '%' sign
+        // should be classified as decimal_number, not percentage.
+        let values: Vec<String> = vec!["5.1", "3.5", "1.4", "0.2", "4.9"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let results: Vec<ClassificationResult> = values
+            .iter()
+            .map(|_| ClassificationResult {
+                label: "representation.numeric.percentage".to_string(),
+                confidence: 0.8,
+                all_scores: vec![],
+            })
+            .collect();
+
+        let votes = vec![
+            ("representation.numeric.percentage".to_string(), 4),
+            ("representation.numeric.decimal_number".to_string(), 1),
+        ];
+
+        let result = disambiguate(&values, &results, &votes, 5, None);
+        assert!(
+            result.is_some(),
+            "Rule 19 should fire for percentage without '%'"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.decimal_number");
+        assert_eq!(rule, "percentage_no_sign");
+    }
+
+    #[test]
+    fn test_rule19_percentage_with_sign_keeps_percentage() {
+        // Values with actual '%' signs should stay as percentage
+        let values: Vec<String> = vec!["35.36%", "12.5%", "98.1%", "0.5%", "100%"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let results: Vec<ClassificationResult> = values
+            .iter()
+            .map(|_| ClassificationResult {
+                label: "representation.numeric.percentage".to_string(),
+                confidence: 0.9,
+                all_scores: vec![],
+            })
+            .collect();
+
+        let votes = vec![("representation.numeric.percentage".to_string(), 5)];
+
+        let result = disambiguate(&values, &results, &votes, 5, None);
+        // Rule 19 should NOT fire — values have '%'
+        assert!(
+            result.is_none()
+                || result
+                    .as_ref()
+                    .map(|(_, r)| r != "percentage_no_sign")
+                    .unwrap_or(true),
+            "Rule 19 should NOT fire when values contain '%'"
+        );
+    }
+
+    #[test]
+    fn test_header_hint_timezone() {
+        assert_eq!(
+            header_hint("timezone"),
+            Some("datetime.offset.iana"),
+            "timezone should hint to iana"
+        );
+        assert_eq!(
+            header_hint("tz"),
+            Some("datetime.offset.iana"),
+            "tz should hint to iana"
+        );
+        assert_eq!(
+            header_hint("time_zone"),
+            Some("datetime.offset.iana"),
+            "time_zone (with underscore) should hint to iana"
+        );
+    }
+
+    #[test]
+    fn test_header_hint_publisher() {
+        assert_eq!(
+            header_hint("publisher"),
+            Some("representation.text.entity_name"),
+            "publisher should hint to entity_name"
+        );
+    }
+
+    #[test]
+    fn test_header_hint_measurement_keywords() {
+        assert_eq!(
+            header_hint("pressure_atm"),
+            Some("representation.numeric.decimal_number"),
+            "pressure_atm should hint to decimal_number"
+        );
+        assert_eq!(
+            header_hint("temperature"),
+            Some("representation.numeric.decimal_number"),
+            "temperature should hint to decimal_number"
+        );
+        assert_eq!(
+            header_hint("voltage"),
+            Some("representation.numeric.decimal_number"),
+            "voltage should hint to decimal_number"
+        );
+    }
+
+    #[test]
+    fn test_header_hint_priority_hardcoded_first() {
+        // "job_title" has a hardcoded hint → categorical
+        // Model2Vec might return entity_name for this header
+        // With hardcoded-first, header_hint should win
+        assert_eq!(
+            header_hint("job_title"),
+            Some("representation.discrete.categorical"),
+            "job_title should hint to categorical (hardcoded)"
+        );
+        assert_eq!(
+            header_hint("occupation"),
+            Some("representation.discrete.categorical"),
+            "occupation should hint to categorical (hardcoded)"
+        );
+    }
+
+    #[test]
+    fn test_geo_override_same_domain() {
+        // When both hint and prediction are location types, the hint should win
+        // at ≤0.90 confidence (higher threshold than generic 0.50)
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.city"),
+            "city must be a location type"
+        );
+        assert!(
+            LOCATION_TYPES.contains(&"geography.location.country"),
+            "country must be a location type"
+        );
+        // Both city and country are location types — same-domain override should apply
     }
 }
