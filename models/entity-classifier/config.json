@@ -1,34 +1,42 @@
 {
   "architecture": "deep_sets_mlp",
-  "version": "v1",
-  "feature_dim": 300,
-  "embed_dim": 128,
-  "n_stat_features": 44,
-  "hidden_dim": 256,
-  "n_classes": 4,
-  "dropout": 0.2,
-  "classes": [
+  "best_epoch": 22,
+  "class_labels": [
     "person",
     "place",
     "organization",
     "creative_work"
   ],
-  "person_class_index": 0,
-  "demotion_threshold": 0.6,
-  "model2vec": "minishlab/potion-base-4M",
-  "label_map": {
-    "Person": "person",
-    "Person/name": "person",
-    "MusicArtistAT": "person",
-    "Place": "place",
-    "addressLocality": "place",
-    "Organization": "organization",
-    "LocalBusiness/name": "organization",
-    "MusicAlbum": "creative_work",
-    "MusicRecording/name": "creative_work",
-    "Event/name": "creative_work",
-    "CreativeWork": "creative_work"
+  "demotion_analysis": {
+    "note": "Full threshold analysis requires inference pass (see binary output)",
+    "val_class_distribution": {
+      "creative_work": 29,
+      "organization": 50,
+      "person": 32,
+      "place": 65
+    },
+    "val_nonperson_count": 144,
+    "val_person_count": 32
   },
+  "demotion_threshold": 0.6,
+  "dropout": 0.2,
+  "feature_layout": {
+    "emb_mean": {
+      "end": 128,
+      "start": 0
+    },
+    "emb_std": {
+      "end": 256,
+      "start": 128
+    },
+    "stat_features": {
+      "end": 300,
+      "start": 256
+    }
+  },
+  "hidden_dim": 256,
+  "input_dim": 300,
+  "n_classes": 4,
   "stat_feature_names": [
     "mean_len",
     "std_len",
@@ -75,61 +83,9 @@
     "max_value_len",
     "max_word_count"
   ],
-  "feature_layout": {
-    "emb_mean": {
-      "start": 0,
-      "end": 128
-    },
-    "emb_std": {
-      "start": 128,
-      "end": 256
-    },
-    "stat_features": {
-      "start": 256,
-      "end": 300
-    }
-  },
-  "train_size": 2911,
-  "test_size": 2117,
-  "test_accuracy_4class": 0.7576759565422768,
-  "cv_accuracy": null,
-  "demotion_analysis": {
-    "0.3": {
-      "n_demoted": 1557,
-      "coverage": 0.73547472838923,
-      "precision": 0.8946692357096981,
-      "wrong_demotions": 164
-    },
-    "0.4": {
-      "n_demoted": 1518,
-      "coverage": 0.7170524326877658,
-      "precision": 0.9044795783926218,
-      "wrong_demotions": 145
-    },
-    "0.5": {
-      "n_demoted": 1473,
-      "coverage": 0.6957959376476146,
-      "precision": 0.9124236252545825,
-      "wrong_demotions": 129
-    },
-    "0.6": {
-      "n_demoted": 1395,
-      "coverage": 0.6589513462446859,
-      "precision": 0.9218637992831541,
-      "wrong_demotions": 109
-    },
-    "0.7": {
-      "n_demoted": 1330,
-      "coverage": 0.6282475200755786,
-      "precision": 0.9255639097744361,
-      "wrong_demotions": 99
-    },
-    "0.8": {
-      "n_demoted": 1253,
-      "coverage": 0.5918752952290978,
-      "precision": 0.9353551476456504,
-      "wrong_demotions": 81
-    }
-  },
-  "usage": "Binary demotion gate: when CharCNN votes full_name, compute features for the column, run MLP forward pass, if max non-person class probability > 0.6, demote to entity_name."
+  "test_accuracy": 0.7443181872367859,
+  "test_size": 176,
+  "total_epochs": 38,
+  "train_size": 1569,
+  "training_time_secs": 6.32203483581543
 }

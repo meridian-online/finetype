@@ -20,26 +20,26 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.5.0 (latest tag: `v0.5.0`)
-**Taxonomy:** 166 definitions across 7 domains (v0.5.1: finance domain, identifier category) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI), tiered-v2 fallback via `--sharp-only`, char-cnn-v7 flat (DuckDB extension)
-**Codebase:** ~20k lines of Rust across 7 crates (including finetype-train for pure Rust ML training)
-**CI status:** All checks pass (fmt, clippy, test, taxonomy check, smoke tests)
+**Version:** 0.5.1
+**Taxonomy:** 164 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 16, identity: 20, representation: 31, technology: 24) — all generators pass, 100% alignment
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v9 flat (164 classes), tiered-v2 fallback via `--sharp-only`
+**Codebase:** ~20k lines of Rust across 7 crates (including finetype-train for pure Rust ML training). Zero Python runtime dependencies.
+**CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
-- **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries: train-sense-model, train-entity-classifier, prepare-sense-data, prepare-model2vec. Dual-format SenseClassifier supports both Python-trained (MHA) and Rust-trained (simple attention) models. Rust model achieves 100% accuracy parity with Python. 253 tests pass.
-- **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category, 5 new types (IBAN, currency_amount, html_content, locale_number, alphanumeric_code), 2 removals (cvv, century). 166 types across 7 domains.
-- **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Fixed L2-normalisation mismatch in Model2Vec, integrated header hints into Sense pipeline, added coordinate disambiguation guard and low-confidence safety valve. Sense is now the default pipeline.
-- **Phase 3 Rust implementation** (NNFT-165–172) — Full Sense→Sharpen pipeline: shared Model2Vec, Candle-ported SenseClassifier, LabelCategoryMap, pipeline integration, build system + CLI loading, A/B evaluation infrastructure.
+- **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers. Removed `technology.hardware.screen_size` and `technology.hardware.ram_size`. Profile eval: 108/119 (90.8% label, 96.6% domain). `remap_collapsed_label()` eliminated — models now natively produce 164-class outputs.
+- **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries: train-sense-model, train-entity-classifier, prepare-sense-data, prepare-model2vec. Dual-format SenseClassifier supports both Python-trained (MHA) and Rust-trained (simple attention) models. 253 tests pass.
+- **Python cleanup** (NNFT-186) — Removed 11 Python files. Only remaining python3 call: DuckDB extension metadata script.
+- **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category. Net: +3 types (IBAN, currency amounts, html_content, locale_number, alphanumeric_code added; cvv, century, screen_size, ram_size removed). 164 types across 7 domains.
+- **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Sense is the default pipeline.
 - **Entity classifier** (NNFT-151/152) — Deep Sets MLP demotes full_name → entity_name for non-person columns.
 
 ### What's in progress
 
-- **Pure Rust Return** (NNFT-182–187) — Eliminating Python from codebase. Phase 0 spike ✅. Phase A: build tools ✅ (NNFT-183). Phase B: eval infrastructure ✅ (NNFT-184). Phase C: Candle training ✅ (NNFT-185). Phase D: cleanup (NNFT-186, not started). Candle 0.8 with `half = "2.4"` pin.
-- **Model retraining for v0.5.1 taxonomy** (NNFT-181) — Retrain model to include new finance/identifier types from v0.5.1 taxonomy. Not yet started. Current profile eval: 109/119 (91.6%) — regression from 116/120 caused by taxonomy changes, not model.
-- **Next accuracy targets** — Profile eval 109/119 after taxonomy v0.5.1. Known misses: swift_code (SEDOL overcall), countries.name (entity demotion), people_directory.company (categorical vs entity_name), books_catalog.publisher (city vs entity_name). Additional misses from taxonomy v0.5.1 schema mapping drift. **Model state:** v0.3.0 models (169 types) + `remap_collapsed_label()` bridging to 166-type taxonomy.
+- **Accuracy improvements** — Profile eval 108/119. Known misses: iris decimals (→percentage), country/city names (→full_name), timezone (→iso_microseconds). Follow-up task pending.
+- **Next accuracy targets** — Profile eval 108/119 (90.8% label, 96.6% domain). Known misses: iris decimals (percentage overcall ×4), countries/world_cities name (full_name vs country/city ×2), airports timezone (iso_microseconds vs iana), pressure_atm (latitude vs decimal_number), publisher (gender vs entity_name), covid Country (city vs country), job_title (entity_name vs categorical). **Model state:** v0.5.1 models (164 types), native label output, no remapping.
 
 ## Architecture
 
@@ -145,7 +145,7 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 96.7% label (116/120), 98.3% domain (118/120) on 21 datasets.
+**Profile eval** (`eval/profile_eval.sh`) — 90.8% label (108/119), 96.6% domain (115/119) on 21 datasets.
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
 **Actionability eval** (`eval-actionability` binary) — 98.7% datetime format_string parse rate.
@@ -165,11 +165,10 @@ GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable c
 
 ## Priority Order
 
-1. **Pure Rust Return** — Phases A→B→C→D: replace Python build/eval/training with Rust + Candle (NNFT-183–186)
-2. **Model retraining for v0.5.1** — Retrain with new taxonomy types (NNFT-181)
-3. **Accuracy lift** — Address remaining misclassifications (NNFT-090, NNFT-099, NNFT-100)
-4. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
-5. **Distribution** — Homebrew tap, crates.io current
+1. **Accuracy lift** — Address remaining 11 misclassifications: iris/percentage overcall, entity/location confusion, timezone misclassification
+2. **DuckDB extension metadata** — Replace last Python script in build chain (NNFT-183)
+3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
+4. **Distribution** — Homebrew tap, crates.io current, v0.5.1 release
 
 ## Decided Items
 

@@ -47,28 +47,6 @@ fn strip_locale_suffix(label: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Remap labels for types collapsed in Phase 0 taxonomy audit (NNFT-162).
-/// The v0.3.0 models still predict these labels; this function maps them
-/// to their new target types before vote aggregation.
-fn remap_collapsed_label(label: &str) -> &str {
-    match label {
-        // Product/technology descriptors → entity_name
-        "technology.hardware.cpu" => "representation.text.entity_name",
-        "technology.hardware.generation" => "representation.text.entity_name",
-        // Named entities
-        "identity.academic.university" => "representation.text.entity_name",
-        // Enumerated categories
-        "identity.academic.degree" => "representation.discrete.categorical",
-        "identity.person.nationality" => "representation.discrete.categorical",
-        "identity.person.occupation" => "representation.discrete.categorical",
-        // Niche format types
-        "technology.internet.slug" => "representation.identifier.alphanumeric_id",
-        // URI merged into URL (37% training overlap, NNFT-161)
-        "technology.internet.uri" => "technology.internet.url",
-        _ => label,
-    }
-}
-
 /// All known boolean type labels (current and legacy).
 /// Centralised to avoid label mismatches across disambiguation rules.
 const BOOLEAN_LABELS: &[&str] = &[
@@ -435,18 +413,18 @@ impl ColumnClassifier {
         // Step 2: Run batch inference
         let results = self.classifier.classify_batch(&sample)?;
 
-        // Step 3: Aggregate votes — collapse 4-level locale labels to 3-level
-        // Remap labels for types collapsed in Phase 0 (NNFT-162).
+        // Step 3: Aggregate votes — collapse 4-level locale labels to 3-level.
         // Track both 3-level type votes and locale distribution within each type.
         let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
         let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new(); // 3-level → locale → count
         for result in &results {
             let (base_label, locale) = strip_locale_suffix(&result.label);
-            let remapped = remap_collapsed_label(base_label);
-            *vote_counts_3level.entry(remapped.to_string()).or_default() += 1;
+            *vote_counts_3level
+                .entry(base_label.to_string())
+                .or_default() += 1;
             if let Some(loc) = locale {
                 *locale_votes
-                    .entry(remapped.to_string())
+                    .entry(base_label.to_string())
                     .or_default()
                     .entry(loc.to_string())
                     .or_default() += 1;
@@ -600,13 +578,12 @@ impl ColumnClassifier {
         }
 
         // Apply header hint: try semantic classifier first, fall back to hardcoded.
-        // Remap collapsed labels (NNFT-162) from both sources.
         let hinted_type: Option<String> = self
             .semantic_hint
             .as_ref()
             .and_then(|sh| sh.classify_header(header))
-            .map(|r| remap_collapsed_label(&r.label).to_string())
-            .or_else(|| header_hint(header).map(|h| remap_collapsed_label(h).to_string()));
+            .map(|r| r.label.clone())
+            .or_else(|| header_hint(header).map(|h| h.to_string()));
 
         if let Some(hinted_type) = hinted_type.as_deref() {
             // If the model already predicts the hinted type, just boost confidence
@@ -747,11 +724,10 @@ impl ColumnClassifier {
     /// 1. Sample 100 values → encode header + first 50 with Model2Vec
     /// 2. Run Sense for broad category + entity subtype
     /// 3. Run CharCNN batch on all 100 values
-    /// 4. Remap collapsed labels
-    /// 5. Masked vote aggregation (only category-eligible labels count)
-    /// 6. Disambiguation rules (scoped to winning category)
-    /// 7. Entity demotion via Sense subtype (replaces Rule 18 + EntityClassifier)
-    /// 8. Post-hoc locale detection
+    /// 4. Masked vote aggregation (only category-eligible labels count)
+    /// 5. Disambiguation rules (scoped to winning category)
+    /// 6. Entity demotion via Sense subtype (replaces Rule 18 + EntityClassifier)
+    /// 7. Post-hoc locale detection
     fn classify_sense_sharpen(
         &self,
         values: &[String],
@@ -796,17 +772,17 @@ impl ColumnClassifier {
         // Step 3: Run CharCNN batch on all sampled values
         let results = self.classifier.classify_batch(&sample)?;
 
-        // Step 4: Aggregate votes — collapse 4-level locale labels to 3-level
-        // Remap labels for types collapsed in Phase 0 (NNFT-162).
+        // Step 4: Aggregate votes — collapse 4-level locale labels to 3-level.
         let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
         let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new();
         for result in &results {
             let (base_label, locale) = strip_locale_suffix(&result.label);
-            let remapped = remap_collapsed_label(base_label);
-            *vote_counts_3level.entry(remapped.to_string()).or_default() += 1;
+            *vote_counts_3level
+                .entry(base_label.to_string())
+                .or_default() += 1;
             if let Some(loc) = locale {
                 *locale_votes
-                    .entry(remapped.to_string())
+                    .entry(base_label.to_string())
                     .or_default()
                     .entry(loc.to_string())
                     .or_default() += 1;
@@ -950,8 +926,8 @@ impl ColumnClassifier {
                 .semantic_hint
                 .as_ref()
                 .and_then(|sh| sh.classify_header(header))
-                .map(|r| remap_collapsed_label(&r.label).to_string())
-                .or_else(|| header_hint(header).map(|h| remap_collapsed_label(h).to_string()));
+                .map(|r| r.label.clone())
+                .or_else(|| header_hint(header).map(|h| h.to_string()));
 
             if let Some(hinted_type) = hinted_type.as_deref() {
                 // Already predicts the hinted type — boost confidence

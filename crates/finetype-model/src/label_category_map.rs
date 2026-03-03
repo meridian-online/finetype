@@ -1,15 +1,15 @@
 //! Label → Sense BroadCategory mapping for output masking (NNFT-169).
 //!
-//! Maps all 161 FineType type labels to their primary `BroadCategory`.
+//! Maps all 166 FineType type labels to their primary `BroadCategory`.
 //! Used during column classification to mask CharCNN predictions to
 //! the Sense-predicted category.
 //!
 //! Categories:
 //!   temporal (45) — all `datetime.*`
-//!   numeric (13) — numeric values, measurements, small integers
+//!   numeric (14) — numeric values, measurements, currency amounts
 //!   geographic (16) — all `geography.*`
 //!   entity (9) — person names, entity names
-//!   format (49) — structured identifiers, codes, sequences
+//!   format (51) — structured identifiers, codes, sequences
 //!   text (29) — free text, low-cardinality enums, categorical
 
 use crate::sense::BroadCategory;
@@ -67,17 +67,18 @@ const TEMPORAL_LABELS: &[&str] = &[
 ];
 
 const NUMERIC_LABELS: &[&str] = &[
+    "finance.currency.amount_eu",
+    "finance.currency.amount_us",
     "identity.person.age",
     "identity.person.height",
     "identity.person.weight",
     "representation.file.file_size",
     "representation.numeric.decimal_number",
+    "representation.numeric.decimal_number_eu",
     "representation.numeric.integer_number",
     "representation.numeric.percentage",
     "representation.numeric.scientific_notation",
     "representation.numeric.si_number",
-    "technology.hardware.ram_size",
-    "technology.hardware.screen_size",
     "technology.internet.http_status_code",
     "technology.internet.port",
 ];
@@ -122,11 +123,13 @@ const FORMAT_LABELS: &[&str] = &[
     "container.key_value.form_data",
     "container.key_value.query_string",
     "container.object.csv",
+    "container.object.html",
     "container.object.json",
     "container.object.json_array",
     "container.object.xml",
     "container.object.yaml",
     // finance.* (moved from identity.payment in v0.5.1, NNFT-179)
+    "finance.banking.iban",
     "finance.banking.swift_bic",
     "finance.crypto.bitcoin_address",
     "finance.crypto.ethereum_address",
@@ -355,22 +358,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_161() {
+    fn test_total_is_164() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 161, "Map should contain exactly 161 types");
+        assert_eq!(map.len(), 164, "Map should contain exactly 164 types");
     }
 
     #[test]
     fn test_category_counts() {
         assert_eq!(TEMPORAL_LABELS.len(), 45, "temporal should have 45 types");
-        assert_eq!(NUMERIC_LABELS.len(), 13, "numeric should have 13 types");
+        assert_eq!(NUMERIC_LABELS.len(), 14, "numeric should have 14 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
             16,
             "geographic should have 16 types"
         );
         assert_eq!(ENTITY_LABELS.len(), 9, "entity should have 9 types");
-        assert_eq!(FORMAT_LABELS.len(), 49, "format should have 49 types");
+        assert_eq!(FORMAT_LABELS.len(), 51, "format should have 51 types");
         assert_eq!(TEXT_LABELS.len(), 29, "text should have 29 types");
     }
 
@@ -474,16 +477,16 @@ mod tests {
         );
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);
-        // 13 primary + 3 incoming (coordinates, latitude, longitude)
-        assert_eq!(numeric.len(), 16, "numeric eligible should be 13+3=16");
+        // 14 primary + 3 incoming (coordinates, latitude, longitude)
+        assert_eq!(numeric.len(), 17, "numeric eligible should be 14+3=17");
 
         let entity = map.eligible_labels(BroadCategory::Entity);
         // 9 primary + 2 incoming (email, phone_number)
         assert_eq!(entity.len(), 11, "entity eligible should be 9+2=11");
 
         let format = map.eligible_labels(BroadCategory::Format);
-        // 49 primary + 3 incoming (postal_code, calling_code, credit_card_network)
-        assert_eq!(format.len(), 52, "format eligible should be 49+3=52");
+        // 51 primary + 3 incoming (postal_code, calling_code, credit_card_network)
+        assert_eq!(format.len(), 54, "format eligible should be 51+3=54");
 
         let text = map.eligible_labels(BroadCategory::Text);
         assert_eq!(

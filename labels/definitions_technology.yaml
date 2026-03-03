@@ -829,74 +829,13 @@ technology.development.os:
 # technology.hardware.cpu: REMOVED in Phase 0 (NNFT-162)
 # Collapsed into representation.text.entity_name. Product names, not structurally detectable.
 
-technology.hardware.ram_size:
-  title: "RAM Size"
-  description: >
-    Memory (RAM) capacity with unit (e.g., 16GB, 8192MB, 32 GB).
-    Transforms to BIGINT (bytes) when specified with unit.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: BIGINT
-  format_string: null
-  transform: >
-    CASE
-      WHEN UPPER({col}) LIKE '%GB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS BIGINT) * 1024 * 1024 * 1024
-      WHEN UPPER({col}) LIKE '%MB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS BIGINT) * 1024 * 1024
-      WHEN UPPER({col}) LIKE '%KB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS BIGINT) * 1024
-      ELSE CAST({col} AS BIGINT)
-    END
-  transform_ext: null
-  decompose:
-    size: "CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)"
-    unit: "UPPER(REGEXP_EXTRACT({col}, '([A-Z]+)$'))"
-  validation:
-    type: string
-    pattern: "^[0-9]+(\\.[0-9]+)?\\s*(GB|MB|KB|TB)$"
-  tier: [BIGINT, hardware]
-  release_priority: 3
-  aliases: [memory_size]
-  samples:
-    - "16GB"
-    - "8192MB"
-    - "32 GB"
-    - "1TB"
-  references: null
-  notes: >
-    v1 migration: Was hardware.ram_size. Transform converts to bytes. Decompose
-    extracts size and unit separately.
+# technology.hardware.ram_size: REMOVED in v0.5.1 (NNFT-181)
+# Confusable attractor — "16GB" looks like decimal_number to flat CharCNN.
+# Values with units (16GB, 8192MB) are better handled as measurement_unit + decimal.
 
-technology.hardware.screen_size:
-  title: "Screen Size"
-  description: >
-    Display size in inches or centimeters (e.g., 15.6", 27 inches, 24.0cm).
-    Transforms to DOUBLE (inches). Decompose extracts size and unit.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: DOUBLE
-  format_string: null
-  transform: >
-    CASE
-      WHEN UPPER({col}) LIKE '%CM%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) / 2.54
-      ELSE CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
-    END
-  transform_ext: null
-  decompose:
-    size: "CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)"
-    unit: "UPPER(REGEXP_EXTRACT({col}, '(IN|CM|INCH|\"|\\'')$'))"
-  validation:
-    type: string
-    pattern: "^[0-9]+(\\.[0-9]+)?\\s*(in|cm|inches|INCHES|CM|IN|\"|\\')?$"
-  tier: [DOUBLE, hardware]
-  release_priority: 3
-  aliases: null
-  samples:
-    - "15.6 inches"
-    - "27\""
-    - "24.0cm"
-    - "13.3in"
-  references: null
-  notes: >
-    v1 migration: Was hardware.screen_size. Transform converts to inches.
+# technology.hardware.screen_size: REMOVED in v0.5.1 (NNFT-181)
+# Confusable attractor — bare decimal values (5.1, 13.3) indistinguishable from decimal_number.
+# Values with units (15.6 inches) are better handled as measurement_unit + decimal.
 
 # technology.hardware.generation: REMOVED in Phase 0 (NNFT-162)
 # Collapsed into representation.text.entity_name. Product/technology descriptors, no format signal.

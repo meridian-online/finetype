@@ -58,10 +58,9 @@ enum Commands {
         #[arg(short, long)]
         value: bool,
 
-        /// Model type: tiered (168 types, ~600 val/sec) or char-cnn (168 types, ~1500 val/sec).
-        /// Tiered uses 34 models in a T0→T1→T2 cascade for higher accuracy.
-        /// Use char-cnn for maximum throughput on large datasets.
-        #[arg(long, default_value = "tiered")]
+        /// Model type: char-cnn (166 types, default) or tiered (legacy 34-model cascade).
+        /// Sense→Sharpen pipeline masks char-cnn output, making tiered routing redundant.
+        #[arg(long, default_value = "char-cnn")]
         model_type: ModelType,
 
         /// Inference mode: row (per-value) or column (distribution-based disambiguation)
@@ -146,7 +145,7 @@ enum Commands {
         device: String,
 
         /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "tiered")]
+        #[arg(long, default_value = "char-cnn")]
         model_type: ModelType,
 
         /// Random seed for deterministic training reproducibility
@@ -280,7 +279,7 @@ enum Commands {
         no_header_hint: bool,
 
         /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "tiered")]
+        #[arg(long, default_value = "char-cnn")]
         model_type: ModelType,
 
         /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
@@ -324,7 +323,7 @@ enum Commands {
         taxonomy: PathBuf,
 
         /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "tiered")]
+        #[arg(long, default_value = "char-cnn")]
         model_type: ModelType,
 
         /// Number of top confusions to show

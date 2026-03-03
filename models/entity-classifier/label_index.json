@@ -1,6 +1,6 @@
-[
-  "person",
-  "place",
-  "organization",
-  "creative_work"
-]
+{
+  "creative_work": 3,
+  "organization": 2,
+  "person": 0,
+  "place": 1
+}

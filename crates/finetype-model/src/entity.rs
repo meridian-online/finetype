@@ -92,20 +92,19 @@ pub struct EntityClassifier {
     device: Device,
 }
 
-/// MLP weights: BatchNorm1d → Linear(300,256) → Linear(256,256) → Linear(256,128) → Linear(128,4)
+/// MLP weights for entity classification.
 ///
-/// PyTorch Sequential naming convention:
-///   net.0  = BatchNorm1d(300)
-///   net.1  = Linear(300, 256)  (+ net.2 = ReLU, net.3 = Dropout)
-///   net.4  = Linear(256, 256)  (+ net.5 = ReLU, net.6 = Dropout)
-///   net.7  = Linear(256, 128)  (+ net.8 = ReLU, net.9 = Dropout)
-///   net.10 = Linear(128, 4)
+/// Supports two formats:
+/// - **Python-trained** (with BatchNorm): `net.0.weight` keys, BatchNorm1d → 4 Linear layers
+/// - **Rust-trained** (no BatchNorm): `ec_fc1.weight` keys, 4 Linear layers only
+///
+/// Format is auto-detected from tensor key names.
 struct MlpWeights {
-    // BatchNorm1d(300) in eval mode: y = (x - running_mean) / sqrt(running_var + eps) * weight + bias
-    bn_weight: Tensor,       // [300]
-    bn_bias: Tensor,         // [300]
-    bn_running_mean: Tensor, // [300]
-    bn_running_var: Tensor,  // [300]
+    // BatchNorm1d(300) — None for Rust-trained models
+    bn_weight: Option<Tensor>,       // [300]
+    bn_bias: Option<Tensor>,         // [300]
+    bn_running_mean: Option<Tensor>, // [300]
+    bn_running_var: Option<Tensor>,  // [300]
     // Linear layers
     fc1_weight: Tensor, // [256, 300]
     fc1_bias: Tensor,   // [256]
@@ -118,7 +117,7 @@ struct MlpWeights {
 }
 
 impl MlpWeights {
-    /// Load MLP weights from safetensors bytes.
+    /// Load MLP weights from safetensors bytes, auto-detecting format.
     fn from_bytes(bytes: &[u8], device: &Device) -> Result<Self, InferenceError> {
         let tensors = candle_core::safetensors::load_buffer(bytes, device)?;
 
@@ -134,23 +133,43 @@ impl MlpWeights {
                 .and_then(|t| Ok(t.to_dtype(DType::F32)?))
         };
 
-        Ok(Self {
-            bn_weight: get("net.0.weight")?,
-            bn_bias: get("net.0.bias")?,
-            bn_running_mean: get("net.0.running_mean")?,
-            bn_running_var: get("net.0.running_var")?,
-            fc1_weight: get("net.1.weight")?,
-            fc1_bias: get("net.1.bias")?,
-            fc2_weight: get("net.4.weight")?,
-            fc2_bias: get("net.4.bias")?,
-            fc3_weight: get("net.7.weight")?,
-            fc3_bias: get("net.7.bias")?,
-            fc4_weight: get("net.10.weight")?,
-            fc4_bias: get("net.10.bias")?,
-        })
+        // Auto-detect format: Python uses "net.0.weight", Rust uses "ec_fc1.weight"
+        let is_rust_format = tensors.contains_key("ec_fc1.weight");
+
+        if is_rust_format {
+            Ok(Self {
+                bn_weight: None,
+                bn_bias: None,
+                bn_running_mean: None,
+                bn_running_var: None,
+                fc1_weight: get("ec_fc1.weight")?,
+                fc1_bias: get("ec_fc1.bias")?,
+                fc2_weight: get("ec_fc2.weight")?,
+                fc2_bias: get("ec_fc2.bias")?,
+                fc3_weight: get("ec_fc3.weight")?,
+                fc3_bias: get("ec_fc3.bias")?,
+                fc4_weight: get("ec_fc4.weight")?,
+                fc4_bias: get("ec_fc4.bias")?,
+            })
+        } else {
+            Ok(Self {
+                bn_weight: Some(get("net.0.weight")?),
+                bn_bias: Some(get("net.0.bias")?),
+                bn_running_mean: Some(get("net.0.running_mean")?),
+                bn_running_var: Some(get("net.0.running_var")?),
+                fc1_weight: get("net.1.weight")?,
+                fc1_bias: get("net.1.bias")?,
+                fc2_weight: get("net.4.weight")?,
+                fc2_bias: get("net.4.bias")?,
+                fc3_weight: get("net.7.weight")?,
+                fc3_bias: get("net.7.bias")?,
+                fc4_weight: get("net.10.weight")?,
+                fc4_bias: get("net.10.bias")?,
+            })
+        }
     }
 
-    /// Forward pass: BatchNorm(eval) → Linear/ReLU × 3 → Linear → softmax.
+    /// Forward pass: [optional BatchNorm] → Linear/ReLU × 3 → Linear → softmax.
     ///
     /// Input x: 1D tensor of shape [feature_dim] (single column).
     /// Output: 1D tensor of shape [n_classes] (class probabilities).
@@ -158,19 +177,26 @@ impl MlpWeights {
         // Unsqueeze to [1, feature_dim] for matmul compatibility
         let x = x.unsqueeze(0)?;
 
-        // BatchNorm1d in eval mode:
+        // BatchNorm1d in eval mode (Python-trained models only):
         //   y = (x - running_mean) / sqrt(running_var + eps) * weight + bias
-        let eps = 1e-5_f64;
-        let x_norm = x.broadcast_sub(&self.bn_running_mean)?;
-        let var_eps = (&self.bn_running_var + eps)?;
-        let std_inv = var_eps.sqrt()?.recip()?;
-        let x_hat = x_norm.broadcast_mul(&std_inv)?;
-        let x_bn = x_hat
-            .broadcast_mul(&self.bn_weight)?
-            .broadcast_add(&self.bn_bias)?;
+        let x_input = if let (Some(bn_w), Some(bn_b), Some(bn_mean), Some(bn_var)) = (
+            &self.bn_weight,
+            &self.bn_bias,
+            &self.bn_running_mean,
+            &self.bn_running_var,
+        ) {
+            let eps = 1e-5_f64;
+            let x_norm = x.broadcast_sub(bn_mean)?;
+            let var_eps = (bn_var + eps)?;
+            let std_inv = var_eps.sqrt()?.recip()?;
+            let x_hat = x_norm.broadcast_mul(&std_inv)?;
+            x_hat.broadcast_mul(bn_w)?.broadcast_add(bn_b)?
+        } else {
+            x
+        };
 
         // FC1: Linear(300, 256) + ReLU
-        let h1 = x_bn
+        let h1 = x_input
             .matmul(&self.fc1_weight.t()?)?
             .broadcast_add(&self.fc1_bias)?
             .relu()?;

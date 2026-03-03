@@ -69,7 +69,7 @@ test:
 	cargo test
 
 generate:
-	cargo run -- generate --localized -s 100 -o training.ndjson
+	cargo run -- generate --localized -s 1000 -o training.ndjson
 
 # ─── GitTables Evaluation ────────────────────
 # Prerequisites:

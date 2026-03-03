@@ -98,9 +98,11 @@ impl CosineScheduler {
 /// Cross-entropy loss: -mean(log_softmax(logits)[target]).
 ///
 /// Validated in Candle spike (test_cross_entropy_loss).
+/// Kept as reference implementation; production training uses `candle_nn::loss::cross_entropy`.
 ///
 /// - `logits`: [B, C] unnormalized class scores
 /// - `targets`: [B] integer class indices (u32)
+#[allow(dead_code)]
 pub fn cross_entropy_loss(logits: &Tensor, targets: &Tensor) -> Result<Tensor> {
     let log_probs = candle_nn::ops::log_softmax(logits, D::Minus1)?;
     let target_log_probs = log_probs.gather(&targets.unsqueeze(1)?, 1)?.squeeze(1)?;

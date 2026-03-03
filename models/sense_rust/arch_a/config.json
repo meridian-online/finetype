@@ -5,9 +5,9 @@
   "n_broad": 6,
   "n_entity": 4,
   "n_params": 281098,
-  "best_epoch": 7,
-  "val_broad_accuracy": 0.8696486,
-  "val_entity_accuracy": 0.7812921,
+  "best_epoch": 8,
+  "val_broad_accuracy": 0.88258785,
+  "val_entity_accuracy": 0.77994615,
   "training_config": {
     "epochs": 50,
     "batch_size": 64,

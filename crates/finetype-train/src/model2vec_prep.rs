@@ -83,7 +83,7 @@ pub fn write_type_embeddings(
 
     let mut tensors = std::collections::HashMap::new();
     tensors.insert(
-        "embeddings".to_string(),
+        "type_embeddings".to_string(),
         safetensors::tensor::TensorView::new(
             safetensors::Dtype::F32,
             [total_rows, dim].to_vec(),

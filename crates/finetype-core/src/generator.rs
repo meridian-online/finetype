@@ -942,18 +942,6 @@ impl Generator {
                 ];
                 Ok(cpus[self.rng.gen_range(0..cpus.len())].to_string())
             }
-            ("hardware", "ram_size") => {
-                let sizes = [
-                    "4GB", "8GB", "16GB", "32GB", "64GB", "128GB", "256GB", "512MB",
-                ];
-                Ok(sizes[self.rng.gen_range(0..sizes.len())].to_string())
-            }
-            ("hardware", "screen_size") => {
-                let sizes = [
-                    "13.3\"", "14\"", "15.6\"", "16\"", "24\"", "27\"", "32\"", "34\"",
-                ];
-                Ok(sizes[self.rng.gen_range(0..sizes.len())].to_string())
-            }
             ("hardware", "generation") => {
                 let gens = [
                     "1st Generation",

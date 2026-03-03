@@ -1,0 +1,11 @@
+{
+  "batch_size": 512,
+  "data_file": "/tmp/charcnn_train_1k_all.jsonl",
+  "epochs": 5,
+  "model_type": "charcnn",
+  "n_classes": 164,
+  "n_samples": 162000,
+  "parent_snapshot": null,
+  "seed": 42,
+  "timestamp": "2026-03-03T03:32:01.107766619+00:00"
+}

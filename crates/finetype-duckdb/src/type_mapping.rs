@@ -100,8 +100,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "technology.development.stage" => "VARCHAR",
 
         // ── technology.hardware ────────────────────────────────────────
-        "technology.hardware.ram_size" => "BIGINT",
-        "technology.hardware.screen_size" => "DOUBLE",
         "technology.hardware.cpu" | "technology.hardware.generation" => "VARCHAR",
 
         // ── identity.commerce (moved from technology.code in v0.5.1) ──

@@ -53,13 +53,11 @@ pub struct ColumnSample {
 /// Training dataset: indexed collection of column samples.
 pub struct SenseDataset {
     pub samples: Vec<ColumnSample>,
-    device: Device,
 }
 
 impl SenseDataset {
     /// Load dataset from JSONL file (one ColumnSample per line).
     pub fn load(path: &Path) -> Result<Self> {
-        let device = Device::Cpu;
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read dataset: {}", path.display()))?;
 
@@ -74,15 +72,12 @@ impl SenseDataset {
         }
 
         tracing::info!("Loaded {} samples from {}", samples.len(), path.display());
-        Ok(Self { samples, device })
+        Ok(Self { samples })
     }
 
     /// Create dataset from pre-built samples.
     pub fn from_samples(samples: Vec<ColumnSample>) -> Self {
-        Self {
-            samples,
-            device: Device::Cpu,
-        }
+        Self { samples }
     }
 
     pub fn len(&self) -> usize {
@@ -129,13 +124,14 @@ impl SenseDataset {
             entity_labels[bi] = sample.entity_subtype_idx;
         }
 
+        let device = &Device::Cpu;
         Ok(BatchData {
-            value_embeds: vec3_to_tensor(&value_embeds, &self.device)?,
-            mask: bool2d_to_tensor(&mask, &self.device)?,
-            header_embeds: vec2_to_tensor(&header_embeds, &self.device)?,
-            has_header: candle_core::Tensor::new(has_header.as_slice(), &self.device)?,
-            broad_labels: usize_to_tensor(&broad_labels, &self.device)?,
-            entity_labels: usize_to_tensor(&entity_labels, &self.device)?,
+            value_embeds: vec3_to_tensor(&value_embeds, device)?,
+            mask: bool2d_to_tensor(&mask, device)?,
+            header_embeds: vec2_to_tensor(&header_embeds, device)?,
+            has_header: candle_core::Tensor::new(has_header.as_slice(), device)?,
+            broad_labels: usize_to_tensor(&broad_labels, device)?,
+            entity_labels: usize_to_tensor(&entity_labels, device)?,
         })
     }
 }
@@ -361,17 +357,18 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
 
     // Numeric labels
     match ft_label {
-        "identity.person.age"
+        "finance.currency.amount_eu"
+        | "finance.currency.amount_us"
+        | "identity.person.age"
         | "identity.person.height"
         | "identity.person.weight"
         | "representation.file.file_size"
         | "representation.numeric.decimal_number"
+        | "representation.numeric.decimal_number_eu"
         | "representation.numeric.integer_number"
         | "representation.numeric.percentage"
         | "representation.numeric.scientific_notation"
         | "representation.numeric.si_number"
-        | "technology.hardware.ram_size"
-        | "technology.hardware.screen_size"
         | "technology.internet.http_status_code"
         | "technology.internet.port" => return Some(3), // numeric
         _ => {}
@@ -382,7 +379,8 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         return Some(1); // format
     }
     match ft_label {
-        "finance.banking.swift_bic"
+        "finance.banking.iban"
+        | "finance.banking.swift_bic"
         | "finance.crypto.bitcoin_address"
         | "finance.crypto.ethereum_address"
         | "finance.payment.credit_card_expiration_date"
