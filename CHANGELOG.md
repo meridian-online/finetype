@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-03
+
+### Accuracy
+
+- **Profile eval: 98.3% label (117/119), 100% domain (119/119)** — up from 96.7% (116/120). Six new disambiguation mechanisms: validation-based candidate elimination (JSON Schema contracts reject impossible types), Rule 19 (percentage without '%' → decimal_number), expanded header hints (timezone, publisher, measurement keywords), hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes. (NNFT-188)
+- **Actionability eval: 96.0%** — 2910/3030 datetime values parse successfully via `TRY_STRPTIME`. Improved from 92.7% via `format_string_alt` support for ISO 8601 fractional seconds. (NNFT-191)
+
+### Added
+
+- **Finance domain** — 16 new types: IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, ISO 4217 currency codes, currency symbols, currency amounts, and more. (NNFT-177, NNFT-178)
+- **Identifier category** — alphanumeric_code, html_content, locale_number added to taxonomy. (NNFT-179, NNFT-180)
+- **Pure Rust ML training** — `finetype-train` crate with 4 binaries: `train-sense-model`, `train-entity-classifier`, `prepare-sense-data`, `prepare-model2vec`. All training via Candle, zero Python dependencies. Dual-format `SenseClassifier` supports both Python-trained (MHA) and Rust-trained (simple attention) models. (NNFT-185)
+- **Validation-based candidate elimination** — after vote aggregation, validates top candidates against JSON Schema contracts. Eliminates candidates where >50% of sample values fail validation. (NNFT-188)
+- **Rule 19: percentage demotion** — percentage winner with no '%' in values → decimal_number. (NNFT-188)
+- **Geography rescue** — recovers location types from unmasked CharCNN votes when Sense misroutes location columns. (NNFT-188)
+- **`format_string_alt` taxonomy field** — alternative format strings for types with common variants (e.g., ISO 8601 with optional fractional seconds). Eval tries multiple format strings per type. (NNFT-191)
+
+### Changed
+
+- **Taxonomy: 163 → 164 types, 6 → 7 domains** — net +3 types (IBAN, currency amounts, html_content, locale_number, alphanumeric_code added; cvv, century, screen_size, ram_size removed). New finance domain with 16 types split from identity. (NNFT-177, NNFT-178, NNFT-179, NNFT-180)
+- **CharCNN v9 model** — retrained on clean 164-type taxonomy (1,000 samples/type). Refreshed Model2Vec type embeddings, Sense + Entity classifiers. `remap_collapsed_label()` eliminated — models now natively produce 164-class outputs. (NNFT-181)
+- **Header hints expanded** — timezone, publisher, measurement keywords. Hardcoded hints now take priority over Model2Vec semantic hints. (NNFT-188)
+
+### Removed
+
+- **Python training scripts** — 11 Python files removed. All training migrated to `finetype-train` Rust crate. (NNFT-186)
+- **`remap_collapsed_label()`** — no longer needed; models trained on clean 164-type taxonomy. (NNFT-181)
+
 ## [0.5.0] - 2026-03-01
 
 ### Accuracy

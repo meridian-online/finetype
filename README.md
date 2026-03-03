@@ -4,7 +4,7 @@
 
 > **Early Development** — FineType is under active development. Expect breaking changes to taxonomy labels, CLI arguments, library APIs, and model formats between releases. Pin to a specific version if stability matters for your use case.
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 163 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 164 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 $ finetype infer -i "192.168.1.1"
@@ -19,16 +19,15 @@ identity.person.email
 
 ## Features
 
-- **163 semantic types** across 6 domains — dates, times, IPs, emails, UUIDs, financial identifiers, and more
+- **164 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing
 - **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
-- **Sense→Sharpen pipeline** — Model2Vec cross-attention predicts broad category, then CharCNN votes are masked to category-eligible labels. 96.7% label accuracy on profile eval.
+- **Sense→Sharpen pipeline** — Model2Vec cross-attention predicts broad category, then CharCNN votes are masked to category-eligible labels. 98.3% label accuracy on profile eval (117/119).
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
 - **DuckDB integration** — 5 scalar functions: `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_version()`
 - **Tiered inference** — 34 specialized CharCNN models in a T0→T1→T2 hierarchy (600+ classifications/sec, 8.5 MB memory)
 - **Real-world validated** — 85-100% accuracy on format-detectable types in [GitTables benchmark](https://zenodo.org/record/5706316) (2,363 columns)
-- **Pure Rust** — no Python runtime, Candle ML framework
-- **388 tests** — taxonomy validation, model inference, column disambiguation, data generation
+- **Pure Rust** — no Python runtime or dependencies, Candle ML framework for training and inference
 
 ## Installation
 
@@ -57,8 +56,6 @@ cargo build --release
 
 ### CLI
 
-FineType provides 9 commands covering the full ML pipeline:
-
 ```bash
 # Classify a single value
 finetype infer -i "bc89:60a9:23b8:c1e9:3924:56de:3eb1:3b90"
@@ -75,18 +72,6 @@ finetype profile -f data.csv
 # Generate synthetic training data
 finetype generate --samples 1000 --output training.ndjson
 
-# Train a CharCNN model
-finetype train --data data/train.ndjson --epochs 10 --batch-size 64
-
-# Evaluate model accuracy
-finetype eval --data data/test.ndjson --model models/tiered-v2
-
-# Use a specific model type (default: tiered)
-finetype infer -i "hello@example.com" --model-type char-cnn --model models/char-cnn-v6
-
-# Evaluate on GitTables benchmark (column-mode vs row-mode)
-finetype eval-gittables --dir eval/gittables
-
 # Validate data quality against taxonomy schemas
 finetype validate -f data.ndjson --strategy quarantine
 
@@ -95,6 +80,9 @@ finetype check
 
 # Show taxonomy (filter by domain, category, priority)
 finetype taxonomy --domain datetime
+
+# Export JSON Schema for a type (supports glob patterns)
+finetype schema "datetime.date.*" --pretty
 ```
 
 ### DuckDB Extension
@@ -138,16 +126,17 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **163 types** across **6 domains**:
+FineType recognizes **164 types** across **7 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
-| `datetime` | 46 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
-| `technology` | 30 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
-| `identity` | 31 | Names, emails, phones, passwords, credit cards, ISIN, CUSIP, LEI, SWIFT/BIC |
-| `representation` | 29 | Integers, floats, booleans (binary/initials/terms), categorical, ordinal, hex colors, JSON |
+| `datetime` | 45 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
+| `representation` | 31 | Integers, floats, booleans (binary/initials/terms), categorical, ordinal, hex colors, JSON |
+| `technology` | 24 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
+| `identity` | 20 | Names, emails, phones, passwords, credit cards |
+| `finance` | 16 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, currency amounts, currency codes |
 | `geography` | 16 | Latitude, longitude, countries, cities, postal codes |
-| `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
+| `container` | 12 | JSON objects, CSV rows, query strings, key-value pairs |
 
 Each type is a **transformation contract** — if the model predicts `datetime.date.us_slash`, that guarantees `strptime(value, '%m/%d/%Y')::DATE` will succeed.
 
@@ -161,10 +150,9 @@ See [`labels/`](labels/) for the complete taxonomy (YAML definitions with valida
 
 | Model | Architecture | Accuracy | Classes |
 |-------|-------------|----------|---------|
-| Sense→Sharpen | **Model2Vec + 34 CharCNNs** | **default** (96.7% profile eval) | 163 |
-| Tiered v2 | 34 CharCNNs (T0→T1→T2) | `--sharp-only` fallback | 163 |
-| CharCNN v7 | Flat (single model) | used by Sense pipeline | 163 |
-| CharCNN v6 | Flat (single model) | 89.15% | 169 |
+| Sense→Sharpen | **Model2Vec + flat CharCNN** | **default** (98.3% label, 100% domain on profile eval) | 164 |
+| Tiered v2 | 34 CharCNNs (T0→T1→T2) | `--sharp-only` fallback | 164 |
+| CharCNN v9 | Flat (single model) | used by Sense pipeline | 164 |
 
 ### Real-World Evaluation (GitTables)
 
@@ -193,7 +181,7 @@ See [`eval/gittables/REPORT.md`](eval/gittables/REPORT.md) for the full evaluati
 
 Single-value classification can be ambiguous: is `01/02/2024` a US date (Jan 2) or EU date (Feb 1)? Is `1995` a year, postal code, or plain number?
 
-Column-mode inference resolves this by analyzing the distribution of values in a column. The default **Sense→Sharpen** pipeline uses Model2Vec to pre-classify the column's broad category, then scopes CharCNN voting to category-eligible types. Disambiguation rules further refine the result:
+Column-mode inference resolves this by analyzing the distribution of values in a column. The default **Sense→Sharpen** pipeline uses Model2Vec cross-attention to predict the column's broad category, then masks CharCNN voting to category-eligible types. Disambiguation rules further refine the result:
 
 - **Date format disambiguation** — US vs EU slash dates, short vs long dates
 - **Year detection** — 4-digit integers predominantly in 1900-2100 range
@@ -215,57 +203,47 @@ finetype profile -f data.csv
 
 ### Inference Pipeline
 
-FineType operates in three modes — single-value, column, and profile — each building on the previous:
+FineType operates in three modes — single-value, column, and profile — each building on the previous.
+
+The default **Sense→Sharpen** column pipeline:
 
 ```mermaid
 flowchart TB
-    subgraph single ["Single-Value Mode"]
+    subgraph sense ["Sense→Sharpen Pipeline (default)"]
         direction TB
-        A["Input string"] --> B["Character tokenizer
-        (per-char integer encoding)"]
-        B --> C["Tier 0: Broad type
-        (15 DuckDB types)"]
-        C --> C1["Tier 1: Category
-        (e.g. DATE → date)"]
-        C1 --> C2["Tier 2: Specific type
-        (e.g. date → iso, us_slash, ...)"]
-        C2 --> D{"Post-process rules
-        (6 format checks)"}
-        D -->|corrected| E["Predicted type
-        + confidence"]
-        D -->|unchanged| E
-    end
-
-    subgraph column ["Column Mode"]
-        direction TB
-        F["Column values"] --> G["Sample ≤100 values"]
-        G --> H["Batch single-value
-        inference"]
-        H --> I["Vote aggregation
-        (label → fraction)"]
-        I --> J{"Disambiguation
-        rules"}
-        J -->|"date, coordinate,
-        numeric rules"| K["Column type
-        + confidence"]
-        J -->|"majority vote
-        stands"| K
+        A["Column values + header"] --> B["Sample 100 values,
+        encode header + 50 values
+        with Model2Vec"]
+        B --> C["Sense classifier →
+        broad category
+        (temporal/numeric/geographic/
+        entity/format/text)"]
+        C --> D["Flat CharCNN batch
+        on all 100 values"]
+        D --> E["Masked vote aggregation
+        (filter to category-eligible labels)"]
+        E --> F{"Disambiguation rules
+        + validation elimination"}
+        F --> G["Entity demotion
+        (non-person → entity_name)"]
+        G --> H["Header hints
+        (hardcoded + Model2Vec)"]
+        H --> I["Column type
+        + confidence + locale"]
     end
 
     subgraph profile ["Profile Mode"]
         direction TB
         L["CSV file"] --> M["Parse columns
         + null detection"]
-        M --> N["Column-mode inference
+        M --> N["Sense→Sharpen
         per column"]
         N --> O["Column type table"]
     end
 
-    single -.->|"used by"| column
-    column -.->|"used by"| profile
+    sense -.->|"used by"| profile
 
-    style single fill:#f0f7ff,stroke:#4a90d9
-    style column fill:#f0fff0,stroke:#4a9050
+    style sense fill:#f0f7ff,stroke:#4a90d9
     style profile fill:#fff8f0,stroke:#d9904a
 ```
 
@@ -273,20 +251,22 @@ flowchart TB
 
 | Stage | What it does | Where |
 |---|---|---|
-| **Character tokenizer** | Encodes each character as an integer (0-127 ASCII + padding). Fixed-length input to the CNN. | `finetype-core` |
-| **Tiered CharCNN** | 34 specialized character-level CNNs in a T0→T1→T2 hierarchy. Tier 0 classifies into 15 broad DuckDB types, Tier 1 resolves categories, Tier 2 picks specific types. Each model is a 3-layer CNN with max-pooling. Trained on synthetic data from taxonomy generators. | `finetype-model` |
-| **Post-processing** | 6 deterministic rules that correct known model confusions using format signals the model struggles with (e.g., `T` vs space in timestamps, `@` for email rescue, hash length check). | `finetype-model` |
-| **Vote aggregation** | In column mode, runs single-value inference on a sample of up to 100 values, then counts votes per type. | `finetype-model` |
-| **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates (component > 12), lat/lon (value > 90), year (4-digit in 1900-2100), port (common port list), postal code (consistent digit length), gender detection, categorical (low cardinality), boolean override (integer spread). | `finetype-model` |
+| **Model2Vec encoding** | Encodes column header and sample values into 256-dim embeddings using potion-base-4M static embeddings. | `finetype-model` |
+| **Sense classifier** | Cross-attention over Model2Vec embeddings predicts broad category (6 classes) and entity subtype (4 classes). ~3.6ms/column. | `finetype-model` |
+| **Flat CharCNN** | Character-level CNN (164 classes) classifies each sample value independently. Per-char integer encoding, 3-layer CNN with max-pooling. | `finetype-model` |
+| **Masked vote aggregation** | Filters CharCNN votes to Sense-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when confidence is low or all votes filtered. | `finetype-model` |
+| **Disambiguation** | Rule-based overrides for ambiguous type pairs: US/EU dates, lat/lon, year detection, port, postal code, gender, categorical, boolean, duration, UTC offset, percentage-without-sign demotion. Validation-based candidate elimination rejects types where >50% of values fail JSON Schema validation. | `finetype-model` |
+| **Entity demotion** | When Sense detects non-person entity subtype and CharCNN votes full_name, demotes to entity_name. | `finetype-model` |
+| **Header hints** | Hardcoded header mappings (priority) + Model2Vec semantic similarity matching. Geography protection and measurement disambiguation guards. | `finetype-model` |
 | **Profile** | CSV parsing with null detection, then column-mode inference on each column. Outputs a type table with confidence scores. | `finetype-cli` |
 
 **Seven crates:**
 
 | Crate | Role | Key Dependencies |
 |-------|------|------------------|
-| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation | `serde_yaml`, `fake`, `chrono`, `uuid` |
-| `finetype-model` | Tiered CharCNN + Sense→Sharpen inference, column-mode disambiguation | `candle-core`, `candle-nn` |
-| `finetype-cli` | Binary: CLI commands (infer, profile, check, generate, train, taxonomy, schema) | `clap`, `csv` |
+| `finetype-core` | Taxonomy parsing, tokenizer, synthetic data generation, validation | `serde_yaml`, `fake`, `chrono`, `uuid`, `jsonschema` |
+| `finetype-model` | Flat CharCNN + Sense→Sharpen inference, column-mode disambiguation, Model2Vec | `candle-core`, `candle-nn` |
+| `finetype-cli` | Binary: CLI commands (infer, profile, check, generate, taxonomy, schema, validate) | `clap`, `csv` |
 | `finetype-duckdb` | DuckDB extension: 5 scalar functions with embedded model | `duckdb`, `libduckdb-sys` |
 | `finetype-eval` | Evaluation binaries (profile, actionability, GitTables, SOTAB) | `csv`, `duckdb`, `arrow` |
 | `finetype-train` | Pure Rust ML training (Sense, Entity, data pipeline, Model2Vec) | `candle-core`, `candle-nn`, `duckdb` |
@@ -297,24 +277,28 @@ flowchart TB
 ```
 finetype/
 ├── crates/
-│   ├── finetype-core/        # Taxonomy, tokenizer, data generation
+│   ├── finetype-core/        # Taxonomy, tokenizer, data generation, validation
 │   ├── finetype-model/       # Candle CNN + Sense→Sharpen, column-mode inference
 │   ├── finetype-cli/         # CLI binary
 │   ├── finetype-duckdb/      # DuckDB extension (5 scalar functions)
 │   ├── finetype-eval/        # Evaluation binaries (Rust, no Python)
 │   └── finetype-train/       # Pure Rust ML training (Candle)
-├── labels/                   # Taxonomy definitions (166 types, 7 domains, YAML)
+├── labels/                   # Taxonomy definitions (164 types, 7 domains, YAML)
 ├── models/                   # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
 ├── eval/                     # Evaluation infrastructure (GitTables, SOTAB, profile)
 ├── backlog/                  # Project tasks and decisions (Backlog.md format)
 └── .github/workflows/        # CI/CD: fmt, clippy, test, finetype check; release cross-compile
 ```
 
-### Why Tiered CharCNNs?
+### Why Sense→Sharpen?
 
-Format types are defined by character patterns (colons in MACs/IPv6, `@` in emails, dashes in UUIDs, `T` separator in ISO 8601). Character-level models capture these patterns directly without tokenization overhead.
+Column classification is a two-stage problem: first determine *what kind* of data a column contains (temporal, numeric, geographic, etc.), then identify the *specific type* within that category. The Sense→Sharpen pipeline mirrors this:
 
-The tiered architecture decomposes the 163-class problem into a cascade of smaller, specialized classifiers. Tier 0 determines the broad DuckDB type (15 classes — DATE, TIMESTAMP, VARCHAR, etc.), Tier 1 narrows to a category, and Tier 2 picks the specific type. Each tier's model only needs to distinguish a handful of classes, making individual decisions more reliable than a single flat 163-way classifier.
+1. **Sense** uses Model2Vec embeddings of the column header and sample values to predict a broad category. This is fast (~3.6ms) and leverages semantic information (column names like "timestamp" or "latitude") that character-level models miss.
+
+2. **Sharpen** runs a flat CharCNN on individual values but masks the output to only category-eligible labels. This combines the character-pattern strength of CNNs (colons in MACs/IPv6, `@` in emails, dashes in UUIDs) with Sense's category guidance to eliminate impossible predictions.
+
+A legacy tiered architecture (34 specialized CharCNNs in a T0→T1→T2 hierarchy) is available via `--sharp-only` for cases where Sense model files are absent.
 
 ### Why Candle?
 
@@ -326,7 +310,7 @@ Pure Rust, no Python runtime, no external C++ dependencies. Integrates cleanly w
 # Build
 cargo build --release
 
-# Run all tests (388)
+# Run all tests
 cargo test --all
 
 # Validate taxonomy (generator ↔ definition alignment)
@@ -340,19 +324,13 @@ cargo run --release -- profile -f data.csv
 
 # Generate training data
 cargo run --release -- generate --samples 500 --output data/train.ndjson
-
-# Train a model
-cargo run --release -- train --data data/train.ndjson --epochs 10
-
-# Evaluate model
-cargo run --release -- eval --data data/test.ndjson --model models/tiered-v2
 ```
 
 Project tasks are tracked in [`backlog/`](backlog/) using [Backlog.md](https://backlog.md).
 
 ### Taxonomy Definitions
 
-Each of the 163 types is defined in YAML under `labels/`:
+Each of the 164 types is defined in YAML under `labels/`:
 
 ```yaml
 datetime.timestamp.iso_8601:
@@ -442,7 +420,7 @@ println!("Valid: {}, Invalid: {}", result.stats.valid_count, result.stats.invali
 
 ### Locale Support
 
-FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (163 types) and does not distinguish between locales at inference time.
+FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (164 types) and does not distinguish between locales at inference time.
 
 **DuckDB `strptime` locale limitation:** DuckDB's `strptime` function only accepts English month and day names. Non-English dates like `6 janvier 2025` will fail with `strptime(col, '%d %B %Y')`. There is no DuckDB locale setting to change this behavior.
 
