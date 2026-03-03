@@ -4,7 +4,7 @@ titanic,/home/hugh/datasets/titanic.csv,Survived,boolean
 titanic,/home/hugh/datasets/titanic.csv,Pclass,class
 titanic,/home/hugh/datasets/titanic.csv,Name,name
 titanic,/home/hugh/datasets/titanic.csv,Sex,gender
-titanic,/home/hugh/datasets/titanic.csv,Age,age
+titanic,/home/hugh/datasets/titanic.csv,Age,number
 titanic,/home/hugh/datasets/titanic.csv,SibSp,number
 titanic,/home/hugh/datasets/titanic.csv,Parch,number
 titanic,/home/hugh/datasets/titanic.csv,Ticket,code
@@ -78,7 +78,7 @@ people_directory,/home/hugh/datasets/people_directory.csv,first_name,first name
 people_directory,/home/hugh/datasets/people_directory.csv,last_name,last name
 people_directory,/home/hugh/datasets/people_directory.csv,email,email
 people_directory,/home/hugh/datasets/people_directory.csv,phone,telephone
-people_directory,/home/hugh/datasets/people_directory.csv,age,age
+people_directory,/home/hugh/datasets/people_directory.csv,age,number
 people_directory,/home/hugh/datasets/people_directory.csv,gender,gender
 people_directory,/home/hugh/datasets/people_directory.csv,ssn,code
 people_directory,/home/hugh/datasets/people_directory.csv,date_of_birth,date
@@ -122,7 +122,7 @@ geography_data,/home/hugh/datasets/geography_data.csv,latitude,latitude
 geography_data,/home/hugh/datasets/geography_data.csv,longitude,longitude
 geography_data,/home/hugh/datasets/geography_data.csv,coordinates,coordinates
 geography_data,/home/hugh/datasets/geography_data.csv,full_address,address
-geography_data,/home/hugh/datasets/geography_data.csv,street_number,street number
+geography_data,/home/hugh/datasets/geography_data.csv,street_number,number
 geography_data,/home/hugh/datasets/geography_data.csv,elevation_m,number
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,isbn,isbn
 codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,issn,issn

@@ -272,11 +272,11 @@ mappings:
 
   - gt_label: street number
     source: profile
-    finetype_label: geography.address.street_number
-    finetype_domain: geography
-    match_quality: direct
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: close
     expand: false
-    notes: Street/house numbers
+    notes: Street/house numbers — type removed in v0.5.2 (NNFT-192), falls to integer
 
   - gt_label: uuid
     source: profile
@@ -412,11 +412,11 @@ mappings:
 
   - gt_label: age
     source: dbpedia
-    finetype_label: identity.person.age
-    finetype_domain: identity
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
     match_quality: close
     expand: false
-    notes: Age values; FineType has age disambiguation
+    notes: Age values — type removed in v0.5.2 (NNFT-192), falls to integer_number
 
   - gt_label: height
     source: both

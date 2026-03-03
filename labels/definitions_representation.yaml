@@ -1142,3 +1142,40 @@ representation.identifier.increment:
     Moved from representation.numeric.increment in v0.5.1 (NNFT-178).
     Often appears as auto-incrementing primary keys or row numbers.
     Difficult to distinguish from regular integers without column context.
+
+representation.identifier.numeric_code:
+  title: "Numeric Code"
+  description: >
+    All-digit string where the digit pattern is meaningful and leading zeros
+    must be preserved. Covers ISO country numeric codes (840, 036), NAICS/SIC
+    industry codes, FIPS codes, product category codes, and similar
+    classification systems. The critical property is that these values MUST
+    remain as VARCHAR — casting to integer strips leading zeros and destroys
+    the code's identity. Defers to geography.address.postal_code and
+    identity.person.phone_number when those more specific types apply.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9]+$"
+  tier: [VARCHAR, identifier]
+  release_priority: 2
+  aliases: [code, classification_code, category_code]
+  samples:
+    - "840"
+    - "036"
+    - "5112"
+    - "06075"
+    - "0001"
+    - "99"
+  references: null
+  notes: >
+    Added in v0.5.2 (NNFT-192). Addresses the #2 analyst frustration:
+    leading zeros stripped when numeric-looking codes are auto-inferred as
+    integers. Column-level disambiguation (header hints, consistent length,
+    leading-zero presence) differentiates from plain integer_number.

@@ -359,7 +359,6 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
     match ft_label {
         "finance.currency.amount_eu"
         | "finance.currency.amount_us"
-        | "identity.person.age"
         | "identity.person.height"
         | "identity.person.weight"
         | "representation.file.file_size"
@@ -1286,7 +1285,7 @@ mod tests {
             finetype_to_broad_category("representation.numeric.decimal_number"),
             Some(3)
         );
-        assert_eq!(finetype_to_broad_category("identity.person.age"), Some(3));
+        assert_eq!(finetype_to_broad_category("identity.person.height"), Some(3));
         // Format
         assert_eq!(finetype_to_broad_category("identity.person.email"), Some(1));
         assert_eq!(

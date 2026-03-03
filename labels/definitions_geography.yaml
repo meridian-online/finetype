@@ -219,37 +219,8 @@ geography.address.full_address:
     (US format vs European format, etc.). Decompose extracts components but
     requires more sophisticated parsing for reliability.
 
-geography.address.street_number:
-  title: "Street Number"
-  description: >
-    House or building number on a street (e.g., 123, 456B).
-    May include letters for sub-addresses or designations.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    numeric_part: "REGEXP_EXTRACT({col}, '^([0-9]+)')"
-    suffix: "REGEXP_EXTRACT({col}, '[0-9]+([A-Z]*)$')"
-  validation:
-    type: string
-    pattern: "^[0-9]+[A-Z]?(/[A-Z])?(-[0-9]+[A-Z]?)?( 1/2)?$"
-    maximum: 99999
-  tier: [VARCHAR, address]
-  release_priority: 3
-  aliases: [house_number]
-  samples:
-    - "123"
-    - "456B"
-    - "100-102"
-    - "12 1/2"
-    - "45A/B"
-  references: null
-  notes: >
-    v1 migration: Was address.street_number. Includes ranges (100-102)
-    and letter suffixes (123A, 123B).
+# geography.address.street_number: REMOVED in v0.5.2 (NNFT-192)
+# Indistinguishable from plain integers. Values fall to integer_number or alphanumeric_id.
 
 geography.address.street_name:
   title: "Street Name"

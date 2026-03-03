@@ -28,7 +28,7 @@ measurement unit,profile,representation.scientific.measurement_unit,representati
 month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
 port,profile,technology.internet.port,technology,direct,false
-street number,profile,geography.address.street_number,geography,direct,false
+street number,profile,representation.numeric.integer_number,representation,close,false
 uuid,profile,representation.identifier.uuid,representation,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
 decimal number,profile,representation.numeric.decimal_number,representation,direct,false
@@ -45,7 +45,7 @@ address,dbpedia,geography.address.full_address,geography,close,false
 county,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
 location,both,geography.location.city,geography,close,false
-age,dbpedia,identity.person.age,identity,close,false
+age,dbpedia,representation.numeric.integer_number,representation,close,false
 height,both,identity.person.height,identity,close,false
 weight,dbpedia,identity.person.weight,identity,close,false
 sentence,dbpedia,representation.text.sentence,representation,close,false

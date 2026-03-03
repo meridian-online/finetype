@@ -1114,7 +1114,7 @@ impl Generator {
                     Ok(format!("{} lbs", self.rng.gen_range(100..265)))
                 }
             }
-            ("person", "age") => Ok(self.rng.gen_range(1..100).to_string()),
+            // ("person", "age") — REMOVED in v0.5.2 (NNFT-192)
             ("person", "occupation") => {
                 let jobs = [
                     "Software Engineer",
@@ -1510,38 +1510,9 @@ impl Generator {
                 Ok(cities[self.rng.gen_range(0..cities.len())].to_string())
             }
 
-            // ── address (5 types) ────────────────────────────────────────
+            // ── address (4 types) ────────────────────────────────────────
+            // ("address", "street_number") — REMOVED in v0.5.2 (NNFT-192)
             ("address", "full_address") => self.gen_full_address(),
-            ("address", "street_number") => {
-                // Street numbers are typically 1-3000, with distinctive address
-                // formats to help distinguish from generic integers.
-                let r = self.rng.gen::<f64>();
-                if r < 0.50 {
-                    // Plain number (common range 1-2000)
-                    Ok(self.rng.gen_range(1..2001).to_string())
-                } else if r < 0.75 {
-                    // Letter suffix: 12A, 100B, 45C (common in European addresses)
-                    let suffix = ['A', 'B', 'C', 'D', 'E'][self.rng.gen_range(0..5)];
-                    Ok(format!("{}{}", self.rng.gen_range(1..500), suffix))
-                } else if r < 0.90 {
-                    // Hyphenated range: 12-14, 100-102 (multi-unit buildings)
-                    let base = self.rng.gen_range(1..500);
-                    Ok(format!("{}-{}", base, base + self.rng.gen_range(1..5)))
-                } else {
-                    // Fraction or unit: 12 1/2, 100A/B
-                    if self.rng.gen_bool(0.5) {
-                        Ok(format!("{} 1/2", self.rng.gen_range(1..200)))
-                    } else {
-                        let suffix = ['A', 'B', 'C'][self.rng.gen_range(0..3)];
-                        Ok(format!(
-                            "{}{}/{}",
-                            self.rng.gen_range(1..200),
-                            suffix,
-                            (b'A' + self.rng.gen_range(0..3)) as char
-                        ))
-                    }
-                }
-            }
             ("address", "street_name") => {
                 let names = locale_data::street_names(self.current_locale());
                 Ok(names[self.rng.gen_range(0..names.len())].to_string())
@@ -1607,7 +1578,7 @@ impl Generator {
             // ── numeric (5 types) ────────────────────────────────────────
             ("numeric", "integer_number") => {
                 // Wider range with varied magnitudes to distinguish from
-                // street_number (1-2000), postal codes, etc.
+                // postal codes, etc.
                 let r = self.rng.gen::<f64>();
                 let val = if r < 0.3 {
                     // Large numbers (thousands to millions)
@@ -2007,9 +1978,64 @@ impl Generator {
                 Ok(vocab[self.rng.gen_range(0..vocab.len())].to_string())
             }
 
-            // ── identifier (3 types) ─────────────────────────────────────
+            // ── identifier (4 types) ─────────────────────────────────────
             ("identifier", "uuid") => Ok(Uuid::new_v4().to_string()),
             ("identifier", "increment") => Ok(self.rng.gen_range(1..100000).to_string()),
+            ("identifier", "numeric_code") => {
+                // All-digit codes with consistent length and leading zeros.
+                // Mix of real-world code patterns to train the model.
+                let r = self.rng.gen::<f64>();
+                if r < 0.25 {
+                    // ISO 3166-1 numeric country codes (3-digit, leading zeros)
+                    let codes = [
+                        "004", "008", "012", "016", "020", "024", "028", "031", "032", "036",
+                        "040", "044", "048", "050", "051", "052", "056", "060", "064", "068",
+                        "070", "072", "076", "084", "090", "096", "100", "104", "108", "112",
+                        "116", "120", "124", "132", "140", "144", "148", "152", "156", "170",
+                        "174", "178", "180", "188", "191", "192", "196", "203", "204", "208",
+                        "214", "218", "222", "226", "231", "232", "233", "242", "246", "250",
+                        "258", "262", "266", "268", "270", "276", "288", "296", "300", "308",
+                        "320", "324", "328", "332", "340", "344", "348", "352", "356", "360",
+                        "364", "368", "372", "376", "380", "384", "388", "392", "398", "400",
+                        "404", "408", "410", "414", "417", "418", "422", "426", "428", "430",
+                        "434", "440", "442", "450", "454", "458", "462", "466", "470", "478",
+                        "480", "484", "492", "496", "498", "500", "504", "508", "512", "516",
+                        "520", "524", "528", "540", "548", "554", "558", "562", "566", "578",
+                        "580", "583", "584", "585", "586", "591", "598", "600", "604", "608",
+                        "616", "620", "624", "626", "630", "634", "642", "643", "646", "659",
+                        "660", "662", "670", "674", "678", "682", "686", "688", "690", "694",
+                        "702", "703", "704", "706", "710", "716", "724", "728", "729", "732",
+                        "740", "748", "752", "756", "760", "762", "764", "768", "776", "780",
+                        "784", "788", "792", "795", "798", "800", "804", "807", "818", "826",
+                        "831", "832", "833", "834", "840", "854", "858", "860", "862", "882",
+                        "887", "894",
+                    ];
+                    Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
+                } else if r < 0.50 {
+                    // NAICS codes (2-6 digits, no leading zeros typically but consistent length)
+                    let naics = [
+                        "11", "21", "22", "23", "31", "32", "33", "42", "44", "45", "48",
+                        "49", "51", "52", "53", "54", "55", "56", "61", "62", "71", "72",
+                        "81", "92", "111", "112", "113", "114", "115", "211", "212", "213",
+                        "221", "236", "237", "238", "311", "312", "313", "314", "315", "316",
+                        "321", "322", "323", "324", "325", "326", "327", "331", "332", "333",
+                        "334", "335", "336", "337", "339", "1111", "1112", "1113", "1114",
+                        "1119", "1121", "1122", "1123", "1124", "1125", "1129", "1131", "1132",
+                        "1133", "1141", "1142", "1151", "1152", "1153", "2111", "2121", "2122",
+                        "2123", "2131", "2211", "2212", "2213", "51111", "51112", "51113",
+                        "51114", "51119", "51121", "51211", "51213", "51219", "51911",
+                    ];
+                    Ok(naics[self.rng.gen_range(0..naics.len())].to_string())
+                } else if r < 0.75 {
+                    // FIPS codes (5-digit state+county, leading zeros common)
+                    let state = self.rng.gen_range(1u32..56);
+                    let county = self.rng.gen_range(1u32..999);
+                    Ok(format!("{:02}{:03}", state, county))
+                } else {
+                    // Product/category codes (4-digit with leading zeros)
+                    Ok(format!("{:04}", self.rng.gen_range(1u32..9999)))
+                }
+            }
             ("identifier", "alphanumeric_id") => {
                 // Generate mixed letter+digit identifier patterns.
                 let pattern_idx = self.rng.gen_range(0..10);

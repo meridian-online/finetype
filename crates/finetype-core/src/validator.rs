@@ -1134,9 +1134,9 @@ datetime.timestamp.iso_8601:
     }
 
     #[test]
-    fn test_street_number_maximum_rejects_large_values() {
-        // NNFT-117: maximum: 99999 on street_number rejects implausibly
-        // large numbers while preserving real street numbers.
+    fn test_pattern_with_maximum_rejects_large_values() {
+        // Tests that maximum bound on a pattern-validated schema rejects
+        // implausibly large numeric values while allowing smaller ones.
         let street_number_schema = Validation {
             schema_type: Some("string".to_string()),
             pattern: Some(r"^[0-9]+[A-Z]?(/[A-Z])?(-[0-9]+[A-Z]?)?( 1/2)?$".to_string()),

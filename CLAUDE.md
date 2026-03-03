@@ -20,28 +20,25 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.5.1
-**Taxonomy:** 164 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 16, identity: 20, representation: 31, technology: 24) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v9 flat (164 classes), tiered-v2 fallback via `--sharp-only`
+**Version:** 0.5.2
+**Taxonomy:** 163 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 15, identity: 19, representation: 32, technology: 24) — all generators pass, 100% alignment
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v10 flat (163 classes), tiered-v2 fallback via `--sharp-only`
 **Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
+- **Taxonomy revision v0.5.2** (NNFT-192) — Removed `geography.address.street_number` (false positives on plain integers) and `identity.person.age` (indistinguishable from integer_number, 205 SOTAB false positives). Added `representation.identifier.numeric_code` (VARCHAR, preserves leading zeros for codes like ISO country numeric, NAICS, FIPS). Net: 164→163 types. CharCNN-v10 retrained. Actionability improved 96.0%→98.7%. Profile eval regressed 117/119→110/116 due to model retrain — follow-up needed.
 - **Actionability improvements** (NNFT-191) — Actionability 92.7% → 96.0% (2910/3030 values). Added `format_string_alt` field to taxonomy YAML for ISO 8601 fractional seconds variant. Updated eval to try multiple format strings per type. Fixed network_logs.timestamp (0% → 100%).
-- **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination (schema contracts reject impossible types), Rule 19 (percentage without '%' → decimal_number), header hint additions (timezone, publisher, measurement keywords), hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes.
-- **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers. Removed `technology.hardware.screen_size` and `technology.hardware.ram_size`. `remap_collapsed_label()` eliminated — models now natively produce 164-class outputs.
-- **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries: train-sense-model, train-entity-classifier, prepare-sense-data, prepare-model2vec. Dual-format SenseClassifier supports both Python-trained (MHA) and Rust-trained (simple attention) models. 253 tests pass.
-- **DuckDB metadata tool** (NNFT-183) — Replaced Python `append_extension_metadata.py` with `finetype-build-tools` crate. `append-duckdb-metadata` binary produces byte-identical output. Zero Python in build chain.
-- **Python cleanup** (NNFT-186) — Removed 11 Python files. All Python dependencies eliminated.
-- **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category. Net: +3 types (IBAN, currency amounts, html_content, locale_number, alphanumeric_code added; cvv, century, screen_size, ram_size removed). 164 types across 7 domains.
-- **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Sense is the default pipeline.
-- **Entity classifier** (NNFT-151/152) — Deep Sets MLP demotes full_name → entity_name for non-person columns.
+- **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination, Rule 19, header hint additions, hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes.
+- **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers.
+- **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries. Zero Python dependencies.
+- **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category. 164 types across 7 domains.
 
 ### What's in progress
 
-- **Remaining accuracy gaps** — Profile eval 117/119 (98.3% label, 99.2% domain). 2 remaining misclassifications: countries.name (full_name vs country — ambiguous "name" header, CharCNN doesn't see country as plurality), datetime_formats_extended.long_full_month_date (iso_8601 vs long_full_month — datetime format confusion). Actionability at 96.0% (target ≥95% achieved) — 2 columns below target: long_full_month_date (0% — misclassification), multilingual.date (33.3% — mixed-format column).
+- **Post-retrain accuracy recovery** — Profile eval 110/116 (94.8% label, 94.8% domain). 6 misclassifications after v0.5.2 retrain: utc_offset→excel_format (new), ean→credit_card_number (new), multilingual.name→region (new), countries.sub-region→full_name (new), countries.name→full_name (pre-existing), world_cities.name→full_name (new). Actionability at 98.7% (target ≥95% achieved) — 1 column below target: multilingual.date (33.3% — mixed-format column).
 
 ## Architecture
 
@@ -80,7 +77,7 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
 
 ### Inference pipeline
 
-**Value-level:** Single string → type label via `CharClassifier` (flat, 169 classes) or `TieredClassifier` (46 CharCNN models in T0→T1→T2 graph). Both implement `ValueClassifier` trait.
+**Value-level:** Single string → type label via `CharClassifier` (flat, 163 classes) or `TieredClassifier` (46 CharCNN models in T0→T1→T2 graph). Both implement `ValueClassifier` trait.
 
 **Column-level (Sense→Sharpen, default):** Vector of strings + header → single column type:
 1. Sample 100 values, encode header + first 50 with Model2Vec
@@ -121,7 +118,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Taxonomy structure
 
-Labels: `domain.category.type` (e.g., `identity.person.email`). 6 domains: container (11), datetime (46), geography (16), identity (31), representation (29), technology (30).
+Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (12), datetime (45), finance (16), geography (15), identity (19), representation (32), technology (24).
 
 Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB type), `format_string`, `transform` (SQL expression), `validation`, `tier`, `decompose`.
 

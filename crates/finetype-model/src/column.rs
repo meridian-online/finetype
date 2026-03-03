@@ -625,12 +625,11 @@ impl ColumnClassifier {
                 return Ok(result);
             }
 
-            // Measurement disambiguation: age, height, and weight values are
+            // Measurement disambiguation: height and weight values are
             // numerically indistinguishable (all small integers in overlapping
             // ranges). When the header provides a specific measurement hint,
             // trust it over the model prediction.
             const MEASUREMENT_TYPES: &[&str] = &[
-                "identity.person.age",
                 "identity.person.height",
                 "identity.person.weight",
             ];
@@ -1076,9 +1075,8 @@ impl ColumnClassifier {
                 if result.label == hinted_type {
                     result.confidence = (result.confidence + 0.1).min(1.0);
                 } else {
-                    // Measurement disambiguation: age/height/weight
+                    // Measurement disambiguation: height/weight
                     const MEASUREMENT_TYPES: &[&str] = &[
-                        "identity.person.age",
                         "identity.person.height",
                         "identity.person.weight",
                     ];
@@ -1269,7 +1267,6 @@ const COORDINATE_PAIR: (&str, &str) = (
 /// Numeric attractors catch integers misclassified as postal codes, etc.
 const NUMERIC_ATTRACTORS: &[&str] = &[
     "geography.address.postal_code",
-    "geography.address.street_number",
 ];
 
 /// Text attractors catch short words/phrases misclassified as identity types.
@@ -1968,9 +1965,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "gender" | "sex" => {
             return Some("identity.person.gender");
         }
-        "age" => {
-            return Some("identity.person.age");
-        }
+        // "age" — REMOVED in v0.5.2 (NNFT-192); falls to integer_number
         "latitude" | "lat" => {
             return Some("geography.coordinate.latitude");
         }
@@ -2312,7 +2307,7 @@ fn disambiguate_ipv4(values: &[String]) -> Option<String> {
 
 /// Disambiguate numeric types based on value range and distribution.
 ///
-/// Covers: port, increment, postal_code, integer_number, street_number, year
+/// Covers: port, increment, postal_code, integer_number, year
 fn disambiguate_numeric(
     values: &[String],
     results: &[ClassificationResult],
@@ -2325,7 +2320,6 @@ fn disambiguate_numeric(
         "representation.numeric.integer_number",
         "representation.numeric.decimal_number",
         "geography.address.postal_code",
-        "geography.address.street_number",
         "datetime.component.year",
     ];
 
@@ -2466,20 +2460,7 @@ fn disambiguate_numeric(
         ));
     }
 
-    // Street number: small positive integers, typically 1-9999
-    let street_range = all_positive && max < 100000 && min >= 1;
-    let is_street_candidate = top_labels.contains(&"geography.address.street_number");
-    if is_street_candidate
-        && street_range
-        && !is_sequential
-        && !has_common_ports
-        && !consistent_digits
-    {
-        return Some((
-            "geography.address.street_number".to_string(),
-            "numeric_street_number_detection".to_string(),
-        ));
-    }
+    // ("geography.address.street_number" detection block — REMOVED in v0.5.2, NNFT-192)
 
     // Fallback: if we couldn't determine more specifically, use the model majority
     // (return None to let the majority vote stand)
@@ -3093,7 +3074,7 @@ mod tests {
 
         let votes = vec![
             ("representation.numeric.integer_number".to_string(), 5),
-            ("geography.address.street_number".to_string(), 3),
+            ("geography.address.postal_code".to_string(), 3),
             ("datetime.component.year".to_string(), 2),
         ];
         let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
@@ -3911,8 +3892,9 @@ mod tests {
     fn test_header_hint_identity() {
         assert_eq!(header_hint("gender"), Some("identity.person.gender"));
         assert_eq!(header_hint("Sex"), Some("identity.person.gender"));
-        assert_eq!(header_hint("age"), Some("identity.person.age"));
-        assert_eq!(header_hint("Age"), Some("identity.person.age"));
+        // "age" hint removed in v0.5.2 (NNFT-192) — falls to integer_number
+        assert_eq!(header_hint("age"), None);
+        assert_eq!(header_hint("Age"), None);
     }
 
     #[test]
@@ -3983,7 +3965,6 @@ mod tests {
             "city",
             "state",
             "gender",
-            "age",
             "url",
             "ip",
             "uuid",
@@ -4663,44 +4644,8 @@ mod tests {
 
     // ── Attractor demotion tests (Rule 14) ──────────────────────────────
 
-    #[test]
-    fn test_attractor_validation_demotion() {
-        // Values that fail street_number validation (^[0-9]{1,5}$):
-        // negative numbers fail pattern — need >50% fail rate to trigger demotion
-        let values: Vec<String> = vec![
-            "-200", "-15000", "-3500", "-50", "-12000", "-800", "25000", "-100", "45000", "600",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        let votes = vec![
-            ("geography.address.street_number".to_string(), 9),
-            ("representation.numeric.integer_number".to_string(), 1),
-        ];
-
-        let yaml = r#"
-geography.address.street_number:
-  title: "Street Number"
-  validation:
-    type: string
-    pattern: "^[0-9]{1,5}$"
-    minLength: 1
-    maxLength: 5
-  tier: [VARCHAR, geography, address]
-  release_priority: 5
-  samples: ["123"]
-"#;
-        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
-
-        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
-        assert!(
-            result.is_some(),
-            "Should demote street_number when values fail validation"
-        );
-        let (label, rule) = result.unwrap();
-        assert_eq!(label, "representation.numeric.integer_number");
-        assert!(rule.starts_with("attractor_demotion_validation:"));
-    }
+    // test_attractor_validation_demotion — REMOVED in v0.5.2 (NNFT-192)
+    // Was testing street_number demotion which no longer exists.
 
     #[test]
     fn test_attractor_confidence_demotion() {
@@ -4811,38 +4756,8 @@ geography.transportation.icao_code:
         );
     }
 
-    #[test]
-    fn test_attractor_no_demotion_true_positive() {
-        // Actual street_number values at high confidence (>0.85) — should NOT demote
-        let values: Vec<String> = vec![
-            "123", "456", "789", "12", "345", "678", "901", "234", "567", "890",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        let votes = vec![("geography.address.street_number".to_string(), 10)];
-
-        let yaml = r#"
-geography.address.street_number:
-  title: "Street Number"
-  validation:
-    type: string
-    pattern: "^[0-9]{1,5}$"
-    minLength: 1
-    maxLength: 5
-  tier: [VARCHAR, geography, address]
-  release_priority: 5
-  samples: ["123"]
-"#;
-        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
-
-        // All pass validation AND confidence is 1.0 → no demotion
-        let result = disambiguate_attractor_demotion(&values, &votes, 10, Some(&taxonomy));
-        assert!(
-            result.is_none(),
-            "Should NOT demote actual street numbers at high confidence"
-        );
-    }
+    // test_attractor_no_demotion_true_positive — REMOVED in v0.5.2 (NNFT-192)
+    // Was testing street_number non-demotion which no longer exists.
 
     #[test]
     fn test_attractor_no_demotion_high_confidence() {
@@ -4890,7 +4805,7 @@ geography.address.postal_code:
             .collect();
         let votes = vec![
             ("geography.address.postal_code".to_string(), 8),
-            ("geography.address.street_number".to_string(), 2),
+            ("representation.numeric.integer_number".to_string(), 2),
         ];
 
         let result = select_fallback(&votes, true, false, false, &values);
@@ -4919,7 +4834,7 @@ geography.address.postal_code:
         let votes = vec![
             ("geography.address.postal_code".to_string(), 6),
             ("representation.numeric.decimal_number".to_string(), 3),
-            ("geography.address.street_number".to_string(), 1),
+            ("representation.numeric.integer_number".to_string(), 1),
         ];
 
         let result = select_fallback(&votes, true, false, false, &values);

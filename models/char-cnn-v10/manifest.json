@@ -1,0 +1,11 @@
+{
+  "batch_size": 512,
+  "data_file": "/tmp/training_163.ndjson",
+  "epochs": 5,
+  "model_type": "charcnn",
+  "n_classes": 163,
+  "n_samples": 161000,
+  "parent_snapshot": null,
+  "seed": 42,
+  "timestamp": "2026-03-03T12:56:11.558263315+00:00"
+}

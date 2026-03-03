@@ -229,7 +229,7 @@ fn build_header_hint_entries() -> Vec<(String, String)> {
         // Person
         ("gender", "identity.person.gender"),
         ("sex", "identity.person.gender"),
-        ("age", "identity.person.age"),
+        // ("age", "identity.person.age") — REMOVED in v0.5.2 (NNFT-192)
         // Geo coordinates
         ("latitude", "geography.coordinate.latitude"),
         ("lat", "geography.coordinate.latitude"),
@@ -582,7 +582,7 @@ mod tests {
         // Verify safetensors
         let st_bytes = std::fs::read(output.join("type_embeddings.safetensors")).unwrap();
         let tensors = safetensors::SafeTensors::deserialize(&st_bytes).unwrap();
-        let emb_tensor = tensors.tensor("embeddings").unwrap();
+        let emb_tensor = tensors.tensor("type_embeddings").unwrap();
         assert_eq!(emb_tensor.shape(), &[4, 3]);
     }
 

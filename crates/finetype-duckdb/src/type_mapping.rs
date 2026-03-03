@@ -121,7 +121,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
 
         // ── geography.address ──────────────────────────────────────────
         "geography.address.full_address" | "geography.address.street_name" => "VARCHAR",
-        "geography.address.street_number" => "INTEGER",
         "geography.address.postal_code" | "geography.address.street_suffix" => "VARCHAR",
 
         // ── geography.contact ──────────────────────────────────────────
@@ -144,7 +143,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "identity.person.nationality"
         | "identity.person.occupation"
         | "identity.person.blood_type" => "VARCHAR",
-        "identity.person.age" => "SMALLINT",
         "identity.person.height" | "identity.person.weight" => "DOUBLE",
 
         // ── identity.academic ──────────────────────────────────────────
@@ -198,7 +196,8 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
 
         // ── representation.identifier ────────────────────────────────
         "representation.identifier.uuid" => "UUID",
-        "representation.identifier.alphanumeric_id" => "VARCHAR",
+        "representation.identifier.alphanumeric_id"
+        | "representation.identifier.numeric_code" => "VARCHAR",
         "representation.identifier.increment" => "BIGINT",
 
         // ── container.object ───────────────────────────────────────────

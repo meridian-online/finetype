@@ -1,9 +1,10 @@
 ---
 id: NNFT-135
 title: Numeric age/integer disambiguation investigation
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-25 09:50'
+updated_date: '2026-03-03 12:59'
 labels:
   - accuracy
   - discovery
@@ -23,6 +24,12 @@ priority: low
 - [ ] #2 Assess whether header hints could rescue these (check if columns have informative headers)
 - [ ] #3 Written finding: rule-fixable vs model-level vs cross-column context needed
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Resolved by removal of `identity.person.age` from the taxonomy in NNFT-192. The age type was indistinguishable from plain integers (CAST(col AS SMALLINT) is identical to integer_number), and produced 205 SOTAB false positives. Age columns now correctly fall through to integer_number, which is the appropriate type for plain numeric values without format-specific validation.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

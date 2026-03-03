@@ -619,7 +619,7 @@ mod tests {
             ("first_name", "identity.person.first_name"),
             ("country", "geography.location.country"),
             ("gender", "identity.person.gender"),
-            ("age", "identity.person.age"),
+            // ("age", "identity.person.age") — REMOVED in v0.5.2 (NNFT-192)
             ("url", "technology.internet.url"),
         ];
 
