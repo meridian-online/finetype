@@ -91,7 +91,7 @@ fn main() -> Result<()> {
             .and_then(|s| s.parse().ok())
             .unwrap_or(0.0);
 
-        let fmt = match format_strings.get(&predicted_type) {
+        let fmts = match format_strings.get(&predicted_type) {
             Some(f) => f.clone(),
             None => continue,
         };
@@ -103,53 +103,67 @@ fn main() -> Result<()> {
             continue;
         }
 
-        let fmt_escaped = fmt.replace('\'', "''");
         let col_escaped = column_name.replace('"', "\"\"");
         let file_escaped = file_path.replace('\'', "''");
 
-        let query = format!(
-            r#"SELECT count(*), count(TRY_STRPTIME("{col}", '{fmt}')), count(*) - count(TRY_STRPTIME("{col}", '{fmt}')) FROM read_csv('{file}', auto_detect=true, all_varchar=true) WHERE "{col}" IS NOT NULL AND TRIM("{col}") != ''"#,
-            col = col_escaped,
-            fmt = fmt_escaped,
-            file = file_escaped,
-        );
+        // Try each format string variant; keep the best result
+        let mut best: Option<ActionResult> = None;
+        for fmt in &fmts {
+            let fmt_escaped = fmt.replace('\'', "''");
+            let query = format!(
+                r#"SELECT count(*), count(TRY_STRPTIME("{col}", '{fmt}')), count(*) - count(TRY_STRPTIME("{col}", '{fmt}')) FROM read_csv('{file}', auto_detect=true, all_varchar=true) WHERE "{col}" IS NOT NULL AND TRIM("{col}") != ''"#,
+                col = col_escaped,
+                fmt = fmt_escaped,
+                file = file_escaped,
+            );
 
-        match conn.query_row(&query, [], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, i64>(2)?,
-            ))
-        }) {
-            Ok((total, success, fail)) => {
-                if total > 0 {
-                    results.push(ActionResult {
-                        dataset,
-                        column_name,
-                        predicted_type,
-                        format_string: fmt,
-                        confidence,
-                        total_values: total,
-                        parse_success: success,
-                        parse_fail: fail,
-                        success_rate: round1(success as f64 / total as f64 * 100.0),
-                    });
+            match conn.query_row(&query, [], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            }) {
+                Ok((total, success, fail)) => {
+                    if total > 0 {
+                        let rate = round1(success as f64 / total as f64 * 100.0);
+                        let candidate = ActionResult {
+                            dataset: dataset.clone(),
+                            column_name: column_name.clone(),
+                            predicted_type: predicted_type.clone(),
+                            format_string: fmt.clone(),
+                            confidence,
+                            total_values: total,
+                            parse_success: success,
+                            parse_fail: fail,
+                            success_rate: rate,
+                        };
+                        if best.as_ref().is_none_or(|b| rate > b.success_rate) {
+                            best = Some(candidate);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: DuckDB query failed for format '{}': {}", fmt, e);
                 }
             }
-            Err(e) => {
-                eprintln!("Warning: DuckDB query failed: {e}");
-                results.push(ActionResult {
-                    dataset,
-                    column_name,
-                    predicted_type,
-                    format_string: fmt,
-                    confidence,
-                    total_values: 0,
-                    parse_success: 0,
-                    parse_fail: 0,
-                    success_rate: 0.0,
-                });
-            }
+        }
+
+        if let Some(result) = best {
+            results.push(result);
+        } else {
+            // All format strings failed — record zero result with primary format
+            results.push(ActionResult {
+                dataset,
+                column_name,
+                predicted_type,
+                format_string: fmts.first().cloned().unwrap_or_default(),
+                confidence,
+                total_values: 0,
+                parse_success: 0,
+                parse_fail: 0,
+                success_rate: 0.0,
+            });
         }
     }
 

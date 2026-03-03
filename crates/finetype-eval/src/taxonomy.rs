@@ -12,8 +12,12 @@ pub struct TaxonomyStats {
     pub domains: BTreeMap<String, usize>,
 }
 
-/// Load format_string for all types from taxonomy YAML files.
-pub fn load_format_strings(labels_dir: &Path) -> Result<BTreeMap<String, String>> {
+/// Load format_string (and format_string_alt) for all types from taxonomy YAML files.
+///
+/// Returns a list of format strings per type. The primary format_string is first,
+/// followed by format_string_alt if present. This allows the eval to try multiple
+/// format variants (e.g., ISO 8601 with and without fractional seconds).
+pub fn load_format_strings(labels_dir: &Path) -> Result<BTreeMap<String, Vec<String>>> {
     let mut format_strings = BTreeMap::new();
     let mut paths: Vec<_> = std::fs::read_dir(labels_dir)
         .with_context(|| format!("Failed to read labels dir: {}", labels_dir.display()))?
@@ -27,6 +31,9 @@ pub fn load_format_strings(labels_dir: &Path) -> Result<BTreeMap<String, String>
         .collect();
     paths.sort();
 
+    let fs_key = serde_yaml::Value::String("format_string".to_string());
+    let fs_alt_key = serde_yaml::Value::String("format_string_alt".to_string());
+
     for yaml_file in &paths {
         let text = std::fs::read_to_string(yaml_file)
             .with_context(|| format!("Failed to read {}", yaml_file.display()))?;
@@ -35,12 +42,23 @@ pub fn load_format_strings(labels_dir: &Path) -> Result<BTreeMap<String, String>
 
         for (key, val) in &data {
             if let serde_yaml::Value::Mapping(map) = val {
-                if let Some(fs) = map.get(&serde_yaml::Value::String("format_string".to_string())) {
+                let mut fmts = Vec::new();
+                if let Some(fs) = map.get(&fs_key) {
                     if let Some(s) = fs.as_str() {
                         if s != "null" {
-                            format_strings.insert(key.clone(), s.to_string());
+                            fmts.push(s.to_string());
                         }
                     }
+                }
+                if let Some(fs_alt) = map.get(&fs_alt_key) {
+                    if let Some(s) = fs_alt.as_str() {
+                        if s != "null" {
+                            fmts.push(s.to_string());
+                        }
+                    }
+                }
+                if !fmts.is_empty() {
+                    format_strings.insert(key.clone(), fmts);
                 }
             }
         }

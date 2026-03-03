@@ -32,14 +32,15 @@ datetime.timestamp.iso_8601:
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
   format_string: "%Y-%m-%dT%H:%M:%SZ"
+  format_string_alt: "%Y-%m-%dT%H:%M:%S.%gZ"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%SZ')"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$"
     minLength: 20
-    maxLength: 20
+    maxLength: 27
   tier: [TIMESTAMP, timestamp]
   release_priority: 5
   aliases: [big_endian]
