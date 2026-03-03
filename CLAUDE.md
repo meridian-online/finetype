@@ -23,23 +23,25 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 **Version:** 0.5.1
 **Taxonomy:** 164 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 16, identity: 20, representation: 31, technology: 24) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v9 flat (164 classes), tiered-v2 fallback via `--sharp-only`
-**Codebase:** ~20k lines of Rust across 7 crates (including finetype-train for pure Rust ML training). Zero Python runtime dependencies.
+**Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
-- **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination (schema contracts reject impossible types), Rule 19 (percentage without '%' → decimal_number), header hint additions (timezone, publisher, measurement keywords), hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes. Actionability 92.7%.
+- **Actionability improvements** (NNFT-191) — Actionability 92.7% → 96.0% (2910/3030 values). Added `format_string_alt` field to taxonomy YAML for ISO 8601 fractional seconds variant. Updated eval to try multiple format strings per type. Fixed network_logs.timestamp (0% → 100%).
+- **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination (schema contracts reject impossible types), Rule 19 (percentage without '%' → decimal_number), header hint additions (timezone, publisher, measurement keywords), hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes.
 - **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers. Removed `technology.hardware.screen_size` and `technology.hardware.ram_size`. `remap_collapsed_label()` eliminated — models now natively produce 164-class outputs.
 - **Pure Rust training** (NNFT-185) — All Python training scripts replaced with Rust/Candle. `finetype-train` crate with 4 binaries: train-sense-model, train-entity-classifier, prepare-sense-data, prepare-model2vec. Dual-format SenseClassifier supports both Python-trained (MHA) and Rust-trained (simple attention) models. 253 tests pass.
-- **Python cleanup** (NNFT-186) — Removed 11 Python files. Only remaining python3 call: DuckDB extension metadata script.
+- **DuckDB metadata tool** (NNFT-183) — Replaced Python `append_extension_metadata.py` with `finetype-build-tools` crate. `append-duckdb-metadata` binary produces byte-identical output. Zero Python in build chain.
+- **Python cleanup** (NNFT-186) — Removed 11 Python files. All Python dependencies eliminated.
 - **Taxonomy v0.5.1** (NNFT-177/178/179/180) — Finance domain (banking, commerce), identifier category. Net: +3 types (IBAN, currency amounts, html_content, locale_number, alphanumeric_code added; cvv, century, screen_size, ram_size removed). 164 types across 7 domains.
 - **Production Sense model deployed** (NNFT-173) — Trained on enriched data (SOTAB + profile + synthetic headers). Sense is the default pipeline.
 - **Entity classifier** (NNFT-151/152) — Deep Sets MLP demotes full_name → entity_name for non-person columns.
 
 ### What's in progress
 
-- **Remaining accuracy gaps** — Profile eval 117/119 (98.3% label, 99.2% domain). 2 remaining misclassifications: countries.name (full_name vs country — ambiguous "name" header, CharCNN doesn't see country as plurality), datetime_formats_extended.long_full_month_date (iso_8601 vs long_full_month — datetime format confusion). Actionability at 92.7% (target ≥95%) — 3 columns below target: network_logs.timestamp (0%), long_full_month_date (0%), multilingual.date (33.3%).
+- **Remaining accuracy gaps** — Profile eval 117/119 (98.3% label, 99.2% domain). 2 remaining misclassifications: countries.name (full_name vs country — ambiguous "name" header, CharCNN doesn't see country as plurality), datetime_formats_extended.long_full_month_date (iso_8601 vs long_full_month — datetime format confusion). Actionability at 96.0% (target ≥95% achieved) — 2 columns below target: long_full_month_date (0% — misclassification), multilingual.date (33.3% — mixed-format column).
 
 ## Architecture
 
@@ -55,6 +57,7 @@ finetype/
     finetype-eval/     # Evaluation binaries (report, actionability, GitTables, SOTAB)
     finetype-candle-spike/  # ML training feasibility spike (Candle 0.8)
     finetype-train/    # Pure Rust ML training (Sense, Entity, data pipeline)
+    finetype-build-tools/  # Build utilities (DuckDB extension metadata)
   labels/              # Taxonomy YAML definitions (6 domain files)
   models/              # Pre-trained model directories
   eval/                # Evaluation infrastructure (GitTables, SOTAB, profile)
@@ -151,7 +154,7 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 **Profile eval** (`eval/profile_eval.sh`) — 98.3% label (117/119), 99.2% domain (117/119) on 21 datasets.
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
-**Actionability eval** (`eval-actionability` binary) — 92.7% datetime format_string parse rate (2810/3030 values). 3 columns below 95%: network_logs.timestamp, long_full_month_date, multilingual.date.
+**Actionability eval** (`eval-actionability` binary) — 96.0% datetime format_string parse rate (2910/3030 values). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds). 2 columns below 95%: long_full_month_date (misclassification), multilingual.date (mixed formats).
 **Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 
@@ -172,7 +175,7 @@ GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable c
 2. **DuckDB extension metadata** — Replace last Python script in build chain (NNFT-183)
 3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
 4. **Distribution** — Homebrew tap, crates.io current, v0.5.1 release
-5. **Optional: actionability improvements** — Remaining 92.7% (vs 95% target) requires model fixes or format_string updates
+5. **Optional: further actionability improvements** — At 96.0% (target met). Remaining gaps: long_full_month_date (misclassification), multilingual.date (mixed formats)
 
 ## Decided Items
 
@@ -244,6 +247,7 @@ make eval-report        # Profile eval + actionability + dashboard
 | Collapsed type remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
 | Candle training spike | `crates/finetype-candle-spike/` (models, data, training, tests) |
 | Candle spike summary | `discovery/candle-feasibility-spike/SUMMARY.md` |
+| DuckDB metadata tool | `crates/finetype-build-tools/src/lib.rs`, `crates/finetype-build-tools/src/bin/append_duckdb_metadata.rs` |
 
 ## Backlog Discipline
 
