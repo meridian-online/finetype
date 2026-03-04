@@ -1,11 +1,11 @@
 ---
 id: NNFT-201
 title: Model retrain on locale-expanded training data
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-04 02:32'
-updated_date: '2026-03-04 08:26'
+updated_date: '2026-03-04 08:27'
 labels:
   - locale
   - training
@@ -104,5 +104,5 @@ Shipped as-is per Hugh's approval. Profile gain (+1.8pp) is the headline. rfc_28
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

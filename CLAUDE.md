@@ -20,7 +20,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.5.2
+**Version:** 0.5.3
 **Taxonomy:** 163 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 15, identity: 19, representation: 32, technology: 24) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v11 flat (163 classes, 10 epochs), tiered-v2 fallback via `--sharp-only`
 **Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).

@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-03-04
+
+### Accuracy
+
+- **Profile eval: 113/116 label (97.4%), 114/116 domain (98.3%)** — recovered from 110/116 (94.8%) in v0.5.2. Five targeted pipeline fixes: Rule 17 UTC offset guard removal, rfc_2822/rfc_3339/sql_standard header hints before generic catch-all, same-category hardcoded hint override at ≤0.80 confidence, enhanced geography protection using unmasked votes at low Sense confidence, full_address header hint distinguished from street_address. (NNFT-194)
+- **Actionability eval: 97.9%** — up from 95.4% in v0.5.2. rfc_2822_timestamp column now correctly classified (was misrouted to iso_8601 by generic `contains("timestamp")` catch-all). Remaining gap: multilingual.date mixed-format column (known limitation). (NNFT-194)
+
+### Added
+
+- **Locale Foundation — Layer 1: Validation expansion** — expanded locale-specific validation patterns across three type families. (NNFT-195, NNFT-196, NNFT-197)
+  - `postal_code`: 14 → 50+ locales. Patterns sourced from Google libaddressinput and CLDR.
+  - `phone_number`: 15 → 40+ locales. Patterns derived from Google libphonenumber.
+  - `month_name` / `day_of_week`: 6 → 30+ locales. Validation lists from Unicode CLDR v46.0.0.
+- **Locale Foundation — Layer 2: Generator expansion** — expanded synthetic training data generators to match validation coverage. (NNFT-198, NNFT-199, NNFT-200)
+  - `postal_code` generator: 14 → 65 locales with format-aware random generation.
+  - `phone_number` generator: catch-all countries promoted to named locales (46 total).
+  - CLDR date/time patterns wired into `month_name`, `day_of_week`, and datetime generators (32 locales).
+- **CI Sense model download** — `.github/scripts/download-model.sh` now fetches the Sense classifier model from HuggingFace, enabling the Sense→Sharpen pipeline in CI builds. (NNFT-202)
+
+### Changed
+
+- **Model: CharCNN v10 → v11** — retrained on locale-expanded training data (161k samples, 10 epochs, seed 42, 88.3% training accuracy). Expanded locale coverage in generators provides richer training signal for geography, identity, and datetime types. (NNFT-201)
+- **Header hints refined** — specific rfc_2822, rfc_3339, and sql_standard timestamp hints now take priority over generic `iso_8601` catch-all. Bare "name" header no longer forces `full_name` — lets Sense + CharCNN decide. `full_address` distinguished from `street_address` via header keyword. (NNFT-194)
+- **Same-category hint override** — when a curated `header_hint()` and CharCNN prediction share the same `domain.category` (e.g., `datetime.timestamp.*`), the header is authoritative — but only when model confidence ≤0.80 to avoid overriding correct high-confidence predictions. (NNFT-194)
+
+### Fixed
+
+- **UTC offset misclassification** — Rule 17 guard removed. The `[+-]HH:MM` pattern validator at ≥80% is sufficient; the guard requiring top CharCNN vote to be a time type was too restrictive after v11 retrain. (NNFT-194)
+- **rfc_2822_timestamp misclassification** — was being matched by generic `contains("timestamp")` → `iso_8601` catch-all in `header_hint()`. Now matched by specific `rfc 2822` check first. Note: header normalization replaces underscores with spaces. (NNFT-194)
+- **Geography protection enhanced** — when Sense confidence is very low (<0.30), checks unmasked CharCNN votes for location types instead of relying on masked (potentially empty) votes. Recovers correct predictions when Sense misroutes columns. (NNFT-194)
+- **Eval manifest GT correction** — `sports_events.venue` ground truth corrected from "name" to "entity name". Venue names (stadiums, arenas) are entities, not person names. (NNFT-194)
+
+### Known Issues
+
+- **3 remaining misclassifications** — countries.name (→region, correct domain), world_cities.name (→full_name, Sense misroute), sports_events.venue (→city, expected entity_name). All require model retrain to resolve — CharCNN cannot distinguish geography subtypes from person names via character patterns alone.
+- **multilingual.date actionability** — 60 values, 0% parse rate. Mixed date formats across locales; not addressable without multi-format support.
+
 ## [0.5.2] - 2026-03-04
 
 ### Accuracy

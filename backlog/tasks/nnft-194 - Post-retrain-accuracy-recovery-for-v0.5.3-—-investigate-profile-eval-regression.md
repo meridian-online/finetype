@@ -3,11 +3,11 @@ id: NNFT-194
 title: >-
   Post-retrain accuracy recovery for v0.5.3 — investigate profile eval
   regression
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-03 22:37'
-updated_date: '2026-03-04 10:02'
+updated_date: '2026-03-04 10:03'
 labels:
   - accuracy
   - post-release
@@ -121,5 +121,5 @@ Five targeted pipeline fixes to recover accuracy after CharCNN v11 retrain on lo
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

@@ -88,3 +88,27 @@ else
   echo "Entity classifier download failed — continuing without entity demotion"
   rm -rf models/entity-classifier
 fi
+
+# ── Sense classifier (optional) ──────────────────────────────────────────
+# Download the Sense broad-category classifier for Sense→Sharpen pipeline.
+# The build gracefully degrades if these are absent (HAS_SENSE_CLASSIFIER=false).
+echo ""
+echo "Downloading Sense classifier model..."
+mkdir -p models/sense
+SENSE_OK=true
+for file in model.safetensors config.json; do
+  echo "  Downloading sense/${file}..."
+  if ! curl -sfL "${REPO}/sense/${file}" -o "models/sense/${file}"; then
+    echo "  WARNING: Failed to download sense/${file} — Sense pipeline will be disabled"
+    SENSE_OK=false
+    break
+  fi
+done
+
+if [ "${SENSE_OK}" = true ]; then
+  echo "Sense classifier files:"
+  find models/sense -type f | sort
+else
+  echo "Sense classifier download failed — continuing with legacy pipeline"
+  rm -rf models/sense
+fi
