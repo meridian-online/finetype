@@ -305,7 +305,25 @@ geography.address.postal_code:
     US ZIP codes (5 digits or ZIP+4), UK postcodes (alphanumeric), etc.
     Locale-specific format.
   designation: locale_specific
-  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO]
+  locales: [
+    EN, EN_AU, EN_GB, EN_CA, EN_US, EN_IE, EN_NZ, EN_SG, EN_PH, EN_NG, EN_KE,
+    DE, DE_AT, DE_CH,
+    FR,
+    ES, ES_MX, ES_AR, ES_CL, ES_CO, ES_PE,
+    IT,
+    NL, NL_BE,
+    PL, PT, PT_BR,
+    RU, UA,
+    JA, ZH, ZH_TW, KO,
+    SV, NB, DA, FI, IS,
+    TR, HE, EL,
+    AR_SA, AR_EG, AR_MA,
+    ZA, NG,
+    HI, UR, BN,
+    TH, MS, ID, VI,
+    CS, HU, RO, BG, HR, SK, SL, LT, LV, ET, SR,
+    LU, MT
+  ]
   broad_type: VARCHAR
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
@@ -322,6 +340,7 @@ geography.address.postal_code:
   # pattern, minLength, maxLength, minimum, maximum, and enum keywords.
   # See data/cldr/README.md for attribution and refresh instructions.
   validation_by_locale:
+    # ── English-speaking locales ──────────────────────────────────────
     EN_US:
       type: string
       pattern: "^(\\d{5})(?:[ \\-](\\d{4}))?$"
@@ -342,41 +361,191 @@ geography.address.postal_code:
       pattern: "^[ABCEGHJKLMNPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z] ?\\d[ABCEGHJ-NPRSTV-Z]\\d$"
       minLength: 6
       maxLength: 7
+    EN_IE:
+      type: string
+      pattern: "^[\\dA-Z]{3} ?[\\dA-Z]{4}$"
+      minLength: 7
+      maxLength: 8
+    EN_NZ:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    EN_SG:
+      type: string
+      pattern: "^\\d{6}$"
+      minLength: 6
+      maxLength: 6
+    EN_PH:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    EN_NG:
+      type: string
+      pattern: "^\\d{6}$"
+      minLength: 6
+      maxLength: 6
+    EN_KE:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    # ── German-speaking locales ───────────────────────────────────────
     DE:
       type: string
       pattern: "^\\d{5}$"
       minLength: 5
       maxLength: 5
+    DE_AT:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    DE_CH:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    # ── French ────────────────────────────────────────────────────────
     FR:
       type: string
       pattern: "^\\d{2} ?\\d{3}$"
       minLength: 5
       maxLength: 6
+    # ── Spanish-speaking locales ──────────────────────────────────────
     ES:
       type: string
       pattern: "^\\d{5}$"
       minLength: 5
       maxLength: 5
+    ES_MX:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    ES_AR:
+      type: string
+      pattern: "^([A-HJ-NP-Z])?\\d{4}([A-Z]{3})?$"
+      minLength: 4
+      maxLength: 8
+    ES_CL:
+      type: string
+      pattern: "^\\d{7}$"
+      minLength: 7
+      maxLength: 7
+    ES_CO:
+      type: string
+      pattern: "^\\d{6}$"
+      minLength: 6
+      maxLength: 6
+    ES_PE:
+      type: string
+      pattern: "^(?:LIMA \\d{1,2}|CALLAO 0?\\d|[0-2]\\d{4})$"
+      minLength: 5
+      maxLength: 8
+    # ── Italian ───────────────────────────────────────────────────────
     IT:
       type: string
       pattern: "^\\d{5}$"
       minLength: 5
       maxLength: 5
+    # ── Dutch-speaking locales ────────────────────────────────────────
     NL:
       type: string
       pattern: "^[1-9]\\d{3} ?(?:[A-RT-Z][A-Z]|S[BCE-RT-Z])$"
       minLength: 6
       maxLength: 7
+    NL_BE:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    # ── Polish ────────────────────────────────────────────────────────
     PL:
       type: string
       pattern: "^\\d{2}-\\d{3}$"
       minLength: 6
       maxLength: 6
+    # ── Portuguese-speaking locales ───────────────────────────────────
+    PT:
+      type: string
+      pattern: "^\\d{4}-\\d{3}$"
+      minLength: 8
+      maxLength: 8
+    PT_BR:
+      type: string
+      pattern: "^\\d{5}-?\\d{3}$"
+      minLength: 8
+      maxLength: 9
+    # ── Eastern European / Slavic locales ─────────────────────────────
     RU:
       type: string
       pattern: "^\\d{6}$"
       minLength: 6
       maxLength: 6
+    UA:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    CS:
+      type: string
+      pattern: "^\\d{3} ?\\d{2}$"
+      minLength: 5
+      maxLength: 6
+    HU:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    RO:
+      type: string
+      pattern: "^\\d{6}$"
+      minLength: 6
+      maxLength: 6
+    BG:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    HR:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    SK:
+      type: string
+      pattern: "^\\d{3} ?\\d{2}$"
+      minLength: 5
+      maxLength: 6
+    SL:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    SR:
+      type: string
+      pattern: "^\\d{5,6}$"
+      minLength: 5
+      maxLength: 6
+    # ── Baltic locales ────────────────────────────────────────────────
+    LT:
+      type: string
+      pattern: "^(?:LT-)?\\d{5}$"
+      minLength: 5
+      maxLength: 8
+    LV:
+      type: string
+      pattern: "^LV-\\d{4}$"
+      minLength: 7
+      maxLength: 7
+    ET:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    # ── East Asian locales ────────────────────────────────────────────
     JA:
       type: string
       pattern: "^\\d{3}-?\\d{4}$"
@@ -387,11 +556,132 @@ geography.address.postal_code:
       pattern: "^\\d{6}$"
       minLength: 6
       maxLength: 6
+    ZH_TW:
+      type: string
+      pattern: "^\\d{3}(?:\\d{2,3})?$"
+      minLength: 3
+      maxLength: 6
     KO:
       type: string
       pattern: "^\\d{5}$"
       minLength: 5
       maxLength: 5
+    # ── Nordic locales ────────────────────────────────────────────────
+    SV:
+      type: string
+      pattern: "^\\d{3} ?\\d{2}$"
+      minLength: 5
+      maxLength: 6
+    NB:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    DA:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    FI:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    IS:
+      type: string
+      pattern: "^\\d{3}$"
+      minLength: 3
+      maxLength: 3
+    # ── Middle Eastern locales ────────────────────────────────────────
+    TR:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    HE:
+      type: string
+      pattern: "^\\d{5}(?:\\d{2})?$"
+      minLength: 5
+      maxLength: 7
+    EL:
+      type: string
+      pattern: "^\\d{3} ?\\d{2}$"
+      minLength: 5
+      maxLength: 6
+    AR_SA:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    AR_EG:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    AR_MA:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    # ── African locales ───────────────────────────────────────────────
+    ZA:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    NG:
+      type: string
+      pattern: "^\\d{6}$"
+      minLength: 6
+      maxLength: 6
+    # ── South Asian locales ───────────────────────────────────────────
+    HI:
+      type: string
+      pattern: "^\\d{6}$"
+      minLength: 6
+      maxLength: 6
+    UR:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    BN:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    # ── Southeast Asian locales ───────────────────────────────────────
+    TH:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    MS:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    ID:
+      type: string
+      pattern: "^\\d{5}$"
+      minLength: 5
+      maxLength: 5
+    VI:
+      type: string
+      pattern: "^\\d{5,6}$"
+      minLength: 5
+      maxLength: 6
+    # ── Small European locales ────────────────────────────────────────
+    LU:
+      type: string
+      pattern: "^\\d{4}$"
+      minLength: 4
+      maxLength: 4
+    MT:
+      type: string
+      pattern: "^[A-Z]{3} ?\\d{2,4}$"
+      minLength: 5
+      maxLength: 8
   tier: [VARCHAR, address]
   release_priority: 4
   aliases: [zip_code, postcode]
