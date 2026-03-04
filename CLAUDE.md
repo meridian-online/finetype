@@ -29,8 +29,9 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
-- **Locale Foundation expansion** (NNFT-195–201) — Layer 1: Expanded validation to 50+ postal codes, 45+ phone numbers, 30+ month/day names. Layer 2: Expanded generators to match (65 postal locales, 46 phone locales, 32 CLDR date/time patterns). CharCNN-v11 retrained on expanded data (10 epochs, 88.3% training accuracy). Profile eval improved 110/116→112/116 (96.6%). Actionability at 95.4% (rfc_2822 misclassification — tracked in NNFT-194).
-- **Taxonomy revision v0.5.2** (NNFT-192) — Removed `geography.address.street_number` (false positives on plain integers) and `identity.person.age` (indistinguishable from integer_number, 205 SOTAB false positives). Added `representation.identifier.numeric_code` (VARCHAR, preserves leading zeros for codes like ISO country numeric, NAICS, FIPS). Net: 164→163 types. CharCNN-v10 retrained. Actionability improved 96.0%→98.7%. Profile eval regressed 117/119→110/116 due to model retrain — follow-up needed.
+- **Post-retrain accuracy recovery** (NNFT-194) — Five targeted pipeline fixes: (1) Rule 17 UTC offset guard removed (utc_offset fix), (2) rfc_2822/rfc_3339/sql_standard header hints added before generic timestamp catch-all, (3) full_address header hint distinguished from street_address, (4) same-category hardcoded hint override for within-category disambiguation, (5) enhanced geography protection checks unmasked votes at low confidence. Profile: 112/116→113/116 (97.4% label, 98.3% domain). Actionability: 95.4%→97.9%. 3 remaining misclassifications require model retrain.
+- **Locale Foundation expansion** (NNFT-195–201) — Layer 1: Expanded validation to 50+ postal codes, 45+ phone numbers, 30+ month/day names. Layer 2: Expanded generators to match (65 postal locales, 46 phone locales, 32 CLDR date/time patterns). CharCNN-v11 retrained on expanded data (10 epochs, 88.3% training accuracy). Profile eval improved 110/116→112/116 (96.6%).
+- **Taxonomy revision v0.5.2** (NNFT-192) — Removed `geography.address.street_number` (false positives on plain integers) and `identity.person.age` (indistinguishable from integer_number, 205 SOTAB false positives). Added `representation.identifier.numeric_code` (VARCHAR, preserves leading zeros for codes like ISO country numeric, NAICS, FIPS). Net: 164→163 types. CharCNN-v10 retrained. Actionability improved 96.0%→98.7%. Profile eval regressed 117/119→110/116 due to model retrain.
 - **Actionability improvements** (NNFT-191) — Actionability 92.7% → 96.0% (2910/3030 values). Added `format_string_alt` field to taxonomy YAML for ISO 8601 fractional seconds variant. Updated eval to try multiple format strings per type. Fixed network_logs.timestamp (0% → 100%).
 - **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination, Rule 19, header hint additions, hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes.
 - **v0.5.1 model retrain** (NNFT-181) — All models retrained on clean 164-type taxonomy. CharCNN-v9 (1,000 samples/type), refreshed Model2Vec type embeddings, Sense + Entity classifiers.
@@ -39,7 +40,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Post-retrain accuracy recovery** (NNFT-194) — Profile eval 112/116 (96.6%). 4 remaining misclassifications: utc_offset→excel_format, sports_events.venue→city, countries.name→full_name, world_cities.name→full_name. Actionability at 95.4% — rfc_2822_timestamp misclassified as iso_8601 (80 values). If fixed, actionability would be 98.0%.
+- **Remaining accuracy gaps** — 3 misclassifications: countries.name→region (expected country), sports_events.venue→city (expected entity_name), world_cities.name→full_name (expected city). All are CharCNN limitations where character patterns can't distinguish geography subtypes from person names. Requires model retrain with geography-focused training data or Sense classifier improvements.
 
 ## Architecture
 
@@ -149,10 +150,10 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 98.3% label (117/119), 99.2% domain (117/119) on 21 datasets.
+**Profile eval** (`eval/profile_eval.sh`) — 97.4% label (113/116), 98.3% domain (114/116) on 21 datasets.
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
-**Actionability eval** (`eval-actionability` binary) — 96.0% datetime format_string parse rate (2910/3030 values). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds). 2 columns below 95%: long_full_month_date (misclassification), multilingual.date (mixed formats).
+**Actionability eval** (`eval-actionability` binary) — 97.9% datetime format_string parse rate (2810/2870 values). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds). 1 column below 95%: multilingual.date (mixed formats, known limitation).
 **Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 

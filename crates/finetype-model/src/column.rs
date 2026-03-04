@@ -610,13 +610,14 @@ impl ColumnClassifier {
         // Hardcoded hints have been curated through NNFT-065/091/102/127/128/156
         // and cover known cases precisely. Model2Vec adds value for unknown headers
         // but can override correct hardcoded mappings (NNFT-188).
-        let hinted_type: Option<String> =
-            header_hint(header).map(|h| h.to_string()).or_else(|| {
-                self.semantic_hint
-                    .as_ref()
-                    .and_then(|sh| sh.classify_header(header))
-                    .map(|r| r.label.clone())
-            });
+        let hardcoded_hint_legacy = header_hint(header).map(|h| h.to_string());
+        let hinted_type: Option<String> = hardcoded_hint_legacy.clone().or_else(|| {
+            self.semantic_hint
+                .as_ref()
+                .and_then(|sh| sh.classify_header(header))
+                .map(|r| r.label.clone())
+        });
+        let hint_is_hardcoded_legacy = hardcoded_hint_legacy.is_some();
 
         if let Some(hinted_type) = hinted_type.as_deref() {
             // If the model already predicts the hinted type, just boost confidence
@@ -735,6 +736,31 @@ impl ColumnClassifier {
                     header.to_lowercase()
                 ));
                 return Ok(result);
+            }
+
+            // Same-category hardcoded hint override (NNFT-194):
+            // When the hardcoded header hint and prediction share the same
+            // domain.category (e.g., both datetime.timestamp.*), the header
+            // is authoritative for format disambiguation. Only applies when
+            // confidence is moderate (≤0.80) — high confidence predictions
+            // within the same category are more likely correct than the hint.
+            if hint_is_hardcoded_legacy && result.label != hinted_type && result.confidence <= 0.80
+            {
+                let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
+                let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
+                if !hint_category.is_empty()
+                    && hint_category == pred_category
+                    && hint_category.contains('.')
+                {
+                    result.label = hinted_type.to_string();
+                    result.confidence = result.confidence.max(0.7);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_same_category:{}",
+                        header.to_lowercase()
+                    ));
+                    return Ok(result);
+                }
             }
 
             let original_label = result.label.clone();
@@ -1060,13 +1086,14 @@ impl ColumnClassifier {
             .is_some_and(|r| r.starts_with("sense_entity_demotion"));
         if !entity_demoted && !header.is_empty() {
             // Hardcoded first (curated knowledge), then Model2Vec (NNFT-188).
-            let hinted_type: Option<String> =
-                header_hint(header).map(|h| h.to_string()).or_else(|| {
-                    self.semantic_hint
-                        .as_ref()
-                        .and_then(|sh| sh.classify_header(header))
-                        .map(|r| r.label.clone())
-                });
+            let hardcoded_hint = header_hint(header).map(|h| h.to_string());
+            let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
+                self.semantic_hint
+                    .as_ref()
+                    .and_then(|sh| sh.classify_header(header))
+                    .map(|r| r.label.clone())
+            });
+            let hint_is_hardcoded = hardcoded_hint.is_some();
 
             if let Some(hinted_type) = hinted_type.as_deref() {
                 // Already predicts the hinted type — boost confidence
@@ -1133,17 +1160,18 @@ impl ColumnClassifier {
                                     header.to_lowercase()
                                 ));
                                 geo_handled = true;
-                            } else if is_generic {
-                                // Generic + person-name hint → check for location votes
-                                let top_location = result
-                                    .vote_distribution
+                            } else if is_generic || result.confidence < 0.3 {
+                                // Generic or very-low-confidence + person-name hint →
+                                // check UNMASKED votes for location types. Low confidence
+                                // (<0.3) suggests Sense may have misrouted this column,
+                                // so masked votes are unreliable. Unmasked CharCNN votes
+                                // give the true value-level signal. (NNFT-194)
+                                let top_unmasked_location = unmasked_votes
                                     .iter()
-                                    .filter(|(label, _)| LOCATION_TYPES.contains(&label.as_str()))
-                                    .max_by(|a, b| {
-                                        a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-                                    });
-                                if let Some((loc_label, loc_frac)) = top_location {
-                                    if *loc_frac >= 0.10 {
+                                    .find(|(label, _)| LOCATION_TYPES.contains(&label.as_str()));
+                                if let Some((loc_label, loc_count)) = top_unmasked_location {
+                                    let loc_frac = *loc_count as f32 / n_samples as f32;
+                                    if loc_frac >= 0.10 {
                                         result.label = loc_label.clone();
                                         result.confidence = loc_frac.max(0.5);
                                         result.disambiguation_applied = true;
@@ -1175,6 +1203,36 @@ impl ColumnClassifier {
                                 header.to_lowercase()
                             ));
                             geo_handled = true;
+                        }
+
+                        // Same-category hardcoded hint override (NNFT-194):
+                        // When the hardcoded header hint and prediction share the
+                        // same domain.category (e.g., both datetime.timestamp.*),
+                        // the header is authoritative for distinguishing format
+                        // variants. Headers like "rfc_2822_timestamp" explicitly
+                        // name the format — trust them over CharCNN's inability
+                        // to distinguish similar timestamp formats. Only applies
+                        // when confidence is moderate (≤0.80).
+                        if !geo_handled
+                            && hint_is_hardcoded
+                            && result.label != hinted_type
+                            && result.confidence <= 0.80
+                        {
+                            let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
+                            let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
+                            if !hint_category.is_empty()
+                                && hint_category == pred_category
+                                && hint_category.contains('.')
+                            {
+                                result.label = hinted_type.to_string();
+                                result.confidence = result.confidence.max(0.7);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_same_category:{}",
+                                    header.to_lowercase()
+                                ));
+                                geo_handled = true;
+                            }
                         }
 
                         // General hint logic (runs for all non-person hints,
@@ -1423,15 +1481,11 @@ fn disambiguate(
     }
 
     // Rule 17: UTC offset override — standalone UTC offset values like "+05:30"
-    // misclassified as time formats (hm_24h, hms_24h) because the HH:MM pattern
-    // matches. The mandatory leading +/- sign distinguishes offsets from times.
-    if top_labels
-        .first()
-        .is_some_and(|l| l.starts_with("datetime.time.") || *l == "datetime.timestamp.rfc_3339")
-    {
-        if let Some((label, rule)) = disambiguate_utc_offset_override(values) {
-            return Some((label, rule));
-        }
+    // misclassified as time formats or other types because the HH:MM pattern
+    // overlaps. The mandatory leading +/- sign at ≥80% of values is sufficient
+    // to distinguish offsets — no top-label guard needed.
+    if let Some((label, rule)) = disambiguate_utc_offset_override(values) {
+        return Some((label, rule));
     }
 
     // Rule 15: Attractor type demotion — demote over-eager specific type
@@ -2081,13 +2135,19 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if h.contains("name") && (h.contains("last") || h.contains("family") || h.contains("sur")) {
         return Some("identity.person.last_name");
     }
-    if h.contains("name") && (h.contains("full") || h.contains("complete") || h == "name") {
+    if h.contains("name") && (h.contains("full") || h.contains("complete")) {
         return Some("identity.person.full_name");
     }
-    if h == "name" || h.ends_with(" name") {
+    if h.ends_with(" name") && h != "name" {
+        // Qualified: "display name", "user name", "account name" → full_name
+        // Bare "name" is ambiguous (could be person, city, country, company) — let
+        // Sense + CharCNN decide based on value evidence.
         return Some("identity.person.full_name");
     }
     if h.contains("address") && !h.contains("email") && !h.contains("ip") {
+        if h.contains("full") {
+            return Some("geography.address.full_address");
+        }
         return Some("geography.address.street_address");
     }
     if h.contains("street") {
@@ -2095,6 +2155,17 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
     if h.contains("born") || h.contains("birth") || h.contains("dob") {
         return Some("datetime.date.iso_date");
+    }
+    // Specific timestamp formats — must precede the generic date/timestamp catch-all.
+    // Note: underscores are already replaced with spaces by header normalization.
+    if h.contains("rfc 2822") || h.contains("rfc2822") {
+        return Some("datetime.timestamp.rfc_2822");
+    }
+    if h.contains("rfc 3339") || h.contains("rfc3339") {
+        return Some("datetime.timestamp.rfc_3339");
+    }
+    if h.contains("sql") && (h.contains("timestamp") || h.contains("datetime")) {
+        return Some("datetime.timestamp.sql_standard");
     }
     if h.contains("date") || h.contains("timestamp") || h.contains("datetime") {
         return Some("datetime.timestamp.iso_8601");
@@ -3856,7 +3927,8 @@ mod tests {
 
     #[test]
     fn test_header_hint_names() {
-        assert_eq!(header_hint("Name"), Some("identity.person.full_name"));
+        // Bare "name" is now ambiguous — returns None so Sense+CharCNN decide
+        assert_eq!(header_hint("Name"), None);
         assert_eq!(header_hint("full_name"), Some("identity.person.full_name"));
         assert_eq!(
             header_hint("first_name"),
@@ -3864,6 +3936,12 @@ mod tests {
         );
         assert_eq!(header_hint("last_name"), Some("identity.person.last_name"));
         assert_eq!(header_hint("surname"), Some("identity.person.last_name"));
+        // Qualified " name" still works
+        assert_eq!(
+            header_hint("display name"),
+            Some("identity.person.full_name")
+        );
+        assert_eq!(header_hint("user name"), Some("identity.person.full_name"));
     }
 
     #[test]
@@ -3911,6 +3989,17 @@ mod tests {
         assert_eq!(header_hint("year"), Some("datetime.component.year"));
         assert_eq!(header_hint("birth_date"), Some("datetime.date.iso_date"));
         assert_eq!(header_hint("dob"), Some("datetime.date.iso_date"));
+        // Specific timestamp formats take priority over generic catch-all
+        assert_eq!(
+            header_hint("rfc_2822_timestamp"),
+            Some("datetime.timestamp.rfc_2822")
+        );
+        assert_eq!(header_hint("rfc2822"), Some("datetime.timestamp.rfc_2822"));
+        assert_eq!(header_hint("rfc_3339"), Some("datetime.timestamp.rfc_3339"));
+        assert_eq!(
+            header_hint("sql_timestamp"),
+            Some("datetime.timestamp.sql_standard")
+        );
     }
 
     #[test]

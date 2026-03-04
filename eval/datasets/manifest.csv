@@ -194,7 +194,7 @@ multilingual,/home/hugh/datasets/multilingual.csv,locale,language code
 multilingual,/home/hugh/datasets/multilingual.csv,country,country
 sports_events,/home/hugh/datasets/sports_events.csv,event_id,code
 sports_events,/home/hugh/datasets/sports_events.csv,sport,category
-sports_events,/home/hugh/datasets/sports_events.csv,venue,name
+sports_events,/home/hugh/datasets/sports_events.csv,venue,entity name
 sports_events,/home/hugh/datasets/sports_events.csv,country,country
 sports_events,/home/hugh/datasets/sports_events.csv,event_date,date
 sports_events,/home/hugh/datasets/sports_events.csv,start_time,time 24h
