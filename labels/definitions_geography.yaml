@@ -875,7 +875,7 @@ geography.contact.calling_code:
     International dialing code for a country (e.g., +1 for USA/Canada,
     +44 for UK, +33 for France). May include +, may not.
   designation: locale_specific
-  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
+  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA, PT_BR, ES_MX, HI, ES_AR, ES_CL, ES_CO, ES_PE, SE, NO, DK, FI, CZ, HU, RO, GR, TR, IL, TH, MY, SG, PH, ID, TW, NZ, NG, PT, AT, CH, BE, IE]
   broad_type: VARCHAR
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
@@ -940,6 +940,96 @@ geography.contact.calling_code:
     ZA:
       type: string
       pattern: "^\\+?27$"
+    PT_BR:
+      type: string
+      pattern: "^\\+?55$"
+    ES_MX:
+      type: string
+      pattern: "^\\+?52$"
+    HI:
+      type: string
+      pattern: "^\\+?91$"
+    ES_AR:
+      type: string
+      pattern: "^\\+?54$"
+    ES_CL:
+      type: string
+      pattern: "^\\+?56$"
+    ES_CO:
+      type: string
+      pattern: "^\\+?57$"
+    ES_PE:
+      type: string
+      pattern: "^\\+?51$"
+    SE:
+      type: string
+      pattern: "^\\+?46$"
+    NO:
+      type: string
+      pattern: "^\\+?47$"
+    DK:
+      type: string
+      pattern: "^\\+?45$"
+    FI:
+      type: string
+      pattern: "^\\+?358$"
+    CZ:
+      type: string
+      pattern: "^\\+?420$"
+    HU:
+      type: string
+      pattern: "^\\+?36$"
+    RO:
+      type: string
+      pattern: "^\\+?40$"
+    GR:
+      type: string
+      pattern: "^\\+?30$"
+    TR:
+      type: string
+      pattern: "^\\+?90$"
+    IL:
+      type: string
+      pattern: "^\\+?972$"
+    TH:
+      type: string
+      pattern: "^\\+?66$"
+    MY:
+      type: string
+      pattern: "^\\+?60$"
+    SG:
+      type: string
+      pattern: "^\\+?65$"
+    PH:
+      type: string
+      pattern: "^\\+?63$"
+    ID:
+      type: string
+      pattern: "^\\+?62$"
+    TW:
+      type: string
+      pattern: "^\\+?886$"
+    NZ:
+      type: string
+      pattern: "^\\+?64$"
+    NG:
+      type: string
+      pattern: "^\\+?234$"
+    PT:
+      type: string
+      pattern: "^\\+?351$"
+    AT:
+      type: string
+      pattern: "^\\+?43$"
+    CH:
+      type: string
+      pattern: "^\\+?41$"
+    BE:
+      type: string
+      pattern: "^\\+?32$"
+    IE:
+      type: string
+      pattern: "^\\+?353$"
   tier: [VARCHAR, contact]
   release_priority: 3
   aliases: [isd_code, country_code]

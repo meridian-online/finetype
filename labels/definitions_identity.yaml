@@ -164,7 +164,7 @@ identity.person.phone_number:
     area code positions, and formatting conventions (e.g., US +1 (xxx) xxx-xxxx
     vs EU +xx-xxx-xxx-xxxx). May include country code, area code, and extension.
   designation: locale_specific
-  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA]
+  locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA, PT_BR, ES_MX, HI, ES_AR, ES_CL, ES_CO, ES_PE, SE, NO, DK, FI, CZ, HU, RO, GR, TR, IL, TH, MY, SG, PH, ID, TW, NZ, NG, PT, AT, CH, BE, IE]
   broad_type: VARCHAR
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
@@ -266,6 +266,161 @@ identity.person.phone_number:
     ZA:
       type: string
       pattern: "^(\\+?27[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{2}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    AR:
+      type: string
+      pattern: "^(\\+?966[\\s\\-./\\u2013]*)?0?[1-9]\\d{1,2}([\\s\\-./\\u2013]*\\d{1,4}){2,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    PT_BR:
+      type: string
+      pattern: "^(\\+?55[\\s\\-./\\u2013]*)?\\(?\\d{2}\\)?[\\s\\-./\\u2013]*\\d{4,5}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    ES_MX:
+      type: string
+      pattern: "^(\\+?52[\\s\\-./\\u2013]*)?\\(?\\d{2,3}\\)?[\\s\\-./\\u2013]*\\d{3,4}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    HI:
+      type: string
+      pattern: "^(\\+?91[\\s\\-./\\u2013]*)?0?\\d{5}[\\s\\-./\\u2013]*\\d{5}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    ES_AR:
+      type: string
+      pattern: "^(\\+?54[\\s\\-./\\u2013]*)?0?\\(?\\d{2,4}\\)?[\\s\\-./\\u2013]*\\d{3,4}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    ES_CL:
+      type: string
+      pattern: "^(\\+?56[\\s\\-./\\u2013]*)?\\d([\\s\\-./\\u2013]*\\d{4}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    ES_CO:
+      type: string
+      pattern: "^(\\+?57[\\s\\-./\\u2013]*)?\\d{3}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    ES_PE:
+      type: string
+      pattern: "^(\\+?51[\\s\\-./\\u2013]*)?\\d{3}([\\s\\-./\\u2013]*\\d{3}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    SE:
+      type: string
+      pattern: "^(\\+?46[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{1,3}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    NO:
+      type: string
+      pattern: "^(\\+?47[\\s\\-./\\u2013]*)?\\d{2}([\\s\\-./\\u2013]*\\d{2}){3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    DK:
+      type: string
+      pattern: "^(\\+?45[\\s\\-./\\u2013]*)?\\d{2}([\\s\\-./\\u2013]*\\d{2}){3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    FI:
+      type: string
+      pattern: "^(\\+?358[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{1,3}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    CZ:
+      type: string
+      pattern: "^(\\+?420[\\s\\-./\\u2013]*)?\\d{3}([\\s\\-./\\u2013]*\\d{3}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    HU:
+      type: string
+      pattern: "^(\\+?36[\\s\\-./\\u2013]*)?\\(?\\d{1,2}\\)?([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    RO:
+      type: string
+      pattern: "^(\\+?40[\\s\\-./\\u2013]*)?0?\\d{2,3}([\\s\\-./\\u2013]*\\d{3}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    GR:
+      type: string
+      pattern: "^(\\+?30[\\s\\-./\\u2013]*)?\\d{3}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    TR:
+      type: string
+      pattern: "^(\\+?90[\\s\\-./\\u2013]*)?0?\\d{3}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    IL:
+      type: string
+      pattern: "^(\\+?972[\\s\\-./\\u2013]*)?0?\\d{1,2}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    TH:
+      type: string
+      pattern: "^(\\+?66[\\s\\-./\\u2013]*)?0?\\d{2}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    MY:
+      type: string
+      pattern: "^(\\+?60[\\s\\-./\\u2013]*)?0?\\d{1,2}([\\s\\-./\\u2013]*\\d{1,4}){2,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    SG:
+      type: string
+      pattern: "^(\\+?65[\\s\\-./\\u2013]*)?[3689]\\d{3}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    PH:
+      type: string
+      pattern: "^(\\+?63[\\s\\-./\\u2013]*)?0?\\d{3}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    ID:
+      type: string
+      pattern: "^(\\+?62[\\s\\-./\\u2013]*)?0?\\d{2,4}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    TW:
+      type: string
+      pattern: "^(\\+?886[\\s\\-./\\u2013]*)?0?\\d([\\s\\-./\\u2013]*\\d{4}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    NZ:
+      type: string
+      pattern: "^(\\+?64[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{1,2}([\\s\\-./\\u2013]*\\d{1,4}){2,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    NG:
+      type: string
+      pattern: "^(\\+?234[\\s\\-./\\u2013]*)?0?\\d{3}([\\s\\-./\\u2013]*\\d{3}){1}[\\s\\-./\\u2013]*\\d{4}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 10
+      maxLength: 35
+    PT:
+      type: string
+      pattern: "^(\\+?351[\\s\\-./\\u2013]*)?\\d{3}([\\s\\-./\\u2013]*\\d{3}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    AT:
+      type: string
+      pattern: "^(\\+?43[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{1,4}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 8
+      maxLength: 35
+    CH:
+      type: string
+      pattern: "^(\\+?41[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{2}([\\s\\-./\\u2013]*\\d{3}){1}([\\s\\-./\\u2013]*\\d{2}){2}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    BE:
+      type: string
+      pattern: "^(\\+?32[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{1,3}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
+      minLength: 9
+      maxLength: 35
+    IE:
+      type: string
+      pattern: "^(\\+?353[\\s\\-./\\u2013]*(\\(0\\))?)?0?\\d{1,2}([\\s\\-./\\u2013]*\\d{1,8}){1,3}(\\s*(ext\\.?|Ext\\.?|x|#)\\s*\\d{1,5})?(\\s*(Work|Cell|Fax|Home|Office))?$"
       minLength: 9
       maxLength: 35
   tier: [VARCHAR, person]
