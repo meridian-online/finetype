@@ -4,10 +4,18 @@
 //! (flat CharCNN or tiered) and taxonomy YAML files at compile time so the
 //! binary works standalone. Detects tiered models by the presence of
 //! tier_graph.json in the default model directory.
+//!
+//! Model resolution strategy:
+//! 1. Try workspace root models/ (normal development builds)
+//! 2. Walk up from CARGO_MANIFEST_DIR to find workspace (cargo publish --dry-run)
+//! 3. Download from HuggingFace to cache (cargo install from crates.io)
 
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+const HF_REPO: &str = "https://huggingface.co/noon-org/finetype-char-cnn/resolve/main";
+const CACHE_VERSION: &str = "0.5.3";
 
 /// Convert a path to a string safe for use inside `include_bytes!()` / `include_str!()`.
 /// On Windows, `canonicalize()` produces `\\?\D:\...` paths with backslashes that Rust
@@ -19,34 +27,267 @@ fn portable_path(p: &Path) -> String {
         .replace('\\', "/")
 }
 
+/// Find labels directory: check manifest dir first (for packaged builds),
+/// then workspace root (for normal development).
+fn find_labels(manifest_dir: &Path, workspace_root: &Path) -> PathBuf {
+    // Check CARGO_MANIFEST_DIR/labels first (works for packaged crates)
+    let manifest_labels = manifest_dir.join("labels");
+    if manifest_labels.exists() && fs::read_dir(&manifest_labels).is_ok() {
+        return manifest_labels;
+    }
+
+    // Fall back to workspace root labels
+    let workspace_labels = workspace_root.join("labels");
+    if workspace_labels.exists() && fs::read_dir(&workspace_labels).is_ok() {
+        return workspace_labels;
+    }
+
+    panic!(
+        "Cannot find labels directory. Checked:\n  {}\n  {}",
+        manifest_labels.display(),
+        workspace_labels.display()
+    );
+}
+
+/// Walk up from start_dir looking for a models/default symlink or directory.
+/// Returns the parent directory containing models/, or None if not found.
+fn find_workspace_with_models(start_dir: &Path) -> Option<PathBuf> {
+    let mut current = start_dir.to_path_buf();
+    // Limit to 10 levels to avoid infinite loops
+    for _ in 0..10 {
+        let models_default = current.join("models").join("default");
+        // Check for symlink or directory
+        if models_default.exists()
+            || std::fs::read_link(&models_default).is_ok()
+            || std::fs::read_to_string(&models_default).is_ok()
+        {
+            return Some(current);
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    None
+}
+
+/// Find models directory: try workspace root, walk-up search, or download.
+fn find_models(manifest_dir: &Path, workspace_root: &Path) -> PathBuf {
+    // Try workspace root first (normal development builds)
+    let workspace_models = workspace_root.join("models");
+    if workspace_models.join("default").exists() {
+        println!("cargo:warning=Using models from workspace: {}", workspace_models.display());
+        return workspace_models;
+    }
+
+    // Try to walk up from manifest dir to find real workspace (cargo publish --dry-run)
+    if let Some(found_root) = find_workspace_with_models(manifest_dir) {
+        let found_models = found_root.join("models");
+        println!(
+            "cargo:warning=Found workspace models via walk-up: {}",
+            found_models.display()
+        );
+        return found_models;
+    }
+
+    // No local models found — download from HuggingFace to cache
+    println!("cargo:warning=Models not found locally, downloading from HuggingFace...");
+    download_models()
+}
+
+/// Download all model groups from HuggingFace to a cache directory.
+/// Returns the path to the models directory.
+fn download_models() -> PathBuf {
+    let cache_dir = get_cache_dir();
+    let models_dir = cache_dir.join("models");
+
+    // Create models directory
+    fs::create_dir_all(&models_dir).expect("Failed to create models cache directory");
+
+    // Download and setup models/default -> char-cnn-v11
+    download_model_group(&models_dir, "char-cnn-v11", &["model.safetensors", "labels.json", "config.yaml"]);
+
+    // Download optional model groups (graceful degradation if they fail)
+    download_model_group_optional(&models_dir, "model2vec", &[
+        "model.safetensors",
+        "type_embeddings.safetensors",
+        "tokenizer.json",
+        "label_index.json",
+    ]);
+
+    download_model_group_optional(
+        &models_dir,
+        "entity-classifier",
+        &["model.safetensors", "config.json", "label_index.json"],
+    );
+
+    download_model_group_optional(&models_dir, "sense", &["model.safetensors", "config.json"]);
+
+    // Create models/default symlink
+    let default_link = models_dir.join("default");
+    let _ = fs::remove_file(&default_link);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        symlink("char-cnn-v11", &default_link).expect("Failed to create models/default symlink");
+    }
+    #[cfg(windows)]
+    {
+        // On Windows, create a plain text file containing the target path
+        fs::write(&default_link, "char-cnn-v11").expect("Failed to create models/default link file");
+    }
+
+    println!(
+        "cargo:warning=Downloaded models to cache: {}",
+        models_dir.display()
+    );
+    models_dir
+}
+
+/// Get the cache directory for models. Uses CARGO_HOME or HOME/.cache/finetype.
+fn get_cache_dir() -> PathBuf {
+    // Prefer CARGO_HOME if set (more aligned with Rust tooling conventions)
+    if let Ok(cargo_home) = env::var("CARGO_HOME") {
+        return PathBuf::from(cargo_home)
+            .join("finetype")
+            .join(&format!("v{}", CACHE_VERSION));
+    }
+
+    // Fall back to HOME/.cache/finetype on Unix, %LOCALAPPDATA% on Windows
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = env::var("LOCALAPPDATA") {
+            return PathBuf::from(appdata)
+                .join("finetype")
+                .join(&format!("v{}", CACHE_VERSION));
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(home) = env::var("HOME") {
+            return PathBuf::from(home)
+                .join(".cache")
+                .join("finetype")
+                .join(&format!("v{}", CACHE_VERSION));
+        }
+    }
+
+    // Fallback to OUT_DIR
+    let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "/tmp/finetype-models".to_string());
+    PathBuf::from(out_dir)
+}
+
+/// Download a model group (e.g., char-cnn-v11, model2vec). Panics if any file is missing.
+fn download_model_group(models_dir: &Path, group_name: &str, files: &[&str]) {
+    let group_dir = models_dir.join(group_name);
+    fs::create_dir_all(&group_dir).expect(&format!("Failed to create {} directory", group_name));
+
+    for file in files {
+        let file_path = group_dir.join(file);
+
+        // Skip if already downloaded
+        if file_path.exists() {
+            continue;
+        }
+
+        let url = format!("{}/{}/{}", HF_REPO, group_name, file);
+        download_file(&url, &file_path).expect(&format!(
+            "Failed to download {}/{} from HuggingFace",
+            group_name, file
+        ));
+    }
+
+    println!(
+        "cargo:warning=Downloaded {} ({} files)",
+        group_name,
+        files.len()
+    );
+}
+
+/// Download a model group, but don't panic if it fails (optional models).
+fn download_model_group_optional(models_dir: &Path, group_name: &str, files: &[&str]) {
+    let group_dir = models_dir.join(group_name);
+    fs::create_dir_all(&group_dir).ok();
+
+    for file in files {
+        let file_path = group_dir.join(file);
+
+        // Skip if already downloaded
+        if file_path.exists() {
+            continue;
+        }
+
+        let url = format!("{}/{}/{}", HF_REPO, group_name, file);
+        if download_file(&url, &file_path).is_err() {
+            println!(
+                "cargo:warning=Failed to download {}/{} — this component will be disabled",
+                group_name, file
+            );
+            let _ = fs::remove_dir_all(&group_dir);
+            return;
+        }
+    }
+
+    println!(
+        "cargo:warning=Downloaded {} ({} files) — optional component enabled",
+        group_name,
+        files.len()
+    );
+}
+
+/// Download a single file from a URL using ureq.
+fn download_file(url: &str, dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let response = ureq::get(url).call()?;
+    let mut reader = response.into_reader();
+    let mut file = fs::File::create(dest)?;
+    std::io::copy(&mut reader, &mut file)?;
+    Ok(())
+}
+
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let workspace_root = PathBuf::from(&manifest_dir)
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let manifest_path = PathBuf::from(&manifest_dir);
 
-    // Models live at workspace root: models/default -> tiered-v2/ or char-cnn-v7/
-    let models_base = workspace_root.join("models");
-    let labels_base = workspace_root.join("labels");
+    // Try to find workspace root: start from manifest, go up 2 levels (normal case),
+    // but be prepared to use walk-up search if needed
+    let mut workspace_root = manifest_path
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf());
 
-    println!("cargo:rerun-if-changed={}", models_base.display());
-    println!("cargo:rerun-if-changed={}", labels_base.display());
+    // If the above doesn't give us a valid workspace root, try walking up
+    if let Some(root) = &workspace_root {
+        if !root.join("Cargo.toml").exists() {
+            workspace_root = find_workspace_with_models(&manifest_path);
+        }
+    } else {
+        workspace_root = find_workspace_with_models(&manifest_path);
+    }
+
+    let workspace_root = workspace_root.unwrap_or_else(|| {
+        // Last resort: use manifest dir as base
+        PathBuf::from(&manifest_dir)
+    });
 
     #[cfg(feature = "embed-models")]
-    generate_embedded_models(&models_base, &labels_base);
+    {
+        let labels_dir = find_labels(&manifest_path, &workspace_root);
+        let models_dir = find_models(&manifest_path, &workspace_root);
+
+        println!("cargo:rerun-if-changed={}", models_dir.display());
+        println!("cargo:rerun-if-changed={}", labels_dir.display());
+
+        generate_embedded_models(&models_dir, &labels_dir);
+    }
 
     #[cfg(not(feature = "embed-models"))]
     {
-        let _ = models_base;
-        let _ = labels_base;
+        let _ = workspace_root;
     }
 }
 
 #[cfg(feature = "embed-models")]
-fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::path::Path) {
+fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
     // Follow the models/default symlink to find the active model.
     //
     // Resolution order (handles all platforms):
@@ -73,7 +314,7 @@ fn generate_embedded_models(models_base: &std::path::Path, labels_base: &std::pa
         .unwrap_or_else(|e| {
             panic!(
                 "Cannot resolve models/default at {:?}: {e}. \
-                 Run download-model.sh or create a symlink to the active model directory.",
+                 This should not happen — models were either local or downloaded. Please report this issue.",
                 default_link
             )
         });
