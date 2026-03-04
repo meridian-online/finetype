@@ -1282,6 +1282,27 @@ datetime.component.day_of_week:
     - ES
     - IT
     - PT
+    - AR
+    - BG
+    - CS
+    - DA
+    - EL
+    - ET
+    - FI
+    - HR
+    - HU
+    - LT
+    - LV
+    - NL
+    - "NO"
+    - PL
+    - RO
+    - RU
+    - SK
+    - SL
+    - SV
+    - TR
+    - UK
   broad_type: VARCHAR
   format_string: null
   transform: "{col}"
@@ -1300,7 +1321,7 @@ datetime.component.day_of_week:
   validation_by_locale:
     # Source: Unicode CLDR (cldr-dates-full, wide day names)
     # License: Unicode License (permissive, attribution)
-    # Each locale lists the 7 full weekday names in that language. (NNFT-141)
+    # Each locale lists the 7 full weekday names in that language. (NNFT-141, NNFT-197)
     EN:
       type: string
       enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -1319,6 +1340,69 @@ datetime.component.day_of_week:
     PT:
       type: string
       enum: ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"]
+    AR:
+      type: string
+      enum: ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+    BG:
+      type: string
+      enum: ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"]
+    CS:
+      type: string
+      enum: ["pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle"]
+    DA:
+      type: string
+      enum: ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"]
+    EL:
+      type: string
+      enum: ["Δευτέρα", "Τρίτη", "Τετάρτη", "Πέμπτη", "Παρασκευή", "Σάββατο", "Κυριακή"]
+    ET:
+      type: string
+      enum: ["esmaspäev", "teisipäev", "kolmapäev", "neljapäev", "reede", "laupäev", "pühapäev"]
+    FI:
+      type: string
+      enum: ["maanantaina", "tiistaina", "keskiviikkona", "torstaina", "perjantaina", "lauantaina", "sunnuntai"]
+    HR:
+      type: string
+      enum: ["ponedjeljak", "utorak", "srijeda", "četvrtak", "petak", "subota", "nedjelja"]
+    HU:
+      type: string
+      enum: ["hétfő", "kedd", "szerda", "csütörtök", "péntek", "szombat", "vasárnap"]
+    LT:
+      type: string
+      enum: ["pirmadienis", "antradienis", "trečiadienis", "ketvirtadienis", "penktadienis", "šeštadienis", "sekmadienis"]
+    LV:
+      type: string
+      enum: ["pirmdiena", "otrdiena", "trešdiena", "ceturtdiena", "piektdiena", "sestdiena", "svētdiena"]
+    NL:
+      type: string
+      enum: ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
+    "NO":
+      type: string
+      enum: ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"]
+    PL:
+      type: string
+      enum: ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
+    RO:
+      type: string
+      enum: ["luni", "marți", "miercuri", "joi", "vineri", "sâmbătă", "duminică"]
+    RU:
+      type: string
+      enum: ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+    SK:
+      type: string
+      enum: ["pondelok", "utorok", "streda", "štvrtok", "piatok", "sobota", "nedeľa"]
+    SL:
+      type: string
+      enum: ["ponedeljek", "torek", "sreda", "četrtek", "petek", "sobota", "nedelja"]
+    SV:
+      type: string
+      enum: ["måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"]
+    TR:
+      type: string
+      enum: ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+    UK:
+      type: string
+      enum: ["понеділок", "вівторок", "середа", "четвер", "пʼятниця", "субота", "неділя"]
   tier: [VARCHAR, component]
   release_priority: 1
   aliases: []
@@ -1341,6 +1425,27 @@ datetime.component.month_name:
     - ES
     - IT
     - PT
+    - AR
+    - BG
+    - CS
+    - DA
+    - EL
+    - ET
+    - FI
+    - HR
+    - HU
+    - LT
+    - LV
+    - NL
+    - "NO"
+    - PL
+    - RO
+    - RU
+    - SK
+    - SL
+    - SV
+    - TR
+    - UK
   broad_type: VARCHAR
   format_string: null
   transform: "{col}"
@@ -1364,7 +1469,7 @@ datetime.component.month_name:
   validation_by_locale:
     # Source: Unicode CLDR (cldr-dates-full, wide month names)
     # License: Unicode License (permissive, attribution)
-    # Each locale lists the 12 full month names in that language. (NNFT-141)
+    # Each locale lists the 12 full month names in that language. (NNFT-141, NNFT-197)
     EN:
       type: string
       enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
@@ -1383,6 +1488,69 @@ datetime.component.month_name:
     PT:
       type: string
       enum: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+    AR:
+      type: string
+      enum: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+    BG:
+      type: string
+      enum: ["януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври", "ноември", "декември"]
+    CS:
+      type: string
+      enum: ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"]
+    DA:
+      type: string
+      enum: ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"]
+    EL:
+      type: string
+      enum: ["Ιανουαρίου", "Φεβρουαρίου", "Μαρτίου", "Απριλίου", "Μαΐου", "Ιουνίου", "Ιουλίου", "Αυγούστου", "Σεπτεμβρίου", "Οκτωβρίου", "Νοεμβρίου", "Δεκεμβρίου"]
+    ET:
+      type: string
+      enum: ["jaanuar", "veebruar", "märts", "aprill", "mai", "juuni", "juuli", "august", "september", "oktoober", "november", "detsember"]
+    FI:
+      type: string
+      enum: ["tammikuuta", "helmikuuta", "maaliskuuta", "huhtikuuta", "toukokuuta", "kesäkuuta", "heinäkuuta", "elokuuta", "syyskuuta", "lokakuuta", "marraskuuta", "joulukuuta"]
+    HR:
+      type: string
+      enum: ["siječnja", "veljače", "ožujka", "travnja", "svibnja", "lipnja", "srpnja", "kolovoza", "rujna", "listopada", "studenoga", "prosinca"]
+    HU:
+      type: string
+      enum: ["január", "február", "március", "április", "május", "június", "július", "augusztus", "szeptember", "október", "november", "december"]
+    LT:
+      type: string
+      enum: ["sausio", "vasario", "kovo", "balandžio", "gegužės", "birželio", "liepos", "rugpjūčio", "rugsėjo", "spalio", "lapkričio", "gruodžio"]
+    LV:
+      type: string
+      enum: ["janvāris", "februāris", "marts", "aprīlis", "maijs", "jūnijs", "jūlijs", "augusts", "septembris", "oktobris", "novembris", "decembris"]
+    NL:
+      type: string
+      enum: ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"]
+    "NO":
+      type: string
+      enum: ["januar", "februar", "mars", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "desember"]
+    PL:
+      type: string
+      enum: ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"]
+    RO:
+      type: string
+      enum: ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie", "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie"]
+    RU:
+      type: string
+      enum: ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+    SK:
+      type: string
+      enum: ["januára", "februára", "marca", "apríla", "mája", "júna", "júla", "augusta", "septembra", "októbra", "novembra", "decembra"]
+    SL:
+      type: string
+      enum: ["januar", "februar", "marec", "april", "maj", "junij", "julij", "avgust", "september", "oktober", "november", "december"]
+    SV:
+      type: string
+      enum: ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"]
+    TR:
+      type: string
+      enum: ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    UK:
+      type: string
+      enum: ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"]
   tier: [VARCHAR, component]
   release_priority: 1
   aliases: [month]
