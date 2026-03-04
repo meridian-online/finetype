@@ -22,13 +22,14 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.5.2
 **Taxonomy:** 163 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 15, identity: 19, representation: 32, technology: 24) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v10 flat (163 classes), tiered-v2 fallback via `--sharp-only`
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v11 flat (163 classes, 10 epochs), tiered-v2 fallback via `--sharp-only`
 **Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
+- **Locale Foundation expansion** (NNFT-195–201) — Layer 1: Expanded validation to 50+ postal codes, 45+ phone numbers, 30+ month/day names. Layer 2: Expanded generators to match (65 postal locales, 46 phone locales, 32 CLDR date/time patterns). CharCNN-v11 retrained on expanded data (10 epochs, 88.3% training accuracy). Profile eval improved 110/116→112/116 (96.6%). Actionability at 95.4% (rfc_2822 misclassification — tracked in NNFT-194).
 - **Taxonomy revision v0.5.2** (NNFT-192) — Removed `geography.address.street_number` (false positives on plain integers) and `identity.person.age` (indistinguishable from integer_number, 205 SOTAB false positives). Added `representation.identifier.numeric_code` (VARCHAR, preserves leading zeros for codes like ISO country numeric, NAICS, FIPS). Net: 164→163 types. CharCNN-v10 retrained. Actionability improved 96.0%→98.7%. Profile eval regressed 117/119→110/116 due to model retrain — follow-up needed.
 - **Actionability improvements** (NNFT-191) — Actionability 92.7% → 96.0% (2910/3030 values). Added `format_string_alt` field to taxonomy YAML for ISO 8601 fractional seconds variant. Updated eval to try multiple format strings per type. Fixed network_logs.timestamp (0% → 100%).
 - **Accuracy improvements** (NNFT-188) — Profile eval 108/119 → 117/119 (98.3% label, 99.2% domain). Six mechanisms: validation-based candidate elimination, Rule 19, header hint additions, hardcoded hint priority over Model2Vec, same-domain geo override, geography rescue from unmasked votes.
@@ -38,7 +39,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Post-retrain accuracy recovery** — Profile eval 110/116 (94.8% label, 94.8% domain). 6 misclassifications after v0.5.2 retrain: utc_offset→excel_format (new), ean→credit_card_number (new), multilingual.name→region (new), countries.sub-region→full_name (new), countries.name→full_name (pre-existing), world_cities.name→full_name (new). Actionability at 98.7% (target ≥95% achieved) — 1 column below target: multilingual.date (33.3% — mixed-format column).
+- **Post-retrain accuracy recovery** (NNFT-194) — Profile eval 112/116 (96.6%). 4 remaining misclassifications: utc_offset→excel_format, sports_events.venue→city, countries.name→full_name, world_cities.name→full_name. Actionability at 95.4% — rfc_2822_timestamp misclassified as iso_8601 (80 values). If fixed, actionability would be 98.0%.
 
 ## Architecture
 

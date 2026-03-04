@@ -4,16 +4,17 @@ title: Model retraining with CLDR locale data for improved type accuracy
 status: To Do
 assignee: []
 created_date: '2026-02-25 09:17'
-updated_date: '2026-03-04 01:55'
+updated_date: '2026-03-04 02:33'
 labels:
   - accuracy
   - training
   - strategic
 milestone: m-6
 dependencies:
-  - NNFT-058
-  - NNFT-060
-  - NNFT-126
+  - NNFT-198
+  - NNFT-199
+  - NNFT-200
+  - NNFT-201
 priority: medium
 ---
 
@@ -43,6 +44,12 @@ This task tracks the strategic direction. Actual implementation through NNFT-058
 - [ ] #3 SOTAB and GitTables re-evaluated showing measurable improvement over v0.3.0 baseline
 - [ ] #4 CharCNN models retrained with CLDR-diversified training data (more locale-representative samples per type, 3-level labels)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Dependencies updated: NNFT-058 and NNFT-060 archived as superseded. Now depends on NNFT-198/199/200 (generators) and NNFT-201 (retrain). NNFT-126 dep removed (shipped).
+<!-- SECTION:NOTES:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

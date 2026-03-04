@@ -1,0 +1,11 @@
+{
+  "batch_size": 512,
+  "data_file": "training_data_v11.ndjson",
+  "epochs": 10,
+  "model_type": "charcnn",
+  "n_classes": 163,
+  "n_samples": 161000,
+  "parent_snapshot": "models/char-cnn-v11.snapshot.20260304T060533Z",
+  "seed": 42,
+  "timestamp": "2026-03-04T08:14:55.907333229+00:00"
+}
