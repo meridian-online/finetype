@@ -19,10 +19,10 @@ identity.person.email
 
 ## Features
 
-- **164 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, and more
+- **163 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing
-- **Locale-aware** — handles region-specific formats (16+ locales for dates, addresses, phone numbers)
-- **Sense→Sharpen pipeline** — Model2Vec cross-attention predicts broad category, then CharCNN votes are masked to category-eligible labels. 98.3% label accuracy on profile eval (117/119).
+- **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 27+ for month/day names. Post-hoc detection returns detected region.
+- **Sense→Sharpen pipeline** — Model2Vec semantic understanding + masked CharCNN voting. 98.3% label accuracy on 21-dataset profile eval.
 - **Column-mode inference** — distribution-based disambiguation resolves ambiguous types (dates, years, coordinates)
 - **DuckDB integration** — 5 scalar functions: `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_version()`
 - **Tiered inference** — 34 specialized CharCNN models in a T0→T1→T2 hierarchy (600+ classifications/sec, 8.5 MB memory)
@@ -126,16 +126,16 @@ println!("{} (confidence: {:.2})", result.label, result.confidence);
 
 ## Taxonomy
 
-FineType recognizes **164 types** across **7 domains**:
+FineType recognizes **163 types** across **7 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
-| `datetime` | 45 | ISO 8601, RFC 2822, Unix timestamps, timezones, date formats |
-| `representation` | 31 | Integers, floats, booleans (binary/initials/terms), categorical, ordinal, hex colors, JSON |
+| `datetime` | 45 | ISO 8601, RFC 2822, Unix timestamps, timezones, month/day names (27+ locales) |
+| `representation` | 32 | Integers, floats, booleans, numeric codes, categorical, ordinal, hex colors, JSON |
 | `technology` | 24 | IPv4, IPv6, MAC addresses, URLs, UUIDs, DOIs, hashes, user agents |
-| `identity` | 20 | Names, emails, phones, passwords, credit cards |
+| `identity` | 19 | Names, emails, phone numbers (46+ locales), passwords, credit cards |
 | `finance` | 16 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, currency amounts, currency codes |
-| `geography` | 16 | Latitude, longitude, countries, cities, postal codes |
+| `geography` | 15 | Latitude, longitude, countries, cities, postal codes (65+ locales) |
 | `container` | 12 | JSON objects, CSV rows, query strings, key-value pairs |
 
 Each type is a **transformation contract** — if the model predicts `datetime.date.us_slash`, that guarantees `strptime(value, '%m/%d/%Y')::DATE` will succeed.
@@ -416,17 +416,25 @@ let result = validate_column(&values, schema, InvalidStrategy::Quarantine).unwra
 println!("Valid: {}, Invalid: {}", result.stats.valid_count, result.stats.invalid_count);
 ```
 
+## Documentation
+
+Detailed guides for advanced features:
+
+- **[Sense & Sharpen Pipeline](docs/SENSE_AND_SHARPEN_PIPELINE.md)** — How the default inference method achieves 98.3% accuracy by combining semantic understanding (Model2Vec) with pattern recognition (CharCNN) and intelligent vote masking.
+- **[Locale Support Guide](docs/LOCALE_GUIDE.md)** — Complete guide to FineType's 65+ locale coverage for phone numbers, postal codes, and date components. Includes examples, validation patterns by region, and how to use locale information in ETL pipelines.
+- **[Entity Classifier](docs/ENTITY_CLASSIFIER.md)** — How FineType disambiguates person names from entity names.
+- **[Locale Detection Architecture](docs/LOCALE_DETECTION_ARCHITECTURE.md)** — Why FineType uses post-hoc validation patterns instead of model-based locale classification, and when that decision should be revisited.
+- **[Taxonomy Comparison](docs/TAXONOMY_COMPARISON.md)** — How FineType's type system compares to schema.org, Wikidata, and GitTables.
+
 ## Known Limitations
 
-### Locale Support
+### DuckDB `strptime` Locale Limitation
 
-FineType's training data generators support 16+ locales for locale-specific types (phone numbers, dates, addresses). However, the current production model uses **3-level labels** (164 types) and does not distinguish between locales at inference time.
+DuckDB's `strptime` function only accepts English month and day names. Non-English dates like `6 janvier 2025` will fail with `strptime(col, '%d %B %Y')`. There is no DuckDB locale setting to change this behavior.
 
-**DuckDB `strptime` locale limitation:** DuckDB's `strptime` function only accepts English month and day names. Non-English dates like `6 janvier 2025` will fail with `strptime(col, '%d %B %Y')`. There is no DuckDB locale setting to change this behavior.
+**Affected types:** `datetime.date.long_full_month`, `datetime.date.abbreviated_month`, and related timestamp variants with non-English month/day names.
 
-**Affected types:** Any type whose transform uses `%B` (full month name), `%b` (abbreviated month), `%A` (full day name), or `%a` (abbreviated day name) — primarily `datetime.date.long_full_month`, `datetime.date.abbreviated_month`, and related timestamp variants.
-
-**Current status:** The 4-level label infrastructure (`domain.category.type.LOCALE`) exists in the training data pipeline but is reserved for future tiered models. The production model guarantees transformation contracts only for English-locale data. This is a deliberate scope decision — non-English locale support requires either a normalization layer or locale-aware transforms, both of which add significant complexity without clear demand.
+**Workaround:** FineType's locale detection correctly identifies non-English dates, but transformation must normalize to English first. See [Locale Support Guide](docs/LOCALE_GUIDE.md) for examples.
 
 ## License
 
