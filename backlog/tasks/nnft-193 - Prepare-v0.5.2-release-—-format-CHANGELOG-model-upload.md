@@ -1,11 +1,11 @@
 ---
 id: NNFT-193
 title: 'Prepare v0.5.2 release — format, CHANGELOG, model upload'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-03 22:34'
-updated_date: '2026-03-03 22:36'
+updated_date: '2026-03-03 22:37'
 labels:
   - release
   - v0.5.2
@@ -64,12 +64,27 @@ Step 3: char-cnn-v10 model uploaded to HuggingFace hughcameron/finetype ✓ — 
 Step 4: CI passes — fmt+clippy+test+check all pass; taxonomy check 163/163 ✓
 <!-- SECTION:NOTES:END -->
 
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed three blockers preventing v0.5.2 release after NNFT-192 taxonomy revision.
+
+**Changes:**
+1. Formatting — `cargo fmt` applied to 4 files (generator.rs, type_mapping.rs, column.rs, data.rs). All CI checks pass.
+2. CHANGELOG — added [0.5.2] section documenting taxonomy changes (164→163: removed street_number & age, added numeric_code), actionability improvement (96.0%→98.7%), model retrain summary, profile eval regression (98.3%→94.8%) as known issue.
+3. Model upload — char-cnn-v10 uploaded to HuggingFace hughcameron/finetype; download verified.
+
+**Tests:** All CI checks pass (fmt+clippy+test+check). Taxonomy check: 163/163 definitions aligned.
+
+**Status:** All blockers resolved. Ready to tag v0.5.2 and trigger release workflow.
+<!-- SECTION:FINAL_SUMMARY:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
-- [ ] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
-- [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
+- [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
+- [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
+- [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

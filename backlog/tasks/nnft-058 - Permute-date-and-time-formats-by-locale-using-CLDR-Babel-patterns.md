@@ -4,10 +4,12 @@ title: Permute date and time formats by locale using CLDR/Babel patterns
 status: To Do
 assignee: []
 created_date: '2026-02-14 10:08'
+updated_date: '2026-03-04 01:55'
 labels:
   - generator
   - locale
   - datetime
+milestone: m-6
 dependencies:
   - NNFT-045
 references:

@@ -4,11 +4,12 @@ title: Model retraining with CLDR locale data for improved type accuracy
 status: To Do
 assignee: []
 created_date: '2026-02-25 09:17'
-updated_date: '2026-02-26 01:41'
+updated_date: '2026-03-04 01:55'
 labels:
   - accuracy
   - training
   - strategic
+milestone: m-6
 dependencies:
   - NNFT-058
   - NNFT-060

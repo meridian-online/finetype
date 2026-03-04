@@ -4,10 +4,12 @@ title: Use CLDR release data as upstream source for locale-specific generators
 status: To Do
 assignee: []
 created_date: '2026-02-14 10:08'
+updated_date: '2026-03-04 01:55'
 labels:
   - infrastructure
   - locale
   - data-quality
+milestone: m-6
 dependencies:
   - NNFT-045
 references:
