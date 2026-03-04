@@ -3325,415 +3325,439 @@ impl Generator {
                     }
                 }
             }
+            "PT_BR" => {
+                // Brazil: (AA) AAAAA-AAAA
+                let a = self.rng.gen_range(11..99);
+                let b = self.rng.gen_range(90000..99999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("({:02}) {:05}-{:04}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+55 {:02} {:05}-{:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+55{:02}{:05}{:04}", a, b, c),
+                })
+            }
+            "ES_MX" => {
+                // Mexico: AAA AAA AAAA
+                let a = self.rng.gen_range(200..999);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:03} {:03} {:04}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+52 {:03} {:03} {:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+52{:03}{:03}{:04}", a, b, c),
+                })
+            }
+            "HI" => {
+                // India: 0AAAAA AAAAA
+                let a = self.rng.gen_range(70000..99999);
+                let b = self.rng.gen_range(10000..99999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:05} {:05}", a, b),
+                    PhoneFmt::International => {
+                        format!("+91 {:05} {:05}", a, b)
+                    }
+                    PhoneFmt::E164 => format!("+91{:05}{:05}", a, b),
+                })
+            }
+            "TH" => {
+                // Thailand: 0AA AAA AAAA
+                let a = self.rng.gen_range(80..99);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02} {:03} {:04}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+66 {:02} {:03} {:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+66{:02}{:03}{:04}", a, b, c),
+                })
+            }
+            "MY" => {
+                // Malaysia: 0AA-AAA AAAA
+                let a = self.rng.gen_range(12..19);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02}-{:03} {:04}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+60 {:02}-{:03} {:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+60{:02}{:03}{:04}", a, b, c),
+                })
+            }
+            "SG" => {
+                // Singapore: AAAA AAAA
+                let a = self.rng.gen_range(6000..9999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:04} {:04}", a, b),
+                    PhoneFmt::International => format!("+65 {:04} {:04}", a, b),
+                    PhoneFmt::E164 => format!("+65{:04}{:04}", a, b),
+                })
+            }
+            "PH" => {
+                // Philippines: 0AAA AAA AAAA
+                let a = self.rng.gen_range(900..999);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("(0{:03}) {:03} {:04}", a, b, c)
+                    }
+                    PhoneFmt::International => {
+                        format!("+63 {:03} {:03} {:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+63{:03}{:03}{:04}", a, b, c),
+                })
+            }
+            "ID" => {
+                // Indonesia: 0AAA-AAA-AAA
+                let a = self.rng.gen_range(811..899);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(100..999);
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("0{:03}-{:03}-{:03}", a, b, c)
+                    }
+                    PhoneFmt::International => {
+                        format!("+62 {:03}-{:03}-{:03}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+62{:03}{:03}{:03}", a, b, c),
+                })
+            }
+            "TW" => {
+                // Taiwan: 09AA AAA AAA
+                let a = self.rng.gen_range(10..99);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(100..999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("09{:02} {:03} {:03}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+886 9{:02} {:03} {:03}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+8869{:02}{:03}{:03}", a, b, c),
+                })
+            }
+            "NZ" => {
+                // New Zealand: 0AA AAA AAAA
+                let a = self.rng.gen_range(21..29);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02} {:03} {:04}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+64 {:02} {:03} {:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+64{:02}{:03}{:04}", a, b, c),
+                })
+            }
+            "IE" => {
+                // Ireland: 085 AAA AAAA
+                let p = [83, 85, 86, 87, 89][self.rng.gen_range(0..5)];
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02} {:03} {:04}", p, a, b),
+                    PhoneFmt::International => {
+                        format!("+353 {:02} {:03} {:04}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+353{:02}{:03}{:04}", p, a, b),
+                })
+            }
+            "SE" => {
+                // Sweden: 070-AAA AA AA
+                let p = self.rng.gen_range(70..79);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(10..99);
+                let c = self.rng.gen_range(10..99);
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("0{:02}-{:03} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::International => {
+                        format!("+46 {:02} {:03} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+46{:02}{:03}{:02}{:02}", p, a, b, c),
+                })
+            }
+            "NO" => {
+                // Norway: AA AA AA AA
+                let (a, b, c, d) = (
+                    self.rng.gen_range(40..99),
+                    self.rng.gen_range(10..99),
+                    self.rng.gen_range(10..99),
+                    self.rng.gen_range(10..99),
+                );
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("{:02} {:02} {:02} {:02}", a, b, c, d)
+                    }
+                    PhoneFmt::International => {
+                        format!("+47 {:02} {:02} {:02} {:02}", a, b, c, d)
+                    }
+                    PhoneFmt::E164 => format!("+47{:02}{:02}{:02}{:02}", a, b, c, d),
+                })
+            }
+            "DK" => {
+                // Denmark: AA AA AA AA
+                let (a, b, c, d) = (
+                    self.rng.gen_range(20..99),
+                    self.rng.gen_range(10..99),
+                    self.rng.gen_range(10..99),
+                    self.rng.gen_range(10..99),
+                );
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("{:02} {:02} {:02} {:02}", a, b, c, d)
+                    }
+                    PhoneFmt::International => {
+                        format!("+45 {:02} {:02} {:02} {:02}", a, b, c, d)
+                    }
+                    PhoneFmt::E164 => format!("+45{:02}{:02}{:02}{:02}", a, b, c, d),
+                })
+            }
+            "CH" => {
+                // Switzerland: 078 AAA AA AA
+                let p = self.rng.gen_range(76..79);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(10..99);
+                let c = self.rng.gen_range(10..99);
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("0{:02} {:03} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::International => {
+                        format!("+41 {:02} {:03} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+41{:02}{:03}{:02}{:02}", p, a, b, c),
+                })
+            }
+            "AT" => {
+                // Austria: 0664 AAAAAA
+                let p = [664, 676, 680, 699][self.rng.gen_range(0..4)];
+                let a = self.rng.gen_range(100000..999999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:03} {:06}", p, a),
+                    PhoneFmt::International => format!("+43 {:03} {:06}", p, a),
+                    PhoneFmt::E164 => format!("+43{:03}{:06}", p, a),
+                })
+            }
+            "BE" => {
+                // Belgium: 0450 AA AA AA
+                let p = self.rng.gen_range(450..499);
+                let (a, b, c) = (
+                    self.rng.gen_range(0..99),
+                    self.rng.gen_range(10..99),
+                    self.rng.gen_range(10..99),
+                );
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("0{:03} {:02} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::International => {
+                        format!("+32 {:03} {:02} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+32{:03}{:02}{:02}{:02}", p, a, b, c),
+                })
+            }
+            "PT" => {
+                // Portugal: 912 AAA AAA
+                let p = self.rng.gen_range(910..969);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(100..999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:03} {:03} {:03}", p, a, b),
+                    PhoneFmt::International => {
+                        format!("+351 {:03} {:03} {:03}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+351{:03}{:03}{:03}", p, a, b),
+                })
+            }
+            "TR" => {
+                // Turkey: (0AAA) AAA AA AA
+                let p = self.rng.gen_range(500..559);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(10..99);
+                let c = self.rng.gen_range(10..99);
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("(0{:03}) {:03} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::International => {
+                        format!("+90 {:03} {:03} {:02} {:02}", p, a, b, c)
+                    }
+                    PhoneFmt::E164 => {
+                        format!("+90{:03}{:03}{:02}{:02}", p, a, b, c)
+                    }
+                })
+            }
+            "IL" => {
+                // Israel: 050-AAA-AAAA
+                let p = [50, 52, 53, 54, 58][self.rng.gen_range(0..5)];
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02}-{:03}-{:04}", p, a, b),
+                    PhoneFmt::International => {
+                        format!("+972 {:02}-{:03}-{:04}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+972{:02}{:03}{:04}", p, a, b),
+                })
+            }
+            "GR" => {
+                // Greece: 69A AAA AAAA
+                let p = self.rng.gen_range(690..699);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:03} {:03} {:04}", p, a, b),
+                    PhoneFmt::International => {
+                        format!("+30 {:03} {:03} {:04}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+30{:03}{:03}{:04}", p, a, b),
+                })
+            }
+            "ZA" => {
+                // South Africa: 071 AAA AAAA
+                let p = self.rng.gen_range(71..84);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02} {:03} {:04}", p, a, b),
+                    PhoneFmt::International => {
+                        format!("+27 {:02} {:03} {:04}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+27{:02}{:03}{:04}", p, a, b),
+                })
+            }
+            "NG" => {
+                // Nigeria: 0802 AAA AAAA
+                let p = self.rng.gen_range(800..909);
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => {
+                        format!("0{:03} {:03} {:04}", p, a, b)
+                    }
+                    PhoneFmt::International => {
+                        format!("+234 {:03} {:03} {:04}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+234{:03}{:03}{:04}", p, a, b),
+                })
+            }
+            "ES_CL" => {
+                // Chile: (A) AAAA AAAA
+                let a = self.rng.gen_range(2..9);
+                let b = self.rng.gen_range(1000..9999);
+                let c = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("({}) {:04} {:04}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+56 {} {:04} {:04}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+56{}{:04}{:04}", a, b, c),
+                })
+            }
+            "ES_CO" => {
+                // Colombia: (AAA) AAAAAAA
+                let a = self.rng.gen_range(300..399);
+                let b = self.rng.gen_range(1000000..9999999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("({:03}) {:07}", a, b),
+                    PhoneFmt::International => format!("+57 {:03} {:07}", a, b),
+                    PhoneFmt::E164 => format!("+57{:03}{:07}", a, b),
+                })
+            }
+            "ES_AR" => {
+                // Argentina: 011 15-AAAA-AAAA
+                let a = self.rng.gen_range(1000..9999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("011 15-{:04}-{:04}", a, b),
+                    PhoneFmt::International => {
+                        format!("+54 9 11 {:04}-{:04}", a, b)
+                    }
+                    PhoneFmt::E164 => format!("+5491{:04}{:04}", a, b),
+                })
+            }
+            "FI" => {
+                // Finland: 041 AAAAAAA
+                let p = [41, 44, 45, 50][self.rng.gen_range(0..4)];
+                let a = self.rng.gen_range(1000000..9999999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("0{:02} {:07}", p, a),
+                    PhoneFmt::International => format!("+358 {:02} {:07}", p, a),
+                    PhoneFmt::E164 => format!("+358{:02}{:07}", p, a),
+                })
+            }
+            "ES_PE" => {
+                // Peru: 9XX XXX XXX
+                let a = self.rng.gen_range(900..999);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(100..999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:03} {:03} {:03}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+51 {:03} {:03} {:03}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+51{:03}{:03}{:03}", a, b, c),
+                })
+            }
+            "HU" => {
+                // Hungary: 06 30 XXX XXXX
+                let p = [20, 30, 31, 50, 70][self.rng.gen_range(0..5)];
+                let a = self.rng.gen_range(100..999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("06 {:02} {:03} {:04}", p, a, b),
+                    PhoneFmt::International => {
+                        format!("+36 {:02} {:03} {:04}", p, a, b)
+                    }
+                    PhoneFmt::E164 => format!("+36{:02}{:03}{:04}", p, a, b),
+                })
+            }
+            "RO" => {
+                // Romania: 07XX XXX XXX
+                let a = self.rng.gen_range(20..89);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(100..999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("07{:02} {:03} {:03}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+40 7{:02} {:03} {:03}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+407{:02}{:03}{:03}", a, b, c),
+                })
+            }
+            "CZ" => {
+                // Czech Republic: 6XX XXX XXX
+                let a = self.rng.gen_range(601..799);
+                let b = self.rng.gen_range(100..999);
+                let c = self.rng.gen_range(100..999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:03} {:03} {:03}", a, b, c),
+                    PhoneFmt::International => {
+                        format!("+420 {:03} {:03} {:03}", a, b, c)
+                    }
+                    PhoneFmt::E164 => format!("+420{:03}{:03}{:03}", a, b, c),
+                })
+            }
             _ => {
-                // Default: randomly pick from 20+ diverse international formats
-                // Covers BR, MX, IN, TH, MY, SG, PH, ID, TW, HK, NZ, IE,
-                // SE, NO, DK, CH, AT, BE, PT, TR, IL, GR, ZA, NG, KE, CL, CO, AR, FI
-                let region = self.rng.gen_range(0..30);
-                match region {
-                    0 => {
-                        // Brazil: (AA) AAAAA-AAAA
-                        let a = self.rng.gen_range(11..99);
-                        let b = self.rng.gen_range(90000..99999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("({:02}) {:05}-{:04}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+55 {:02} {:05}-{:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+55{:02}{:05}{:04}", a, b, c),
-                        })
+                // Generic international format for unlisted locales
+                let cc = locale_data::phone_country_code(&locale);
+                let a = self.rng.gen_range(1000..9999);
+                let b = self.rng.gen_range(1000..9999);
+                Ok(match fmt {
+                    PhoneFmt::National => format!("{:04} {:04}", a, b),
+                    PhoneFmt::International => format!("{} {:04} {:04}", cc, a, b),
+                    PhoneFmt::E164 => {
+                        format!("{}{:04}{:04}", cc.replace(' ', ""), a, b)
                     }
-                    1 => {
-                        // Mexico: AAA AAA AAAA
-                        let a = self.rng.gen_range(200..999);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("{:03} {:03} {:04}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+52 {:03} {:03} {:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+52{:03}{:03}{:04}", a, b, c),
-                        })
-                    }
-                    2 => {
-                        // India: 0AAAAA AAAAA
-                        let a = self.rng.gen_range(70000..99999);
-                        let b = self.rng.gen_range(10000..99999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:05} {:05}", a, b),
-                            PhoneFmt::International => {
-                                format!("+91 {:05} {:05}", a, b)
-                            }
-                            PhoneFmt::E164 => format!("+91{:05}{:05}", a, b),
-                        })
-                    }
-                    3 => {
-                        // Thailand: 0AA AAA AAAA
-                        let a = self.rng.gen_range(80..99);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02} {:03} {:04}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+66 {:02} {:03} {:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+66{:02}{:03}{:04}", a, b, c),
-                        })
-                    }
-                    4 => {
-                        // Malaysia: 0AA-AAA AAAA
-                        let a = self.rng.gen_range(12..19);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02}-{:03} {:04}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+60 {:02}-{:03} {:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+60{:02}{:03}{:04}", a, b, c),
-                        })
-                    }
-                    5 => {
-                        // Singapore: AAAA AAAA
-                        let a = self.rng.gen_range(6000..9999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("{:04} {:04}", a, b),
-                            PhoneFmt::International => format!("+65 {:04} {:04}", a, b),
-                            PhoneFmt::E164 => format!("+65{:04}{:04}", a, b),
-                        })
-                    }
-                    6 => {
-                        // Philippines: 0AAA AAA AAAA
-                        let a = self.rng.gen_range(900..999);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("(0{:03}) {:03} {:04}", a, b, c)
-                            }
-                            PhoneFmt::International => {
-                                format!("+63 {:03} {:03} {:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+63{:03}{:03}{:04}", a, b, c),
-                        })
-                    }
-                    7 => {
-                        // Indonesia: 0AAA-AAA-AAA
-                        let a = self.rng.gen_range(811..899);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(100..999);
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("0{:03}-{:03}-{:03}", a, b, c)
-                            }
-                            PhoneFmt::International => {
-                                format!("+62 {:03}-{:03}-{:03}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+62{:03}{:03}{:03}", a, b, c),
-                        })
-                    }
-                    8 => {
-                        // Taiwan: 09AA AAA AAA
-                        let a = self.rng.gen_range(10..99);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(100..999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("09{:02} {:03} {:03}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+886 9{:02} {:03} {:03}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+8869{:02}{:03}{:03}", a, b, c),
-                        })
-                    }
-                    9 => {
-                        // Hong Kong: AAAA AAAA
-                        let a = self.rng.gen_range(5000..9999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("{:04} {:04}", a, b),
-                            PhoneFmt::International => format!("+852 {:04} {:04}", a, b),
-                            PhoneFmt::E164 => format!("+852{:04}{:04}", a, b),
-                        })
-                    }
-                    10 => {
-                        // New Zealand: 0AA AAA AAAA
-                        let a = self.rng.gen_range(21..29);
-                        let b = self.rng.gen_range(100..999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02} {:03} {:04}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+64 {:02} {:03} {:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+64{:02}{:03}{:04}", a, b, c),
-                        })
-                    }
-                    11 => {
-                        // Ireland: 085 AAA AAAA
-                        let p = [83, 85, 86, 87, 89][self.rng.gen_range(0..5)];
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02} {:03} {:04}", p, a, b),
-                            PhoneFmt::International => {
-                                format!("+353 {:02} {:03} {:04}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+353{:02}{:03}{:04}", p, a, b),
-                        })
-                    }
-                    12 => {
-                        // Sweden: 070-AAA AA AA
-                        let p = self.rng.gen_range(70..79);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(10..99);
-                        let c = self.rng.gen_range(10..99);
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("0{:02}-{:03} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::International => {
-                                format!("+46 {:02} {:03} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+46{:02}{:03}{:02}{:02}", p, a, b, c),
-                        })
-                    }
-                    13 => {
-                        // Norway: AA AA AA AA
-                        let (a, b, c, d) = (
-                            self.rng.gen_range(40..99),
-                            self.rng.gen_range(10..99),
-                            self.rng.gen_range(10..99),
-                            self.rng.gen_range(10..99),
-                        );
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("{:02} {:02} {:02} {:02}", a, b, c, d)
-                            }
-                            PhoneFmt::International => {
-                                format!("+47 {:02} {:02} {:02} {:02}", a, b, c, d)
-                            }
-                            PhoneFmt::E164 => format!("+47{:02}{:02}{:02}{:02}", a, b, c, d),
-                        })
-                    }
-                    14 => {
-                        // Denmark: AA AA AA AA
-                        let (a, b, c, d) = (
-                            self.rng.gen_range(20..99),
-                            self.rng.gen_range(10..99),
-                            self.rng.gen_range(10..99),
-                            self.rng.gen_range(10..99),
-                        );
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("{:02} {:02} {:02} {:02}", a, b, c, d)
-                            }
-                            PhoneFmt::International => {
-                                format!("+45 {:02} {:02} {:02} {:02}", a, b, c, d)
-                            }
-                            PhoneFmt::E164 => format!("+45{:02}{:02}{:02}{:02}", a, b, c, d),
-                        })
-                    }
-                    15 => {
-                        // Switzerland: 078 AAA AA AA
-                        let p = self.rng.gen_range(76..79);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(10..99);
-                        let c = self.rng.gen_range(10..99);
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("0{:02} {:03} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::International => {
-                                format!("+41 {:02} {:03} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+41{:02}{:03}{:02}{:02}", p, a, b, c),
-                        })
-                    }
-                    16 => {
-                        // Austria: 0664 AAAAAA
-                        let p = [664, 676, 680, 699][self.rng.gen_range(0..4)];
-                        let a = self.rng.gen_range(100000..999999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:03} {:06}", p, a),
-                            PhoneFmt::International => format!("+43 {:03} {:06}", p, a),
-                            PhoneFmt::E164 => format!("+43{:03}{:06}", p, a),
-                        })
-                    }
-                    17 => {
-                        // Belgium: 0450 AA AA AA
-                        let p = self.rng.gen_range(450..499);
-                        let (a, b, c) = (
-                            self.rng.gen_range(0..99),
-                            self.rng.gen_range(10..99),
-                            self.rng.gen_range(10..99),
-                        );
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("0{:03} {:02} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::International => {
-                                format!("+32 {:03} {:02} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+32{:03}{:02}{:02}{:02}", p, a, b, c),
-                        })
-                    }
-                    18 => {
-                        // Portugal: 912 AAA AAA
-                        let p = self.rng.gen_range(910..969);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(100..999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("{:03} {:03} {:03}", p, a, b),
-                            PhoneFmt::International => {
-                                format!("+351 {:03} {:03} {:03}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+351{:03}{:03}{:03}", p, a, b),
-                        })
-                    }
-                    19 => {
-                        // Turkey: (0AAA) AAA AA AA
-                        let p = self.rng.gen_range(500..559);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(10..99);
-                        let c = self.rng.gen_range(10..99);
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("(0{:03}) {:03} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::International => {
-                                format!("+90 {:03} {:03} {:02} {:02}", p, a, b, c)
-                            }
-                            PhoneFmt::E164 => {
-                                format!("+90{:03}{:03}{:02}{:02}", p, a, b, c)
-                            }
-                        })
-                    }
-                    20 => {
-                        // Israel: 050-AAA-AAAA
-                        let p = [50, 52, 53, 54, 58][self.rng.gen_range(0..5)];
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02}-{:03}-{:04}", p, a, b),
-                            PhoneFmt::International => {
-                                format!("+972 {:02}-{:03}-{:04}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+972{:02}{:03}{:04}", p, a, b),
-                        })
-                    }
-                    21 => {
-                        // Greece: 69A AAA AAAA
-                        let p = self.rng.gen_range(690..699);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("{:03} {:03} {:04}", p, a, b),
-                            PhoneFmt::International => {
-                                format!("+30 {:03} {:03} {:04}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+30{:03}{:03}{:04}", p, a, b),
-                        })
-                    }
-                    22 => {
-                        // South Africa: 071 AAA AAAA
-                        let p = self.rng.gen_range(71..84);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02} {:03} {:04}", p, a, b),
-                            PhoneFmt::International => {
-                                format!("+27 {:02} {:03} {:04}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+27{:02}{:03}{:04}", p, a, b),
-                        })
-                    }
-                    23 => {
-                        // Nigeria: 0802 AAA AAAA
-                        let p = self.rng.gen_range(800..909);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => {
-                                format!("0{:03} {:03} {:04}", p, a, b)
-                            }
-                            PhoneFmt::International => {
-                                format!("+234 {:03} {:03} {:04}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+234{:03}{:03}{:04}", p, a, b),
-                        })
-                    }
-                    24 => {
-                        // Kenya: 0712 AAAAAA
-                        let p = self.rng.gen_range(710..799);
-                        let a = self.rng.gen_range(100000..999999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:03} {:06}", p, a),
-                            PhoneFmt::International => format!("+254 {:03} {:06}", p, a),
-                            PhoneFmt::E164 => format!("+254{:03}{:06}", p, a),
-                        })
-                    }
-                    25 => {
-                        // Chile: (A) AAAA AAAA
-                        let a = self.rng.gen_range(2..9);
-                        let b = self.rng.gen_range(1000..9999);
-                        let c = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("({}) {:04} {:04}", a, b, c),
-                            PhoneFmt::International => {
-                                format!("+56 {} {:04} {:04}", a, b, c)
-                            }
-                            PhoneFmt::E164 => format!("+56{}{:04}{:04}", a, b, c),
-                        })
-                    }
-                    26 => {
-                        // Colombia: (AAA) AAAAAAA
-                        let a = self.rng.gen_range(300..399);
-                        let b = self.rng.gen_range(1000000..9999999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("({:03}) {:07}", a, b),
-                            PhoneFmt::International => format!("+57 {:03} {:07}", a, b),
-                            PhoneFmt::E164 => format!("+57{:03}{:07}", a, b),
-                        })
-                    }
-                    27 => {
-                        // Argentina: 011 15-AAAA-AAAA
-                        let a = self.rng.gen_range(1000..9999);
-                        let b = self.rng.gen_range(1000..9999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("011 15-{:04}-{:04}", a, b),
-                            PhoneFmt::International => {
-                                format!("+54 9 11 {:04}-{:04}", a, b)
-                            }
-                            PhoneFmt::E164 => format!("+5491{:04}{:04}", a, b),
-                        })
-                    }
-                    28 => {
-                        // Finland: 041 AAAAAAA
-                        let p = [41, 44, 45, 50][self.rng.gen_range(0..4)];
-                        let a = self.rng.gen_range(1000000..9999999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:02} {:07}", p, a),
-                            PhoneFmt::International => format!("+358 {:02} {:07}", p, a),
-                            PhoneFmt::E164 => format!("+358{:02}{:07}", p, a),
-                        })
-                    }
-                    _ => {
-                        // Vietnam: 0912 AAA AAA
-                        let p = self.rng.gen_range(900..999);
-                        let a = self.rng.gen_range(100..999);
-                        let b = self.rng.gen_range(100..999);
-                        Ok(match fmt {
-                            PhoneFmt::National => format!("0{:03} {:03} {:03}", p, a, b),
-                            PhoneFmt::International => {
-                                format!("+84 {:03} {:03} {:03}", p, a, b)
-                            }
-                            PhoneFmt::E164 => format!("+84{:03}{:03}{:03}", p, a, b),
-                        })
-                    }
-                }
+                })
             }
         }
     }
