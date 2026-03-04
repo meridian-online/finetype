@@ -3942,6 +3942,176 @@ impl Generator {
             )),
             "CN" => Ok(format!("{:06}", self.rng.gen_range(100000..999999))),
             "KR" => Ok(format!("{:05}", self.rng.gen_range(10000..99999))),
+
+            // 4-digit postal codes
+            "4D" => Ok(format!("{:04}", self.rng.gen_range(1000..9999))),
+
+            // 5-digit postal codes
+            "5D" => Ok(format!("{:05}", self.rng.gen_range(10000..99999))),
+
+            // 6-digit postal codes
+            "6D" => Ok(format!("{:06}", self.rng.gen_range(100000..999999))),
+
+            // Czech/Slovak/Greek/Swedish: 3+2 digits with optional space
+            "CS" => {
+                let d3 = self.rng.gen_range(100..999);
+                let d2 = self.rng.gen_range(0..100u32);
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("{:03} {:02}", d3, d2))
+                } else {
+                    Ok(format!("{:03}{:02}", d3, d2))
+                }
+            }
+
+            // Portugal: XXXX-XXX
+            "PT" => Ok(format!(
+                "{:04}-{:03}",
+                self.rng.gen_range(1000..9999),
+                self.rng.gen_range(1..999)
+            )),
+
+            // Brazil: XXXXX-XXX (dash optional)
+            "BR" => {
+                let d5 = self.rng.gen_range(10000..99999);
+                let d3 = self.rng.gen_range(1..999);
+                if self.rng.gen_bool(0.7) {
+                    Ok(format!("{:05}-{:03}", d5, d3))
+                } else {
+                    Ok(format!("{:05}{:03}", d5, d3))
+                }
+            }
+
+            // Lithuania: optional LT- prefix + 5 digits
+            "LT" => {
+                let code = self.rng.gen_range(10000..99999);
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("LT-{:05}", code))
+                } else {
+                    Ok(format!("{:05}", code))
+                }
+            }
+
+            // Latvia: LV-XXXX
+            "LV" => Ok(format!("LV-{:04}", self.rng.gen_range(1000..9999))),
+
+            // Argentina: optional [A-HJ-NP-Z] + 4 digits + optional [A-Z]{3}
+            "ES_AR" => {
+                const AR_FIRST: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ";
+                let d4 = self.rng.gen_range(1000..9999);
+                let variant = self.rng.gen_range(0u32..3);
+                match variant {
+                    0 => Ok(format!("{:04}", d4)),
+                    1 => {
+                        let l = AR_FIRST[self.rng.gen_range(0..AR_FIRST.len())] as char;
+                        Ok(format!("{}{:04}", l, d4))
+                    }
+                    _ => {
+                        let l1 = AR_FIRST[self.rng.gen_range(0..AR_FIRST.len())] as char;
+                        let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l3 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        let l4 = (b'A' + self.rng.gen_range(0..26)) as char;
+                        Ok(format!("{}{:04}{}{}{}", l1, d4, l2, l3, l4))
+                    }
+                }
+            }
+
+            // Chile: 7 digits
+            "CL" => Ok(format!("{:07}", self.rng.gen_range(1000000..9999999))),
+
+            // Peru: LIMA dd, CALLAO d, or [0-2]dddd
+            "PE" => {
+                let variant = self.rng.gen_range(0u32..3);
+                match variant {
+                    0 => Ok(format!("LIMA {}", self.rng.gen_range(1..100u32))),
+                    1 => {
+                        let d = self.rng.gen_range(0..10u32);
+                        if self.rng.gen_bool(0.5) {
+                            Ok(format!("CALLAO {}", d))
+                        } else {
+                            Ok(format!("CALLAO {:02}", d))
+                        }
+                    }
+                    _ => {
+                        let first = self.rng.gen_range(0..3u32);
+                        let rest = self.rng.gen_range(0..10000u32);
+                        Ok(format!("{}{:04}", first, rest))
+                    }
+                }
+            }
+
+            // Malta: [A-Z]{3} + optional space + 2-4 digits
+            "MT" => {
+                let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
+                let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
+                let l3 = (b'A' + self.rng.gen_range(0..26)) as char;
+                let num = match self.rng.gen_range(2u32..5) {
+                    2 => format!("{:02}", self.rng.gen_range(10..99)),
+                    3 => format!("{:03}", self.rng.gen_range(100..999)),
+                    _ => format!("{:04}", self.rng.gen_range(1000..9999)),
+                };
+                if self.rng.gen_bool(0.7) {
+                    Ok(format!("{}{}{} {}", l1, l2, l3, num))
+                } else {
+                    Ok(format!("{}{}{}{}", l1, l2, l3, num))
+                }
+            }
+
+            // Ireland: Eircode [\dA-Z]{3} [\dA-Z]{4}
+            "IE" => {
+                const AN: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let len = AN.len();
+                Ok(format!(
+                    "{}{}{} {}{}{}{}",
+                    AN[self.rng.gen_range(0..len)] as char,
+                    AN[self.rng.gen_range(0..len)] as char,
+                    AN[self.rng.gen_range(0..len)] as char,
+                    AN[self.rng.gen_range(0..len)] as char,
+                    AN[self.rng.gen_range(0..len)] as char,
+                    AN[self.rng.gen_range(0..len)] as char,
+                    AN[self.rng.gen_range(0..len)] as char,
+                ))
+            }
+
+            // Taiwan: 3, 5, or 6 digits
+            "TW" => {
+                let variant = self.rng.gen_range(0u32..3);
+                match variant {
+                    0 => Ok(format!("{:03}", self.rng.gen_range(100..999))),
+                    1 => Ok(format!("{:05}", self.rng.gen_range(10000..99999))),
+                    _ => Ok(format!("{:06}", self.rng.gen_range(100000..999999))),
+                }
+            }
+
+            // Israel: 5 or 7 digits
+            "HE" => {
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("{:05}", self.rng.gen_range(10000..99999)))
+                } else {
+                    Ok(format!("{:07}", self.rng.gen_range(1000000..9999999)))
+                }
+            }
+
+            // Iceland: 3 digits
+            "IS" => Ok(format!("{:03}", self.rng.gen_range(100..999))),
+
+            // Serbia: 5 or 6 digits
+            "SR" => {
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("{:05}", self.rng.gen_range(10000..99999)))
+                } else {
+                    Ok(format!("{:06}", self.rng.gen_range(100000..999999)))
+                }
+            }
+
+            // Vietnam: 5 or 6 digits
+            "VI" => {
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("{:05}", self.rng.gen_range(10000..99999)))
+                } else {
+                    Ok(format!("{:06}", self.rng.gen_range(100000..999999)))
+                }
+            }
+
             _ => Ok(format!("{:05}", self.rng.gen_range(10000..99999))),
         }
     }

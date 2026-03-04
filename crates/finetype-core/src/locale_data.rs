@@ -2754,6 +2754,7 @@ pub fn phone_country_code(locale: &str) -> &'static str {
 /// Returns (pattern_type, example) for generation.
 pub fn postal_format(locale: &str) -> &'static str {
     match locale {
+        // Existing formats
         "EN_US" | "EN" => "US", // 5 digits or ZIP+4
         "EN_GB" => "UK",        // A9 9AA or A9A 9AA
         "EN_AU" => "AU",        // 4 digits
@@ -2768,6 +2769,63 @@ pub fn postal_format(locale: &str) -> &'static str {
         "JA" => "JP",           // XXX-XXXX
         "ZH" => "CN",           // 6 digits
         "KO" => "KR",           // 5 digits
+
+        // 4-digit formats
+        "BG" | "BN" | "DA" | "DE_AT" | "DE_CH" | "EN_NZ" | "EN_PH" | "HU" | "LU" | "NB"
+        | "NL_BE" | "SL" | "ZA" => "4D",
+
+        // 5-digit formats
+        "AR_EG" | "AR_MA" | "AR_SA" | "EN_KE" | "ES_MX" | "ET" | "FI" | "HR" | "ID" | "MS"
+        | "TH" | "TR" | "UA" | "UR" => "5D",
+
+        // 6-digit formats
+        "EN_NG" | "EN_SG" | "ES_CO" | "HI" | "NG" | "RO" => "6D",
+
+        // 3+2 digits with optional space (Czech, Slovak, Greek, Swedish)
+        "CS" | "SK" | "EL" | "SV" => "CS",
+
+        // Portugal: XXXX-XXX
+        "PT" => "PT",
+
+        // Brazil: XXXXX-XXX
+        "PT_BR" => "BR",
+
+        // Lithuania: optional LT- prefix + 5 digits
+        "LT" => "LT",
+
+        // Latvia: LV-XXXX
+        "LV" => "LV",
+
+        // Argentina: optional letter + 4 digits + optional 3 letters
+        "ES_AR" => "ES_AR",
+
+        // Chile: 7 digits
+        "ES_CL" => "CL",
+
+        // Peru: LIMA/CALLAO/numeric
+        "ES_PE" => "PE",
+
+        // Malta: AAA + 2-4 digits
+        "MT" => "MT",
+
+        // Ireland: Eircode
+        "EN_IE" => "IE",
+
+        // Taiwan: 3, 5, or 6 digits
+        "ZH_TW" => "TW",
+
+        // Israel: 5 or 7 digits
+        "HE" => "HE",
+
+        // Iceland: 3 digits
+        "IS" => "IS",
+
+        // Serbia: 5-6 digits
+        "SR" => "SR",
+
+        // Vietnam: 5-6 digits
+        "VI" => "VI",
+
         _ => "US",
     }
 }
