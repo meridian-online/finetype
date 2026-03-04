@@ -3108,6 +3108,155 @@ pub fn base_locale(locale: &str) -> &str {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CLDR-sourced date format patterns (data/cldr/cldr_date_patterns.tsv)
+// ---------------------------------------------------------------------------
+
+/// Date field ordering in locale-specific date formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateFieldOrder {
+    /// Month Day Year — "January 15, 2024" (en-US, en-CA)
+    MonthDayYear,
+    /// Day Month Year — "15 January 2024" (most locales)
+    DayMonthYear,
+    /// Year Month Day — "2024. január 15." (hu) / "2024 sausio 15" (lt)
+    YearMonthDay,
+    /// Year Day Month — "2024. gada 15. janvāris" (lv)
+    YearDayMonth,
+}
+
+/// CLDR-sourced date format pattern for locale-specific generation.
+///
+/// Separators and suffixes are placed according to the field order:
+/// - **MDY:** `{month}{day_month_sep}{day}{day_suffix}{month_year_sep}{year}{year_suffix}`
+/// - **DMY:** `{day}{day_suffix}{day_month_sep}{month}{month_year_sep}{year}{year_suffix}`
+/// - **YMD:** `{year}{year_suffix}{month_year_sep}{month}{day_month_sep}{day}{day_suffix}`
+/// - **YDM:** `{year}{year_suffix}{month_year_sep}{day}{day_suffix}{day_month_sep}{month}`
+#[derive(Debug, Clone, Copy)]
+pub struct DateFormatPattern {
+    /// Component ordering
+    pub order: DateFieldOrder,
+    /// Separator between day and month components
+    pub day_month_sep: &'static str,
+    /// Separator between month and year components (or year-to-day for YDM)
+    pub month_year_sep: &'static str,
+    /// Suffix after day number (e.g., "." for Czech/German)
+    pub day_suffix: &'static str,
+    /// Suffix after year number (e.g., "." for Hungarian)
+    pub year_suffix: &'static str,
+}
+
+// -- Pattern constants derived from data/cldr/cldr_date_patterns.tsv --
+
+/// DMY with simple spaces: "15 January 2024"
+const DMY: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::DayMonthYear,
+    day_month_sep: " ",
+    month_year_sep: " ",
+    day_suffix: "",
+    year_suffix: "",
+};
+
+/// DMY with period after day: "15. März 2024" (de, cs, da, et, fi, hr, no, sk, sl)
+const DMY_DOT: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::DayMonthYear,
+    day_month_sep: " ",
+    month_year_sep: " ",
+    day_suffix: ".",
+    year_suffix: "",
+};
+
+/// DMY with "de" prepositions: "15 de enero de 2024" (es full month, pt)
+const DMY_DE: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::DayMonthYear,
+    day_month_sep: " de ",
+    month_year_sep: " de ",
+    day_suffix: "",
+    year_suffix: "",
+};
+
+/// MDY with comma before year: "January 15, 2024" (en, en-US, en-CA)
+const MDY_COMMA: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::MonthDayYear,
+    day_month_sep: " ",
+    month_year_sep: ", ",
+    day_suffix: "",
+    year_suffix: "",
+};
+
+/// YMD Hungarian: "2024. január 15." — periods after year and day
+const YMD_HU: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::YearMonthDay,
+    day_month_sep: " ",
+    month_year_sep: " ",
+    day_suffix: ".",
+    year_suffix: ".",
+};
+
+/// YMD Lithuanian: "2024 sausio 15" — no suffixes
+const YMD_LT: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::YearMonthDay,
+    day_month_sep: " ",
+    month_year_sep: " ",
+    day_suffix: "",
+    year_suffix: "",
+};
+
+/// YDM Latvian: "2024. gada 15. janvāris"
+const YDM_LV: DateFormatPattern = DateFormatPattern {
+    order: DateFieldOrder::YearDayMonth,
+    day_month_sep: " ",
+    month_year_sep: " gada ",
+    day_suffix: ".",
+    year_suffix: ".",
+};
+
+/// Get the CLDR-sourced date format pattern for a locale.
+///
+/// `full_month`: true for `long_full_month`/`weekday_full_month`,
+///               false for `abbreviated_month`/`weekday_abbreviated_month`.
+///
+/// The distinction matters for locales like Spanish where full-month dates use
+/// "de" prepositions ("15 de enero de 2024") but abbreviated dates don't
+/// ("15 ene 2024").
+pub fn date_format_pattern(locale: &str, full_month: bool) -> DateFormatPattern {
+    match locale {
+        // MDY: US-style
+        "EN" | "EN_US" | "EN_CA" => MDY_COMMA,
+        // DMY with "de" preposition: Spanish (full month only), Portuguese (both)
+        "ES" if full_month => DMY_DE,
+        "PT" | "PT_BR" => DMY_DE,
+        // DMY with period after day: Germanic and Central European
+        "DE" | "CS" | "DA" | "ET" | "FI" | "HR" | "NO" | "SK" | "SL" => DMY_DOT,
+        // YMD: Hungarian (with periods)
+        "HU" => YMD_HU,
+        // YMD: Lithuanian (plain)
+        "LT" => YMD_LT,
+        // YDM: Latvian
+        "LV" => YDM_LV,
+        // DMY simple: EN_AU, EN_GB, FR, IT, NL, PL, RU, AR, BG, EL, RO, SV, TR, UK, ...
+        _ => DMY,
+    }
+}
+
+/// Get weekday placement and separator for weekday date patterns.
+///
+/// Returns `(weekday_before_date, separator)` derived from CLDR full-length
+/// date patterns.
+pub fn weekday_format(locale: &str) -> (bool, &'static str) {
+    match locale {
+        // Weekday after date
+        "HU" | "LT" => (false, ", "),
+        "TR" => (false, " "),
+        // Arabic comma (U+060C)
+        "AR" => (true, "\u{060C} "),
+        // Weekday before, space only (no comma)
+        "FR" | "IT" | "NL" | "EL" | "SV" | "CS" | "DA" | "FI" | "NO" | "SK" => (true, " "),
+        // Weekday before, comma + space (default)
+        _ => (true, ", "),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

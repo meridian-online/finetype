@@ -672,14 +672,14 @@ datetime.date.abbreviated_month:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Za-z]{3} \\d{2}, \\d{4}$"
+    pattern: "^(?:[A-Za-z]{3,} \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]{3,} \\d{4})$"
   tier: [DATE, date]
   release_priority: 5
   aliases: []
   samples:
     - "Jan 15, 2024"
+    - "15 Jan 2024"
     - "Dec 31, 2019"
-    - "Jun 01, 2000"
   references: null
   notes: "Per-locale samples needed for non-EN locales."
 
@@ -710,12 +710,13 @@ datetime.date.long_full_month:
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Za-z]+ \\d{2}, \\d{4}$"
+    pattern: "^(?:[A-Za-z]+ \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]+ \\d{4})$"
   tier: [DATE, date]
   release_priority: 5
   aliases: [long_full_month_name]
   samples:
     - "January 15, 2024"
+    - "15 January 2024"
     - "December 31, 2019"
   references: null
   notes: "v1 name: date.long_full_month_name"
@@ -734,18 +735,18 @@ datetime.date.weekday_abbreviated_month:
     - IT
     - PT
   broad_type: DATE
-  format_string: "%A, %d %b %Y"
-  transform: "strptime({col}, '%A, %d %b %Y')::DATE"
+  format_string: "%A, %b %d, %Y"
+  transform: "strptime({col}, '%A, %b %d, %Y')::DATE"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Za-z]+, \\d{2} [A-Za-z]{3} \\d{4}$"
+    pattern: "^[A-Za-z]+[, ]+(?:[A-Za-z]{3,} \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]{3,} \\d{4})$"
   tier: [DATE, date]
   release_priority: 5
   aliases: [full_weekday_abbreviated_month]
   samples:
-    - "Monday, 15 Jan 2024"
+    - "Monday, Jan 15, 2024"
     - "Tuesday, 31 Dec 2019"
   references: null
   notes: "v1 name: date.full_weekday_abbreviated_month"
@@ -764,18 +765,18 @@ datetime.date.weekday_full_month:
     - IT
     - PT
   broad_type: DATE
-  format_string: "%A, %d %B %Y"
-  transform: "strptime({col}, '%A, %d %B %Y')::DATE"
+  format_string: "%A, %B %d, %Y"
+  transform: "strptime({col}, '%A, %B %d, %Y')::DATE"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^[A-Za-z]+, \\d{2} [A-Za-z]+ \\d{4}$"
+    pattern: "^[A-Za-z]+[, ]+(?:[A-Za-z]+ \\d{1,2},? \\d{4}|\\d{1,2}\\.? [A-Za-z]+ \\d{4})$"
   tier: [DATE, date]
   release_priority: 5
   aliases: [long_weekday_month_name]
   samples:
-    - "Monday, 15 January 2024"
+    - "Monday, January 15, 2024"
     - "Tuesday, 31 December 2019"
   references: null
   notes: "v1 name: date.long_weekday_month_name"

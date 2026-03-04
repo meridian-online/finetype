@@ -28,16 +28,6 @@ enum PhoneFmt {
     E164,
 }
 
-/// Date component ordering by locale (derived from CLDR dateFormats).
-enum DateOrder {
-    /// Month Day, Year — "January 15, 2024" (en-US, en-CA)
-    Mdy,
-    /// Day Month Year — "15 January 2024" (most of the world)
-    Dmy,
-    /// Year Month Day — "2024. január 15." (hu, lt, lv)
-    Ymd,
-}
-
 /// A generated sample with its label.
 #[derive(Debug, Clone)]
 pub struct Sample {
@@ -289,63 +279,64 @@ impl Generator {
             ("date", "short_mdy") => Ok(self.random_datetime().format("%m-%d-%y").to_string()),
             ("date", "short_dmy") => Ok(self.random_datetime().format("%d-%m-%y").to_string()),
             ("date", "abbreviated_month") => {
-                // Format: "Month DD, YYYY" or "DD Month YYYY" — locale names, mixed ordering
-                // for training diversity. The CharCNN needs to see month abbreviations from
-                // many locales. Format variations teach the model to recognise abbreviated
-                // month patterns regardless of ordering.
+                // CLDR-sourced locale patterns with abbreviated month names.
                 let dt = self.random_datetime();
                 let abbrevs = locale_data::month_abbreviations(self.current_locale());
                 let month_abbr = abbrevs[(dt.month0() as usize) % abbrevs.len()];
-                Ok(match self.date_order() {
-                    DateOrder::Mdy => format!("{} {:02}, {}", month_abbr, dt.day(), dt.year()),
-                    DateOrder::Dmy => format!("{} {} {}", dt.day(), month_abbr, dt.year()),
-                    DateOrder::Ymd => format!("{} {} {}", dt.year(), month_abbr, dt.day()),
-                })
-            }
-            ("date", "long_full_month") => {
-                // Same as abbreviated_month but with full month names.
-                let dt = self.random_datetime();
-                let months = locale_data::month_names(self.current_locale());
-                let month_name = months[(dt.month0() as usize) % months.len()];
-                Ok(match self.date_order() {
-                    DateOrder::Mdy => format!("{} {:02}, {}", month_name, dt.day(), dt.year()),
-                    DateOrder::Dmy => format!("{} {} {}", dt.day(), month_name, dt.year()),
-                    DateOrder::Ymd => format!("{} {} {}", dt.year(), month_name, dt.day()),
-                })
-            }
-            ("date", "weekday_abbreviated_month") => {
-                // Fixed format: "Weekday, DD Abbr YYYY" — matches format_string %A, %d %b %Y.
-                // Locale diversity comes from translated weekday/month names, not reordering.
-                let dt = self.random_datetime();
-                let weekdays = locale_data::weekday_names(self.current_locale());
-                let abbrevs = locale_data::month_abbreviations(self.current_locale());
-                let weekday =
-                    weekdays[(dt.weekday().num_days_from_monday() as usize) % weekdays.len()];
-                let month_abbr = abbrevs[(dt.month0() as usize) % abbrevs.len()];
-                Ok(format!(
-                    "{}, {:02} {} {}",
-                    weekday,
+                let pat = locale_data::date_format_pattern(self.current_locale(), false);
+                Ok(Self::format_date_parts(
+                    &pat,
                     dt.day(),
                     month_abbr,
-                    dt.year()
+                    dt.year(),
                 ))
             }
+            ("date", "long_full_month") => {
+                // CLDR-sourced locale patterns with full month names.
+                let dt = self.random_datetime();
+                let months = locale_data::month_names(self.current_locale());
+                let month_name = months[(dt.month0() as usize) % months.len()];
+                let pat = locale_data::date_format_pattern(self.current_locale(), true);
+                Ok(Self::format_date_parts(
+                    &pat,
+                    dt.day(),
+                    month_name,
+                    dt.year(),
+                ))
+            }
+            ("date", "weekday_abbreviated_month") => {
+                // CLDR-sourced locale patterns: weekday + abbreviated month date.
+                let dt = self.random_datetime();
+                let weekdays = locale_data::weekday_names(self.current_locale());
+                let abbrevs = locale_data::month_abbreviations(self.current_locale());
+                let weekday =
+                    weekdays[(dt.weekday().num_days_from_monday() as usize) % weekdays.len()];
+                let month_abbr = abbrevs[(dt.month0() as usize) % abbrevs.len()];
+                let pat = locale_data::date_format_pattern(self.current_locale(), false);
+                let date_part = Self::format_date_parts(&pat, dt.day(), month_abbr, dt.year());
+                let (wk_before, wk_sep) = locale_data::weekday_format(self.current_locale());
+                Ok(if wk_before {
+                    format!("{}{}{}", weekday, wk_sep, date_part)
+                } else {
+                    format!("{}{}{}", date_part, wk_sep, weekday)
+                })
+            }
             ("date", "weekday_full_month") => {
-                // Fixed format: "Weekday, DD Month YYYY" — matches format_string %A, %d %B %Y.
-                // Locale diversity comes from translated weekday/month names, not reordering.
+                // CLDR-sourced locale patterns: weekday + full month date.
                 let dt = self.random_datetime();
                 let weekdays = locale_data::weekday_names(self.current_locale());
                 let months = locale_data::month_names(self.current_locale());
                 let weekday =
                     weekdays[(dt.weekday().num_days_from_monday() as usize) % weekdays.len()];
                 let month_name = months[(dt.month0() as usize) % months.len()];
-                Ok(format!(
-                    "{}, {:02} {} {}",
-                    weekday,
-                    dt.day(),
-                    month_name,
-                    dt.year()
-                ))
+                let pat = locale_data::date_format_pattern(self.current_locale(), true);
+                let date_part = Self::format_date_parts(&pat, dt.day(), month_name, dt.year());
+                let (wk_before, wk_sep) = locale_data::weekday_format(self.current_locale());
+                Ok(if wk_before {
+                    format!("{}{}{}", weekday, wk_sep, date_part)
+                } else {
+                    format!("{}{}{}", date_part, wk_sep, weekday)
+                })
             }
             ("date", "ordinal") => Ok(format!(
                 "{}-{:03}",
@@ -2976,17 +2967,55 @@ impl Generator {
         self.locale.as_deref().unwrap_or("EN")
     }
 
-    /// Get the date component ordering for the current locale.
-    ///
-    /// Based on CLDR dateFormats (long/full patterns):
-    /// - MDY: en, en-US (Month Day, Year — "January 15, 2024")
-    /// - DMY: Most of the world (Day Month Year — "15 January 2024")
-    /// - YMD: hu, lt (Year Month Day — "2024. január 15.")
-    fn date_order(&self) -> DateOrder {
-        match self.current_locale() {
-            "EN" | "EN_US" | "EN_CA" => DateOrder::Mdy,
-            "HU" | "LT" | "LV" => DateOrder::Ymd,
-            _ => DateOrder::Dmy,
+    /// Format a date using a CLDR-derived locale pattern.
+    fn format_date_parts(
+        pat: &locale_data::DateFormatPattern,
+        day: u32,
+        month: &str,
+        year: i32,
+    ) -> String {
+        use locale_data::DateFieldOrder;
+        match pat.order {
+            DateFieldOrder::MonthDayYear => format!(
+                "{}{}{}{}{}{}{}",
+                month,
+                pat.day_month_sep,
+                day,
+                pat.day_suffix,
+                pat.month_year_sep,
+                year,
+                pat.year_suffix
+            ),
+            DateFieldOrder::DayMonthYear => format!(
+                "{}{}{}{}{}{}{}",
+                day,
+                pat.day_suffix,
+                pat.day_month_sep,
+                month,
+                pat.month_year_sep,
+                year,
+                pat.year_suffix
+            ),
+            DateFieldOrder::YearMonthDay => format!(
+                "{}{}{}{}{}{}{}",
+                year,
+                pat.year_suffix,
+                pat.month_year_sep,
+                month,
+                pat.day_month_sep,
+                day,
+                pat.day_suffix
+            ),
+            DateFieldOrder::YearDayMonth => format!(
+                "{}{}{}{}{}{}{}",
+                year,
+                pat.year_suffix,
+                pat.month_year_sep,
+                day,
+                pat.day_suffix,
+                pat.day_month_sep,
+                month
+            ),
         }
     }
 
