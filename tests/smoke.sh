@@ -14,97 +14,14 @@
 
 set -euo pipefail
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# ── Load shared helpers ─────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-PASS=0
-FAIL=0
-SKIP=0
-ERRORS=()
-
-# Allow override via env var
-FINETYPE="${FINETYPE:-$REPO_ROOT/target/release/finetype}"
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-pass() {
-    PASS=$((PASS + 1))
-    printf "  \033[32m✓\033[0m %s\n" "$1"
-}
-
-fail() {
-    FAIL=$((FAIL + 1))
-    ERRORS+=("$1: $2")
-    printf "  \033[31m✗\033[0m %s — %s\n" "$1" "$2"
-}
-
-skip() {
-    SKIP=$((SKIP + 1))
-    printf "  \033[33m○\033[0m %s (skipped)\n" "$1"
-}
-
-section() {
-    printf "\n\033[1m%s\033[0m\n" "$1"
-}
-
-# Assert output equals expected
-assert_eq() {
-    local name="$1" actual="$2" expected="$3"
-    if [ "$actual" = "$expected" ]; then
-        pass "$name"
-    else
-        fail "$name" "expected '$expected', got '$actual'"
-    fi
-}
-
-# Assert output contains expected substring
-assert_contains() {
-    local name="$1" actual="$2" expected="$3"
-    if echo "$actual" | grep -qF "$expected"; then
-        pass "$name"
-    else
-        fail "$name" "expected output to contain '$expected', got '$actual'"
-    fi
-}
-
-# Assert command succeeds (exit code 0)
-assert_ok() {
-    local name="$1"
-    shift
-    if output=$("$@" 2>&1); then
-        pass "$name"
-        echo "$output"
-    else
-        fail "$name" "command failed with exit $?: $output"
-        echo ""
-    fi
-}
-
-# Assert command fails (non-zero exit)
-assert_fail() {
-    local name="$1"
-    shift
-    if output=$("$@" 2>&1); then
-        fail "$name" "expected failure but command succeeded: $output"
-    else
-        pass "$name"
-    fi
-}
+source "$SCRIPT_DIR/helpers.sh"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
-if [[ "${1:-}" != "--skip-build" ]]; then
-    section "Building release binary..."
-    (cd "$REPO_ROOT" && cargo build --release -p finetype-cli 2>&1)
-    printf "  Binary: %s\n" "$FINETYPE"
-fi
-
-if [ ! -x "$FINETYPE" ]; then
-    printf "\033[31mERROR: Binary not found at %s\033[0m\n" "$FINETYPE"
-    exit 1
-fi
+handle_build "$@"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEST SUITE
@@ -312,15 +229,9 @@ assert_contains "invalid subcommand shows error" "$OUT" "error"
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-section "Results"
-TOTAL=$((PASS + FAIL + SKIP))
-printf "  %d passed, %d failed, %d skipped (of %d)\n" "$PASS" "$FAIL" "$SKIP" "$TOTAL"
+print_summary "Results"
 
 if [ "$FAIL" -gt 0 ]; then
-    printf "\n\033[31mFailures:\033[0m\n"
-    for err in "${ERRORS[@]}"; do
-        printf "  - %s\n" "$err"
-    done
     exit 1
 fi
 

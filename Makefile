@@ -43,6 +43,20 @@ fmt:
 clippy:
 	cargo clippy -- -D warnings
 
+# ─── CLI Tests ─────────────────────────────────
+.PHONY: test-smoke test-docs test-golden test-cli
+
+test-smoke:
+	./tests/smoke.sh --skip-build
+
+test-docs:
+	./tests/doc_tests.sh --skip-build
+
+test-golden:
+	./tests/doc_tests.sh --skip-build --golden-only
+
+test-cli: test-smoke test-docs
+
 # ─── Build ────────────────────────────────────
 .PHONY: build build-release check test generate
 
