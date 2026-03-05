@@ -94,7 +94,7 @@ detect_hardware() {
     os="$(uname -s)"
     case "$os" in
         Darwin)
-            FEATURES="metal"
+            CARGO_FEATURES="--no-default-features --features metal"
             DEVICE_NAME="Metal"
             # Try to get chip name
             local chip
@@ -103,17 +103,17 @@ detect_hardware() {
             ;;
         Linux)
             if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
-                FEATURES="cuda"
+                CARGO_FEATURES="--no-default-features --features cuda"
                 DEVICE_NAME="CUDA"
                 DEVICE_DETAIL="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "NVIDIA GPU")"
             else
-                FEATURES="cpu"
+                CARGO_FEATURES="--no-default-features --features cpu"
                 DEVICE_NAME="CPU"
                 DEVICE_DETAIL="$(lscpu 2>/dev/null | grep 'Model name' | sed 's/.*: *//' || echo "Unknown")"
             fi
             ;;
         *)
-            FEATURES="cpu"
+            CARGO_FEATURES="--no-default-features --features cpu"
             DEVICE_NAME="CPU"
             DEVICE_DETAIL="Unknown"
             ;;
@@ -147,7 +147,7 @@ if [[ -n "$DATA_FILE" ]]; then
 else
     TRAINING_DATA="training.ndjson"
     echo "[1/3] Generating training data (${SAMPLES} samples/type)..."
-    cargo run -p finetype-cli --features "${FEATURES}" --release -- generate \
+    cargo run -p finetype-cli ${CARGO_FEATURES} --release -- generate \
         --samples "$SAMPLES" \
         --seed "$SEED" \
         --output "$TRAINING_DATA"
@@ -156,8 +156,8 @@ fi
 
 # ─── Step 2: Build CLI with correct features ───────────────────────
 echo ""
-echo "[2/3] Building with --features ${FEATURES}..."
-cargo build -p finetype-cli --features "${FEATURES}" --release
+echo "[2/3] Building with ${CARGO_FEATURES}..."
+cargo build -p finetype-cli ${CARGO_FEATURES} --release
 
 # ─── Step 3: Train ─────────────────────────────────────────────────
 echo ""
@@ -166,7 +166,7 @@ mkdir -p "$MODEL_DIR"
 
 # Build the train command
 TRAIN_CMD=(
-    cargo run -p finetype-cli --features "${FEATURES}" --release --
+    cargo run -p finetype-cli ${CARGO_FEATURES} --release --
     train
     --data "$TRAINING_DATA"
     --output "$MODEL_DIR"
