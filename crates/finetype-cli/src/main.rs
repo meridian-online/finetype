@@ -586,11 +586,7 @@ fn cmd_infer(
     /// Detect locale for a single value by testing it against all locale validators.
     /// Unlike `detect_locale_from_validation` (column mode, pass-rate ranking),
     /// this returns the first locale whose validator passes for a single value.
-    fn detect_single_value_locale(
-        value: &str,
-        label: &str,
-        taxonomy: &Taxonomy,
-    ) -> Option<String> {
+    fn detect_single_value_locale(value: &str, label: &str, taxonomy: &Taxonomy) -> Option<String> {
         let locale_validators = taxonomy.get_locale_validators(label)?;
         for (locale, validator) in locale_validators {
             if validator.validate(value).is_valid {
@@ -655,7 +651,10 @@ fn cmd_infer(
             }
             OutputFormat::Csv => {
                 if show_value && show_confidence {
-                    println!("\"{}\",\"{}\",{:.4}", text, display_label, result.confidence);
+                    println!(
+                        "\"{}\",\"{}\",{:.4}",
+                        text, display_label, result.confidence
+                    );
                 } else if show_value {
                     println!("\"{}\",\"{}\"", text, display_label);
                 } else if show_confidence {
@@ -783,7 +782,14 @@ fn cmd_infer(
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
                 for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
+                    output_result(
+                        text,
+                        result,
+                        output,
+                        show_value,
+                        show_confidence,
+                        taxonomy.as_ref(),
+                    );
                 }
             }
         }
@@ -794,7 +800,14 @@ fn cmd_infer(
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
                 for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
+                    output_result(
+                        text,
+                        result,
+                        output,
+                        show_value,
+                        show_confidence,
+                        taxonomy.as_ref(),
+                    );
                 }
             }
         }
@@ -823,7 +836,14 @@ fn cmd_infer(
                     total_timing.tier2_models = total_timing.tier2_models.max(timing.tier2_models);
                     total_timing.total_ms += timing.total_ms;
                     for (text, result) in chunk.iter().zip(results.iter()) {
-                        output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
+                        output_result(
+                            text,
+                            result,
+                            output,
+                            show_value,
+                            show_confidence,
+                            taxonomy.as_ref(),
+                        );
                     }
                 }
                 let elapsed = t_start.elapsed();
@@ -855,7 +875,14 @@ fn cmd_infer(
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
                 for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
+                    output_result(
+                        text,
+                        result,
+                        output,
+                        show_value,
+                        show_confidence,
+                        taxonomy.as_ref(),
+                    );
                 }
             }
         }

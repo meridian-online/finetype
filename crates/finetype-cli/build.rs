@@ -75,7 +75,10 @@ fn find_models(manifest_dir: &Path, workspace_root: &Path) -> PathBuf {
     // Try workspace root first (normal development builds)
     let workspace_models = workspace_root.join("models");
     if workspace_models.join("default").exists() {
-        println!("cargo:warning=Using models from workspace: {}", workspace_models.display());
+        println!(
+            "cargo:warning=Using models from workspace: {}",
+            workspace_models.display()
+        );
         return workspace_models;
     }
 
@@ -104,15 +107,23 @@ fn download_models() -> PathBuf {
     fs::create_dir_all(&models_dir).expect("Failed to create models cache directory");
 
     // Download and setup models/default -> char-cnn-v11
-    download_model_group(&models_dir, "char-cnn-v11", &["model.safetensors", "labels.json", "config.yaml"]);
+    download_model_group(
+        &models_dir,
+        "char-cnn-v11",
+        &["model.safetensors", "labels.json", "config.yaml"],
+    );
 
     // Download optional model groups (graceful degradation if they fail)
-    download_model_group_optional(&models_dir, "model2vec", &[
-        "model.safetensors",
-        "type_embeddings.safetensors",
-        "tokenizer.json",
-        "label_index.json",
-    ]);
+    download_model_group_optional(
+        &models_dir,
+        "model2vec",
+        &[
+            "model.safetensors",
+            "type_embeddings.safetensors",
+            "tokenizer.json",
+            "label_index.json",
+        ],
+    );
 
     download_model_group_optional(
         &models_dir,
@@ -133,7 +144,8 @@ fn download_models() -> PathBuf {
     #[cfg(windows)]
     {
         // On Windows, create a plain text file containing the target path
-        fs::write(&default_link, "char-cnn-v11").expect("Failed to create models/default link file");
+        fs::write(&default_link, "char-cnn-v11")
+            .expect("Failed to create models/default link file");
     }
 
     println!(

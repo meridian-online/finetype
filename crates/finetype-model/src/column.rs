@@ -1078,8 +1078,9 @@ impl ColumnClassifier {
                     Some(format!("sense_geo_hint_override:{}", header.to_lowercase()));
             } else {
                 // Original rescue: check unmasked votes for location signal
-                let header_hint_blocks_rescue = header_hint(header)
-                    .is_some_and(|h| !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h));
+                let header_hint_blocks_rescue = header_hint(header).is_some_and(|h| {
+                    !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h)
+                });
                 if !header_hint_blocks_rescue {
                     if let Some((top_label, top_count)) = unmasked_votes.first() {
                         if LOCATION_TYPES.contains(&top_label.as_str()) {

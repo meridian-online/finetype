@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-05
+
+### Accuracy
+
+- **Profile eval: 111/116 label (95.7%), 114/116 domain (98.3%)** — with CharCNN-v12 model (216 classes) and targeted pipeline fix. (NNFT-226)
+- **Actionability eval: 96.2%** — 2760/2870 datetime values parse correctly. (NNFT-226)
+
+### Added
+
+- **Format Coverage expansion — 53 new type definitions** (163→216 types, 33% increase). (NNFT-223)
+  - **40 datetime formats:** 15 timestamps (Apache CLF, syslog BSD/ISO, ctime, W3C DTF, ISO 8601 milliseconds/microseconds/date-only, RFC 3339 nano, SQL microseconds, Unix milliseconds/microseconds), 23 dates (Chinese 年月日, Korean 년월일, Japanese era 令和, dot-separated variants, slash variants with 2-digit year, month-first/day-first with leading zeros, abbreviated month, year-month, year-quarter), 2 periods (quarter, fiscal year).
+  - **13 finance formats:** 11 currency (Indian lakh/crore, Swiss apostrophe, Brazilian real, Japanese yen, Chinese yuan, Korean won, Scandinavian comma, accounting parentheses negative, minor unit integer, cryptocurrency, generic symbol), 2 rates (basis points, yield percentage).
+  - New YAML categories: `datetime.period.*` (span-based dates) and `finance.rate.*` (rates, not amounts).
+- **CLI output format alignment** — `label` field added to JSON output, locale suffix in human-readable output. (NNFT-221)
+
+### Changed
+
+- **Model: CharCNN v11 → v12** — retrained on 216-type taxonomy with 212k samples (1000/type, 10 epochs, seed 42, 87.97% training accuracy). 44 types graduated from release_priority 1-2 → 3 to include in training data. (NNFT-226)
+- **LabelCategoryMap expanded** — updated for 216 types: temporal 45→85, currency 16→29. New types routed to correct Sense categories for masked vote aggregation. (NNFT-225)
+- **Header-hint location override (Step 7b-pre)** — when a hardcoded header hint points to a LOCATION_TYPE (country/city/state/region/continent) but the prediction is not a location type, the hint overrides directly. Catches Sense misrouting where country names get masked to temporal types. (NNFT-226)
+
+### Known Issues
+
+- **5 remaining misclassifications** — address→street_address (expected full_address), abbreviated_month_date→long_full_month, airports.name→city (expected full_name), npi→isbn, company→last_name (expected entity_name). Mix of CharCNN limitations and keyword-match ambiguity in header_hint.
+- **multilingual.date actionability** — mixed date formats across locales; not addressable without multi-format support.
+
 ## [0.5.3] - 2026-03-04
 
 ### Accuracy
