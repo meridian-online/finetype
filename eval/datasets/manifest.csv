@@ -1,214 +1,214 @@
 dataset,file_path,column_name,gt_label
-titanic,/home/hugh/datasets/titanic.csv,PassengerId,id
-titanic,/home/hugh/datasets/titanic.csv,Survived,boolean
-titanic,/home/hugh/datasets/titanic.csv,Pclass,class
-titanic,/home/hugh/datasets/titanic.csv,Name,name
-titanic,/home/hugh/datasets/titanic.csv,Sex,gender
-titanic,/home/hugh/datasets/titanic.csv,Age,number
-titanic,/home/hugh/datasets/titanic.csv,SibSp,number
-titanic,/home/hugh/datasets/titanic.csv,Parch,number
-titanic,/home/hugh/datasets/titanic.csv,Ticket,code
-titanic,/home/hugh/datasets/titanic.csv,Fare,price
-titanic,/home/hugh/datasets/titanic.csv,Cabin,code
-titanic,/home/hugh/datasets/titanic.csv,Embarked,category
-airports,/home/hugh/datasets/airports.csv,id,id
-airports,/home/hugh/datasets/airports.csv,name,name
-airports,/home/hugh/datasets/airports.csv,city,city
-airports,/home/hugh/datasets/airports.csv,country,country
-airports,/home/hugh/datasets/airports.csv,iata,iata
-airports,/home/hugh/datasets/airports.csv,icao,icao
-airports,/home/hugh/datasets/airports.csv,latitude,latitude
-airports,/home/hugh/datasets/airports.csv,longitude,longitude
-airports,/home/hugh/datasets/airports.csv,altitude,number
-airports,/home/hugh/datasets/airports.csv,utc_offset,utc offset
-airports,/home/hugh/datasets/airports.csv,timezone,time zone
-airports,/home/hugh/datasets/airports.csv,type,category
-airports,/home/hugh/datasets/airports.csv,source,category
-countries,/home/hugh/datasets/countries.csv,name,country
-countries,/home/hugh/datasets/countries.csv,alpha-2,country code
-countries,/home/hugh/datasets/countries.csv,alpha-3,country code
-countries,/home/hugh/datasets/countries.csv,country-code,code
-countries,/home/hugh/datasets/countries.csv,iso_3166-2,code
-countries,/home/hugh/datasets/countries.csv,region,region
-countries,/home/hugh/datasets/countries.csv,sub-region,region
-countries,/home/hugh/datasets/countries.csv,region-code,code
-countries,/home/hugh/datasets/countries.csv,sub-region-code,code
-covid_timeseries,/home/hugh/datasets/covid_timeseries.csv,Date,date
-covid_timeseries,/home/hugh/datasets/covid_timeseries.csv,Country,country
-covid_timeseries,/home/hugh/datasets/covid_timeseries.csv,Confirmed,number
-covid_timeseries,/home/hugh/datasets/covid_timeseries.csv,Recovered,number
-covid_timeseries,/home/hugh/datasets/covid_timeseries.csv,Deaths,number
-us_states,/home/hugh/datasets/us_states.csv,State,state
-us_states,/home/hugh/datasets/us_states.csv,Abbreviation,code
-world_cities,/home/hugh/datasets/world_cities.csv,name,city
-world_cities,/home/hugh/datasets/world_cities.csv,country,country
-world_cities,/home/hugh/datasets/world_cities.csv,subcountry,region
-world_cities,/home/hugh/datasets/world_cities.csv,geonameid,id
-iris,/home/hugh/datasets/iris.csv,sepal_length,decimal number
-iris,/home/hugh/datasets/iris.csv,sepal_width,decimal number
-iris,/home/hugh/datasets/iris.csv,petal_length,decimal number
-iris,/home/hugh/datasets/iris.csv,petal_width,decimal number
-iris,/home/hugh/datasets/iris.csv,species,category
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,order_id,code
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,customer_email,email
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,order_date,date
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,total_price,price
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,currency,currency
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,credit_card_last4,code
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,shipping_country,country
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,shipping_postal_code,postal code
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,status,status
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,is_gift,boolean
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,tracking_url,url
-ecommerce_orders,/home/hugh/datasets/ecommerce_orders.csv,phone,telephone
-tech_systems,/home/hugh/datasets/tech_systems.csv,server_hostname,hostname
-tech_systems,/home/hugh/datasets/tech_systems.csv,ip_address,ip_v4
-tech_systems,/home/hugh/datasets/tech_systems.csv,mac_address,mac address
-tech_systems,/home/hugh/datasets/tech_systems.csv,os,operating system
-tech_systems,/home/hugh/datasets/tech_systems.csv,version,version
-tech_systems,/home/hugh/datasets/tech_systems.csv,language,language
-tech_systems,/home/hugh/datasets/tech_systems.csv,port,port
-tech_systems,/home/hugh/datasets/tech_systems.csv,uuid,uuid
-tech_systems,/home/hugh/datasets/tech_systems.csv,api_key,code
-tech_systems,/home/hugh/datasets/tech_systems.csv,user_agent,user agent
-tech_systems,/home/hugh/datasets/tech_systems.csv,log_timestamp,timestamp
-tech_systems,/home/hugh/datasets/tech_systems.csv,request_url,url
-people_directory,/home/hugh/datasets/people_directory.csv,full_name,name
-people_directory,/home/hugh/datasets/people_directory.csv,first_name,first name
-people_directory,/home/hugh/datasets/people_directory.csv,last_name,last name
-people_directory,/home/hugh/datasets/people_directory.csv,email,email
-people_directory,/home/hugh/datasets/people_directory.csv,phone,telephone
-people_directory,/home/hugh/datasets/people_directory.csv,age,number
-people_directory,/home/hugh/datasets/people_directory.csv,gender,gender
-people_directory,/home/hugh/datasets/people_directory.csv,ssn,code
-people_directory,/home/hugh/datasets/people_directory.csv,date_of_birth,date
-people_directory,/home/hugh/datasets/people_directory.csv,company,entity name
-people_directory,/home/hugh/datasets/people_directory.csv,job_title,occupation
-people_directory,/home/hugh/datasets/people_directory.csv,salary,price
-people_directory,/home/hugh/datasets/people_directory.csv,height_cm,height
-people_directory,/home/hugh/datasets/people_directory.csv,weight_kg,weight
-financial_data,/home/hugh/datasets/financial_data.csv,date,date
-financial_data,/home/hugh/datasets/financial_data.csv,ticker,code
-financial_data,/home/hugh/datasets/financial_data.csv,open_price,price
-financial_data,/home/hugh/datasets/financial_data.csv,close_price,price
-financial_data,/home/hugh/datasets/financial_data.csv,high_price,price
-financial_data,/home/hugh/datasets/financial_data.csv,low_price,price
-financial_data,/home/hugh/datasets/financial_data.csv,volume,number
-financial_data,/home/hugh/datasets/financial_data.csv,market_cap,value
-financial_data,/home/hugh/datasets/financial_data.csv,pe_ratio,decimal number
-financial_data,/home/hugh/datasets/financial_data.csv,dividend_yield,percentage
-financial_data,/home/hugh/datasets/financial_data.csv,currency,currency
-financial_data,/home/hugh/datasets/financial_data.csv,exchange,category
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,iso_date,date
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,us_date,date
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,eu_date,date
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,iso_timestamp,timestamp
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,sql_timestamp,sql timestamp
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,unix_epoch,time
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,unix_ms,time
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,year,year
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,month_name,month name
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,day_of_week,day of week
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,time_24h,time 24h
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,duration_iso,duration
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,utc_offset,utc offset
-datetime_formats,/home/hugh/datasets/datetime_formats.csv,timezone,time zone
-geography_data,/home/hugh/datasets/geography_data.csv,city,city
-geography_data,/home/hugh/datasets/geography_data.csv,country_code,country code
-geography_data,/home/hugh/datasets/geography_data.csv,country,country
-geography_data,/home/hugh/datasets/geography_data.csv,region,region
-geography_data,/home/hugh/datasets/geography_data.csv,postal_code,postal code
-geography_data,/home/hugh/datasets/geography_data.csv,latitude,latitude
-geography_data,/home/hugh/datasets/geography_data.csv,longitude,longitude
-geography_data,/home/hugh/datasets/geography_data.csv,coordinates,coordinates
-geography_data,/home/hugh/datasets/geography_data.csv,full_address,address
-geography_data,/home/hugh/datasets/geography_data.csv,street_number,number
-geography_data,/home/hugh/datasets/geography_data.csv,elevation_m,number
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,isbn,isbn
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,issn,issn
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,ean,ean
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,uuid,uuid
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,credit_card,credit card number
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,swift_code,swift code
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,iban,code
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,hex_color,color
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,mime_type,file format
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,locale,language code
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,sha256,hash
-codes_and_ids,/home/hugh/datasets/codes_and_ids.csv,semantic_version,version
-medical_records,/home/hugh/datasets/medical_records.csv,patient_id,id
-medical_records,/home/hugh/datasets/medical_records.csv,npi,npi
-medical_records,/home/hugh/datasets/medical_records.csv,first_name,first name
-medical_records,/home/hugh/datasets/medical_records.csv,last_name,last name
-medical_records,/home/hugh/datasets/medical_records.csv,date_of_birth,date
-medical_records,/home/hugh/datasets/medical_records.csv,gender,gender
-medical_records,/home/hugh/datasets/medical_records.csv,blood_pressure,value
-medical_records,/home/hugh/datasets/medical_records.csv,heart_rate,number
-medical_records,/home/hugh/datasets/medical_records.csv,temperature_f,decimal number
-medical_records,/home/hugh/datasets/medical_records.csv,weight_lbs,weight
-medical_records,/home/hugh/datasets/medical_records.csv,height_in,height
-medical_records,/home/hugh/datasets/medical_records.csv,diagnosis_code,code
-medical_records,/home/hugh/datasets/medical_records.csv,visit_date,date
-medical_records,/home/hugh/datasets/medical_records.csv,is_admitted,boolean
-books_catalog,/home/hugh/datasets/books_catalog.csv,isbn,isbn
-books_catalog,/home/hugh/datasets/books_catalog.csv,title,title
-books_catalog,/home/hugh/datasets/books_catalog.csv,author,author
-books_catalog,/home/hugh/datasets/books_catalog.csv,publisher,entity name
-books_catalog,/home/hugh/datasets/books_catalog.csv,year_published,year
-books_catalog,/home/hugh/datasets/books_catalog.csv,pages,number
-books_catalog,/home/hugh/datasets/books_catalog.csv,language,language
-books_catalog,/home/hugh/datasets/books_catalog.csv,rating,rating
-books_catalog,/home/hugh/datasets/books_catalog.csv,price_usd,price
-books_catalog,/home/hugh/datasets/books_catalog.csv,url,url
-books_catalog,/home/hugh/datasets/books_catalog.csv,description,description
-network_logs,/home/hugh/datasets/network_logs.csv,timestamp,timestamp
-network_logs,/home/hugh/datasets/network_logs.csv,source_ip,ip_v4
-network_logs,/home/hugh/datasets/network_logs.csv,destination_ip,ip_v4
-network_logs,/home/hugh/datasets/network_logs.csv,method,category
-network_logs,/home/hugh/datasets/network_logs.csv,url_path,code
-network_logs,/home/hugh/datasets/network_logs.csv,status_code,http status code
-network_logs,/home/hugh/datasets/network_logs.csv,response_time_ms,number
-network_logs,/home/hugh/datasets/network_logs.csv,user_agent,user agent
-network_logs,/home/hugh/datasets/network_logs.csv,request_id,uuid
-network_logs,/home/hugh/datasets/network_logs.csv,content_type,file format
-network_logs,/home/hugh/datasets/network_logs.csv,payload_size_bytes,number
-network_logs,/home/hugh/datasets/network_logs.csv,query_params,code
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,experiment_id,id
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,measurement_unit,measurement unit
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,value,decimal number
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,percentage,percentage
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,formula,code
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,ph_value,decimal number
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,temperature_celsius,decimal number
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,pressure_atm,decimal number
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,timestamp,timestamp
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,latitude,latitude
-scientific_measurements,/home/hugh/datasets/scientific_measurements.csv,longitude,longitude
-multilingual,/home/hugh/datasets/multilingual.csv,name,name
-multilingual,/home/hugh/datasets/multilingual.csv,address,address
-multilingual,/home/hugh/datasets/multilingual.csv,postal_code,postal code
-multilingual,/home/hugh/datasets/multilingual.csv,phone,telephone
-multilingual,/home/hugh/datasets/multilingual.csv,date,date
-multilingual,/home/hugh/datasets/multilingual.csv,price,price
-multilingual,/home/hugh/datasets/multilingual.csv,locale,language code
-multilingual,/home/hugh/datasets/multilingual.csv,country,country
-sports_events,/home/hugh/datasets/sports_events.csv,event_id,code
-sports_events,/home/hugh/datasets/sports_events.csv,sport,category
-sports_events,/home/hugh/datasets/sports_events.csv,venue,entity name
-sports_events,/home/hugh/datasets/sports_events.csv,country,country
-sports_events,/home/hugh/datasets/sports_events.csv,event_date,date
-sports_events,/home/hugh/datasets/sports_events.csv,start_time,time 24h
-sports_events,/home/hugh/datasets/sports_events.csv,duration_minutes,number
-sports_events,/home/hugh/datasets/sports_events.csv,attendance,number
-sports_events,/home/hugh/datasets/sports_events.csv,ticket_price,price
-sports_events,/home/hugh/datasets/sports_events.csv,status,status
-sports_events,/home/hugh/datasets/sports_events.csv,is_broadcast,boolean
-sports_events,/home/hugh/datasets/sports_events.csv,viewer_rating,percentage
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,eu_dot_date,eu dot date
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,abbreviated_month_date,abbreviated month date
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,long_full_month_date,long full month date
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,time_12h,time 12h
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,time_12h_seconds,time 12h seconds
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,rfc_2822_timestamp,rfc 2822 timestamp
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,american_timestamp,american timestamp
-datetime_formats_extended,/home/hugh/datasets/datetime_formats_extended.csv,european_timestamp,european timestamp
+titanic,eval/datasets/csv/titanic.csv,PassengerId,id
+titanic,eval/datasets/csv/titanic.csv,Survived,boolean
+titanic,eval/datasets/csv/titanic.csv,Pclass,class
+titanic,eval/datasets/csv/titanic.csv,Name,name
+titanic,eval/datasets/csv/titanic.csv,Sex,gender
+titanic,eval/datasets/csv/titanic.csv,Age,number
+titanic,eval/datasets/csv/titanic.csv,SibSp,number
+titanic,eval/datasets/csv/titanic.csv,Parch,number
+titanic,eval/datasets/csv/titanic.csv,Ticket,code
+titanic,eval/datasets/csv/titanic.csv,Fare,price
+titanic,eval/datasets/csv/titanic.csv,Cabin,code
+titanic,eval/datasets/csv/titanic.csv,Embarked,category
+airports,eval/datasets/csv/airports.csv,id,id
+airports,eval/datasets/csv/airports.csv,name,name
+airports,eval/datasets/csv/airports.csv,city,city
+airports,eval/datasets/csv/airports.csv,country,country
+airports,eval/datasets/csv/airports.csv,iata,iata
+airports,eval/datasets/csv/airports.csv,icao,icao
+airports,eval/datasets/csv/airports.csv,latitude,latitude
+airports,eval/datasets/csv/airports.csv,longitude,longitude
+airports,eval/datasets/csv/airports.csv,altitude,number
+airports,eval/datasets/csv/airports.csv,utc_offset,utc offset
+airports,eval/datasets/csv/airports.csv,timezone,time zone
+airports,eval/datasets/csv/airports.csv,type,category
+airports,eval/datasets/csv/airports.csv,source,category
+countries,eval/datasets/csv/countries.csv,name,country
+countries,eval/datasets/csv/countries.csv,alpha-2,country code
+countries,eval/datasets/csv/countries.csv,alpha-3,country code
+countries,eval/datasets/csv/countries.csv,country-code,code
+countries,eval/datasets/csv/countries.csv,iso_3166-2,code
+countries,eval/datasets/csv/countries.csv,region,region
+countries,eval/datasets/csv/countries.csv,sub-region,region
+countries,eval/datasets/csv/countries.csv,region-code,code
+countries,eval/datasets/csv/countries.csv,sub-region-code,code
+covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Date,date
+covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Country,country
+covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Confirmed,number
+covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Recovered,number
+covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Deaths,number
+us_states,eval/datasets/csv/us_states.csv,State,state
+us_states,eval/datasets/csv/us_states.csv,Abbreviation,code
+world_cities,eval/datasets/csv/world_cities.csv,name,city
+world_cities,eval/datasets/csv/world_cities.csv,country,country
+world_cities,eval/datasets/csv/world_cities.csv,subcountry,region
+world_cities,eval/datasets/csv/world_cities.csv,geonameid,id
+iris,eval/datasets/csv/iris.csv,sepal_length,decimal number
+iris,eval/datasets/csv/iris.csv,sepal_width,decimal number
+iris,eval/datasets/csv/iris.csv,petal_length,decimal number
+iris,eval/datasets/csv/iris.csv,petal_width,decimal number
+iris,eval/datasets/csv/iris.csv,species,category
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,order_id,code
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,customer_email,email
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,order_date,date
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,total_price,price
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,currency,currency
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,credit_card_last4,code
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,shipping_country,country
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,shipping_postal_code,postal code
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,status,status
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,is_gift,boolean
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,tracking_url,url
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,phone,telephone
+tech_systems,eval/datasets/csv/tech_systems.csv,server_hostname,hostname
+tech_systems,eval/datasets/csv/tech_systems.csv,ip_address,ip_v4
+tech_systems,eval/datasets/csv/tech_systems.csv,mac_address,mac address
+tech_systems,eval/datasets/csv/tech_systems.csv,os,operating system
+tech_systems,eval/datasets/csv/tech_systems.csv,version,version
+tech_systems,eval/datasets/csv/tech_systems.csv,language,language
+tech_systems,eval/datasets/csv/tech_systems.csv,port,port
+tech_systems,eval/datasets/csv/tech_systems.csv,uuid,uuid
+tech_systems,eval/datasets/csv/tech_systems.csv,api_key,code
+tech_systems,eval/datasets/csv/tech_systems.csv,user_agent,user agent
+tech_systems,eval/datasets/csv/tech_systems.csv,log_timestamp,timestamp
+tech_systems,eval/datasets/csv/tech_systems.csv,request_url,url
+people_directory,eval/datasets/csv/people_directory.csv,full_name,name
+people_directory,eval/datasets/csv/people_directory.csv,first_name,first name
+people_directory,eval/datasets/csv/people_directory.csv,last_name,last name
+people_directory,eval/datasets/csv/people_directory.csv,email,email
+people_directory,eval/datasets/csv/people_directory.csv,phone,telephone
+people_directory,eval/datasets/csv/people_directory.csv,age,number
+people_directory,eval/datasets/csv/people_directory.csv,gender,gender
+people_directory,eval/datasets/csv/people_directory.csv,ssn,code
+people_directory,eval/datasets/csv/people_directory.csv,date_of_birth,date
+people_directory,eval/datasets/csv/people_directory.csv,company,entity name
+people_directory,eval/datasets/csv/people_directory.csv,job_title,occupation
+people_directory,eval/datasets/csv/people_directory.csv,salary,price
+people_directory,eval/datasets/csv/people_directory.csv,height_cm,height
+people_directory,eval/datasets/csv/people_directory.csv,weight_kg,weight
+financial_data,eval/datasets/csv/financial_data.csv,date,date
+financial_data,eval/datasets/csv/financial_data.csv,ticker,code
+financial_data,eval/datasets/csv/financial_data.csv,open_price,price
+financial_data,eval/datasets/csv/financial_data.csv,close_price,price
+financial_data,eval/datasets/csv/financial_data.csv,high_price,price
+financial_data,eval/datasets/csv/financial_data.csv,low_price,price
+financial_data,eval/datasets/csv/financial_data.csv,volume,number
+financial_data,eval/datasets/csv/financial_data.csv,market_cap,value
+financial_data,eval/datasets/csv/financial_data.csv,pe_ratio,decimal number
+financial_data,eval/datasets/csv/financial_data.csv,dividend_yield,percentage
+financial_data,eval/datasets/csv/financial_data.csv,currency,currency
+financial_data,eval/datasets/csv/financial_data.csv,exchange,category
+datetime_formats,eval/datasets/csv/datetime_formats.csv,iso_date,date
+datetime_formats,eval/datasets/csv/datetime_formats.csv,us_date,date
+datetime_formats,eval/datasets/csv/datetime_formats.csv,eu_date,date
+datetime_formats,eval/datasets/csv/datetime_formats.csv,iso_timestamp,timestamp
+datetime_formats,eval/datasets/csv/datetime_formats.csv,sql_timestamp,sql timestamp
+datetime_formats,eval/datasets/csv/datetime_formats.csv,unix_epoch,time
+datetime_formats,eval/datasets/csv/datetime_formats.csv,unix_ms,time
+datetime_formats,eval/datasets/csv/datetime_formats.csv,year,year
+datetime_formats,eval/datasets/csv/datetime_formats.csv,month_name,month name
+datetime_formats,eval/datasets/csv/datetime_formats.csv,day_of_week,day of week
+datetime_formats,eval/datasets/csv/datetime_formats.csv,time_24h,time 24h
+datetime_formats,eval/datasets/csv/datetime_formats.csv,duration_iso,duration
+datetime_formats,eval/datasets/csv/datetime_formats.csv,utc_offset,utc offset
+datetime_formats,eval/datasets/csv/datetime_formats.csv,timezone,time zone
+geography_data,eval/datasets/csv/geography_data.csv,city,city
+geography_data,eval/datasets/csv/geography_data.csv,country_code,country code
+geography_data,eval/datasets/csv/geography_data.csv,country,country
+geography_data,eval/datasets/csv/geography_data.csv,region,region
+geography_data,eval/datasets/csv/geography_data.csv,postal_code,postal code
+geography_data,eval/datasets/csv/geography_data.csv,latitude,latitude
+geography_data,eval/datasets/csv/geography_data.csv,longitude,longitude
+geography_data,eval/datasets/csv/geography_data.csv,coordinates,coordinates
+geography_data,eval/datasets/csv/geography_data.csv,full_address,address
+geography_data,eval/datasets/csv/geography_data.csv,street_number,number
+geography_data,eval/datasets/csv/geography_data.csv,elevation_m,number
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,isbn,isbn
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,issn,issn
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,ean,ean
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,uuid,uuid
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,credit_card,credit card number
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,swift_code,swift code
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,iban,code
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,hex_color,color
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,mime_type,file format
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,locale,language code
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,sha256,hash
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,semantic_version,version
+medical_records,eval/datasets/csv/medical_records.csv,patient_id,id
+medical_records,eval/datasets/csv/medical_records.csv,npi,npi
+medical_records,eval/datasets/csv/medical_records.csv,first_name,first name
+medical_records,eval/datasets/csv/medical_records.csv,last_name,last name
+medical_records,eval/datasets/csv/medical_records.csv,date_of_birth,date
+medical_records,eval/datasets/csv/medical_records.csv,gender,gender
+medical_records,eval/datasets/csv/medical_records.csv,blood_pressure,value
+medical_records,eval/datasets/csv/medical_records.csv,heart_rate,number
+medical_records,eval/datasets/csv/medical_records.csv,temperature_f,decimal number
+medical_records,eval/datasets/csv/medical_records.csv,weight_lbs,weight
+medical_records,eval/datasets/csv/medical_records.csv,height_in,height
+medical_records,eval/datasets/csv/medical_records.csv,diagnosis_code,code
+medical_records,eval/datasets/csv/medical_records.csv,visit_date,date
+medical_records,eval/datasets/csv/medical_records.csv,is_admitted,boolean
+books_catalog,eval/datasets/csv/books_catalog.csv,isbn,isbn
+books_catalog,eval/datasets/csv/books_catalog.csv,title,title
+books_catalog,eval/datasets/csv/books_catalog.csv,author,author
+books_catalog,eval/datasets/csv/books_catalog.csv,publisher,entity name
+books_catalog,eval/datasets/csv/books_catalog.csv,year_published,year
+books_catalog,eval/datasets/csv/books_catalog.csv,pages,number
+books_catalog,eval/datasets/csv/books_catalog.csv,language,language
+books_catalog,eval/datasets/csv/books_catalog.csv,rating,rating
+books_catalog,eval/datasets/csv/books_catalog.csv,price_usd,price
+books_catalog,eval/datasets/csv/books_catalog.csv,url,url
+books_catalog,eval/datasets/csv/books_catalog.csv,description,description
+network_logs,eval/datasets/csv/network_logs.csv,timestamp,timestamp
+network_logs,eval/datasets/csv/network_logs.csv,source_ip,ip_v4
+network_logs,eval/datasets/csv/network_logs.csv,destination_ip,ip_v4
+network_logs,eval/datasets/csv/network_logs.csv,method,category
+network_logs,eval/datasets/csv/network_logs.csv,url_path,code
+network_logs,eval/datasets/csv/network_logs.csv,status_code,http status code
+network_logs,eval/datasets/csv/network_logs.csv,response_time_ms,number
+network_logs,eval/datasets/csv/network_logs.csv,user_agent,user agent
+network_logs,eval/datasets/csv/network_logs.csv,request_id,uuid
+network_logs,eval/datasets/csv/network_logs.csv,content_type,file format
+network_logs,eval/datasets/csv/network_logs.csv,payload_size_bytes,number
+network_logs,eval/datasets/csv/network_logs.csv,query_params,code
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,experiment_id,id
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,measurement_unit,measurement unit
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,value,decimal number
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,percentage,percentage
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,formula,code
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,ph_value,decimal number
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,temperature_celsius,decimal number
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,pressure_atm,decimal number
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,timestamp,timestamp
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,latitude,latitude
+scientific_measurements,eval/datasets/csv/scientific_measurements.csv,longitude,longitude
+multilingual,eval/datasets/csv/multilingual.csv,name,name
+multilingual,eval/datasets/csv/multilingual.csv,address,address
+multilingual,eval/datasets/csv/multilingual.csv,postal_code,postal code
+multilingual,eval/datasets/csv/multilingual.csv,phone,telephone
+multilingual,eval/datasets/csv/multilingual.csv,date,date
+multilingual,eval/datasets/csv/multilingual.csv,price,price
+multilingual,eval/datasets/csv/multilingual.csv,locale,language code
+multilingual,eval/datasets/csv/multilingual.csv,country,country
+sports_events,eval/datasets/csv/sports_events.csv,event_id,code
+sports_events,eval/datasets/csv/sports_events.csv,sport,category
+sports_events,eval/datasets/csv/sports_events.csv,venue,entity name
+sports_events,eval/datasets/csv/sports_events.csv,country,country
+sports_events,eval/datasets/csv/sports_events.csv,event_date,date
+sports_events,eval/datasets/csv/sports_events.csv,start_time,time 24h
+sports_events,eval/datasets/csv/sports_events.csv,duration_minutes,number
+sports_events,eval/datasets/csv/sports_events.csv,attendance,number
+sports_events,eval/datasets/csv/sports_events.csv,ticket_price,price
+sports_events,eval/datasets/csv/sports_events.csv,status,status
+sports_events,eval/datasets/csv/sports_events.csv,is_broadcast,boolean
+sports_events,eval/datasets/csv/sports_events.csv,viewer_rating,percentage
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,eu_dot_date,eu dot date
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,abbreviated_month_date,abbreviated month date
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,long_full_month_date,long full month date
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,time_12h,time 12h
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,time_12h_seconds,time 12h seconds
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,rfc_2822_timestamp,rfc 2822 timestamp
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,american_timestamp,american timestamp
+datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,european_timestamp,european timestamp

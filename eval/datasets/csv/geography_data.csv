@@ -1,0 +1,101 @@
+city,country_code,country,region,postal_code,latitude,longitude,coordinates,full_address,street_number,elevation_m
+Berlin,DE,Germany,Berlin,10115,52.481044,13.598283,"52.4810,13.5983","5856 Oak St, Berlin",4468,1479
+Mumbai,IN,India,Maharashtra,400001,19.212247,73.332856,"19.2122,73.3329","799 Park Rd, Mumbai",8678,314
+Toronto,CA,Canada,ON,M5H 2N2,43.347015,-79.255170,"43.3470,-79.2552","1549 Market Ave, Toronto",8909,1321
+Berlin,DE,Germany,Berlin,10115,52.846822,13.589967,"52.8468,13.5900","4933 Park Rd, Berlin",1571,2188
+Dubai,AE,United Arab Emirates,Dubai,00000,25.056429,54.914518,"25.0564,54.9145","2244 Market Rd, Dubai",6112,1986
+Mumbai,IN,India,Maharashtra,400001,18.916313,73.288488,"18.9163,73.2885","1679 Oak Ave, Mumbai",8248,905
+Sydney,AU,Australia,NSW,2000,-33.573693,151.267955,"-33.5737,151.2680","8613 Market St, Sydney",6838,1886
+London,GB,United Kingdom,England,EC1A 1BB,51.123966,-0.496568,"51.1240,-0.4966","285 Elm Rd, London",5105,1485
+Tokyo,JP,Japan,Tokyo,100-0001,35.993239,140.040026,"35.9932,140.0400","9792 Market Rd, Tokyo",2822,1247
+New York,US,United States,NY,10001,40.957260,-74.387403,"40.9573,-74.3874","2109 Oak Ave, New York",5037,513
+Sydney,AU,Australia,NSW,2000,-34.238582,150.787905,"-34.2386,150.7879","1831 Main St, Sydney",7935,1766
+New York,US,United States,NY,10001,40.409151,-74.473207,"40.4092,-74.4732","8413 Market St, New York",7686,487
+Paris,FR,France,Île-de-France,75001,48.399881,2.153846,"48.3999,2.1538","169 Main St, Paris",9860,841
+Dubai,AE,United Arab Emirates,Dubai,00000,25.605975,54.955582,"25.6060,54.9556","5760 Main St, Dubai",2385,1136
+Dubai,AE,United Arab Emirates,Dubai,00000,25.052637,54.931357,"25.0526,54.9314","8203 Market Ave, Dubai",8273,2335
+London,GB,United Kingdom,England,EC1A 1BB,51.106506,-0.049666,"51.1065,-0.0497","230 Market Ave, London",3139,1154
+Tokyo,JP,Japan,Tokyo,100-0001,36.077860,139.687426,"36.0779,139.6874","1617 Oak Blvd, Tokyo",6005,2414
+Tokyo,JP,Japan,Tokyo,100-0001,35.615866,140.108048,"35.6159,140.1080","2964 Park Blvd, Tokyo",6949,877
+Toronto,CA,Canada,ON,M5H 2N2,43.380754,-79.770355,"43.3808,-79.7704","5150 Main Blvd, Toronto",1808,2128
+Tokyo,JP,Japan,Tokyo,100-0001,35.672016,139.511550,"35.6720,139.5116","4724 Market St, Tokyo",1348,1343
+São Paulo,BR,Brazil,SP,01000-000,-23.934777,-46.849689,"-23.9348,-46.8497","9837 Park Blvd, São Paulo",3701,2268
+Mumbai,IN,India,Maharashtra,400001,18.866589,73.233066,"18.8666,73.2331","3094 Main Blvd, Mumbai",6021,734
+New York,US,United States,NY,10001,41.211523,-74.014352,"41.2115,-74.0144","1724 Elm Blvd, New York",8564,348
+London,GB,United Kingdom,England,EC1A 1BB,51.150768,-0.227176,"51.1508,-0.2272","9676 Main Ave, London",1061,1489
+Sydney,AU,Australia,NSW,2000,-34.030168,151.304261,"-34.0302,151.3043","6624 Main Ave, Sydney",6959,2044
+Paris,FR,France,Île-de-France,75001,49.121417,2.618172,"49.1214,2.6182","9727 Park Blvd, Paris",5835,1948
+Dubai,AE,United Arab Emirates,Dubai,00000,25.654939,55.758323,"25.6549,55.7583","8380 Park Ave, Dubai",7449,442
+London,GB,United Kingdom,England,EC1A 1BB,51.258090,-0.130526,"51.2581,-0.1305","2206 Main St, London",866,279
+São Paulo,BR,Brazil,SP,01000-000,-23.372393,-46.161227,"-23.3724,-46.1612","6270 Market Rd, São Paulo",2503,1240
+Dubai,AE,United Arab Emirates,Dubai,00000,25.328033,55.530971,"25.3280,55.5310","8519 Elm Blvd, Dubai",3309,1202
+São Paulo,BR,Brazil,SP,01000-000,-23.560250,-46.871635,"-23.5602,-46.8716","5630 Market St, São Paulo",518,1762
+London,GB,United Kingdom,England,EC1A 1BB,51.391030,-0.313241,"51.3910,-0.3132","6166 Elm Blvd, London",590,134
+Tokyo,JP,Japan,Tokyo,100-0001,35.732867,140.010661,"35.7329,140.0107","4966 Oak Blvd, Tokyo",7057,550
+Paris,FR,France,Île-de-France,75001,49.072323,2.339655,"49.0723,2.3397","1793 Market Blvd, Paris",9074,2209
+Dubai,AE,United Arab Emirates,Dubai,00000,25.174618,55.333055,"25.1746,55.3331","2561 Market St, Dubai",6413,1078
+São Paulo,BR,Brazil,SP,01000-000,-23.459455,-46.755502,"-23.4595,-46.7555","5780 Park Rd, São Paulo",1007,115
+Dubai,AE,United Arab Emirates,Dubai,00000,24.749918,55.607734,"24.7499,55.6077","5716 Market St, Dubai",5592,1558
+London,GB,United Kingdom,England,EC1A 1BB,51.435548,0.364146,"51.4355,0.3641","6750 Park St, London",4002,1014
+Sydney,AU,Australia,NSW,2000,-33.720717,151.301832,"-33.7207,151.3018","1074 Park St, Sydney",5532,695
+New York,US,United States,NY,10001,40.751217,-74.468622,"40.7512,-74.4686","6922 Market Blvd, New York",4369,83
+São Paulo,BR,Brazil,SP,01000-000,-23.462511,-46.147535,"-23.4625,-46.1475","6189 Market Blvd, São Paulo",5283,2345
+London,GB,United Kingdom,England,EC1A 1BB,51.815727,-0.527743,"51.8157,-0.5277","3374 Park Blvd, London",8238,1390
+Tokyo,JP,Japan,Tokyo,100-0001,35.791028,139.513634,"35.7910,139.5136","7144 Oak Blvd, Tokyo",1235,2194
+Sydney,AU,Australia,NSW,2000,-34.081444,150.756831,"-34.0814,150.7568","9397 Elm Ave, Sydney",1507,2368
+London,GB,United Kingdom,England,EC1A 1BB,51.599265,-0.354435,"51.5993,-0.3544","9281 Market Blvd, London",6998,859
+Berlin,DE,Germany,Berlin,10115,52.815652,13.556537,"52.8157,13.5565","4946 Market Rd, Berlin",7093,2211
+Berlin,DE,Germany,Berlin,10115,52.220077,13.307301,"52.2201,13.3073","8444 Elm Ave, Berlin",305,2114
+Tokyo,JP,Japan,Tokyo,100-0001,35.753043,139.363253,"35.7530,139.3633","7657 Park Blvd, Tokyo",9276,245
+Toronto,CA,Canada,ON,M5H 2N2,43.353848,-79.420713,"43.3538,-79.4207","3939 Oak Rd, Toronto",7134,1680
+Berlin,DE,Germany,Berlin,10115,52.880186,13.816138,"52.8802,13.8161","3336 Elm Rd, Berlin",4703,657
+Paris,FR,France,Île-de-France,75001,49.043455,2.088330,"49.0435,2.0883","3908 Main Ave, Paris",3145,113
+Sydney,AU,Australia,NSW,2000,-33.571755,151.019841,"-33.5718,151.0198","7953 Market Blvd, Sydney",6915,151
+Sydney,AU,Australia,NSW,2000,-34.209442,150.845731,"-34.2094,150.8457","4234 Park Ave, Sydney",692,1990
+New York,US,United States,NY,10001,40.268127,-73.609495,"40.2681,-73.6095","5144 Market Rd, New York",1042,1667
+Berlin,DE,Germany,Berlin,10115,52.691672,13.790719,"52.6917,13.7907","6503 Oak Ave, Berlin",1834,2338
+Toronto,CA,Canada,ON,M5H 2N2,44.086135,-79.361242,"44.0861,-79.3612","9510 Market Rd, Toronto",8134,369
+Sydney,AU,Australia,NSW,2000,-33.768979,151.482491,"-33.7690,151.4825","5135 Park Blvd, Sydney",3866,1732
+Sydney,AU,Australia,NSW,2000,-34.224522,150.884454,"-34.2245,150.8845","4499 Elm Blvd, Sydney",4167,2414
+New York,US,United States,NY,10001,40.703159,-74.131295,"40.7032,-74.1313","1851 Park Blvd, New York",7781,1009
+Paris,FR,France,Île-de-France,75001,49.236034,2.789172,"49.2360,2.7892","5948 Elm Rd, Paris",5050,86
+Dubai,AE,United Arab Emirates,Dubai,00000,24.739609,55.510250,"24.7396,55.5102","896 Oak Rd, Dubai",9056,1575
+Paris,FR,France,Île-de-France,75001,48.995549,2.552817,"48.9955,2.5528","2000 Market Ave, Paris",7249,1591
+New York,US,United States,NY,10001,41.122589,-74.113024,"41.1226,-74.1130","4187 Park St, New York",3858,1218
+Sydney,AU,Australia,NSW,2000,-33.509383,150.869527,"-33.5094,150.8695","7191 Park Blvd, Sydney",556,1122
+London,GB,United Kingdom,England,EC1A 1BB,51.830598,0.312695,"51.8306,0.3127","7719 Elm Rd, London",6921,411
+Tokyo,JP,Japan,Tokyo,100-0001,35.874682,139.656635,"35.8747,139.6566","5765 Elm Rd, Tokyo",7427,112
+New York,US,United States,NY,10001,40.854173,-74.322260,"40.8542,-74.3223","7265 Oak St, New York",6565,819
+Paris,FR,France,Île-de-France,75001,48.670322,1.934432,"48.6703,1.9344","2586 Oak Ave, Paris",9733,1680
+Berlin,DE,Germany,Berlin,10115,52.471490,13.778506,"52.4715,13.7785","2188 Park Ave, Berlin",9717,1341
+Paris,FR,France,Île-de-France,75001,48.555264,2.266696,"48.5553,2.2667","2981 Elm Blvd, Paris",9346,919
+New York,US,United States,NY,10001,41.160909,-73.582888,"41.1609,-73.5829","3748 Main Blvd, New York",3249,1072
+Tokyo,JP,Japan,Tokyo,100-0001,35.225983,139.768304,"35.2260,139.7683","9837 Park Ave, Tokyo",1460,1507
+Tokyo,JP,Japan,Tokyo,100-0001,36.123444,139.267651,"36.1234,139.2677","8616 Elm Blvd, Tokyo",8097,485
+Sydney,AU,Australia,NSW,2000,-33.655236,150.899844,"-33.6552,150.8998","4362 Park Blvd, Sydney",6260,533
+Mumbai,IN,India,Maharashtra,400001,19.432338,72.977783,"19.4323,72.9778","4637 Oak Blvd, Mumbai",2956,1673
+Tokyo,JP,Japan,Tokyo,100-0001,35.204973,140.126428,"35.2050,140.1264","3859 Market Blvd, Tokyo",4069,1514
+Dubai,AE,United Arab Emirates,Dubai,00000,25.389067,55.228964,"25.3891,55.2290","170 Elm Ave, Dubai",5297,1628
+Sydney,AU,Australia,NSW,2000,-33.655464,151.417753,"-33.6555,151.4178","9785 Park St, Sydney",1562,2281
+New York,US,United States,NY,10001,40.264913,-73.574935,"40.2649,-73.5749","7716 Park St, New York",88,1038
+Toronto,CA,Canada,ON,M5H 2N2,43.772858,-79.580693,"43.7729,-79.5807","6467 Park Ave, Toronto",9168,168
+Dubai,AE,United Arab Emirates,Dubai,00000,24.884172,54.940666,"24.8842,54.9407","8075 Park Blvd, Dubai",2162,367
+Berlin,DE,Germany,Berlin,10115,52.730256,13.337930,"52.7303,13.3379","4267 Main Rd, Berlin",724,523
+São Paulo,BR,Brazil,SP,01000-000,-23.178820,-46.298496,"-23.1788,-46.2985","5908 Elm Rd, São Paulo",4313,1080
+Toronto,CA,Canada,ON,M5H 2N2,43.466210,-78.990528,"43.4662,-78.9905","5170 Elm Ave, Toronto",9105,1802
+New York,US,United States,NY,10001,40.401720,-74.451433,"40.4017,-74.4514","3001 Main Blvd, New York",4264,669
+São Paulo,BR,Brazil,SP,01000-000,-23.614070,-46.138098,"-23.6141,-46.1381","8109 Main Blvd, São Paulo",5842,2297
+São Paulo,BR,Brazil,SP,01000-000,-23.592740,-47.020809,"-23.5927,-47.0208","2426 Main Rd, São Paulo",1534,834
+Paris,FR,France,Île-de-France,75001,48.537255,2.020495,"48.5373,2.0205","8336 Park Ave, Paris",9561,16
+Toronto,CA,Canada,ON,M5H 2N2,43.920048,-79.702631,"43.9200,-79.7026","1259 Oak Blvd, Toronto",1546,1346
+New York,US,United States,NY,10001,40.497081,-73.524666,"40.4971,-73.5247","1999 Elm Rd, New York",9673,434
+Berlin,DE,Germany,Berlin,10115,52.173775,12.986063,"52.1738,12.9861","7862 Elm Rd, Berlin",9736,23
+Berlin,DE,Germany,Berlin,10115,52.989771,13.561173,"52.9898,13.5612","7424 Park Ave, Berlin",3464,199
+Paris,FR,France,Île-de-France,75001,48.679771,1.907735,"48.6798,1.9077","1159 Market Blvd, Paris",1517,1633
+Paris,FR,France,Île-de-France,75001,48.534611,2.817249,"48.5346,2.8172","6536 Main St, Paris",3412,667
+Mumbai,IN,India,Maharashtra,400001,19.355493,72.662636,"19.3555,72.6626","2526 Main Rd, Mumbai",8043,1770
+Paris,FR,France,Île-de-France,75001,49.260334,2.455714,"49.2603,2.4557","5883 Main Rd, Paris",8400,818
+São Paulo,BR,Brazil,SP,01000-000,-23.605058,-46.745210,"-23.6051,-46.7452","4399 Market Blvd, São Paulo",1479,1730
+Berlin,DE,Germany,Berlin,10115,52.633868,13.339106,"52.6339,13.3391","6980 Main St, Berlin",8411,1399
+São Paulo,BR,Brazil,SP,01000-000,-23.374060,-46.485689,"-23.3741,-46.4857","2541 Elm St, São Paulo",4763,1917
+Mumbai,IN,India,Maharashtra,400001,18.655183,73.179245,"18.6552,73.1792","4922 Oak Ave, Mumbai",4922,1018

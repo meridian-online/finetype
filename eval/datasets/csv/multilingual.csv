@@ -1,0 +1,61 @@
+name,address,postal_code,phone,date,price,locale,country
+Petra Schmidt,"Marktplatz 23, Hamburg",56111,+49 69 4818006,11.05.2020,"9140,88 €",de-DE,Deutschland
+Hans Müller,"Marktplatz 81, Köln",75168,+49 70 4123785,25.07.2021,"2647,27 €",de-DE,Deutschland
+Monika Fischer,"Gartenweg 87, Frankfurt",57377,+49 78 3671224,06.06.2020,"1115,58 €",de-DE,Deutschland
+Stefan Braun,"Gartenweg 130, Köln",48824,+49 78 3984802,13.10.2020,"1986,80 €",de-DE,Deutschland
+Hans Müller,"Kirchgasse 170, Frankfurt",44520,+49 39 6707004,18.06.2023,"1331,06 €",de-DE,Deutschland
+Monika Fischer,"Hauptstraße 189, Hamburg",90402,+49 66 2379281,11.04.2023,"8260,69 €",de-DE,Deutschland
+Petra Schmidt,"Kirchgasse 40, Hamburg",13454,+49 61 4765958,27.12.2021,"2454,03 €",de-DE,Deutschland
+Petra Schmidt,"Marktplatz 166, München",29054,+49 30 5979362,08.01.2024,"4832,77 €",de-DE,Deutschland
+Monika Fischer,"Marktplatz 143, Köln",84460,+49 42 7917641,06.09.2024,"3996,37 €",de-DE,Deutschland
+Stefan Braun,"Marktplatz 192, Hamburg",57706,+49 81 5421758,14.06.2022,"8999,73 €",de-DE,Deutschland
+Petra Schmidt,"Gartenweg 139, Hamburg",20097,+49 74 3256414,11.12.2021,"7954,98 €",de-DE,Deutschland
+Stefan Braun,"Berliner Straße 25, Köln",72355,+49 64 6259401,04.10.2021,"7200,62 €",de-DE,Deutschland
+Stefan Braun,"Berliner Straße 120, Hamburg",85269,+49 83 1892572,15.10.2023,"4971,34 €",de-DE,Deutschland
+Monika Fischer,"Hauptstraße 44, Berlin",83394,+49 58 1965457,12.08.2021,"638,64 €",de-DE,Deutschland
+Klaus Weber,"Hauptstraße 185, Hamburg",84678,+49 46 1462664,23.10.2023,"4308,44 €",de-DE,Deutschland
+Petra Schmidt,"Marktplatz 56, Frankfurt",50609,+49 64 6111364,11.04.2024,"7983,57 €",de-DE,Deutschland
+Stefan Braun,"Marktplatz 37, Köln",99302,+49 67 6275739,28.01.2024,"530,60 €",de-DE,Deutschland
+Klaus Weber,"Kirchgasse 31, Berlin",90458,+49 34 9888098,14.12.2021,"7325,10 €",de-DE,Deutschland
+Petra Schmidt,"Kirchgasse 199, München",33755,+49 31 9304303,24.02.2022,"891,88 €",de-DE,Deutschland
+Monika Fischer,"Kirchgasse 180, Frankfurt",63421,+49 54 8959238,05.06.2021,"959,44 €",de-DE,Deutschland
+佐藤一郎,東京都渋谷区7-8-9,540-5128,+81-66-2486-4023,2022/07/07,"¥237,749",ja-JP,日本
+佐藤一郎,東京都新宿区4-5-6,562-2540,+81-70-5223-1334,2024/01/18,"¥62,119",ja-JP,日本
+佐藤一郎,東京都新宿区1-2-3,101-9669,+81-4-1076-6355,2023/05/01,"¥839,000",ja-JP,日本
+渡辺大輔,東京都中央区4-5-6,979-2136,+81-25-4088-9162,2021/09/07,"¥362,118",ja-JP,日本
+田中太郎,東京都渋谷区7-8-9,483-3898,+81-59-3908-9312,2021/08/01,"¥652,400",ja-JP,日本
+田中太郎,東京都中央区1-2-3,926-6106,+81-40-2765-6718,2021/10/17,"¥175,616",ja-JP,日本
+田中太郎,東京都千代田区1-2-3,717-3543,+81-81-6527-8449,2024/07/26,"¥469,794",ja-JP,日本
+田中太郎,東京都中央区1-2-3,446-5034,+81-49-3316-4923,2023/04/26,"¥424,023",ja-JP,日本
+田中太郎,東京都港区1-2-3,591-2618,+81-69-2490-6251,2024/10/19,"¥736,416",ja-JP,日本
+渡辺大輔,東京都中央区4-5-6,875-9951,+81-85-4292-5629,2022/03/15,"¥800,711",ja-JP,日本
+鈴木花子,東京都港区7-8-9,536-7623,+81-58-7177-2349,2023/01/16,"¥109,485",ja-JP,日本
+佐藤一郎,東京都中央区4-5-6,724-7370,+81-42-9152-5705,2020/09/27,"¥43,754",ja-JP,日本
+鈴木花子,東京都新宿区4-5-6,701-9893,+81-25-6138-1785,2024/01/02,"¥317,761",ja-JP,日本
+高橋美咲,東京都渋谷区4-5-6,650-1859,+81-90-8107-9329,2024/03/17,"¥388,937",ja-JP,日本
+田中太郎,東京都渋谷区1-2-3,568-4042,+81-31-6247-2195,2021/08/07,"¥598,989",ja-JP,日本
+渡辺大輔,東京都新宿区1-2-3,490-4375,+81-17-5758-1077,2021/11/27,"¥959,803",ja-JP,日本
+佐藤一郎,東京都渋谷区4-5-6,946-4741,+81-50-7585-1733,2021/03/20,"¥258,231",ja-JP,日本
+渡辺大輔,東京都港区4-5-6,796-6074,+81-29-5466-7704,2020/07/27,"¥433,832",ja-JP,日本
+高橋美咲,東京都港区1-2-3,936-8998,+81-35-1170-7479,2020/12/25,"¥471,045",ja-JP,日本
+鈴木花子,東京都渋谷区1-2-3,752-2874,+81-17-3603-9004,2020/03/18,"¥343,381",ja-JP,日本
+Maria Santos,"Rua São Paulo, 3263, Brasília",80288-393,+55 47 99340-5284,04/02/2023,"R$ 82288,70",pt-BR,Brasil
+Maria Santos,"Rua das Flores, 4545, Salvador",36317-230,+55 77 90584-8683,16/02/2020,"R$ 22871,99",pt-BR,Brasil
+Ana Costa,"Rua do Comércio, 685, São Paulo",41686-546,+55 89 96076-8177,24/03/2023,"R$ 59703,58",pt-BR,Brasil
+João Silva,"Rua do Comércio, 1724, Brasília",15735-682,+55 12 92502-6592,28/05/2021,"R$ 35017,87",pt-BR,Brasil
+Maria Santos,"Rua das Flores, 3206, Salvador",30066-398,+55 75 91042-4690,06/11/2021,"R$ 33595,17",pt-BR,Brasil
+Ana Costa,"Rua das Flores, 3609, São Paulo",42214-716,+55 78 94715-3639,05/09/2022,"R$ 5680,69",pt-BR,Brasil
+João Silva,"Rua XV de Novembro, 4244, Curitiba",12288-733,+55 32 95270-7068,02/03/2020,"R$ 68434,13",pt-BR,Brasil
+João Silva,"Rua XV de Novembro, 29, Curitiba",17656-933,+55 60 99288-2960,28/04/2020,"R$ 56367,68",pt-BR,Brasil
+João Silva,"Rua das Flores, 3903, Curitiba",94513-495,+55 47 96336-8367,24/04/2023,"R$ 61264,11",pt-BR,Brasil
+Pedro Oliveira,"Rua XV de Novembro, 3926, Rio de Janeiro",69535-649,+55 57 93667-3365,10/11/2021,"R$ 96303,38",pt-BR,Brasil
+Ana Costa,"Rua São Paulo, 1314, Brasília",12744-542,+55 49 92359-1697,15/07/2024,"R$ 85169,00",pt-BR,Brasil
+Ana Costa,"Rua do Comércio, 2892, Rio de Janeiro",63188-531,+55 64 97546-8410,15/07/2023,"R$ 36362,03",pt-BR,Brasil
+Pedro Oliveira,"Rua XV de Novembro, 1091, Curitiba",36989-351,+55 38 93128-4188,28/12/2024,"R$ 36347,49",pt-BR,Brasil
+Ana Costa,"Rua XV de Novembro, 3071, Brasília",37985-502,+55 29 97704-2780,18/11/2023,"R$ 30038,72",pt-BR,Brasil
+Carlos Souza,"Rua XV de Novembro, 417, Rio de Janeiro",38465-445,+55 81 92567-7296,17/07/2021,"R$ 94319,55",pt-BR,Brasil
+João Silva,"Rua do Comércio, 3162, Curitiba",97424-276,+55 45 99230-3553,21/07/2024,"R$ 78187,29",pt-BR,Brasil
+Maria Santos,"Rua do Comércio, 3370, Brasília",71417-351,+55 27 97973-6180,20/10/2024,"R$ 73533,67",pt-BR,Brasil
+João Silva,"Rua das Flores, 536, São Paulo",12813-108,+55 17 95431-2473,11/06/2021,"R$ 74360,25",pt-BR,Brasil
+Maria Santos,"Rua São Paulo, 541, Brasília",91688-423,+55 85 97317-8783,11/12/2021,"R$ 28980,92",pt-BR,Brasil
+João Silva,"Rua do Comércio, 1246, Rio de Janeiro",64419-221,+55 79 96712-3593,18/09/2023,"R$ 69988,56",pt-BR,Brasil

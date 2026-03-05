@@ -1,0 +1,101 @@
+order_id,customer_email,order_date,total_price,currency,credit_card_last4,shipping_country,shipping_postal_code,status,is_gift,tracking_url,phone
+ORD-93810,alice26@outlook.com,2023-10-09,742.22,EUR,2679,Australia,81482,pending,false,https://tracking.example.com/pkg/f15047815b44,+1-232-130-2535
+ORD-38657,bob518@outlook.com,2023-01-28,1688.11,CAD,9928,France,38893,returned,false,https://tracking.example.com/pkg/636f2314ddd8,+1-206-877-3615
+ORD-65392,carol285@gmail.com,2023-08-09,2872.06,GBP,2674,United States,59797,pending,false,https://tracking.example.com/pkg/b03de27cecff,+1-552-718-5333
+ORD-15695,dave550@gmail.com,2024-01-23,245.60,GBP,6925,Japan,35203,pending,true,https://tracking.example.com/pkg/de698030e861,+1-877-333-5741
+ORD-20458,bob888@gmail.com,2024-01-25,841.13,CAD,6977,United Kingdom,58520,delivered,true,https://tracking.example.com/pkg/7a71a52f4fad,+1-886-373-2169
+ORD-89840,bob547@outlook.com,2023-09-08,498.56,JPY,5422,Australia,83000,shipped,false,https://tracking.example.com/pkg/2d39ed6a740e,+1-986-894-1916
+ORD-40021,alice825@yahoo.com,2024-02-15,810.54,EUR,6155,United Kingdom,95909,returned,false,https://tracking.example.com/pkg/d8066cdb02cb,+1-858-569-3340
+ORD-44718,bob253@outlook.com,2024-07-28,1621.53,CAD,8019,Japan,62350,delivered,true,https://tracking.example.com/pkg/aa55db2e5268,+1-341-621-9085
+ORD-21915,alice882@gmail.com,2023-06-06,1886.05,CAD,7916,Japan,18326,returned,false,https://tracking.example.com/pkg/5f4680f4b3cc,+1-810-579-9669
+ORD-42953,eve882@gmail.com,2024-11-27,2164.95,CAD,9797,Canada,44973,delivered,true,https://tracking.example.com/pkg/0dee6a0ce7f6,+1-500-545-3591
+ORD-69470,alice977@outlook.com,2023-09-27,2915.94,EUR,9317,United States,91959,delivered,true,https://tracking.example.com/pkg/ab0dc5b2c922,+1-356-482-3646
+ORD-80697,eve941@gmail.com,2024-09-05,979.22,USD,2832,Germany,50306,shipped,true,https://tracking.example.com/pkg/8ac2534a054e,+1-446-999-2290
+ORD-21226,dave836@gmail.com,2024-06-29,2299.83,EUR,8787,Japan,31643,delivered,false,https://tracking.example.com/pkg/507349eedfcc,+1-416-652-4295
+ORD-50857,dave688@outlook.com,2024-01-18,1319.91,AUD,8397,United States,42493,shipped,true,https://tracking.example.com/pkg/60ff290972c5,+1-546-121-4770
+ORD-87128,bob8@gmail.com,2024-12-25,1896.99,EUR,2104,United States,53309,pending,true,https://tracking.example.com/pkg/4b774f7c0259,+1-485-785-8953
+ORD-38080,eve136@outlook.com,2024-08-07,1732.86,EUR,8749,Canada,63354,shipped,true,https://tracking.example.com/pkg/6f3d736ae09c,+1-299-774-8062
+ORD-56438,dave421@yahoo.com,2023-02-25,2023.35,CAD,2612,United States,62772,delivered,true,https://tracking.example.com/pkg/a524fffd20a5,+1-454-296-4116
+ORD-80292,dave144@yahoo.com,2023-07-07,842.84,EUR,2235,France,82132,pending,true,https://tracking.example.com/pkg/3f46ae897855,+1-867-653-1241
+ORD-22224,bob171@yahoo.com,2024-05-12,1449.25,JPY,1960,United Kingdom,59672,pending,false,https://tracking.example.com/pkg/09d63f787aa9,+1-471-902-8454
+ORD-47388,dave714@outlook.com,2024-07-23,1988.99,JPY,3536,United Kingdom,48890,shipped,true,https://tracking.example.com/pkg/5ceeb8fd4833,+1-793-853-9883
+ORD-17989,carol59@gmail.com,2024-08-21,1435.59,AUD,3579,United States,76562,pending,true,https://tracking.example.com/pkg/1d6695d337a4,+1-270-709-2113
+ORD-98501,bob414@gmail.com,2024-08-06,746.17,AUD,1651,Japan,20745,returned,false,https://tracking.example.com/pkg/0adb4df05b64,+1-467-309-6147
+ORD-41285,carol406@gmail.com,2024-11-18,1940.04,JPY,6180,Canada,19508,pending,false,https://tracking.example.com/pkg/875135bcb8c4,+1-836-676-2638
+ORD-19602,eve219@outlook.com,2023-09-29,406.04,GBP,2127,United Kingdom,58434,delivered,true,https://tracking.example.com/pkg/4f5272f2b999,+1-648-953-9900
+ORD-49651,eve827@outlook.com,2024-06-25,33.38,AUD,5905,Australia,23577,shipped,false,https://tracking.example.com/pkg/f2668e3116d4,+1-318-209-3546
+ORD-45697,carol620@gmail.com,2023-12-18,618.75,CAD,5325,Japan,74032,delivered,true,https://tracking.example.com/pkg/92a41ae6e69d,+1-294-749-7939
+ORD-46265,alice4@yahoo.com,2023-05-14,1914.96,GBP,3647,Australia,67912,cancelled,false,https://tracking.example.com/pkg/d6e0ed8f4132,+1-774-109-2832
+ORD-19862,bob559@gmail.com,2024-01-14,1751.69,EUR,8041,United Kingdom,15482,delivered,false,https://tracking.example.com/pkg/50b938fa059f,+1-240-466-4441
+ORD-99399,bob683@gmail.com,2023-12-29,2342.54,JPY,3532,United Kingdom,31299,shipped,false,https://tracking.example.com/pkg/4dcdb860e02c,+1-225-283-6442
+ORD-63964,bob274@gmail.com,2024-12-19,333.20,USD,8711,United Kingdom,36158,returned,false,https://tracking.example.com/pkg/119e9caa5ed5,+1-512-940-4728
+ORD-39219,alice676@gmail.com,2024-02-13,991.49,USD,5573,Germany,94080,cancelled,false,https://tracking.example.com/pkg/2d25f781a348,+1-895-963-9785
+ORD-53404,alice119@yahoo.com,2023-07-02,1745.95,GBP,1626,United States,88193,returned,false,https://tracking.example.com/pkg/3a46342419f1,+1-946-905-6139
+ORD-67199,eve524@gmail.com,2024-01-30,2699.51,EUR,5173,United States,67154,pending,true,https://tracking.example.com/pkg/4ac2905a836b,+1-572-541-2146
+ORD-97062,carol639@yahoo.com,2024-11-10,2545.56,CAD,5920,Japan,50538,returned,false,https://tracking.example.com/pkg/64828e2ed9ed,+1-612-813-5844
+ORD-82667,bob197@yahoo.com,2024-11-11,2821.68,CAD,3851,Japan,84593,delivered,false,https://tracking.example.com/pkg/e4769fbe8fa5,+1-761-953-1006
+ORD-49829,carol216@yahoo.com,2024-08-16,1823.91,GBP,8618,France,67954,shipped,false,https://tracking.example.com/pkg/ca6fb688546f,+1-953-273-2389
+ORD-47196,eve680@outlook.com,2024-09-26,1012.20,EUR,6085,United Kingdom,36100,shipped,true,https://tracking.example.com/pkg/469b551f975c,+1-247-350-8784
+ORD-90120,alice467@yahoo.com,2024-10-06,1731.25,CAD,7291,France,62383,shipped,true,https://tracking.example.com/pkg/8af87d0e4587,+1-871-804-1090
+ORD-23970,dave225@gmail.com,2024-12-13,1558.68,USD,5082,Canada,25906,returned,true,https://tracking.example.com/pkg/cd94b0c3819a,+1-675-783-9702
+ORD-83259,eve325@yahoo.com,2024-09-19,2446.86,AUD,7991,Canada,81810,returned,true,https://tracking.example.com/pkg/cf6668cee121,+1-961-982-8777
+ORD-68991,carol770@gmail.com,2024-10-14,839.15,AUD,8939,Australia,41358,delivered,false,https://tracking.example.com/pkg/b382a2948bca,+1-279-830-5681
+ORD-40735,carol344@yahoo.com,2024-07-07,250.92,EUR,4788,France,30028,shipped,true,https://tracking.example.com/pkg/0a54e5d6b91b,+1-624-517-6421
+ORD-81121,dave426@gmail.com,2023-07-31,2500.33,JPY,1320,Canada,85456,returned,false,https://tracking.example.com/pkg/f3d8e706e112,+1-206-460-5892
+ORD-61116,dave552@outlook.com,2024-07-13,2401.60,EUR,8999,United Kingdom,45774,returned,false,https://tracking.example.com/pkg/5af5e2bbee21,+1-229-498-6507
+ORD-97670,dave742@gmail.com,2024-04-23,2759.42,AUD,9751,United States,61645,cancelled,true,https://tracking.example.com/pkg/e5b04198c66b,+1-285-758-8022
+ORD-27786,dave187@gmail.com,2023-09-24,1143.51,EUR,8449,Germany,54236,returned,false,https://tracking.example.com/pkg/ff382a19b1c6,+1-970-951-7906
+ORD-43065,alice482@gmail.com,2024-07-06,165.73,GBP,4673,Australia,18993,pending,true,https://tracking.example.com/pkg/5b2b6a936937,+1-453-304-1333
+ORD-91439,bob245@gmail.com,2024-04-29,2011.67,AUD,4571,France,43586,delivered,true,https://tracking.example.com/pkg/a6c86c5ddfb0,+1-820-721-2876
+ORD-31465,carol111@outlook.com,2023-01-27,2787.36,AUD,7149,France,35995,pending,true,https://tracking.example.com/pkg/cb37c45c3c63,+1-304-813-5941
+ORD-99687,eve825@gmail.com,2024-08-02,2350.07,GBP,9728,France,96706,delivered,true,https://tracking.example.com/pkg/63339878fec6,+1-718-763-6590
+ORD-11658,dave843@yahoo.com,2023-04-19,1306.22,GBP,8532,Australia,30052,returned,true,https://tracking.example.com/pkg/279c26ba33cf,+1-951-634-5425
+ORD-90728,eve794@yahoo.com,2024-04-21,1312.36,CAD,5397,Germany,42177,pending,false,https://tracking.example.com/pkg/48c29068d24e,+1-661-349-8613
+ORD-84691,eve685@yahoo.com,2023-12-11,95.80,GBP,3979,France,37802,delivered,false,https://tracking.example.com/pkg/97726a8747f5,+1-548-386-5526
+ORD-82848,alice530@gmail.com,2023-03-29,731.64,JPY,9004,Japan,41499,returned,false,https://tracking.example.com/pkg/97e33ba6b1fe,+1-658-911-1282
+ORD-22196,carol227@yahoo.com,2024-12-09,737.47,CAD,7046,France,82544,cancelled,false,https://tracking.example.com/pkg/51cc791ca019,+1-635-863-6419
+ORD-56112,dave278@yahoo.com,2023-09-15,699.30,CAD,4155,Germany,25670,cancelled,true,https://tracking.example.com/pkg/4e6fb21aa140,+1-396-321-8933
+ORD-46241,eve779@outlook.com,2024-09-03,856.16,USD,4180,Germany,39816,delivered,true,https://tracking.example.com/pkg/1c0bd7b2b0d5,+1-509-114-9751
+ORD-26591,carol47@gmail.com,2024-07-20,883.48,EUR,9042,United States,11607,cancelled,false,https://tracking.example.com/pkg/d75697fc8346,+1-680-590-8216
+ORD-54657,bob989@gmail.com,2023-09-16,2823.77,JPY,2869,Canada,18564,returned,false,https://tracking.example.com/pkg/6b1d6ae54d44,+1-275-690-1878
+ORD-29887,bob831@outlook.com,2023-11-08,264.68,EUR,2940,Japan,64548,cancelled,true,https://tracking.example.com/pkg/dab35b4f3f0e,+1-994-635-7232
+ORD-69049,dave305@outlook.com,2024-03-15,923.08,AUD,1986,Japan,23006,shipped,true,https://tracking.example.com/pkg/aaeaa3ad2da7,+1-470-776-2330
+ORD-30585,bob178@outlook.com,2023-03-18,478.02,JPY,8381,Australia,87832,returned,false,https://tracking.example.com/pkg/a299477b1f65,+1-233-337-5720
+ORD-47056,dave73@outlook.com,2023-08-28,2772.48,CAD,4241,France,25043,cancelled,true,https://tracking.example.com/pkg/5c9d98474711,+1-863-252-5352
+ORD-28643,alice62@gmail.com,2023-11-11,1789.17,AUD,5728,France,26299,returned,false,https://tracking.example.com/pkg/b27b506b1de0,+1-916-512-5460
+ORD-75597,eve506@yahoo.com,2023-03-24,1798.12,JPY,6280,Japan,42816,pending,true,https://tracking.example.com/pkg/42ebd5193e41,+1-434-790-1339
+ORD-98117,carol591@gmail.com,2023-06-29,1416.79,CAD,8245,Germany,33788,cancelled,false,https://tracking.example.com/pkg/5603ddcefa4b,+1-850-933-9056
+ORD-21959,dave357@yahoo.com,2023-12-08,969.95,USD,3634,Germany,63955,returned,false,https://tracking.example.com/pkg/7b290d843d48,+1-878-510-1601
+ORD-69614,alice323@yahoo.com,2023-11-28,356.60,JPY,9431,Canada,10150,cancelled,false,https://tracking.example.com/pkg/45fa9d6d4bd3,+1-623-155-4073
+ORD-77952,carol638@yahoo.com,2024-10-02,1331.69,USD,4335,Germany,81987,shipped,false,https://tracking.example.com/pkg/491c91ba0ec9,+1-648-815-8941
+ORD-25915,alice997@outlook.com,2024-09-15,2399.94,CAD,3594,Germany,82199,pending,false,https://tracking.example.com/pkg/f3c482851f89,+1-295-330-2858
+ORD-70482,alice664@gmail.com,2024-05-25,2798.62,GBP,9337,Australia,45838,returned,false,https://tracking.example.com/pkg/ccfa8e400c4f,+1-683-349-8483
+ORD-82255,bob393@gmail.com,2024-09-05,1529.63,EUR,2143,Germany,64387,delivered,false,https://tracking.example.com/pkg/e8cd94cd058a,+1-202-389-5891
+ORD-86931,eve676@yahoo.com,2023-06-02,1345.17,JPY,6654,Germany,82340,cancelled,false,https://tracking.example.com/pkg/c0b1b78210f4,+1-666-429-4090
+ORD-41300,eve393@gmail.com,2024-02-25,140.50,CAD,8749,Australia,59968,returned,true,https://tracking.example.com/pkg/e760e4f84365,+1-707-137-3068
+ORD-75836,eve340@gmail.com,2024-03-26,308.13,JPY,1251,Australia,28894,returned,true,https://tracking.example.com/pkg/ea073e9cf9a8,+1-276-580-5342
+ORD-54375,eve710@yahoo.com,2024-10-27,250.13,GBP,9742,France,51505,returned,true,https://tracking.example.com/pkg/a33de1d7334d,+1-832-170-4846
+ORD-92727,carol233@outlook.com,2023-04-03,1307.56,USD,2646,France,31805,delivered,true,https://tracking.example.com/pkg/74227e9d382f,+1-247-432-1919
+ORD-48452,carol384@yahoo.com,2023-05-30,740.14,JPY,3950,United Kingdom,32946,pending,false,https://tracking.example.com/pkg/80469775a54c,+1-834-799-4945
+ORD-75230,eve147@gmail.com,2024-04-17,1917.32,JPY,5183,Australia,11231,returned,false,https://tracking.example.com/pkg/a0e82fe80618,+1-893-659-3588
+ORD-19681,dave968@yahoo.com,2024-08-24,904.46,JPY,5097,France,49599,shipped,false,https://tracking.example.com/pkg/0eea580f0834,+1-694-209-4886
+ORD-59986,eve368@outlook.com,2023-10-30,2978.14,GBP,1359,Canada,96275,returned,false,https://tracking.example.com/pkg/1c3927c60b0e,+1-208-679-1803
+ORD-89482,dave853@yahoo.com,2023-08-24,1825.11,GBP,4588,Australia,34920,cancelled,false,https://tracking.example.com/pkg/95445be43d35,+1-894-873-3240
+ORD-92345,alice926@outlook.com,2024-10-23,127.86,JPY,1546,Japan,57823,shipped,true,https://tracking.example.com/pkg/fef80e935c4c,+1-502-434-7807
+ORD-33021,bob136@outlook.com,2024-01-10,1597.24,GBP,3695,Germany,73156,delivered,false,https://tracking.example.com/pkg/330b5d6b6d43,+1-317-579-2233
+ORD-28449,bob881@outlook.com,2024-11-21,2940.02,AUD,6992,United States,61717,pending,false,https://tracking.example.com/pkg/b7381698c58f,+1-749-226-8451
+ORD-58311,carol599@yahoo.com,2024-10-15,2821.46,USD,4830,France,13280,cancelled,false,https://tracking.example.com/pkg/a410e7f6460f,+1-824-326-2035
+ORD-93283,dave932@outlook.com,2023-11-06,1951.22,USD,3290,United States,14877,delivered,false,https://tracking.example.com/pkg/0c34b779c052,+1-318-199-4846
+ORD-80457,bob398@yahoo.com,2024-01-15,2014.74,CAD,9850,France,86983,shipped,false,https://tracking.example.com/pkg/aa1711ef7aa4,+1-870-201-9017
+ORD-90694,dave962@yahoo.com,2023-02-03,2073.93,EUR,8264,France,40947,delivered,true,https://tracking.example.com/pkg/962a48aaa7f1,+1-902-476-9920
+ORD-94518,carol63@yahoo.com,2023-10-10,577.52,USD,8450,United States,96870,shipped,true,https://tracking.example.com/pkg/771198e82b26,+1-251-905-6464
+ORD-41925,bob806@outlook.com,2023-07-30,215.13,AUD,4394,Japan,38305,shipped,false,https://tracking.example.com/pkg/41d4c4948c07,+1-992-251-1046
+ORD-46342,bob134@outlook.com,2023-09-14,2397.55,USD,1422,United Kingdom,11947,delivered,true,https://tracking.example.com/pkg/b7cbfaf4585c,+1-802-431-1258
+ORD-32838,carol54@gmail.com,2024-03-07,1582.99,CAD,2041,France,68756,delivered,true,https://tracking.example.com/pkg/c909dc272aed,+1-662-615-4629
+ORD-90623,alice745@outlook.com,2024-06-17,911.86,CAD,1510,United States,72781,returned,false,https://tracking.example.com/pkg/3129afb7389f,+1-902-210-9032
+ORD-68138,alice921@gmail.com,2023-11-26,1828.80,USD,3067,Germany,91830,cancelled,false,https://tracking.example.com/pkg/e7531cd001e2,+1-590-711-9692
+ORD-48652,dave518@outlook.com,2024-03-16,306.53,CAD,2874,Canada,95814,cancelled,true,https://tracking.example.com/pkg/df0c4a6cd200,+1-640-562-4743
+ORD-64239,carol848@yahoo.com,2024-02-13,1253.80,USD,6120,France,50963,delivered,false,https://tracking.example.com/pkg/cd10d3bd1f61,+1-356-803-8770
+ORD-18799,alice852@gmail.com,2023-04-06,1301.30,CAD,7105,Canada,27054,cancelled,true,https://tracking.example.com/pkg/162cdcd46fc4,+1-800-675-6400
+ORD-97819,alice421@yahoo.com,2024-11-12,2823.97,JPY,1842,Germany,88696,delivered,false,https://tracking.example.com/pkg/940039337567,+1-306-691-9313
+ORD-37884,bob673@yahoo.com,2023-08-18,2543.34,GBP,7022,United States,46512,cancelled,true,https://tracking.example.com/pkg/199a178a268a,+1-639-965-1430

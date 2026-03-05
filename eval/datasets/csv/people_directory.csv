@@ -1,0 +1,101 @@
+full_name,first_name,last_name,email,phone,age,gender,ssn,date_of_birth,company,job_title,salary,height_cm,weight_kg
+William Jones,William,Jones,william.jones34@outlook.com,+61-392-253-9475,70,Male,158-86-7620,2009-04-05,InfoSys,Analyst,229080,151.3,84.8
+Barbara Jones,Barbara,Jones,barbara.jones54@company.com,+49-954-136-4111,43,Non-binary,830-38-9759,2007-04-08,DigiCore,Consultant,172989,165.0,61.9
+Sarah Williams,Sarah,Williams,sarah.williams38@gmail.com,+49-331-858-5237,68,Non-binary,881-33-6499,2008-09-17,TechStars,Director,133135,161.2,111.0
+Susan Garcia,Susan,Garcia,susan.garcia48@company.com,+33-501-574-2929,52,Male,987-91-2166,1992-05-13,NextGen,Manager,218440,169.1,70.9
+Mary Williams,Mary,Williams,mary.williams18@gmail.com,+61-619-683-8496,31,Female,983-33-2324,1993-09-29,InfoSys,Analyst,122159,181.7,50.3
+David Brown,David,Brown,david.brown98@gmail.com,+33-982-262-9021,72,Male,232-88-8105,2006-11-01,MegaTech,Designer,152466,198.3,76.8
+Mary Rodriguez,Mary,Rodriguez,mary.rodriguez26@outlook.com,+61-214-429-9700,34,Male,792-10-5076,1970-04-20,InfoSys,VP,73798,155.1,85.2
+Barbara Williams,Barbara,Williams,barbara.williams9@gmail.com,+61-497-566-9524,60,Non-binary,445-65-3192,1980-09-30,DigiCore,Consultant,236638,159.4,116.4
+Richard Smith,Richard,Smith,richard.smith30@gmail.com,+44-416-851-1359,59,Non-binary,273-25-7006,2013-10-18,Acme Corp,Designer,207856,162.8,87.4
+Mary Martinez,Mary,Martinez,mary.martinez7@outlook.com,+1-869-956-1323,25,Non-binary,218-63-8279,1984-02-12,TechStars,VP,164360,185.1,64.4
+James Jones,James,Jones,james.jones54@outlook.com,+1-878-632-5423,61,Non-binary,817-27-7862,1959-05-31,TechStars,VP,69887,189.2,84.8
+Karen Brown,Karen,Brown,karen.brown34@outlook.com,+44-566-820-7713,40,Male,140-80-9132,1968-08-19,DigiCore,Consultant,101474,150.1,97.0
+Patricia Martinez,Patricia,Martinez,patricia.martinez86@company.com,+44-292-898-9383,26,Non-binary,840-22-5192,2007-10-22,NextGen,Researcher,117600,163.2,53.5
+Jennifer Smith,Jennifer,Smith,jennifer.smith38@company.com,+61-636-856-2898,28,Male,109-27-3793,1979-06-27,InfoSys,Researcher,203002,163.4,101.3
+Elizabeth Garcia,Elizabeth,Garcia,elizabeth.garcia24@gmail.com,+49-609-567-5453,75,Female,806-71-7909,2008-03-18,DataFlow,Manager,74737,184.8,54.1
+Jennifer Johnson,Jennifer,Johnson,jennifer.johnson54@outlook.com,+49-782-794-8178,33,Non-binary,488-55-1472,2011-05-29,DataFlow,Researcher,167958,155.6,78.8
+Mary Johnson,Mary,Johnson,mary.johnson34@outlook.com,+61-212-821-9598,71,Non-binary,690-82-4669,2010-02-04,InfoSys,Manager,153468,183.1,67.4
+Elizabeth Miller,Elizabeth,Miller,elizabeth.miller20@outlook.com,+33-255-111-3571,54,Female,972-73-3709,1956-09-19,DigiCore,Consultant,103148,166.5,69.5
+Thomas Brown,Thomas,Brown,thomas.brown71@outlook.com,+49-612-936-4850,27,Female,554-83-8341,1957-11-24,DigiCore,Researcher,122853,155.9,84.8
+James Johnson,James,Johnson,james.johnson52@company.com,+1-770-662-1002,74,Male,910-87-5990,1995-08-10,NextGen,Researcher,129352,168.2,53.8
+Linda Davis,Linda,Davis,linda.davis43@outlook.com,+33-814-584-6952,67,Female,216-22-4633,1950-03-13,InfoSys,Consultant,206110,198.2,70.4
+Thomas Garcia,Thomas,Garcia,thomas.garcia90@gmail.com,+1-368-604-3301,74,Non-binary,860-62-2752,1972-10-24,NextGen,Director,71652,196.5,77.5
+Joseph Brown,Joseph,Brown,joseph.brown92@company.com,+1-975-524-1761,62,Non-binary,702-25-8381,1991-01-13,DataFlow,Researcher,41137,176.5,53.4
+Susan Martinez,Susan,Martinez,susan.martinez62@outlook.com,+44-908-692-3845,68,Male,206-59-6273,1995-03-24,MegaTech,Designer,199644,195.8,103.4
+David Miller,David,Miller,david.miller44@company.com,+49-336-241-7762,60,Non-binary,866-75-5897,2012-12-07,InfoSys,Director,92661,160.5,100.0
+Elizabeth Williams,Elizabeth,Williams,elizabeth.williams91@outlook.com,+44-715-655-6281,67,Male,879-55-8870,2002-04-15,MegaTech,VP,150726,190.4,86.6
+James Miller,James,Miller,james.miller19@gmail.com,+1-404-373-3636,40,Non-binary,356-28-2016,2011-12-16,CloudBase,Director,237550,177.1,75.1
+Joseph Johnson,Joseph,Johnson,joseph.johnson79@outlook.com,+33-429-860-7371,37,Non-binary,903-99-5712,2012-03-02,Acme Corp,Designer,141595,170.8,105.2
+William Rodriguez,William,Rodriguez,william.rodriguez7@gmail.com,+61-407-735-8259,75,Male,748-92-7025,2017-09-29,NextGen,Director,117116,172.4,118.8
+John Williams,John,Williams,john.williams23@outlook.com,+33-322-486-1665,49,Female,669-43-3131,1964-06-09,CloudBase,Engineer,126655,173.3,115.6
+Mary Williams,Mary,Williams,mary.williams42@outlook.com,+1-992-740-5934,53,Non-binary,663-55-2194,2013-06-28,InfoSys,Director,88200,176.0,105.0
+Jennifer Miller,Jennifer,Miller,jennifer.miller70@outlook.com,+49-294-457-4624,35,Non-binary,439-52-6911,1976-05-03,NextGen,Researcher,187150,191.2,118.7
+James Johnson,James,Johnson,james.johnson86@company.com,+49-446-757-4994,24,Non-binary,428-58-2857,1984-08-14,CloudBase,VP,46476,195.6,107.5
+Elizabeth Rodriguez,Elizabeth,Rodriguez,elizabeth.rodriguez66@company.com,+49-244-403-4154,42,Non-binary,184-22-3742,1998-04-07,Acme Corp,Manager,95255,183.5,104.2
+Susan Johnson,Susan,Johnson,susan.johnson27@outlook.com,+49-862-936-2181,69,Non-binary,257-13-8523,2014-04-25,InfoSys,Engineer,62943,153.7,62.5
+David Rodriguez,David,Rodriguez,david.rodriguez10@outlook.com,+44-464-517-7357,50,Non-binary,514-65-6183,1951-07-08,MegaTech,Manager,180203,150.3,100.4
+John Martinez,John,Martinez,john.martinez6@outlook.com,+1-566-614-2738,40,Non-binary,408-87-2417,1975-04-04,DigiCore,Designer,143576,191.1,52.2
+Jennifer Rodriguez,Jennifer,Rodriguez,jennifer.rodriguez29@gmail.com,+49-758-402-3360,41,Non-binary,914-92-7113,1951-01-01,DataFlow,Manager,50950,150.3,91.8
+Sarah Rodriguez,Sarah,Rodriguez,sarah.rodriguez11@company.com,+44-966-859-6633,35,Female,761-75-3333,1964-06-10,DataFlow,Director,201712,191.7,63.6
+Jennifer Martinez,Jennifer,Martinez,jennifer.martinez7@outlook.com,+49-860-662-2198,40,Non-binary,168-42-2608,1967-09-17,DigiCore,Consultant,133621,156.4,95.9
+Patricia Jones,Patricia,Jones,patricia.jones80@gmail.com,+44-525-597-8383,43,Non-binary,775-49-3496,2000-09-27,InfoSys,Consultant,152278,158.4,71.9
+Linda Miller,Linda,Miller,linda.miller36@company.com,+44-895-850-6432,52,Female,556-55-6004,1993-09-09,TechStars,Analyst,209227,180.3,108.9
+Robert Rodriguez,Robert,Rodriguez,robert.rodriguez26@company.com,+1-944-177-1305,54,Non-binary,131-84-7637,2002-12-08,NextGen,Engineer,184597,163.0,112.6
+Sarah Davis,Sarah,Davis,sarah.davis84@gmail.com,+61-601-328-5767,30,Female,613-75-2483,1985-08-06,InfoSys,Engineer,213717,161.9,117.5
+Karen Williams,Karen,Williams,karen.williams97@outlook.com,+44-656-263-3935,58,Non-binary,775-28-8921,1982-03-11,Acme Corp,Director,239615,174.4,54.4
+Elizabeth Brown,Elizabeth,Brown,elizabeth.brown6@outlook.com,+44-730-910-6918,46,Female,565-15-1653,2008-03-07,InfoSys,Manager,224480,198.4,94.3
+David Jones,David,Jones,david.jones75@outlook.com,+33-378-485-7201,45,Non-binary,769-19-9465,1972-07-27,MegaTech,Director,175363,170.3,107.2
+Elizabeth Davis,Elizabeth,Davis,elizabeth.davis62@outlook.com,+1-713-242-8207,32,Male,178-75-5600,1968-12-22,DataFlow,Analyst,81250,168.1,100.2
+Patricia Brown,Patricia,Brown,patricia.brown54@company.com,+1-693-791-8844,52,Male,704-30-7732,1952-01-06,NextGen,Engineer,73524,178.7,61.3
+Thomas Smith,Thomas,Smith,thomas.smith74@gmail.com,+1-370-364-3949,55,Female,713-82-1305,2014-07-22,CloudBase,Manager,96778,172.5,119.5
+Jessica Williams,Jessica,Williams,jessica.williams29@company.com,+33-346-913-3979,61,Non-binary,623-43-3747,2014-12-21,InfoSys,Researcher,196377,179.5,66.1
+Richard Williams,Richard,Williams,richard.williams14@gmail.com,+44-735-980-9263,65,Female,946-29-2577,1965-12-01,DigiCore,Engineer,245486,176.6,102.7
+John Davis,John,Davis,john.davis85@gmail.com,+33-752-947-1019,71,Non-binary,764-65-9553,1987-09-28,InfoSys,Engineer,222882,176.5,66.1
+Jessica Miller,Jessica,Miller,jessica.miller45@outlook.com,+33-300-535-3193,38,Female,884-39-2373,1975-06-01,MegaTech,VP,89550,150.3,102.1
+James Martinez,James,Martinez,james.martinez67@gmail.com,+33-207-484-4365,66,Female,518-56-2746,1963-11-20,MegaTech,VP,108498,192.7,79.6
+Elizabeth Martinez,Elizabeth,Martinez,elizabeth.martinez36@outlook.com,+49-973-308-7770,57,Non-binary,594-32-7065,2000-02-28,DigiCore,VP,120387,178.9,104.2
+Richard Williams,Richard,Williams,richard.williams85@gmail.com,+44-657-901-3650,28,Male,620-61-6544,1999-05-25,Acme Corp,Analyst,142001,198.2,50.4
+John Williams,John,Williams,john.williams61@outlook.com,+49-290-165-5310,36,Female,181-87-1618,2014-12-31,MegaTech,Designer,200947,182.8,70.1
+Karen Smith,Karen,Smith,karen.smith23@outlook.com,+49-649-110-4304,64,Non-binary,392-34-1550,2003-10-14,NextGen,Analyst,216691,151.8,66.7
+James Williams,James,Williams,james.williams12@company.com,+49-561-785-7474,47,Non-binary,305-76-1251,2016-02-11,TechStars,Manager,184072,164.2,108.1
+Charles Garcia,Charles,Garcia,charles.garcia45@company.com,+44-820-299-8450,47,Non-binary,104-43-3867,1986-07-11,TechStars,Manager,171902,164.7,116.3
+Thomas Jones,Thomas,Jones,thomas.jones69@outlook.com,+61-910-553-7178,58,Female,888-41-6565,1991-03-02,DigiCore,Engineer,166345,155.8,54.7
+Linda Brown,Linda,Brown,linda.brown41@company.com,+61-728-648-1159,66,Female,354-46-2523,1985-10-16,InfoSys,Manager,185372,196.6,83.4
+Elizabeth Brown,Elizabeth,Brown,elizabeth.brown74@company.com,+44-964-799-4115,53,Non-binary,304-40-4965,1973-10-23,NextGen,Director,93154,191.7,108.5
+Elizabeth Williams,Elizabeth,Williams,elizabeth.williams14@gmail.com,+1-892-779-9071,61,Male,882-79-1692,1993-04-08,InfoSys,Consultant,169064,194.9,111.7
+Charles Jones,Charles,Jones,charles.jones63@gmail.com,+33-486-507-4638,70,Non-binary,231-16-9613,1987-12-19,DigiCore,Engineer,171720,167.4,110.2
+Jennifer Davis,Jennifer,Davis,jennifer.davis16@outlook.com,+33-671-423-1137,22,Non-binary,315-58-2650,1979-03-13,InfoSys,VP,89060,177.4,66.6
+Jessica Martinez,Jessica,Martinez,jessica.martinez44@company.com,+44-710-534-4449,48,Non-binary,870-57-6981,1985-12-09,CloudBase,Researcher,87156,178.6,118.5
+Linda Johnson,Linda,Johnson,linda.johnson93@company.com,+44-768-542-7240,34,Male,919-29-8749,1950-11-16,DataFlow,Designer,170966,156.7,112.5
+Thomas Rodriguez,Thomas,Rodriguez,thomas.rodriguez93@company.com,+49-507-356-1781,47,Male,807-30-1983,1969-05-01,CloudBase,Researcher,205114,154.8,102.1
+David Garcia,David,Garcia,david.garcia47@outlook.com,+33-463-452-1324,48,Male,459-96-4259,2001-10-02,DataFlow,VP,133089,166.3,85.7
+Joseph Johnson,Joseph,Johnson,joseph.johnson49@outlook.com,+61-674-746-3373,32,Non-binary,927-53-7911,2006-08-20,MegaTech,Manager,60738,158.1,66.0
+William Jones,William,Jones,william.jones91@company.com,+33-860-504-5444,50,Female,865-85-9535,1990-05-26,MegaTech,Analyst,88204,192.7,58.8
+Linda Jones,Linda,Jones,linda.jones96@outlook.com,+1-415-270-7505,28,Male,165-70-9985,1954-10-30,Acme Corp,Designer,177358,188.2,55.8
+David Martinez,David,Martinez,david.martinez20@gmail.com,+49-516-334-5053,69,Female,553-90-3071,1961-10-11,DataFlow,Engineer,49215,183.2,110.2
+William Davis,William,Davis,william.davis60@outlook.com,+61-761-555-3213,66,Non-binary,281-85-8480,2006-08-13,MegaTech,VP,131008,174.1,65.9
+John Davis,John,Davis,john.davis40@company.com,+49-466-259-5973,22,Male,635-27-6634,1975-09-23,DigiCore,Engineer,220294,196.1,116.3
+Jessica Jones,Jessica,Jones,jessica.jones2@company.com,+61-811-336-1118,57,Female,293-62-8161,1985-06-01,NextGen,Analyst,227416,186.9,77.3
+Richard Brown,Richard,Brown,richard.brown34@gmail.com,+49-840-345-9464,70,Non-binary,926-98-5454,1975-07-17,CloudBase,Designer,89283,192.7,62.8
+Barbara Johnson,Barbara,Johnson,barbara.johnson82@company.com,+33-663-378-9060,34,Female,119-29-1813,1997-12-29,Acme Corp,Analyst,66810,164.1,58.8
+Joseph Smith,Joseph,Smith,joseph.smith30@gmail.com,+44-215-605-4558,43,Female,419-73-7084,1991-08-08,Acme Corp,Consultant,61030,192.2,116.6
+Mary Jones,Mary,Jones,mary.jones51@gmail.com,+33-681-285-4148,75,Female,936-58-1206,1960-12-10,NextGen,Designer,242172,198.7,67.3
+Mary Brown,Mary,Brown,mary.brown59@outlook.com,+1-733-781-4415,52,Female,797-49-6293,1964-03-25,Acme Corp,Manager,106404,174.1,70.9
+Elizabeth Smith,Elizabeth,Smith,elizabeth.smith86@gmail.com,+1-441-748-8113,42,Male,271-45-2960,1985-07-05,NextGen,Engineer,51008,179.1,98.4
+Karen Williams,Karen,Williams,karen.williams48@gmail.com,+44-361-611-2497,65,Non-binary,446-90-1983,1955-05-13,InfoSys,Analyst,223848,176.8,57.5
+Jessica Brown,Jessica,Brown,jessica.brown41@outlook.com,+61-649-850-4161,23,Non-binary,486-55-3207,1972-06-28,Acme Corp,Researcher,225237,171.9,70.6
+Jessica Brown,Jessica,Brown,jessica.brown73@gmail.com,+33-556-431-8674,39,Non-binary,981-80-3627,1956-03-06,DataFlow,Researcher,117508,191.0,87.9
+Joseph Smith,Joseph,Smith,joseph.smith82@outlook.com,+49-951-289-1306,61,Female,894-89-4912,1978-10-09,TechStars,Designer,89773,176.2,84.8
+Sarah Williams,Sarah,Williams,sarah.williams79@company.com,+61-619-756-6276,29,Male,635-94-2092,1953-12-05,DataFlow,Analyst,48198,160.1,84.0
+Patricia Smith,Patricia,Smith,patricia.smith74@outlook.com,+49-873-601-9615,61,Non-binary,704-42-1804,1982-11-13,NextGen,Manager,43430,196.5,64.6
+Jessica Johnson,Jessica,Johnson,jessica.johnson60@outlook.com,+1-569-671-7814,74,Female,913-17-5355,1997-06-17,Acme Corp,Manager,119666,153.9,65.1
+Thomas Johnson,Thomas,Johnson,thomas.johnson13@outlook.com,+44-744-494-4104,34,Non-binary,772-41-3931,2000-02-06,MegaTech,Manager,240876,181.9,75.1
+Joseph Miller,Joseph,Miller,joseph.miller14@gmail.com,+44-763-511-9268,43,Non-binary,261-78-8258,1981-08-10,InfoSys,Consultant,137444,170.6,94.3
+William Martinez,William,Martinez,william.martinez31@outlook.com,+33-419-484-5162,45,Female,558-60-1003,2015-02-28,Acme Corp,VP,196175,150.8,59.5
+Barbara Smith,Barbara,Smith,barbara.smith39@gmail.com,+44-522-122-5521,57,Non-binary,669-83-3534,1958-06-17,Acme Corp,Researcher,133233,157.8,68.5
+Charles Brown,Charles,Brown,charles.brown30@company.com,+61-294-684-7550,58,Male,851-19-6319,1993-04-16,DataFlow,Researcher,220773,185.1,107.4
+Patricia Martinez,Patricia,Martinez,patricia.martinez83@company.com,+1-948-927-7251,27,Male,889-52-6700,1988-12-18,MegaTech,Manager,241953,161.3,95.7
+Karen Smith,Karen,Smith,karen.smith82@outlook.com,+49-255-412-9591,24,Female,652-82-3450,1979-04-28,NextGen,Analyst,53243,183.7,119.8
+Joseph Martinez,Joseph,Martinez,joseph.martinez74@outlook.com,+1-427-542-5747,72,Female,251-26-6507,1957-05-28,DigiCore,Engineer,183694,170.0,56.0
+Thomas Miller,Thomas,Miller,thomas.miller90@gmail.com,+44-692-672-4245,53,Female,767-83-4212,2000-05-06,NextGen,Director,58781,163.3,80.1
