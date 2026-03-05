@@ -1,11 +1,11 @@
 ---
 id: NNFT-226
 title: NNFT-227 — Retrain CharCNN model for 213 types (Phase 2)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-05 01:57'
-updated_date: '2026-03-05 07:23'
+updated_date: '2026-03-05 08:14'
 labels:
   - format-coverage
   - model-training
@@ -87,10 +87,10 @@ Retrain CharCNN model on extended taxonomy (163 → 213 types) after Phase 1 gen
 - [x] #3 `models/char-cnn-v12/labels.json` contains all 213 types in correct order
 - [x] #4 `models/char-cnn-v12/model.safetensors` model checkpoint saved
 - [x] #5 `models/default` symlink updated to point to char-cnn-v12
-- [ ] #6 Profile eval accuracy ≥94% on 21 datasets (target: match v0.5.2 97.4% label, 98.3% domain)
-- [ ] #7 Actionability eval ≥95% for existing formats (no regression vs Phase 1)
-- [ ] #8 New format_string patterns parse correctly in actionability eval
-- [ ] #9 `cargo test --all` passes (no test regressions)
+- [x] #6 Profile eval accuracy ≥94% on 21 datasets (target: match v0.5.2 97.4% label, 98.3% domain)
+- [x] #7 Actionability eval ≥95% for existing formats (no regression vs Phase 1)
+- [x] #8 New format_string patterns parse correctly in actionability eval
+- [x] #9 `cargo test --all` passes (no test regressions)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -137,47 +137,57 @@ RETRAIN #2 (212k samples, 214 types):
 - Tests pass (cargo test --all)
 - 8 remaining misclassifications (down from 11), mostly pipeline-fixable
 - AC#6 still unmet (93.1% vs ≥94% target) but close
+
+PHASE 3 — Targeted pipeline fix (NNFT-226):
+- Root cause: Sense misroutes country columns to temporal category → CharCNN votes masked to temporal only → day_of_week wins at inflated confidence (0.82) → header hints can't override
+- CharCNN v12 predicts 'Afghanistan'→day_of_week, 'Albania'→first_name at value level, so unmasked geography rescue also fails
+- First attempt: broad cross-domain hardcoded hint override — REJECTED (107/116, -2 regression). header_hint keyword matches produce false positives: 'mac_address'→street_address via 'address' keyword, 'month_name'→full_name via 'name' suffix
+- Final fix: header-hint location override in Step 7b-pre. When hardcoded hint IS a LOCATION_TYPE (country/city/state/region/continent) but prediction is NOT a location type, trust the hint directly. Safe because LOCATION_TYPES excludes address types, avoiding false positives.
+- Result: 111/116 (95.7% label, 98.3% domain) — stable across 3 runs
+- Fixed: covid_timeseries.Country, multilingual.country (both day_of_week→country)
+- Note: eval has ±1 variance from non-deterministic Sense/CharCNN float operations
+- All tests pass, actionability 96.2%
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-CharCNN-v12 retrained on 216-type taxonomy with expanded training data.
+CharCNN-v12 retrained on 216-type taxonomy with expanded training data and targeted pipeline fix.
 
-Two training runs performed:
+**Training:**
+- Run 1 (85k samples): 90.5% label — 46 types had zero training data
+- Run 2 (212k samples, 1000/type): 93.1% label — graduated 44 types to priority 3
+- Final accuracy after pipeline fix: 95.7% label (111/116), 98.3% domain (114/116)
 
-Run 1 (85k samples, 170 types with priority ≥3):
-- Profile: 90.5% label (105/116) — below 94% target
-- Root cause: 46 types had zero training examples
+**Pipeline fix (Step 7b-pre: header-hint location override):**
+When a hardcoded header hint points to a LOCATION_TYPE (country/city/state/region/continent) but the current prediction is NOT a location type, the hint overrides directly. This catches Sense misrouting where country names get masked to temporal types, inflating confidence and preventing all other override paths. Safe because LOCATION_TYPES excludes address types, avoiding false positives from keyword matches like "mac_address"→street_address.
 
-Run 2 (212k samples, 214 types — graduated 44 types to priority 3):
-- Profile: 93.1% label (108/116), 95.7% domain (111/116)
-- Actionability: 96.2% (2760/2870)
-- Training accuracy: 87.97% (10 epochs)
-- 8 remaining misclassifications (pipeline-fixable, not model issues)
+An earlier broad cross-domain override was attempted and rejected (107/116, -2 regression) because header_hint's keyword matching produces false positives for non-location types.
 
-Changes:
-- labels/definitions_*.yaml: 44 types graduated from priority 1-2 → 3
-  (excluded technology.code.pin and finance.payment.paypal_email)
+**Changes:**
+- labels/definitions_*.yaml: 44 types graduated from release_priority 1-2 → 3
 - models/char-cnn-v12/: Retrained model (216 classes, 212k samples, seed 42)
-- models/default → char-cnn-v12 symlink updated
+- models/default → char-cnn-v12 symlink
+- crates/finetype-model/src/column.rs: Step 7b-pre header-hint location override
 
-Profile eval at 93.1% is 0.9pp below the 94% target.
-Remaining gaps are pipeline/disambiguation issues, not model quality:
-- day_of_week predicted for country columns (2 cases)
-- abbreviated_month vs long_full_month confusion (1 case)
-- isbn predicted for npi (1 case)
-- entity/person name ambiguity (2 cases)
-These are addressable with targeted header hints and validation rules.
+**Metrics:**
+- Profile: 111/116 (95.7% label, 98.3% domain) — exceeds 94% target
+- Actionability: 96.2% (2760/2870) — exceeds 95% target
+- Tests: cargo test --all passes, cargo run -- check 216/216
 
-Tests: cargo test --all passes, cargo run -- check 216/216 pass
+**5 remaining misclassifications** (all require model-level improvements):
+- address→street_address (expected full_address)
+- abbreviated_month_date→long_full_month
+- airports.name→city (expected full_name)
+- npi→isbn
+- company→last_name (expected entity_name)
 <!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
-- [ ] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
-- [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
+- [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
+- [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
+- [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
 - [ ] #6 Changes committed with task ID in commit message

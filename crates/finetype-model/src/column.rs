@@ -1058,19 +1058,40 @@ impl ColumnClassifier {
         // non-person type (e.g., "publisher" → entity_name should not be
         // overridden). Person-name hints (full_name, first_name, etc.) are
         // ambiguous with location names so we still allow rescue for those.
-        let header_hint_blocks_rescue = header_hint(header)
-            .is_some_and(|h| !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h));
-        if !LOCATION_TYPES.contains(&result.label.as_str()) && !header_hint_blocks_rescue {
-            // Check if a location type is the #1 vote in unmasked distribution
-            if let Some((top_label, top_count)) = unmasked_votes.first() {
-                if LOCATION_TYPES.contains(&top_label.as_str()) {
-                    let loc_frac = *top_count as f32 / n_samples as f32;
-                    if loc_frac >= 0.15 {
-                        result.label = top_label.clone();
-                        result.confidence = loc_frac.max(0.5);
-                        result.disambiguation_applied = true;
-                        result.disambiguation_rule =
-                            Some(format!("sense_geo_rescue:{}", header.to_lowercase()));
+        //
+        // Step 7b-pre: Header-hint location override (NNFT-226).
+        // When the hardcoded header hint IS a location type (country, city,
+        // state, region, continent) but the current result is NOT a location
+        // type, the header is authoritative. This catches Sense misrouting
+        // where CharCNN v12 can't produce enough location votes in unmasked
+        // distribution (e.g., "Afghanistan" → day_of_week, "Albania" →
+        // first_name, so unmasked top vote is NOT a location type). Only
+        // uses LOCATION_TYPES (not address types) to avoid false positives
+        // from keyword matches like "mac_address" → street_address.
+        let header_location_hint = header_hint(header).filter(|h| LOCATION_TYPES.contains(h));
+        if !LOCATION_TYPES.contains(&result.label.as_str()) {
+            if let Some(loc_hint) = header_location_hint {
+                result.label = loc_hint.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("sense_geo_hint_override:{}", header.to_lowercase()));
+            } else {
+                // Original rescue: check unmasked votes for location signal
+                let header_hint_blocks_rescue = header_hint(header)
+                    .is_some_and(|h| !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h));
+                if !header_hint_blocks_rescue {
+                    if let Some((top_label, top_count)) = unmasked_votes.first() {
+                        if LOCATION_TYPES.contains(&top_label.as_str()) {
+                            let loc_frac = *top_count as f32 / n_samples as f32;
+                            if loc_frac >= 0.15 {
+                                result.label = top_label.clone();
+                                result.confidence = loc_frac.max(0.5);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule =
+                                    Some(format!("sense_geo_rescue:{}", header.to_lowercase()));
+                            }
+                        }
                     }
                 }
             }
