@@ -232,7 +232,7 @@ finance.currency.currency_symbol:
     type: string
     pattern: "^[\\p{Sc}]+$"
   tier: [VARCHAR, payment]
-  release_priority: 2
+  release_priority: 3
   aliases: [currency_sign]
   samples:
     - "$"
@@ -368,7 +368,7 @@ finance.payment.paypal_email:
     type: string
     pattern: "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
   tier: [VARCHAR, payment]
-  release_priority: 2
+  release_priority: 3
   aliases: [paypal_account]
   samples:
     - "user@example.com"

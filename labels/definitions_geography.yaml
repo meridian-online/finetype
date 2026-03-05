@@ -286,7 +286,7 @@ geography.address.street_suffix:
       - Plaza
       - Square
   tier: [VARCHAR, address]
-  release_priority: 2
+  release_priority: 3
   aliases: [street_type]
   samples:
     - "Street"

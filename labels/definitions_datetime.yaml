@@ -1236,7 +1236,7 @@ datetime.component.year:
     minimum: 1000
     maximum: 2100
   tier: [INTEGER, component]
-  release_priority: 1
+  release_priority: 3
   aliases: []
   samples:
     - "2024"
@@ -1262,7 +1262,7 @@ datetime.component.day_of_month:
     minimum: 1
     maximum: 31
   tier: [INTEGER, component]
-  release_priority: 1
+  release_priority: 3
   aliases: []
   samples:
     - "1"
@@ -1405,7 +1405,7 @@ datetime.component.day_of_week:
       type: string
       enum: ["понеділок", "вівторок", "середа", "четвер", "пʼятниця", "субота", "неділя"]
   tier: [VARCHAR, component]
-  release_priority: 1
+  release_priority: 3
   aliases: []
   samples:
     - "Monday"
@@ -1553,7 +1553,7 @@ datetime.component.month_name:
       type: string
       enum: ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"]
   tier: [VARCHAR, component]
-  release_priority: 1
+  release_priority: 3
   aliases: [month]
   samples:
     - "January"
@@ -1590,7 +1590,7 @@ datetime.component.periodicity:
       - "Yearly"
       - "Never"
   tier: [VARCHAR, component]
-  release_priority: 1
+  release_priority: 3
   aliases: []
   samples:
     - "Daily"
@@ -2050,7 +2050,7 @@ datetime.timestamp.dot_ymd_24h:
     minLength: 19
     maxLength: 19
   tier: [TIMESTAMP, timestamp]
-  release_priority: 2
+  release_priority: 3
   aliases: []
   samples:
     - "2024.01.15 14:30:00"
@@ -2749,7 +2749,7 @@ datetime.date.jp_era_long:
     type: string
     pattern: "^(\u4EE4\u548C|\u5E73\u6210|\u662D\u548C|\u5927\u6B63|\u660E\u6CBB)\\d{1,2}\u5E74\\d{1,2}\u6708\\d{1,2}\u65E5$"
   tier: [VARCHAR, date]
-  release_priority: 2
+  release_priority: 3
   aliases: [wareki_long]
   samples:
     - "\u4EE4\u548C6\u5E741\u670815\u65E5"

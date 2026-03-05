@@ -4,8 +4,8 @@
   "epochs": 10,
   "model_type": "charcnn",
   "n_classes": 216,
-  "n_samples": 85000,
-  "parent_snapshot": null,
+  "n_samples": 212000,
+  "parent_snapshot": "models/char-cnn-v12.snapshot.20260305T045033Z",
   "seed": 42,
-  "timestamp": "2026-03-05T03:52:28.021182325+00:00"
+  "timestamp": "2026-03-05T07:20:20.710174337+00:00"
 }

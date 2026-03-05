@@ -521,7 +521,7 @@ identity.person.gender:
       - Prefer not to say
       - Unknown
   tier: [VARCHAR, person]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "Male"
@@ -549,7 +549,7 @@ identity.person.gender_code:
     type: string
     pattern: "^[MFX]$"
   tier: [VARCHAR, person]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "M"
@@ -575,7 +575,7 @@ identity.person.gender_symbol:
     type: string
     pattern: "^[♂♀⚧⚪]$"
   tier: [VARCHAR, person]
-  release_priority: 2
+  release_priority: 3
   aliases: null
   samples:
     - "♂"
@@ -606,7 +606,7 @@ identity.person.blood_type:
     type: string
     pattern: "^(A|B|AB|O)[+-]?$"
   tier: [VARCHAR, person]
-  release_priority: 2
+  release_priority: 3
   aliases: null
   samples:
     - "O+"
@@ -643,7 +643,7 @@ identity.person.height:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(cm|in|ft|inches|feet)?$|^[0-9]+'[0-9]+\"$"
   tier: [DOUBLE, person]
-  release_priority: 2
+  release_priority: 3
   aliases: null
   samples:
     - "180 cm"
@@ -677,7 +677,7 @@ identity.person.weight:
     type: string
     pattern: "^[0-9]+(\\.[0-9]+)?\\s*(kg|lbs|lb|g|oz|stones)?$"
   tier: [DOUBLE, person]
-  release_priority: 2
+  release_priority: 3
   aliases: null
   samples:
     - "75 kg"

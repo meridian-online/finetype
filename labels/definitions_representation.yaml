@@ -286,7 +286,7 @@ representation.text.sentence:
     maxLength: 1000
     pattern: "^[A-Z].*[.!?]$"
   tier: [VARCHAR, text]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "This is a complete sentence."
@@ -473,7 +473,7 @@ representation.text.paragraph:
     minLength: 50
     maxLength: 65536
   tier: [VARCHAR, text]
-  release_priority: 1
+  release_priority: 3
   aliases: [description, review, article, body_text]
   samples:
     - "This product works great. I would recommend it to anyone looking for quality."
@@ -510,7 +510,7 @@ representation.file.extension:
     type: string
     pattern: "^\\.?[a-zA-Z0-9]{1,10}$"
   tier: [VARCHAR, file]
-  release_priority: 2
+  release_priority: 3
   aliases: [file_type]
   samples:
     - "txt"
@@ -543,7 +543,7 @@ representation.file.mime_type:
     type: string
     pattern: "^[a-zA-Z]+/[a-zA-Z0-9.+\\-]+(;.*)?$"
   tier: [VARCHAR, file]
-  release_priority: 1
+  release_priority: 3
   aliases: [content_type, media_type]
   samples:
     - "text/plain"
@@ -655,7 +655,7 @@ representation.scientific.dna_sequence:
     type: string
     pattern: "^[ATGCRYSWKMBDHVN]+$"
   tier: [VARCHAR, scientific]
-  release_priority: 2
+  release_priority: 3
   aliases: [dna]
   samples:
     - "ATGCAGC"
@@ -686,7 +686,7 @@ representation.scientific.rna_sequence:
     type: string
     pattern: "^[AUGCRYSWKMBDHVN]+$"
   tier: [VARCHAR, scientific]
-  release_priority: 2
+  release_priority: 3
   aliases: [rna]
   samples:
     - "AUGCAGC"
@@ -716,7 +716,7 @@ representation.scientific.protein_sequence:
     type: string
     pattern: "^[ACDEFGHIKLMNPQRSTVWXY*]+$"
   tier: [VARCHAR, scientific]
-  release_priority: 2
+  release_priority: 3
   aliases: [protein, peptide, amino_acid_sequence]
   samples:
     - "MKVLLIVGS"
@@ -775,7 +775,7 @@ representation.scientific.measurement_unit:
       - L
       - g
   tier: [VARCHAR, scientific]
-  release_priority: 1
+  release_priority: 3
   aliases: [unit]
   samples:
     - "meter"
@@ -829,7 +829,7 @@ representation.scientific.metric_prefix:
       - zepto
       - yocto
   tier: [VARCHAR, scientific]
-  release_priority: 1
+  release_priority: 3
   aliases: [si_prefix]
   samples:
     - "kilo"
@@ -906,7 +906,7 @@ representation.discrete.ordinal:
     minLength: 1
     maxLength: 30
   tier: [VARCHAR, discrete]
-  release_priority: 2
+  release_priority: 3
   aliases: [rank, grade, rating, tier]
   samples:
     - "high"
@@ -1131,7 +1131,7 @@ representation.identifier.increment:
     type: string
     pattern: "^[0-9]+$"
   tier: [BIGINT, identifier]
-  release_priority: 1
+  release_priority: 3
   aliases: [counter, sequence, id]
   samples:
     - "1"
@@ -1164,7 +1164,7 @@ representation.identifier.numeric_code:
     type: string
     pattern: "^[0-9]+$"
   tier: [VARCHAR, identifier]
-  release_priority: 2
+  release_priority: 3
   aliases: [code, classification_code, category_code]
   samples:
     - "840"

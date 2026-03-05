@@ -307,7 +307,7 @@ technology.internet.http_method:
     type: string
     enum: [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, CONNECT]
   tier: [VARCHAR, internet]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "GET"
@@ -685,7 +685,7 @@ technology.development.programming_language:
       - Perl
       - Lua
   tier: [VARCHAR, development]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "Python"
@@ -727,7 +727,7 @@ technology.development.software_license:
       - CC0-1.0
       - Proprietary
   tier: [VARCHAR, development]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "MIT"
@@ -763,7 +763,7 @@ technology.development.stage:
       - Deprecated
       - Archived
   tier: [VARCHAR, development]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "Alpha"
@@ -803,7 +803,7 @@ technology.development.os:
       - Android
       - FreeBSD
   tier: [VARCHAR, development]
-  release_priority: 1
+  release_priority: 3
   aliases: null
   samples:
     - "Windows"

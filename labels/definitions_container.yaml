@@ -99,7 +99,7 @@ container.object.json_array:
     type: string
     pattern: "^\\[.*\\]$"
   tier: [JSON, object]
-  release_priority: 2
+  release_priority: 3
   aliases: [json_list, array]
   samples:
     - "[1, 2, 3]"
@@ -133,7 +133,7 @@ container.object.xml:
     type: string
     pattern: "^<.*>.*</.*>$"
   tier: [VARCHAR, object]
-  release_priority: 1
+  release_priority: 3
   aliases: [xml_document]
   samples:
     - '<root><name>John</name><age>30</age></root>'
@@ -167,7 +167,7 @@ container.object.html:
     pattern: "^.*<(p|div|span|a|br|img|h[1-6]|ul|ol|li|table|tr|td|th|strong|em|b|i|form|input|button|select|textarea|header|footer|nav|section|article|main|aside|figure|figcaption|blockquote|pre|code|script|style|link|meta|head|body|html)[\\s>/ ].*$"
     minLength: 3
   tier: [VARCHAR, object]
-  release_priority: 2
+  release_priority: 3
   aliases: [html_content, html_fragment]
   samples:
     - '<p>Hello world</p>'
@@ -207,7 +207,7 @@ container.object.yaml:
     type: string
     pattern: "^[a-zA-Z_][a-zA-Z0-9_]*:\\s*.*"
   tier: [VARCHAR, object]
-  release_priority: 1
+  release_priority: 3
   aliases: [yaml]
   samples:
     - "name: John\nage: 30\nactive: true"
@@ -243,7 +243,7 @@ container.object.csv:
     type: string
     pattern: "^[^,]+(,[^,]+)*$"
   tier: [VARCHAR, object]
-  release_priority: 1
+  release_priority: 3
   aliases: [csv_row, delimited_record]
   samples:
     - "John,30,true"
@@ -312,7 +312,7 @@ container.array.pipe_separated:
     type: string
     pattern: "^[^|]+(\\|[^|]+)*$"
   tier: [VARCHAR, array]
-  release_priority: 2
+  release_priority: 3
   aliases: [pipe_list]
   samples:
     - "apple|banana|cherry"
@@ -341,7 +341,7 @@ container.array.semicolon_separated:
     type: string
     pattern: "^[^;]+(;[^;]+)*$"
   tier: [VARCHAR, array]
-  release_priority: 2
+  release_priority: 3
   aliases: [semicolon_list]
   samples:
     - "apple;banana;cherry"
@@ -370,7 +370,7 @@ container.array.whitespace_separated:
     type: string
     pattern: "^[^\\s]+(\\s+[^\\s]+)*$"
   tier: [VARCHAR, array]
-  release_priority: 2
+  release_priority: 3
   aliases: [space_separated, space_list]
   samples:
     - "apple banana cherry"
@@ -431,7 +431,7 @@ container.key_value.form_data:
     type: string
     pattern: "^[^=&]+=([^&]*)(&[^=&]+=[^&]*)*$"
   tier: [VARCHAR, key_value]
-  release_priority: 2
+  release_priority: 3
   aliases: null
   samples:
     - "username=john&password=secret"
