@@ -72,7 +72,8 @@ PROFILED=0
 ERRORS=0
 
 # Track which files we've already profiled (dedup)
-declare -A SEEN_FILES
+# Using newline-separated string for bash 3.2 compatibility (macOS)
+SEEN_FILES=""
 
 while IFS=, read -r dataset file_path column_name gt_label; do
     # Skip header
@@ -80,8 +81,8 @@ while IFS=, read -r dataset file_path column_name gt_label; do
 
     # Skip if already profiled this file
     key="${dataset}:${file_path}"
-    if [ "${SEEN_FILES[$key]:-}" = "1" ]; then continue; fi
-    SEEN_FILES[$key]=1
+    if echo "$SEEN_FILES" | grep -q "^${key}$"; then continue; fi
+    SEEN_FILES="${SEEN_FILES}${key}"$'\n'
 
     # Resolve relative paths from repo root
     if [[ ! "$file_path" = /* ]]; then
