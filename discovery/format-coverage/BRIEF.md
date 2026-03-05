@@ -1,5 +1,9 @@
 # Format Coverage Research Brief
 
+## What is FineType?
+
+[FineType](https://github.com/noon-org/finetype) is an open-source type inference engine that detects and classifies data types in tabular datasets. Given a column of text values, it returns a precise type label (e.g. `datetime.date.iso`, `finance.currency.amount_us`) along with a DuckDB-compatible format string and SQL transform. It currently classifies 163 types across 7 domains using a CharCNN model and a taxonomy defined in YAML. Written in Rust with zero Python dependencies.
+
 ## Question
 
 What date, time, timestamp, and currency formats appear commonly in real-world datasets — and what should FineType call each one?
