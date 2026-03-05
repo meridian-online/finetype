@@ -2528,9 +2528,14 @@ fn cmd_profile(
                 } else {
                     String::new()
                 };
+                let locale_str = if let Some(locale) = &p.detected_locale {
+                    format!(" locale:{}", locale)
+                } else {
+                    String::new()
+                };
                 println!(
-                    "  {:<25} {:<45} {:>6}{}",
-                    p.name, p.label, conf_str, disambig
+                    "  {:<25} {:<45} {:>6}{}{}",
+                    p.name, p.label, conf_str, disambig, locale_str
                 );
             }
 
