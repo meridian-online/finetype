@@ -1,12 +1,12 @@
 //! Label → Sense BroadCategory mapping for output masking (NNFT-169).
 //!
-//! Maps all 163 FineType type labels to their primary `BroadCategory`.
+//! Maps all 216 FineType type labels to their primary `BroadCategory`.
 //! Used during column classification to mask CharCNN predictions to
 //! the Sense-predicted category.
 //!
 //! Categories:
-//!   temporal (45) — all `datetime.*`
-//!   numeric (13) — numeric values, measurements, currency amounts
+//!   temporal (85) — all `datetime.*`
+//!   numeric (26) — numeric values, measurements, currency amounts, rates
 //!   geographic (15) — all `geography.*`
 //!   entity (9) — person names, entity names
 //!   format (52) — structured identifiers, codes, sequences
@@ -24,29 +24,54 @@ const TEMPORAL_LABELS: &[&str] = &[
     "datetime.component.month_name",
     "datetime.component.periodicity",
     "datetime.component.year",
+    "datetime.date.abbrev_month_no_comma",
     "datetime.date.abbreviated_month",
+    "datetime.date.chinese_ymd",
     "datetime.date.compact_dmy",
     "datetime.date.compact_mdy",
+    "datetime.date.compact_ym",
     "datetime.date.compact_ymd",
+    "datetime.date.dmy_dash",
+    "datetime.date.dmy_dash_abbrev",
+    "datetime.date.dmy_dash_abbrev_short",
+    "datetime.date.dmy_space_abbrev",
+    "datetime.date.dmy_space_full",
     "datetime.date.eu_dot",
+    "datetime.date.eu_short_dot",
+    "datetime.date.eu_short_slash",
     "datetime.date.eu_slash",
+    "datetime.date.full_month_no_comma",
     "datetime.date.iso",
     "datetime.date.iso_week",
+    "datetime.date.jp_era_long",
+    "datetime.date.jp_era_short",
     "datetime.date.julian",
+    "datetime.date.korean_ymd",
     "datetime.date.long_full_month",
+    "datetime.date.mdy_dash",
+    "datetime.date.month_year_abbrev",
+    "datetime.date.month_year_full",
+    "datetime.date.month_year_slash",
     "datetime.date.ordinal",
     "datetime.date.short_dmy",
     "datetime.date.short_mdy",
     "datetime.date.short_ymd",
+    "datetime.date.us_short_slash",
     "datetime.date.us_slash",
     "datetime.date.weekday_abbreviated_month",
+    "datetime.date.weekday_dmy_full",
     "datetime.date.weekday_full_month",
+    "datetime.date.year_month",
+    "datetime.date.ymd_dot",
+    "datetime.date.ymd_slash",
     "datetime.duration.iso_8601",
     "datetime.epoch.unix_microseconds",
     "datetime.epoch.unix_milliseconds",
     "datetime.epoch.unix_seconds",
     "datetime.offset.iana",
     "datetime.offset.utc",
+    "datetime.period.fiscal_year",
+    "datetime.period.quarter",
     "datetime.time.hm_12h",
     "datetime.time.hm_24h",
     "datetime.time.hms_12h",
@@ -54,21 +79,49 @@ const TEMPORAL_LABELS: &[&str] = &[
     "datetime.time.iso",
     "datetime.timestamp.american",
     "datetime.timestamp.american_24h",
+    "datetime.timestamp.clf",
+    "datetime.timestamp.ctime",
+    "datetime.timestamp.dot_dmy_24h",
+    "datetime.timestamp.dot_ymd_24h",
+    "datetime.timestamp.epoch_nanoseconds",
     "datetime.timestamp.european",
     "datetime.timestamp.iso_8601",
     "datetime.timestamp.iso_8601_compact",
+    "datetime.timestamp.iso_8601_micros_offset",
     "datetime.timestamp.iso_8601_microseconds",
+    "datetime.timestamp.iso_8601_millis_offset",
+    "datetime.timestamp.iso_8601_milliseconds",
     "datetime.timestamp.iso_8601_offset",
     "datetime.timestamp.iso_microseconds",
+    "datetime.timestamp.iso_space_zulu",
+    "datetime.timestamp.pg_short_offset",
     "datetime.timestamp.rfc_2822",
     "datetime.timestamp.rfc_2822_ordinal",
     "datetime.timestamp.rfc_3339",
+    "datetime.timestamp.slash_ymd_24h",
+    "datetime.timestamp.sql_microseconds",
+    "datetime.timestamp.sql_microseconds_offset",
+    "datetime.timestamp.sql_milliseconds",
     "datetime.timestamp.sql_standard",
+    "datetime.timestamp.syslog_bsd",
 ];
 
 const NUMERIC_LABELS: &[&str] = &[
+    "finance.currency.amount_accounting_us",
+    "finance.currency.amount_ch",
+    "finance.currency.amount_code_prefix",
+    "finance.currency.amount_crypto",
     "finance.currency.amount_eu",
+    "finance.currency.amount_eu_suffix",
+    "finance.currency.amount_indian",
+    "finance.currency.amount_minor_int",
+    "finance.currency.amount_multisym",
+    "finance.currency.amount_neg_trailing",
+    "finance.currency.amount_nodecimal",
+    "finance.currency.amount_space_sep",
     "finance.currency.amount_us",
+    "finance.rate.basis_points",
+    "finance.rate.yield",
     "identity.person.height",
     "identity.person.weight",
     "representation.file.file_size",
@@ -357,15 +410,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_164() {
+    fn test_total_is_216() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 163, "Map should contain exactly 163 types");
+        assert_eq!(map.len(), 216, "Map should contain exactly 216 types");
     }
 
     #[test]
     fn test_category_counts() {
-        assert_eq!(TEMPORAL_LABELS.len(), 45, "temporal should have 45 types");
-        assert_eq!(NUMERIC_LABELS.len(), 13, "numeric should have 13 types");
+        assert_eq!(TEMPORAL_LABELS.len(), 85, "temporal should have 85 types");
+        assert_eq!(NUMERIC_LABELS.len(), 26, "numeric should have 26 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
             15,
@@ -464,8 +517,8 @@ mod tests {
         let temporal = map.eligible_labels(BroadCategory::Temporal);
         assert_eq!(
             temporal.len(),
-            45,
-            "temporal eligible should be 45 (no overlaps)"
+            85,
+            "temporal eligible should be 85 (no overlaps)"
         );
 
         let geographic = map.eligible_labels(BroadCategory::Geographic);
@@ -476,8 +529,8 @@ mod tests {
         );
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);
-        // 13 primary + 3 incoming (coordinates, latitude, longitude)
-        assert_eq!(numeric.len(), 16, "numeric eligible should be 13+3=16");
+        // 26 primary + 3 incoming (coordinates, latitude, longitude)
+        assert_eq!(numeric.len(), 29, "numeric eligible should be 26+3=29");
 
         let entity = map.eligible_labels(BroadCategory::Entity);
         // 9 primary + 2 incoming (email, phone_number)
