@@ -99,12 +99,12 @@ echo ""
 
 # ─── Step 1: Profile eval ──────────────────────────────────────────
 echo "[1/3] Running profile evaluation..."
-make eval-profile 2>&1 | tail -5
+make eval-profile 2>&1
 echo ""
 
 # ─── Step 2: Actionability eval ────────────────────────────────────
 echo "[2/3] Running actionability evaluation..."
-make eval-actionability 2>&1 | tail -3
+make eval-actionability 2>&1
 echo ""
 
 # ─── Step 3: Report generation ─────────────────────────────────────
@@ -116,7 +116,7 @@ ${EVAL_RUN} eval-report -- \
     --profile-results eval/eval_output/profile_results.csv \
     --actionability-results eval/eval_output/actionability_results.csv \
     --labels-dir labels \
-    --output eval/eval_output/report.md 2>&1 | tail -3
+    --output eval/eval_output/report.md 2>&1
 echo ""
 
 # ─── Summary ────────────────────────────────────────────────────────

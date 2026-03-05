@@ -98,11 +98,17 @@ while IFS=, read -r dataset file_path column_name gt_label; do
     printf "  \033[34m→\033[0m Profiling %s (%s)..." "$dataset" "$(basename "$file_path")"
 
     # Run finetype profile and parse JSON output
-    PROFILE_JSON=$("$FINETYPE" profile -f "$file_path" -o json 2>/dev/null) || {
-        printf " \033[31mFAILED\033[0m\n"
+    PROFILE_ERR=$(mktemp)
+    PROFILE_JSON=$("$FINETYPE" profile -f "$file_path" -o json 2>"$PROFILE_ERR") || {
+        ERR_MSG=$(head -1 "$PROFILE_ERR")
+        printf " \033[31mFAILED\033[0m"
+        if [ -n "$ERR_MSG" ]; then printf " (%s)" "$ERR_MSG"; fi
+        printf "\n"
+        rm -f "$PROFILE_ERR"
         ERRORS=$((ERRORS + 1))
         continue
     }
+    rm -f "$PROFILE_ERR"
 
     # Parse JSON: extract column, type, confidence for each column
     echo "$PROFILE_JSON" | jq -r --arg d "$dataset" \
