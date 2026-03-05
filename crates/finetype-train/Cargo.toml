@@ -38,6 +38,11 @@ rand = { workspace = true }
 finetype-core = { workspace = true }
 finetype-model = { workspace = true }
 
+[features]
+default = []
+cuda = ["candle-core/cuda", "candle-nn/cuda"]
+metal = ["candle-core/metal", "candle-nn/metal"]
+
 [dev-dependencies]
 tempfile = { workspace = true }
 
