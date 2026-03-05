@@ -161,7 +161,7 @@ fn get_cache_dir() -> PathBuf {
     if let Ok(cargo_home) = env::var("CARGO_HOME") {
         return PathBuf::from(cargo_home)
             .join("finetype")
-            .join(&format!("v{}", CACHE_VERSION));
+            .join(format!("v{}", CACHE_VERSION));
     }
 
     // Fall back to HOME/.cache/finetype on Unix, %LOCALAPPDATA% on Windows
@@ -170,7 +170,7 @@ fn get_cache_dir() -> PathBuf {
         if let Ok(appdata) = env::var("LOCALAPPDATA") {
             return PathBuf::from(appdata)
                 .join("finetype")
-                .join(&format!("v{}", CACHE_VERSION));
+                .join(format!("v{}", CACHE_VERSION));
         }
     }
 
@@ -180,7 +180,7 @@ fn get_cache_dir() -> PathBuf {
             return PathBuf::from(home)
                 .join(".cache")
                 .join("finetype")
-                .join(&format!("v{}", CACHE_VERSION));
+                .join(format!("v{}", CACHE_VERSION));
         }
     }
 
