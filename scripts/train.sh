@@ -150,23 +150,14 @@ else
     cargo run -p finetype-cli --features "${FEATURES}" --release -- generate \
         --samples "$SAMPLES" \
         --seed "$SEED" \
-        --output "$TRAINING_DATA" 2>&1 | while IFS= read -r line; do
-        # Show build progress, suppress verbose output
-        if [[ "$line" == *"Compiling"* ]] || [[ "$line" == *"Finished"* ]]; then
-            echo "  $line"
-        fi
-    done
+        --output "$TRAINING_DATA"
     echo "  Done: $(wc -l < "$TRAINING_DATA") training samples"
 fi
 
 # ─── Step 2: Build CLI with correct features ───────────────────────
 echo ""
 echo "[2/3] Building with --features ${FEATURES}..."
-cargo build -p finetype-cli --features "${FEATURES}" --release 2>&1 | while IFS= read -r line; do
-    if [[ "$line" == *"Compiling"* ]] || [[ "$line" == *"Finished"* ]]; then
-        echo "  $line"
-    fi
-done
+cargo build -p finetype-cli --features "${FEATURES}" --release
 
 # ─── Step 3: Train ─────────────────────────────────────────────────
 echo ""
@@ -181,63 +172,13 @@ TRAIN_CMD=(
     --output "$MODEL_DIR"
     --epochs "$EPOCHS"
     --seed "$SEED"
-    --device "${DEVICE_NAME,,}"  # lowercase
+    --device "$(echo "$DEVICE_NAME" | tr '[:upper:]' '[:lower:]')"
 )
 
-EPOCH_START_TIME=""
 TRAIN_START_TIME=$(date +%s)
-TOTAL_EPOCHS="$EPOCHS"
 
-# Run training, parsing stderr for progress display
-"${TRAIN_CMD[@]}" 2>&1 | tee "$LOG_FILE" | while IFS= read -r line; do
-    # Parse epoch completion lines
-    if [[ "$line" =~ Epoch\ ([0-9]+)/([0-9]+):\ loss=([0-9.]+),\ accuracy=([0-9.]+)% ]]; then
-        epoch="${BASH_REMATCH[1]}"
-        total="${BASH_REMATCH[2]}"
-        loss="${BASH_REMATCH[3]}"
-        acc="${BASH_REMATCH[4]}"
-
-        now=$(date +%s)
-        elapsed=$((now - TRAIN_START_TIME))
-        elapsed_min=$((elapsed / 60))
-        elapsed_sec=$((elapsed % 60))
-
-        if [[ "$epoch" -gt 0 ]]; then
-            per_epoch=$((elapsed / epoch))
-            remaining=$(( per_epoch * (total - epoch) ))
-            eta_min=$((remaining / 60))
-            eta_sec=$((remaining % 60))
-            eta_str="${eta_min}m$(printf '%02d' ${eta_sec})s"
-        else
-            eta_str="--"
-        fi
-
-        # Progress bar
-        filled=$((epoch * 40 / total))
-        empty=$((40 - filled))
-        bar=$(printf '%0.s=' $(seq 1 $filled 2>/dev/null) || true)
-        space=$(printf '%0.s ' $(seq 1 $empty 2>/dev/null) || true)
-
-        printf '\r  [%s%s] %d/%d  loss=%.4f  acc=%.1f%%  elapsed=%dm%02ds  ETA=%s     ' \
-            "$bar" "$space" "$epoch" "$total" "$loss" "$acc" \
-            "$elapsed_min" "$elapsed_sec" "$eta_str"
-    elif [[ "$line" == *"Starting epoch"* ]]; then
-        # Just mark epoch start, don't print (the completion line is more useful)
-        :
-    elif [[ "$line" == *"Compiling"* ]] || [[ "$line" == *"Finished"* ]]; then
-        echo "  $line"
-    elif [[ "$line" == *"Batch"* ]]; then
-        # Suppress batch-level output (too noisy)
-        :
-    elif [[ "$line" == *"Saved"* ]] || [[ "$line" == *"saved"* ]] || [[ "$line" == *"Best"* ]]; then
-        echo ""
-        echo "  $line"
-    elif [[ "$line" == *"WARNING"* ]] || [[ "$line" == *"warning"* ]]; then
-        :  # Suppress build warnings
-    elif [[ "$line" == *"model"* ]] || [[ "$line" == *"Model"* ]]; then
-        echo "  $line"
-    fi
-done
+# Run training — output goes to terminal and log file
+"${TRAIN_CMD[@]}" 2>&1 | tee "$LOG_FILE"
 
 echo ""
 echo ""
