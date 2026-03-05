@@ -213,6 +213,12 @@ cargo run -- check      # Validate taxonomy/generator alignment
 make ci                 # fmt + clippy + test + check
 cargo build -p finetype_duckdb --release  # DuckDB extension
 make eval-report        # Profile eval + actionability + dashboard
+
+# Training workflow scripts (Metal auto-detected on macOS)
+./scripts/train.sh --samples 1000 --size small --epochs 5   # Quick training run
+./scripts/train.sh --samples 5000 --size large --epochs 15  # Large model (M1 Metal)
+./scripts/eval.sh --model models/char-cnn-v13               # Evaluate a trained model
+./scripts/package.sh models/char-cnn-v13                     # Package for distribution
 ```
 
 ## Key File Reference
@@ -249,6 +255,10 @@ make eval-report        # Profile eval + actionability + dashboard
 | Candle training spike | `crates/finetype-candle-spike/` (models, data, training, tests) |
 | Candle spike summary | `discovery/candle-feasibility-spike/SUMMARY.md` |
 | DuckDB metadata tool | `crates/finetype-build-tools/src/lib.rs`, `crates/finetype-build-tools/src/bin/append_duckdb_metadata.rs` |
+| Training script | `scripts/train.sh` |
+| Eval script | `scripts/eval.sh` |
+| Package script | `scripts/package.sh` |
+| Device auto-detection (train) | `crates/finetype-train/src/device.rs` |
 
 ## Backlog Discipline
 
