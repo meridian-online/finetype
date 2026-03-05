@@ -1598,3 +1598,1238 @@ datetime.component.periodicity:
     - "Quarterly"
   references: null
   notes: null
+
+# ═════════════════════════════════════════════════════════════════════
+# NEW TIMESTAMP FORMATS (Format Coverage Expansion — NNFT-223)
+#
+# 16 additional timestamp formats covering:
+#   - Fractional-second precision variants (milliseconds, microseconds)
+#   - Timezone offset combinations
+#   - Log formats (Apache CLF, BSD syslog, ctime)
+#   - Regional separator variants (dot-DMY, slash-YMD)
+# ═════════════════════════════════════════════════════════════════════
+
+datetime.timestamp.sql_microseconds:
+  title: SQL Timestamp with Microseconds
+  description: >
+    Space-separated date and time with 6-digit microsecond precision.
+    Default output of Python str(datetime.now()) and PostgreSQL TIMESTAMP.
+    Distinct from iso_8601_microseconds by space (not T) separator.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y-%m-%d %H:%M:%S.%f"
+  transform: "strptime({col}, '%Y-%m-%d %H:%M:%S.%f')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}$"
+    minLength: 26
+    maxLength: 26
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 5
+  aliases: [sql_micro]
+  samples:
+    - "2024-01-15 14:30:00.123456"
+    - "2019-12-31 23:59:59.000000"
+    - "2023-06-01 08:15:30.789012"
+  references: null
+  notes: >
+    New in format coverage expansion. High prevalence — Python str(datetime.now()) default.
+
+datetime.timestamp.sql_milliseconds:
+  title: SQL Timestamp with Milliseconds
+  description: >
+    Space-separated date and time with 3-digit millisecond precision.
+    MySQL DATETIME(3), Java Timestamp.toString() output. DuckDB uses
+    %g specifier for 3-digit milliseconds.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y-%m-%d %H:%M:%S.%g"
+  transform: "strptime({col}, '%Y-%m-%d %H:%M:%S.%g')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}$"
+    minLength: 23
+    maxLength: 23
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 5
+  aliases: [sql_millis]
+  samples:
+    - "2024-01-15 14:30:00.123"
+    - "2019-12-31 23:59:59.000"
+    - "2023-06-01 08:15:30.789"
+  references: null
+  notes: >
+    New in format coverage expansion. MySQL DATETIME(3), Java Timestamp.toString().
+
+datetime.timestamp.iso_8601_milliseconds:
+  title: ISO 8601 with Milliseconds
+  description: >
+    ISO 8601 datetime with 3-digit millisecond precision and UTC indicator.
+    The exact output of JavaScript Date.toISOString() — arguably the most
+    common timestamp format in JSON REST APIs worldwide.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y-%m-%dT%H:%M:%S.%gZ"
+  transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%gZ')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    minLength: 24
+    maxLength: 24
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 5
+  aliases: [js_iso, iso_millis]
+  samples:
+    - "2024-01-15T14:30:00.123Z"
+    - "2019-12-31T23:59:59.999Z"
+    - "2023-06-01T00:00:00.000Z"
+  references:
+    - title: "MDN Date.toISOString()"
+      link: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString"
+  notes: >
+    New in format coverage expansion. Highest-impact single addition —
+    covers the entire JavaScript ecosystem. Distinct from iso_8601 by
+    mandatory 3-digit fractional seconds.
+
+datetime.timestamp.iso_8601_millis_offset:
+  title: ISO 8601 with Milliseconds and Offset
+  description: >
+    ISO 8601 datetime with 3-digit milliseconds and numeric timezone offset.
+    Java OffsetDateTime.toString() with ms precision.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMPTZ
+  format_string: "%Y-%m-%dT%H:%M:%S.%g%z"
+  transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%g%z')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}[+-]\\d{2}:\\d{2}$"
+    minLength: 29
+    maxLength: 29
+  tier: [TIMESTAMPTZ, timestamp]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "2024-01-15T14:30:00.123+05:30"
+    - "2023-12-31T23:59:59.999-05:00"
+    - "2024-06-01T12:00:00.000+00:00"
+  references: null
+  notes: >
+    New in format coverage expansion. Java OffsetDateTime with ms precision.
+
+datetime.timestamp.iso_8601_micros_offset:
+  title: ISO 8601 with Microseconds and Offset
+  description: >
+    ISO 8601 datetime with 6-digit microsecond precision and numeric timezone
+    offset. Python datetime.now(tz).isoformat() output, RFC 5424 syslog.
+    Neither iso_8601_microseconds nor iso_8601_offset covers this combination.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMPTZ
+  format_string: "%Y-%m-%dT%H:%M:%S.%f%z"
+  transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%f%z')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}[+-]\\d{2}:\\d{2}$"
+    minLength: 32
+    maxLength: 32
+  tier: [TIMESTAMPTZ, timestamp]
+  release_priority: 5
+  aliases: [rfc_5424_micro]
+  samples:
+    - "2024-01-15T14:30:00.123456+00:00"
+    - "2023-12-31T23:59:59.000000-05:00"
+    - "2024-06-01T08:15:30.789012+05:30"
+  references:
+    - title: "RFC 5424 — The Syslog Protocol"
+      link: "https://datatracker.ietf.org/doc/html/rfc5424"
+  notes: >
+    New in format coverage expansion. High prevalence — Python isoformat() with tz,
+    RFC 5424 syslog. Fills the gap between iso_8601_microseconds and iso_8601_offset.
+
+datetime.timestamp.clf:
+  title: Common Log Format (Apache/Nginx)
+  description: >
+    Apache and Nginx Common Log Format timestamp. Note the distinctive
+    colon between date and time with no space, and abbreviated month.
+    Billions of log lines generated daily in this format worldwide.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMPTZ
+  format_string: "%d/%b/%Y:%H:%M:%S %z"
+  transform: "strptime({col}, '%d/%b/%Y:%H:%M:%S %z')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}/[A-Z][a-z]{2}/\\d{4}:\\d{2}:\\d{2}:\\d{2} [+-]\\d{4}$"
+    minLength: 26
+    maxLength: 26
+  tier: [TIMESTAMPTZ, timestamp]
+  release_priority: 5
+  aliases: [apache, nginx_log]
+  samples:
+    - "15/Jan/2024:14:30:00 +0000"
+    - "31/Dec/2023:23:59:59 -0500"
+    - "01/Jun/2024:08:15:30 +0530"
+  references:
+    - title: "Apache Log Files"
+      link: "https://httpd.apache.org/docs/2.4/logs.html"
+  notes: >
+    New in format coverage expansion. Critical for web log analysis.
+    Highly distinctive format — colon between date:time is unique.
+
+datetime.timestamp.syslog_bsd:
+  title: BSD Syslog (RFC 3164)
+  description: >
+    Legacy syslog format from RFC 3164. No year component — year must
+    be inferred from context. Day is space-padded. Extremely widespread
+    in /var/log/syslog on Linux/BSD systems.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: "%b %e %H:%M:%S"
+  transform: "strptime(CAST(YEAR(CURRENT_DATE) AS VARCHAR) || ' ' || {col}, '%Y %b %e %H:%M:%S')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]{2} [\\s\\d]\\d \\d{2}:\\d{2}:\\d{2}$"
+    minLength: 15
+    maxLength: 15
+  tier: [VARCHAR, timestamp]
+  release_priority: 4
+  aliases: [rfc_3164]
+  samples:
+    - "Jan 15 14:30:00"
+    - "Dec 31 23:59:59"
+    - "Jun  1 08:15:30"
+  references:
+    - title: "RFC 3164 — The BSD syslog Protocol"
+      link: "https://datatracker.ietf.org/doc/html/rfc3164"
+  notes: >
+    New in format coverage expansion. No year in format — transform prepends
+    current year. Day may be space-padded (e.g., " 1" for first of month).
+    broad_type is VARCHAR because year inference makes DATE unreliable.
+
+datetime.timestamp.sql_microseconds_offset:
+  title: SQL Timestamp with Microseconds and Offset
+  description: >
+    PostgreSQL TIMESTAMPTZ output format. Space-separated date and time
+    with 6-digit microseconds and full timezone offset.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMPTZ
+  format_string: "%Y-%m-%d %H:%M:%S.%f%z"
+  transform: "strptime({col}, '%Y-%m-%d %H:%M:%S.%f%z')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}[+-]\\d{2}:\\d{2}$"
+    minLength: 32
+    maxLength: 32
+  tier: [TIMESTAMPTZ, timestamp]
+  release_priority: 5
+  aliases: [pg_timestamptz]
+  samples:
+    - "2024-01-15 14:30:00.123456+00:00"
+    - "2023-12-31 23:59:59.000000-05:00"
+    - "2024-06-01 08:15:30.789012+05:30"
+  references: null
+  notes: >
+    New in format coverage expansion. PostgreSQL TIMESTAMPTZ default output.
+    Distinct from iso_8601_micros_offset by space (not T) separator.
+
+datetime.timestamp.pg_short_offset:
+  title: PostgreSQL Short Offset
+  description: >
+    PostgreSQL-specific format with 2-digit timezone offset (e.g., -05
+    instead of -05:00). Microsecond precision with abbreviated offset.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMPTZ
+  format_string: "%Y-%m-%d %H:%M:%S.%f%z"
+  transform: "strptime({col} || ':00', '%Y-%m-%d %H:%M:%S.%f%z')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{6}[+-]\\d{2}$"
+    minLength: 28
+    maxLength: 29
+  tier: [TIMESTAMPTZ, timestamp]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "2024-01-15 14:30:00.123456-05"
+    - "2023-12-31 23:59:59.000000+00"
+    - "2024-06-01 08:15:30.789012+10"
+  references: null
+  notes: >
+    New in format coverage expansion. PostgreSQL sometimes emits short offsets
+    (-05 instead of -05:00). Transform appends :00 for strptime compatibility.
+
+datetime.timestamp.dot_dmy_24h:
+  title: European Dot Timestamp (DMY 24h)
+  description: >
+    Dot-separated Day.Month.Year with space and 24-hour time. Standard
+    in German, Central European, and Russian systems. SAP and German
+    banking exports frequently use this format.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%d.%m.%Y %H:%M:%S"
+  transform: "strptime({col}, '%d.%m.%Y %H:%M:%S')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}\\.\\d{2}\\.\\d{4} \\d{2}:\\d{2}:\\d{2}$"
+    minLength: 19
+    maxLength: 19
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 4
+  aliases: [eu_dot_timestamp]
+  samples:
+    - "15.01.2024 14:30:00"
+    - "31.12.2023 23:59:59"
+    - "01.06.2024 08:15:30"
+  references: null
+  notes: >
+    New in format coverage expansion. Common in DACH region (Germany, Austria,
+    Switzerland) and Eastern European ERP exports.
+
+datetime.timestamp.slash_ymd_24h:
+  title: Slash YMD Timestamp (24h)
+  description: >
+    Slash-separated Year/Month/Day with space and 24-hour time. Standard
+    in Japanese system logs and .NET ja-JP culture default.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y/%m/%d %H:%M:%S"
+  transform: "strptime({col}, '%Y/%m/%d %H:%M:%S')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+    minLength: 19
+    maxLength: 19
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 4
+  aliases: [jp_timestamp]
+  samples:
+    - "2024/01/15 14:30:00"
+    - "2023/12/31 23:59:59"
+    - "2024/06/01 08:15:30"
+  references: null
+  notes: >
+    New in format coverage expansion. Japanese system logs, .NET ja-JP culture.
+
+datetime.timestamp.ctime:
+  title: C ctime / asctime Format
+  description: >
+    Output of C ctime() and asctime() functions, Python datetime.ctime(),
+    Ruby Time#to_s. Day-of-week abbreviation, month abbreviation,
+    space-padded day, 24-hour time, then 4-digit year.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%a %b %e %H:%M:%S %Y"
+  transform: "strptime({col}, '%a %b %e %H:%M:%S %Y')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]{2} [A-Z][a-z]{2} [\\s\\d]\\d \\d{2}:\\d{2}:\\d{2} \\d{4}$"
+    minLength: 24
+    maxLength: 24
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 3
+  aliases: [asctime]
+  samples:
+    - "Mon Jan 15 14:30:00 2024"
+    - "Tue Dec 31 23:59:59 2019"
+    - "Sat Jun  1 08:15:30 2024"
+  references: null
+  notes: >
+    New in format coverage expansion. Unix tradition format. Day may be
+    space-padded. Python datetime.ctime(), C ctime()/asctime().
+
+datetime.timestamp.epoch_nanoseconds:
+  title: Unix Epoch Nanoseconds
+  description: >
+    Nanoseconds since Unix epoch (1970-01-01T00:00:00Z). 19-digit integer.
+    OpenTelemetry time_unix_nano, Go time.UnixNano(). Distinct from other
+    epoch formats by digit count (19 vs 10/13/16).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: null
+  transform: "epoch_ns({col})"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{19}$"
+    minLength: 19
+    maxLength: 19
+  tier: [BIGINT, epoch]
+  release_priority: 3
+  aliases: [unix_nano]
+  samples:
+    - "1705325400000000000"
+    - "1704067199000000000"
+    - "1717228530000000000"
+  references:
+    - title: "OpenTelemetry time_unix_nano"
+      link: "https://opentelemetry.io/docs/specs/otel/metrics/data-model/"
+  notes: >
+    New in format coverage expansion. OpenTelemetry, Go time.UnixNano().
+    Transform uses DuckDB epoch_ns() function.
+
+datetime.timestamp.iso_space_zulu:
+  title: ISO with Space Separator and Z
+  description: >
+    RFC 3339 variant using space instead of T separator with UTC Z indicator.
+    SQLite datetime('now') output and some cloud service log formats.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y-%m-%d %H:%M:%SZ"
+  transform: "strptime({col}, '%Y-%m-%d %H:%M:%SZ')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}Z$"
+    minLength: 20
+    maxLength: 20
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 4
+  aliases: [sqlite_utc]
+  samples:
+    - "2024-01-15 14:30:00Z"
+    - "2023-12-31 23:59:59Z"
+    - "2024-06-01 00:00:00Z"
+  references: null
+  notes: >
+    New in format coverage expansion. RFC 3339 permits space instead of T.
+    SQLite datetime('now'), AWS CloudWatch, GCP logs.
+
+datetime.timestamp.dot_ymd_24h:
+  title: Dot YMD Timestamp (24h)
+  description: >
+    Dot-separated Year.Month.Day with space and 24-hour time.
+    Niche format found in some East Asian and Baltic systems.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y.%m.%d %H:%M:%S"
+  transform: "strptime({col}, '%Y.%m.%d %H:%M:%S')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}\\.\\d{2}\\.\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+    minLength: 19
+    maxLength: 19
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 2
+  aliases: []
+  samples:
+    - "2024.01.15 14:30:00"
+    - "2023.12.31 23:59:59"
+    - "2024.06.01 08:15:30"
+  references: null
+  notes: >
+    New in format coverage expansion. Low prevalence. East Asian/Baltic niche.
+
+# ═════════════════════════════════════════════════════════════════════
+# NEW DATE FORMATS (Format Coverage Expansion — NNFT-223)
+#
+# 23 additional date formats covering:
+#   - Separator variants (slash, dash, dot, space)
+#   - Field-order variants (DMY, YMD, MDY)
+#   - Named-month formats (abbreviated, full, with/without comma)
+#   - Partial dates (year-month, month-year)
+#   - CJK formats (Chinese, Korean, Japanese era)
+# ═════════════════════════════════════════════════════════════════════
+
+datetime.date.ymd_slash:
+  title: YMD Date (slash-separated)
+  description: >
+    Year/Month/Day with slash separators. Unambiguous due to year-first
+    ordering. CLDR ja-JP short format; standard in Japanese and
+    Taiwanese CSV exports.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%Y/%m/%d"
+  transform: "strptime({col}, '%Y/%m/%d')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}/\\d{2}/\\d{2}$"
+    minLength: 10
+    maxLength: 10
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "2024/01/15"
+    - "2023/12/31"
+    - "2000/06/01"
+  references: null
+  notes: >
+    New in format coverage expansion. High prevalence in East Asian data.
+
+datetime.date.ymd_dot:
+  title: YMD Date (dot-separated)
+  description: >
+    Year.Month.Day with dot separators. Unambiguous due to year-first
+    ordering. Hungarian, Norwegian, and some East Asian administrative data.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%Y.%m.%d"
+  transform: "strptime({col}, '%Y.%m.%d')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}\\.\\d{2}\\.\\d{2}$"
+    minLength: 10
+    maxLength: 10
+  tier: [DATE, date]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "2024.01.15"
+    - "2023.12.31"
+    - "2000.06.01"
+  references: null
+  notes: >
+    New in format coverage expansion. Hungarian, Norwegian, East Asian systems.
+
+datetime.date.dmy_dash:
+  title: DMY Date (dash-separated)
+  description: >
+    Day-Month-Year with dash separators and 4-digit year. Extremely
+    common in EU informal data and Pandas examples. Ambiguous with
+    mdy_dash when day <= 12.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d-%m-%Y"
+  transform: "strptime({col}, '%d-%m-%Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}-\\d{2}-\\d{4}$"
+    minLength: 10
+    maxLength: 10
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "15-01-2024"
+    - "31-12-2023"
+    - "01-06-2000"
+  references: null
+  notes: >
+    New in format coverage expansion. Ambiguous with mdy_dash when day <= 12.
+    Column-mode inference resolves via value distribution (if any day > 12, classify DMY).
+
+datetime.date.mdy_dash:
+  title: MDY Date (dash-separated)
+  description: >
+    Month-Day-Year with dash separators and 4-digit year. US database
+    exports. Ambiguous with dmy_dash when day <= 12.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%m-%d-%Y"
+  transform: "strptime({col}, '%m-%d-%Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}-\\d{2}-\\d{4}$"
+    minLength: 10
+    maxLength: 10
+  tier: [DATE, date]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "01-15-2024"
+    - "12-31-2023"
+    - "06-01-2000"
+  references: null
+  notes: >
+    New in format coverage expansion. US database exports. Ambiguous with
+    dmy_dash — resolved by column-mode inference checking if any value has
+    first component > 12.
+
+datetime.date.dmy_space_abbrev:
+  title: DMY Date with Abbreviated Month (space-separated)
+  description: >
+    Day Month-Abbr Year with space separators. Unambiguous due to named
+    month. RFC 2822 date portion, military/NATO records, PostgreSQL to_char.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d %b %Y"
+  transform: "strptime({col}, '%d %b %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-3]?\\d [A-Z][a-z]{2} \\d{4}$"
+    minLength: 10
+    maxLength: 11
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "15 Jan 2024"
+    - "31 Dec 2023"
+    - "1 Jun 2000"
+  references: null
+  notes: >
+    New in format coverage expansion. RFC 2822 date portion, military/NATO.
+
+datetime.date.dmy_space_full:
+  title: DMY Date with Full Month (space-separated)
+  description: >
+    Day FullMonth Year with space separators. Unambiguous due to named
+    month. CLDR en-GB long format, European formal documents.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d %B %Y"
+  transform: "strptime({col}, '%d %B %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-3]?\\d [A-Z][a-z]+ \\d{4}$"
+    minLength: 12
+    maxLength: 20
+  tier: [DATE, date]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "15 January 2024"
+    - "31 December 2023"
+    - "1 June 2000"
+  references: null
+  notes: >
+    New in format coverage expansion. CLDR en-GB long format.
+
+datetime.date.abbrev_month_no_comma:
+  title: Abbreviated Month Day Year (no comma)
+  description: >
+    Month-Abbr Day Year without comma separator. Unambiguous due to named
+    month. SQL Server BCP output, syslog date headers. Distinct from
+    abbreviated_month which requires a comma (Jan 15, 2024).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%b %d %Y"
+  transform: "strptime({col}, '%b %d %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]{2} [0-3]?\\d \\d{4}$"
+    minLength: 10
+    maxLength: 11
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "Jan 15 2024"
+    - "Dec 31 2023"
+    - "Jun 1 2000"
+  references: null
+  notes: >
+    New in format coverage expansion. SQL Server BCP output. Distinct from
+    abbreviated_month (which has comma: "Jan 15, 2024").
+
+datetime.date.full_month_no_comma:
+  title: Full Month Day Year (no comma)
+  description: >
+    FullMonth Day Year without comma separator. Variant of long_full_month
+    without the comma. Unambiguous due to named month.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%B %d %Y"
+  transform: "strptime({col}, '%B %d %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]+ [0-3]?\\d \\d{4}$"
+    minLength: 12
+    maxLength: 20
+  tier: [DATE, date]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "January 15 2024"
+    - "December 31 2023"
+    - "June 1 2000"
+  references: null
+  notes: >
+    New in format coverage expansion. Variant of long_full_month without comma.
+
+datetime.date.dmy_dash_abbrev:
+  title: DMY Date with Abbreviated Month (dash-separated)
+  description: >
+    Day-MonthAbbr-Year with dash separators. The Oracle NLS_DATE_FORMAT
+    default. Extremely common in banking and financial data exports.
+    Unambiguous due to named month.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d-%b-%Y"
+  transform: "strptime({col}, '%d-%b-%Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-3]?\\d-[A-Z][a-z]{2}-\\d{4}$"
+    minLength: 10
+    maxLength: 11
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: [oracle_date]
+  samples:
+    - "15-Jan-2024"
+    - "31-Dec-2023"
+    - "01-Jun-2000"
+  references: null
+  notes: >
+    New in format coverage expansion. Oracle NLS_DATE_FORMAT default (DD-MON-YYYY).
+    High prevalence in enterprise database exports.
+
+datetime.date.dmy_dash_abbrev_short:
+  title: DMY Date with Abbreviated Month (dash, 2-digit year)
+  description: >
+    Day-MonthAbbr-ShortYear with dash separators. Oracle classic DD-MON-RR
+    format. Named month resolves field order; 2-digit year has century
+    ambiguity.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d-%b-%y"
+  transform: "strptime({col}, '%d-%b-%y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-3]?\\d-[A-Z][a-z]{2}-\\d{2}$"
+    minLength: 8
+    maxLength: 9
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: [oracle_date_short]
+  samples:
+    - "15-Jan-24"
+    - "31-Dec-99"
+    - "01-Jun-00"
+  references: null
+  notes: >
+    New in format coverage expansion. Oracle classic DD-MON-RR format.
+
+datetime.date.us_short_slash:
+  title: US Short Date (slash, 2-digit year)
+  description: >
+    Month/Day/ShortYear with slash separators. Excel US short date format.
+    Ambiguous with eu_short_slash when day <= 12.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%m/%d/%y"
+  transform: "strptime({col}, '%m/%d/%y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}/\\d{2}/\\d{2}$"
+    minLength: 8
+    maxLength: 8
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "01/15/24"
+    - "12/31/23"
+    - "06/01/00"
+  references: null
+  notes: >
+    New in format coverage expansion. Excel US short date. Ambiguous with
+    eu_short_slash — resolved by column-mode inference.
+
+datetime.date.eu_short_slash:
+  title: EU Short Date (slash, 2-digit year)
+  description: >
+    Day/Month/ShortYear with slash separators. Excel EU short date format.
+    Ambiguous with us_short_slash when day <= 12.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d/%m/%y"
+  transform: "strptime({col}, '%d/%m/%y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}/\\d{2}/\\d{2}$"
+    minLength: 8
+    maxLength: 8
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: []
+  samples:
+    - "15/01/24"
+    - "31/12/23"
+    - "01/06/00"
+  references: null
+  notes: >
+    New in format coverage expansion. Excel EU short date. Ambiguous with
+    us_short_slash — resolved by column-mode inference.
+
+datetime.date.eu_short_dot:
+  title: EU Short Date (dot, 2-digit year)
+  description: >
+    Day.Month.ShortYear with dot separators and 2-digit year.
+    CLDR de-DE short format (d.M.yy). Dot convention is nearly always DMY.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%d.%m.%y"
+  transform: "strptime({col}, '%d.%m.%y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}\\.\\d{2}\\.\\d{2}$"
+    minLength: 8
+    maxLength: 8
+  tier: [DATE, date]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "15.01.24"
+    - "31.12.23"
+    - "01.06.00"
+  references: null
+  notes: >
+    New in format coverage expansion. CLDR de-DE short format.
+
+datetime.date.year_month:
+  title: Year-Month (ISO truncated)
+  description: >
+    ISO 8601 truncated form with no day component. Pervasive in monthly
+    time-series data, financial reporting, and API responses.
+    Transforms to first day of month.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%Y-%m"
+  transform: "strptime({col} || '-01', '%Y-%m-%d')::DATE"
+  transform_ext: null
+  decompose:
+    year: "CAST(SUBSTRING({col}, 1, 4) AS INT)"
+    month: "CAST(SUBSTRING({col}, 6, 2) AS INT)"
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}$"
+    minLength: 7
+    maxLength: 7
+  tier: [DATE, date]
+  release_priority: 5
+  aliases: [yearmonth]
+  samples:
+    - "2024-01"
+    - "2023-12"
+    - "2000-06"
+  references: null
+  notes: >
+    New in format coverage expansion. ISO 8601 truncated date.
+    Transform appends -01 to create full date for strptime.
+
+datetime.date.compact_ym:
+  title: Compact Year-Month (YYYYMM)
+  description: >
+    6-digit compact year-month with no separators. Data warehouse period
+    keys, financial reporting codes. Could collide with 6-digit integers —
+    requires header/context hints.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%Y%m"
+  transform: "strptime({col} || '01', '%Y%m%d')::DATE"
+  transform_ext: null
+  decompose:
+    year: "CAST(SUBSTRING({col}, 1, 4) AS INT)"
+    month: "CAST(SUBSTRING({col}, 5, 2) AS INT)"
+  validation:
+    type: string
+    pattern: "^\\d{4}(0[1-9]|1[0-2])$"
+    minLength: 6
+    maxLength: 6
+  tier: [DATE, date]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "202401"
+    - "202312"
+    - "200006"
+  references: null
+  notes: >
+    New in format coverage expansion. Data warehouse period keys.
+    Collision risk with 6-digit integers mitigated by month validation (01-12).
+
+datetime.date.month_year_full:
+  title: Full Month Year
+  description: >
+    Full month name followed by 4-digit year. No day component.
+    Financial reports, government statistical publications.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%B %Y"
+  transform: "strptime('01 ' || {col}, '%d %B %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]+ \\d{4}$"
+    minLength: 8
+    maxLength: 14
+  tier: [VARCHAR, date]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "January 2024"
+    - "December 2023"
+    - "June 2000"
+  references: null
+  notes: >
+    New in format coverage expansion. Financial reports, gov statistics.
+
+datetime.date.month_year_abbrev:
+  title: Abbreviated Month Year
+  description: >
+    Abbreviated month name followed by 4-digit year. No day component.
+    Financial dashboards, CLDR yMMM skeleton.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%b %Y"
+  transform: "strptime('01 ' || {col}, '%d %b %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]{2} \\d{4}$"
+    minLength: 8
+    maxLength: 8
+  tier: [VARCHAR, date]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "Jan 2024"
+    - "Dec 2023"
+    - "Jun 2000"
+  references: null
+  notes: >
+    New in format coverage expansion. Financial dashboards, CLDR yMMM skeleton.
+
+datetime.date.month_year_slash:
+  title: Month/Year (slash-separated)
+  description: >
+    Numeric Month/Year with slash separator. No day component.
+    Billing data, credit card contexts, expiration-like formats.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%m/%Y"
+  transform: "strptime('01/' || {col}, '%d/%m/%Y')::DATE"
+  transform_ext: null
+  decompose:
+    month: "CAST(SUBSTRING({col}, 1, 2) AS INT)"
+    year: "CAST(SUBSTRING({col}, 4, 4) AS INT)"
+  validation:
+    type: string
+    pattern: "^(0[1-9]|1[0-2])/\\d{4}$"
+    minLength: 7
+    maxLength: 7
+  tier: [VARCHAR, date]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "01/2024"
+    - "12/2023"
+    - "06/2000"
+  references: null
+  notes: >
+    New in format coverage expansion. Billing data, financial periodization.
+
+datetime.date.weekday_dmy_full:
+  title: Weekday DMY Full (formal)
+  description: >
+    Full weekday name, Day FullMonth Year. Unambiguous due to named
+    components. CLDR en-GB/fr-FR full format, formal correspondence.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: "%A, %d %B %Y"
+  transform: "strptime({col}, '%A, %d %B %Y')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z][a-z]+, [0-3]?\\d [A-Z][a-z]+ \\d{4}$"
+    minLength: 22
+    maxLength: 32
+  tier: [DATE, date]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "Monday, 15 January 2024"
+    - "Sunday, 31 December 2023"
+    - "Saturday, 1 June 2024"
+  references: null
+  notes: >
+    New in format coverage expansion. CLDR en-GB full format.
+
+datetime.date.chinese_ymd:
+  title: Chinese Standard Date
+  description: >
+    Year-Month-Day with Chinese character delimiters. Standard in Chinese
+    government, institutional data, and formal documents. Uses Unicode
+    characters for year, month, day markers.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: null
+  transform: "strptime(regexp_replace(regexp_replace(regexp_replace({col}, '\u5E74', '-'), '\u6708', '-'), '\u65E5', ''), '%Y-%-m-%-d')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}\u5E74[1-9]\\d?\u6708[1-3]?\\d\u65E5$"
+  tier: [VARCHAR, date]
+  release_priority: 4
+  aliases: [cn_standard]
+  samples:
+    - "2024\u5E741\u670815\u65E5"
+    - "2023\u5E7412\u670825\u65E5"
+    - "2022\u5E746\u67081\u65E5"
+  references: null
+  notes: >
+    New in format coverage expansion. Chinese standard date with Unicode
+    delimiters. Transform strips Chinese characters and parses as ISO-like.
+
+datetime.date.korean_ymd:
+  title: Korean Standard Date
+  description: >
+    Year-Month-Day with Korean character delimiters and spaces.
+    Standard in Korean government and institutional data.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: null
+  transform: "strptime(regexp_replace(regexp_replace(regexp_replace({col}, '\uB144 ', '-'), '\uC6D4 ', '-'), '\uC77C', ''), '%Y-%-m-%-d')::DATE"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}\uB144 [1-9]\\d?\uC6D4 [1-3]?\\d\uC77C$"
+  tier: [VARCHAR, date]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "2024\uB144 1\uC6D4 15\uC77C"
+    - "2023\uB144 12\uC6D4 25\uC77C"
+    - "2022\uB144 6\uC6D4 1\uC77C"
+  references: null
+  notes: >
+    New in format coverage expansion. Korean standard date with Unicode
+    delimiters. Transform strips Korean characters and parses as ISO-like.
+
+datetime.date.jp_era_short:
+  title: Japanese Imperial Year (Short)
+  description: >
+    Era abbreviation + year/month/day. Uses single-letter era abbreviation:
+    R (Reiwa/令和, 2019+), H (Heisei/平成, 1989-2019), S (Showa/昭和,
+    1926-1989), T (Taisho/大正, 1912-1926), M (Meiji/明治, 1868-1912).
+    Common in Japanese government documents and banking records.
+    Requires era-to-year offset calculation.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: null
+  transform: >
+    CASE
+      WHEN {col}[1] = 'R' THEN make_date(2018 + CAST(split_part(substring({col}, 2), '/', 1) AS INT), CAST(split_part(substring({col}, 2), '/', 2) AS INT), CAST(split_part(substring({col}, 2), '/', 3) AS INT))
+      WHEN {col}[1] = 'H' THEN make_date(1988 + CAST(split_part(substring({col}, 2), '/', 1) AS INT), CAST(split_part(substring({col}, 2), '/', 2) AS INT), CAST(split_part(substring({col}, 2), '/', 3) AS INT))
+      WHEN {col}[1] = 'S' THEN make_date(1925 + CAST(split_part(substring({col}, 2), '/', 1) AS INT), CAST(split_part(substring({col}, 2), '/', 2) AS INT), CAST(split_part(substring({col}, 2), '/', 3) AS INT))
+      WHEN {col}[1] = 'T' THEN make_date(1911 + CAST(split_part(substring({col}, 2), '/', 1) AS INT), CAST(split_part(substring({col}, 2), '/', 2) AS INT), CAST(split_part(substring({col}, 2), '/', 3) AS INT))
+      WHEN {col}[1] = 'M' THEN make_date(1867 + CAST(split_part(substring({col}, 2), '/', 1) AS INT), CAST(split_part(substring({col}, 2), '/', 2) AS INT), CAST(split_part(substring({col}, 2), '/', 3) AS INT))
+    END
+  transform_ext: null
+  decompose:
+    era: "substring({col}, 1, 1)"
+    era_year: "CAST(split_part(substring({col}, 2), '/', 1) AS INT)"
+  validation:
+    type: string
+    pattern: "^[RHSTM]\\d{1,2}/\\d{1,2}/\\d{1,2}$"
+  tier: [VARCHAR, date]
+  release_priority: 3
+  aliases: [wareki_short]
+  samples:
+    - "R6/01/15"
+    - "R1/05/01"
+    - "H31/04/30"
+    - "S64/01/07"
+  references:
+    - title: "Date and time notation in Japan"
+      link: "https://en.wikipedia.org/wiki/Date_and_time_notation_in_Japan"
+  notes: >
+    New in format coverage expansion. Japanese imperial year (Wareki).
+    Era offset table: R+2018, H+1988, S+1925, T+1911, M+1867.
+    R1 = 2019 (Reiwa started May 1, 2019), H31 = 2019 (Heisei ended April 30).
+
+datetime.date.jp_era_long:
+  title: Japanese Imperial Year (Long/Kanji)
+  description: >
+    Full Japanese era name in kanji followed by year, month, day with
+    Chinese-style character delimiters. Used in formal Japanese government
+    and legal documents.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: null
+  transform: >
+    CASE
+      WHEN {col} LIKE '\u4EE4\u548C%' THEN make_date(2018 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
+      WHEN {col} LIKE '\u5E73\u6210%' THEN make_date(1988 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
+      WHEN {col} LIKE '\u662D\u548C%' THEN make_date(1925 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
+      WHEN {col} LIKE '\u5927\u6B63%' THEN make_date(1911 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
+      WHEN {col} LIKE '\u660E\u6CBB%' THEN make_date(1867 + CAST(regexp_extract({col}, '(\d+)\u5E74', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u6708', 1) AS INT), CAST(regexp_extract({col}, '(\d+)\u65E5', 1) AS INT))
+    END
+  transform_ext: null
+  decompose:
+    era_name: "regexp_extract({col}, '^([^\u0030-\u0039]+)', 1)"
+    era_year: "CAST(regexp_extract({col}, '(\u005C\u0064+)\u5E74', 1) AS INT)"
+  validation:
+    type: string
+    pattern: "^(\u4EE4\u548C|\u5E73\u6210|\u662D\u548C|\u5927\u6B63|\u660E\u6CBB)\\d{1,2}\u5E74\\d{1,2}\u6708\\d{1,2}\u65E5$"
+  tier: [VARCHAR, date]
+  release_priority: 2
+  aliases: [wareki_long]
+  samples:
+    - "\u4EE4\u548C6\u5E741\u670815\u65E5"
+    - "\u5E73\u621031\u5E744\u670830\u65E5"
+    - "\u662D\u548C64\u5E741\u67087\u65E5"
+  references:
+    - title: "Date and time notation in Japan"
+      link: "https://en.wikipedia.org/wiki/Date_and_time_notation_in_Japan"
+  notes: >
+    New in format coverage expansion. Formal Japanese imperial year with
+    kanji era names. Transform maps era names to gregorian year offsets.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: period
+#
+# Date ranges and fiscal/calendar periods. These represent spans of
+# time rather than specific points. Transforms default to period start.
+# ═════════════════════════════════════════════════════════════════════
+
+datetime.period.quarter:
+  title: Calendar Quarter
+  description: >
+    Calendar quarter notation (Q1-Q4 with year). Ubiquitous in SEC filings,
+    earnings data, and business intelligence dashboards. Represents a
+    3-month range. Transforms to first day of the quarter.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: DATE
+  format_string: null
+  transform: "make_date(CAST(regexp_extract({col}, '(\\d{4})') AS INT), (CAST(regexp_extract({col}, 'Q([1-4])') AS INT) - 1) * 3 + 1, 1)"
+  transform_ext: null
+  decompose:
+    year: "CAST(regexp_extract({col}, '(\\d{4})') AS INT)"
+    quarter: "CAST(regexp_extract({col}, 'Q([1-4])') AS INT)"
+  validation:
+    type: string
+    pattern: "^(Q[1-4]\\s?\\d{4}|\\d{4}[\\s-]?Q[1-4])$"
+  tier: [VARCHAR, component]
+  release_priority: 4
+  aliases: [quarter_iso]
+  samples:
+    - "Q1 2024"
+    - "Q4 2023"
+    - "2024-Q2"
+    - "2023 Q3"
+  references: null
+  notes: >
+    New in format coverage expansion. Accepts both "Q1 2024" and "2024-Q1"
+    variants. Transform extracts year and quarter, constructs first day of quarter.
+
+datetime.period.fiscal_year:
+  title: Fiscal Year
+  description: >
+    Fiscal year notation (FY prefix with 2 or 4-digit year). Common in
+    corporate finance CSVs, government budget documents, and annual reports.
+    The fiscal year ending period varies by organization — FY2024 may
+    refer to a period ending in calendar 2024 or starting in 2024.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(regexp_extract({col}, 'FY(\\d{2,4})') AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    year: "CAST(regexp_extract({col}, 'FY(\\d{2,4})') AS INT)"
+  validation:
+    type: string
+    pattern: "^FY\\d{2,4}$"
+    minLength: 4
+    maxLength: 6
+  tier: [VARCHAR, component]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "FY2024"
+    - "FY24"
+    - "FY2023"
+    - "FY25"
+  references: null
+  notes: >
+    New in format coverage expansion. Fiscal year offset context varies
+    by organization. broad_type is VARCHAR because calendar date mapping
+    requires organization-specific fiscal calendar knowledge.

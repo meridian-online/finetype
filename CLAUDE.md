@@ -21,8 +21,8 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ## Current State
 
 **Version:** 0.5.3
-**Taxonomy:** 163 definitions across 7 domains (container: 12, datetime: 45, finance: 16, geography: 15, identity: 19, representation: 32, technology: 24) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v11 flat (163 classes, 10 epochs), tiered-v2 fallback via `--sharp-only`
+**Taxonomy:** 216 definitions across 7 domains (container: 12, datetime: 85, finance: 29, geography: 15, identity: 19, representation: 32, technology: 24) — all generators pass, 100% alignment
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v11 flat (163 classes, 10 epochs), tiered-v2 fallback via `--sharp-only`. Model retrain pending for 216-class taxonomy.
 **Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
@@ -40,6 +40,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
+- **Format Coverage expansion** (NNFT-222–226) — 53 new type definitions added to taxonomy (163→216 types, 33% increase). 40 datetime formats (23 dates, 15 timestamps, 2 periods) + 13 finance formats (11 currency, 2 rate). Includes CJK dates (Chinese 年月日, Korean 년월일, Japanese era 令和), Apache CLF, ISO 8601 milliseconds, Indian lakh/crore, Swiss apostrophe, accounting parentheses. All generators pass, 100% sample validation. Model retrain (NNFT-226) and LabelCategoryMap update (NNFT-225) pending.
 - **Remaining accuracy gaps** — 3 misclassifications: countries.name→region (expected country), sports_events.venue→city (expected entity_name), world_cities.name→full_name (expected city). All are CharCNN limitations where character patterns can't distinguish geography subtypes from person names. Requires model retrain with geography-focused training data or Sense classifier improvements.
 
 ## Architecture
@@ -120,7 +121,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Taxonomy structure
 
-Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (12), datetime (45), finance (16), geography (15), identity (19), representation (32), technology (24).
+Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (12), datetime (85), finance (29), geography (15), identity (19), representation (32), technology (24).
 
 Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB type), `format_string`, `transform` (SQL expression), `validation`, `tier`, `decompose`.
 

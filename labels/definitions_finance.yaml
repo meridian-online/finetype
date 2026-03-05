@@ -576,3 +576,434 @@ finance.crypto.ethereum_address:
     v1 migration: Was payment.ethereum_address. Transform lowercases.
     EIP-55 checksummed addresses use mixed case but lowercase canonical form
     is preferable for storage.
+
+# ═════════════════════════════════════════════════════════════════════
+# NEW CURRENCY FORMATS (Format Coverage Expansion — NNFT-223)
+#
+# 11 additional currency amount formats covering:
+#   - Accounting notation (parentheses for negatives)
+#   - Non-Western grouping (Indian lakh/crore, Swiss apostrophe)
+#   - Symbol position variants (EU suffix, code prefix)
+#   - Zero-decimal currencies (JPY, KRW, VND)
+#   - Minor unit representation (Stripe/Adyen integer cents)
+#   - Multi-character currency symbols (R$, HK$, kr, Kč)
+#   - Cryptocurrency high-precision amounts
+#   - Alternative negative notation (trailing minus, CR/DR)
+# ═════════════════════════════════════════════════════════════════════
+
+finance.currency.amount_accounting_us:
+  title: "Currency Amount (US Accounting)"
+  description: >
+    US accounting format where negative values are enclosed in parentheses
+    rather than using a minus sign. Standard in 10-K filings, ledgers,
+    SAP, Smartsheet, and Dataiku exports. Comma thousands, period decimal.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({col}, '(', '-'), ')', ''), '$', ''), ',', ''), ' ', '') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    is_negative: "CASE WHEN {col} LIKE '(%' THEN true ELSE false END"
+    numeric_value: "CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({col}, '(', '-'), ')', ''), '$', ''), ',', ''), ' ', '') AS DECIMAL(18,2))"
+  validation:
+    type: string
+    pattern: "^\\(?\\$?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\)?$"
+  tier: [VARCHAR, currency]
+  release_priority: 5
+  aliases: [accounting, gaap_amount]
+  samples:
+    - "$1,234.56"
+    - "($1,234.56)"
+    - "$0.50"
+    - "($999.99)"
+    - "$10,000.00"
+  references: null
+  notes: >
+    New in format coverage expansion. Parentheses = negative is universal
+    in US GAAP accounting. Transform strips parens→minus, symbol, commas.
+
+finance.currency.amount_eu_suffix:
+  title: "Currency Amount (EU Suffix)"
+  description: >
+    European format with currency symbol as suffix. Period for thousands,
+    comma for decimal, symbol after amount with optional space.
+    CLDR default for Germany, France, Spain, Italy, Netherlands.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    symbol: "REGEXP_EXTRACT({col}, '([€$£¥₹₩₿\\p{Sc}]+)\\s*$')"
+    numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '\\s+', '', 'g'), '\\.', '', 'g'), ',', '.') AS DECIMAL(18,2))"
+  validation:
+    type: string
+    pattern: "^-?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€$£¥₹₩₿\\p{Sc}]$"
+  tier: [VARCHAR, currency]
+  release_priority: 5
+  aliases: [eu_suffix]
+  samples:
+    - "1.234,56 €"
+    - "999,99 €"
+    - "-1.234,56 €"
+    - "0,50 €"
+    - "10.000,00 €"
+  references: null
+  notes: >
+    New in format coverage expansion. CLDR default for most eurozone countries.
+    Distinct from amount_eu which allows prefix symbols.
+
+finance.currency.amount_space_sep:
+  title: "Currency Amount (Space-Separated Thousands)"
+  description: >
+    European variant using thin space or regular space for thousands
+    grouping, comma for decimal, symbol as suffix. French, Polish,
+    Czech formatting convention. Watch for NBSP (U+00A0).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '[\\s\\x{00A0}]+', '', 'g'), ',', '.'), '\\.$', '') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    symbol: "REGEXP_EXTRACT({col}, '([€$£¥₹₩₿\\p{Sc}]+)')"
+    numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[€$£¥₹₩₿\\p{Sc}]', '', 'g'), '[\\s\\x{00A0}]+', '', 'g'), ',', '.'), '\\.$', '') AS DECIMAL(18,2))"
+  validation:
+    type: string
+    pattern: "^-?[0-9]{1,3}([\\s\\x{00A0}][0-9]{3})*(,[0-9]{1,2})?\\s?[€$£¥₹₩₿\\p{Sc}]?$"
+  tier: [VARCHAR, currency]
+  release_priority: 4
+  aliases: [fr_amount]
+  samples:
+    - "1 234,56 €"
+    - "999,99 €"
+    - "-1 234,56 €"
+    - "10 000,00 €"
+  references: null
+  notes: >
+    New in format coverage expansion. French/Polish/Czech convention.
+    Must handle both regular space and NBSP (U+00A0) as grouping separator.
+
+finance.currency.amount_indian:
+  title: "Currency Amount (Indian Lakh/Crore)"
+  description: >
+    Indian numbering system with irregular grouping: first three digits,
+    then groups of two (XX,XX,XXX pattern). Lakh = 1,00,000 (100k),
+    Crore = 1,00,00,000 (10M). Serves 1.4 billion people. Rupee symbol
+    prefix. Period decimal separator.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[₹Rs\\.\\s]', '', 'g'), ',', '') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    symbol: "REGEXP_EXTRACT({col}, '^([₹]|Rs\\.?\\s?)')"
+    numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[₹Rs\\.\\s]', '', 'g'), ',', '') AS DECIMAL(18,2))"
+  validation:
+    type: string
+    pattern: "^[₹]?(?:Rs\\.?\\s?)?[0-9]{1,2}(,[0-9]{2})*(,[0-9]{3})(\\.[0-9]{1,2})?$"
+  tier: [VARCHAR, currency]
+  release_priority: 5
+  aliases: [lakh_crore, inr_amount]
+  samples:
+    - "₹12,34,567.89"
+    - "₹1,00,000.00"
+    - "₹99,999.50"
+    - "Rs. 1,23,456.78"
+    - "₹1,00,00,000.00"
+  references: null
+  notes: >
+    New in format coverage expansion. Indian numbering (2,2,3 grouping).
+    Key distinguishing signal is irregular comma placement.
+
+finance.currency.amount_ch:
+  title: "Currency Amount (Swiss Apostrophe)"
+  description: >
+    Swiss/Liechtenstein format using apostrophe for thousands separator
+    and period for decimal. Supports both straight apostrophe (U+0027)
+    and right single quotation mark (U+2019).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, 'CHF\\s?', ''), '[''\\x{2019}]', '', 'g'), '\\s+', '') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    symbol: "CASE WHEN {col} LIKE 'CHF%' THEN 'CHF' ELSE NULL END"
+    numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, 'CHF\\s?', ''), '[''\\x{2019}]', '', 'g'), '\\s+', '') AS DECIMAL(18,2))"
+  validation:
+    type: string
+    pattern: "^(CHF\\s?)?-?[0-9]{1,3}(['\\x{2019}][0-9]{3})*(\\.[0-9]{1,2})?(\\s?CHF)?$"
+  tier: [VARCHAR, currency]
+  release_priority: 4
+  aliases: [swiss_amount]
+  samples:
+    - "CHF 1'234.56"
+    - "1'234.56 CHF"
+    - "CHF 10'000.00"
+    - "-CHF 999.99"
+  references: null
+  notes: >
+    New in format coverage expansion. Must handle both U+0027 (apostrophe)
+    and U+2019 (right single quotation mark) as thousands separator.
+
+finance.currency.amount_nodecimal:
+  title: "Currency Amount (Zero-Decimal Currency)"
+  description: >
+    Currency amounts for zero-decimal currencies (JPY, KRW, VND, CLP,
+    ISK, HUF, and ~15 others). No fractional part. Comma thousands
+    grouping with symbol prefix or suffix. broad_type is INTEGER.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[¥₩\\p{Sc}]', '', 'g'), ',', '') AS INTEGER)"
+  transform_ext: null
+  decompose:
+    symbol: "REGEXP_EXTRACT({col}, '([¥₩\\p{Sc}])')"
+    numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[¥₩\\p{Sc}]', '', 'g'), ',', '') AS INTEGER)"
+  validation:
+    type: string
+    pattern: "^[¥₩\\p{Sc}]?-?[0-9]{1,3}(,[0-9]{3})*[¥₩\\p{Sc}]?$"
+  tier: [VARCHAR, currency]
+  release_priority: 5
+  aliases: [jpy_amount, zero_decimal]
+  samples:
+    - "¥1,234"
+    - "₩10,000"
+    - "¥100,000"
+    - "₩1,234,567"
+  references: null
+  notes: >
+    New in format coverage expansion. Zero-decimal currencies per ISO 4217:
+    JPY, KRW, VND, CLP, ISK, HUF, etc. No fractional component.
+
+finance.currency.amount_code_prefix:
+  title: "Currency Amount (ISO Code Prefix)"
+  description: >
+    ISO 4217 three-letter currency code as prefix, followed by amount.
+    Standard in SWIFT messages, banking/FX systems, and international
+    financial data. Separator conventions vary by currency.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Z]{3}\\s?', ''), ',', '') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    currency_code: "REGEXP_EXTRACT({col}, '^([A-Z]{3})')"
+    numeric_value: "CAST(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Z]{3}\\s?', ''), ',', '') AS DECIMAL(18,2))"
+  validation:
+    type: string
+    pattern: "^[A-Z]{3}\\s?-?[0-9]{1,3}([,.]?[0-9]{3})*(\\.[0-9]{1,2})?$"
+  tier: [VARCHAR, currency]
+  release_priority: 5
+  aliases: [iso_code_amount]
+  samples:
+    - "USD 1,234.56"
+    - "EUR 1.234,56"
+    - "GBP 999.99"
+    - "JPY 10,000"
+  references: null
+  notes: >
+    New in format coverage expansion. SWIFT, FX, banking standard.
+
+finance.currency.amount_minor_int:
+  title: "Currency Amount (Minor Unit Integer)"
+  description: >
+    Monetary amount as integer in smallest currency unit (cents, pence, etc.).
+    Every major payment processor (Stripe, Adyen, Square, PayPal Braintree)
+    stores amounts this way. Column looks like a plain integer but represents
+    dollars divided by 100. Detection requires column-name heuristics.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS DECIMAL(18,2)) / 100"
+  transform_ext: null
+  decompose:
+    major_units: "CAST({col} AS INTEGER) / 100"
+    minor_units: "CAST({col} AS INTEGER) % 100"
+  validation:
+    type: string
+    pattern: "^-?[0-9]+$"
+  tier: [VARCHAR, currency]
+  release_priority: 3
+  aliases: [cents, minor_units]
+  samples:
+    - "12345"
+    - "99999"
+    - "50"
+    - "100000"
+  references: null
+  notes: >
+    New in format coverage expansion. Stripe, Adyen, Square standard.
+    Detection challenge: looks like a plain integer. Requires header hint
+    (e.g., "amount_cents", "price_minor") for disambiguation.
+
+finance.currency.amount_crypto:
+  title: "Currency Amount (Cryptocurrency)"
+  description: >
+    Cryptocurrency amount with ticker symbol suffix. Supports high-precision
+    decimals (up to 8+ decimal places). Common in exchange exports and
+    portfolio tracking data.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE({col}, '\\s*[A-Z]{2,5}$', '') AS DECIMAL(18,8))"
+  transform_ext: null
+  decompose:
+    ticker: "REGEXP_EXTRACT({col}, '([A-Z]{2,5})$')"
+    numeric_value: "CAST(REGEXP_REPLACE({col}, '\\s*[A-Z]{2,5}$', '') AS DECIMAL(18,8))"
+  validation:
+    type: string
+    pattern: "^-?[0-9]+\\.?[0-9]*\\s?[A-Z]{2,5}$"
+  tier: [VARCHAR, currency]
+  release_priority: 3
+  aliases: [crypto_amount]
+  samples:
+    - "0.00123456 BTC"
+    - "1.50000000 ETH"
+    - "100.00 USDT"
+    - "0.025 BTC"
+  references: null
+  notes: >
+    New in format coverage expansion. Crypto amounts can have up to 18 decimal
+    places (ETH). Transform casts to DECIMAL(18,8) for reasonable precision.
+
+finance.currency.amount_multisym:
+  title: "Currency Amount (Multi-Character Symbol)"
+  description: >
+    Currency amounts with multi-character symbols: R$ (Brazilian Real),
+    HK$ (Hong Kong Dollar), kr (Nordic Krone), Kč (Czech Koruna),
+    zł (Polish Zloty). Separator conventions follow local standard.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '^[A-Za-z$₹€£¥₩₿\\p{Sc}\\s]+', ''), '[.,](?=[0-9]{3})', '', 'g'), '[\\s]', '', 'g'), ',', '.') AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    symbol: "REGEXP_EXTRACT({col}, '^([A-Za-z$₹€£¥₩₿\\p{Sc}\\s]+)')"
+  validation:
+    type: string
+    pattern: "^(R\\$|HK\\$|NT\\$|S\\$|A\\$|C\\$|NZ\\$|kr|Kč|zł|Ft|lei|Rp|Rs\\.?)\\s?-?[0-9]"
+  tier: [VARCHAR, currency]
+  release_priority: 4
+  aliases: []
+  samples:
+    - "R$ 1.234,56"
+    - "HK$ 1,234.56"
+    - "kr 1 234,56"
+    - "Kč 1 234,56"
+    - "zł 1 234,56"
+  references: null
+  notes: >
+    New in format coverage expansion. Multi-character symbols generalize
+    locale-specific parsing. Transform strips symbol, normalizes separators.
+
+finance.currency.amount_neg_trailing:
+  title: "Currency Amount (Trailing Negative)"
+  description: >
+    Currency amount with trailing minus sign or CR/DR suffix for negative
+    values. Standard in SAP, COBOL/mainframe exports, and bank statement
+    formats. The negative indicator follows the amount.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(CASE WHEN {col} LIKE '%-' OR {col} LIKE '%CR' THEN '-' || REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[-]$|\\s*(CR|DR)$', ''), '[\\$€£¥₹]', ''), ',', '') ELSE REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[-]$|\\s*(CR|DR)$', ''), '[\\$€£¥₹]', ''), ',', '') END AS DECIMAL(18,2))"
+  transform_ext: null
+  decompose:
+    is_negative: "CASE WHEN {col} LIKE '%-' OR {col} LIKE '%CR' THEN true ELSE false END"
+  validation:
+    type: string
+    pattern: "^[\\$€£¥₹]?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\s?(-|CR|DR)$"
+  tier: [VARCHAR, currency]
+  release_priority: 3
+  aliases: [sap_amount, cobol_amount]
+  samples:
+    - "$1,234.56-"
+    - "1,234.56 CR"
+    - "$999.99-"
+    - "10,000.00 DR"
+  references: null
+  notes: >
+    New in format coverage expansion. SAP, COBOL/mainframe, bank statements.
+    CR = credit (negative in expense context), DR = debit.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: rate
+#
+# Financial rates and yield measures. Distinct from currency amounts
+# in that they represent percentages, basis points, or return rates
+# rather than monetary values.
+# ═════════════════════════════════════════════════════════════════════
+
+finance.rate.basis_points:
+  title: "Basis Points"
+  description: >
+    Financial rate expressed in basis points (bps or bp). One basis
+    point = 0.01% = 0.0001 in decimal. Standard in fixed-income markets,
+    central bank data, and debt analysis. Common in Bloomberg, Reuters,
+    and central bank feeds.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE({col}, '\\s*(bps|bp)$', '') AS DECIMAL(18,4)) / 10000"
+  transform_ext: null
+  decompose:
+    raw_bps: "CAST(REGEXP_REPLACE({col}, '\\s*(bps|bp)$', '') AS DECIMAL(10,2))"
+    decimal_rate: "CAST(REGEXP_REPLACE({col}, '\\s*(bps|bp)$', '') AS DECIMAL(18,4)) / 10000"
+  validation:
+    type: string
+    pattern: "^-?[0-9]+(\\.[0-9]+)?\\s?(bps|bp)$"
+  tier: [VARCHAR, rate]
+  release_priority: 3
+  aliases: [bps]
+  samples:
+    - "125 bps"
+    - "25.5 bps"
+    - "-50 bp"
+    - "100 bps"
+  references: null
+  notes: >
+    New in format coverage expansion. Fixed-income standard unit.
+    Transform divides by 10000 to convert to decimal rate.
+
+finance.rate.yield:
+  title: "Financial Yield / Return"
+  description: >
+    Financial return or yield notation with explicit sign and percentage.
+    Common in Bloomberg, Yahoo Finance, investment return reports.
+    Distinct from percentage by requiring explicit +/- sign prefix.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST(REGEXP_REPLACE({col}, '%$', '') AS DECIMAL(10,4)) / 100"
+  transform_ext: null
+  decompose:
+    raw_pct: "CAST(REGEXP_REPLACE({col}, '%$', '') AS DECIMAL(10,4))"
+    decimal_rate: "CAST(REGEXP_REPLACE({col}, '%$', '') AS DECIMAL(10,4)) / 100"
+  validation:
+    type: string
+    pattern: "^[+-][0-9]+(\\.[0-9]+)?%$"
+  tier: [VARCHAR, rate]
+  release_priority: 3
+  aliases: [return_pct]
+  samples:
+    - "+2.5%"
+    - "-1.2%"
+    - "+0.75%"
+    - "-3.25%"
+    - "+10.0%"
+  references: null
+  notes: >
+    New in format coverage expansion. Distinct from percentage type by
+    mandatory +/- sign prefix. Financial returns, yield notation.

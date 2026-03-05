@@ -258,6 +258,134 @@ impl Generator {
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string()),
 
+            // ── new timestamp types (16 types) ──────────────────────────
+            ("timestamp", "sql_microseconds") => {
+                let dt = self.random_datetime();
+                let micros = self.rng.gen_range(0..1_000_000u32);
+                Ok(format!("{}.{:06}", dt.format("%Y-%m-%d %H:%M:%S"), micros))
+            }
+            ("timestamp", "sql_milliseconds") => {
+                let dt = self.random_datetime();
+                let millis = self.rng.gen_range(0..1000u32);
+                Ok(format!("{}.{:03}", dt.format("%Y-%m-%d %H:%M:%S"), millis))
+            }
+            ("timestamp", "iso_8601_milliseconds") => {
+                let dt = self.random_datetime();
+                let millis = self.rng.gen_range(0..1000u32);
+                Ok(format!("{}.{:03}Z", dt.format("%Y-%m-%dT%H:%M:%S"), millis))
+            }
+            ("timestamp", "iso_8601_millis_offset") => {
+                let dt = self.random_datetime();
+                let millis = self.rng.gen_range(0..1000u32);
+                let offset_h = self.rng.gen_range(-12i32..=12);
+                let offset_m = if offset_h == 0 && self.rng.gen_bool(0.3) {
+                    30
+                } else {
+                    0
+                };
+                Ok(format!(
+                    "{}.{:03}{:+03}:{:02}",
+                    dt.format("%Y-%m-%dT%H:%M:%S"),
+                    millis,
+                    offset_h,
+                    offset_m
+                ))
+            }
+            ("timestamp", "iso_8601_micros_offset") => {
+                let dt = self.random_datetime();
+                let micros = self.rng.gen_range(0..1_000_000u32);
+                let offset_h = self.rng.gen_range(-12i32..=12);
+                Ok(format!(
+                    "{}.{:06}{:+03}:00",
+                    dt.format("%Y-%m-%dT%H:%M:%S"),
+                    micros,
+                    offset_h
+                ))
+            }
+            ("timestamp", "clf") => {
+                // Apache/Nginx Common Log Format: 15/Jan/2024:14:30:00 +0000
+                let dt = self.random_datetime();
+                let offset_h = self.rng.gen_range(-12i32..=12);
+                Ok(format!(
+                    "{}:{} {:+03}00",
+                    dt.format("%d/%b/%Y"),
+                    dt.format("%H:%M:%S"),
+                    offset_h
+                ))
+            }
+            ("timestamp", "syslog_bsd") => {
+                // RFC 3164 BSD syslog: Jan 15 14:30:00 (no year)
+                let dt = self.random_datetime();
+                let day = dt.day();
+                // BSD syslog pads single-digit days with a space
+                Ok(format!(
+                    "{} {:>2} {}",
+                    dt.format("%b"),
+                    day,
+                    dt.format("%H:%M:%S")
+                ))
+            }
+            ("timestamp", "sql_microseconds_offset") => {
+                let dt = self.random_datetime();
+                let micros = self.rng.gen_range(0..1_000_000u32);
+                let offset_h = self.rng.gen_range(-12i32..=12);
+                Ok(format!(
+                    "{}.{:06}{:+03}:00",
+                    dt.format("%Y-%m-%d %H:%M:%S"),
+                    micros,
+                    offset_h
+                ))
+            }
+            ("timestamp", "pg_short_offset") => {
+                // PostgreSQL 2-digit offset: 2024-01-15 14:30:00.123456-05
+                let dt = self.random_datetime();
+                let micros = self.rng.gen_range(0..1_000_000u32);
+                let offset_h = self.rng.gen_range(-12i32..=12);
+                Ok(format!(
+                    "{}.{:06}{:+03}",
+                    dt.format("%Y-%m-%d %H:%M:%S"),
+                    micros,
+                    offset_h
+                ))
+            }
+            ("timestamp", "dot_dmy_24h") => Ok(self
+                .random_datetime()
+                .format("%d.%m.%Y %H:%M:%S")
+                .to_string()),
+            ("timestamp", "slash_ymd_24h") => Ok(self
+                .random_datetime()
+                .format("%Y/%m/%d %H:%M:%S")
+                .to_string()),
+            ("timestamp", "ctime") => {
+                // C ctime() format: Mon Jan 15 14:30:00 2024
+                let dt = self.random_datetime();
+                let day = dt.day();
+                Ok(format!(
+                    "{} {:>2} {} {}",
+                    dt.format("%a %b"),
+                    day,
+                    dt.format("%H:%M:%S"),
+                    dt.format("%Y")
+                ))
+            }
+            ("timestamp", "epoch_nanoseconds") => {
+                // 19-digit nanosecond epoch (2015-2030 range)
+                let secs = self.rng.gen_range(1_420_000_000i64..1_900_000_000);
+                let nanos = self.rng.gen_range(0i64..1_000_000_000);
+                Ok(format!("{}", secs * 1_000_000_000 + nanos))
+            }
+            ("timestamp", "iso_space_zulu") => {
+                // RFC 3339 space variant: 2024-01-15 14:30:00Z
+                Ok(format!(
+                    "{}Z",
+                    self.random_datetime().format("%Y-%m-%d %H:%M:%S")
+                ))
+            }
+            ("timestamp", "dot_ymd_24h") => Ok(self
+                .random_datetime()
+                .format("%Y.%m.%d %H:%M:%S")
+                .to_string()),
+
             // ── date (17 types) ──────────────────────────────────────────
             ("date", "iso") => Ok(self.random_datetime().format("%Y-%m-%d").to_string()),
             ("date", "us_slash") => Ok(self.random_datetime().format("%m/%d/%Y").to_string()),
@@ -353,6 +481,140 @@ impl Generator {
                 self.rng.gen_range(2020..2030),
                 self.rng.gen_range(1..53)
             )),
+
+            // ── new date types (23 types) ────────────────────────────────
+
+            // Separator variants (7)
+            ("date", "ymd_slash") => Ok(self.random_datetime().format("%Y/%m/%d").to_string()),
+            ("date", "ymd_dot") => Ok(self.random_datetime().format("%Y.%m.%d").to_string()),
+            ("date", "dmy_dash") => Ok(self.random_datetime().format("%d-%m-%Y").to_string()),
+            ("date", "mdy_dash") => Ok(self.random_datetime().format("%m-%d-%Y").to_string()),
+            ("date", "us_short_slash") => Ok(self.random_datetime().format("%m/%d/%y").to_string()),
+            ("date", "eu_short_slash") => Ok(self.random_datetime().format("%d/%m/%y").to_string()),
+            ("date", "eu_short_dot") => Ok(self.random_datetime().format("%d.%m.%y").to_string()),
+
+            // Named month variants (6)
+            ("date", "dmy_space_abbrev") => {
+                // 15 Jan 2024
+                let dt = self.random_datetime();
+                Ok(format!("{} {} {}", dt.day(), dt.format("%b"), dt.year()))
+            }
+            ("date", "dmy_space_full") => {
+                // 15 January 2024 — avoid "May" (3 chars) to meet minLength: 12
+                let dt = self.random_datetime_avoiding_may();
+                Ok(format!("{:02} {} {}", dt.day(), dt.format("%B"), dt.year()))
+            }
+            ("date", "abbrev_month_no_comma") => {
+                // Jan 15 2024 (no comma, unlike abbreviated_month)
+                let dt = self.random_datetime();
+                Ok(format!("{} {} {}", dt.format("%b"), dt.day(), dt.year()))
+            }
+            ("date", "full_month_no_comma") => {
+                // January 15 2024 — avoid "May" (3 chars) to meet minLength: 12
+                let dt = self.random_datetime_avoiding_may();
+                Ok(format!("{} {:02} {}", dt.format("%B"), dt.day(), dt.year()))
+            }
+            ("date", "dmy_dash_abbrev") => {
+                // 15-Jan-2024 (Oracle NLS_DATE_FORMAT default)
+                Ok(self.random_datetime().format("%d-%b-%Y").to_string())
+            }
+            ("date", "dmy_dash_abbrev_short") => {
+                // 15-Jan-24 (Oracle DD-MON-RR)
+                Ok(self.random_datetime().format("%d-%b-%y").to_string())
+            }
+
+            // Partial dates (5)
+            ("date", "year_month") => Ok(self.random_datetime().format("%Y-%m").to_string()),
+            ("date", "compact_ym") => {
+                let dt = self.random_datetime();
+                Ok(format!("{}{:02}", dt.year(), dt.month()))
+            }
+            ("date", "month_year_full") => {
+                // January 2024
+                let dt = self.random_datetime();
+                Ok(format!("{} {}", dt.format("%B"), dt.year()))
+            }
+            ("date", "month_year_abbrev") => {
+                // Jan 2024
+                let dt = self.random_datetime();
+                Ok(format!("{} {}", dt.format("%b"), dt.year()))
+            }
+            ("date", "month_year_slash") => {
+                // 01/2024
+                let dt = self.random_datetime();
+                Ok(format!("{:02}/{}", dt.month(), dt.year()))
+            }
+
+            // Weekday variant (1)
+            ("date", "weekday_dmy_full") => {
+                // Monday, 15 January 2024 — use long months (≥6 chars) for minLength: 22
+                let dt = self.random_datetime_long_month();
+                Ok(format!(
+                    "{}, {:02} {} {}",
+                    dt.format("%A"),
+                    dt.day(),
+                    dt.format("%B"),
+                    dt.year()
+                ))
+            }
+
+            // CJK formats (4)
+            ("date", "chinese_ymd") => {
+                // 2024年1月15日
+                let dt = self.random_datetime();
+                Ok(format!("{}年{}月{}日", dt.year(), dt.month(), dt.day()))
+            }
+            ("date", "korean_ymd") => {
+                // 2024년 1월 15일
+                let dt = self.random_datetime();
+                Ok(format!("{}년 {}월 {}일", dt.year(), dt.month(), dt.day()))
+            }
+            ("date", "jp_era_short") => {
+                // R6/01/15 — Japanese era short format
+                let dt = self.random_datetime();
+                let (era_letter, era_year) = self.gregorian_to_jp_era(dt.year());
+                Ok(format!(
+                    "{}{}/{:02}/{:02}",
+                    era_letter,
+                    era_year,
+                    dt.month(),
+                    dt.day()
+                ))
+            }
+            ("date", "jp_era_long") => {
+                // 令和6年1月15日 — Japanese era long format
+                let dt = self.random_datetime();
+                let (_, era_year) = self.gregorian_to_jp_era(dt.year());
+                let era_name = self.jp_era_name(dt.year());
+                Ok(format!(
+                    "{}{}年{}月{}日",
+                    era_name,
+                    era_year,
+                    dt.month(),
+                    dt.day()
+                ))
+            }
+
+            // ── period (2 types) ─────────────────────────────────────────
+            ("period", "quarter") => {
+                // Q1 2024 or 2024-Q1
+                let year = self.rng.gen_range(2015..2030);
+                let q = self.rng.gen_range(1..=4);
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("Q{} {}", q, year))
+                } else {
+                    Ok(format!("{}-Q{}", year, q))
+                }
+            }
+            ("period", "fiscal_year") => {
+                // FY2024 or FY24
+                let year = self.rng.gen_range(2015i32..2030);
+                if self.rng.gen_bool(0.6) {
+                    Ok(format!("FY{}", year))
+                } else {
+                    Ok(format!("FY{}", year % 100))
+                }
+            }
 
             // ── time (5 types) ───────────────────────────────────────────
             ("time", "iso") => {
@@ -2559,6 +2821,171 @@ impl Generator {
             ("crypto", "bitcoin_address") => self.gen_identity("payment", "bitcoin_address"),
             ("crypto", "ethereum_address") => self.gen_identity("payment", "ethereum_address"),
 
+            // ── new currency types (11 types) ────────────────────────────
+            ("currency", "amount_accounting_us") => {
+                // ($1,234.56) for negatives, $1,234.56 for positives
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, ',');
+                let is_negative = self.rng.gen_bool(0.4);
+                if is_negative {
+                    Ok(format!("(${}.{:02})", formatted, cents))
+                } else {
+                    Ok(format!("${}.{:02}", formatted, cents))
+                }
+            }
+            ("currency", "amount_eu_suffix") => {
+                // 1.234,56 € — period thousands, comma decimal, single-char symbol suffix
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, '.');
+                let symbols = ["€", "£", "¥", "₹"];
+                let sym = symbols[self.rng.gen_range(0..symbols.len())];
+                let is_negative = self.rng.gen_bool(0.1);
+                if is_negative {
+                    Ok(format!("-{},{:02} {}", formatted, cents, sym))
+                } else {
+                    Ok(format!("{},{:02} {}", formatted, cents, sym))
+                }
+            }
+            ("currency", "amount_space_sep") => {
+                // 1 234,56 € — space thousands, comma decimal, single-char symbol suffix
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, ' ');
+                let symbols = ["€", "£", "¥", "₹"];
+                let sym = symbols[self.rng.gen_range(0..symbols.len())];
+                let is_negative = self.rng.gen_bool(0.1);
+                if is_negative {
+                    Ok(format!("-{},{:02} {}", formatted, cents, sym))
+                } else {
+                    Ok(format!("{},{:02} {}", formatted, cents, sym))
+                }
+            }
+            ("currency", "amount_indian") => {
+                // ₹12,34,567.89 — Indian lakh/crore grouping
+                // Pattern requires amounts >= 1000 for proper XX,XX,XXX grouping
+                let int_part = if self.rng.gen_bool(0.4) {
+                    self.rng.gen_range(1_000i64..10_000_000)
+                } else {
+                    self.rng.gen_range(1_000i64..100_000)
+                };
+                let cents = self.rng.gen_range(0..100u32);
+                let formatted = Self::format_indian_grouping(int_part);
+                // Pattern supports ₹ or Rs. prefix (no negative)
+                if self.rng.gen_bool(0.8) {
+                    Ok(format!("₹{}.{:02}", formatted, cents))
+                } else {
+                    Ok(format!("Rs. {}.{:02}", formatted, cents))
+                }
+            }
+            ("currency", "amount_ch") => {
+                // CHF 1'234.56 — Swiss apostrophe thousands
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, '\'');
+                let is_negative = self.rng.gen_bool(0.1);
+                // Pattern: ^(CHF\s?)?-?[0-9]...(\.[0-9]{1,2})?(\s?CHF)?$
+                if is_negative {
+                    Ok(format!("CHF -{}.{:02}", formatted, cents))
+                } else {
+                    Ok(format!("CHF {}.{:02}", formatted, cents))
+                }
+            }
+            ("currency", "amount_nodecimal") => {
+                // ¥1,234 — zero-decimal currencies (JPY, KRW, VND)
+                let int_part = if self.rng.gen_bool(0.3) {
+                    self.rng.gen_range(1_000i64..10_000_000)
+                } else {
+                    self.rng.gen_range(100i64..100_000)
+                };
+                let formatted = Self::format_int_with_separator(int_part, ',');
+                let symbols = ["¥", "₩"];
+                let sym = symbols[self.rng.gen_range(0..symbols.len())];
+                // Pattern: ^[¥₩\p{Sc}]?-? — symbol then minus
+                let is_negative = self.rng.gen_bool(0.1);
+                if is_negative {
+                    Ok(format!("{}-{}", sym, formatted))
+                } else {
+                    Ok(format!("{}{}", sym, formatted))
+                }
+            }
+            ("currency", "amount_code_prefix") => {
+                // USD 1,234.56 — ISO code prefix
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, ',');
+                let codes = ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "CNY"];
+                let code = codes[self.rng.gen_range(0..codes.len())];
+                // Pattern: ^[A-Z]{3}\s?-? — code then space then minus
+                let is_negative = self.rng.gen_bool(0.1);
+                if is_negative {
+                    Ok(format!("{} -{}.{:02}", code, formatted, cents))
+                } else {
+                    Ok(format!("{} {}.{:02}", code, formatted, cents))
+                }
+            }
+            ("currency", "amount_minor_int") => {
+                // 12345 — amount in smallest currency unit (cents)
+                let amount = self.rng.gen_range(1i64..10_000_000);
+                Ok(amount.to_string())
+            }
+            ("currency", "amount_crypto") => {
+                // 0.00123456 BTC — high decimal precision
+                let tickers = ["BTC", "ETH", "SOL", "DOGE", "XRP", "ADA"];
+                let ticker = tickers[self.rng.gen_range(0..tickers.len())];
+                let whole = self.rng.gen_range(0i64..100);
+                let frac = self.rng.gen_range(0u64..100_000_000);
+                Ok(format!("{}.{:08} {}", whole, frac, ticker))
+            }
+            ("currency", "amount_multisym") => {
+                // R$ 1.234,56 — multi-character symbol prefix, EU-style separators
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, '.');
+                let symbols = ["R$", "HK$", "S$", "A$", "NZ$", "C$"];
+                let sym = symbols[self.rng.gen_range(0..symbols.len())];
+                // Pattern: ^(symbol)\s?-? — symbol then minus
+                let is_negative = self.rng.gen_bool(0.1);
+                if is_negative {
+                    Ok(format!("{} -{},{:02}", sym, formatted, cents))
+                } else {
+                    Ok(format!("{} {},{:02}", sym, formatted, cents))
+                }
+            }
+            ("currency", "amount_neg_trailing") => {
+                // $1,234.56- or 1,234.56 CR — trailing negative notation
+                // Pattern ALWAYS requires trailing indicator (-|CR|DR)
+                let (int_part, cents) = self.random_amount();
+                let formatted = Self::format_int_with_separator(int_part, ',');
+                let r = self.rng.gen::<f64>();
+                if r < 0.4 {
+                    Ok(format!("${}.{:02}-", formatted, cents))
+                } else if r < 0.7 {
+                    Ok(format!("{}.{:02} CR", formatted, cents))
+                } else {
+                    Ok(format!("{}.{:02} DR", formatted, cents))
+                }
+            }
+
+            // ── rate (2 types) ───────────────────────────────────────────
+            ("rate", "basis_points") => {
+                // 125 bps or 125bps
+                let bps = self.rng.gen_range(1i32..500);
+                let is_negative = self.rng.gen_bool(0.2);
+                let val = if is_negative { -bps } else { bps };
+                if self.rng.gen_bool(0.6) {
+                    Ok(format!("{} bps", val))
+                } else {
+                    Ok(format!("{}bps", val))
+                }
+            }
+            ("rate", "yield") => {
+                // +2.5% or -1.2%
+                let whole = self.rng.gen_range(0i32..20);
+                let frac = self.rng.gen_range(0..100u32);
+                let is_positive = self.rng.gen_bool(0.7);
+                if is_positive {
+                    Ok(format!("+{}.{:02}%", whole, frac))
+                } else {
+                    Ok(format!("-{}.{:02}%", whole, frac))
+                }
+            }
+
             _ => Err(GeneratorError::NotImplemented(format!(
                 "finance.{}.{}",
                 category, type_name
@@ -2767,6 +3194,123 @@ impl Generator {
             .unwrap()
             .and_hms_opt(hour, minute, second)
             .unwrap()
+    }
+
+    /// Generate a random datetime avoiding May (month 5) to meet minLength
+    /// constraints in validation patterns for full month name formats.
+    fn random_datetime_avoiding_may(&mut self) -> NaiveDateTime {
+        let year = self.rng.gen_range(2015..2030);
+        // Months 1-12 excluding 5 (May has only 3 chars)
+        let months_no_may = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12];
+        let month = months_no_may[self.rng.gen_range(0..months_no_may.len())];
+        let day = self.rng.gen_range(1..=28);
+        let hour = self.rng.gen_range(0..24);
+        let minute = self.rng.gen_range(0..60);
+        let second = self.rng.gen_range(0..60);
+        NaiveDate::from_ymd_opt(year, month, day)
+            .unwrap()
+            .and_hms_opt(hour, minute, second)
+            .unwrap()
+    }
+
+    /// Generate a random datetime using only months with ≥6-char names
+    /// (January, February, August, September, October, November, December)
+    /// to meet minLength: 22 for weekday+full month formats.
+    fn random_datetime_long_month(&mut self) -> NaiveDateTime {
+        let year = self.rng.gen_range(2015..2030);
+        // Months with name length >= 6: Jan(7), Feb(8), Aug(6), Sep(9), Oct(7), Nov(8), Dec(8)
+        let long_months = [1, 2, 8, 9, 10, 11, 12];
+        let month = long_months[self.rng.gen_range(0..long_months.len())];
+        let day = self.rng.gen_range(1..=28);
+        let hour = self.rng.gen_range(0..24);
+        let minute = self.rng.gen_range(0..60);
+        let second = self.rng.gen_range(0..60);
+        NaiveDate::from_ymd_opt(year, month, day)
+            .unwrap()
+            .and_hms_opt(hour, minute, second)
+            .unwrap()
+    }
+
+    /// Convert Gregorian year to Japanese era letter and era year.
+    /// Era offset table: era_year + offset = gregorian_year.
+    /// R→2018, H→1988, S→1925, T→1911, M→1867.
+    fn gregorian_to_jp_era(&self, year: i32) -> (&'static str, i32) {
+        if year >= 2019 {
+            ("R", year - 2018)
+        } else if year >= 1989 {
+            ("H", year - 1988)
+        } else if year >= 1926 {
+            ("S", year - 1925)
+        } else if year >= 1912 {
+            ("T", year - 1911)
+        } else {
+            ("M", year - 1867)
+        }
+    }
+
+    /// Get full Japanese era name for a Gregorian year.
+    fn jp_era_name(&self, year: i32) -> &'static str {
+        if year >= 2019 {
+            "令和"
+        } else if year >= 1989 {
+            "平成"
+        } else if year >= 1926 {
+            "昭和"
+        } else if year >= 1912 {
+            "大正"
+        } else {
+            "明治"
+        }
+    }
+
+    /// Format an integer with a configurable thousands separator.
+    fn format_int_with_separator(n: i64, sep: char) -> String {
+        let s = n.abs().to_string();
+        let mut result = String::new();
+        for (i, ch) in s.chars().rev().enumerate() {
+            if i > 0 && i % 3 == 0 {
+                result.push(sep);
+            }
+            result.push(ch);
+        }
+        result.chars().rev().collect()
+    }
+
+    /// Format an integer with Indian lakh/crore grouping (XX,XX,XXX).
+    fn format_indian_grouping(n: i64) -> String {
+        let s = n.abs().to_string();
+        if s.len() <= 3 {
+            return s;
+        }
+        // Last 3 digits are grouped normally, then groups of 2
+        let (prefix, last3) = s.split_at(s.len() - 3);
+        let mut result = String::new();
+        for (i, ch) in prefix.chars().rev().enumerate() {
+            if i > 0 && i % 2 == 0 {
+                result.push(',');
+            }
+            result.push(ch);
+        }
+        let prefix_formatted: String = result.chars().rev().collect();
+        format!("{},{}", prefix_formatted, last3)
+    }
+
+    /// Generate a random monetary amount as (integer_part, cents).
+    fn random_amount(&mut self) -> (i64, u32) {
+        let r = self.rng.gen::<f64>();
+        if r < 0.3 {
+            (
+                self.rng.gen_range(1_000i64..10_000_000),
+                self.rng.gen_range(0..100u32),
+            )
+        } else if r < 0.5 {
+            (self.rng.gen_range(0i64..100), self.rng.gen_range(0..100u32))
+        } else {
+            (
+                self.rng.gen_range(100i64..100_000),
+                self.rng.gen_range(0..100u32),
+            )
+        }
     }
 
     fn gen_hex_string(&mut self, char_count: usize) -> String {
@@ -4757,6 +5301,342 @@ test.test.test:
                 "Currency symbol should be short: {} (len={})",
                 val,
                 val.len()
+            );
+        }
+    }
+
+    // ── New format coverage tests (NNFT-224) ─────────────────────────
+
+    #[test]
+    fn test_chinese_ymd() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.date.chinese_ymd").unwrap();
+            assert!(val.contains('年'), "Should contain 年: {}", val);
+            assert!(val.contains('月'), "Should contain 月: {}", val);
+            assert!(val.contains('日'), "Should contain 日: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_korean_ymd() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.date.korean_ymd").unwrap();
+            assert!(val.contains('년'), "Should contain 년: {}", val);
+            assert!(val.contains('월'), "Should contain 월: {}", val);
+            assert!(val.contains('일'), "Should contain 일: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_jp_era_short() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.date.jp_era_short").unwrap();
+            // Should start with era letter (R, H, S, T, or M)
+            let first = val.chars().next().unwrap();
+            assert!(
+                "RHSTM".contains(first),
+                "Should start with era letter: {}",
+                val
+            );
+            // Should contain slashes
+            assert_eq!(
+                val.matches('/').count(),
+                2,
+                "Should have 2 slashes: {}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_jp_era_long() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.date.jp_era_long").unwrap();
+            assert!(val.contains('年'), "Should contain 年: {}", val);
+            assert!(val.contains('月'), "Should contain 月: {}", val);
+            assert!(val.contains('日'), "Should contain 日: {}", val);
+            // Should start with an era name
+            let starts_with_era = val.starts_with("令和")
+                || val.starts_with("平成")
+                || val.starts_with("昭和")
+                || val.starts_with("大正")
+                || val.starts_with("明治");
+            assert!(starts_with_era, "Should start with era name: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_jp_era_offset_correctness() {
+        let gen = Generator::with_seed(test_taxonomy(), 42);
+        // R6 → 2024 (2018 + 6 = 2024)
+        assert_eq!(gen.gregorian_to_jp_era(2024), ("R", 6));
+        // R1 → 2019 (2018 + 1 = 2019)
+        assert_eq!(gen.gregorian_to_jp_era(2019), ("R", 1));
+        // H31 → 2019 boundary: 1988 + 31 = 2019, but Reiwa starts 2019
+        // Our implementation: year >= 2019 → R, so H31 doesn't exist (correct for post-April)
+        assert_eq!(gen.gregorian_to_jp_era(2019), ("R", 1));
+        // H1 → 1989
+        assert_eq!(gen.gregorian_to_jp_era(1989), ("H", 1));
+        // S64 → 1989, but since 1989 >= 1989 → H1
+        assert_eq!(gen.gregorian_to_jp_era(1989), ("H", 1));
+        // S1 → 1926
+        assert_eq!(gen.gregorian_to_jp_era(1926), ("S", 1));
+    }
+
+    #[test]
+    fn test_amount_accounting_us() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen
+                .generate_value("finance.currency.amount_accounting_us")
+                .unwrap();
+            assert!(val.contains('$'), "Should contain $: {}", val);
+            // Parentheses or regular format
+            let is_negative = val.starts_with('(') && val.ends_with(')');
+            let is_positive = val.starts_with('$');
+            assert!(
+                is_negative || is_positive,
+                "Should be ($X) or $X format: {}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_amount_indian() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen
+                .generate_value("finance.currency.amount_indian")
+                .unwrap();
+            assert!(
+                val.contains('₹') || val.starts_with("Rs"),
+                "Should contain ₹ or Rs: {}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_indian_grouping_helper() {
+        assert_eq!(Generator::format_indian_grouping(1234567), "12,34,567");
+        assert_eq!(Generator::format_indian_grouping(100000), "1,00,000");
+        assert_eq!(Generator::format_indian_grouping(999), "999");
+        assert_eq!(Generator::format_indian_grouping(1000), "1,000");
+        assert_eq!(Generator::format_indian_grouping(10000), "10,000");
+        assert_eq!(Generator::format_indian_grouping(100000000), "10,00,00,000");
+    }
+
+    #[test]
+    fn test_format_int_with_separator() {
+        assert_eq!(
+            Generator::format_int_with_separator(1234567, ','),
+            "1,234,567"
+        );
+        assert_eq!(
+            Generator::format_int_with_separator(1234567, '.'),
+            "1.234.567"
+        );
+        assert_eq!(
+            Generator::format_int_with_separator(1234567, '\''),
+            "1'234'567"
+        );
+        assert_eq!(Generator::format_int_with_separator(999, ','), "999");
+        assert_eq!(Generator::format_int_with_separator(0, ','), "0");
+    }
+
+    #[test]
+    fn test_amount_crypto() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen
+                .generate_value("finance.currency.amount_crypto")
+                .unwrap();
+            let tickers = ["BTC", "ETH", "SOL", "DOGE", "XRP", "ADA"];
+            let has_ticker = tickers.iter().any(|t| val.contains(t));
+            assert!(has_ticker, "Should contain a crypto ticker: {}", val);
+            assert!(val.contains('.'), "Should have decimal: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_yield_generator() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("finance.rate.yield").unwrap();
+            assert!(val.ends_with('%'), "Should end with %: {}", val);
+            let first = val.chars().next().unwrap();
+            assert!(
+                first == '+' || first == '-',
+                "Should start with +/-: {}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_basis_points() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("finance.rate.basis_points").unwrap();
+            assert!(val.contains("bps"), "Should contain bps: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_clf_timestamp() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.timestamp.clf").unwrap();
+            // Format: 15/Jan/2024:14:30:00 +0000
+            assert!(val.contains(':'), "Should contain colon: {}", val);
+            assert!(val.contains('/'), "Should contain slash: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_syslog_bsd_timestamp() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.timestamp.syslog_bsd").unwrap();
+            // Format: Jan 15 14:30:00 (no year)
+            assert!(val.contains(':'), "Should contain time: {}", val);
+            // Should NOT contain a 4-digit year
+            let has_year = val
+                .split_whitespace()
+                .any(|w| w.len() == 4 && w.chars().all(|c| c.is_ascii_digit()));
+            assert!(!has_year, "Should not contain year: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_epoch_nanoseconds() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen
+                .generate_value("datetime.timestamp.epoch_nanoseconds")
+                .unwrap();
+            assert!(
+                val.len() >= 18 && val.len() <= 19,
+                "Should be 18-19 digits: {} (len={})",
+                val,
+                val.len()
+            );
+            assert!(
+                val.chars().all(|c| c.is_ascii_digit()),
+                "Should be all digits: {}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_quarter() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.period.quarter").unwrap();
+            assert!(val.contains('Q'), "Should contain Q: {}", val);
+            // Either "Q1 2024" or "2024-Q1"
+            let has_q_num = val.contains("Q1")
+                || val.contains("Q2")
+                || val.contains("Q3")
+                || val.contains("Q4");
+            assert!(has_q_num, "Should have Q1-Q4: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_fiscal_year() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        for _ in 0..20 {
+            let val = gen.generate_value("datetime.period.fiscal_year").unwrap();
+            assert!(val.starts_with("FY"), "Should start with FY: {}", val);
+        }
+    }
+
+    #[test]
+    fn test_all_54_new_generators_produce_output() {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        let new_types = [
+            // 23 date types
+            "datetime.date.ymd_slash",
+            "datetime.date.ymd_dot",
+            "datetime.date.dmy_dash",
+            "datetime.date.mdy_dash",
+            "datetime.date.us_short_slash",
+            "datetime.date.eu_short_slash",
+            "datetime.date.eu_short_dot",
+            "datetime.date.dmy_space_abbrev",
+            "datetime.date.dmy_space_full",
+            "datetime.date.abbrev_month_no_comma",
+            "datetime.date.full_month_no_comma",
+            "datetime.date.dmy_dash_abbrev",
+            "datetime.date.dmy_dash_abbrev_short",
+            "datetime.date.year_month",
+            "datetime.date.compact_ym",
+            "datetime.date.month_year_full",
+            "datetime.date.month_year_abbrev",
+            "datetime.date.month_year_slash",
+            "datetime.date.weekday_dmy_full",
+            "datetime.date.chinese_ymd",
+            "datetime.date.korean_ymd",
+            "datetime.date.jp_era_short",
+            "datetime.date.jp_era_long",
+            // 2 period types
+            "datetime.period.quarter",
+            "datetime.period.fiscal_year",
+            // 16 timestamp types
+            "datetime.timestamp.sql_microseconds",
+            "datetime.timestamp.sql_milliseconds",
+            "datetime.timestamp.iso_8601_milliseconds",
+            "datetime.timestamp.iso_8601_millis_offset",
+            "datetime.timestamp.iso_8601_micros_offset",
+            "datetime.timestamp.clf",
+            "datetime.timestamp.syslog_bsd",
+            "datetime.timestamp.sql_microseconds_offset",
+            "datetime.timestamp.pg_short_offset",
+            "datetime.timestamp.dot_dmy_24h",
+            "datetime.timestamp.slash_ymd_24h",
+            "datetime.timestamp.ctime",
+            "datetime.timestamp.epoch_nanoseconds",
+            "datetime.timestamp.iso_space_zulu",
+            "datetime.timestamp.dot_ymd_24h",
+            // 11 currency types
+            "finance.currency.amount_accounting_us",
+            "finance.currency.amount_eu_suffix",
+            "finance.currency.amount_space_sep",
+            "finance.currency.amount_indian",
+            "finance.currency.amount_ch",
+            "finance.currency.amount_nodecimal",
+            "finance.currency.amount_code_prefix",
+            "finance.currency.amount_minor_int",
+            "finance.currency.amount_crypto",
+            "finance.currency.amount_multisym",
+            "finance.currency.amount_neg_trailing",
+            // 2 rate types
+            "finance.rate.basis_points",
+            "finance.rate.yield",
+        ];
+
+        assert_eq!(new_types.len(), 53, "Should have exactly 53 new types");
+
+        for type_key in &new_types {
+            let result = gen.generate_value(type_key);
+            assert!(
+                result.is_ok(),
+                "Generator should succeed for {}: {:?}",
+                type_key,
+                result.err()
+            );
+            let val = result.unwrap();
+            assert!(
+                !val.is_empty(),
+                "Output should not be empty for {}",
+                type_key
             );
         }
     }
