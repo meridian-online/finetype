@@ -45,7 +45,10 @@ FROM schema_mapping;
 
 -- Profile results: dataset, column_name, predicted_type, confidence
 CREATE OR REPLACE TABLE profile_results AS
-SELECT * FROM read_csv('eval/eval_output/profile_results.csv', auto_detect=true);
+SELECT * FROM read_csv('eval/eval_output/profile_results.csv',
+    columns={'dataset': 'VARCHAR', 'column_name': 'VARCHAR',
+             'predicted_type': 'VARCHAR', 'confidence': 'DOUBLE'},
+    header=true);
 
 .print ''
 .print '--- Profile results loaded ---'
