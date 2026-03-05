@@ -255,6 +255,10 @@ pub struct ColumnResult {
     /// e.g., "EN_US", "FR_FR", "UNIVERSAL". None if the model was trained
     /// without locale labels or the type has no locale variants.
     pub detected_locale: Option<String>,
+    /// Whether the prediction is generic (low-confidence, attractor-demoted,
+    /// boolean, or designation-based). Generic predictions yield to header hints
+    /// and indicate the type may not be precise enough for downstream transforms.
+    pub is_generic: bool,
 }
 
 /// Column-mode classifier that wraps a single-value classifier.
@@ -394,6 +398,7 @@ impl ColumnClassifier {
                 disambiguation_rule: None,
                 samples_used: 0,
                 detected_locale: None,
+                is_generic: false,
             });
         }
 
@@ -509,6 +514,7 @@ impl ColumnClassifier {
                 disambiguation_rule: Some(rule_name),
                 samples_used: n_samples,
                 detected_locale: disambig_locale,
+                is_generic: false,
             }
         } else {
             // No disambiguation needed — use majority vote
@@ -526,6 +532,7 @@ impl ColumnClassifier {
                 disambiguation_rule: None,
                 samples_used: n_samples,
                 detected_locale,
+                is_generic: false,
             }
         };
 
@@ -563,7 +570,19 @@ impl ColumnClassifier {
             }
         }
 
+        self.finalize_is_generic(&mut result);
         Ok(result)
+    }
+
+    /// Set `is_generic` on a result based on its final label and disambiguation state.
+    /// Called before returning from classification methods to ensure the field is always
+    /// computed on the final (post-hint, post-demotion) label.
+    fn finalize_is_generic(&self, result: &mut ColumnResult) {
+        result.is_generic = is_generic_prediction(
+            &result.label,
+            &result.disambiguation_rule,
+            self.taxonomy.as_ref(),
+        );
     }
 
     /// Get a reference to the underlying classifier.
@@ -603,6 +622,7 @@ impl ColumnClassifier {
             .as_ref()
             .is_some_and(|r| r.starts_with("entity_demotion"))
         {
+            self.finalize_is_generic(&mut result);
             return Ok(result);
         }
 
@@ -623,6 +643,7 @@ impl ColumnClassifier {
             // If the model already predicts the hinted type, just boost confidence
             if result.label == hinted_type {
                 result.confidence = (result.confidence + 0.1).min(1.0);
+                self.finalize_is_generic(&mut result);
                 return Ok(result);
             }
 
@@ -644,6 +665,7 @@ impl ColumnClassifier {
                 result.disambiguation_applied = true;
                 result.disambiguation_rule =
                     Some(format!("header_hint_measurement:{}", header.to_lowercase()));
+                self.finalize_is_generic(&mut result);
                 return Ok(result);
             }
             // Scientific measurement override (NNFT-188): header contains
@@ -659,6 +681,7 @@ impl ColumnClassifier {
                     "header_hint_sci_measurement:{}",
                     header.to_lowercase()
                 ));
+                self.finalize_is_generic(&mut result);
                 return Ok(result);
             }
 
@@ -697,6 +720,7 @@ impl ColumnClassifier {
                         "header_hint_location_keep:{}",
                         header.to_lowercase()
                     ));
+                    self.finalize_is_generic(&mut result);
                     return Ok(result);
                 }
 
@@ -715,6 +739,7 @@ impl ColumnClassifier {
                             result.disambiguation_applied = true;
                             result.disambiguation_rule =
                                 Some(format!("header_hint_location:{}", header.to_lowercase()));
+                            self.finalize_is_generic(&mut result);
                             return Ok(result);
                         }
                     }
@@ -735,6 +760,7 @@ impl ColumnClassifier {
                     "header_hint_geo_override:{}",
                     header.to_lowercase()
                 ));
+                self.finalize_is_generic(&mut result);
                 return Ok(result);
             }
 
@@ -759,6 +785,7 @@ impl ColumnClassifier {
                         "header_hint_same_category:{}",
                         header.to_lowercase()
                     ));
+                    self.finalize_is_generic(&mut result);
                     return Ok(result);
                 }
             }
@@ -808,6 +835,7 @@ impl ColumnClassifier {
             }
         }
 
+        self.finalize_is_generic(&mut result);
         Ok(result)
     }
 
@@ -838,6 +866,7 @@ impl ColumnClassifier {
                 disambiguation_rule: None,
                 samples_used: 0,
                 detected_locale: None,
+                is_generic: false,
             });
         }
 
@@ -1001,6 +1030,7 @@ impl ColumnClassifier {
                 disambiguation_rule: Some(rule_name),
                 samples_used: n_samples,
                 detected_locale: disambig_locale,
+                is_generic: false,
             }
         } else {
             let confidence = if majority_fraction >= self.config.min_agreement {
@@ -1020,6 +1050,7 @@ impl ColumnClassifier {
                 },
                 samples_used: n_samples,
                 detected_locale,
+                is_generic: false,
             }
         };
 
@@ -1316,6 +1347,7 @@ impl ColumnClassifier {
             }
         }
 
+        self.finalize_is_generic(&mut result);
         Ok(result)
     }
 
@@ -3563,6 +3595,7 @@ mod tests {
             disambiguation_rule: None,
             samples_used: 0,
             detected_locale: None,
+            is_generic: false,
         };
         assert_eq!(result.label, "unknown");
         assert_eq!(result.samples_used, 0);

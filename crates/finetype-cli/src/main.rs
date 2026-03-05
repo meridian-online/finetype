@@ -2460,7 +2460,16 @@ fn cmd_profile(
         disambiguation_applied: bool,
         disambiguation_rule: Option<String>,
         detected_locale: Option<String>,
+        // Taxonomy contract fields (NNFT-207)
+        broad_type: Option<String>,
+        format_string: Option<String>,
+        transform: Option<String>,
+        is_generic: bool,
     }
+
+    // Load taxonomy for enrichment (may already be loaded for validation)
+    let taxonomy_path = std::path::PathBuf::from("labels");
+    let enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
 
     let mut profiles: Vec<ColProfile> = Vec::new();
 
@@ -2482,6 +2491,10 @@ fn cmd_profile(
                 disambiguation_applied: false,
                 disambiguation_rule: None,
                 detected_locale: None,
+                broad_type: None,
+                format_string: None,
+                transform: None,
+                is_generic: false,
             });
             continue;
         }
@@ -2491,6 +2504,22 @@ fn cmd_profile(
         } else {
             column_classifier.classify_column_with_header(col_values, &name)?
         };
+
+        // Look up taxonomy contract fields for the predicted label
+        let (broad_type, format_string, transform) =
+            if let Some(ref taxonomy) = enrichment_taxonomy {
+                if let Some(def) = taxonomy.get(&result.label) {
+                    (
+                        def.broad_type.clone(),
+                        def.format_string.clone(),
+                        def.transform.clone(),
+                    )
+                } else {
+                    (None, None, None)
+                }
+            } else {
+                (None, None, None)
+            };
 
         profiles.push(ColProfile {
             name,
@@ -2502,6 +2531,10 @@ fn cmd_profile(
             disambiguation_applied: result.disambiguation_applied,
             disambiguation_rule: result.disambiguation_rule,
             detected_locale: result.detected_locale,
+            broad_type,
+            format_string,
+            transform,
+            is_generic: result.is_generic,
         });
     }
 
@@ -2514,7 +2547,10 @@ fn cmd_profile(
             );
             println!("{}", "═".repeat(80));
             println!();
-            println!("  {:<25} {:<45} {:>6}", "COLUMN", "TYPE", "CONF");
+            println!(
+                "  {:<25} {:<38} {:>8} {:>6}",
+                "COLUMN", "TYPE", "BROAD", "CONF"
+            );
             println!("  {}", "─".repeat(78));
 
             for p in &profiles {
@@ -2523,6 +2559,7 @@ fn cmd_profile(
                 } else {
                     "—".to_string()
                 };
+                let broad = p.broad_type.as_deref().unwrap_or("—");
                 let disambig = if p.disambiguation_applied {
                     format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
                 } else {
@@ -2534,8 +2571,8 @@ fn cmd_profile(
                     String::new()
                 };
                 println!(
-                    "  {:<25} {:<45} {:>6}{}{}",
-                    p.name, p.label, conf_str, disambig, locale_str
+                    "  {:<25} {:<38} {:>8} {:>6}{}{}",
+                    p.name, p.label, broad, conf_str, disambig, locale_str
                 );
             }
 
@@ -2554,6 +2591,17 @@ fn cmd_profile(
                     obj.insert("column".to_string(), json!(p.name));
                     obj.insert("type".to_string(), json!(p.label));
                     obj.insert("confidence".to_string(), json!(p.confidence));
+                    // Taxonomy contract fields (NNFT-207)
+                    if let Some(bt) = &p.broad_type {
+                        obj.insert("broad_type".to_string(), json!(bt));
+                    }
+                    if let Some(fs) = &p.format_string {
+                        obj.insert("format_string".to_string(), json!(fs));
+                    }
+                    if let Some(tr) = &p.transform {
+                        obj.insert("transform".to_string(), json!(tr));
+                    }
+                    obj.insert("is_generic".to_string(), json!(p.is_generic));
                     obj.insert("samples_used".to_string(), json!(p.samples_used));
                     obj.insert("non_null".to_string(), json!(p.non_null_count));
                     obj.insert("null".to_string(), json!(p.null_count));
@@ -2578,13 +2626,17 @@ fn cmd_profile(
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         OutputFormat::Csv => {
-            println!("column,type,confidence,samples_used,non_null,null,disambiguation,locale");
+            println!("column,type,confidence,broad_type,format_string,transform,is_generic,samples_used,non_null,null,disambiguation,locale");
             for p in &profiles {
                 println!(
-                    "\"{}\",\"{}\",{:.4},{},{},{},\"{}\",\"{}\"",
+                    "\"{}\",\"{}\",{:.4},\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\",\"{}\"",
                     p.name,
                     p.label,
                     p.confidence,
+                    p.broad_type.as_deref().unwrap_or(""),
+                    p.format_string.as_deref().unwrap_or(""),
+                    p.transform.as_deref().unwrap_or(""),
+                    p.is_generic,
                     p.samples_used,
                     p.non_null_count,
                     p.null_count,

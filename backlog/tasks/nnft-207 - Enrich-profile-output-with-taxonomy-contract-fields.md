@@ -1,9 +1,11 @@
 ---
 id: NNFT-207
 title: Enrich profile output with taxonomy contract fields
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@nightingale'
 created_date: '2026-03-04 20:14'
+updated_date: '2026-03-05 23:20'
 labels:
   - cli
   - profile
@@ -28,6 +30,19 @@ Profile currently returns type/confidence/nulls. Add `broad_type`, `transform`, 
 - [ ] #3 CSV output includes new columns
 - [ ] #4 Tests pass
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add is_generic field to ColumnResult in column.rs
+2. Extend ColProfile struct in cmd_profile with broad_type, transform, format_string, is_generic
+3. After classification, look up predicted label in taxonomy to populate new fields
+4. Enrich JSON output with all four fields
+5. Enrich plain output with broad_type column
+6. Enrich CSV output with all four columns
+7. Run cargo test + taxonomy check
+8. Verify output formats manually
+<!-- SECTION:PLAN:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
