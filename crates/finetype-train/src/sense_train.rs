@@ -4,7 +4,7 @@
 //! with AdamW, cosine annealing LR, early stopping, and header dropout.
 
 use anyhow::{Context, Result};
-use candle_core::{Device, Tensor};
+use candle_core::Tensor;
 use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarMap};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -264,7 +264,7 @@ pub fn train_sense(
     train_data: &SenseDataset,
     val_data: &SenseDataset,
 ) -> Result<TrainingSummary> {
-    let device = Device::Cpu;
+    let device = crate::get_device();
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     tracing::info!(
@@ -488,7 +488,7 @@ mod tests {
     use super::*;
     use crate::data::ColumnSample;
     use crate::sense::EMBED_DIM;
-    use candle_core::DType;
+    use candle_core::{DType, Device};
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
 

@@ -7,8 +7,11 @@
 //! - **Model2Vec type embeddings** — FPS algorithm for taxonomy label matching
 
 pub mod data;
+pub mod device;
 pub mod entity;
 pub mod model2vec_prep;
 pub mod sense;
 pub mod sense_train;
 pub mod training;
+
+pub use device::get_device;
