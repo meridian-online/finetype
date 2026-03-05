@@ -42,7 +42,6 @@ When you classify a column, FineType returns both the **type** and the **locale*
 $ finetype infer -i "+33 1 42 68 53 00" --output json
 {
   "label": "identity.person.phone_number",
-  "confidence": 0.99,
   "locale": "FR",
   "broad_type": "VARCHAR"
 }
@@ -50,8 +49,7 @@ $ finetype infer -i "+33 1 42 68 53 00" --output json
 $ finetype infer -i "M5V 3A8" --output json
 {
   "label": "geography.address.postal_code",
-  "confidence": 0.98,
-  "locale": "CA",
+  "locale": "EN_CA",
   "broad_type": "VARCHAR"
 }
 ```
@@ -105,7 +103,7 @@ When you classify a value, FineType returns the matching locale:
 
 ```bash
 $ finetype infer -i "(202) 555-0100"
-identity.person.phone_number.US
+identity.person.phone_number.EN_US
 
 $ finetype infer -i "030 12345678"
 identity.person.phone_number.DE
@@ -133,13 +131,13 @@ FineType validates against all 65 patterns:
 
 ```bash
 $ finetype infer -i "M5V 3A8"
-geography.address.postal_code.CA
+geography.address.postal_code.EN_CA
 
 $ finetype infer -i "10115"
 geography.address.postal_code.DE
 
 $ finetype infer -i "01310-100"
-geography.address.postal_code.BR
+geography.address.postal_code.PT_BR
 ```
 
 ### Month Names
@@ -148,16 +146,16 @@ geography.address.postal_code.BR
 
 ```bash
 $ finetype infer -i "janvier"
-datetime.date.month_name.FR
+datetime.component.month_name.FR
 
 $ finetype infer -i "Januar"
-datetime.date.month_name.DE
+datetime.component.month_name.DE
 
 $ finetype infer -i "enero"
-datetime.date.month_name.ES
+datetime.component.month_name.ES
 
 $ finetype infer -i "January"
-datetime.date.month_name.EN
+datetime.component.month_name.EN
 ```
 
 Useful for datasets with non-English date text:
@@ -165,13 +163,13 @@ Useful for datasets with non-English date text:
 ```sql
 -- French dataset
 SELECT finetype(month_col) FROM french_dates;
--- → datetime.date.month_name.FR (not EN)
+-- → datetime.component.month_name.FR (not EN)
 
 -- Then extract and transform
 SELECT
   CASE finetype(month_col)
-    WHEN 'datetime.date.month_name.FR' THEN parse_fr_month(month_col)
-    WHEN 'datetime.date.month_name.EN' THEN strptime(month_col, '%B')
+    WHEN 'datetime.component.month_name.FR' THEN parse_fr_month(month_col)
+    WHEN 'datetime.component.month_name.EN' THEN strptime(month_col, '%B')
   END as month
 FROM french_dates;
 ```

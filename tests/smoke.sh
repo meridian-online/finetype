@@ -98,7 +98,7 @@ section "5. Infer — Output Formats"
 
 # JSON output
 OUT=$("$FINETYPE" infer -i "john@example.com" -o json 2>/dev/null)
-assert_contains "json has class field" "$OUT" '"class"'
+assert_contains "json has label field" "$OUT" '"label"'
 
 # JSON with confidence
 OUT=$("$FINETYPE" infer -i "john@example.com" -o json --confidence 2>/dev/null)
@@ -143,7 +143,7 @@ assert_contains "column mode classifies emails" "$OUT" "email"
 
 # Column mode JSON
 OUT=$("$FINETYPE" infer --file "$TMPFILE2" --mode column -o json 2>/dev/null)
-assert_contains "column mode json has class" "$OUT" '"class"'
+assert_contains "column mode json has label" "$OUT" '"label"'
 assert_contains "column mode json has samples_used" "$OUT" '"samples_used"'
 
 # ── Embedded Model (No models/ dir) ──────────────────────────────────────────

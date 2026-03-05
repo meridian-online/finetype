@@ -576,6 +576,30 @@ fn cmd_infer(
     let total_values = inputs.len();
     let t_start = Instant::now();
 
+    // Load taxonomy for value-mode enrichment (locale detection, broad_type)
+    let taxonomy_path = std::path::PathBuf::from("labels");
+    let taxonomy = load_taxonomy(&taxonomy_path).ok().map(|mut t| {
+        t.compile_locale_validators();
+        t
+    });
+
+    /// Detect locale for a single value by testing it against all locale validators.
+    /// Unlike `detect_locale_from_validation` (column mode, pass-rate ranking),
+    /// this returns the first locale whose validator passes for a single value.
+    fn detect_single_value_locale(
+        value: &str,
+        label: &str,
+        taxonomy: &Taxonomy,
+    ) -> Option<String> {
+        let locale_validators = taxonomy.get_locale_validators(label)?;
+        for (locale, validator) in locale_validators {
+            if validator.validate(value).is_valid {
+                return Some(locale.clone());
+            }
+        }
+        None
+    }
+
     // Helper to output result
     fn output_result(
         text: &str,
@@ -583,39 +607,61 @@ fn cmd_infer(
         output: OutputFormat,
         show_value: bool,
         show_confidence: bool,
+        taxonomy: Option<&Taxonomy>,
     ) {
+        // Detect locale for suffix and JSON enrichment
+        let locale = taxonomy.and_then(|tax| detect_single_value_locale(text, &result.label, tax));
+
+        // Build display label: append .LOCALE suffix when detected
+        let display_label = if let Some(ref loc) = locale {
+            format!("{}.{}", result.label, loc)
+        } else {
+            result.label.clone()
+        };
+
         match output {
             OutputFormat::Plain => {
                 if show_value && show_confidence {
-                    println!("{}\t{}\t{:.4}", text, result.label, result.confidence);
+                    println!("{}\t{}\t{:.4}", text, display_label, result.confidence);
                 } else if show_value {
-                    println!("{}\t{}", text, result.label);
+                    println!("{}\t{}", text, display_label);
                 } else if show_confidence {
-                    println!("{}\t{:.4}", result.label, result.confidence);
+                    println!("{}\t{:.4}", display_label, result.confidence);
                 } else {
-                    println!("{}", result.label);
+                    println!("{}", display_label);
                 }
             }
             OutputFormat::Json => {
                 let mut obj = serde_json::Map::new();
-                obj.insert("class".to_string(), json!(result.label));
+                obj.insert("label".to_string(), json!(result.label));
                 if show_value {
                     obj.insert("input".to_string(), json!(text));
                 }
                 if show_confidence {
                     obj.insert("confidence".to_string(), json!(result.confidence));
                 }
+                // Enrich with taxonomy fields when available
+                if let Some(tax) = taxonomy {
+                    if let Some(def) = tax.get(&result.label) {
+                        if let Some(ref bt) = def.broad_type {
+                            obj.insert("broad_type".to_string(), json!(bt));
+                        }
+                    }
+                }
+                if let Some(ref loc) = locale {
+                    obj.insert("locale".to_string(), json!(loc));
+                }
                 println!("{}", serde_json::Value::Object(obj));
             }
             OutputFormat::Csv => {
                 if show_value && show_confidence {
-                    println!("\"{}\",\"{}\",{:.4}", text, result.label, result.confidence);
+                    println!("\"{}\",\"{}\",{:.4}", text, display_label, result.confidence);
                 } else if show_value {
-                    println!("\"{}\",\"{}\"", text, result.label);
+                    println!("\"{}\",\"{}\"", text, display_label);
                 } else if show_confidence {
-                    println!("\"{}\",{:.4}", result.label, result.confidence);
+                    println!("\"{}\",{:.4}", display_label, result.confidence);
                 } else {
-                    println!("\"{}\"", result.label);
+                    println!("\"{}\"", display_label);
                 }
             }
         }
@@ -693,7 +739,7 @@ fn cmd_infer(
             }
             OutputFormat::Json => {
                 let mut obj = serde_json::Map::new();
-                obj.insert("class".to_string(), json!(result.label));
+                obj.insert("label".to_string(), json!(result.label));
                 obj.insert("confidence".to_string(), json!(result.confidence));
                 obj.insert("samples_used".to_string(), json!(result.samples_used));
                 obj.insert(
@@ -737,7 +783,7 @@ fn cmd_infer(
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
                 for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(text, result, output, show_value, show_confidence);
+                    output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
                 }
             }
         }
@@ -748,7 +794,7 @@ fn cmd_infer(
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
                 for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(text, result, output, show_value, show_confidence);
+                    output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
                 }
             }
         }
@@ -777,7 +823,7 @@ fn cmd_infer(
                     total_timing.tier2_models = total_timing.tier2_models.max(timing.tier2_models);
                     total_timing.total_ms += timing.total_ms;
                     for (text, result) in chunk.iter().zip(results.iter()) {
-                        output_result(text, result, output, show_value, show_confidence);
+                        output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
                     }
                 }
                 let elapsed = t_start.elapsed();
@@ -809,7 +855,7 @@ fn cmd_infer(
                 let batch_texts: Vec<String> = chunk.to_vec();
                 let results = classifier.classify_batch(&batch_texts)?;
                 for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(text, result, output, show_value, show_confidence);
+                    output_result(text, result, output, show_value, show_confidence, taxonomy.as_ref());
                 }
             }
         }
