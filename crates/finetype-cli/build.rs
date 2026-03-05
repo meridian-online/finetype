@@ -192,7 +192,8 @@ fn get_cache_dir() -> PathBuf {
 /// Download a model group (e.g., char-cnn-v11, model2vec). Panics if any file is missing.
 fn download_model_group(models_dir: &Path, group_name: &str, files: &[&str]) {
     let group_dir = models_dir.join(group_name);
-    fs::create_dir_all(&group_dir).expect(&format!("Failed to create {} directory", group_name));
+    fs::create_dir_all(&group_dir)
+        .unwrap_or_else(|_| panic!("Failed to create {} directory", group_name));
 
     for file in files {
         let file_path = group_dir.join(file);
@@ -203,10 +204,12 @@ fn download_model_group(models_dir: &Path, group_name: &str, files: &[&str]) {
         }
 
         let url = format!("{}/{}/{}", HF_REPO, group_name, file);
-        download_file(&url, &file_path).expect(&format!(
-            "Failed to download {}/{} from HuggingFace",
-            group_name, file
-        ));
+        download_file(&url, &file_path).unwrap_or_else(|_| {
+            panic!(
+                "Failed to download {}/{} from HuggingFace",
+                group_name, file
+            )
+        });
     }
 
     println!(
