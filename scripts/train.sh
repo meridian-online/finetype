@@ -18,10 +18,16 @@ HIDDEN_DIM=""
 MODEL_NAME=""
 DATA_FILE=""
 
-# ─── Architecture presets ───────────────────────────────────────────
-declare -A PRESET_EMBED_DIM=([small]=32  [medium]=64  [large]=128)
-declare -A PRESET_NUM_FILTERS=([small]=64 [medium]=128 [large]=256)
-declare -A PRESET_HIDDEN_DIM=([small]=128 [medium]=256 [large]=512)
+# ─── Architecture presets (bash 3.2 compatible — no associative arrays) ──
+preset_values() {
+    # Usage: preset_values <size> → sets PRESET_EMBED PRESET_FILTERS PRESET_HIDDEN
+    case "$1" in
+        small)  PRESET_EMBED=32;  PRESET_FILTERS=64;  PRESET_HIDDEN=128 ;;
+        medium) PRESET_EMBED=64;  PRESET_FILTERS=128; PRESET_HIDDEN=256 ;;
+        large)  PRESET_EMBED=128; PRESET_FILTERS=256; PRESET_HIDDEN=512 ;;
+        *) return 1 ;;
+    esac
+}
 
 # ─── Usage ──────────────────────────────────────────────────────────
 usage() {
@@ -71,16 +77,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate size preset
-if [[ -z "${PRESET_EMBED_DIM[$SIZE]+x}" ]]; then
+# Validate size preset and resolve defaults
+if ! preset_values "$SIZE"; then
     echo "Error: Unknown size preset '$SIZE'. Use small, medium, or large." >&2
     exit 1
 fi
 
 # Resolve architecture params (overrides take precedence)
-EMBED_DIM="${EMBED_DIM:-${PRESET_EMBED_DIM[$SIZE]}}"
-NUM_FILTERS="${NUM_FILTERS:-${PRESET_NUM_FILTERS[$SIZE]}}"
-HIDDEN_DIM="${HIDDEN_DIM:-${PRESET_HIDDEN_DIM[$SIZE]}}"
+EMBED_DIM="${EMBED_DIM:-$PRESET_EMBED}"
+NUM_FILTERS="${NUM_FILTERS:-$PRESET_FILTERS}"
+HIDDEN_DIM="${HIDDEN_DIM:-$PRESET_HIDDEN}"
 
 # ─── Hardware detection ─────────────────────────────────────────────
 detect_hardware() {
@@ -118,8 +124,9 @@ detect_hardware
 
 # ─── Auto-detect model name ────────────────────────────────────────
 if [[ -z "$MODEL_NAME" ]]; then
-    # Find highest existing char-cnn-vN and increment
-    LATEST=$(ls -d models/char-cnn-v* 2>/dev/null | sed 's/.*char-cnn-v//' | sort -n | tail -1 || echo "0")
+    # Find highest existing char-cnn-vN and increment (ignore snapshots)
+    LATEST=$(ls -d models/char-cnn-v* 2>/dev/null | sed 's/.*char-cnn-v//' | grep -E '^[0-9]+$' | sort -n | tail -1 || echo "0")
+    LATEST="${LATEST:-0}"
     NEXT=$((LATEST + 1))
     MODEL_NAME="char-cnn-v${NEXT}"
 fi
