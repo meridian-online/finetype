@@ -1229,8 +1229,7 @@ impl ColumnClassifier {
                                     ));
                                 }
                                 geo_handled = true;
-                            } else if !hint_is_hardcoded
-                                && (is_generic || result.confidence < 0.3)
+                            } else if !hint_is_hardcoded && (is_generic || result.confidence < 0.3)
                             {
                                 // Model2Vec person-name hint + generic/very-low-confidence →
                                 // check UNMASKED votes for location types. Low confidence
@@ -1337,9 +1336,7 @@ impl ColumnClassifier {
                                     "sense_header_hint_generic:{}",
                                     header.to_lowercase()
                                 ));
-                            } else if hint_is_hardcoded
-                                && result.confidence < 0.5
-                                && !hint_in_votes
+                            } else if hint_is_hardcoded && result.confidence < 0.5 && !hint_in_votes
                             {
                                 // Hardcoded hint authority (NNFT-235): hardcoded hints
                                 // are curated knowledge. At low confidence (<0.5), they
