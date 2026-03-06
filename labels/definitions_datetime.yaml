@@ -342,7 +342,7 @@ datetime.timestamp.rfc_2822_ordinal:
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
   format_string: null
-  transform: null
+  transform: "strptime(regexp_replace({col}, '(\\d+)(?:st|nd|rd|th)', '\\1'), '%d %b %Y %H:%M:%S %z')"
   transform_ext: null
   decompose: null
   validation:
@@ -359,9 +359,9 @@ datetime.timestamp.rfc_2822_ordinal:
     - title: "RFC 2822 - Internet Message Format"
       link: "https://www.rfc-editor.org/rfc/rfc2822"
   notes: >
-    No direct strptime support — ordinal suffix requires preprocessing
-    (strip backtick-wrapped suffixes) before parsing as standard RFC 2822.
-    transform is null because custom logic is needed.
+    No direct strptime support — ordinal suffix requires preprocessing.
+    Transform strips ordinal suffixes (st/nd/rd/th) via regexp_replace
+    before parsing with strptime.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: date
@@ -819,7 +819,7 @@ datetime.date.julian:
   locales: [UNIVERSAL]
   broad_type: DATE
   format_string: null
-  transform: null
+  transform: "strptime(concat('20', {col}), '%Y-%j')::DATE"
   transform_ext: null
   decompose: null
   validation:
@@ -838,8 +838,7 @@ datetime.date.julian:
       link: "https://en.wikipedia.org/wiki/Julian_day"
   notes: >
     No direct strptime support for 2-digit year + day-of-year.
-    Requires custom parsing: concat '20' + first 2 chars, then
-    strptime(result, '%Y-%j').
+    Transform prepends '20' to get 4-digit year, then parses with %Y-%j.
 
 datetime.date.iso_week:
   title: ISO Week Date
