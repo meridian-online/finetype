@@ -121,32 +121,20 @@ fn collect_value(value: &Value, prefix: &str, paths: &mut IndexMap<String, Vec<O
         Value::Null => {
             // Add None for null values at this path
             if !prefix.is_empty() {
-                paths
-                    .entry(prefix.to_string())
-                    .or_insert_with(Vec::new)
-                    .push(None);
+                paths.entry(prefix.to_string()).or_default().push(None);
             }
         }
         Value::Bool(b) => {
             let path = prefix.to_string();
-            paths
-                .entry(path)
-                .or_insert_with(Vec::new)
-                .push(Some(b.to_string()));
+            paths.entry(path).or_default().push(Some(b.to_string()));
         }
         Value::Number(n) => {
             let path = prefix.to_string();
-            paths
-                .entry(path)
-                .or_insert_with(Vec::new)
-                .push(Some(n.to_string()));
+            paths.entry(path).or_default().push(Some(n.to_string()));
         }
         Value::String(s) => {
             let path = prefix.to_string();
-            paths
-                .entry(path)
-                .or_insert_with(Vec::new)
-                .push(Some(s.clone()));
+            paths.entry(path).or_default().push(Some(s.clone()));
         }
         Value::Array(arr) => {
             // Array path: use [] notation
@@ -327,10 +315,7 @@ mod tests {
         );
         assert_eq!(
             map.get("address.country"),
-            Some(&vec![
-                Some("USA".to_string()),
-                Some("USA".to_string())
-            ])
+            Some(&vec![Some("USA".to_string()), Some("USA".to_string())])
         );
 
         Ok(())
@@ -354,9 +339,8 @@ mod tests {
     fn test_path_order_preserved() {
         // Note: serde_json::json! doesn't preserve insertion order by default
         // The order is determined by the JSON parser, which typically sorts alphabetically
-        let json = serde_json::from_str::<Value>(
-            r#"{"z_field":"z","a_field":"a","m_field":"m"}"#
-        ).unwrap();
+        let json = serde_json::from_str::<Value>(r#"{"z_field":"z","a_field":"a","m_field":"m"}"#)
+            .unwrap();
         let map = collect_json(&json);
 
         let paths: Vec<_> = map.paths().collect();

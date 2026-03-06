@@ -2953,7 +2953,7 @@ fn read_json_input(
                 for item in arr {
                     let item_map = json_reader::collect_json(item);
                     for (path, values) in item_map.all_paths() {
-                        let entry = all_paths.entry(path.clone()).or_insert_with(Vec::new);
+                        let entry = all_paths.entry(path.clone()).or_default();
                         entry.extend(values.iter().cloned());
                     }
                     // Fill missing paths with None
