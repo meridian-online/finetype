@@ -159,6 +159,35 @@ else
     skip "CSV regression (no datasets available)"
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+
+section "11. JSON + --validate (plain output)"
+
+validate_plain=$("$FINETYPE" profile -f "$FIXTURES/nested_objects.json" --validate 2>/dev/null)
+assert_contains "validate plain has VALID column" "$validate_plain" "VALID"
+assert_contains "validate plain has Quality grade" "$validate_plain" "Quality:"
+assert_contains "validate plain shows JSON paths" "$validate_plain" "user.contact.email"
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+section "12. JSON + --validate -o markdown"
+
+validate_md=$("$FINETYPE" profile -f "$FIXTURES/nested_objects.json" --validate -o markdown 2>/dev/null)
+assert_contains "validate markdown has Valid Rate header" "$validate_md" "Valid Rate"
+assert_contains "validate markdown has Quality header" "$validate_md" "Quality"
+assert_contains "validate markdown has bold Quality grade" "$validate_md" "**Quality:"
+assert_contains "validate markdown shows JSON paths" "$validate_md" "user.contact.phone"
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+section "13. JSON + --validate -o json"
+
+validate_json=$("$FINETYPE" profile -f "$FIXTURES/test_profile.json" --validate -o json 2>/dev/null)
+assert_contains "validate json has quality field" "$validate_json" '"quality"'
+assert_contains "validate json has valid count" "$validate_json" '"valid"'
+assert_contains "validate json has quality_score" "$validate_json" '"quality_score"'
+assert_contains "validate json shows JSON paths" "$validate_json" '"address.city"'
+
 # ═══════════════════════════════════════════════════════════════════════════════
 
 print_summary "JSON Profiling Smoke Tests"
