@@ -224,3 +224,9 @@ time 12h seconds,profile,datetime.time.hms_12h,datetime,direct,false
 rfc 2822 timestamp,profile,datetime.timestamp.rfc_2822,datetime,direct,false
 american timestamp,profile,datetime.timestamp.mdy_12h,datetime,direct,false
 european timestamp,profile,datetime.timestamp.dmy_hm,datetime,direct,false
+iso timestamp,profile,datetime.timestamp.iso_8601,datetime,direct,false
+iso timestamp milliseconds,profile,datetime.timestamp.iso_8601_milliseconds,datetime,direct,false
+iso date,profile,datetime.date.iso,datetime,direct,false
+alphanumeric id,profile,representation.identifier.alphanumeric_id,representation,direct,false
+http method,profile,technology.internet.http_method,technology,direct,false
+currency code,profile,finance.currency.currency_code,finance,direct,false

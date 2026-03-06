@@ -22,13 +22,15 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.2
 **Taxonomy:** 209 definitions across 7 domains (container: 12, datetime: 84, finance: 28, geography: 15, identity: 19, representation: 32, technology: 19) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v12 flat (216 classes, 10 epochs, 212k samples), tiered-v2 fallback via `--sharp-only`.
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v13 flat (209 classes, 10 epochs, 209k samples), tiered-v2 fallback via `--sharp-only`.
 **Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
 
 ### Recent milestones
 
+- **Taxonomy cleanup** (NNFT-233/234) — Removed 7 low-precision types (216→209), recategorized color types, renamed 10 geographic type names to format-structural names (eu_→dmy_, us_→mdy_, american→mdy_12h, european→dmy_hm, decimal_number_eu→decimal_number_comma). CharCNN-v13 retrained on 209k samples (1000/type). Profile: 143/146 (97.9% label, 98.6% domain). Actionability: 99.3%.
+- **Post-retrain accuracy recovery v13** (NNFT-235) — Five pipeline fixes for entity/geography confusion: (1) same-domain geo override ignores confidence threshold for hardcoded hints, (2) hardcoded person-name hints override location predictions, (3) 20+ entity-name header hints (company, venue, station, etc.), (4) bare "address" → full_address, (5) hardcoded hints apply at <0.5 confidence. Profile: 135/146→143/146 (97.9%). 3 remaining: bare "name" ambiguity.
 - **Format Coverage expansion** (NNFT-222–226) — 53 new type definitions (163→216 types, 33% increase). 40 datetime + 13 finance formats including CJK dates, Apache CLF, ISO 8601 milliseconds, Indian lakh/crore, Swiss apostrophe, accounting notation. CharCNN-v12 retrained on 212k samples (1000/type). Pipeline fix: header-hint location override (Step 7b-pre) for Sense misrouting. Profile: 111/116 (95.7% label). Actionability: 96.2%.
 - **Post-retrain accuracy recovery** (NNFT-194) — Five targeted pipeline fixes: (1) Rule 17 UTC offset guard removed (utc_offset fix), (2) rfc_2822/rfc_3339/sql_standard header hints added before generic timestamp catch-all, (3) full_address header hint distinguished from street_address, (4) same-category hardcoded hint override for within-category disambiguation, (5) enhanced geography protection checks unmasked votes at low confidence. Profile: 112/116→113/116 (97.4% label, 98.3% domain). Actionability: 95.4%→97.9%. 3 remaining misclassifications require model retrain.
 - **Locale Foundation expansion** (NNFT-195–201) — Layer 1: Expanded validation to 50+ postal codes, 45+ phone numbers, 30+ month/day names. Layer 2: Expanded generators to match (65 postal locales, 46 phone locales, 32 CLDR date/time patterns). CharCNN-v11 retrained on expanded data (10 epochs, 88.3% training accuracy). Profile eval improved 110/116→112/116 (96.6%).
@@ -41,8 +43,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Format Coverage expansion** (NNFT-222–226) — Complete. 53 new type definitions (163→216 types). CharCNN-v12 retrained (212k samples, 1000/type). Profile: 111/116 (95.7% label, 98.3% domain). Actionability: 96.2%. Pipeline fix: header-hint location override for Sense misrouting.
-- **Remaining accuracy gaps** — 5 misclassifications: address→street_address (expected full_address), abbreviated_month_date→long_full_month, airports.name→city (expected full_name), npi→isbn, company→last_name (expected entity_name). Mix of CharCNN limitations and keyword-match ambiguity in header_hint.
+- **Remaining accuracy gaps** — 3 misclassifications (all bare "name" header ambiguity): airports.name→region (expected full_name), countries.name→city (expected country), multilingual.name→region (expected full_name). Genuinely ambiguous — "name" means different things per dataset.
 
 ## Architecture
 
@@ -153,10 +154,10 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 95.7% label (111/116), 98.3% domain (114/116) on 21 datasets.
+**Profile eval** (`eval/profile_eval.sh`) — 97.9% label (143/146), 98.6% domain (144/146) on 25 datasets.
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
-**Actionability eval** (`eval-actionability` binary) — 96.2% datetime format_string parse rate (2760/2870 values). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds). 2 columns below 95%: multilingual.date (mixed formats), abbreviated_month_date (misclassification).
+**Actionability eval** (`eval-actionability` binary) — 99.3% datetime format_string parse rate (226951/228512 values). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds).
 **Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 

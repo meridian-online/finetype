@@ -1206,19 +1206,39 @@ impl ColumnClassifier {
                         let mut geo_handled = false;
                         if PERSON_NAME_HINTS.contains(&hinted_type) {
                             if LOCATION_TYPES.contains(&result.label.as_str()) {
-                                result.confidence = result.confidence.max(0.5);
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_location_keep:{}",
-                                    header.to_lowercase()
-                                ));
+                                // Result is already a location type. If the hint
+                                // is a hardcoded person-name hint (e.g., "first_name"
+                                // header → first_name), trust the header over CharCNN's
+                                // location prediction — person names and place names
+                                // overlap in CharCNN vocabulary but the header is
+                                // authoritative. (NNFT-235)
+                                if hint_is_hardcoded {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = result.confidence.max(0.6);
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_person_override:{}",
+                                        header.to_lowercase()
+                                    ));
+                                } else {
+                                    result.confidence = result.confidence.max(0.5);
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_location_keep:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
                                 geo_handled = true;
-                            } else if is_generic || result.confidence < 0.3 {
-                                // Generic or very-low-confidence + person-name hint →
+                            } else if !hint_is_hardcoded
+                                && (is_generic || result.confidence < 0.3)
+                            {
+                                // Model2Vec person-name hint + generic/very-low-confidence →
                                 // check UNMASKED votes for location types. Low confidence
                                 // (<0.3) suggests Sense may have misrouted this column,
                                 // so masked votes are unreliable. Unmasked CharCNN votes
                                 // give the true value-level signal. (NNFT-194)
+                                // Skip this for hardcoded hints — they're authoritative
+                                // and should fall through to general hint logic. (NNFT-235)
                                 let top_unmasked_location = unmasked_votes
                                     .iter()
                                     .find(|(label, _)| LOCATION_TYPES.contains(&label.as_str()));
@@ -1238,15 +1258,18 @@ impl ColumnClassifier {
                             }
                         }
 
-                        // Same-domain geographic override (NNFT-188): when both
-                        // the hint and prediction are location types (e.g., city vs
-                        // country), allow override at higher confidence (≤0.90) since
-                        // header names like "Country" are authoritative for geo types.
+                        // Same-domain geographic override (NNFT-188, NNFT-235):
+                        // when both hint and prediction are location types (e.g.,
+                        // city vs country), the header is authoritative. Hardcoded
+                        // hints (e.g., "Country" → country) override at any
+                        // confidence — the header explicitly names the geo type.
+                        // Model2Vec hints use the original ≤0.90 threshold since
+                        // semantic similarity is less precise.
                         if !geo_handled
                             && LOCATION_TYPES.contains(&hinted_type)
                             && LOCATION_TYPES.contains(&result.label.as_str())
                             && result.label != hinted_type
-                            && result.confidence <= 0.90
+                            && (hint_is_hardcoded || result.confidence <= 0.90)
                         {
                             result.label = hinted_type.to_string();
                             result.confidence = result.confidence.max(0.6);
@@ -1312,6 +1335,22 @@ impl ColumnClassifier {
                                 result.disambiguation_applied = true;
                                 result.disambiguation_rule = Some(format!(
                                     "sense_header_hint_generic:{}",
+                                    header.to_lowercase()
+                                ));
+                            } else if hint_is_hardcoded
+                                && result.confidence < 0.5
+                                && !hint_in_votes
+                            {
+                                // Hardcoded hint authority (NNFT-235): hardcoded hints
+                                // are curated knowledge. At low confidence (<0.5), they
+                                // should override even when the hinted type isn't in
+                                // CharCNN votes. Example: "job_title" → categorical
+                                // when CharCNN votes are scattered across name types.
+                                result.label = hinted_type.to_string();
+                                result.confidence = 0.5;
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_hardcoded:{}",
                                     header.to_lowercase()
                                 ));
                             } else if result.confidence < 0.3 && !hint_in_votes {
@@ -2121,7 +2160,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("datetime.offset.iana");
         }
         // Publisher / publishing (NNFT-188)
-        "publisher" | "publishing house" | "published by" => {
+        // Company / venue / station — entity names confused with city (NNFT-235)
+        "publisher" | "publishing house" | "published by" | "company" | "employer"
+        | "organization" | "organisation" | "venue" | "stadium" | "arena" | "theater"
+        | "theatre" | "station" | "station name" | "facility" | "building" | "hotel"
+        | "restaurant" | "hospital" | "school" | "university" | "manufacturer" => {
             return Some("representation.text.entity_name");
         }
         // Financial code columns (cvv removed in v0.5.1)
@@ -2199,10 +2242,13 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("identity.person.full_name");
     }
     if h.contains("address") && !h.contains("email") && !h.contains("ip") {
-        if h.contains("full") {
-            return Some("geography.address.full_address");
+        // "street address" or "street_address" → street_address
+        // "full address" → full_address
+        // Bare "address" → full_address (NNFT-235: more commonly means full address)
+        if h.contains("street") {
+            return Some("geography.address.street_address");
         }
-        return Some("geography.address.street_address");
+        return Some("geography.address.full_address");
     }
     if h.contains("street") {
         return Some("geography.address.street_address");
