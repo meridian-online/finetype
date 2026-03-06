@@ -345,6 +345,7 @@ enum OutputFormat {
     Plain,
     Json,
     Csv,
+    Markdown,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -622,7 +623,7 @@ fn cmd_infer(
         };
 
         match output {
-            OutputFormat::Plain => {
+            OutputFormat::Plain | OutputFormat::Markdown => {
                 if show_value && show_confidence {
                     println!("{}\t{}\t{:.4}", text, display_label, result.confidence);
                 } else if show_value {
@@ -716,7 +717,7 @@ fn cmd_infer(
         };
 
         match output {
-            OutputFormat::Plain => {
+            OutputFormat::Plain | OutputFormat::Markdown => {
                 println!("{}", result.label);
                 if show_confidence {
                     println!(
@@ -1612,7 +1613,7 @@ fn cmd_taxonomy(
     defs.sort_by_key(|(k, _)| (*k).clone());
 
     match output {
-        OutputFormat::Plain => {
+        OutputFormat::Plain | OutputFormat::Markdown => {
             println!("Domains: {:?}", taxonomy.domains());
             println!("Total labels: {}", taxonomy.len());
             if let Some(dom) = &domain {
@@ -1910,7 +1911,7 @@ fn cmd_check(
     let report = checker.run(&taxonomy);
 
     match output {
-        OutputFormat::Plain => {
+        OutputFormat::Plain | OutputFormat::Markdown => {
             print!("{}", format_report(&report, verbose));
         }
         OutputFormat::Json => {
@@ -2272,6 +2273,31 @@ fn cmd_validate(
                     s.validity_rate()
                 );
             }
+        }
+        OutputFormat::Markdown => {
+            println!("## Data Quality Report\n");
+            println!("| Label | Total | Valid | Invalid | Null | Validity Rate |");
+            println!("|-------|------:|------:|--------:|-----:|--------------:|");
+            for gr in &group_results {
+                let s = &gr.result.stats;
+                println!(
+                    "| {} | {} | {} | {} | {} | {:.1}% |",
+                    gr.label,
+                    s.total_count,
+                    s.valid_count,
+                    s.invalid_count,
+                    s.null_count,
+                    s.validity_rate() * 100.0
+                );
+            }
+            println!(
+                "\n**Overall:** {} values, {} valid, {} invalid, {} null — Strategy: {}",
+                total_values,
+                total_valid,
+                total_invalid,
+                total_null,
+                strategy.name()
+            );
         }
     }
 
@@ -2799,6 +2825,57 @@ fn cmd_profile(
                     p.disambiguation_rule.as_deref().unwrap_or(""),
                     p.detected_locale.as_deref().unwrap_or("")
                 );
+            }
+        }
+        OutputFormat::Markdown => {
+            println!(
+                "## FineType Column Profile — `{}`\n",
+                file.to_string_lossy()
+            );
+            println!("{} rows, {} columns\n", row_count, n_cols);
+            if validate {
+                println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
+                println!("|--------|------|-----------|----------:|-----------:|--------:|");
+            } else {
+                println!("| Column | Type | Broad Type | Confidence |");
+                println!("|--------|------|-----------|----------:|");
+            }
+            for p in &profiles {
+                let conf_str = if p.non_null_count > 0 {
+                    format!("{:.1}%", p.confidence * 100.0)
+                } else {
+                    "—".to_string()
+                };
+                let broad = p.broad_type.as_deref().unwrap_or("—");
+                if validate {
+                    let (valid_str, score_str) = match &p.quality {
+                        Some(q) => (
+                            format!("{:.1}%", q.score.type_conforming_rate * 100.0),
+                            format!("{:.1}%", q.score.quality_score * 100.0),
+                        ),
+                        None => ("—".to_string(), "—".to_string()),
+                    };
+                    println!(
+                        "| {} | `{}` | {} | {} | {} | {} |",
+                        p.name, p.label, broad, conf_str, valid_str, score_str
+                    );
+                } else {
+                    println!("| {} | `{}` | {} | {} |", p.name, p.label, broad, conf_str);
+                }
+            }
+            let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
+            if validate {
+                let scores: Vec<_> = profiles
+                    .iter()
+                    .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                    .collect();
+                let grade = finetype_core::compute_file_grade(&scores);
+                println!(
+                    "\n{}/{} columns typed — **Quality: {}**",
+                    typed_cols, n_cols, grade
+                );
+            } else {
+                println!("\n{}/{} columns typed", typed_cols, n_cols);
             }
         }
     }
@@ -3426,7 +3503,7 @@ fn cmd_eval_gittables(
     // ── 7. Output results ───────────────────────────────────────────────────
 
     match output {
-        OutputFormat::Plain | OutputFormat::Csv => {
+        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown => {
             println!("GitTables Column-Mode Evaluation");
             println!("{}", "═".repeat(70));
             println!();
@@ -3777,7 +3854,7 @@ fn cmd_eval(
     confusion_vec.sort_by(|a, b| b.1.cmp(&a.1));
 
     match output {
-        OutputFormat::Plain | OutputFormat::Csv => {
+        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown => {
             println!("FineType Model Evaluation");
             println!("{}", "=".repeat(60));
             println!();
