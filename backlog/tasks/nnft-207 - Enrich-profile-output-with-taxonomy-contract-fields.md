@@ -1,11 +1,11 @@
 ---
 id: NNFT-207
 title: Enrich profile output with taxonomy contract fields
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-04 20:14'
-updated_date: '2026-03-05 23:20'
+updated_date: '2026-03-05 23:33'
 labels:
   - cli
   - profile
@@ -25,10 +25,10 @@ Profile currently returns type/confidence/nulls. Add `broad_type`, `transform`, 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 JSON output includes broad_type, transform, format_string, is_generic per column
-- [ ] #2 Plain output shows broad_type
-- [ ] #3 CSV output includes new columns
-- [ ] #4 Tests pass
+- [x] #1 JSON output includes broad_type, transform, format_string, is_generic per column
+- [x] #2 Plain output shows broad_type
+- [x] #3 CSV output includes new columns
+- [x] #4 Tests pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,6 +43,20 @@ Profile currently returns type/confidence/nulls. Add `broad_type`, `transform`, 
 7. Run cargo test + taxonomy check
 8. Verify output formats manually
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Enriched all three profile output formats with taxonomy contract fields.
+
+Changes:
+- Added is_generic to ColumnResult (computed via finalize_is_generic helper on all return paths)
+- JSON: broad_type, format_string, transform, is_generic per column
+- Plain: BROAD column showing DuckDB target type (DATE, TIMESTAMP, VARCHAR, etc.)
+- CSV: broad_type, format_string, transform, is_generic columns added
+
+Verified: 381 tests pass, taxonomy check passes, clippy clean. All output formats manually verified.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

@@ -9,6 +9,7 @@
 
 pub mod checker;
 pub mod generator;
+pub mod json_reader;
 pub mod locale_data;
 pub mod taxonomy;
 pub mod tokenizer;
@@ -16,6 +17,7 @@ pub mod validator;
 
 pub use checker::{format_report, CheckReport, Checker};
 pub use generator::{Generator, Sample};
+pub use json_reader::{collect_json, collect_ndjson, JsonPathMap};
 pub use taxonomy::{
     Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary, Validation,
 };

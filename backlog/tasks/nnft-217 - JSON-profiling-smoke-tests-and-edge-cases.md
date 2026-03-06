@@ -4,7 +4,7 @@ title: JSON profiling smoke tests and edge cases
 status: To Do
 assignee: []
 created_date: '2026-03-04 20:15'
-updated_date: '2026-03-04 20:16'
+updated_date: '2026-03-06 00:01'
 labels:
   - testing
   - json
@@ -19,15 +19,20 @@ priority: medium
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-End-to-end smoke tests for JSON profiling: depth limit (default 5), array sampling (default 100), heterogeneous arrays, deeply nested objects. Depends on NNFT-215 (CLI wiring).
+End-to-end smoke tests for JSON profiling functionality. Tests cover nested objects, arrays of objects, mixed types, empty arrays, deeply nested structures, schema evolution across NDJSON lines, and top-level scalars (error case). Depends on NNFT-216 (CLI wiring).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Smoke test in tests/ directory
-- [ ] #2 `--json-depth N` flag limits flattening depth
-- [ ] #3 Array sampling defaults to 100 elements
-- [ ] #4 Heterogeneous arrays typed as majority type
+- [ ] #1 Smoke test files created in tests/ covering JSON and NDJSON inputs
+- [ ] #2 Test: nested objects with dot notation paths (a.b.c)
+- [ ] #3 Test: arrays of objects with bracket notation (users[].email)
+- [ ] #4 Test: mixed types in arrays typed as VARCHAR
+- [ ] #5 Test: empty arrays handled gracefully
+- [ ] #6 Test: deeply nested structures (10+ levels)
+- [ ] #7 Test: schema evolution across NDJSON lines (missing fields → None)
+- [ ] #8 Test: top-level scalars produce appropriate error message
+- [ ] #9 All tests verify both plain and JSON output formats produce expected results
 <!-- AC:END -->
 
 ## Definition of Done

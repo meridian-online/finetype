@@ -28,6 +28,7 @@ phonenumber = { workspace = true }
 regex = { workspace = true }
 jsonschema = { workspace = true }
 thiserror = { workspace = true }
+indexmap = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4"
