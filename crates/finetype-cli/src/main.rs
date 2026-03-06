@@ -285,6 +285,10 @@ enum Commands {
         /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
         #[arg(long)]
         sharp_only: bool,
+
+        /// Run JSON Schema validation after classification
+        #[arg(long)]
+        validate: bool,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -493,6 +497,7 @@ fn main() -> Result<()> {
             no_header_hint,
             model_type,
             sharp_only,
+            validate,
         } => cmd_profile(
             file,
             model,
@@ -502,6 +507,7 @@ fn main() -> Result<()> {
             no_header_hint,
             model_type,
             sharp_only,
+            validate,
         ),
 
         Commands::EvalGittables {
@@ -1707,6 +1713,7 @@ fn definition_to_full_json(key: &str, d: &finetype_core::Definition) -> serde_js
     obj.insert("designation".into(), designation);
     obj.insert("broad_type".into(), json!(d.broad_type));
     obj.insert("format_string".into(), json!(d.format_string));
+    obj.insert("format_string_alt".into(), json!(d.format_string_alt));
     obj.insert("transform".into(), json!(d.transform));
     obj.insert("transform_ext".into(), json!(d.transform_ext));
     obj.insert("locales".into(), json!(d.locales));
@@ -1852,6 +1859,11 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     // Add examples from samples
     if !def.samples.is_empty() {
         schema.insert("examples".into(), to_json_value(&def.samples));
+    }
+
+    // Extension: alternative format string for type variants
+    if let Some(alt) = &def.format_string_alt {
+        schema.insert("x-format-string-alt".into(), json!(alt));
     }
 
     serde_json::Value::Object(schema)
@@ -2357,6 +2369,7 @@ fn cmd_profile(
     no_header_hint: bool,
     model_type: ModelType,
     sharp_only: bool,
+    validate: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
@@ -2440,6 +2453,17 @@ fn cmd_profile(
         format_string: Option<String>,
         transform: Option<String>,
         is_generic: bool,
+        // Validation quality fields (NNFT-212)
+        quality: Option<ColQuality>,
+    }
+
+    #[allow(dead_code)]
+    struct ColQuality {
+        valid_count: usize,
+        invalid_count: usize,
+        null_count: usize,
+        total_count: usize,
+        validity_rate: f64,
     }
 
     // Load taxonomy for enrichment (may already be loaded for validation)
@@ -2470,6 +2494,7 @@ fn cmd_profile(
                 format_string: None,
                 transform: None,
                 is_generic: false,
+                quality: None,
             });
             continue;
         }
@@ -2488,20 +2513,20 @@ fn cmd_profile(
         };
 
         // Look up taxonomy contract fields for the predicted label
-        let (broad_type, format_string, transform) =
-            if let Some(ref taxonomy) = enrichment_taxonomy {
-                if let Some(def) = taxonomy.get(&result.label) {
-                    (
-                        def.broad_type.clone(),
-                        def.format_string.clone(),
-                        def.transform.clone(),
-                    )
-                } else {
-                    (None, None, None)
-                }
+        let (broad_type, format_string, transform) = if let Some(ref taxonomy) = enrichment_taxonomy
+        {
+            if let Some(def) = taxonomy.get(&result.label) {
+                (
+                    def.broad_type.clone(),
+                    def.format_string.clone(),
+                    def.transform.clone(),
+                )
             } else {
                 (None, None, None)
-            };
+            }
+        } else {
+            (None, None, None)
+        };
 
         profiles.push(ColProfile {
             name,
@@ -2517,7 +2542,70 @@ fn cmd_profile(
             format_string,
             transform,
             is_generic: result.is_generic,
+            quality: None,
         });
+    }
+
+    // Validation pass (NNFT-212): run JSON Schema validation per column
+    if validate {
+        use finetype_core::{validate_column_for_label, InvalidStrategy};
+
+        // Reuse enrichment_taxonomy (already loaded) — need compiled validators
+        let validation_taxonomy = if let Some(ref tax) = enrichment_taxonomy {
+            let mut t = tax.clone();
+            t.compile_validators();
+            Some(t)
+        } else {
+            let tp = std::path::PathBuf::from("labels");
+            if let Ok(mut t) = load_taxonomy(&tp) {
+                t.compile_validators();
+                Some(t)
+            } else {
+                None
+            }
+        };
+
+        if let Some(ref tax) = validation_taxonomy {
+            for (i, profile) in profiles.iter_mut().enumerate() {
+                if profile.label == "unknown" {
+                    continue;
+                }
+                let col_values = &columns[i];
+                // Build Option<&str> slice: non-null sample values + nulls
+                let mut val_refs: Vec<Option<&str>> =
+                    col_values.iter().map(|v| Some(v.as_str())).collect();
+                // Append nulls to match total row count
+                for _ in 0..profile.null_count {
+                    val_refs.push(None);
+                }
+
+                match validate_column_for_label(
+                    &val_refs,
+                    &profile.label,
+                    tax,
+                    InvalidStrategy::Quarantine,
+                ) {
+                    Ok(result) => {
+                        let s = &result.stats;
+                        let validity_rate = if s.total_count > 0 {
+                            s.valid_count as f64 / s.total_count as f64
+                        } else {
+                            0.0
+                        };
+                        profile.quality = Some(ColQuality {
+                            valid_count: s.valid_count,
+                            invalid_count: s.invalid_count,
+                            null_count: s.null_count,
+                            total_count: s.total_count,
+                            validity_rate,
+                        });
+                    }
+                    Err(_) => {
+                        // No schema available for this label — quality stays None
+                    }
+                }
+            }
+        }
     }
 
     // Output results
@@ -2529,10 +2617,17 @@ fn cmd_profile(
             );
             println!("{}", "═".repeat(80));
             println!();
-            println!(
-                "  {:<25} {:<38} {:>8} {:>6}",
-                "COLUMN", "TYPE", "BROAD", "CONF"
-            );
+            if validate {
+                println!(
+                    "  {:<25} {:<38} {:>8} {:>6} {:>8}",
+                    "COLUMN", "TYPE", "BROAD", "CONF", "VALID"
+                );
+            } else {
+                println!(
+                    "  {:<25} {:<38} {:>8} {:>6}",
+                    "COLUMN", "TYPE", "BROAD", "CONF"
+                );
+            }
             println!("  {}", "─".repeat(78));
 
             for p in &profiles {
@@ -2552,9 +2647,17 @@ fn cmd_profile(
                 } else {
                     String::new()
                 };
+                let quality_str = if validate {
+                    match &p.quality {
+                        Some(q) => format!(" {:>7.1}%", q.validity_rate * 100.0),
+                        None => "      —".to_string(),
+                    }
+                } else {
+                    String::new()
+                };
                 println!(
-                    "  {:<25} {:<38} {:>8} {:>6}{}{}",
-                    p.name, p.label, broad, conf_str, disambig, locale_str
+                    "  {:<25} {:<38} {:>8} {:>6}{}{}{}",
+                    p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
                 );
             }
 
@@ -2595,6 +2698,24 @@ fn cmd_profile(
                     if let Some(locale) = &p.detected_locale {
                         obj.insert("locale".to_string(), json!(locale));
                     }
+                    if validate {
+                        match &p.quality {
+                            Some(q) => {
+                                obj.insert(
+                                    "quality".to_string(),
+                                    json!({
+                                        "valid": q.valid_count,
+                                        "invalid": q.invalid_count,
+                                        "null": q.null_count,
+                                        "validity_rate": (q.validity_rate * 10000.0).round() / 10000.0,
+                                    }),
+                                );
+                            }
+                            None => {
+                                obj.insert("quality".to_string(), json!(null));
+                            }
+                        }
+                    }
                     serde_json::Value::Object(obj)
                 })
                 .collect();
@@ -2603,7 +2724,14 @@ fn cmd_profile(
                 // Structured JSON output: reconstruct nested hierarchy
                 let schema_input: Vec<(String, String, Option<String>, f32)> = profiles
                     .iter()
-                    .map(|p| (p.name.clone(), p.label.clone(), p.broad_type.clone(), p.confidence))
+                    .map(|p| {
+                        (
+                            p.name.clone(),
+                            p.label.clone(),
+                            p.broad_type.clone(),
+                            p.confidence,
+                        )
+                    })
                     .collect();
                 let schema = reconstruct_json_schema(&schema_input);
                 let result = json!({

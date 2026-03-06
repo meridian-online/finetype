@@ -119,6 +119,8 @@ pub struct Definition {
     pub broad_type: Option<String>,
     /// DuckDB strptime format string (null if not strptime-based)
     pub format_string: Option<String>,
+    /// Alternative format string for type variants (e.g., ISO 8601 with fractional seconds)
+    pub format_string_alt: Option<String>,
     /// DuckDB SQL expression ({col} = column placeholder)
     pub transform: Option<String>,
     /// Enhanced transform requiring a DuckDB extension
