@@ -148,7 +148,8 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 | `finetype generate` | Generate synthetic training data |
 | `finetype train` | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
 | `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
-| `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns) |
+| `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns, `x-finetype-*` DDL fields) |
+| `finetype schema-for <file>` | Profile → CREATE TABLE DDL (`--table-name`, `-o json\|arrow`) |
 
 ### Evaluation infrastructure
 
