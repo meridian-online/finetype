@@ -196,6 +196,53 @@ impl std::fmt::Display for Label {
     }
 }
 
+/// DDL-oriented metadata extracted from a Definition.
+///
+/// Provides DuckDB-specific contract fields for schema generation and transformation.
+#[derive(Debug, Clone)]
+pub struct DdlInfo {
+    /// DuckDB SQL type (e.g., "VARCHAR", "TIMESTAMP", "DOUBLE", "DATE", "BOOLEAN", "BIGINT")
+    pub duckdb_type: String,
+    /// SQL transformation expression, e.g., "strptime({col}, '%Y-%m-%dT%H:%M:%SZ')"
+    pub transform: Option<String>,
+    /// Primary format string for strptime (e.g., "%Y-%m-%dT%H:%M:%SZ")
+    pub format_string: Option<String>,
+    /// Alternative format string for type variants (e.g., "%Y-%m-%dT%H:%M:%S.%gZ")
+    pub format_string_alt: Option<String>,
+    /// Whether column should be nullable in DDL (defaults to true)
+    pub nullable: bool,
+    /// Struct expansion for multi-field output
+    pub decompose: Option<serde_yaml::Value>,
+}
+
+impl DdlInfo {
+    /// Map a DuckDB broad_type string to the SQL type name.
+    ///
+    /// Returns the canonical SQL type for use in CREATE TABLE statements.
+    pub fn duckdb_type_from_broad_type(broad_type: &str) -> String {
+        match broad_type {
+            // String types
+            "VARCHAR" => "VARCHAR".to_string(),
+            // Numeric types
+            "DOUBLE" => "DOUBLE".to_string(),
+            "BIGINT" => "BIGINT".to_string(),
+            "DECIMAL" => "DECIMAL".to_string(),
+            // Date/Time types
+            "DATE" => "DATE".to_string(),
+            "TIMESTAMP" => "TIMESTAMP".to_string(),
+            "TIME" => "TIME".to_string(),
+            // Boolean
+            "BOOLEAN" => "BOOLEAN".to_string(),
+            // JSON/Composite
+            "JSON" => "JSON".to_string(),
+            "STRUCT" => "STRUCT".to_string(),
+            "LIST" => "LIST".to_string(),
+            // If not recognized, default to VARCHAR
+            _ => "VARCHAR".to_string(),
+        }
+    }
+}
+
 /// The complete taxonomy of label definitions.
 ///
 /// Optionally holds a cache of pre-compiled validators (populated via
@@ -508,6 +555,32 @@ impl Taxonomy {
             .as_ref()
             .map(|c| c.len())
             .unwrap_or(0)
+    }
+
+    /// Extract DDL-oriented metadata from a definition.
+    ///
+    /// Returns `None` if the label doesn't exist. Otherwise returns a `DdlInfo`
+    /// with broad_type, transform, format_string, format_string_alt, and decompose.
+    ///
+    /// The `nullable` field defaults to `true`; callers should override based on
+    /// null counts from profiling if needed.
+    pub fn ddl_info(&self, label: &str) -> Option<DdlInfo> {
+        self.get(label).map(|def| {
+            let duckdb_type = def
+                .broad_type
+                .as_ref()
+                .map(|bt| DdlInfo::duckdb_type_from_broad_type(bt))
+                .unwrap_or_else(|| "VARCHAR".to_string());
+
+            DdlInfo {
+                duckdb_type,
+                transform: def.transform.clone(),
+                format_string: def.format_string.clone(),
+                format_string_alt: def.format_string_alt.clone(),
+                nullable: true,
+                decompose: def.decompose.clone(),
+            }
+        })
     }
 
     /// Build a tier graph from the taxonomy's tier fields.
@@ -1161,6 +1234,83 @@ geography.address.postal_code:
             );
         } else {
             eprintln!("Skipping full taxonomy locale test (labels/ not found)");
+        }
+    }
+
+    #[test]
+    fn test_ddl_info_from_definition() {
+        let taxonomy = Taxonomy::from_yaml(SAMPLE_YAML).unwrap();
+        let ddl_info = taxonomy
+            .ddl_info("datetime.timestamp.iso_8601")
+            .expect("Expected DdlInfo");
+
+        assert_eq!(ddl_info.duckdb_type, "TIMESTAMP");
+        assert_eq!(
+            ddl_info.transform.as_deref(),
+            Some("strptime({col}, '%Y-%m-%dT%H:%M:%SZ')")
+        );
+        assert_eq!(
+            ddl_info.format_string.as_deref(),
+            Some("%Y-%m-%dT%H:%M:%SZ")
+        );
+        assert!(ddl_info.nullable);
+        assert!(ddl_info.format_string_alt.is_none());
+        assert!(ddl_info.decompose.is_none());
+    }
+
+    #[test]
+    fn test_ddl_info_missing_label() {
+        let taxonomy = Taxonomy::from_yaml(SAMPLE_YAML).unwrap();
+        let result = taxonomy.ddl_info("nonexistent.label.type");
+        assert!(result.is_none(), "Expected None for missing label");
+    }
+
+    #[test]
+    fn test_duckdb_type_mapping() {
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("VARCHAR"), "VARCHAR");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("TIMESTAMP"), "TIMESTAMP");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("DOUBLE"), "DOUBLE");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("DATE"), "DATE");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("BOOLEAN"), "BOOLEAN");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("BIGINT"), "BIGINT");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("JSON"), "JSON");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("STRUCT"), "STRUCT");
+        assert_eq!(DdlInfo::duckdb_type_from_broad_type("LIST"), "LIST");
+        // Unknown types should default to VARCHAR
+        assert_eq!(
+            DdlInfo::duckdb_type_from_broad_type("UNKNOWN_TYPE"),
+            "VARCHAR"
+        );
+    }
+
+    #[test]
+    fn test_ddl_info_across_domains() {
+        // Test DdlInfo extraction across multiple domains using real taxonomy
+        let taxonomy_result = Taxonomy::from_directory("labels");
+        if let Ok(taxonomy) = taxonomy_result {
+            // Sample a few types from different domains
+            let test_cases = vec![
+                ("datetime.date.iso_8601", "DATE"),
+                ("identity.person.email", "VARCHAR"),
+                ("geography.address.postal_code", "VARCHAR"),
+                ("representation.numeric.decimal_number", "DOUBLE"),
+                ("finance.currency.currency_code", "VARCHAR"),
+            ];
+
+            for (label, expected_type) in test_cases {
+                if let Some(ddl_info) = taxonomy.ddl_info(label) {
+                    assert_eq!(
+                        ddl_info.duckdb_type, expected_type,
+                        "Wrong DDL type for {}",
+                        label
+                    );
+                } else {
+                    // It's OK if the label doesn't exist in the test environment
+                    eprintln!("Label {} not found in test environment", label);
+                }
+            }
+        } else {
+            eprintln!("Skipping multi-domain test (labels/ not found)");
         }
     }
 }
