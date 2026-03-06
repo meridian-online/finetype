@@ -212,3 +212,39 @@ datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,time_1
 datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,rfc_2822_timestamp,rfc 2822 timestamp
 datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,american_timestamp,american timestamp
 datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,european_timestamp,european timestamp
+api_users_json,eval/datasets/json/api_users.json,address.city,city
+api_users_json,eval/datasets/json/api_users.json,address.country,country
+api_users_json,eval/datasets/json/api_users.json,address.postal_code,postal code
+api_users_json,eval/datasets/json/api_users.json,email,email
+api_users_json,eval/datasets/json/api_users.json,name,name
+api_users_json,eval/datasets/json/api_users.json,phone,telephone
+api_users_json,eval/datasets/json/api_users.json,profile_url,url
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,currency,currency code
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,customer_email,email
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,is_express,boolean
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,order_date,iso timestamp
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,order_id,alphanumeric id
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,product,category
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,quantity,number
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,status,status
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,total,decimal number
+ecommerce_orders_json,eval/datasets/json/ecommerce_orders.ndjson,unit_price,price
+server_logs_json,eval/datasets/json/server_logs.ndjson,bytes_sent,number
+server_logs_json,eval/datasets/json/server_logs.ndjson,client_ip,ip_v4
+server_logs_json,eval/datasets/json/server_logs.ndjson,method,http method
+server_logs_json,eval/datasets/json/server_logs.ndjson,path,route
+server_logs_json,eval/datasets/json/server_logs.ndjson,request_url,url
+server_logs_json,eval/datasets/json/server_logs.ndjson,response_time_ms,decimal number
+server_logs_json,eval/datasets/json/server_logs.ndjson,status_code,http status code
+server_logs_json,eval/datasets/json/server_logs.ndjson,timestamp,iso timestamp milliseconds
+server_logs_json,eval/datasets/json/server_logs.ndjson,user_agent,user agent
+weather_stations_json,eval/datasets/json/weather_stations.json,humidity_pct,decimal number
+weather_stations_json,eval/datasets/json/weather_stations.json,location.city,city
+weather_stations_json,eval/datasets/json/weather_stations.json,location.country,country
+weather_stations_json,eval/datasets/json/weather_stations.json,location.latitude,latitude
+weather_stations_json,eval/datasets/json/weather_stations.json,location.longitude,longitude
+weather_stations_json,eval/datasets/json/weather_stations.json,observation_date,iso date
+weather_stations_json,eval/datasets/json/weather_stations.json,precipitation_mm,decimal number
+weather_stations_json,eval/datasets/json/weather_stations.json,station_name,entity name
+weather_stations_json,eval/datasets/json/weather_stations.json,temperature_c,decimal number
+weather_stations_json,eval/datasets/json/weather_stations.json,wind_speed_kmh,decimal number

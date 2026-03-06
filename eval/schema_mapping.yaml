@@ -1871,3 +1871,55 @@ mappings:
     match_quality: direct
     expand: false
     notes: European datetime (DD/MM/YYYY HH:MM)
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JSON PROFILING EVAL — added for m-9 JSON eval datasets (NNFT-230)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - gt_label: iso timestamp
+    source: profile
+    finetype_label: datetime.timestamp.iso_8601
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: ISO 8601 timestamp (YYYY-MM-DDTHH:MM:SSZ)
+
+  - gt_label: iso timestamp milliseconds
+    source: profile
+    finetype_label: datetime.timestamp.iso_8601_milliseconds
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: ISO 8601 timestamp with milliseconds (YYYY-MM-DDTHH:MM:SS.mmmZ)
+
+  - gt_label: iso date
+    source: profile
+    finetype_label: datetime.date.iso
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+    notes: ISO 8601 date (YYYY-MM-DD)
+
+  - gt_label: alphanumeric id
+    source: profile
+    finetype_label: representation.identifier.alphanumeric_id
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+    notes: Alphanumeric identifier with prefix (e.g., ORD-10001)
+
+  - gt_label: http method
+    source: profile
+    finetype_label: technology.internet.http_method
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+    notes: HTTP request methods (GET, POST, PUT, DELETE)
+
+  - gt_label: currency code
+    source: profile
+    finetype_label: finance.currency.currency_code
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+    notes: ISO 4217 currency codes (USD, EUR, GBP)
