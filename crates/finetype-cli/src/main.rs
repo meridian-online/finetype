@@ -2453,17 +2453,16 @@ fn cmd_profile(
         format_string: Option<String>,
         transform: Option<String>,
         is_generic: bool,
-        // Validation quality fields (NNFT-212)
-        quality: Option<ColQuality>,
+        // Validation quality fields (NNFT-212, NNFT-213)
+        quality: Option<ColProfileQuality>,
     }
 
-    #[allow(dead_code)]
-    struct ColQuality {
+    /// Per-column validation + quality data.
+    struct ColProfileQuality {
         valid_count: usize,
         invalid_count: usize,
         null_count: usize,
-        total_count: usize,
-        validity_rate: f64,
+        score: finetype_core::ColumnQualityScore,
     }
 
     // Load taxonomy for enrichment (may already be loaded for validation)
@@ -2587,17 +2586,16 @@ fn cmd_profile(
                 ) {
                     Ok(result) => {
                         let s = &result.stats;
-                        let validity_rate = if s.total_count > 0 {
-                            s.valid_count as f64 / s.total_count as f64
-                        } else {
-                            0.0
-                        };
-                        profile.quality = Some(ColQuality {
+                        let score = finetype_core::compute_column_quality(
+                            s.valid_count,
+                            s.invalid_count,
+                            s.null_count,
+                        );
+                        profile.quality = Some(ColProfileQuality {
                             valid_count: s.valid_count,
                             invalid_count: s.invalid_count,
                             null_count: s.null_count,
-                            total_count: s.total_count,
-                            validity_rate,
+                            score,
                         });
                     }
                     Err(_) => {
@@ -2649,7 +2647,7 @@ fn cmd_profile(
                 };
                 let quality_str = if validate {
                     match &p.quality {
-                        Some(q) => format!(" {:>7.1}%", q.validity_rate * 100.0),
+                        Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
                         None => "      —".to_string(),
                     }
                 } else {
@@ -2663,10 +2661,22 @@ fn cmd_profile(
 
             println!();
             let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            println!(
-                "{}/{} columns typed, {} rows analyzed",
-                typed_cols, n_cols, row_count
-            );
+            if validate {
+                let scores: Vec<_> = profiles
+                    .iter()
+                    .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                    .collect();
+                let grade = finetype_core::compute_file_grade(&scores);
+                println!(
+                    "{}/{} columns typed, {} rows analyzed — Quality: {}",
+                    typed_cols, n_cols, row_count, grade
+                );
+            } else {
+                println!(
+                    "{}/{} columns typed, {} rows analyzed",
+                    typed_cols, n_cols, row_count
+                );
+            }
         }
         OutputFormat::Json => {
             let cols: Vec<serde_json::Value> = profiles
@@ -2701,13 +2711,17 @@ fn cmd_profile(
                     if validate {
                         match &p.quality {
                             Some(q) => {
+                                let r = |v: f64| (v * 10000.0).round() / 10000.0;
                                 obj.insert(
                                     "quality".to_string(),
                                     json!({
                                         "valid": q.valid_count,
                                         "invalid": q.invalid_count,
                                         "null": q.null_count,
-                                        "validity_rate": (q.validity_rate * 10000.0).round() / 10000.0,
+                                        "type_conforming_rate": r(q.score.type_conforming_rate),
+                                        "null_rate": r(q.score.null_rate),
+                                        "completeness": r(q.score.completeness),
+                                        "quality_score": r(q.score.quality_score),
                                     }),
                                 );
                             }
@@ -2719,6 +2733,17 @@ fn cmd_profile(
                     serde_json::Value::Object(obj)
                 })
                 .collect();
+
+            // Compute file-level grade when validation is active
+            let file_grade = if validate {
+                let scores: Vec<_> = profiles
+                    .iter()
+                    .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                    .collect();
+                Some(finetype_core::compute_file_grade(&scores))
+            } else {
+                None
+            };
 
             if is_json_input {
                 // Structured JSON output: reconstruct nested hierarchy
@@ -2734,19 +2759,25 @@ fn cmd_profile(
                     })
                     .collect();
                 let schema = reconstruct_json_schema(&schema_input);
-                let result = json!({
+                let mut result = json!({
                     "file": file.to_string_lossy(),
                     "rows": row_count,
                     "schema": schema,
                     "columns": cols,
                 });
+                if let Some(grade) = &file_grade {
+                    result["grade"] = json!(grade.to_string());
+                }
                 println!("{}", serde_json::to_string_pretty(&result)?);
             } else {
-                let result = json!({
+                let mut result = json!({
                     "file": file.to_string_lossy(),
                     "rows": row_count,
                     "columns": cols,
                 });
+                if let Some(grade) = &file_grade {
+                    result["grade"] = json!(grade.to_string());
+                }
                 println!("{}", serde_json::to_string_pretty(&result)?);
             }
         }
