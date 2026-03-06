@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-03-07
+
+### Taxonomy
+
+- **Taxonomy cleanup** — Removed 7 low-precision types, recategorized color types. Net: 216→209 types across 7 domains. (NNFT-233)
+- **Geographic name removal** — Renamed 10 types from locale-based names to format-structural names: `eu_slash`→`dmy_slash`, `us_slash`→`mdy_slash`, `american`→`mdy_12h`, `european`→`dmy_hm`, `decimal_number_eu`→`decimal_number_comma`, plus 5 short-form date variants. (NNFT-234)
+
+### Accuracy
+
+- **Profile eval: 97.9% label, 98.6% domain** (143/146 columns correct) — up from 92.5% after v13 retrain. Five targeted pipeline fixes for entity/geography confusion: hardcoded geo override ignores confidence threshold, person-name hints override location predictions, 20+ entity-name header hints (company, venue, station, etc.), bare "address"→full_address, hardcoded hints apply at low confidence. (NNFT-235)
+- **Actionability eval: 99.3%** — 226,951/228,512 values transformed successfully across 238 columns and 82 types.
+- **CharCNN v13** — Retrained on 209-type taxonomy (1000 samples/type, 10 epochs, 88.1% training accuracy).
+
+### Fixed
+
+- Clippy `collapsible_str_replace` and `fmt` compatibility for Rust 1.94 CI.
+
 ## [0.6.2] - 2026-03-06
 
 ### Added
