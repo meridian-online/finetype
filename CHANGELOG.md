@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-03-06
+
+### Added
+
+- **`DdlInfo` API** — new `finetype-core` struct and `Taxonomy::ddl_info()` method for DDL-oriented metadata extraction (broad_type, transform, format_string, format_string_alt, decompose). Foundation for schema generation tools. (NNFT-210)
+- **`finetype schema-for` command** — profile a CSV/JSON file and output DuckDB `CREATE TABLE` statement with correct types and inline transformation comments. Supports `--table-name` override and `--output json` for structured schema. (NNFT-218)
+- **`--output arrow` for schema-for** — exports Arrow IPC JSON schema format compatible with arrow-rs and pyarrow. Maps DuckDB types to Arrow DataTypes. (NNFT-219)
+- **`x-finetype-*` extension fields in `finetype schema`** — JSON Schema output now includes `x-finetype-broad-type`, `x-finetype-transform`, `x-finetype-format-string` for programmatic DDL generation. (NNFT-220)
+
+### Changed
+
+- `finetype schema` output now includes DDL contract fields (x-finetype-*) alongside format strings, enabling direct SQL code generation.
+
 ## [0.6.1] - 2026-03-06
 
 ### Accuracy
