@@ -1862,7 +1862,19 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
         schema.insert("examples".into(), to_json_value(&def.samples));
     }
 
-    // Extension: alternative format string for type variants
+    // FineType DDL extension fields (x-finetype-* prefix)
+    if let Some(broad_type) = &def.broad_type {
+        let duckdb_type = finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
+        schema.insert("x-finetype-broad-type".into(), json!(duckdb_type));
+    }
+    if let Some(transform) = &def.transform {
+        schema.insert("x-finetype-transform".into(), json!(transform));
+    }
+    if let Some(fmt) = &def.format_string {
+        schema.insert("x-finetype-format-string".into(), json!(fmt));
+    }
+
+    // Extension: alternative format string for type variants (kept without prefix for backwards compat)
     if let Some(alt) = &def.format_string_alt {
         schema.insert("x-format-string-alt".into(), json!(alt));
     }

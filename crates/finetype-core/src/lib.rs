@@ -23,7 +23,7 @@ pub use quality::{
     compute_column_quality, compute_file_grade, ColumnQualityScore, FileQualityGrade,
 };
 pub use taxonomy::{
-    Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary, Validation,
+    DdlInfo, Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary, Validation,
 };
 pub use tokenizer::Tokenizer;
 pub use validator::{
