@@ -1,0 +1,5 @@
+[
+  {"id": 1, "tags": ["rust", "json", "parsing"], "active": true},
+  {"id": 2, "tags": ["python", "data"], "active": false},
+  {"id": 3, "tags": ["sql", "analytics", "duckdb"], "active": true}
+]

@@ -1,0 +1,5 @@
+[
+  {"user": {"contact": {"email": "alice@example.com", "phone": "+1-555-0101"}, "name": "Alice Smith"}, "score": 95},
+  {"user": {"contact": {"email": "bob@example.com", "phone": "+1-555-0102"}, "name": "Bob Jones"}, "score": 87},
+  {"user": {"contact": {"email": "charlie@example.com", "phone": "+1-555-0103"}, "name": "Charlie Brown"}, "score": 72}
+]

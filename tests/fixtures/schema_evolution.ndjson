@@ -1,0 +1,5 @@
+{"name": "Alice Smith", "email": "alice@example.com", "age": 30}
+{"name": "Bob Jones", "email": "bob@example.com", "phone": "+1-555-0102"}
+{"name": "Charlie Brown", "age": 35, "phone": "+1-555-0103"}
+{"name": "Diana Prince", "email": "diana@example.com", "age": 28, "phone": "+1-555-0104"}
+{"name": "Eve Wilson", "email": "eve@example.com"}
