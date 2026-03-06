@@ -208,9 +208,9 @@ enum Commands {
         #[arg(short, long, default_value = "models/default")]
         model: PathBuf,
 
-        /// Output format (plain = SQL, json = structured object)
+        /// Output format (plain = SQL, json = structured object, arrow = Arrow schema JSON)
         #[arg(short, long, default_value = "plain")]
-        output: OutputFormat,
+        output: SchemaOutputFormat,
 
         /// Maximum values to sample per column (default 100)
         #[arg(long, default_value = "100")]
@@ -385,6 +385,14 @@ enum OutputFormat {
     Json,
     Csv,
     Markdown,
+}
+
+/// Output format for schema-for command (plain SQL, JSON, or Arrow schema).
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum SchemaOutputFormat {
+    Plain,
+    Json,
+    Arrow,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -1967,7 +1975,7 @@ fn cmd_schema_for(
     file: PathBuf,
     table_name: Option<String>,
     model: PathBuf,
-    output: OutputFormat,
+    output: SchemaOutputFormat,
     sample_size: usize,
     delimiter: Option<char>,
     no_header_hint: bool,
@@ -2118,7 +2126,7 @@ fn cmd_schema_for(
     }
 
     match output {
-        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown => {
+        SchemaOutputFormat::Plain => {
             // SQL output
             let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
             let pipeline = if sharp_only {
@@ -2173,7 +2181,7 @@ fn cmd_schema_for(
             }
             println!(");");
         }
-        OutputFormat::Json => {
+        SchemaOutputFormat::Json => {
             // Structured JSON output
             let columns_json: Vec<serde_json::Value> = schema_cols
                 .iter()
@@ -2201,6 +2209,32 @@ fn cmd_schema_for(
 
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
+        SchemaOutputFormat::Arrow => {
+            // Arrow IPC JSON schema format
+            let fields: Vec<serde_json::Value> = schema_cols
+                .iter()
+                .map(|col| {
+                    let arrow_type = duckdb_to_arrow_type(&col.duckdb_type);
+                    json!({
+                        "name": col.name,
+                        "type": arrow_type,
+                        "nullable": true,
+                        "children": [],
+                    })
+                })
+                .collect();
+
+            let schema = json!({
+                "fields": fields,
+                "metadata": {
+                    "finetype_version": env!("CARGO_PKG_VERSION"),
+                    "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
+                    "row_count": row_count.to_string(),
+                }
+            });
+
+            println!("{}", serde_json::to_string_pretty(&schema)?);
+        }
     }
 
     Ok(())
@@ -2214,6 +2248,26 @@ fn sanitise_identifier(s: &str) -> String {
         .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_')
         .collect()
+}
+
+/// Map DuckDB SQL type to Arrow DataType JSON representation.
+///
+/// Uses the Arrow IPC JSON schema format compatible with arrow-rs and pyarrow.
+fn duckdb_to_arrow_type(duckdb_type: &str) -> serde_json::Value {
+    match duckdb_type {
+        "VARCHAR" => json!({"name": "utf8"}),
+        "DOUBLE" => json!({"name": "floatingpoint", "precision": "DOUBLE"}),
+        "BIGINT" => json!({"name": "int", "bitWidth": 64, "isSigned": true}),
+        "DECIMAL" => json!({"name": "decimal", "precision": 38, "scale": 10, "bitWidth": 128}),
+        "DATE" => json!({"name": "date", "unit": "DAY"}),
+        "TIMESTAMP" => json!({"name": "timestamp", "unit": "MICROSECOND", "timezone": null}),
+        "TIME" => json!({"name": "time", "unit": "MICROSECOND", "bitWidth": 64}),
+        "BOOLEAN" => json!({"name": "bool"}),
+        "JSON" => json!({"name": "utf8"}),
+        "STRUCT" => json!({"name": "struct"}),
+        "LIST" => json!({"name": "list"}),
+        _ => json!({"name": "utf8"}),
+    }
 }
 
 /// Format a column name for SQL, quoting if it contains non-identifier characters.
