@@ -2730,8 +2730,12 @@ impl Generator {
                     with_sep.push(ch);
                 }
                 let formatted_int: String = with_sep.chars().rev().collect();
-                let is_negative = self.rng.gen_bool(0.1);
-                if is_negative {
+                let neg_style = self.rng.gen::<f64>();
+                if neg_style < 0.05 {
+                    // Accounting notation: parenthesized negative
+                    Ok(format!("({}{}.{:02})", symbol, formatted_int, cents))
+                } else if neg_style < 0.15 {
+                    // Standard negative
                     Ok(format!("-{}{}.{:02}", symbol, formatted_int, cents))
                 } else {
                     Ok(format!("{}{}.{:02}", symbol, formatted_int, cents))
