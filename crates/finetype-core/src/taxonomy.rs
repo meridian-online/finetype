@@ -1268,7 +1268,10 @@ geography.address.postal_code:
     #[test]
     fn test_duckdb_type_mapping() {
         assert_eq!(DdlInfo::duckdb_type_from_broad_type("VARCHAR"), "VARCHAR");
-        assert_eq!(DdlInfo::duckdb_type_from_broad_type("TIMESTAMP"), "TIMESTAMP");
+        assert_eq!(
+            DdlInfo::duckdb_type_from_broad_type("TIMESTAMP"),
+            "TIMESTAMP"
+        );
         assert_eq!(DdlInfo::duckdb_type_from_broad_type("DOUBLE"), "DOUBLE");
         assert_eq!(DdlInfo::duckdb_type_from_broad_type("DATE"), "DATE");
         assert_eq!(DdlInfo::duckdb_type_from_broad_type("BOOLEAN"), "BOOLEAN");

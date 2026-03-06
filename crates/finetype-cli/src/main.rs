@@ -1971,6 +1971,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
 // SCHEMA-FOR — Profile file → CREATE TABLE DDL
 // ═══════════════════════════════════════════════════════════════════════════════
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_schema_for(
     file: PathBuf,
     table_name: Option<String>,
@@ -2050,10 +2051,7 @@ fn cmd_schema_for(
 
     // Derive table name from filename stem
     let table = table_name.unwrap_or_else(|| {
-        let stem = file
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("data");
+        let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("data");
         sanitise_identifier(stem)
     });
 
@@ -2243,8 +2241,7 @@ fn cmd_schema_for(
 /// Sanitise a string for use as a SQL identifier.
 /// Replaces hyphens with underscores and strips non-alphanumeric characters.
 fn sanitise_identifier(s: &str) -> String {
-    s.replace('-', "_")
-        .replace('.', "_")
+    s.replace(['-', '.'], "_")
         .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_')
         .collect()
