@@ -2489,6 +2489,7 @@ fn cmd_profile(
         invalid_count: usize,
         null_count: usize,
         score: finetype_core::ColumnQualityScore,
+        invalid_samples: Vec<String>,
     }
 
     // Load taxonomy for enrichment (may already be loaded for validation)
@@ -2617,11 +2618,18 @@ fn cmd_profile(
                             s.invalid_count,
                             s.null_count,
                         );
+                        let invalid_samples: Vec<String> = result
+                            .quarantined
+                            .iter()
+                            .take(5)
+                            .map(|q| q.value.clone())
+                            .collect();
                         profile.quality = Some(ColProfileQuality {
                             valid_count: s.valid_count,
                             invalid_count: s.invalid_count,
                             null_count: s.null_count,
                             score,
+                            invalid_samples,
                         });
                     }
                     Err(_) => {
@@ -2683,6 +2691,14 @@ fn cmd_profile(
                     "  {:<25} {:<38} {:>8} {:>6}{}{}{}",
                     p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
                 );
+                // Show top 3 invalid samples inline (plain output, validate mode)
+                if validate {
+                    if let Some(ref q) = p.quality {
+                        for sample in q.invalid_samples.iter().take(3) {
+                            println!("  {:>25} ⚠ \"{}\"", "", sample);
+                        }
+                    }
+                }
             }
 
             println!();
@@ -2750,6 +2766,12 @@ fn cmd_profile(
                                         "quality_score": r(q.score.quality_score),
                                     }),
                                 );
+                                if !q.invalid_samples.is_empty() {
+                                    obj.insert(
+                                        "invalid_samples".to_string(),
+                                        json!(q.invalid_samples),
+                                    );
+                                }
                             }
                             None => {
                                 obj.insert("quality".to_string(), json!(null));
@@ -2874,6 +2896,29 @@ fn cmd_profile(
                     "\n{}/{} columns typed — **Quality: {}**",
                     typed_cols, n_cols, grade
                 );
+                // Data Issues section for columns with invalid samples
+                let issues: Vec<_> = profiles
+                    .iter()
+                    .filter_map(|p| {
+                        p.quality.as_ref().and_then(|q| {
+                            if q.invalid_samples.is_empty() {
+                                None
+                            } else {
+                                Some((&p.name, &q.invalid_samples))
+                            }
+                        })
+                    })
+                    .collect();
+                if !issues.is_empty() {
+                    println!("\n### Data Issues\n");
+                    for (name, samples) in &issues {
+                        println!("**{}** — invalid samples:", name);
+                        for s in *samples {
+                            println!("- `{}`", s);
+                        }
+                        println!();
+                    }
+                }
             } else {
                 println!("\n{}/{} columns typed", typed_cols, n_cols);
             }
