@@ -1,7 +1,7 @@
 ---
 id: NNFT-209
 title: JSON/NDJSON path collector with reconstruction metadata
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-04 20:14'

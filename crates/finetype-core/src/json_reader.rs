@@ -178,6 +178,7 @@ fn collect_value(value: &Value, prefix: &str, paths: &mut IndexMap<String, Vec<O
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_collect_simple_object() {

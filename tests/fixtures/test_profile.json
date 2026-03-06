@@ -1,0 +1,7 @@
+[
+  {"name": "Alice Smith", "email": "alice@example.com", "age": 30, "address": {"city": "New York", "country": "USA"}},
+  {"name": "Bob Jones", "email": "bob@example.com", "age": 25, "address": {"city": "Los Angeles", "country": "USA"}},
+  {"name": "Charlie Brown", "email": "charlie@example.com", "age": 35, "address": {"city": "Chicago", "country": "USA"}},
+  {"name": "Diana Prince", "email": "diana@example.com", "age": 28, "address": {"city": "San Francisco", "country": "USA"}},
+  {"name": "Eve Wilson", "email": "eve@example.com", "age": 42, "address": {"city": "Seattle", "country": "USA"}}
+]
