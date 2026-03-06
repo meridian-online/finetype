@@ -1,11 +1,11 @@
 ---
 id: NNFT-234
 title: 'NNFT-234 — Pre-retrain taxonomy rename: remove geographic names from types'
-status: In Progress
+status: Done
 assignee:
   - nightingale
 created_date: '2026-03-06 09:10'
-updated_date: '2026-03-06 09:36'
+updated_date: '2026-03-06 09:37'
 labels:
   - refactor
   - taxonomy
@@ -73,10 +73,10 @@ Tests verify: 209/209 types passing, all 258 unit tests pass, 25/25 smoke tests 
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
-- [ ] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
-- [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
+- [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
+- [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
+- [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
