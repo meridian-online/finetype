@@ -1,10 +1,11 @@
 ---
 id: NNFT-222
 title: 'NNFT-223 — Format Coverage Taxonomy Expansion (Phase 1: YAML + Generators)'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@nightingale'
 created_date: '2026-03-05 01:55'
-updated_date: '2026-03-05 02:25'
+updated_date: '2026-03-06 08:27'
 labels:
   - format-coverage
   - taxonomy
@@ -38,14 +39,14 @@ This is Phase 1 of a 2-phase implementation:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 54 types added to YAML definitions with zero validation collisions
-- [ ] #2 All 54 generators implemented with samples matching format_string or custom parsing
-- [ ] #3 CJK generators produce correct Unicode output (Chinese 年月日, Korean 년월일, Japanese era offset)
-- [ ] #4 LabelCategoryMap updated with 38 new datetime types (45→83) and 12 new currency types (4→16)
-- [ ] #5 `cargo run -- check` passes (taxonomy ↔ generator alignment validated)
-- [ ] #6 `cargo test --all` passes (type count assertions updated: 163→213)
-- [ ] #7 CLI inference works for all 54 new formats and 163 existing types
-- [ ] #8 No breaking changes to existing types or locale validation (NNFT-195-201 untouched)
+- [x] #1 All 54 types added to YAML definitions with zero validation collisions
+- [x] #2 All 54 generators implemented with samples matching format_string or custom parsing
+- [x] #3 CJK generators produce correct Unicode output (Chinese 年月日, Korean 년월일, Japanese era offset)
+- [x] #4 LabelCategoryMap updated with 38 new datetime types (45→83) and 12 new currency types (4→16)
+- [x] #5 `cargo run -- check` passes (taxonomy ↔ generator alignment validated)
+- [x] #6 `cargo test --all` passes (type count assertions updated: 163→213)
+- [x] #7 CLI inference works for all 54 new formats and 163 existing types
+- [x] #8 No breaking changes to existing types or locale validation (NNFT-195-201 untouched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -56,12 +57,22 @@ Final: 53 new types, 216 total (not 54/217 from initial plan).
 Timestamps: 15 new (not 16). All other counts unchanged.
 <!-- SECTION:NOTES:END -->
 
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Umbrella task for Format Coverage expansion. All 8 subtasks completed across NNFT-223 through NNFT-227.
+
+Delivered: 53 new type definitions (163→216, 33% increase), generators, LabelCategoryMap updates, CharCNN-v12 retrain, pipeline fix (header-hint location override), v0.6.0 release.
+
+CJK: Chinese 年月日, Korean 년월일, Japanese era short (R6/01/15) and long (令和6年1月15日) all included with generators and validation.
+<!-- SECTION:FINAL_SUMMARY:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
-- [ ] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
+- [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
+- [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

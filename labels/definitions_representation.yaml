@@ -326,7 +326,7 @@ representation.text.word:
     v1 migration: Was text.word. Single word without spaces.
     Allows hyphens and underscores in middle. Transform lowercases.
 
-representation.text.color_hex:
+representation.format.color_hex:
   title: "Color (Hexadecimal)"
   description: >
     Color as hexadecimal value (e.g., #FF0000, #f00, FF0000).
@@ -357,7 +357,7 @@ representation.text.color_hex:
     v1 migration: Was text.hex_color. Transform uppercases.
     Accepts # prefix or without. 3-digit (short) or 6-digit (long) hex.
 
-representation.text.color_rgb:
+representation.format.color_rgb:
   title: "Color (RGB)"
   description: >
     Color as RGB tuple (0-255 for each channel).

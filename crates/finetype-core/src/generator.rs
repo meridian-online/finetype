@@ -697,7 +697,6 @@ impl Generator {
                 let months = locale_data::month_names(self.current_locale());
                 Ok(months[self.rng.gen_range(0..months.len())].to_string())
             }
-            ("component", "day_of_month") => Ok(self.rng.gen_range(1u32..=31).to_string()),
             ("component", "day_of_week") => {
                 let days = locale_data::weekday_names(self.current_locale());
                 Ok(days[self.rng.gen_range(0..days.len())].to_string())
@@ -1075,16 +1074,7 @@ impl Generator {
                 ];
                 Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
             }
-            ("code", "pin") => {
-                let len = if self.rng.gen_bool(0.7) { 4 } else { 6 };
-                Ok(format!(
-                    "{:0width$}",
-                    self.rng.gen_range(0..10u32.pow(len)),
-                    width = len as usize
-                ))
-            }
-
-            // ── development (8 types) ────────────────────────────────────
+            // ── development ────────────────────────────────────
             ("development", "version") => {
                 let major = self.rng.gen_range(0..20);
                 let minor = self.rng.gen_range(0..50);
@@ -1107,74 +1097,6 @@ impl Generator {
                 } else {
                     Ok(format!("{}.{:02}", y, m))
                 }
-            }
-            ("development", "programming_language") => {
-                let langs = [
-                    "Python",
-                    "JavaScript",
-                    "TypeScript",
-                    "Java",
-                    "C++",
-                    "C#",
-                    "Go",
-                    "Rust",
-                    "PHP",
-                    "Ruby",
-                    "Kotlin",
-                    "Swift",
-                    "Scala",
-                    "Haskell",
-                    "R",
-                    "Julia",
-                    "MATLAB",
-                    "Perl",
-                    "Lua",
-                    "Elixir",
-                ];
-                Ok(langs[self.rng.gen_range(0..langs.len())].to_string())
-            }
-            ("development", "software_license") => {
-                let licenses = [
-                    "MIT",
-                    "Apache-2.0",
-                    "GPL-3.0",
-                    "GPL-2.0",
-                    "BSD-3-Clause",
-                    "BSD-2-Clause",
-                    "ISC",
-                    "MPL-2.0",
-                    "LGPL-3.0",
-                    "AGPL-3.0",
-                    "Unlicense",
-                    "CC0-1.0",
-                ];
-                Ok(licenses[self.rng.gen_range(0..licenses.len())].to_string())
-            }
-            ("development", "stage") => {
-                let stages = [
-                    "Alpha",
-                    "Beta",
-                    "Release Candidate",
-                    "Stable",
-                    "LTS",
-                    "Deprecated",
-                ];
-                Ok(stages[self.rng.gen_range(0..stages.len())].to_string())
-            }
-            ("development", "os") => {
-                let oses = [
-                    "Windows 10",
-                    "Windows 11",
-                    "macOS",
-                    "Ubuntu",
-                    "Fedora",
-                    "Debian",
-                    "Arch Linux",
-                    "CentOS",
-                    "iOS",
-                    "Android",
-                ];
-                Ok(oses[self.rng.gen_range(0..oses.len())].to_string())
             }
             // technology.development.boolean — REMOVED in NNFT-075
             // Relocated to representation.boolean.{binary,initials,terms}
@@ -1425,17 +1347,7 @@ impl Generator {
                 Ok(format!("{:02}/{:02}", month, year))
             }
             // cvv removed in NNFT-177 (taxonomy revision v0.5.1)
-            ("payment", "credit_card_network") => {
-                let networks = [
-                    "Visa",
-                    "Mastercard",
-                    "Amex",
-                    "Discover",
-                    "Diners Club",
-                    "JCB",
-                ];
-                Ok(networks[self.rng.gen_range(0..networks.len())].to_string())
-            }
+            // credit_card_network removed in NNFT-233 (low precision, enum-only)
             ("payment", "bitcoin_address") => {
                 let base58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
                 let prefix_choice = self.rng.gen_range(0..3);
@@ -1971,26 +1883,6 @@ impl Generator {
                 Ok(format!("{}{}", words.join(" "), ending))
             }
             ("text", "word") => Ok(self.random_word()),
-            ("text", "color_hex") => {
-                let r = self.rng.gen::<u8>();
-                let g = self.rng.gen::<u8>();
-                let b = self.rng.gen::<u8>();
-                if self.rng.gen_bool(0.8) {
-                    Ok(format!("#{:02X}{:02X}{:02X}", r, g, b))
-                } else {
-                    Ok(format!("{:02x}{:02x}{:02x}", r, g, b))
-                }
-            }
-            ("text", "color_rgb") => {
-                let r = self.rng.gen_range(0..256);
-                let g = self.rng.gen_range(0..256);
-                let b = self.rng.gen_range(0..256);
-                if self.rng.gen_bool(0.6) {
-                    Ok(format!("rgb({}, {}, {})", r, g, b))
-                } else {
-                    Ok(format!("{}, {}, {}", r, g, b))
-                }
-            }
             ("text", "entity_name") => self.gen_entity_name(),
             ("text", "paragraph") => self.gen_paragraph(),
             ("text", "emoji") => {
@@ -2021,6 +1913,28 @@ impl Generator {
                     "\u{1f3b8}",
                 ];
                 Ok(emojis[self.rng.gen_range(0..emojis.len())].to_string())
+            }
+
+            // ── format (2 types) ─────────────────────────────────────────
+            ("format", "color_hex") => {
+                let r = self.rng.gen::<u8>();
+                let g = self.rng.gen::<u8>();
+                let b = self.rng.gen::<u8>();
+                if self.rng.gen_bool(0.8) {
+                    Ok(format!("#{:02X}{:02X}{:02X}", r, g, b))
+                } else {
+                    Ok(format!("{:02x}{:02x}{:02x}", r, g, b))
+                }
+            }
+            ("format", "color_rgb") => {
+                let r = self.rng.gen_range(0..256);
+                let g = self.rng.gen_range(0..256);
+                let b = self.rng.gen_range(0..256);
+                if self.rng.gen_bool(0.6) {
+                    Ok(format!("rgb({}, {}, {})", r, g, b))
+                } else {
+                    Ok(format!("{}, {}, {}", r, g, b))
+                }
             }
 
             // ── file (4 types) ───────────────────────────────────────────
@@ -2809,9 +2723,6 @@ impl Generator {
             ("payment", "credit_card_number") => self.gen_identity("payment", "credit_card_number"),
             ("payment", "credit_card_expiration_date") => {
                 self.gen_identity("payment", "credit_card_expiration_date")
-            }
-            ("payment", "credit_card_network") => {
-                self.gen_identity("payment", "credit_card_network")
             }
             ("payment", "paypal_email") => self.gen_identity("payment", "paypal_email"),
 
@@ -4805,7 +4716,9 @@ test.test.test:
     #[test]
     fn test_representation_hex_color() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
-        let val = gen.generate_value("representation.text.color_hex").unwrap();
+        let val = gen
+            .generate_value("representation.format.color_hex")
+            .unwrap();
         assert!(val.len() == 7 || val.len() == 6);
     }
 

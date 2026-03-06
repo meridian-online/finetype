@@ -319,40 +319,6 @@ finance.payment.credit_card_expiration_date:
     MM/YY to end-of-month DATE. Decompose extracts month and year separately.
     Typical format: MM/YY (e.g., 12/25 for December 2025).
 
-finance.payment.credit_card_network:
-  title: "Credit Card Network"
-  description: >
-    Payment card network (Visa, Mastercard, American Express, Discover, etc.).
-    Inferred from card number prefix. Broad categorization.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    enum:
-      - Visa
-      - Mastercard
-      - Amex
-      - Discover
-      - Diners Club
-      - JCB
-  tier: [VARCHAR, payment]
-  release_priority: 1
-  aliases: [card_issuer, card_brand]
-  samples:
-    - "Visa"
-    - "Mastercard"
-    - "Amex"
-    - "Discover"
-  references: null
-  notes: >
-    v1 migration: Was payment.credit_card_network marked broad_words.
-    Can be inferred from card number but also may appear as explicit string.
-
 finance.payment.paypal_email:
   title: "PayPal Email"
   description: >

@@ -1244,32 +1244,6 @@ datetime.component.year:
   references: null
   notes: "v1 name: datetime.year. Was designation: duplicate."
 
-datetime.component.day_of_month:
-  title: Day of Month
-  description: >
-    Integer day of month (1-31). Highly ambiguous — overlaps with
-    many integer types. Best identified via column-mode inference.
-  designation: broad_numbers
-  locales: [UNIVERSAL]
-  broad_type: TINYINT
-  format_string: null
-  transform: "{col}::TINYINT"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: integer
-    minimum: 1
-    maximum: 31
-  tier: [INTEGER, component]
-  release_priority: 3
-  aliases: []
-  samples:
-    - "1"
-    - "15"
-    - "31"
-  references: null
-  notes: null
-
 datetime.component.day_of_week:
   title: Day of Week Name
   description: >
