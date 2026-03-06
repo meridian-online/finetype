@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-06
+
+### Accuracy
+
+- **Actionability eval: 99.7%** — expanded to cover transform-based types (Tier B: epochs, currency, JSON, numeric). Tier A (strptime formats) 96.2%, Tier B (transforms) 99.8%, combined 99.7% on 80 types across 204 columns. (NNFT-205)
+
+### Added
+
+- **`profile --validate`** — new CLI flag to run JSON Schema validation per column after classification. Outputs valid/invalid/null counts and validity rates. (NNFT-212)
+- **Quality scores and file-level grades** — `ColumnQualityScore` with type_conforming_rate, null_rate, completeness metrics. File-level grade: A≥95%, B≥85%, C≥70%, D≥50%, F<50%. Available in JSON and markdown output. (NNFT-213)
+- **`--output markdown`** — pipe-separated tables for profile and validate commands. Clean formatting suitable for GitHub issues and documentation. (NNFT-208)
+- **Quarantine samples in validation reports** — up to 5 sample invalid values per column in JSON, markdown, and plain output. Helps users quickly understand validation failures without inspecting full dataset. (NNFT-214)
+- **`format_string_alt` field** — new YAML field for type definitions with alternate format strings (e.g., ISO 8601 with/without fractional seconds). Wired through taxonomy JSON export (`--full --output json`) and schema output. (NNFT-203)
+
+### Fixed
+
+- **Currency broad_type mismatch** — `amount_us` and `amount_eu` now declare `broad_type: DECIMAL` to match transform output (previously VARCHAR). Fixes schema-for DDL generation. (NNFT-206)
+- **Accounting notation support** — `amount_us` validation and generator now accept parenthesized negatives like `($1,234.56)`. (NNFT-206)
+- **Transform stubs completed** — `julian_date` and `rfc_2822_ordinal` now have working DuckDB transforms and generators, eliminating dead-end definitions. (NNFT-204)
+
+### Changed
+
+- **Evaluation infrastructure** — eval binaries now test both strptime-based formats and SQL transform-based types, providing comprehensive actionability coverage.
+
 ## [0.6.0] - 2026-03-05
 
 ### Accuracy
