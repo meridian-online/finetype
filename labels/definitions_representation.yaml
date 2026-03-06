@@ -84,13 +84,13 @@ representation.numeric.decimal_number:
     v1 migration: Was numeric.decimal_number. Transforms to DOUBLE.
     Decompose extracts integer and fractional parts.
 
-representation.numeric.decimal_number_eu:
-  title: "Decimal Number (EU Format)"
+representation.numeric.decimal_number_comma:
+  title: "Decimal Number (Comma Separator)"
   description: >
-    Number with European formatting: period as thousands separator and comma
-    as decimal separator (e.g., 1.234,56, 999,99, -42,5). The inverse of
-    US format where period is decimal and comma is thousands. Silent corruption
-    risk: "1.234" is either 1234 (European thousands) or 1.234 (US decimal).
+    Number with comma as decimal separator and period as thousands separator
+    (e.g., 1.234,56, 999,99, -42,5). The inverse of US format where period
+    is decimal and comma is thousands. Silent corruption risk: "1.234" is
+    either 1234 (comma-decimal thousands) or 1.234 (US decimal).
     Transforms to DOUBLE after swapping separators.
   designation: universal
   locales: [UNIVERSAL]

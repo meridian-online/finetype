@@ -484,7 +484,7 @@ mappings:
     finetype_domain: datetime
     match_quality: partial
     expand: false
-    notes: "Maps to many FineType date types: iso, us_slash, eu_slash, etc."
+    notes: "Maps to many FineType date types: iso, mdy_slash, dmy_slash, etc."
 
   - gt_label: created
     source: dbpedia
@@ -1810,11 +1810,11 @@ mappings:
   # ── Profile (datetime_formats_extended) ──────────────────────────
   - gt_label: eu dot date
     source: profile
-    finetype_label: datetime.date.eu_dot
+    finetype_label: datetime.date.dmy_dot
     finetype_domain: datetime
     match_quality: direct
     expand: false
-    notes: European date with dot separators (dd.mm.yyyy)
+    notes: DMY date with dot separators (dd.mm.yyyy)
 
   - gt_label: abbreviated month date
     source: profile
@@ -1858,19 +1858,19 @@ mappings:
 
   - gt_label: american timestamp
     source: profile
-    finetype_label: datetime.timestamp.american
+    finetype_label: datetime.timestamp.mdy_12h
     finetype_domain: datetime
     match_quality: direct
     expand: false
-    notes: American datetime (MM/DD/YYYY HH:MM AM/PM)
+    notes: MDY datetime with 12-hour clock (MM/DD/YYYY HH:MM AM/PM)
 
   - gt_label: european timestamp
     source: profile
-    finetype_label: datetime.timestamp.european
+    finetype_label: datetime.timestamp.dmy_hm
     finetype_domain: datetime
     match_quality: direct
     expand: false
-    notes: European datetime (DD/MM/YYYY HH:MM)
+    notes: DMY datetime with hour-minute (DD/MM/YYYY HH:MM)
 
   # ═══════════════════════════════════════════════════════════════════════════
   # JSON PROFILING EVAL — added for m-9 JSON eval datasets (NNFT-230)

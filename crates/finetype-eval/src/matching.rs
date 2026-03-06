@@ -109,7 +109,7 @@ mod tests {
     fn test_domain_match() {
         assert!(is_domain_match(
             "datetime.date.iso",
-            "datetime.date.us_slash",
+            "datetime.date.mdy_slash",
             "datetime"
         ));
     }

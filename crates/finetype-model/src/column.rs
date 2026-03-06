@@ -5,7 +5,7 @@
 //! disambiguation rules to determine the most likely type for the entire column.
 //!
 //! This is critical for resolving ambiguous types like:
-//! - `us_slash` vs `eu_slash` dates (MM/DD vs DD/MM)
+//! - `mdy_slash` vs `dmy_slash` dates (MM/DD vs DD/MM)
 //! - `short_dmy` vs `short_mdy` dates
 //! - `latitude` vs `longitude` coordinates
 //! - Numeric types (port, increment, postal_code, integer_number)
@@ -1362,7 +1362,7 @@ impl ColumnClassifier {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Disambiguation rule pairs: types that are ambiguous in single-value mode.
-const DATE_SLASH_PAIR: (&str, &str) = ("datetime.date.us_slash", "datetime.date.eu_slash");
+const DATE_SLASH_PAIR: (&str, &str) = ("datetime.date.mdy_slash", "datetime.date.dmy_slash");
 
 const SHORT_DATE_PAIR: (&str, &str) = ("datetime.date.short_mdy", "datetime.date.short_dmy");
 
@@ -1410,7 +1410,7 @@ fn disambiguate(
     // Get the top labels in the vote
     let top_labels: Vec<&str> = votes.iter().take(3).map(|(l, _)| l.as_str()).collect();
 
-    // Rule 1: Date slash disambiguation (us_slash vs eu_slash)
+    // Rule 1: Date slash disambiguation (mdy_slash vs dmy_slash)
     if contains_pair(&top_labels, DATE_SLASH_PAIR.0, DATE_SLASH_PAIR.1) {
         if let Some(label) = disambiguate_slash_dates(values) {
             return Some((label, "date_slash_disambiguation".to_string()));
@@ -2278,11 +2278,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
 // DISAMBIGUATION RULES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Disambiguate us_slash vs eu_slash dates.
+/// Disambiguate mdy_slash vs dmy_slash dates.
 ///
 /// Pattern: `DD/MM/YYYY` or `MM/DD/YYYY`
-/// Rule: If ANY value has first component > 12, it must be DD/MM (eu_slash).
-///       If ANY value has second component > 12, it must be MM/DD (us_slash).
+/// Rule: If ANY value has first component > 12, it must be DD/MM (dmy_slash).
+///       If ANY value has second component > 12, it must be MM/DD (mdy_slash).
 fn disambiguate_slash_dates(values: &[String]) -> Option<String> {
     let mut first_over_12 = false;
     let mut second_over_12 = false;
@@ -2304,11 +2304,11 @@ fn disambiguate_slash_dates(values: &[String]) -> Option<String> {
     }
 
     if first_over_12 && !second_over_12 {
-        // First component > 12 means it's the day → DD/MM/YYYY → eu_slash
-        Some("datetime.date.eu_slash".to_string())
+        // First component > 12 means it's the day → DD/MM/YYYY → dmy_slash
+        Some("datetime.date.dmy_slash".to_string())
     } else if second_over_12 && !first_over_12 {
-        // Second component > 12 means it's the day → MM/DD/YYYY → us_slash
-        Some("datetime.date.us_slash".to_string())
+        // Second component > 12 means it's the day → MM/DD/YYYY → mdy_slash
+        Some("datetime.date.mdy_slash".to_string())
     } else {
         // Both ambiguous or contradictory — let model decide
         None
@@ -3001,11 +3001,11 @@ mod tests {
         .collect();
 
         let result = disambiguate_slash_dates(&values);
-        assert_eq!(result, Some("datetime.date.eu_slash".to_string()));
+        assert_eq!(result, Some("datetime.date.dmy_slash".to_string()));
     }
 
     #[test]
-    fn test_slash_date_us_detected() {
+    fn test_slash_date_mdy_detected() {
         let values: Vec<String> = vec![
             "01/15/2024",
             "06/28/2023",
@@ -3018,7 +3018,7 @@ mod tests {
         .collect();
 
         let result = disambiguate_slash_dates(&values);
-        assert_eq!(result, Some("datetime.date.us_slash".to_string()));
+        assert_eq!(result, Some("datetime.date.mdy_slash".to_string()));
     }
 
     #[test]

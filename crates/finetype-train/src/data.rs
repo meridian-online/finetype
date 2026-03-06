@@ -363,7 +363,7 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         | "identity.person.weight"
         | "representation.file.file_size"
         | "representation.numeric.decimal_number"
-        | "representation.numeric.decimal_number_eu"
+        | "representation.numeric.decimal_number_comma"
         | "representation.numeric.integer_number"
         | "representation.numeric.percentage"
         | "representation.numeric.scientific_notation"

@@ -1,11 +1,11 @@
 ---
 id: NNFT-233
 title: 'Taxonomy cleanup: remove 7 low-precision types, recategorize color types'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-06 08:30'
-updated_date: '2026-03-06 08:55'
+updated_date: '2026-03-06 08:56'
 labels:
   - taxonomy
   - cleanup
@@ -100,6 +100,6 @@ Removed 7 low-precision types that violate the Precision Principle and recategor
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

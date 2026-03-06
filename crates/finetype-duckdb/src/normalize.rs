@@ -66,7 +66,7 @@ fn normalize_date(value: &str, label: &str) -> Option<String> {
             let v = v.replace('/', "-");
             validate_date_parts(&v)
         }
-        "datetime.date.us_slash" | "datetime.date.short_mdy" => {
+        "datetime.date.mdy_slash" | "datetime.date.short_mdy" => {
             // MM/DD/YYYY or MM-DD-YYYY
             let parts: Vec<&str> = v.splitn(3, ['/', '-']).collect();
             if parts.len() == 3 {
@@ -78,7 +78,7 @@ fn normalize_date(value: &str, label: &str) -> Option<String> {
                 None
             }
         }
-        "datetime.date.eu_slash" | "datetime.date.eu_dot" | "datetime.date.short_dmy" => {
+        "datetime.date.dmy_slash" | "datetime.date.dmy_dot" | "datetime.date.short_dmy" => {
             // DD/MM/YYYY or DD.MM.YYYY or DD-MM-YYYY
             let parts: Vec<&str> = v.splitn(3, ['/', '.', '-']).collect();
             if parts.len() == 3 {
@@ -487,25 +487,25 @@ mod tests {
     }
 
     #[test]
-    fn test_us_date_normalized() {
+    fn test_mdy_date_normalized() {
         assert_eq!(
-            normalize("01/15/2024", "datetime.date.us_slash"),
+            normalize("01/15/2024", "datetime.date.mdy_slash"),
             Some("2024-01-15".to_string())
         );
     }
 
     #[test]
-    fn test_eu_date_normalized() {
+    fn test_dmy_date_normalized() {
         assert_eq!(
-            normalize("15/01/2024", "datetime.date.eu_slash"),
+            normalize("15/01/2024", "datetime.date.dmy_slash"),
             Some("2024-01-15".to_string())
         );
     }
 
     #[test]
-    fn test_eu_dot_date_normalized() {
+    fn test_dmy_dot_date_normalized() {
         assert_eq!(
-            normalize("15.01.2024", "datetime.date.eu_dot"),
+            normalize("15.01.2024", "datetime.date.dmy_dot"),
             Some("2024-01-15".to_string())
         );
     }
@@ -555,16 +555,16 @@ mod tests {
 
     #[test]
     fn test_invalid_date_returns_none() {
-        assert_eq!(normalize("13/32/2024", "datetime.date.us_slash"), None);
+        assert_eq!(normalize("13/32/2024", "datetime.date.mdy_slash"), None);
     }
 
     #[test]
     fn test_feb_leap_year() {
         assert_eq!(
-            normalize("02/29/2024", "datetime.date.us_slash"),
+            normalize("02/29/2024", "datetime.date.mdy_slash"),
             Some("2024-02-29".to_string())
         );
-        assert_eq!(normalize("02/29/2023", "datetime.date.us_slash"), None);
+        assert_eq!(normalize("02/29/2023", "datetime.date.mdy_slash"), None);
     }
 
     // ── Time Tests ───────────────────────────────────────────────────────

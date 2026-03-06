@@ -12,9 +12,9 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
     match label {
         // ── datetime.date ──────────────────────────────────────────────
         "datetime.date.iso"
-        | "datetime.date.us_slash"
-        | "datetime.date.eu_slash"
-        | "datetime.date.eu_dot"
+        | "datetime.date.mdy_slash"
+        | "datetime.date.dmy_slash"
+        | "datetime.date.dmy_dot"
         | "datetime.date.long_full_month"
         | "datetime.date.abbreviated_month"
         | "datetime.date.weekday_full_month"
@@ -41,9 +41,9 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "datetime.timestamp.iso_8601_compact"
         | "datetime.timestamp.iso_8601_microseconds"
         | "datetime.timestamp.iso_microseconds"
-        | "datetime.timestamp.american"
-        | "datetime.timestamp.american_24h"
-        | "datetime.timestamp.european"
+        | "datetime.timestamp.mdy_12h"
+        | "datetime.timestamp.mdy_24h"
+        | "datetime.timestamp.dmy_hm"
         | "datetime.timestamp.sql_standard" => "TIMESTAMP",
 
         "datetime.timestamp.iso_8601_offset"

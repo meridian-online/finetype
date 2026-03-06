@@ -216,11 +216,11 @@ time of day,dbpedia,,datetime,partial,false
 published on,dbpedia,,datetime,partial,false
 dec,dbpedia,,representation,semantic_only,false
 filename,dbpedia,,representation,semantic_only,true
-eu dot date,profile,datetime.date.eu_dot,datetime,direct,false
+eu dot date,profile,datetime.date.dmy_dot,datetime,direct,false
 abbreviated month date,profile,datetime.date.abbreviated_month,datetime,direct,false
 long full month date,profile,datetime.date.long_full_month,datetime,direct,false
 time 12h,profile,datetime.time.hm_12h,datetime,direct,false
 time 12h seconds,profile,datetime.time.hms_12h,datetime,direct,false
 rfc 2822 timestamp,profile,datetime.timestamp.rfc_2822,datetime,direct,false
-american timestamp,profile,datetime.timestamp.american,datetime,direct,false
-european timestamp,profile,datetime.timestamp.european,datetime,direct,false
+american timestamp,profile,datetime.timestamp.mdy_12h,datetime,direct,false
+european timestamp,profile,datetime.timestamp.dmy_hm,datetime,direct,false

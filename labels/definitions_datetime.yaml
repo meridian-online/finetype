@@ -230,10 +230,10 @@ datetime.timestamp.sql_standard:
       link: "https://www.iso.org/standard/76583.html"
   notes: null
 
-datetime.timestamp.american:
-  title: American Datetime
+datetime.timestamp.mdy_12h:
+  title: MDY 12-Hour Datetime
   description: >
-    US-style datetime with 12-hour clock and AM/PM indicator.
+    Month/Day/Year datetime with 12-hour clock and AM/PM indicator.
     Month-first ordering (MM/DD/YYYY).
   designation: universal
   locales: [UNIVERSAL]
@@ -256,10 +256,10 @@ datetime.timestamp.american:
       link: "https://en.wikipedia.org/wiki/Date_format_by_country#United_States"
   notes: null
 
-datetime.timestamp.american_24h:
-  title: American Datetime (24-hour)
+datetime.timestamp.mdy_24h:
+  title: MDY 24-Hour Datetime
   description: >
-    US-style date ordering (MM/DD/YYYY) with 24-hour time.
+    Month/Day/Year date ordering (MM/DD/YYYY) with 24-hour time.
     Common in US military, healthcare, and technical systems.
   designation: universal
   locales: [UNIVERSAL]
@@ -280,10 +280,10 @@ datetime.timestamp.american_24h:
   references: null
   notes: "v1 name: datetime.formatted_datetime"
 
-datetime.timestamp.european:
-  title: European Datetime
+datetime.timestamp.dmy_hm:
+  title: DMY Hour-Minute Datetime
   description: >
-    European-style datetime with 24-hour clock. Day-first ordering
+    Day/Month/Year datetime with 24-hour clock. Day-first ordering
     (DD/MM/YYYY). Used across the EU and many Commonwealth countries.
   designation: universal
   locales: [UNIVERSAL]
@@ -399,11 +399,11 @@ datetime.date.iso:
       link: "https://www.iso.org/standard/70907.html"
   notes: "v1 name: datetime.date"
 
-datetime.date.us_slash:
-  title: US Date (slash-separated)
+datetime.date.mdy_slash:
+  title: MDY Date (slash-separated)
   description: >
     Month/Day/Year with slash separators. Standard US date format.
-    Ambiguous with EU format for days 1-12 — column-mode inference
+    Ambiguous with DMY format for days 1-12 — column-mode inference
     uses value distribution to disambiguate.
   designation: universal
   locales: [UNIVERSAL]
@@ -424,13 +424,13 @@ datetime.date.us_slash:
     - "01/15/2024"
     - "12/31/2019"
   references: null
-  notes: "v1 name: datetime.formatted_date. Ambiguous with eu_slash when day <= 12."
+  notes: "v1 name: datetime.formatted_date. Ambiguous with dmy_slash when day <= 12."
 
-datetime.date.eu_slash:
-  title: European Date (slash-separated)
+datetime.date.dmy_slash:
+  title: DMY Date (slash-separated)
   description: >
     Day/Month/Year with slash separators. Standard format across
-    Europe, Australia, and much of Asia. Ambiguous with US format
+    Europe, Australia, and much of Asia. Ambiguous with MDY format
     for days 1-12.
   designation: universal
   locales: [UNIVERSAL]
@@ -452,12 +452,12 @@ datetime.date.eu_slash:
     - "31/12/2019"
   references: null
   notes: >
-    NEW in v2. Critical for non-US data. Ambiguous with us_slash when
+    NEW in v2. Critical for non-US data. Ambiguous with mdy_slash when
     day <= 12 — column-mode inference resolves by checking if any value
     has first component > 12.
 
-datetime.date.eu_dot:
-  title: European Date (dot-separated)
+datetime.date.dmy_dot:
+  title: DMY Date (dot-separated)
   description: >
     Day.Month.Year with dot separators. Common in Germany, Austria,
     Switzerland, and Eastern European countries.
@@ -2334,11 +2334,11 @@ datetime.date.dmy_dash_abbrev_short:
   notes: >
     New in format coverage expansion. Oracle classic DD-MON-RR format.
 
-datetime.date.us_short_slash:
-  title: US Short Date (slash, 2-digit year)
+datetime.date.mdy_short_slash:
+  title: MDY Short Date (slash, 2-digit year)
   description: >
     Month/Day/ShortYear with slash separators. Excel US short date format.
-    Ambiguous with eu_short_slash when day <= 12.
+    Ambiguous with dmy_short_slash when day <= 12.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
@@ -2361,13 +2361,13 @@ datetime.date.us_short_slash:
   references: null
   notes: >
     New in format coverage expansion. Excel US short date. Ambiguous with
-    eu_short_slash — resolved by column-mode inference.
+    dmy_short_slash — resolved by column-mode inference.
 
-datetime.date.eu_short_slash:
-  title: EU Short Date (slash, 2-digit year)
+datetime.date.dmy_short_slash:
+  title: DMY Short Date (slash, 2-digit year)
   description: >
     Day/Month/ShortYear with slash separators. Excel EU short date format.
-    Ambiguous with us_short_slash when day <= 12.
+    Ambiguous with mdy_short_slash when day <= 12.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
@@ -2390,10 +2390,10 @@ datetime.date.eu_short_slash:
   references: null
   notes: >
     New in format coverage expansion. Excel EU short date. Ambiguous with
-    us_short_slash — resolved by column-mode inference.
+    mdy_short_slash — resolved by column-mode inference.
 
-datetime.date.eu_short_dot:
-  title: EU Short Date (dot, 2-digit year)
+datetime.date.dmy_short_dot:
+  title: DMY Short Date (dot, 2-digit year)
   description: >
     Day.Month.ShortYear with dot separators and 2-digit year.
     CLDR de-DE short format (d.M.yy). Dot convention is nearly always DMY.

@@ -237,15 +237,15 @@ impl Generator {
                     offset_h
                 ))
             }
-            ("timestamp", "american") => Ok(self
+            ("timestamp", "mdy_12h") => Ok(self
                 .random_datetime()
                 .format("%m/%d/%Y %I:%M %p")
                 .to_string()),
-            ("timestamp", "american_24h") => Ok(self
+            ("timestamp", "mdy_24h") => Ok(self
                 .random_datetime()
                 .format("%m/%d/%Y %H:%M:%S")
                 .to_string()),
-            ("timestamp", "european") => {
+            ("timestamp", "dmy_hm") => {
                 Ok(self.random_datetime().format("%d/%m/%Y %H:%M").to_string())
             }
             ("timestamp", "iso_microseconds") => {
@@ -388,9 +388,9 @@ impl Generator {
 
             // ── date (17 types) ──────────────────────────────────────────
             ("date", "iso") => Ok(self.random_datetime().format("%Y-%m-%d").to_string()),
-            ("date", "us_slash") => Ok(self.random_datetime().format("%m/%d/%Y").to_string()),
-            ("date", "eu_slash") => Ok(self.random_datetime().format("%d/%m/%Y").to_string()),
-            ("date", "eu_dot") => Ok(self.random_datetime().format("%d.%m.%Y").to_string()),
+            ("date", "mdy_slash") => Ok(self.random_datetime().format("%m/%d/%Y").to_string()),
+            ("date", "dmy_slash") => Ok(self.random_datetime().format("%d/%m/%Y").to_string()),
+            ("date", "dmy_dot") => Ok(self.random_datetime().format("%d.%m.%Y").to_string()),
             ("date", "compact_ymd") => {
                 let dt = self.random_datetime();
                 Ok(format!("{}{:02}{:02}", dt.year(), dt.month(), dt.day()))
@@ -489,9 +489,13 @@ impl Generator {
             ("date", "ymd_dot") => Ok(self.random_datetime().format("%Y.%m.%d").to_string()),
             ("date", "dmy_dash") => Ok(self.random_datetime().format("%d-%m-%Y").to_string()),
             ("date", "mdy_dash") => Ok(self.random_datetime().format("%m-%d-%Y").to_string()),
-            ("date", "us_short_slash") => Ok(self.random_datetime().format("%m/%d/%y").to_string()),
-            ("date", "eu_short_slash") => Ok(self.random_datetime().format("%d/%m/%y").to_string()),
-            ("date", "eu_short_dot") => Ok(self.random_datetime().format("%d.%m.%y").to_string()),
+            ("date", "mdy_short_slash") => {
+                Ok(self.random_datetime().format("%m/%d/%y").to_string())
+            }
+            ("date", "dmy_short_slash") => {
+                Ok(self.random_datetime().format("%d/%m/%y").to_string())
+            }
+            ("date", "dmy_short_dot") => Ok(self.random_datetime().format("%d.%m.%y").to_string()),
 
             // Named month variants (6)
             ("date", "dmy_space_abbrev") => {
@@ -1768,7 +1772,7 @@ impl Generator {
                 let precision = self.rng.gen_range(1..8);
                 Ok(format!("{:.prec$}", val, prec = precision))
             }
-            ("numeric", "decimal_number_eu") => {
+            ("numeric", "decimal_number_comma") => {
                 // European format: period thousands separator, comma decimal separator
                 let r = self.rng.gen::<f64>();
                 let (integer_part, decimal_digits) = if r < 0.3 {
@@ -4657,9 +4661,9 @@ test.test.test:
     }
 
     #[test]
-    fn test_datetime_date_us_slash() {
+    fn test_datetime_date_mdy_slash() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
-        let val = gen.generate_value("datetime.date.us_slash").unwrap();
+        let val = gen.generate_value("datetime.date.mdy_slash").unwrap();
         assert_eq!(val.len(), 10);
         assert!(val.contains('/'));
     }
@@ -5484,9 +5488,9 @@ test.test.test:
             "datetime.date.ymd_dot",
             "datetime.date.dmy_dash",
             "datetime.date.mdy_dash",
-            "datetime.date.us_short_slash",
-            "datetime.date.eu_short_slash",
-            "datetime.date.eu_short_dot",
+            "datetime.date.mdy_short_slash",
+            "datetime.date.dmy_short_slash",
+            "datetime.date.dmy_short_dot",
             "datetime.date.dmy_space_abbrev",
             "datetime.date.dmy_space_full",
             "datetime.date.abbrev_month_no_comma",
