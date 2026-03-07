@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-03-07
+
+### Added
+
+- **MCP server** — `finetype mcp` subcommand exposing type inference to AI agents via Model Context Protocol. 6 tools (infer, profile, ddl, taxonomy, schema, generate) + taxonomy resources. Built on rmcp v1.1.0, stdio transport, JSON + markdown dual output. (NNFT-241)
+- **Taxonomy expansion to 250 types** — 43 new type definitions across all domains: geography +10 (wkt, geojson, h3, geohash, plus_code, dms, mgrs, iso6346, hs_code, unlocode), technology +11 (ulid, tsid, snowflake_id, aws_arn, s3_uri, jwt, docker_ref, git_sha, cidr, urn, data_uri), identity +15 (icd10, loinc, cpt, hcpcs, vin, eu_vat, ssn, ein, pan_india, abn, orcid, email_display, phone_e164, upc, isrc), finance +3 (figi, aba_routing, bsb), representation +4 (cas_number, inchi, smiles, color_hsl). (NNFT-244)
+- **PII field** — `pii: Option<bool>` on Definition struct, 11 types tagged. `x-finetype-pii` in JSON Schema output. (NNFT-244.05)
+- **`x-finetype-transform-ext`** — Extended transform metadata in schema output. (NNFT-244.05)
+
+### Changed
+
+- **Taxonomy precision cleanup** — Removed 2 low-precision integer-range types: `http_status_code` and `port` (false positives on plain integers). Renamed 7 currency amount types to format-structural names (amount_us→amount, amount_eu→amount_comma, etc.). Old names preserved as aliases. (NNFT-242, NNFT-243)
+- **Duration regex** — Expanded to full ISO 8601 spec. `iso_8601_verbose` aliased to `iso_8601`. (NNFT-244.05)
+- **bcp47 dedup** — Aliased to `locale_code`. (NNFT-244.02)
+
+### Model
+
+- **CharCNN v14** — Retrained on 250-type taxonomy (1500 samples/type, 372k total, 10 epochs, 86.6% training accuracy). (NNFT-245)
+- **Sense classifier** — Retrained with 250-type category mappings (87.1% broad accuracy, 78.5% entity accuracy). (NNFT-245)
+- **Model2Vec** — Refreshed type embeddings for all 250 types (750 embeddings × 128 dim). (NNFT-245)
+
+### Accuracy
+
+- **Profile eval: 95.7% label, 97.3% domain** (178/186 columns) on expanded eval suite with 43 new type columns. 3 new false positives from type overlaps (cpt/postal_code, hs_code/decimal_number, docker_ref/hostname). (NNFT-245)
+- **Actionability eval: 99.9%** — 232,321/232,541 values transformed successfully. (NNFT-245)
+
 ## [0.6.3] - 2026-03-07
 
 ### Taxonomy
