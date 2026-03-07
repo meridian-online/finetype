@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-03-08
+
+### Added
+
+- **`finetype load` command** — Generates runnable DuckDB `CREATE TABLE AS SELECT` statements from file profiling. Pipe directly into DuckDB: `finetype load -f data.csv | duckdb`. Features: taxonomy transform expressions for typed columns, column name normalization via SQL aliases (default on, `--no-normalize-names` to opt out), trailing `SELECT * LIMIT 10` preview (`--limit N` to control), `all_varchar=true` for FineType-controlled type casting. (NNFT-238)
+- **`profile -o arrow`** — Arrow IPC JSON schema output format, moved from the retired `schema-for` command. (NNFT-239)
+
+### Removed
+
+- **`schema-for` command** — Retired entirely. Its three output modes are now covered by `load` (runnable CTAS), `profile -o json` (superset with confidence/locale/quality), and `profile -o arrow`. No deprecation period — command was young with no known external consumers. (NNFT-239)
+
 ## [0.6.5] - 2026-03-07
 
 ### Fixed
