@@ -395,22 +395,6 @@ fn normalize_internet(value: &str, label: &str) -> Option<String> {
             }
             Some(v.to_string())
         }
-        "technology.internet.http_status_code" => {
-            let n: u16 = v.parse().ok()?;
-            if (100..=599).contains(&n) {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        }
-        "technology.internet.port" => {
-            let n: u32 = v.parse().ok()?;
-            if n <= 65535 {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        }
         _ => Some(v.to_string()),
     }
 }

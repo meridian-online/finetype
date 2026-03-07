@@ -21,14 +21,15 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ## Current State
 
 **Version:** 0.6.3
-**Taxonomy:** 209 definitions across 7 domains (container: 12, datetime: 84, finance: 28, geography: 15, identity: 19, representation: 32, technology: 19) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v13 flat (209 classes, 10 epochs, 209k samples), tiered-v2 fallback via `--sharp-only`.
+**Taxonomy:** 207 definitions across 7 domains (container: 12, datetime: 84, finance: 28, geography: 15, identity: 19, representation: 32, technology: 17) — all generators pass, 100% alignment
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v13 flat (209 classes, 10 epochs, 209k samples — pre-NNFT-242/243 taxonomy, retrain pending), tiered-v2 fallback via `--sharp-only`.
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent milestones
 
+- **Taxonomy precision cleanup** (NNFT-242/243) — Removed 2 low-precision integer-range types (http_status_code, port — false positives on plain integers). Renamed 7 currency amount types from locale-based to format-structural names (amount_us→amount, amount_eu→amount_comma, amount_accounting_us→amount_accounting, amount_eu_suffix→amount_comma_suffix, amount_space_sep→amount_space, amount_indian→amount_lakh, amount_ch→amount_apostrophe). Old names preserved in aliases. 209→207 types. Model retrain pending.
 - **MCP server** (NNFT-241) — `finetype mcp` subcommand exposing type inference to AI agents via Model Context Protocol. 6 tools (infer, profile, ddl, taxonomy, schema, generate) + taxonomy resources. Built on rmcp v1.1.0 (official Rust MCP SDK), stdio transport, JSON + markdown dual output. New `finetype-mcp` library crate.
 - **Taxonomy cleanup** (NNFT-233/234) — Removed 7 low-precision types (216→209), recategorized color types, renamed 10 geographic type names to format-structural names (eu_→dmy_, us_→mdy_, american→mdy_12h, european→dmy_hm, decimal_number_eu→decimal_number_comma). CharCNN-v13 retrained on 209k samples (1000/type). Profile: 143/146 (97.9% label, 98.6% domain). Actionability: 99.3%.
 - **Post-retrain accuracy recovery v13** (NNFT-235) — Five pipeline fixes for entity/geography confusion: (1) same-domain geo override ignores confidence threshold for hardcoded hints, (2) hardcoded person-name hints override location predictions, (3) 20+ entity-name header hints (company, venue, station, etc.), (4) bare "address" → full_address, (5) hardcoded hints apply at <0.5 confidence. Profile: 135/146→143/146 (97.9%). 3 remaining: bare "name" ambiguity.
@@ -126,7 +127,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Taxonomy structure
 
-Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (12), datetime (85), finance (29), geography (15), identity (19), representation (32), technology (24).
+Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (12), datetime (84), finance (28), geography (15), identity (19), representation (32), technology (17).
 
 Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB type), `format_string`, `transform` (SQL expression), `validation`, `tier`, `decompose`.
 

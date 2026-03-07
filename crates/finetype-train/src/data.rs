@@ -357,8 +357,8 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
 
     // Numeric labels
     match ft_label {
-        "finance.currency.amount_eu"
-        | "finance.currency.amount_us"
+        "finance.currency.amount_comma"
+        | "finance.currency.amount"
         | "identity.person.height"
         | "identity.person.weight"
         | "representation.file.file_size"
@@ -367,9 +367,7 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         | "representation.numeric.integer_number"
         | "representation.numeric.percentage"
         | "representation.numeric.scientific_notation"
-        | "representation.numeric.si_number"
-        | "technology.internet.http_status_code"
-        | "technology.internet.port" => return Some(3), // numeric
+        | "representation.numeric.si_number" => return Some(3), // numeric
         _ => {}
     }
 

@@ -259,8 +259,6 @@ fn build_header_hint_entries() -> Vec<(String, String)> {
         // Currency
         ("currency", "finance.currency.currency_code"),
         ("currency code", "finance.currency.currency_code"),
-        // Port
-        ("port", "technology.internet.port"),
         // Phone
         ("phone", "identity.person.phone_number"),
         ("phone number", "identity.person.phone_number"),
@@ -397,10 +395,6 @@ fn build_header_hint_entries() -> Vec<(String, String)> {
         // Weight/Height
         ("weight", "identity.person.weight"),
         ("height", "identity.person.height"),
-        // HTTP status
-        ("status code", "technology.internet.http_status_code"),
-        ("response code", "technology.internet.http_status_code"),
-        ("http status", "technology.internet.http_status_code"),
         // MIME
         ("content type", "representation.file.mime_type"),
         ("media type", "representation.file.mime_type"),

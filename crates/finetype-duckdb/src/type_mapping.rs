@@ -82,8 +82,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "technology.internet.top_level_domain"
         | "technology.internet.user_agent" => "VARCHAR",
         "technology.internet.http_method" => "VARCHAR",
-        "technology.internet.http_status_code" => "SMALLINT",
-        "technology.internet.port" => "SMALLINT",
 
         // ── technology.cryptographic ───────────────────────────────────
         "technology.cryptographic.hash"

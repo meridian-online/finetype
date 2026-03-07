@@ -14,7 +14,7 @@
 #
 # Finance domain covers:
 #   - banking identifiers (IBAN, SWIFT/BIC)
-#   - currency amounts (US format, EU format)
+#   - currency amounts (period decimal, comma decimal, locale variants)
 #   - currency metadata (codes, symbols)
 #   - securities identifiers (CUSIP, ISIN, SEDOL, LEI)
 #   - cryptocurrency addresses (Bitcoin, Ethereum)
@@ -110,7 +110,7 @@ finance.banking.iban:
 # datetime principle where distinct formats deserve distinct types.
 # ═════════════════════════════════════════════════════════════════════
 
-finance.currency.amount_us:
+finance.currency.amount:
   title: "Currency Amount (US Format)"
   description: >
     Currency amount with US/international formatting: optional currency symbol
@@ -131,7 +131,7 @@ finance.currency.amount_us:
     pattern: "^[\\$£¥₹₩₿\\p{Sc}]?\\s?-?\\s?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?$|^-?[\\$£¥₹₩₿\\p{Sc}]\\s?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?$|^\\([\\$£¥₹₩₿\\p{Sc}]?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\)$"
   tier: [VARCHAR, currency]
   release_priority: 4
-  aliases: [currency_amount, money_us, price]
+  aliases: [amount_us, currency_amount, money_us, price]
   samples:
     - "$1,234.56"
     - "-$999.99"
@@ -148,9 +148,9 @@ finance.currency.amount_us:
     New in v0.5.1 (NNFT-180). US/international format uses comma as thousands
     separator and period as decimal separator. Transform handles both standard
     negatives (-$X) and accounting notation (($X)). Casts to DECIMAL(18,2).
-    Distinct from amount_eu which uses the inverted separator convention.
+    Distinct from amount_comma which uses the inverted separator convention.
 
-finance.currency.amount_eu:
+finance.currency.amount_comma:
   title: "Currency Amount (EU Format)"
   description: >
     Currency amount with European formatting: optional currency symbol
@@ -170,7 +170,7 @@ finance.currency.amount_eu:
     pattern: "^[€\\$£¥₹₩₿\\p{Sc}]?\\s?-?\\s?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€\\$£¥₹₩₿\\p{Sc}]?$|^-?[€\\$£¥₹₩₿\\p{Sc}]?\\s?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€\\$£¥₹₩₿\\p{Sc}]?$"
   tier: [VARCHAR, currency]
   release_priority: 4
-  aliases: [currency_amount_eu, money_eu, price_eu]
+  aliases: [amount_eu, currency_amount_eu, money_eu, price_eu]
   samples:
     - "€1.234,56"
     - "1.234,56 €"
@@ -185,7 +185,7 @@ finance.currency.amount_eu:
     New in v0.5.1 (NNFT-180). European format uses period as thousands separator
     and comma as decimal separator. Transform strips currency symbol, removes
     period thousands separators, replaces comma with period, then casts to
-    DECIMAL(18,2). Distinct from amount_us which uses US separator convention.
+    DECIMAL(18,2). Distinct from amount (period decimal) which uses US separator convention.
 
 finance.currency.currency_code:
   title: "Currency Code (ISO 4217)"
@@ -559,7 +559,7 @@ finance.crypto.ethereum_address:
 #   - Alternative negative notation (trailing minus, CR/DR)
 # ═════════════════════════════════════════════════════════════════════
 
-finance.currency.amount_accounting_us:
+finance.currency.amount_accounting:
   title: "Currency Amount (US Accounting)"
   description: >
     US accounting format where negative values are enclosed in parentheses
@@ -579,7 +579,7 @@ finance.currency.amount_accounting_us:
     pattern: "^\\(?\\$?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\)?$"
   tier: [VARCHAR, currency]
   release_priority: 5
-  aliases: [accounting, gaap_amount]
+  aliases: [amount_accounting_us, accounting, gaap_amount]
   samples:
     - "$1,234.56"
     - "($1,234.56)"
@@ -591,7 +591,7 @@ finance.currency.amount_accounting_us:
     New in format coverage expansion. Parentheses = negative is universal
     in US GAAP accounting. Transform strips parens→minus, symbol, commas.
 
-finance.currency.amount_eu_suffix:
+finance.currency.amount_comma_suffix:
   title: "Currency Amount (EU Suffix)"
   description: >
     European format with currency symbol as suffix. Period for thousands,
@@ -611,7 +611,7 @@ finance.currency.amount_eu_suffix:
     pattern: "^-?[0-9]{1,3}(\\.[0-9]{3})*(,[0-9]{1,2})?\\s?[€$£¥₹₩₿\\p{Sc}]$"
   tier: [VARCHAR, currency]
   release_priority: 5
-  aliases: [eu_suffix]
+  aliases: [amount_eu_suffix, eu_suffix]
   samples:
     - "1.234,56 €"
     - "999,99 €"
@@ -621,9 +621,9 @@ finance.currency.amount_eu_suffix:
   references: null
   notes: >
     New in format coverage expansion. CLDR default for most eurozone countries.
-    Distinct from amount_eu which allows prefix symbols.
+    Distinct from amount_comma which allows prefix symbols.
 
-finance.currency.amount_space_sep:
+finance.currency.amount_space:
   title: "Currency Amount (Space-Separated Thousands)"
   description: >
     European variant using thin space or regular space for thousands
@@ -643,7 +643,7 @@ finance.currency.amount_space_sep:
     pattern: "^-?[0-9]{1,3}([\\s\\x{00A0}][0-9]{3})*(,[0-9]{1,2})?\\s?[€$£¥₹₩₿\\p{Sc}]?$"
   tier: [VARCHAR, currency]
   release_priority: 4
-  aliases: [fr_amount]
+  aliases: [amount_space_sep, fr_amount]
   samples:
     - "1 234,56 €"
     - "999,99 €"
@@ -654,7 +654,7 @@ finance.currency.amount_space_sep:
     New in format coverage expansion. French/Polish/Czech convention.
     Must handle both regular space and NBSP (U+00A0) as grouping separator.
 
-finance.currency.amount_indian:
+finance.currency.amount_lakh:
   title: "Currency Amount (Indian Lakh/Crore)"
   description: >
     Indian numbering system with irregular grouping: first three digits,
@@ -675,7 +675,7 @@ finance.currency.amount_indian:
     pattern: "^[₹]?(?:Rs\\.?\\s?)?[0-9]{1,2}(,[0-9]{2})*(,[0-9]{3})(\\.[0-9]{1,2})?$"
   tier: [VARCHAR, currency]
   release_priority: 5
-  aliases: [lakh_crore, inr_amount]
+  aliases: [amount_indian, lakh_crore, inr_amount]
   samples:
     - "₹12,34,567.89"
     - "₹1,00,000.00"
@@ -687,7 +687,7 @@ finance.currency.amount_indian:
     New in format coverage expansion. Indian numbering (2,2,3 grouping).
     Key distinguishing signal is irregular comma placement.
 
-finance.currency.amount_ch:
+finance.currency.amount_apostrophe:
   title: "Currency Amount (Swiss Apostrophe)"
   description: >
     Swiss/Liechtenstein format using apostrophe for thousands separator
@@ -707,7 +707,7 @@ finance.currency.amount_ch:
     pattern: "^(CHF\\s?)?-?[0-9]{1,3}(['\\x{2019}][0-9]{3})*(\\.[0-9]{1,2})?(\\s?CHF)?$"
   tier: [VARCHAR, currency]
   release_priority: 4
-  aliases: [swiss_amount]
+  aliases: [amount_ch, swiss_amount]
   samples:
     - "CHF 1'234.56"
     - "1'234.56 CHF"

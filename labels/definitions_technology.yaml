@@ -201,34 +201,8 @@ technology.internet.hostname:
     v1 migration: Was internet.hostname. Pattern requires lowercase (use LOWER()
     to normalize). Does not validate DNS resolution.
 
-technology.internet.port:
-  title: "Port Number"
-  description: >
-    TCP/UDP port number (0-65535). When inferred from VARCHAR, transforms to SMALLINT.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: SMALLINT
-  format_string: null
-  transform: "CAST({col} AS SMALLINT)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^([0-9]{1,5})$"
-    minimum: 0
-    maximum: 65535
-  tier: [SMALLINT, internet]
-  release_priority: 4
-  aliases: null
-  samples:
-    - "80"
-    - "443"
-    - "8080"
-    - "3306"
-  references: null
-  notes: >
-    v1 migration: Was internet.port. Validates numeric range 0-65535.
-    Common ports: 80 (HTTP), 443 (HTTPS), 22 (SSH), 3306 (MySQL), 5432 (PostgreSQL).
+# technology.internet.port: REMOVED in NNFT-242
+# False positives on plain integer columns. Range 0-65535 overlaps heavily with integer_number.
 
 technology.internet.top_level_domain:
   title: "Top-Level Domain (TLD)"
@@ -318,32 +292,8 @@ technology.internet.http_method:
     v1 migration: Was internet.http_method marked broad_words. Lower priority
     due to high cardinality but limited semantic information.
 
-technology.internet.http_status_code:
-  title: "HTTP Status Code"
-  description: >
-    HTTP response status code (100-599). Numeric string or integer.
-    When inferred as VARCHAR, transforms to SMALLINT.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: SMALLINT
-  format_string: null
-  transform: "CAST({col} AS SMALLINT)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^([1-5][0-9]{2})$"
-  tier: [SMALLINT, internet]
-  release_priority: 4
-  aliases: [http_status]
-  samples:
-    - "200"
-    - "404"
-    - "500"
-    - "301"
-  references: null
-  notes: >
-    v1 migration: Was internet.http_status_code. Valid range: 100-599.
+# technology.internet.http_status_code: REMOVED in NNFT-242
+# False positives on plain integer columns. Range 100-599 overlaps heavily with integer_number.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: cryptographic

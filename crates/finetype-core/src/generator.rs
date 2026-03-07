@@ -808,23 +808,7 @@ impl Generator {
                     tlds[self.rng.gen_range(0..tlds.len())]
                 ))
             }
-            ("internet", "port") => {
-                // Weighted toward common/well-known ports to distinguish from generic integers
-                if self.rng.gen_bool(0.6) {
-                    // Well-known ports
-                    let common = [
-                        22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995, 3306, 3389, 5432, 5672,
-                        5900, 6379, 8080, 8443, 8888, 9090, 9200, 9300, 27017,
-                    ];
-                    Ok(common[self.rng.gen_range(0..common.len())].to_string())
-                } else if self.rng.gen_bool(0.5) {
-                    // Registered ports (1024-49151)
-                    Ok(self.rng.gen_range(1024..49152).to_string())
-                } else {
-                    // Ephemeral ports (49152-65535)
-                    Ok(self.rng.gen_range(49152..65535).to_string())
-                }
-            }
+            // ("internet", "port") => REMOVED in NNFT-242
             ("internet", "top_level_domain") => {
                 let tlds = [
                     "com", "org", "net", "io", "dev", "edu", "gov", "mil", "co.uk", "com.au",
@@ -854,12 +838,7 @@ impl Generator {
                 let methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
                 Ok(methods[self.rng.gen_range(0..methods.len())].to_string())
             }
-            ("internet", "http_status_code") => {
-                let codes = [
-                    200, 201, 204, 301, 302, 304, 400, 401, 403, 404, 405, 500, 502, 503,
-                ];
-                Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
-            }
+            // ("internet", "http_status_code") => REMOVED in NNFT-242
 
             // ── cryptographic (3 types) ──────────────────────────────────
             // uuid moved to representation.identifier in NNFT-178
@@ -2533,7 +2512,7 @@ impl Generator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DOMAIN: finance (3 new types: iban, amount_us, amount_eu)
+    // DOMAIN: finance (3 new types: iban, amount, amount_comma)
     // ═══════════════════════════════════════════════════════════════════════════
 
     fn gen_finance(&mut self, category: &str, type_name: &str) -> Result<String, GeneratorError> {
@@ -2617,7 +2596,7 @@ impl Generator {
             }
 
             // ── currency ─────────────────────────────────────────────────
-            ("currency", "amount_us") => {
+            ("currency", "amount") => {
                 // US format: $1,234.56
                 let symbols = ["$", "£", "¥"];
                 let symbol = symbols[self.rng.gen_range(0..symbols.len())];
@@ -2659,7 +2638,7 @@ impl Generator {
                     Ok(format!("{}{}.{:02}", symbol, formatted_int, cents))
                 }
             }
-            ("currency", "amount_eu") => {
+            ("currency", "amount_comma") => {
                 // EU format: €1.234,56
                 let r = self.rng.gen::<f64>();
                 let (integer_part, cents) = if r < 0.3 {
@@ -2741,7 +2720,7 @@ impl Generator {
             ("crypto", "ethereum_address") => self.gen_identity("payment", "ethereum_address"),
 
             // ── new currency types (11 types) ────────────────────────────
-            ("currency", "amount_accounting_us") => {
+            ("currency", "amount_accounting") => {
                 // ($1,234.56) for negatives, $1,234.56 for positives
                 let (int_part, cents) = self.random_amount();
                 let formatted = Self::format_int_with_separator(int_part, ',');
@@ -2752,7 +2731,7 @@ impl Generator {
                     Ok(format!("${}.{:02}", formatted, cents))
                 }
             }
-            ("currency", "amount_eu_suffix") => {
+            ("currency", "amount_comma_suffix") => {
                 // 1.234,56 € — period thousands, comma decimal, single-char symbol suffix
                 let (int_part, cents) = self.random_amount();
                 let formatted = Self::format_int_with_separator(int_part, '.');
@@ -2765,7 +2744,7 @@ impl Generator {
                     Ok(format!("{},{:02} {}", formatted, cents, sym))
                 }
             }
-            ("currency", "amount_space_sep") => {
+            ("currency", "amount_space") => {
                 // 1 234,56 € — space thousands, comma decimal, single-char symbol suffix
                 let (int_part, cents) = self.random_amount();
                 let formatted = Self::format_int_with_separator(int_part, ' ');
@@ -2778,7 +2757,7 @@ impl Generator {
                     Ok(format!("{},{:02} {}", formatted, cents, sym))
                 }
             }
-            ("currency", "amount_indian") => {
+            ("currency", "amount_lakh") => {
                 // ₹12,34,567.89 — Indian lakh/crore grouping
                 // Pattern requires amounts >= 1000 for proper XX,XX,XXX grouping
                 let int_part = if self.rng.gen_bool(0.4) {
@@ -2795,7 +2774,7 @@ impl Generator {
                     Ok(format!("Rs. {}.{:02}", formatted, cents))
                 }
             }
-            ("currency", "amount_ch") => {
+            ("currency", "amount_apostrophe") => {
                 // CHF 1'234.56 — Swiss apostrophe thousands
                 let (int_part, cents) = self.random_amount();
                 let formatted = Self::format_int_with_separator(int_part, '\'');
@@ -5309,11 +5288,11 @@ test.test.test:
     }
 
     #[test]
-    fn test_amount_accounting_us() {
+    fn test_amount_accounting() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..20 {
             let val = gen
-                .generate_value("finance.currency.amount_accounting_us")
+                .generate_value("finance.currency.amount_accounting")
                 .unwrap();
             assert!(val.contains('$'), "Should contain $: {}", val);
             // Parentheses or regular format
@@ -5328,12 +5307,10 @@ test.test.test:
     }
 
     #[test]
-    fn test_amount_indian() {
+    fn test_amount_lakh() {
         let mut gen = Generator::with_seed(test_taxonomy(), 42);
         for _ in 0..20 {
-            let val = gen
-                .generate_value("finance.currency.amount_indian")
-                .unwrap();
+            let val = gen.generate_value("finance.currency.amount_lakh").unwrap();
             assert!(
                 val.contains('₹') || val.starts_with("Rs"),
                 "Should contain ₹ or Rs: {}",
@@ -5527,11 +5504,11 @@ test.test.test:
             "datetime.timestamp.iso_space_zulu",
             "datetime.timestamp.dot_ymd_24h",
             // 11 currency types
-            "finance.currency.amount_accounting_us",
-            "finance.currency.amount_eu_suffix",
-            "finance.currency.amount_space_sep",
-            "finance.currency.amount_indian",
-            "finance.currency.amount_ch",
+            "finance.currency.amount_accounting",
+            "finance.currency.amount_comma_suffix",
+            "finance.currency.amount_space",
+            "finance.currency.amount_lakh",
+            "finance.currency.amount_apostrophe",
             "finance.currency.amount_nodecimal",
             "finance.currency.amount_code_prefix",
             "finance.currency.amount_minor_int",

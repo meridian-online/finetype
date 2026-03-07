@@ -2126,9 +2126,6 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "currency" | "currency code" => {
             return Some("identity.financial.currency_code");
         }
-        "port" => {
-            return Some("technology.internet.port");
-        }
         "id" | "identifier" => {
             return Some("representation.identifier.increment");
         }
@@ -2477,7 +2474,6 @@ fn disambiguate_numeric(
 ) -> Option<(String, String)> {
     // Only trigger for numeric-looking columns
     let numeric_types = [
-        "technology.internet.port",
         "representation.identifier.increment",
         "representation.numeric.integer_number",
         "representation.numeric.decimal_number",
@@ -2521,16 +2517,6 @@ fn disambiguate_numeric(
     } else {
         false
     };
-
-    // Port detection: 0-65535, common ports cluster
-    // Require ≥30% of values to match common ports (not just "any").
-    // This prevents false positives on age/count columns where a few values
-    // (e.g., 22, 25, 53) coincidentally match common port numbers.
-    let all_in_port_range = min >= 0 && max <= 65535;
-    let common_ports = [80, 443, 8080, 3306, 5432, 22, 21, 25, 53, 3000, 8000, 8443];
-    let common_port_count = parsed.iter().filter(|v| common_ports.contains(v)).count();
-    let common_port_fraction = common_port_count as f64 / parsed.len() as f64;
-    let has_common_ports = common_port_fraction >= 0.3;
 
     // Postal code detection: typically 3-10 digits, non-sequential, bounded range
     let all_positive = min > 0;
@@ -2595,14 +2581,6 @@ fn disambiguate_numeric(
         return Some((
             "representation.identifier.increment".to_string(),
             "numeric_sequential_detection".to_string(),
-        ));
-    }
-
-    if has_common_ports && all_in_port_range && !is_sequential {
-        // Has common ports and all in range → port
-        return Some((
-            "technology.internet.port".to_string(),
-            "numeric_port_detection".to_string(),
         ));
     }
 
@@ -3155,35 +3133,7 @@ mod tests {
         assert_eq!(label, "representation.identifier.increment");
     }
 
-    #[test]
-    fn test_numeric_port_detection() {
-        let values: Vec<String> = vec![
-            "80", "443", "8080", "3306", "22", "5432", "3000", "8443", "25", "53",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        let results: Vec<ClassificationResult> = values
-            .iter()
-            .map(|_| ClassificationResult {
-                label: "technology.internet.port".to_string(),
-                confidence: 0.7,
-                all_scores: vec![],
-            })
-            .collect();
-
-        let votes = vec![
-            ("technology.internet.port".to_string(), 7),
-            ("representation.numeric.integer_number".to_string(), 3),
-        ];
-        let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
-
-        let result = disambiguate_numeric(&values, &results, &top_labels);
-        assert!(result.is_some());
-        let (label, _rule) = result.unwrap();
-        assert_eq!(label, "technology.internet.port");
-    }
+    // test_numeric_port_detection: REMOVED in NNFT-242 (port type removed)
 
     #[test]
     fn test_numeric_postal_code_detection() {
@@ -3372,35 +3322,7 @@ mod tests {
         assert_eq!(label, "representation.identifier.increment");
     }
 
-    #[test]
-    fn test_year_not_triggered_for_ports() {
-        // Port numbers (some happen to be in year range but have common ports)
-        let values: Vec<String> = vec!["80", "443", "8080", "3306", "22"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-
-        let results: Vec<ClassificationResult> = values
-            .iter()
-            .map(|_| ClassificationResult {
-                label: "technology.internet.port".to_string(),
-                confidence: 0.8,
-                all_scores: vec![],
-            })
-            .collect();
-
-        let votes = vec![
-            ("technology.internet.port".to_string(), 4),
-            ("representation.numeric.integer_number".to_string(), 1),
-        ];
-        let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
-
-        let result = disambiguate_numeric(&values, &results, &top_labels);
-        // Should NOT be year (values are 2-4 digits, not all 4-digit)
-        if let Some((label, _)) = result {
-            assert_ne!(label, "datetime.component.year");
-        }
-    }
+    // test_year_not_triggered_for_ports: REMOVED in NNFT-242 (port type removed)
 
     #[test]
     fn test_year_with_outlier_not_postal_code() {
@@ -3561,71 +3483,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_age_column_not_detected_as_port() {
-        // Age values like 22, 25, 53 coincidentally match common port numbers,
-        // but the fraction is too low (3/10 = 30%) and the column is clearly ages.
-        // With the ≥30% threshold and the sequential/year checks running first,
-        // this should NOT be classified as port.
-        let values: Vec<String> = vec!["22", "25", "30", "35", "40", "45", "50", "53", "60", "70"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-
-        let results: Vec<ClassificationResult> = values
-            .iter()
-            .map(|_| ClassificationResult {
-                label: "technology.internet.port".to_string(),
-                confidence: 0.7,
-                all_scores: vec![],
-            })
-            .collect();
-
-        let votes = vec![
-            ("technology.internet.port".to_string(), 6),
-            ("representation.numeric.integer_number".to_string(), 4),
-        ];
-        let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
-
-        let result = disambiguate_numeric(&values, &results, &top_labels);
-        // Should NOT be port — only 3 of 10 values (22, 25, 53) match common ports
-        // and these are typical age values
-        if let Some((label, _)) = result {
-            assert_ne!(label, "technology.internet.port");
-        }
-    }
-
-    #[test]
-    fn test_age_column_with_mixed_values_not_port() {
-        // Realistic Titanic-like age column: mix of young and old ages.
-        // Values 21, 22, 25, 53 match common ports but that's only 4/15 = 27% < 30%.
-        let values: Vec<String> = vec![
-            "2", "5", "14", "17", "21", "22", "25", "28", "33", "38", "42", "47", "53", "61", "75",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-        let results: Vec<ClassificationResult> = values
-            .iter()
-            .map(|_| ClassificationResult {
-                label: "technology.internet.port".to_string(),
-                confidence: 0.6,
-                all_scores: vec![],
-            })
-            .collect();
-
-        let votes = vec![
-            ("technology.internet.port".to_string(), 8),
-            ("representation.numeric.integer_number".to_string(), 7),
-        ];
-        let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
-
-        let result = disambiguate_numeric(&values, &results, &top_labels);
-        if let Some((label, _)) = result {
-            assert_ne!(label, "technology.internet.port");
-        }
-    }
+    // test_age_column_not_detected_as_port: REMOVED in NNFT-242 (port type removed)
+    // test_age_column_with_mixed_values_not_port: REMOVED in NNFT-242 (port type removed)
 
     #[test]
     fn test_empty_column() {
@@ -4074,7 +3933,7 @@ mod tests {
         assert_eq!(header_hint("website"), Some("technology.internet.url"));
         assert_eq!(header_hint("ip_address"), Some("technology.internet.ip_v4"));
         assert_eq!(header_hint("uuid"), Some("technology.identifier.uuid"));
-        assert_eq!(header_hint("port"), Some("technology.internet.port"));
+        // "port" header hint removed in NNFT-242
     }
 
     #[test]
@@ -6206,12 +6065,7 @@ datetime.component.day_of_week:
             "numeric_postal_code_detection should be treated as generic to yield to header hints"
         );
 
-        // Other numeric rules should NOT be generic
-        let port_rule = Some("numeric_port_detection".to_string());
-        assert!(
-            !is_generic_prediction("technology.internet.port", &port_rule, None),
-            "numeric_port_detection should NOT be generic"
-        );
+        // numeric_port_detection assertion removed in NNFT-242 (port type removed)
     }
 
     #[test]

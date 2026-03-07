@@ -106,19 +106,19 @@ const TEMPORAL_LABELS: &[&str] = &[
 ];
 
 const NUMERIC_LABELS: &[&str] = &[
-    "finance.currency.amount_accounting_us",
-    "finance.currency.amount_ch",
+    "finance.currency.amount",
+    "finance.currency.amount_accounting",
+    "finance.currency.amount_apostrophe",
     "finance.currency.amount_code_prefix",
+    "finance.currency.amount_comma",
+    "finance.currency.amount_comma_suffix",
     "finance.currency.amount_crypto",
-    "finance.currency.amount_eu",
-    "finance.currency.amount_eu_suffix",
-    "finance.currency.amount_indian",
+    "finance.currency.amount_lakh",
     "finance.currency.amount_minor_int",
     "finance.currency.amount_multisym",
     "finance.currency.amount_neg_trailing",
     "finance.currency.amount_nodecimal",
-    "finance.currency.amount_space_sep",
-    "finance.currency.amount_us",
+    "finance.currency.amount_space",
     "finance.rate.basis_points",
     "finance.rate.yield",
     "identity.person.height",
@@ -130,8 +130,6 @@ const NUMERIC_LABELS: &[&str] = &[
     "representation.numeric.percentage",
     "representation.numeric.scientific_notation",
     "representation.numeric.si_number",
-    "technology.internet.http_status_code",
-    "technology.internet.port",
 ];
 
 const GEOGRAPHIC_LABELS: &[&str] = &[
@@ -403,13 +401,13 @@ mod tests {
     #[test]
     fn test_total_is_209() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 209, "Map should contain exactly 209 types");
+        assert_eq!(map.len(), 207, "Map should contain exactly 207 types");
     }
 
     #[test]
     fn test_category_counts() {
         assert_eq!(TEMPORAL_LABELS.len(), 84, "temporal should have 84 types");
-        assert_eq!(NUMERIC_LABELS.len(), 26, "numeric should have 26 types");
+        assert_eq!(NUMERIC_LABELS.len(), 24, "numeric should have 24 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
             15,
@@ -517,7 +515,7 @@ mod tests {
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);
         // 26 primary + 3 incoming (coordinates, latitude, longitude)
-        assert_eq!(numeric.len(), 29, "numeric eligible should be 26+3=29");
+        assert_eq!(numeric.len(), 27, "numeric eligible should be 24+3=27");
 
         let entity = map.eligible_labels(BroadCategory::Entity);
         // 9 primary + 2 incoming (email, phone_number)

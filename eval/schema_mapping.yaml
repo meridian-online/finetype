@@ -190,13 +190,7 @@ mappings:
     expand: false
     notes: Cryptographic hash (SHA-256, MD5, etc.)
 
-  - gt_label: http status code
-    source: profile
-    finetype_label: technology.internet.http_status_code
-    finetype_domain: technology
-    match_quality: direct
-    expand: false
-    notes: HTTP status codes (200, 404, 500, etc.)
+  # http status code: REMOVED in NNFT-242
 
   - gt_label: iata
     source: profile
@@ -262,13 +256,7 @@ mappings:
     expand: false
     notes: National Provider Identifier (10-digit)
 
-  - gt_label: port
-    source: profile
-    finetype_label: technology.internet.port
-    finetype_domain: technology
-    match_quality: direct
-    expand: false
-    notes: Network port numbers (0-65535)
+  # port: REMOVED in NNFT-242
 
   - gt_label: street number
     source: profile

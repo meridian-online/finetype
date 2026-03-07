@@ -18,7 +18,6 @@ ean,profile,identity.commerce.ean,identity,direct,false
 first name,profile,identity.person.first_name,identity,direct,false
 last name,profile,identity.person.last_name,identity,direct,false
 hash,profile,technology.cryptographic.hash,technology,direct,false
-http status code,profile,technology.internet.http_status_code,technology,direct,false
 iata,profile,geography.transportation.iata_code,geography,direct,false
 icao,profile,geography.transportation.icao_code,geography,direct,false
 hostname,profile,technology.internet.hostname,technology,direct,false
@@ -27,7 +26,6 @@ mac address,profile,technology.internet.mac_address,technology,direct,false
 measurement unit,profile,representation.scientific.measurement_unit,representation,direct,false
 month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
-port,profile,technology.internet.port,technology,direct,false
 street number,profile,representation.numeric.integer_number,representation,close,false
 uuid,profile,representation.identifier.uuid,representation,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
