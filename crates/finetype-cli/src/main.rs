@@ -237,45 +237,6 @@ enum Commands {
         no_normalize_names: bool,
     },
 
-    /// Generate DuckDB CREATE TABLE from file profiling
-    SchemaFor {
-        /// Input file (CSV, JSON, NDJSON)
-        #[arg(short, long)]
-        file: PathBuf,
-
-        /// Override table name (default: derived from filename)
-        #[arg(long)]
-        table_name: Option<String>,
-
-        /// Model directory
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
-
-        /// Output format (plain = SQL, json = structured object, arrow = Arrow schema JSON)
-        #[arg(short, long, default_value = "plain")]
-        output: SchemaOutputFormat,
-
-        /// Maximum values to sample per column (default 100)
-        #[arg(long, default_value = "100")]
-        sample_size: usize,
-
-        /// CSV delimiter character (default: auto-detect)
-        #[arg(long)]
-        delimiter: Option<char>,
-
-        /// Disable column name header hints
-        #[arg(long)]
-        no_header_hint: bool,
-
-        /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "char-cnn")]
-        model_type: ModelType,
-
-        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
-        #[arg(long)]
-        sharp_only: bool,
-    },
-
     /// Validate generator ↔ taxonomy alignment
     Check {
         /// Taxonomy file or directory
@@ -344,7 +305,7 @@ enum Commands {
         #[arg(short, long, default_value = "models/default")]
         model: PathBuf,
 
-        /// Output format (plain, json, csv)
+        /// Output format (plain, json, csv, markdown, arrow)
         #[arg(short, long, default_value = "plain")]
         output: OutputFormat,
 
@@ -431,13 +392,6 @@ enum OutputFormat {
     Json,
     Csv,
     Markdown,
-}
-
-/// Output format for schema-for command (plain SQL, JSON, or Arrow schema).
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
-enum SchemaOutputFormat {
-    Plain,
-    Json,
     Arrow,
 }
 
@@ -577,28 +531,6 @@ fn main() -> Result<()> {
             sharp_only,
             limit,
             no_normalize_names,
-        ),
-
-        Commands::SchemaFor {
-            file,
-            table_name,
-            model,
-            output,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            sharp_only,
-        } => cmd_schema_for(
-            file,
-            table_name,
-            model,
-            output,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            sharp_only,
         ),
 
         Commands::Check {
@@ -791,7 +723,7 @@ fn cmd_infer(
         };
 
         match output {
-            OutputFormat::Plain | OutputFormat::Markdown => {
+            OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
                 if show_value && show_confidence {
                     println!("{}\t{}\t{:.4}", text, display_label, result.confidence);
                 } else if show_value {
@@ -885,7 +817,7 @@ fn cmd_infer(
         };
 
         match output {
-            OutputFormat::Plain | OutputFormat::Markdown => {
+            OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
                 println!("{}", result.label);
                 if show_confidence {
                     println!(
@@ -1781,7 +1713,7 @@ fn cmd_taxonomy(
     defs.sort_by_key(|(k, _)| (*k).clone());
 
     match output {
-        OutputFormat::Plain | OutputFormat::Markdown => {
+        OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
             println!("Domains: {:?}", taxonomy.domains());
             println!("Total labels: {}", taxonomy.len());
             if let Some(dom) = &domain {
@@ -2361,277 +2293,6 @@ fn build_load_expr(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SCHEMA-FOR — Profile file → CREATE TABLE DDL
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
-fn cmd_schema_for(
-    file: PathBuf,
-    table_name: Option<String>,
-    model: PathBuf,
-    output: SchemaOutputFormat,
-    sample_size: usize,
-    delimiter: Option<char>,
-    no_header_hint: bool,
-    model_type: ModelType,
-    sharp_only: bool,
-) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
-
-    eprintln!("Loading model from {:?}", model);
-    let classifier: Box<dyn ValueClassifier> = match model_type {
-        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-    };
-
-    let config = ColumnConfig {
-        sample_size,
-        ..Default::default()
-    };
-    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
-        eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        let entity = load_entity_classifier(&semantic);
-        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-        if let Some(entity) = entity {
-            eprintln!("Loaded entity classifier (full_name demotion gate)");
-            cc.set_entity_classifier(entity);
-        }
-        cc
-    } else {
-        ColumnClassifier::new(classifier, config)
-    };
-
-    // Load taxonomy for validation-based attractor demotion
-    let taxonomy_path = std::path::PathBuf::from("labels");
-    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
-        taxonomy.compile_validators();
-        taxonomy.compile_locale_validators();
-        eprintln!(
-            "Loaded taxonomy ({} types, {} validators cached)",
-            taxonomy.labels().len(),
-            taxonomy.validator_count()
-        );
-        column_classifier.set_taxonomy(taxonomy);
-    }
-
-    // Wire up Sense classifier
-    if !sharp_only {
-        wire_sense(&mut column_classifier);
-    }
-
-    eprintln!("Reading {:?}", file);
-
-    // Detect file format by extension
-    let ext = file
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .unwrap_or_default();
-    let is_json_input = matches!(ext.as_str(), "json" | "ndjson" | "jsonl");
-
-    let (headers, columns, row_count) = if is_json_input {
-        read_json_input(&file, &ext)?
-    } else {
-        read_csv_input(&file, delimiter)?
-    };
-
-    let n_cols = headers.len();
-    eprintln!("Read {} rows, {} columns", row_count, n_cols);
-
-    // Load taxonomy for DDL info lookup
-    let taxonomy = load_taxonomy(&taxonomy_path).ok();
-
-    // Derive table name from filename stem
-    let table = table_name.unwrap_or_else(|| {
-        let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("data");
-        sanitise_identifier(stem)
-    });
-
-    // Profile each column and collect DDL info
-    struct SchemaColumn {
-        name: String,
-        label: String,
-        duckdb_type: String,
-        transform: Option<String>,
-        is_generic: bool,
-    }
-
-    let mut schema_cols: Vec<SchemaColumn> = Vec::new();
-
-    for (i, col_values) in columns.iter().enumerate() {
-        let name = headers
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("col_{}", i));
-
-        if col_values.is_empty() {
-            schema_cols.push(SchemaColumn {
-                name,
-                label: "unknown".to_string(),
-                duckdb_type: "VARCHAR".to_string(),
-                transform: None,
-                is_generic: true,
-            });
-            continue;
-        }
-
-        // For JSON paths, extract the leaf as header hint
-        let header_hint = if is_json_input {
-            path_leaf(&name)
-        } else {
-            name.clone()
-        };
-
-        let result = if no_header_hint {
-            column_classifier.classify_column(col_values)?
-        } else {
-            column_classifier.classify_column_with_header(col_values, &header_hint)?
-        };
-
-        // Look up DDL info from taxonomy
-        let (duckdb_type, transform) = if let Some(ref tax) = taxonomy {
-            if let Some(ddl) = tax.ddl_info(&result.label) {
-                (ddl.duckdb_type, ddl.transform)
-            } else {
-                ("VARCHAR".to_string(), None)
-            }
-        } else {
-            ("VARCHAR".to_string(), None)
-        };
-
-        // Generic predictions default to VARCHAR
-        let final_type = if result.is_generic {
-            "VARCHAR".to_string()
-        } else {
-            duckdb_type
-        };
-
-        schema_cols.push(SchemaColumn {
-            name,
-            label: result.label,
-            duckdb_type: final_type,
-            transform,
-            is_generic: result.is_generic,
-        });
-    }
-
-    match output {
-        SchemaOutputFormat::Plain => {
-            // SQL output
-            let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
-            let pipeline = if sharp_only {
-                "Sharpen-only"
-            } else {
-                "Sense→Sharpen"
-            };
-            println!(
-                "-- Generated by FineType ({} types, {} pipeline)",
-                type_count, pipeline
-            );
-            println!(
-                "-- Source: {} ({} rows, {} columns)",
-                file.file_name()
-                    .and_then(|f| f.to_str())
-                    .unwrap_or("unknown"),
-                row_count,
-                n_cols
-            );
-            println!("CREATE TABLE {} (", table);
-
-            // Calculate column name width for alignment
-            let max_name_len = schema_cols
-                .iter()
-                .map(|c| format_column_name(&c.name).len())
-                .max()
-                .unwrap_or(0);
-
-            for (i, col) in schema_cols.iter().enumerate() {
-                let col_name = format_column_name(&col.name);
-                let is_last = i == schema_cols.len() - 1;
-                let comma = if is_last { "" } else { "," };
-
-                // Build comment: "-- label" or "-- label → transform"
-                let comment = if col.is_generic {
-                    format!("-- {}", col.label)
-                } else if let Some(ref tf) = col.transform {
-                    format!("-- {} → {}", col.label, tf)
-                } else {
-                    format!("-- {}", col.label)
-                };
-
-                println!(
-                    "    {:width$} {}{:padding$} {}",
-                    col_name,
-                    col.duckdb_type,
-                    comma,
-                    comment,
-                    width = max_name_len,
-                    padding = 10usize.saturating_sub(col.duckdb_type.len() + comma.len()),
-                );
-            }
-            println!(");");
-        }
-        SchemaOutputFormat::Json => {
-            // Structured JSON output
-            let columns_json: Vec<serde_json::Value> = schema_cols
-                .iter()
-                .map(|col| {
-                    let mut obj = serde_json::Map::new();
-                    obj.insert("name".into(), json!(col.name));
-                    obj.insert("type".into(), json!(col.duckdb_type));
-                    obj.insert("label".into(), json!(col.label));
-                    obj.insert("nullable".into(), json!(true));
-                    obj.insert("is_generic".into(), json!(col.is_generic));
-                    if let Some(ref tf) = col.transform {
-                        obj.insert("transform".into(), json!(tf));
-                    }
-                    serde_json::Value::Object(obj)
-                })
-                .collect();
-
-            let result = json!({
-                "table_name": table,
-                "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
-                "row_count": row_count,
-                "column_count": n_cols,
-                "columns": columns_json,
-            });
-
-            println!("{}", serde_json::to_string_pretty(&result)?);
-        }
-        SchemaOutputFormat::Arrow => {
-            // Arrow IPC JSON schema format
-            let fields: Vec<serde_json::Value> = schema_cols
-                .iter()
-                .map(|col| {
-                    let arrow_type = duckdb_to_arrow_type(&col.duckdb_type);
-                    json!({
-                        "name": col.name,
-                        "type": arrow_type,
-                        "nullable": true,
-                        "children": [],
-                    })
-                })
-                .collect();
-
-            let schema = json!({
-                "fields": fields,
-                "metadata": {
-                    "finetype_version": env!("CARGO_PKG_VERSION"),
-                    "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
-                    "row_count": row_count.to_string(),
-                }
-            });
-
-            println!("{}", serde_json::to_string_pretty(&schema)?);
-        }
-    }
-
-    Ok(())
-}
-
 /// Sanitise a string for use as a SQL identifier.
 /// Replaces hyphens with underscores and strips non-alphanumeric characters.
 fn sanitise_identifier(s: &str) -> String {
@@ -2700,7 +2361,7 @@ fn cmd_check(
     let report = checker.run(&taxonomy);
 
     match output {
-        OutputFormat::Plain | OutputFormat::Markdown => {
+        OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
             print!("{}", format_report(&report, verbose));
         }
         OutputFormat::Json => {
@@ -2946,7 +2607,7 @@ fn cmd_validate(
 
     // ── Output quality report ──────────────────────────────────────────────
     match output {
-        OutputFormat::Plain => {
+        OutputFormat::Plain | OutputFormat::Arrow => {
             println!("Data Quality Report");
             println!("{}", "═".repeat(60));
             println!();
@@ -3712,6 +3373,33 @@ fn cmd_profile(
                 println!("\n{}/{} columns typed", typed_cols, n_cols);
             }
         }
+        OutputFormat::Arrow => {
+            // Arrow IPC JSON schema format
+            let fields: Vec<serde_json::Value> = profiles
+                .iter()
+                .map(|p| {
+                    let duckdb_type = p.broad_type.as_deref().unwrap_or("VARCHAR");
+                    let arrow_type = duckdb_to_arrow_type(duckdb_type);
+                    json!({
+                        "name": p.name,
+                        "type": arrow_type,
+                        "nullable": true,
+                        "children": [],
+                    })
+                })
+                .collect();
+
+            let schema = json!({
+                "fields": fields,
+                "metadata": {
+                    "finetype_version": env!("CARGO_PKG_VERSION"),
+                    "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
+                    "row_count": row_count.to_string(),
+                }
+            });
+
+            println!("{}", serde_json::to_string_pretty(&schema)?);
+        }
     }
 
     Ok(())
@@ -4337,7 +4025,7 @@ fn cmd_eval_gittables(
     // ── 7. Output results ───────────────────────────────────────────────────
 
     match output {
-        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown => {
+        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown | OutputFormat::Arrow => {
             println!("GitTables Column-Mode Evaluation");
             println!("{}", "═".repeat(70));
             println!();
@@ -4688,7 +4376,7 @@ fn cmd_eval(
     confusion_vec.sort_by(|a, b| b.1.cmp(&a.1));
 
     match output {
-        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown => {
+        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown | OutputFormat::Arrow => {
             println!("FineType Model Evaluation");
             println!("{}", "=".repeat(60));
             println!();
