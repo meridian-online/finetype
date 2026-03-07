@@ -485,7 +485,7 @@ technology.code.locale_code:
     pattern: "^[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2,4})*$"
   tier: [VARCHAR, code]
   release_priority: 4
-  aliases: null
+  aliases: [bcp47, language_tag]
   samples:
     - "en"
     - "en-US"
@@ -496,6 +496,7 @@ technology.code.locale_code:
   notes: >
     v1 migration: Was code.locale_code. IETF BCP 47 format. Common codes:
     en, en-US, fr, de, zh-Hans, zh-Hant. Decompose extracts language and country.
+    bcp47 alias added in NNFT-244.02 — locale_code already covers BCP 47 format.
 
 technology.development.version:
   title: "Version Number"
@@ -562,4 +563,351 @@ technology.development.calver:
   notes: >
     v1 migration: Was development.calver. Decompose extracts year, month, day.
     Format: YYYY.MM or YYYY.MM.DD.
+
+technology.development.docker_ref:
+  title: "Docker/OCI Image Reference"
+  description: >
+    OCI container image reference in the form [registry/]repository[:tag][@digest].
+    Used in Dockerfiles, Kubernetes manifests, and CI/CD pipelines.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    registry: "REGEXP_EXTRACT({col}, '^(?:([a-zA-Z0-9.\\-]+(?::\\d+)?)/)')"
+    repository: "REGEXP_EXTRACT({col}, '(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?([a-z0-9._\\-/]+?)(?::|@|$)')"
+    tag: "REGEXP_EXTRACT({col}, ':([a-zA-Z0-9_.\\-]+)')"
+    digest: "REGEXP_EXTRACT({col}, '@(sha256:[a-fA-F0-9]{64})')"
+  validation:
+    type: string
+    pattern: "^(?:(?:[a-zA-Z0-9.\\-]+(?::\\d+)?)/)?(?:[a-z0-9._\\-/]+)(?::[a-zA-Z0-9_.\\-]+)?(?:@sha256:[a-fA-F0-9]{64})?$"
+  tier: [VARCHAR, development]
+  release_priority: 3
+  aliases: [oci_image_ref, container_image]
+  samples:
+    - "nginx:latest"
+    - "ghcr.io/myorg/myapp:v1.2.3"
+    - "docker.io/library/postgres:16-alpine"
+    - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+  references: null
+  notes: >
+    New in NNFT-244.02. OCI image reference format. Includes optional registry,
+    repository path, tag, and digest components.
+
+technology.development.git_sha:
+  title: "Git Commit SHA"
+  description: >
+    Full 40-character hexadecimal SHA-1 hash identifying a git commit.
+    Used in version control systems, CI/CD pipelines, and deployment tracking.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9a-f]{40}$"
+  tier: [VARCHAR, development]
+  release_priority: 4
+  aliases: [commit_hash, git_hash]
+  samples:
+    - "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+    - "5d41402abc4b2a76b9719d911017c59200000000"
+    - "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+  references: null
+  notes: >
+    New in NNFT-244.02. Distinguished from cryptographic.hash by being exactly
+    40 hex chars (SHA-1 length). Disambiguation relies on header hints
+    (commit, sha, revision) since hash also matches 40-char SHA-1.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: identifier
+#
+# Technology-specific identifiers with structured formats that encode
+# timestamps or other metadata. Distinguished from representation.identifier
+# by having technology-specific semantics.
+# ═════════════════════════════════════════════════════════════════════
+
+technology.identifier.ulid:
+  title: "ULID"
+  description: >
+    Universally Unique Lexicographically Sortable Identifier. 26-character
+    Crockford Base32 string encoding a 48-bit timestamp and 80 bits of randomness.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "TRY_CAST({col} AS ULID)"
+  decompose:
+    timestamp_ms: "EPOCH_MS(({col}::ULID)::BIGINT)"
+  validation:
+    type: string
+    pattern: "^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$"
+  tier: [VARCHAR, identifier]
+  release_priority: 4
+  aliases: null
+  samples:
+    - "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    - "01H5J3XZQK0000000000000000"
+    - "01FWHE4G8R2SXHM3F07YR3FW0T"
+  references: null
+  notes: >
+    New in NNFT-244.02. Crockford Base32 excludes I, L, O, U to avoid
+    ambiguity. Always uppercase. First 10 chars encode millisecond timestamp.
+
+technology.identifier.tsid:
+  title: "TSID"
+  description: >
+    Time-Sorted ID. 32 lowercase hexadecimal characters with an embedded
+    timestamp in the leading digits. Distinguished from UUID by having no
+    hyphens, and from cryptographic hashes by the timestamp constraint.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "tsid_to_timestamp({col})"
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9a-f]{32}$"
+  tier: [VARCHAR, identifier]
+  release_priority: 3
+  aliases: null
+  samples:
+    - "0190a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
+    - "018f47d5a6b70000000000000000abcd"
+    - "0191c8e4f2a30000fedcba9876543210"
+  references: null
+  notes: >
+    New in NNFT-244.02. Leading 8-10 hex chars decode to a reasonable
+    timestamp (2010-2050). Disambiguation from hash/token_hex requires
+    header hints or timestamp validation.
+
+technology.identifier.snowflake_id:
+  title: "Snowflake ID"
+  description: >
+    Twitter/Discord-style snowflake identifier. A 17-20 digit integer
+    encoding a millisecond timestamp, worker ID, and sequence number.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: BIGINT
+  format_string: null
+  transform: "epoch_ms(({col}::BIGINT >> 22) + 1288834974657)"
+  transform_ext: null
+  decompose:
+    timestamp_ms: "({col}::BIGINT >> 22) + 1288834974657"
+    worker_id: "({col}::BIGINT >> 12) & 1023"
+    sequence: "{col}::BIGINT & 4095"
+  validation:
+    type: string
+    pattern: "^\\d{17,20}$"
+  tier: [BIGINT, identifier]
+  release_priority: 3
+  aliases: [twitter_id, discord_id]
+  samples:
+    - "175928847299117063"
+    - "1234567890123456789"
+    - "80351110224678912"
+  references: null
+  notes: >
+    New in NNFT-244.02. Twitter epoch: 1288834974657 (2010-11-04).
+    Bits: 41 timestamp + 10 worker + 12 sequence. Range ~10^17 to ~10^19.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: cloud
+#
+# Cloud provider resource identifiers and URIs.
+# ═════════════════════════════════════════════════════════════════════
+
+technology.cloud.aws_arn:
+  title: "AWS ARN"
+  description: >
+    Amazon Resource Name. Globally unique identifier for AWS resources
+    in the format arn:partition:service:region:account-id:resource.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    partition: "REGEXP_EXTRACT({col}, '^arn:([^:]+):')"
+    service: "REGEXP_EXTRACT({col}, '^arn:[^:]+:([^:]+):')"
+    region: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:([^:]*):' )"
+    account_id: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:[^:]*:([^:]*):' )"
+    resource: "REGEXP_EXTRACT({col}, '^arn:[^:]+:[^:]+:[^:]*:[^:]*:(.+)$')"
+  validation:
+    type: string
+    pattern: "^arn:(aws|aws-cn|aws-us-gov):[a-zA-Z0-9\\-]+:[a-z0-9\\-]*:\\d{0,12}:.+$"
+  tier: [VARCHAR, cloud]
+  release_priority: 3
+  aliases: [amazon_resource_name]
+  samples:
+    - "arn:aws:s3:::my-bucket"
+    - "arn:aws:iam::123456789012:user/johndoe"
+    - "arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0"
+    - "arn:aws:lambda:eu-west-1:123456789012:function:my-function"
+  references: null
+  notes: >
+    New in NNFT-244.02. Region and account-id may be empty for global
+    resources (e.g., S3 buckets, IAM). Three partitions: aws, aws-cn, aws-us-gov.
+
+technology.cloud.s3_uri:
+  title: "S3 URI"
+  description: >
+    Amazon S3 bucket/key URI in the format s3://bucket-name/key-path.
+    Used in data pipelines, ETL tools, and cloud storage references.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    bucket: "REGEXP_EXTRACT({col}, '^s3://([^/]+)')"
+    key: "REGEXP_EXTRACT({col}, '^s3://[^/]+/(.*)')"
+  validation:
+    type: string
+    pattern: "^s3://[a-z0-9][a-z0-9.\\-]{1,61}[a-z0-9](/.*)?$"
+  tier: [VARCHAR, cloud]
+  release_priority: 3
+  aliases: null
+  samples:
+    - "s3://my-bucket/data/file.csv"
+    - "s3://production-logs/2024/01/events.parquet"
+    - "s3://data-lake-raw/ingestion/batch-001/part-00000.json"
+  references: null
+  notes: >
+    New in NNFT-244.02. Bucket names: 3-63 chars, lowercase, no underscores.
+    Key paths can contain any characters after the bucket name.
+
+technology.cryptographic.jwt:
+  title: "JSON Web Token"
+  description: >
+    JSON Web Token (JWT) consisting of three base64url-encoded segments
+    separated by dots: header.payload.signature. Used for authentication
+    and information exchange.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    header: "REGEXP_EXTRACT({col}, '^([A-Za-z0-9_-]+)\\.')"
+    payload: "REGEXP_EXTRACT({col}, '^\\.([A-Za-z0-9_-]+)\\.')"
+    signature: "REGEXP_EXTRACT({col}, '\\.([A-Za-z0-9_-]+)$')"
+  validation:
+    type: string
+    pattern: "^[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}$"
+  tier: [VARCHAR, cryptographic]
+  release_priority: 3
+  aliases: [json_web_token]
+  samples:
+    - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    - "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoLmV4YW1wbGUuY29tIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+  references: null
+  notes: >
+    New in NNFT-244.02. Each segment is at least 10 base64url chars to
+    distinguish from other dot-separated formats. Header typically starts
+    with "eyJ" (base64 for '{"').
+
+technology.internet.cidr:
+  title: "CIDR Notation"
+  description: >
+    Classless Inter-Domain Routing notation combining an IPv4 address
+    with a prefix length (e.g., 192.168.1.0/24). Used in network
+    configuration, firewall rules, and IP access control.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "CAST({col} AS INET)"
+  decompose:
+    network: "REGEXP_EXTRACT({col}, '^([^/]+)/')"
+    prefix_length: "CAST(REGEXP_EXTRACT({col}, '/(\\d+)$') AS TINYINT)"
+  validation:
+    type: string
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12]\\d|3[0-2])$"
+  tier: [INET, internet]
+  release_priority: 4
+  aliases: [cidr_block, ip_range]
+  samples:
+    - "192.168.1.0/24"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "0.0.0.0/0"
+  references: null
+  notes: >
+    New in NNFT-244.02. IPv4 CIDR only. Prefix length 0-32. Distinguished
+    from plain IPv4 by the /prefix suffix.
+
+technology.internet.urn:
+  title: "URN"
+  description: >
+    Uniform Resource Name — a persistent, location-independent identifier
+    in the format urn:nid:nss. Used for namespaced identifiers like
+    ISBN URNs, OIDs, and UUID URNs.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    nid: "REGEXP_EXTRACT({col}, '^urn:([^:]+):')"
+    nss: "REGEXP_EXTRACT({col}, '^urn:[^:]+:(.+)$')"
+  validation:
+    type: string
+    pattern: "^urn:[a-z0-9][a-z0-9\\-]{0,31}:.+$"
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  aliases: [uniform_resource_name]
+  samples:
+    - "urn:isbn:0451450523"
+    - "urn:ietf:rfc:2648"
+    - "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66"
+    - "urn:oid:2.16.840"
+  references: null
+  notes: >
+    New in NNFT-244.02. NID (Namespace ID) is 1-32 lowercase alphanumeric
+    or hyphen chars. NSS (Namespace Specific String) is the remainder.
+
+technology.internet.data_uri:
+  title: "Data URI"
+  description: >
+    Inline data URI scheme embedding content directly in a string.
+    Format: data:[mediatype][;base64],data. Used for embedding small
+    files in HTML, CSS, and API responses.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    media_type: "REGEXP_EXTRACT({col}, '^data:([^;,]+)')"
+    is_base64: "CASE WHEN {col} LIKE '%base64,%' THEN true ELSE false END"
+  validation:
+    type: string
+    pattern: "^data:(?:[a-zA-Z0-9]+/[a-zA-Z0-9\\-+.]+)?(?:;[a-zA-Z0-9\\-]+=[^;,]*)*(?:;base64)?,.+$"
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  aliases: null
+  samples:
+    - "data:text/plain;base64,SGVsbG8gV29ybGQ="
+    - "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
+    - "data:application/json,{\"key\":\"value\"}"
+    - "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
+  references: null
+  notes: >
+    New in NNFT-244.02. Media type is optional (defaults to text/plain;charset=US-ASCII).
+    Base64 encoding is indicated by ;base64 before the comma.
 

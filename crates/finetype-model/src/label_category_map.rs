@@ -7,7 +7,7 @@
 //! Categories:
 //!   temporal (85) — all `datetime.*`
 //!   numeric (26) — numeric values, measurements, currency amounts, rates
-//!   geographic (15) — all `geography.*`
+//!   geographic (25) — all `geography.*`
 //!   entity (9) — person names, entity names
 //!   format (52) — structured identifiers, codes, sequences
 //!   text (29) — free text, low-cardinality enums, categorical
@@ -139,15 +139,25 @@ const GEOGRAPHIC_LABELS: &[&str] = &[
     "geography.address.street_suffix",
     "geography.contact.calling_code",
     "geography.coordinate.coordinates",
+    "geography.coordinate.dms",
+    "geography.coordinate.geohash",
     "geography.coordinate.latitude",
     "geography.coordinate.longitude",
+    "geography.coordinate.mgrs",
+    "geography.coordinate.plus_code",
+    "geography.format.geojson",
+    "geography.format.wkt",
+    "geography.index.h3",
     "geography.location.city",
     "geography.location.continent",
     "geography.location.country",
     "geography.location.country_code",
     "geography.location.region",
+    "geography.transportation.hs_code",
     "geography.transportation.iata_code",
     "geography.transportation.icao_code",
+    "geography.transportation.iso6346",
+    "geography.transportation.unlocode",
 ];
 
 const ENTITY_LABELS: &[&str] = &[
@@ -177,6 +187,8 @@ const FORMAT_LABELS: &[&str] = &[
     "container.object.xml",
     "container.object.yaml",
     // finance.* (moved from identity.payment in v0.5.1, NNFT-179)
+    "finance.banking.aba_routing",
+    "finance.banking.bsb",
     "finance.banking.iban",
     "finance.banking.swift_bic",
     "finance.crypto.bitcoin_address",
@@ -185,44 +197,80 @@ const FORMAT_LABELS: &[&str] = &[
     "finance.payment.credit_card_number",
     "finance.payment.paypal_email",
     "finance.securities.cusip",
+    "finance.securities.figi",
     "finance.securities.isin",
     "finance.securities.lei",
     "finance.securities.sedol",
+    // identity.academic.*
+    "identity.academic.orcid",
     // identity.commerce.* (moved from technology.code in v0.5.1, NNFT-179)
     "identity.commerce.ean",
     "identity.commerce.isbn",
+    "identity.commerce.isrc",
     "identity.commerce.issn",
+    "identity.commerce.upc",
+    // identity.government.*
+    "identity.government.abn",
+    "identity.government.ein",
+    "identity.government.eu_vat",
+    "identity.government.pan_india",
+    "identity.government.ssn",
+    "identity.government.vin",
     // identity.medical.*
+    "identity.medical.cpt",
     "identity.medical.dea_number",
+    "identity.medical.hcpcs",
+    "identity.medical.icd10",
+    "identity.medical.loinc",
     "identity.medical.ndc",
     "identity.medical.npi",
     // identity.person (structured formats)
     "identity.person.email",
+    "identity.person.email_display",
     "identity.person.password",
+    "identity.person.phone_e164",
     "identity.person.phone_number",
     // representation.format (structured format codes)
     "representation.format.color_hex",
+    "representation.format.color_hsl",
     "representation.format.color_rgb",
     // representation.identifier (moved from code/numeric/cryptographic in v0.5.1)
     "representation.identifier.alphanumeric_id",
     "representation.identifier.increment",
     "representation.identifier.numeric_code",
     "representation.identifier.uuid",
-    // representation.scientific (bio sequences — structured alphabet)
+    // representation.scientific (bio sequences, chemical identifiers — structured alphabet)
+    "representation.scientific.cas_number",
     "representation.scientific.dna_sequence",
+    "representation.scientific.inchi",
     "representation.scientific.protein_sequence",
     "representation.scientific.rna_sequence",
+    // technology.cloud.*
+    "technology.cloud.aws_arn",
+    "technology.cloud.s3_uri",
     // technology.code.*
     "technology.code.doi",
     "technology.code.imei",
     "technology.code.locale_code",
+    // technology.cryptographic (structured tokens)
+    "technology.cryptographic.jwt",
+    // technology.development (structured references)
+    "technology.development.docker_ref",
+    "technology.development.git_sha",
+    // technology.identifier (structured IDs with embedded metadata)
+    "technology.identifier.snowflake_id",
+    "technology.identifier.tsid",
+    "technology.identifier.ulid",
     // technology.internet (structured network formats)
+    "technology.internet.cidr",
+    "technology.internet.data_uri",
     "technology.internet.hostname",
     "technology.internet.ip_v4",
     "technology.internet.ip_v4_with_port",
     "technology.internet.ip_v6",
     "technology.internet.mac_address",
     "technology.internet.url",
+    "technology.internet.urn",
     "technology.internet.user_agent",
 ];
 
@@ -244,6 +292,7 @@ const TEXT_LABELS: &[&str] = &[
     // representation.scientific (categorical — limited value sets)
     "representation.scientific.measurement_unit",
     "representation.scientific.metric_prefix",
+    "representation.scientific.smiles",
     // representation.text.* (free text)
     "representation.text.emoji",
     "representation.text.paragraph",
@@ -278,6 +327,8 @@ const ALSO_ELIGIBLE: &[(&str, BroadCategory)] = &[
     ("geography.coordinate.longitude", BroadCategory::Numeric),
     // format ↔ entity (emails/phones are identity-domain types)
     ("identity.person.email", BroadCategory::Entity),
+    ("identity.person.email_display", BroadCategory::Entity),
+    ("identity.person.phone_e164", BroadCategory::Entity),
     ("identity.person.phone_number", BroadCategory::Entity),
 ];
 
@@ -399,9 +450,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_209() {
+    fn test_total_is_250() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 207, "Map should contain exactly 207 types");
+        assert_eq!(map.len(), 250, "Map should contain exactly 250 types");
     }
 
     #[test]
@@ -410,12 +461,12 @@ mod tests {
         assert_eq!(NUMERIC_LABELS.len(), 24, "numeric should have 24 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
-            15,
-            "geographic should have 15 types"
+            25,
+            "geographic should have 25 types"
         );
         assert_eq!(ENTITY_LABELS.len(), 9, "entity should have 9 types");
-        assert_eq!(FORMAT_LABELS.len(), 51, "format should have 51 types");
-        assert_eq!(TEXT_LABELS.len(), 24, "text should have 24 types");
+        assert_eq!(FORMAT_LABELS.len(), 83, "format should have 83 types");
+        assert_eq!(TEXT_LABELS.len(), 25, "text should have 25 types");
     }
 
     #[test]
@@ -509,8 +560,8 @@ mod tests {
         let geographic = map.eligible_labels(BroadCategory::Geographic);
         assert_eq!(
             geographic.len(),
-            15,
-            "geographic eligible should be 15 (no incoming overlaps)"
+            25,
+            "geographic eligible should be 25 (no incoming overlaps)"
         );
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);
@@ -518,18 +569,18 @@ mod tests {
         assert_eq!(numeric.len(), 27, "numeric eligible should be 24+3=27");
 
         let entity = map.eligible_labels(BroadCategory::Entity);
-        // 9 primary + 2 incoming (email, phone_number)
-        assert_eq!(entity.len(), 11, "entity eligible should be 9+2=11");
+        // 9 primary + 4 incoming (email, email_display, phone_e164, phone_number)
+        assert_eq!(entity.len(), 13, "entity eligible should be 9+4=13");
 
         let format = map.eligible_labels(BroadCategory::Format);
-        // 51 primary + 2 incoming (postal_code, calling_code)
-        assert_eq!(format.len(), 53, "format eligible should be 51+2=53");
+        // 83 primary + 2 incoming (postal_code, calling_code)
+        assert_eq!(format.len(), 85, "format eligible should be 83+2=85");
 
         let text = map.eligible_labels(BroadCategory::Text);
         assert_eq!(
             text.len(),
-            24,
-            "text eligible should be 24 (no incoming overlaps)"
+            25,
+            "text eligible should be 25 (no incoming overlaps)"
         );
     }
 

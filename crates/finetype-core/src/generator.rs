@@ -881,8 +881,84 @@ impl Generator {
                 Ok(methods[self.rng.gen_range(0..methods.len())].to_string())
             }
             // ("internet", "http_status_code") => REMOVED in NNFT-242
+            ("internet", "cidr") => {
+                let prefix_len = self.rng.gen_range(0..33u8);
+                // Generate network-aligned IP for common prefixes
+                let (a, b, c, d) = match prefix_len {
+                    0 => (0, 0, 0, 0),
+                    1..=8 => (self.rng.gen_range(1..255), 0, 0, 0),
+                    9..=16 => (self.rng.gen_range(1..255), self.rng.gen_range(0..255), 0, 0),
+                    17..=24 => (
+                        self.rng.gen_range(1..255),
+                        self.rng.gen_range(0..255),
+                        self.rng.gen_range(0..255),
+                        0,
+                    ),
+                    _ => (
+                        self.rng.gen_range(1..255),
+                        self.rng.gen_range(0..255),
+                        self.rng.gen_range(0..255),
+                        self.rng.gen_range(0..255),
+                    ),
+                };
+                Ok(format!("{}.{}.{}.{}/{}", a, b, c, d, prefix_len))
+            }
+            ("internet", "urn") => {
+                let nids = [
+                    "isbn", "ietf", "uuid", "oid", "lex", "example", "xmlorg", "publicid",
+                ];
+                let nid = nids[self.rng.gen_range(0..nids.len())];
+                let nss = match nid {
+                    "isbn" => format!("{}", self.rng.gen_range(1000000000u64..9999999999)),
+                    "ietf" => format!("rfc:{}", self.rng.gen_range(1000..9999)),
+                    "uuid" => {
+                        let hex = self.gen_hex_string(32);
+                        format!(
+                            "{}-{}-{}-{}-{}",
+                            &hex[0..8],
+                            &hex[8..12],
+                            &hex[12..16],
+                            &hex[16..20],
+                            &hex[20..32]
+                        )
+                    }
+                    "oid" => format!(
+                        "2.16.{}.{}",
+                        self.rng.gen_range(100..999),
+                        self.rng.gen_range(1..99999)
+                    ),
+                    _ => format!("{}-{}", self.random_word(), self.rng.gen_range(1..999)),
+                };
+                Ok(format!("urn:{}:{}", nid, nss))
+            }
+            ("internet", "data_uri") => {
+                let media_types = [
+                    "text/plain",
+                    "text/html",
+                    "image/png",
+                    "image/jpeg",
+                    "image/svg+xml",
+                    "application/json",
+                    "application/pdf",
+                ];
+                let media = media_types[self.rng.gen_range(0..media_types.len())];
+                if self.rng.gen_bool(0.7) {
+                    // base64 variant
+                    let base64url =
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                    let len = self.rng.gen_range(20..60);
+                    let data: String = (0..len)
+                        .map(|_| base64url.as_bytes()[self.rng.gen_range(0..64)] as char)
+                        .collect();
+                    Ok(format!("data:{};base64,{}=", media, data))
+                } else {
+                    // plain text variant
+                    let word = self.random_word();
+                    Ok(format!("data:{},{}", media, word))
+                }
+            }
 
-            // ── cryptographic (3 types) ──────────────────────────────────
+            // ── cryptographic (4 types) ──────────────────────────────────
             // uuid moved to representation.identifier in NNFT-178
             ("cryptographic", "hash") => {
                 // Generate MD5 (32), SHA1 (40), or SHA256 (64) length hashes
@@ -915,6 +991,62 @@ impl Generator {
                     token.replace_range(pos..pos + 1, &special.to_string());
                 }
                 Ok(token)
+            }
+            ("cryptographic", "jwt") => {
+                // Generate realistic JWT: header.payload.signature
+                use std::fmt::Write as FmtWrite;
+                // Header: {"alg":"HS256","typ":"JWT"} or RS256 variant
+                let headers = [
+                    r#"{"alg":"HS256","typ":"JWT"}"#,
+                    r#"{"alg":"RS256","typ":"JWT"}"#,
+                    r#"{"alg":"ES256","typ":"JWT"}"#,
+                ];
+                let header = headers[self.rng.gen_range(0..headers.len())];
+                // Payload: {"sub":"...","iat":...,"exp":...}
+                let sub_id = self.rng.gen_range(1000..999999);
+                let iat = self.rng.gen_range(1_600_000_000u64..1_900_000_000);
+                let exp = iat + self.rng.gen_range(3600..86400);
+                let payload = format!(
+                    r#"{{"sub":"{}","name":"{}","iat":{},"exp":{}}}"#,
+                    sub_id,
+                    self.random_word(),
+                    iat,
+                    exp
+                );
+                // Signature: random bytes, base64url-encoded
+                let sig_bytes: Vec<u8> = (0..32).map(|_| self.rng.gen::<u8>()).collect();
+
+                fn base64url_encode(input: &[u8]) -> String {
+                    let mut out = String::new();
+                    let table = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+                    for chunk in input.chunks(3) {
+                        let b0 = chunk[0] as usize;
+                        let b1 = if chunk.len() > 1 {
+                            chunk[1] as usize
+                        } else {
+                            0
+                        };
+                        let b2 = if chunk.len() > 2 {
+                            chunk[2] as usize
+                        } else {
+                            0
+                        };
+                        let _ = write!(out, "{}", table[b0 >> 2] as char);
+                        let _ = write!(out, "{}", table[((b0 & 3) << 4) | (b1 >> 4)] as char);
+                        if chunk.len() > 1 {
+                            let _ = write!(out, "{}", table[((b1 & 0xf) << 2) | (b2 >> 6)] as char);
+                        }
+                        if chunk.len() > 2 {
+                            let _ = write!(out, "{}", table[b2 & 0x3f] as char);
+                        }
+                    }
+                    out
+                }
+
+                let h = base64url_encode(header.as_bytes());
+                let p = base64url_encode(payload.as_bytes());
+                let s = base64url_encode(&sig_bytes);
+                Ok(format!("{}.{}.{}", h, p, s))
             }
 
             // ── code (7 types) ───────────────────────────────────────────
@@ -1125,6 +1257,158 @@ impl Generator {
             }
             // technology.development.boolean — REMOVED in NNFT-075
             // Relocated to representation.boolean.{binary,initials,terms}
+            ("development", "docker_ref") => {
+                let registries = [
+                    "",
+                    "docker.io/",
+                    "ghcr.io/",
+                    "gcr.io/",
+                    "quay.io/",
+                    "registry.example.com:5000/",
+                ];
+                let registry = registries[self.rng.gen_range(0..registries.len())];
+                let orgs = ["library", "myorg", "acme", "hashicorp", "grafana"];
+                let images = [
+                    "nginx", "redis", "postgres", "alpine", "ubuntu", "node", "python", "consul",
+                    "vault",
+                ];
+                let org = orgs[self.rng.gen_range(0..orgs.len())];
+                let image = images[self.rng.gen_range(0..images.len())];
+                let tag = match self.rng.gen_range(0..4) {
+                    0 => "latest".to_string(),
+                    1 => format!(
+                        "{}.{}.{}",
+                        self.rng.gen_range(1..20),
+                        self.rng.gen_range(0..10),
+                        self.rng.gen_range(0..10)
+                    ),
+                    2 => format!("{}-alpine", self.rng.gen_range(1..20)),
+                    _ => format!("sha-{}", &self.gen_hex_string(8)[..7]),
+                };
+                if registry.is_empty() {
+                    Ok(format!("{}/{}:{}", org, image, tag))
+                } else {
+                    Ok(format!("{}{}/{}:{}", registry, org, image, tag))
+                }
+            }
+            ("development", "git_sha") => Ok(self.gen_hex_string(40)),
+
+            // ── identifier (3 types) ──────────────────────────────────
+            ("identifier", "ulid") => {
+                // Crockford Base32: 0-9, A-H, J-K, M-N, P-T, V-X, Y-Z (no I, L, O, U)
+                let crockford = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+                // First 10 chars: encode a timestamp in 2020-2030 range
+                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
+                let range_ms: u64 = 315_360_000_000; // ~10 years
+                let ts = base_ms + self.rng.gen_range(0..range_ms);
+                let mut ts_chars = [0u8; 10];
+                let mut t = ts;
+                for i in (0..10).rev() {
+                    ts_chars[i] = crockford[(t % 32) as usize];
+                    t /= 32;
+                }
+                let rand_chars: String = (0..16)
+                    .map(|_| crockford[self.rng.gen_range(0..32)] as char)
+                    .collect();
+                let ts_str: String = ts_chars.iter().map(|&b| b as char).collect();
+                Ok(format!("{}{}", ts_str, rand_chars))
+            }
+            ("identifier", "tsid") => {
+                // 32 hex chars with realistic timestamp in leading bytes
+                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
+                let range_ms: u64 = 315_360_000_000; // ~10 years
+                let ts = base_ms + self.rng.gen_range(0..range_ms);
+                let ts_hex = format!("{:012x}", ts);
+                let random_hex = self.gen_hex_string(20);
+                Ok(format!("{}{}", ts_hex, random_hex))
+            }
+            ("identifier", "snowflake_id") => {
+                // Twitter snowflake: (timestamp_ms - epoch) << 22 | worker << 12 | sequence
+                let twitter_epoch: u64 = 1_288_834_974_657;
+                let base_ms: u64 = 1_577_836_800_000; // 2020-01-01
+                let range_ms: u64 = 315_360_000_000;
+                let ts = base_ms + self.rng.gen_range(0..range_ms) - twitter_epoch;
+                let worker: u64 = self.rng.gen_range(0..1024);
+                let seq: u64 = self.rng.gen_range(0..4096);
+                let id = (ts << 22) | (worker << 12) | seq;
+                Ok(id.to_string())
+            }
+
+            // ── cloud (2 types) ───────────────────────────────────────
+            ("cloud", "aws_arn") => {
+                let services = [
+                    ("s3", "", "", "my-bucket"),
+                    ("iam", "", "123456789012", "user/johndoe"),
+                    ("iam", "", "123456789012", "role/AdminRole"),
+                    (
+                        "ec2",
+                        "us-east-1",
+                        "123456789012",
+                        "instance/i-0abcdef1234567890",
+                    ),
+                    (
+                        "ec2",
+                        "us-west-2",
+                        "987654321098",
+                        "vpc/vpc-0a1b2c3d4e5f67890",
+                    ),
+                    (
+                        "lambda",
+                        "eu-west-1",
+                        "123456789012",
+                        "function:my-function",
+                    ),
+                    (
+                        "lambda",
+                        "ap-southeast-1",
+                        "555555555555",
+                        "function:processor",
+                    ),
+                    ("sqs", "us-east-1", "123456789012", "my-queue"),
+                    ("sns", "us-west-2", "123456789012", "my-topic"),
+                    ("dynamodb", "eu-central-1", "123456789012", "table/users"),
+                    ("rds", "us-east-1", "123456789012", "db:mydb"),
+                    (
+                        "logs",
+                        "us-east-1",
+                        "123456789012",
+                        "log-group:/aws/lambda/my-function",
+                    ),
+                ];
+                let (service, region, account, resource) =
+                    services[self.rng.gen_range(0..services.len())];
+                Ok(format!(
+                    "arn:aws:{}:{}:{}:{}",
+                    service, region, account, resource
+                ))
+            }
+            ("cloud", "s3_uri") => {
+                let buckets = [
+                    "my-bucket",
+                    "data-lake-raw",
+                    "production-logs",
+                    "ml-models",
+                    "analytics-output",
+                    "backup-daily",
+                    "etl-staging",
+                ];
+                let bucket = buckets[self.rng.gen_range(0..buckets.len())];
+                let path = match self.rng.gen_range(0..4) {
+                    0 => format!("data/{}.csv", self.random_word()),
+                    1 => format!(
+                        "{}/{:02}/events.parquet",
+                        self.rng.gen_range(2020..2026),
+                        self.rng.gen_range(1..13)
+                    ),
+                    2 => format!(
+                        "ingestion/batch-{:03}/part-{:05}.json",
+                        self.rng.gen_range(1..100),
+                        self.rng.gen_range(0..10)
+                    ),
+                    _ => format!("models/{}/model.safetensors", self.random_word()),
+                };
+                Ok(format!("s3://{}/{}", bucket, path))
+            }
 
             // ── hardware (4 types) ───────────────────────────────────────
             ("hardware", "cpu") => {
@@ -1246,6 +1530,54 @@ impl Generator {
                 ))
             }
             ("person", "phone_number") => self.gen_phone_number(),
+            ("person", "email_display") => {
+                let first = self.random_first_name();
+                let last = self.random_last_name();
+                let domains = [
+                    "example.com",
+                    "corp.com",
+                    "company.org",
+                    "mail.com",
+                    "work.net",
+                ];
+                let domain = domains[self.rng.gen_range(0..domains.len())];
+                let email = format!(
+                    "{}.{}@{}",
+                    first.to_lowercase(),
+                    last.to_lowercase(),
+                    domain
+                );
+                if self.rng.gen_bool(0.5) {
+                    Ok(format!("\"{} {}\" <{}>", first, last, email))
+                } else {
+                    Ok(format!("{} {} <{}>", first, last, email))
+                }
+            }
+            ("person", "phone_e164") => {
+                let prefixes: &[(&str, u32)] = &[
+                    ("+1", 10),  // US/CA
+                    ("+44", 10), // UK
+                    ("+61", 9),  // AU
+                    ("+33", 9),  // FR
+                    ("+49", 10), // DE
+                    ("+81", 10), // JP
+                    ("+86", 11), // CN
+                    ("+91", 10), // IN
+                    ("+55", 11), // BR
+                    ("+82", 10), // KR
+                ];
+                let &(prefix, digits) = &prefixes[self.rng.gen_range(0..prefixes.len())];
+                let subscriber: String = (0..digits)
+                    .map(|i| {
+                        if i == 0 {
+                            (b'1' + self.rng.gen_range(0..9)) as char
+                        } else {
+                            (b'0' + self.rng.gen_range(0..10)) as char
+                        }
+                    })
+                    .collect();
+                Ok(format!("{}{}", prefix, subscriber))
+            }
             ("person", "username") => {
                 let first = self.random_first_name().to_lowercase();
                 let seps = [".", "_", "-", ""];
@@ -1657,10 +1989,195 @@ impl Generator {
                 }
             }
 
-            // ── commerce (3 types, moved from technology.code in v0.5.1) ──
+            // ── medical: new types (4 types) ─────────────────────────────
+            ("medical", "icd10") => {
+                let letters = b"ABCDEFGHJKLMNPRSTV";
+                let first = letters[self.rng.gen_range(0..letters.len())] as char;
+                let d1 = self.rng.gen_range(0..10u8);
+                let d2 = self.rng.gen_range(0..10u8);
+                if self.rng.gen_bool(0.7) {
+                    let sub_len = self.rng.gen_range(1..=4);
+                    let sub: String = (0..sub_len)
+                        .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                        .collect();
+                    Ok(format!("{}{}{}.{}", first, d1, d2, sub))
+                } else {
+                    Ok(format!("{}{}{}", first, d1, d2))
+                }
+            }
+            ("medical", "loinc") => {
+                let len = self.rng.gen_range(1..=5usize);
+                let num: u32 = match len {
+                    1 => self.rng.gen_range(1..10),
+                    2 => self.rng.gen_range(10..100),
+                    3 => self.rng.gen_range(100..1000),
+                    4 => self.rng.gen_range(1000..10000),
+                    _ => self.rng.gen_range(10000..100000),
+                };
+                let check = self.rng.gen_range(0..10u8);
+                Ok(format!("{}-{}", num, check))
+            }
+            ("medical", "cpt") => {
+                if self.rng.gen_bool(0.8) {
+                    let code = self.rng.gen_range(10000..99999u32);
+                    Ok(format!("{}", code))
+                } else {
+                    let code = self.rng.gen_range(1000..9999u32);
+                    let suffix = ['F', 'T', 'U'][self.rng.gen_range(0..3)];
+                    Ok(format!("{}{}", code, suffix))
+                }
+            }
+            ("medical", "hcpcs") => {
+                let letter = (b'A' + self.rng.gen_range(0..22u8)) as char; // A-V
+                let code = self.rng.gen_range(0..10000u32);
+                Ok(format!("{}{:04}", letter, code))
+            }
+
+            // ── government (6 types) ─────────────────────────────────────
+            ("government", "vin") => {
+                let vin_chars = b"ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+                let vin: String = (0..17)
+                    .map(|_| vin_chars[self.rng.gen_range(0..vin_chars.len())] as char)
+                    .collect();
+                Ok(vin)
+            }
+            ("government", "eu_vat") => match self.rng.gen_range(0..6u8) {
+                0 => Ok(format!("DE{:09}", self.rng.gen_range(0..1_000_000_000u32))),
+                1 => {
+                    let n: u64 = self.rng.gen_range(0..100_000_000_000u64);
+                    Ok(format!("FR{:011}", n))
+                }
+                2 => Ok(format!("ATU{:08}", self.rng.gen_range(0..100_000_000u32))),
+                3 => Ok(format!(
+                    "NL{:09}B{:02}",
+                    self.rng.gen_range(0..1_000_000_000u32),
+                    self.rng.gen_range(1..99u32)
+                )),
+                4 => {
+                    let n: u64 = self.rng.gen_range(0..100_000_000_000u64);
+                    Ok(format!("IT{:011}", n))
+                }
+                _ => {
+                    let letter = (b'A' + self.rng.gen_range(0..26)) as char;
+                    Ok(format!(
+                        "ES{}{:08}",
+                        letter,
+                        self.rng.gen_range(0..100_000_000u32)
+                    ))
+                }
+            },
+            ("government", "ssn") => {
+                let area = loop {
+                    let a = self.rng.gen_range(1..899u32);
+                    if a != 666 {
+                        break a;
+                    }
+                };
+                let group = self.rng.gen_range(1..100u32);
+                let serial = self.rng.gen_range(1..10000u32);
+                Ok(format!("{:03}-{:02}-{:04}", area, group, serial))
+            }
+            ("government", "ein") => {
+                let prefix = self.rng.gen_range(10..99u32);
+                let suffix = self.rng.gen_range(0..10_000_000u32);
+                Ok(format!("{:02}-{:07}", prefix, suffix))
+            }
+            ("government", "pan_india") => {
+                let holder_types = b"PCHABGJLTF";
+                let first3: String = (0..3)
+                    .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
+                    .collect();
+                let fourth = holder_types[self.rng.gen_range(0..holder_types.len())] as char;
+                let fifth = (b'A' + self.rng.gen_range(0..26)) as char;
+                let digits = self.rng.gen_range(0..10000u32);
+                let last = (b'A' + self.rng.gen_range(0..26)) as char;
+                Ok(format!(
+                    "{}{}{}{:04}{}",
+                    first3, fourth, fifth, digits, last
+                ))
+            }
+            ("government", "abn") => {
+                let digits: Vec<u8> = (0..11).map(|_| self.rng.gen_range(0..10u8)).collect();
+                if self.rng.gen_bool(0.6) {
+                    Ok(format!(
+                        "{}{} {}{}{} {}{}{} {}{}{}",
+                        digits[0],
+                        digits[1],
+                        digits[2],
+                        digits[3],
+                        digits[4],
+                        digits[5],
+                        digits[6],
+                        digits[7],
+                        digits[8],
+                        digits[9],
+                        digits[10]
+                    ))
+                } else {
+                    let s: String = digits.iter().map(|d| (b'0' + d) as char).collect();
+                    Ok(s)
+                }
+            }
+
+            // ── academic (1 type) ────────────────────────────────────────
+            ("academic", "orcid") => {
+                let groups: Vec<String> = (0..3)
+                    .map(|_| {
+                        let g = self.rng.gen_range(0..10000u16);
+                        format!("{:04}", g)
+                    })
+                    .collect();
+                let last3 = self.rng.gen_range(0..1000u16);
+                let last_char = if self.rng.gen_bool(0.1) {
+                    'X'
+                } else {
+                    (b'0' + self.rng.gen_range(0..10)) as char
+                };
+                Ok(format!(
+                    "{}-{}-{}-{:03}{}",
+                    groups[0], groups[1], groups[2], last3, last_char
+                ))
+            }
+
+            // ── commerce (5 types) ───────────────────────────────────────
             ("commerce", "isbn") => self.gen_technology("code", "isbn"),
             ("commerce", "ean") => self.gen_technology("code", "ean"),
             ("commerce", "issn") => self.gen_technology("code", "issn"),
+            ("commerce", "upc") => {
+                // UPC-A: 11 digits + Mod 10 check digit
+                let body: Vec<u8> = (0..11).map(|_| self.rng.gen_range(0..10u8)).collect();
+                let sum: u32 = body
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &d)| {
+                        let d = d as u32;
+                        if i % 2 == 0 {
+                            d * 3
+                        } else {
+                            d
+                        }
+                    })
+                    .sum();
+                let check = ((10 - (sum % 10)) % 10) as u8;
+                let s: String = body.iter().map(|d| (b'0' + d) as char).collect();
+                Ok(format!("{}{}", s, check))
+            }
+            ("commerce", "isrc") => {
+                let countries = ["US", "GB", "FR", "DE", "JP", "AU", "CA", "SE", "NL", "IT"];
+                let cc = countries[self.rng.gen_range(0..countries.len())];
+                let registrant: String = (0..3)
+                    .map(|_| {
+                        if self.rng.gen_bool(0.7) {
+                            (b'A' + self.rng.gen_range(0..26)) as char
+                        } else {
+                            (b'0' + self.rng.gen_range(0..10)) as char
+                        }
+                    })
+                    .collect();
+                let year = self.rng.gen_range(0..100u32);
+                let designation = self.rng.gen_range(0..100000u32);
+                Ok(format!("{}{}{:02}{:05}", cc, registrant, year, designation))
+            }
 
             _ => Err(GeneratorError::NotImplemented(format!(
                 "identity.{}.{}",
@@ -1670,7 +2187,7 @@ impl Generator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DOMAIN: geography (16 types)
+    // DOMAIN: geography (25 types)
     // ═══════════════════════════════════════════════════════════════════════════
 
     fn gen_geography(&mut self, category: &str, type_name: &str) -> Result<String, GeneratorError> {
@@ -1713,7 +2230,94 @@ impl Generator {
             }
             ("address", "postal_code") => self.gen_postal_code(),
 
-            // ── coordinate (3 types) ─────────────────────────────────────
+            // ── format (2 types) ─────────────────────────────────────────
+            ("format", "wkt") => {
+                let r = self.rng.gen::<f64>();
+                if r < 0.4 {
+                    let x = self.rng.gen_range(-180.0f64..180.0);
+                    let y = self.rng.gen_range(-90.0f64..90.0);
+                    Ok(format!("POINT ({:.4} {:.4})", x, y))
+                } else if r < 0.6 {
+                    let pts: Vec<String> = (0..self.rng.gen_range(2..5))
+                        .map(|_| {
+                            let x = self.rng.gen_range(-180.0f64..180.0);
+                            let y = self.rng.gen_range(-90.0f64..90.0);
+                            format!("{:.2} {:.2}", x, y)
+                        })
+                        .collect();
+                    Ok(format!("LINESTRING ({})", pts.join(", ")))
+                } else if r < 0.85 {
+                    let n = self.rng.gen_range(4..7);
+                    let mut pts: Vec<String> = (0..n)
+                        .map(|_| {
+                            let x = self.rng.gen_range(-180.0f64..180.0);
+                            let y = self.rng.gen_range(-90.0f64..90.0);
+                            format!("{:.2} {:.2}", x, y)
+                        })
+                        .collect();
+                    // Close the ring
+                    pts.push(pts[0].clone());
+                    Ok(format!("POLYGON (({}))", pts.join(", ")))
+                } else if r < 0.95 {
+                    let pts: Vec<String> = (0..self.rng.gen_range(2..5))
+                        .map(|_| {
+                            let x = self.rng.gen_range(-180.0f64..180.0);
+                            let y = self.rng.gen_range(-90.0f64..90.0);
+                            format!("({:.2} {:.2})", x, y)
+                        })
+                        .collect();
+                    Ok(format!("MULTIPOINT ({})", pts.join(", ")))
+                } else {
+                    Ok("POINT EMPTY".to_string())
+                }
+            }
+            ("format", "geojson") => {
+                let r = self.rng.gen::<f64>();
+                if r < 0.5 {
+                    let x = self.rng.gen_range(-180.0f64..180.0);
+                    let y = self.rng.gen_range(-90.0f64..90.0);
+                    Ok(format!(
+                        "{{\"type\": \"Point\", \"coordinates\": [{:.4}, {:.4}]}}",
+                        x, y
+                    ))
+                } else if r < 0.75 {
+                    let pts: Vec<String> = (0..self.rng.gen_range(2..4))
+                        .map(|_| {
+                            let x = self.rng.gen_range(-180.0f64..180.0);
+                            let y = self.rng.gen_range(-90.0f64..90.0);
+                            format!("[{:.2}, {:.2}]", x, y)
+                        })
+                        .collect();
+                    Ok(format!(
+                        "{{\"type\": \"LineString\", \"coordinates\": [{}]}}",
+                        pts.join(", ")
+                    ))
+                } else {
+                    let x = self.rng.gen_range(-180.0f64..180.0);
+                    let y = self.rng.gen_range(-90.0f64..90.0);
+                    Ok(format!(
+                        "{{\"type\": \"Feature\", \"geometry\": {{\"type\": \"Point\", \"coordinates\": [{:.4}, {:.4}]}}, \"properties\": {{}}}}",
+                        x, y
+                    ))
+                }
+            }
+
+            // ── index (1 type) ───────────────────────────────────────────
+            ("index", "h3") => {
+                // H3 index: 15 hex characters. Use realistic prefixes.
+                let prefixes = ["89283082", "891f1d4c", "8a2a1072", "87283082", "8e283082"];
+                let prefix = prefixes[self.rng.gen_range(0..prefixes.len())];
+                let suffix_len = 15 - prefix.len();
+                let suffix: String = (0..suffix_len)
+                    .map(|_| {
+                        let hex_chars = b"0123456789abcdef";
+                        hex_chars[self.rng.gen_range(0..16)] as char
+                    })
+                    .collect();
+                Ok(format!("{}{}", prefix, suffix))
+            }
+
+            // ── coordinate (7 types) ─────────────────────────────────────
             ("coordinate", "latitude") => {
                 let lat = (self.rng.gen::<f64>() - 0.5) * 180.0;
                 Ok(format!("{:.4}", lat))
@@ -1727,8 +2331,55 @@ impl Generator {
                 let lon = (self.rng.gen::<f64>() - 0.5) * 360.0;
                 Ok(format!("{:.4},{:.4}", lat, lon))
             }
+            ("coordinate", "geohash") => {
+                let alphabet = b"0123456789bcdefghjkmnpqrstuvwxyz";
+                let len = self.rng.gen_range(4..=12);
+                let hash: String = (0..len)
+                    .map(|_| alphabet[self.rng.gen_range(0..alphabet.len())] as char)
+                    .collect();
+                Ok(hash)
+            }
+            ("coordinate", "plus_code") => {
+                let alphabet = b"23456789CFGHJMPQRVWX";
+                let first8: String = (0..8)
+                    .map(|_| alphabet[self.rng.gen_range(0..alphabet.len())] as char)
+                    .collect();
+                let refine_len = self.rng.gen_range(2..=4);
+                let refine: String = (0..refine_len)
+                    .map(|_| alphabet[self.rng.gen_range(0..alphabet.len())] as char)
+                    .collect();
+                Ok(format!("{}+{}", first8, refine))
+            }
+            ("coordinate", "dms") => {
+                let lat_d = self.rng.gen_range(0..90);
+                let lat_m = self.rng.gen_range(0..60);
+                let lat_s = self.rng.gen_range(0..60);
+                let lat_dir = if self.rng.gen_bool(0.5) { 'N' } else { 'S' };
+                let lon_d = self.rng.gen_range(0..180);
+                let lon_m = self.rng.gen_range(0..60);
+                let lon_s = self.rng.gen_range(0..60);
+                let lon_dir = if self.rng.gen_bool(0.5) { 'E' } else { 'W' };
+                Ok(format!(
+                    "{}°{}'{}\"{} {}°{}'{}\"{}",
+                    lat_d, lat_m, lat_s, lat_dir, lon_d, lon_m, lon_s, lon_dir
+                ))
+            }
+            ("coordinate", "mgrs") => {
+                let zone = self.rng.gen_range(1..=60);
+                let bands = b"CDEFGHJKLMNPQRSTUVWX";
+                let band = bands[self.rng.gen_range(0..bands.len())] as char;
+                let sq_chars = b"ABCDEFGHJKLMNPQRSTUVWXYZ"; // excludes I and O
+                let sq1 = sq_chars[self.rng.gen_range(0..sq_chars.len())] as char;
+                let sq2 = sq_chars[self.rng.gen_range(0..sq_chars.len())] as char;
+                // Even number of digits (2, 4, 6, 8, or 10)
+                let precision = self.rng.gen_range(1..=5) * 2;
+                let digits: String = (0..precision)
+                    .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                    .collect();
+                Ok(format!("{}{}{}{}{}", zone, band, sq1, sq2, digits))
+            }
 
-            // ── transportation (2 types) ─────────────────────────────────
+            // ── transportation (5 types) ─────────────────────────────────
             ("transportation", "iata_code") => {
                 let code: String = (0..3)
                     .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
@@ -1740,6 +2391,55 @@ impl Generator {
                     .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
                     .collect();
                 Ok(code)
+            }
+            ("transportation", "iso6346") => {
+                // Owner code: 3 uppercase letters
+                let owner: String = (0..3)
+                    .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
+                    .collect();
+                // Equipment category: U, J, or Z
+                let cats = ['U', 'J', 'Z'];
+                let cat = cats[self.rng.gen_range(0..cats.len())];
+                // Serial + check digit: 7 digits
+                let serial: String = (0..7)
+                    .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                    .collect();
+                Ok(format!("{}{}{}", owner, cat, serial))
+            }
+            ("transportation", "hs_code") => {
+                let r = self.rng.gen::<f64>();
+                if r < 0.4 {
+                    // 6-digit with dot: XXXX.XX
+                    let a = self.rng.gen_range(0..10000u32);
+                    let b = self.rng.gen_range(0..100u32);
+                    Ok(format!("{:04}.{:02}", a, b))
+                } else if r < 0.7 {
+                    // 8-digit with dots: XXXX.XX.XX
+                    let a = self.rng.gen_range(0..10000u32);
+                    let b = self.rng.gen_range(0..100u32);
+                    let c = self.rng.gen_range(0..100u32);
+                    Ok(format!("{:04}.{:02}.{:02}", a, b, c))
+                } else {
+                    // 10-digit with dots: XXXX.XX.XX.XX
+                    let a = self.rng.gen_range(0..10000u32);
+                    let b = self.rng.gen_range(0..100u32);
+                    let c = self.rng.gen_range(0..100u32);
+                    let d = self.rng.gen_range(0..100u32);
+                    Ok(format!("{:04}.{:02}.{:02}.{:02}", a, b, c, d))
+                }
+            }
+            ("transportation", "unlocode") => {
+                // 2-letter country code + 3-char location
+                let country_codes = [
+                    "US", "GB", "DE", "FR", "NL", "SG", "CN", "JP", "AU", "BR", "IN", "AE", "KR",
+                    "IT", "ES", "CA", "MX", "NO", "SE", "DK",
+                ];
+                let country = country_codes[self.rng.gen_range(0..country_codes.len())];
+                let loc_chars = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+                let loc: String = (0..3)
+                    .map(|_| loc_chars[self.rng.gen_range(0..loc_chars.len())] as char)
+                    .collect();
+                Ok(format!("{}{}", country, loc))
             }
 
             // ── contact (1 type) ─────────────────────────────────────────
@@ -1959,6 +2659,17 @@ impl Generator {
                     Ok(format!("rgb({}, {}, {})", r, g, b))
                 } else {
                     Ok(format!("{}, {}, {}", r, g, b))
+                }
+            }
+            ("format", "color_hsl") => {
+                let h = self.rng.gen_range(0..361);
+                let s = self.rng.gen_range(0..101);
+                let l = self.rng.gen_range(0..101);
+                if self.rng.gen_bool(0.3) {
+                    let a = self.rng.gen_range(1..10) as f32 / 10.0;
+                    Ok(format!("hsla({}, {}%, {}%, {})", h, s, l, a))
+                } else {
+                    Ok(format!("hsl({}, {}%, {}%)", h, s, l))
                 }
             }
 
@@ -2756,6 +3467,55 @@ impl Generator {
             ("securities", "isin") => self.gen_identity("payment", "isin"),
             ("securities", "sedol") => self.gen_identity("payment", "sedol"),
             ("securities", "lei") => self.gen_identity("payment", "lei"),
+            ("securities", "figi") => {
+                // FIGI: 2 consonants + 'G' + 8 alphanumeric (no vowels) + 1 check digit (0-9)
+                let consonants = "BCDFGHJKLMNPQRSTVWXYZ";
+                let alphanum_no_vowels = "BCDFGHJKLMNPQRSTVWXYZ0123456789";
+                let prefix: String = (0..2)
+                    .map(|_| consonants.as_bytes()[self.rng.gen_range(0..consonants.len())] as char)
+                    .collect();
+                let body: String = (0..8)
+                    .map(|_| {
+                        alphanum_no_vowels.as_bytes()
+                            [self.rng.gen_range(0..alphanum_no_vowels.len())]
+                            as char
+                    })
+                    .collect();
+                let check = self.rng.gen_range(0..10u8);
+                Ok(format!("{}G{}{}", prefix, body, check))
+            }
+
+            // ── banking (aba_routing, bsb) ────────────────────────────────
+            ("banking", "aba_routing") => {
+                // ABA routing: valid prefix (01-12, 21-32, 61-72, 80) + 6 digits + checksum
+                let prefixes = [
+                    "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "21",
+                    "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "61", "62",
+                    "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "80",
+                ];
+                let prefix = prefixes[self.rng.gen_range(0..prefixes.len())];
+                let mid: String = (0..6)
+                    .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                    .collect();
+                let digits_str = format!("{}{}", prefix, mid);
+                let digits: Vec<u32> = digits_str.bytes().map(|b| (b - b'0') as u32).collect();
+                let weights = [3u32, 7, 1, 3, 7, 1, 3, 7];
+                let sum: u32 = digits.iter().zip(weights.iter()).map(|(d, w)| d * w).sum();
+                let check = (10 - (sum % 10)) % 10;
+                Ok(format!("{}{}{}", prefix, mid, check))
+            }
+            ("banking", "bsb") => {
+                // BSB: ###-### format
+                let bank_codes = [
+                    "012", "013", "014", "033", "034", "035", "062", "063", "064", "082", "083",
+                    "084",
+                ];
+                let bank = bank_codes[self.rng.gen_range(0..bank_codes.len())];
+                let branch: String = (0..3)
+                    .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                    .collect();
+                Ok(format!("{}-{}", bank, branch))
+            }
 
             // ── crypto (moved from identity.payment) ─────────────────────
             ("crypto", "bitcoin_address") => self.gen_identity("payment", "bitcoin_address"),
