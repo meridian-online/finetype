@@ -1911,3 +1911,268 @@ mappings:
     match_quality: direct
     expand: false
     notes: ISO 4217 currency codes (USD, EUR, GBP)
+
+  # ─── New types from NNFT-244 taxonomy expansion ────────────────────
+  # Geography
+  - gt_label: wkt
+    source: profile_eval
+    finetype_label: geography.format.wkt
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: geojson
+    source: profile_eval
+    finetype_label: geography.format.geojson
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: h3
+    source: profile_eval
+    finetype_label: geography.index.h3
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: geohash
+    source: profile_eval
+    finetype_label: geography.coordinate.geohash
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: plus code
+    source: profile_eval
+    finetype_label: geography.coordinate.plus_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: dms
+    source: profile_eval
+    finetype_label: geography.coordinate.dms
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: mgrs
+    source: profile_eval
+    finetype_label: geography.coordinate.mgrs
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: iso6346
+    source: profile_eval
+    finetype_label: geography.transportation.iso6346
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: hs code
+    source: profile_eval
+    finetype_label: geography.transportation.hs_code
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  - gt_label: unlocode
+    source: profile_eval
+    finetype_label: geography.transportation.unlocode
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+  # Technology
+  - gt_label: ulid
+    source: profile_eval
+    finetype_label: technology.identifier.ulid
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: tsid
+    source: profile_eval
+    finetype_label: technology.identifier.tsid
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: snowflake id
+    source: profile_eval
+    finetype_label: technology.identifier.snowflake_id
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: aws arn
+    source: profile_eval
+    finetype_label: technology.cloud.aws_arn
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: s3 uri
+    source: profile_eval
+    finetype_label: technology.cloud.s3_uri
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: jwt
+    source: profile_eval
+    finetype_label: technology.cryptographic.jwt
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: docker ref
+    source: profile_eval
+    finetype_label: technology.development.docker_ref
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: git sha
+    source: profile_eval
+    finetype_label: technology.development.git_sha
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: cidr
+    source: profile_eval
+    finetype_label: technology.internet.cidr
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: urn
+    source: profile_eval
+    finetype_label: technology.internet.urn
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: data uri
+    source: profile_eval
+    finetype_label: technology.internet.data_uri
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  # Identity
+  - gt_label: icd10
+    source: profile_eval
+    finetype_label: identity.medical.icd10
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: loinc
+    source: profile_eval
+    finetype_label: identity.medical.loinc
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: cpt
+    source: profile_eval
+    finetype_label: identity.medical.cpt
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: hcpcs
+    source: profile_eval
+    finetype_label: identity.medical.hcpcs
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: vin
+    source: profile_eval
+    finetype_label: identity.government.vin
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: eu vat
+    source: profile_eval
+    finetype_label: identity.government.eu_vat
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: ssn
+    source: profile_eval
+    finetype_label: identity.government.ssn
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: ein
+    source: profile_eval
+    finetype_label: identity.government.ein
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: pan india
+    source: profile_eval
+    finetype_label: identity.government.pan_india
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: abn
+    source: profile_eval
+    finetype_label: identity.government.abn
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: orcid
+    source: profile_eval
+    finetype_label: identity.academic.orcid
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: email display
+    source: profile_eval
+    finetype_label: identity.person.email_display
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: phone e164
+    source: profile_eval
+    finetype_label: identity.person.phone_e164
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: upc
+    source: profile_eval
+    finetype_label: identity.commerce.upc
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  - gt_label: isrc
+    source: profile_eval
+    finetype_label: identity.commerce.isrc
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+  # Finance
+  - gt_label: figi
+    source: profile_eval
+    finetype_label: finance.securities.figi
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: aba routing
+    source: profile_eval
+    finetype_label: finance.banking.aba_routing
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: bsb
+    source: profile_eval
+    finetype_label: finance.banking.bsb
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  # Representation
+  - gt_label: cas number
+    source: profile_eval
+    finetype_label: representation.scientific.cas_number
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: inchi
+    source: profile_eval
+    finetype_label: representation.scientific.inchi
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: smiles
+    source: profile_eval
+    finetype_label: representation.scientific.smiles
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: color hsl
+    source: profile_eval
+    finetype_label: representation.format.color_hsl
+    finetype_domain: representation
+    match_quality: direct
+    expand: false

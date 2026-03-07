@@ -248,3 +248,46 @@ weather_stations_json,eval/datasets/json/weather_stations.json,precipitation_mm,
 weather_stations_json,eval/datasets/json/weather_stations.json,station_name,entity name
 weather_stations_json,eval/datasets/json/weather_stations.json,temperature_c,decimal number
 weather_stations_json,eval/datasets/json/weather_stations.json,wind_speed_kmh,decimal number
+new_geography,eval/datasets/csv/new_geography.csv,wkt,wkt
+new_geography,eval/datasets/csv/new_geography.csv,geojson,geojson
+new_geography,eval/datasets/csv/new_geography.csv,h3,h3
+new_geography,eval/datasets/csv/new_geography.csv,geohash,geohash
+new_geography,eval/datasets/csv/new_geography.csv,plus_code,plus code
+new_geography,eval/datasets/csv/new_geography.csv,dms,dms
+new_geography,eval/datasets/csv/new_geography.csv,mgrs,mgrs
+new_geography,eval/datasets/csv/new_geography.csv,iso6346,iso6346
+new_geography,eval/datasets/csv/new_geography.csv,hs_code,hs code
+new_geography,eval/datasets/csv/new_geography.csv,unlocode,unlocode
+new_technology,eval/datasets/csv/new_technology.csv,ulid,ulid
+new_technology,eval/datasets/csv/new_technology.csv,tsid,tsid
+new_technology,eval/datasets/csv/new_technology.csv,snowflake_id,snowflake id
+new_technology,eval/datasets/csv/new_technology.csv,aws_arn,aws arn
+new_technology,eval/datasets/csv/new_technology.csv,s3_uri,s3 uri
+new_technology,eval/datasets/csv/new_technology.csv,jwt,jwt
+new_technology,eval/datasets/csv/new_technology.csv,docker_ref,docker ref
+new_technology,eval/datasets/csv/new_technology.csv,git_sha,git sha
+new_technology,eval/datasets/csv/new_technology.csv,cidr,cidr
+new_technology,eval/datasets/csv/new_technology.csv,urn,urn
+new_technology,eval/datasets/csv/new_technology.csv,data_uri,data uri
+new_identity,eval/datasets/csv/new_identity.csv,icd10,icd10
+new_identity,eval/datasets/csv/new_identity.csv,loinc,loinc
+new_identity,eval/datasets/csv/new_identity.csv,cpt,cpt
+new_identity,eval/datasets/csv/new_identity.csv,hcpcs,hcpcs
+new_identity,eval/datasets/csv/new_identity.csv,vin,vin
+new_identity,eval/datasets/csv/new_identity.csv,eu_vat,eu vat
+new_identity,eval/datasets/csv/new_identity.csv,ssn,ssn
+new_identity,eval/datasets/csv/new_identity.csv,ein,ein
+new_identity,eval/datasets/csv/new_identity.csv,pan_india,pan india
+new_identity,eval/datasets/csv/new_identity.csv,abn,abn
+new_identity,eval/datasets/csv/new_identity.csv,orcid,orcid
+new_identity,eval/datasets/csv/new_identity.csv,email_display,email display
+new_identity,eval/datasets/csv/new_identity.csv,phone_e164,phone e164
+new_identity,eval/datasets/csv/new_identity.csv,upc,upc
+new_identity,eval/datasets/csv/new_identity.csv,isrc,isrc
+new_finance,eval/datasets/csv/new_finance.csv,figi,figi
+new_finance,eval/datasets/csv/new_finance.csv,aba_routing,aba routing
+new_finance,eval/datasets/csv/new_finance.csv,bsb,bsb
+new_representation,eval/datasets/csv/new_representation.csv,cas_number,cas number
+new_representation,eval/datasets/csv/new_representation.csv,inchi,inchi
+new_representation,eval/datasets/csv/new_representation.csv,smiles,smiles
+new_representation,eval/datasets/csv/new_representation.csv,color_hsl,color hsl

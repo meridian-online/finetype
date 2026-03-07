@@ -1,0 +1,11 @@
+{
+  "batch_size": 32,
+  "data_file": "training-v14-250.ndjson",
+  "epochs": 10,
+  "model_type": "charcnn",
+  "n_classes": 250,
+  "n_samples": 372000,
+  "parent_snapshot": null,
+  "seed": 42,
+  "timestamp": "2026-03-07T10:20:03.628845228+00:00"
+}

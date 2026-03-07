@@ -228,3 +228,46 @@ iso date,profile,datetime.date.iso,datetime,direct,false
 alphanumeric id,profile,representation.identifier.alphanumeric_id,representation,direct,false
 http method,profile,technology.internet.http_method,technology,direct,false
 currency code,profile,finance.currency.currency_code,finance,direct,false
+wkt,profile_eval,geography.format.wkt,geography,direct,false
+geojson,profile_eval,geography.format.geojson,geography,direct,false
+h3,profile_eval,geography.index.h3,geography,direct,false
+geohash,profile_eval,geography.coordinate.geohash,geography,direct,false
+plus code,profile_eval,geography.coordinate.plus_code,geography,direct,false
+dms,profile_eval,geography.coordinate.dms,geography,direct,false
+mgrs,profile_eval,geography.coordinate.mgrs,geography,direct,false
+iso6346,profile_eval,geography.transportation.iso6346,geography,direct,false
+hs code,profile_eval,geography.transportation.hs_code,geography,direct,false
+unlocode,profile_eval,geography.transportation.unlocode,geography,direct,false
+ulid,profile_eval,technology.identifier.ulid,technology,direct,false
+tsid,profile_eval,technology.identifier.tsid,technology,direct,false
+snowflake id,profile_eval,technology.identifier.snowflake_id,technology,direct,false
+aws arn,profile_eval,technology.cloud.aws_arn,technology,direct,false
+s3 uri,profile_eval,technology.cloud.s3_uri,technology,direct,false
+jwt,profile_eval,technology.cryptographic.jwt,technology,direct,false
+docker ref,profile_eval,technology.development.docker_ref,technology,direct,false
+git sha,profile_eval,technology.development.git_sha,technology,direct,false
+cidr,profile_eval,technology.internet.cidr,technology,direct,false
+urn,profile_eval,technology.internet.urn,technology,direct,false
+data uri,profile_eval,technology.internet.data_uri,technology,direct,false
+icd10,profile_eval,identity.medical.icd10,identity,direct,false
+loinc,profile_eval,identity.medical.loinc,identity,direct,false
+cpt,profile_eval,identity.medical.cpt,identity,direct,false
+hcpcs,profile_eval,identity.medical.hcpcs,identity,direct,false
+vin,profile_eval,identity.government.vin,identity,direct,false
+eu vat,profile_eval,identity.government.eu_vat,identity,direct,false
+ssn,profile_eval,identity.government.ssn,identity,direct,false
+ein,profile_eval,identity.government.ein,identity,direct,false
+pan india,profile_eval,identity.government.pan_india,identity,direct,false
+abn,profile_eval,identity.government.abn,identity,direct,false
+orcid,profile_eval,identity.academic.orcid,identity,direct,false
+email display,profile_eval,identity.person.email_display,identity,direct,false
+phone e164,profile_eval,identity.person.phone_e164,identity,direct,false
+upc,profile_eval,identity.commerce.upc,identity,direct,false
+isrc,profile_eval,identity.commerce.isrc,identity,direct,false
+figi,profile_eval,finance.securities.figi,finance,direct,false
+aba routing,profile_eval,finance.banking.aba_routing,finance,direct,false
+bsb,profile_eval,finance.banking.bsb,finance,direct,false
+cas number,profile_eval,representation.scientific.cas_number,representation,direct,false
+inchi,profile_eval,representation.scientific.inchi,representation,direct,false
+smiles,profile_eval,representation.scientific.smiles,representation,direct,false
+color hsl,profile_eval,representation.format.color_hsl,representation,direct,false
