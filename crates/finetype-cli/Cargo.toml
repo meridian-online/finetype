@@ -23,6 +23,7 @@ embed-models = []
 [dependencies]
 finetype-core = { workspace = true }
 finetype-model = { workspace = true }
+finetype-mcp = { path = "../finetype-mcp" }
 chrono = { workspace = true }
 clap = { workspace = true }
 csv = { workspace = true }

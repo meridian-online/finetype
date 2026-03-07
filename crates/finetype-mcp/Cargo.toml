@@ -1,0 +1,21 @@
+[package]
+name = "finetype-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "MCP server for FineType semantic type classification"
+
+[dependencies]
+finetype-core = { workspace = true }
+finetype-model = { workspace = true }
+
+rmcp = { version = "1.1", features = ["server", "transport-io"] }
+schemars = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+csv = { workspace = true }

@@ -350,6 +350,9 @@ enum Commands {
         output: OutputFormat,
     },
 
+    /// Start MCP server for AI agent integration (stdio transport)
+    Mcp,
+
     /// Evaluate model accuracy on a test set
     #[command(hide = true)]
     Eval {
@@ -595,7 +598,36 @@ fn main() -> Result<()> {
             top_confusions,
             output,
         } => cmd_eval(data, model, taxonomy, model_type, top_confusions, output),
+
+        Commands::Mcp => cmd_mcp(),
     }
+}
+
+fn cmd_mcp() -> Result<()> {
+    eprintln!("Starting FineType MCP server...");
+
+    // Load models
+    let model_path = PathBuf::from("models/default");
+    let char_classifier = load_char_classifier(&model_path)?;
+
+    // Load taxonomy
+    let taxonomy_path = PathBuf::from("labels");
+    let taxonomy = load_taxonomy(&taxonomy_path)?;
+
+    // Load semantic hint classifier (optional)
+    let semantic = load_semantic_hint();
+
+    // Create MCP server
+    let server = finetype_mcp::FineTypeServer::new(char_classifier, taxonomy, semantic);
+
+    // TODO: Add Sense + Entity wiring once MCP server supports it
+
+    eprintln!("FineType MCP server ready (stdio transport)");
+
+    // Run the async server
+    tokio::runtime::Runtime::new()?.block_on(server.serve_stdio())?;
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
