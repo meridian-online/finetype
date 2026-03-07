@@ -176,6 +176,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 | `finetype train` | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
 | `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
 | `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns, `x-finetype-*` DDL fields) |
+| `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`) |
 | `finetype schema-for <file>` | Profile → CREATE TABLE DDL (`--table-name`, `-o json\|arrow`) |
 | `finetype mcp` | Start MCP server over stdio (6 tools: profile, infer, ddl, taxonomy, schema, generate) |
 

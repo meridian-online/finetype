@@ -194,6 +194,49 @@ enum Commands {
         pretty: bool,
     },
 
+    /// Generate runnable DuckDB CTAS from file profiling
+    Load {
+        /// Input CSV file
+        #[arg(short, long)]
+        file: PathBuf,
+
+        /// Override table name (default: derived from filename)
+        #[arg(long)]
+        table_name: Option<String>,
+
+        /// Model directory
+        #[arg(short, long, default_value = "models/default")]
+        model: PathBuf,
+
+        /// Maximum values to sample per column (default 100)
+        #[arg(long, default_value = "100")]
+        sample_size: usize,
+
+        /// CSV delimiter character (default: auto-detect)
+        #[arg(long)]
+        delimiter: Option<char>,
+
+        /// Disable column name header hints
+        #[arg(long)]
+        no_header_hint: bool,
+
+        /// Model type (char-cnn, tiered, transformer)
+        #[arg(long, default_value = "char-cnn")]
+        model_type: ModelType,
+
+        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
+        #[arg(long)]
+        sharp_only: bool,
+
+        /// Number of preview rows in trailing SELECT (0 = no preview)
+        #[arg(long, default_value = "10")]
+        limit: usize,
+
+        /// Disable DuckDB normalize_names (preserve original column names)
+        #[arg(long)]
+        no_normalize_names: bool,
+    },
+
     /// Generate DuckDB CREATE TABLE from file profiling
     SchemaFor {
         /// Input file (CSV, JSON, NDJSON)
@@ -511,6 +554,30 @@ fn main() -> Result<()> {
             file,
             pretty,
         } => cmd_schema(type_key, file, pretty),
+
+        Commands::Load {
+            file,
+            table_name,
+            model,
+            sample_size,
+            delimiter,
+            no_header_hint,
+            model_type,
+            sharp_only,
+            limit,
+            no_normalize_names,
+        } => cmd_load(
+            file,
+            table_name,
+            model,
+            sample_size,
+            delimiter,
+            no_header_hint,
+            model_type,
+            sharp_only,
+            limit,
+            no_normalize_names,
+        ),
 
         Commands::SchemaFor {
             file,
@@ -2004,6 +2071,294 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
         std::mem::swap(&mut prev, &mut curr);
     }
     prev[b_len]
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOAD — Profile file → runnable DuckDB CTAS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Normalise a column name for analyst-friendly SQL output:
+/// lowercase, spaces→underscores, strip hyphens, prefix leading digit with underscore.
+///
+/// We apply normalization ourselves via SQL aliases rather than using DuckDB's
+/// `normalize_names=true` parameter, because DuckDB additionally prefixes reserved
+/// words (name→_name, value→_value) which we can't reliably replicate. Using aliases
+/// gives us full control and reserved words work fine in alias position.
+fn normalize_column_name(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    for ch in name.chars() {
+        if ch == ' ' {
+            result.push('_');
+        } else if ch == '-' {
+            // Strip hyphens (matches DuckDB behaviour)
+        } else {
+            result.push(ch.to_ascii_lowercase());
+        }
+    }
+    // Prefix leading digits with underscore
+    if result.starts_with(|c: char| c.is_ascii_digit()) {
+        result.insert(0, '_');
+    }
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cmd_load(
+    file: PathBuf,
+    table_name: Option<String>,
+    model: PathBuf,
+    sample_size: usize,
+    delimiter: Option<char>,
+    no_header_hint: bool,
+    model_type: ModelType,
+    sharp_only: bool,
+    limit: usize,
+    no_normalize_names: bool,
+) -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+
+    eprintln!("Loading model from {:?}", model);
+    let classifier: Box<dyn ValueClassifier> = match model_type {
+        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+    };
+
+    let config = ColumnConfig {
+        sample_size,
+        ..Default::default()
+    };
+    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
+        eprintln!("Loaded semantic hint classifier (Model2Vec)");
+        let entity = load_entity_classifier(&semantic);
+        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+        if let Some(entity) = entity {
+            eprintln!("Loaded entity classifier (full_name demotion gate)");
+            cc.set_entity_classifier(entity);
+        }
+        cc
+    } else {
+        ColumnClassifier::new(classifier, config)
+    };
+
+    // Load taxonomy for validation-based attractor demotion
+    let taxonomy_path = std::path::PathBuf::from("labels");
+    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+        eprintln!(
+            "Loaded taxonomy ({} types, {} validators cached)",
+            taxonomy.labels().len(),
+            taxonomy.validator_count()
+        );
+        column_classifier.set_taxonomy(taxonomy);
+    }
+
+    // Wire up Sense classifier
+    if !sharp_only {
+        wire_sense(&mut column_classifier);
+    }
+
+    eprintln!("Reading {:?}", file);
+
+    let (headers, columns, row_count) = read_csv_input(&file, delimiter)?;
+
+    let n_cols = headers.len();
+    eprintln!("Read {} rows, {} columns", row_count, n_cols);
+
+    // Load taxonomy for DDL info lookup
+    let taxonomy = load_taxonomy(&taxonomy_path).ok();
+
+    // Derive table name from filename stem
+    let table = table_name.unwrap_or_else(|| {
+        let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("data");
+        sanitise_identifier(stem)
+    });
+
+    let normalize = !no_normalize_names;
+
+    // Profile each column and collect type info
+    struct LoadColumn {
+        /// Original column name from the CSV header
+        original_name: String,
+        /// Normalized column name (or same as original if --no-normalize-names)
+        output_name: String,
+        label: String,
+        duckdb_type: String,
+        transform: Option<String>,
+        is_generic: bool,
+    }
+
+    let mut load_cols: Vec<LoadColumn> = Vec::new();
+
+    for (i, col_values) in columns.iter().enumerate() {
+        let original_name = headers
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| format!("col_{}", i));
+
+        let output_name = if normalize {
+            normalize_column_name(&original_name)
+        } else {
+            original_name.clone()
+        };
+
+        if col_values.is_empty() {
+            load_cols.push(LoadColumn {
+                original_name,
+                output_name,
+                label: "unknown".to_string(),
+                duckdb_type: "VARCHAR".to_string(),
+                transform: None,
+                is_generic: true,
+            });
+            continue;
+        }
+
+        // Use original name for header hints (pre-normalization)
+        let result = if no_header_hint {
+            column_classifier.classify_column(col_values)?
+        } else {
+            column_classifier.classify_column_with_header(col_values, &original_name)?
+        };
+
+        // Look up DDL info from taxonomy
+        let (duckdb_type, transform) = if let Some(ref tax) = taxonomy {
+            if let Some(ddl) = tax.ddl_info(&result.label) {
+                (ddl.duckdb_type, ddl.transform)
+            } else {
+                ("VARCHAR".to_string(), None)
+            }
+        } else {
+            ("VARCHAR".to_string(), None)
+        };
+
+        // Generic predictions default to VARCHAR
+        let final_type = if result.is_generic {
+            "VARCHAR".to_string()
+        } else {
+            duckdb_type
+        };
+
+        load_cols.push(LoadColumn {
+            original_name,
+            output_name,
+            label: result.label,
+            duckdb_type: final_type,
+            transform,
+            is_generic: result.is_generic,
+        });
+    }
+
+    // File path as provided by user
+    let file_str = file.to_string_lossy();
+
+    // all_varchar=true ensures FineType controls all type casting via transforms.
+    // Without it, DuckDB auto_detect may cast columns (e.g., dates) before our
+    // transform expressions can operate on them.
+    let read_csv_params = format!("read_csv('{}', all_varchar=true)", file_str);
+
+    // Header comment
+    let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
+    let pipeline = if sharp_only {
+        "Sharpen-only"
+    } else {
+        "Sense→Sharpen"
+    };
+    println!(
+        "-- Generated by FineType ({} types, {} pipeline)",
+        type_count, pipeline
+    );
+    println!(
+        "-- Source: {} ({} rows, {} columns)",
+        file.file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("unknown"),
+        row_count,
+        n_cols
+    );
+
+    // CTAS statement
+    println!("CREATE TABLE {} AS", table);
+    println!("SELECT");
+
+    // Build all expressions first to calculate alignment
+    let exprs: Vec<String> = load_cols
+        .iter()
+        .map(|c| {
+            build_load_expr(
+                &c.original_name,
+                &c.output_name,
+                &c.duckdb_type,
+                &c.transform,
+                c.is_generic,
+            )
+        })
+        .collect();
+
+    let max_expr_len = exprs.iter().map(|e| e.len()).max().unwrap_or(0);
+
+    for (i, col) in load_cols.iter().enumerate() {
+        let expr = &exprs[i];
+        let is_last = i == load_cols.len() - 1;
+        let comma = if is_last { "" } else { "," };
+
+        let comment = format!("-- {}", col.label);
+
+        // Align comments
+        let padding = max_expr_len.saturating_sub(expr.len()) + 1;
+        println!(
+            "    {}{}{:>pad$}{}",
+            expr,
+            comma,
+            " ",
+            comment,
+            pad = padding
+        );
+    }
+
+    println!("FROM {};", read_csv_params);
+
+    // Preview SELECT
+    if limit > 0 {
+        println!();
+        println!("SELECT * FROM {} LIMIT {};", table, limit);
+    }
+
+    Ok(())
+}
+
+/// Build a SELECT expression for a column in the CTAS.
+///
+/// Uses the original column name (quoted if needed) to reference the source,
+/// and adds an AS alias when the output name differs (normalization).
+/// VARCHAR/generic columns use bare column ref; typed columns use the transform.
+fn build_load_expr(
+    original_name: &str,
+    output_name: &str,
+    duckdb_type: &str,
+    transform: &Option<String>,
+    is_generic: bool,
+) -> String {
+    let source_ref = format_column_name(original_name);
+    let alias = format_column_name(output_name);
+    let needs_alias = source_ref != alias;
+
+    if is_generic || duckdb_type == "VARCHAR" {
+        // Bare column reference — no redundant CAST
+        if needs_alias {
+            format!("{} AS {}", source_ref, alias)
+        } else {
+            source_ref
+        }
+    } else if let Some(tf) = transform {
+        // Substitute {col} in transform expression
+        let cast_expr = tf.replace("{col}", &source_ref);
+        format!("{} AS {}", cast_expr, alias)
+    } else {
+        // No transform but non-VARCHAR — simple CAST
+        format!("CAST({} AS {}) AS {}", source_ref, duckdb_type, alias)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
