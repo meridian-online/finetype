@@ -23,12 +23,13 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 **Version:** 0.6.3
 **Taxonomy:** 209 definitions across 7 domains (container: 12, datetime: 84, finance: 28, geography: 15, identity: 19, representation: 32, technology: 19) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v13 flat (209 classes, 10 epochs, 209k samples), tiered-v2 fallback via `--sharp-only`.
-**Codebase:** ~20k lines of Rust across 8 crates (including finetype-train for pure Rust ML training). Zero Python dependencies (build + runtime).
+**Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
-**Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged)
+**Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent milestones
 
+- **MCP server** (NNFT-241) — `finetype mcp` subcommand exposing type inference to AI agents via Model Context Protocol. 6 tools (infer, profile, ddl, taxonomy, schema, generate) + taxonomy resources. Built on rmcp v1.1.0 (official Rust MCP SDK), stdio transport, JSON + markdown dual output. New `finetype-mcp` library crate.
 - **Taxonomy cleanup** (NNFT-233/234) — Removed 7 low-precision types (216→209), recategorized color types, renamed 10 geographic type names to format-structural names (eu_→dmy_, us_→mdy_, american→mdy_12h, european→dmy_hm, decimal_number_eu→decimal_number_comma). CharCNN-v13 retrained on 209k samples (1000/type). Profile: 143/146 (97.9% label, 98.6% domain). Actionability: 99.3%.
 - **Post-retrain accuracy recovery v13** (NNFT-235) — Five pipeline fixes for entity/geography confusion: (1) same-domain geo override ignores confidence threshold for hardcoded hints, (2) hardcoded person-name hints override location predictions, (3) 20+ entity-name header hints (company, venue, station, etc.), (4) bare "address" → full_address, (5) hardcoded hints apply at <0.5 confidence. Profile: 135/146→143/146 (97.9%). 3 remaining: bare "name" ambiguity.
 - **Format Coverage expansion** (NNFT-222–226) — 53 new type definitions (163→216 types, 33% increase). 40 datetime + 13 finance formats including CJK dates, Apache CLF, ISO 8601 milliseconds, Indian lakh/crore, Swiss apostrophe, accounting notation. CharCNN-v12 retrained on 212k samples (1000/type). Pipeline fix: header-hint location override (Step 7b-pre) for Sense misrouting. Profile: 111/116 (95.7% label). Actionability: 96.2%.
@@ -54,7 +55,8 @@ finetype/
   crates/
     finetype-core/     # Taxonomy, generators, validation, tokenizer
     finetype-model/    # CharCNN, tiered classifier, column disambiguation, training
-    finetype-cli/      # CLI binary (infer, profile, generate, check, train)
+    finetype-cli/      # CLI binary (infer, profile, generate, check, train, mcp)
+    finetype-mcp/      # MCP server (rmcp v1.1.0, 6 tools, taxonomy resources)
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
     finetype-eval/     # Evaluation binaries (report, actionability, GitTables, SOTAB)
     finetype-candle-spike/  # ML training feasibility spike (Candle 0.8)
@@ -74,7 +76,8 @@ finetype-core  (no internal deps — taxonomy, generators, validation)
     |
 finetype-model (depends on core — CharCNN, tiered inference, column mode)
     |
-    +--- finetype-cli   (depends on core + model — CLI binary)
+    +--- finetype-cli   (depends on core + model + mcp — CLI binary)
+    +--- finetype-mcp   (depends on core + model — MCP server library)
     +--- finetype-duckdb (depends on core + model — DuckDB extension)
 
 finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arrow)
@@ -139,6 +142,25 @@ Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB t
 
 Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 
+### MCP server
+
+`finetype mcp` starts an MCP server over stdio transport (rmcp v1.1.0). AI agents launch it as a subprocess.
+
+**Tools (6):**
+
+| Tool | Purpose |
+|---|---|
+| `infer` | Classify values (single or column mode with header) |
+| `profile` | Profile all columns in CSV file (path or inline data) |
+| `ddl` | Generate CREATE TABLE DDL from file profiling |
+| `taxonomy` | Search/filter type taxonomy by domain/category/query |
+| `schema` | Export JSON Schema contract for type(s), supports globs |
+| `generate` | Generate synthetic sample data for a type |
+
+**Resources:** `finetype://taxonomy`, `finetype://taxonomy/{domain}`, `finetype://taxonomy/{d}.{c}.{t}`
+
+All tools return JSON primary content + markdown summary. File tools accept `path` or inline `data`.
+
 ### CLI commands
 
 | Command | Purpose |
@@ -151,6 +173,7 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 | `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
 | `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns, `x-finetype-*` DDL fields) |
 | `finetype schema-for <file>` | Profile → CREATE TABLE DDL (`--table-name`, `-o json\|arrow`) |
+| `finetype mcp` | Start MCP server over stdio (6 tools: profile, infer, ddl, taxonomy, schema, generate) |
 
 ### Evaluation infrastructure
 
@@ -204,6 +227,7 @@ Key decisions — do not revisit without good reason. See backlog decisions and 
 18. **Sense Architecture A** — Cross-attention over Model2Vec beats transformer encoder: +1.6pp accuracy, 23.7x faster, simpler Candle port. (NNFT-163, decision-005)
 19. **Sense integration: flat CharCNN + output masking** — Use existing flat model with Sense-guided category masking, not per-category retraining. Sample 100/encode 50. Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). (NNFT-164, decision-006)
 20. **Pure Rust via Candle (Path A)** — Full Rust migration replacing all Python. Candle 0.8 with `half = "2.4"` pin. Validated: architecture, gradients, optimizer, safetensors round-trip. (NNFT-182/187)
+21. **MCP server via rmcp** — Official Rust MCP SDK v1.1.0, stdio transport, single binary (`finetype mcp` subcommand). 6 tools + taxonomy resources. JSON + markdown dual output. (NNFT-240/241)
 
 ## Build & Test
 
@@ -238,6 +262,10 @@ make eval-report        # Profile eval + actionability + dashboard
 | Model2Vec artifacts | `models/model2vec/` |
 | Entity classifier model | `models/entity-classifier/` |
 | DuckDB type mappings | `crates/finetype-duckdb/src/type_mapping.rs` |
+| MCP server | `crates/finetype-mcp/src/lib.rs` |
+| MCP tool handlers | `crates/finetype-mcp/src/tools/*.rs` (6 tools) |
+| MCP taxonomy resources | `crates/finetype-mcp/src/resources.rs` |
+| MCP spike report | `discovery/mcp-server/SPIKE.md` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |
 | CI workflow | `.github/workflows/ci.yml` |
 | Eval config | `eval/config.env` |
@@ -265,3 +293,50 @@ make eval-report        # Profile eval + actionability + dashboard
 ## Backlog Discipline
 
 **Every bug fix, feature, and release MUST have a corresponding backlog task.** Create retroactively with status `Done` if already complete.
+
+<!-- ooo:START -->
+<!-- ooo:VERSION:0.14.0 -->
+# Ouroboros — Specification-First AI Development
+
+> Before telling AI what to build, define what should be built.
+> As Socrates asked 2,500 years ago — "What do you truly know?"
+> Ouroboros turns that question into an evolutionary AI workflow engine.
+
+Most AI coding fails at the input, not the output. Ouroboros fixes this by
+**exposing hidden assumptions before any code is written**.
+
+1. **Socratic Clarity** — Question until ambiguity ≤ 0.2
+2. **Ontological Precision** — Solve the root problem, not symptoms
+3. **Evolutionary Loops** — Each evaluation cycle feeds back into better specs
+
+```
+Interview → Seed → Execute → Evaluate
+    ↑                           ↓
+    └─── Evolutionary Loop ─────┘
+```
+
+## ooo Commands
+
+Each command loads its agent/MCP on-demand. Details in each skill file.
+
+| Command | Loads |
+|---------|-------|
+| `ooo` | — |
+| `ooo interview` | `ouroboros:socratic-interviewer` |
+| `ooo seed` | `ouroboros:seed-architect` |
+| `ooo run` | MCP required |
+| `ooo evolve` | MCP: `evolve_step` |
+| `ooo evaluate` | `ouroboros:evaluator` |
+| `ooo unstuck` | `ouroboros:{persona}` |
+| `ooo status` | MCP: `session_status` |
+| `ooo setup` | — |
+| `ooo help` | — |
+
+## Agents
+
+Loaded on-demand — not preloaded.
+
+**Core**: socratic-interviewer, ontologist, seed-architect, evaluator,
+wonder, reflect, advocate, contrarian, judge
+**Support**: hacker, simplifier, researcher, architect
+<!-- ooo:END -->
