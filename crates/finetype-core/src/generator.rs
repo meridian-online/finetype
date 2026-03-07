@@ -2826,6 +2826,67 @@ impl Generator {
                     .collect();
                 Ok(seq)
             }
+            ("scientific", "cas_number") => {
+                // CAS: 2-7 digits, hyphen, 2 digits, hyphen, 1 check digit
+                let part1_len = self.rng.gen_range(2..=7);
+                let part1: String = (0..part1_len)
+                    .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                    .collect();
+                let part2: String = (0..2)
+                    .map(|_| (b'0' + self.rng.gen_range(0..10)) as char)
+                    .collect();
+                let all_digits: Vec<u32> = format!("{}{}", part1, part2)
+                    .bytes()
+                    .map(|b| (b - b'0') as u32)
+                    .collect();
+                let check: u32 = all_digits
+                    .iter()
+                    .rev()
+                    .enumerate()
+                    .map(|(i, &d)| d * (i as u32 + 1))
+                    .sum();
+                Ok(format!("{}-{}-{}", part1, part2, check % 10))
+            }
+            ("scientific", "inchi") => {
+                let molecules = [
+                    "InChI=1S/H2O/h1H2",
+                    "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+                    "InChI=1S/CH4/h1H4",
+                    "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H",
+                    "InChI=1S/CO2/c2-1-3",
+                    "InChI=1S/NaCl/c1-2",
+                    "InChI=1S/C2H4O2/c1-2(3)4/h1H3,(H,3,4)",
+                    "InChI=1S/C6H12O6/c7-1-2-3(8)4(9)5(10)6(11)12-2/h2-11H,1H2",
+                    "InChI=1S/C3H8O/c1-2-3-4/h4H,2-3H2,1H3",
+                    "InChI=1S/NH3/h1H3",
+                    "InChI=1S/C8H10N4O2/c1-10-4-9-6-5(10)7(13)12(2)8(14)11(6)3",
+                    "InChI=1S/C9H8O4/c1-6(10)13-8-5-3-2-4-7(8)9(11)12/h2-5H,1H3,(H,11,12)",
+                ];
+                Ok(molecules[self.rng.gen_range(0..molecules.len())].to_string())
+            }
+            ("scientific", "smiles") => {
+                let molecules = [
+                    "O",
+                    "CCO",
+                    "CC",
+                    "c1ccccc1",
+                    "CC(=O)O",
+                    "CC(=O)Oc1ccccc1C(=O)O",
+                    "C(=O)(N)N",
+                    "OC(=O)C(O)C(O)C(O)C(O)CO",
+                    "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+                    "C1CCCCC1",
+                    "CC(=O)NC1=CC=C(C=C1)O",
+                    "C(C(=O)O)N",
+                    "c1cc(ccc1O)O",
+                    "CCCCCCCCCCCCCCCC(=O)O",
+                    "CC(O)=O",
+                    "N#N",
+                    "O=C=O",
+                    "[Na+].[Cl-]",
+                ];
+                Ok(molecules[self.rng.gen_range(0..molecules.len())].to_string())
+            }
             ("scientific", "measurement_unit") => {
                 let units = [
                     "meter", "kilogram", "second", "ampere", "kelvin", "mole", "candela", "hertz",

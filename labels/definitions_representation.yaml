@@ -388,6 +388,42 @@ representation.format.color_rgb:
     v1 migration: Was text.rgb_color. Format flexible to handle
     "rgb(...)", "(r,g,b)", or "r,g,b" variants.
 
+representation.format.color_hsl:
+  title: "Color (HSL)"
+  description: >
+    Color in HSL (Hue, Saturation, Lightness) or HSLA (with alpha) CSS notation.
+    Hue is 0-360 degrees, saturation and lightness are percentages (0-100%),
+    optional alpha is 0-1 decimal. CSS3/CSS4 standard colour representation.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    hue: "CAST(REGEXP_EXTRACT({col}, 'hsla?\\(\\s*(\\d+)') AS SMALLINT)"
+    saturation: "CAST(REGEXP_EXTRACT({col}, ',\\s*(\\d+)%') AS SMALLINT)"
+    lightness: "CAST(REGEXP_EXTRACT({col}, ',\\s*\\d+%\\s*,\\s*(\\d+)%|%\\s*,\\s*(\\d+)%') AS SMALLINT)"
+  validation:
+    type: string
+    pattern: "^hsla?\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}%\\s*,\\s*\\d{1,3}%\\s*(,\\s*[\\d.]+\\s*)?\\)$"
+  tier: [VARCHAR, text]
+  release_priority: 3
+  aliases: [hsl_color, hsla_color]
+  samples:
+    - "hsl(120, 100%, 50%)"
+    - "hsl(240, 100%, 50%)"
+    - "hsl(0, 100%, 50%)"
+    - "hsla(240, 100%, 50%, 0.5)"
+    - "hsl(60, 75%, 60%)"
+    - "hsla(300, 50%, 50%, 0.8)"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). HSL completes the CSS colour
+    representation family alongside hex and RGB. HSL is arguably more intuitive
+    for designers (hue = colour wheel position, saturation = intensity,
+    lightness = brightness). HSLA adds an alpha transparency channel.
+
 representation.text.emoji:
   title: "Emoji"
   description: >
@@ -790,6 +826,115 @@ representation.scientific.measurement_unit:
     v1 migration: Was science.measure_unit marked broad_words.
     SI base units and common derived units. Supports both symbols
     and full names.
+
+representation.scientific.cas_number:
+  title: "CAS Registry Number"
+  description: >
+    Chemical Abstracts Service registry number. Unique numeric identifier for
+    chemical substances. Format: 2-7 digits, hyphen, 2 digits, hyphen, 1 check
+    digit. The check digit is the weighted sum of all preceding digits mod 10,
+    where the rightmost digit before the check has weight 1, next has weight 2, etc.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    part1: "REGEXP_EXTRACT({col}, '^(\\d+)-')"
+    part2: "REGEXP_EXTRACT({col}, '-(\\d{2})-')"
+    check_digit: "REGEXP_EXTRACT({col}, '-(\\d)$')"
+  validation:
+    type: string
+    pattern: "^\\d{2,7}-\\d{2}-\\d$"
+  tier: [VARCHAR, scientific]
+  release_priority: 3
+  aliases: [cas_rn, cas_id, chemical_id]
+  samples:
+    - "7732-18-5"
+    - "64-17-5"
+    - "50-78-2"
+    - "7647-14-5"
+    - "67-56-1"
+    - "71-43-2"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). CAS numbers are the global standard
+    for chemical substance identification. Over 200 million substances registered.
+    Check digit algorithm: number all digits right-to-left (excluding check),
+    multiply each by its position, sum, mod 10. Water=7732-18-5, Ethanol=64-17-5.
+
+representation.scientific.inchi:
+  title: "InChI Identifier"
+  description: >
+    IUPAC International Chemical Identifier. Machine-readable string that
+    encodes molecular structure. Always starts with "InChI=1S/" (standard)
+    or "InChI=1/" (non-standard). Layers encode formula, connections,
+    hydrogen, charge, stereochemistry.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    version: "REGEXP_EXTRACT({col}, 'InChI=(1S?)')"
+    formula: "REGEXP_EXTRACT({col}, 'InChI=1S?/([^/]+)')"
+  validation:
+    type: string
+    pattern: "^InChI=1S?/.+$"
+  tier: [VARCHAR, scientific]
+  release_priority: 3
+  aliases: [international_chemical_identifier]
+  samples:
+    - "InChI=1S/H2O/h1H2"
+    - "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
+    - "InChI=1S/CH4/h1H4"
+    - "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H"
+    - "InChI=1S/CO2/c2-1-3"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). InChI is the IUPAC standard for
+    machine-readable chemical identifiers. The "1S" prefix means standard InChI
+    version 1. The formula layer (first after version) gives the molecular formula.
+    Widely used in cheminformatics databases (PubChem, ChEBI, ChemSpider).
+
+representation.scientific.smiles:
+  title: "SMILES Notation"
+  description: >
+    Simplified Molecular-Input Line-Entry System. Compact linear notation for
+    describing chemical structures using ASCII characters. Atoms represented by
+    element symbols, bonds by special characters. Widely used in cheminformatics
+    and drug discovery databases.
+  designation: broad_characters
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Za-z0-9@+\\-\\[\\]\\(\\)\\\\/#=%.:]+$"
+    minLength: 1
+    maxLength: 1000
+  tier: [VARCHAR, scientific]
+  release_priority: 3
+  aliases: [smiles_string, molecular_notation]
+  samples:
+    - "O"
+    - "CCO"
+    - "CC(=O)Oc1ccccc1C(=O)O"
+    - "c1ccccc1"
+    - "CC(=O)O"
+    - "C(=O)(N)N"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). SMILES is extremely common in
+    chemical and pharmaceutical datasets. The broad_characters designation
+    reflects that single values like "O" or "CC" are indistinguishable from
+    plain text — column-level disambiguation (header hints) is essential.
+    Common molecules: O=water, CCO=ethanol, c1ccccc1=benzene, CC(=O)O=acetic acid.
 
 representation.scientific.metric_prefix:
   title: "Metric Prefix"

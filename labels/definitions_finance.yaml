@@ -449,6 +449,42 @@ finance.securities.sedol:
     with weights [1, 3, 1, 7, 3, 9] applied to the first 6 characters
     (digits 0-9 have face value, letters B=11, C=12, ..., Z=35, skipping vowels).
 
+finance.securities.figi:
+  title: "FIGI"
+  description: >
+    Financial Instrument Global Identifier. 12-character alphanumeric code
+    assigned by Bloomberg and the Object Management Group. Format: 2 consonants
+    (no vowels) + 'G' + 8 alphanumeric characters (no vowels) + 1 check digit.
+    Used globally for securities identification in trading and clearing systems.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "UPPER(CAST({col} AS VARCHAR))"
+  transform_ext: null
+  decompose:
+    prefix: "SUBSTRING({col}, 1, 2)"
+    body: "SUBSTRING({col}, 4, 8)"
+    check_digit: "SUBSTRING({col}, 12, 1)"
+  validation:
+    type: string
+    pattern: "^[BCDFGHJKLMNPQRSTVWXYZ]{2}G[BCDFGHJKLMNPQRSTVWXYZ0-9]{8}\\d$"
+  tier: [VARCHAR, payment]
+  release_priority: 3
+  aliases: [bloomberg_id, open_figi]
+  samples:
+    - "BBG000BLNQ16"
+    - "BBG000B9XRY4"
+    - "BBG000BVPV84"
+    - "BBG000BPH459"
+    - "BBG000GZQ728"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). FIGI is the open standard for
+    financial instrument identification, replacing proprietary Bloomberg tickers
+    for many use cases. The 'G' in position 3 is always present. No vowels
+    allowed in consonant positions (prevents forming words, like SEDOL).
+
 finance.securities.lei:
   title: "LEI"
   description: >
@@ -481,6 +517,82 @@ finance.securities.lei:
     New in v2. LEI was introduced after the 2008 financial crisis for entity
     identification in financial transactions. Check digits use ISO 7064 Mod 97-10:
     convert letters to numbers (A=10..Z=35), compute mod 97, check digits = 98 - remainder.
+
+finance.banking.aba_routing:
+  title: "ABA Routing Number"
+  description: >
+    US ABA (American Bankers Association) routing transit number. 9-digit
+    identifier for financial institutions in the US Federal Reserve system.
+    First two digits are a valid Federal Reserve prefix (01-12, 21-32, 61-72, 80).
+    The 9th digit is a weighted checksum (weights 3,7,1 repeating, sum mod 10 = 0).
+  designation: locale_specific
+  locales: [EN_US]
+  pii: true
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    federal_reserve_district: "SUBSTRING({col}, 1, 2)"
+    institution_id: "SUBSTRING({col}, 3, 4)"
+    check_digit: "SUBSTRING({col}, 9, 1)"
+  validation:
+    type: string
+    pattern: "^(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\\d{7}$"
+  tier: [VARCHAR, banking]
+  release_priority: 3
+  aliases: [routing_number, routing_transit_number, aba_number]
+  samples:
+    - "021000021"
+    - "111000025"
+    - "021200025"
+    - "071000013"
+    - "011401533"
+    - "121000358"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). ABA routing numbers identify US
+    financial institutions for ACH and wire transfers. The first two digits
+    indicate the Federal Reserve district. Check digit: sum of
+    (3*d1 + 7*d2 + 1*d3 + 3*d4 + 7*d5 + 1*d6 + 3*d7 + 7*d8 + 1*d9) mod 10 = 0.
+
+finance.banking.bsb:
+  title: "BSB Number"
+  description: >
+    Australian Bank-State-Branch number. 6-digit identifier formatted as
+    ###-### that identifies a bank branch in the Australian financial system.
+    First two digits identify the bank, third digit identifies the state,
+    last three digits identify the branch.
+  designation: locale_specific
+  locales: [EN_AU]
+  pii: true
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    bank_code: "SUBSTRING({col}, 1, 2)"
+    state_code: "SUBSTRING({col}, 3, 1)"
+    branch_code: "SUBSTRING({col}, 5, 3)"
+  validation:
+    type: string
+    pattern: "^\\d{3}-\\d{3}$"
+  tier: [VARCHAR, banking]
+  release_priority: 3
+  aliases: [bank_state_branch]
+  samples:
+    - "062-000"
+    - "033-001"
+    - "012-003"
+    - "082-001"
+    - "063-010"
+    - "013-252"
+  references: null
+  notes: >
+    New in taxonomy expansion (NNFT-244.04). BSB numbers are used in Australian
+    domestic payments (BECS). The hyphen in position 4 is always present.
+    Bank codes: 01=ANZ, 03=WBC, 06=CBA, 08=NAB, 01x=other. State: 2=NSW,
+    3=VIC, 4=QLD, 5=SA, 6=WA, 7=TAS.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: crypto
