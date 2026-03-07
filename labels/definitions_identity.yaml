@@ -443,6 +443,76 @@ identity.person.phone_number:
     and digits-only version. Pattern is permissive to handle various formats.
   pii: true
 
+identity.person.email_display:
+  title: "Email with Display Name"
+  description: >
+    Email address with a display name (RFC 5322 mailbox format).
+    Format: "Display Name" <local@domain> or Display Name <local@domain>.
+    Commonly used in email headers and contact lists.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    display_name: "REGEXP_EXTRACT({col}, '^\"?([^\"<>]+?)\"?\\s*<')"
+    email: "REGEXP_EXTRACT({col}, '<([^>]+)>')"
+  validation:
+    type: string
+    pattern: "^\"?[^\"<>]+\"?\\s*<[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}>$"
+    minLength: 10
+    maxLength: 300
+  tier: [VARCHAR, person]
+  release_priority: 3
+  aliases: [mailbox, email_with_name]
+  samples:
+    - "\"John Doe\" <john@example.com>"
+    - "Jane Smith <jane@corp.com>"
+    - "\"Alice B. Johnson\" <alice.j@company.org>"
+    - "Support Team <support@example.com>"
+  references: null
+  notes: >
+    RFC 5322 mailbox format. Display name may be quoted or unquoted.
+    Decompose extracts the display name and bare email address separately.
+  pii: true
+
+identity.person.phone_e164:
+  title: "Phone Number (E.164)"
+  description: >
+    International phone number in strict E.164 format: plus sign followed
+    by country code and subscriber number, digits only, no formatting.
+    Maximum 15 digits total.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    country_code: "REGEXP_EXTRACT({col}, '^\\+(\\d{1,3})')"
+    subscriber: "REGEXP_EXTRACT({col}, '^\\+\\d{1,3}(\\d+)$')"
+  validation:
+    type: string
+    pattern: "^\\+[1-9]\\d{6,14}$"
+    minLength: 8
+    maxLength: 16
+  tier: [VARCHAR, person]
+  release_priority: 3
+  aliases: [e164, international_phone]
+  samples:
+    - "+61412345678"
+    - "+14155552671"
+    - "+442071234567"
+    - "+33142685300"
+    - "+8613800138000"
+  references: null
+  notes: >
+    ITU-T E.164 canonical form. Distinct from phone_number which allows
+    formatting variations (spaces, hyphens, parentheses). E.164 is
+    digits-only with mandatory + prefix. Max 15 digits after +.
+  pii: true
+
 identity.person.username:
   title: "Username"
   description: >
@@ -809,6 +879,71 @@ identity.commerce.issn:
     v1 migration: Was code.issn. 8 characters including hyphens: XXXX-XXXX.
     Last character can be digit or X (for check digit 10).
 
+identity.commerce.upc:
+  title: "UPC"
+  description: >
+    Universal Product Code — 12-digit barcode identifier for retail products.
+    Distinct from EAN-13 (13 digits). Includes a Mod 10 check digit.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{12}$"
+    minLength: 12
+    maxLength: 12
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [upc_a, barcode]
+  samples:
+    - "042100005264"
+    - "883028594054"
+    - "012345678905"
+    - "614141000036"
+  references: null
+  notes: >
+    UPC-A is a 12-digit code. EAN-13 is a superset (UPC can be converted
+    to EAN-13 by prepending 0). Check digit uses same Mod 10 algorithm.
+
+identity.commerce.isrc:
+  title: "ISRC"
+  description: >
+    International Standard Recording Code — 12-character identifier for
+    sound recordings and music videos. Format: CC-XXX-YY-NNNNN where
+    CC is country code, XXX is registrant, YY is year, NNNNN is designation.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    country_code: "REGEXP_EXTRACT({col}, '^([A-Z]{2})')"
+    registrant: "REGEXP_EXTRACT({col}, '^[A-Z]{2}([A-Z0-9]{3})')"
+    year: "REGEXP_EXTRACT({col}, '^[A-Z]{2}[A-Z0-9]{3}(\\d{2})')"
+    designation: "REGEXP_EXTRACT({col}, '(\\d{5})$')"
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}[A-Z0-9]{3}\\d{7}$"
+    minLength: 12
+    maxLength: 12
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [recording_code]
+  samples:
+    - "USUAN1400011"
+    - "GBAYE7700223"
+    - "FRUM71200001"
+    - "DEAB51300001"
+  references: null
+  notes: >
+    ISO 3901 standard. Typically written without hyphens in data systems.
+    Country code follows ISO 3166-1 alpha-2.
+
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: medical
 #
@@ -908,3 +1043,365 @@ identity.medical.ndc:
     NDC formats vary by segment width. The FDA accepts multiple formats.
     Transformation preserves the string since the dash-separated format
     carries structural meaning.
+
+identity.medical.icd10:
+  title: "ICD-10 Diagnosis Code"
+  description: >
+    International Classification of Diseases, 10th Revision code used to
+    classify diagnoses and procedures. Format: letter + 2 digits + optional
+    dot + up to 4 alphanumeric characters.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-TV-Z][0-9][0-9AB](\\.[0-9A-TV-Z]{1,4})?$"
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [icd, diagnosis_code]
+  samples:
+    - "E11.9"
+    - "J18.9"
+    - "M54.5"
+    - "I10"
+    - "Z00.00"
+  references: null
+  notes: >
+    ICD-10-CM codes used in US healthcare. First character is a letter
+    (excluding U), followed by two digits, then optional decimal with
+    up to 4 additional characters for specificity.
+
+identity.medical.loinc:
+  title: "LOINC Code"
+  description: >
+    Logical Observation Identifiers Names and Codes — universal standard
+    for identifying lab observations and clinical measurements.
+    Format: 1-5 digits, hyphen, single check digit.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{1,5}-\\d$"
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [lab_code, observation_code]
+  samples:
+    - "2951-2"
+    - "718-7"
+    - "4548-4"
+    - "14749-6"
+    - "2345-7"
+  references: null
+  notes: >
+    LOINC codes maintained by the Regenstrief Institute. The check digit
+    after the hyphen is a Mod 10 Type 1 check digit.
+
+identity.medical.cpt:
+  title: "CPT Procedure Code"
+  description: >
+    Current Procedural Terminology code for medical procedures and services.
+    Format: 5 digits, or 4 digits followed by a letter suffix (F, T, or U
+    for tracking/performance/services).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{5}$|^\\d{4}[FTU]$"
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [procedure_code]
+  samples:
+    - "99213"
+    - "29580"
+    - "2029F"
+    - "0307T"
+    - "99214"
+  references: null
+  notes: >
+    CPT codes maintained by the AMA. 5-digit numeric overlap with postal
+    codes — disambiguation via header hints. Category II codes end in F,
+    Category III codes end in T.
+
+identity.medical.hcpcs:
+  title: "HCPCS Level II Code"
+  description: >
+    Healthcare Common Procedure Coding System Level II code for
+    non-physician services, supplies, and equipment. Format: letter
+    (A-V) followed by 4 digits.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-V]\\d{4}$"
+  tier: [VARCHAR, medical]
+  release_priority: 3
+  aliases: [hcpcs_code]
+  samples:
+    - "J1234"
+    - "E0114"
+    - "A4253"
+    - "L3000"
+    - "G0008"
+  references: null
+  notes: >
+    HCPCS Level II maintained by CMS. Letter prefix indicates category
+    (A=transportation/supplies, E=DME, J=drugs, L=orthotics, etc.).
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: government
+#
+# Government-issued identifiers for taxation, vehicles, and business.
+# ═════════════════════════════════════════════════════════════════════
+
+identity.government.vin:
+  title: "Vehicle Identification Number"
+  description: >
+    17-character alphanumeric code uniquely identifying motor vehicles.
+    Uses characters A-H, J-N, P, R-Z, 0-9 (excludes I, O, Q to avoid
+    confusion with 1, 0). Encodes manufacturer, vehicle attributes,
+    and serial number.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-HJ-NPR-Z0-9]{17}$"
+    minLength: 17
+    maxLength: 17
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [vehicle_id]
+  samples:
+    - "1HGBH41JXMN109186"
+    - "WVWZZZ3CZWE123456"
+    - "JM1BK343551234567"
+    - "5YJSA1DN5DFP12345"
+  references: null
+  notes: >
+    ISO 3779 standard. Position 9 is a check digit (North America).
+    Excludes I, O, Q to prevent misreading. 17 characters since 1981.
+
+identity.government.eu_vat:
+  title: "EU VAT Number"
+  description: >
+    European Union Value Added Tax identification number. Format: 2-letter
+    country code prefix followed by 2-12 alphanumeric characters. Each
+    EU member state has its own format rules.
+  designation: locale_specific
+  locales: [DE, FR, ES, IT, NL, PL, AT, BE, IE, SE, DK, FI, CZ, HU, RO, GR, PT]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    country_code: "REGEXP_EXTRACT({col}, '^([A-Z]{2})')"
+    local_number: "REGEXP_EXTRACT({col}, '^[A-Z]{2}(.+)$')"
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}[0-9A-Za-z+*.]{2,12}$"
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [vat_number, vat_id]
+  samples:
+    - "DE123456789"
+    - "FR12345678901"
+    - "ATU12345678"
+    - "NL123456789B01"
+    - "GB123456789"
+  references: null
+  notes: >
+    Each EU country has specific format rules. DE = 9 digits,
+    FR = 2 chars + 9 digits, AT = U + 8 digits, etc.
+
+identity.government.ssn:
+  title: "US Social Security Number"
+  description: >
+    9-digit identifier assigned to US citizens and residents for tax
+    and social security purposes. Format: AAA-GG-SSSS where area
+    number cannot be 000, 666, or 900-999.
+  designation: locale_specific
+  locales: [EN_US]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    area: "REGEXP_EXTRACT({col}, '^(\\d{3})')"
+    group: "REGEXP_EXTRACT({col}, '-(\\d{2})-')"
+    serial: "REGEXP_EXTRACT({col}, '(\\d{4})$')"
+  validation:
+    type: string
+    pattern: "^(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}$"
+    minLength: 11
+    maxLength: 11
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [social_security_number]
+  samples:
+    - "078-05-1120"
+    - "219-09-9999"
+    - "123-45-6789"
+    - "531-02-7834"
+  references: null
+  notes: >
+    SSA randomized assignment since 2011. Area numbers 000, 666,
+    and 900-999 are never assigned. Group 00 and serial 0000 are invalid.
+  pii: true
+
+identity.government.ein:
+  title: "US Employer Identification Number"
+  description: >
+    9-digit number assigned by the IRS to business entities for tax
+    identification. Format: XX-XXXXXXX (2 digits, hyphen, 7 digits).
+  designation: locale_specific
+  locales: [EN_US]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}-\\d{7}$"
+    minLength: 10
+    maxLength: 10
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [employer_id, tax_id]
+  samples:
+    - "12-3456789"
+    - "91-1234567"
+    - "20-5678901"
+    - "47-8901234"
+  references: null
+  notes: >
+    IRS-assigned. First two digits are the campus/service center code.
+    Required for business tax filings, hiring, and bank accounts.
+  pii: true
+
+identity.government.pan_india:
+  title: "Indian PAN"
+  description: >
+    Permanent Account Number issued by the Indian Income Tax Department.
+    10-character alphanumeric: 5 letters + 4 digits + 1 letter.
+    Fourth letter indicates holder type (P=person, C=company, etc.).
+  designation: locale_specific
+  locales: [EN_IN, HI]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z]{5}\\d{4}[A-Z]$"
+    minLength: 10
+    maxLength: 10
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [pan, pan_number]
+  samples:
+    - "ABCPD1234E"
+    - "AAACB0000C"
+    - "FNKPS1234H"
+    - "AABCR1234F"
+  references: null
+  notes: >
+    4th character indicates entity type: P (person), C (company),
+    H (HUF), A (AOP), B (BOI), G (government), J (AJP), L (local authority),
+    F (firm), T (trust). 5th character is first letter of surname/name.
+  pii: true
+
+identity.government.abn:
+  title: "Australian Business Number"
+  description: >
+    11-digit identifier for Australian businesses, issued by the
+    Australian Business Register. May appear with or without spaces.
+  designation: locale_specific
+  locales: [EN_AU]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{2}\\s?\\d{3}\\s?\\d{3}\\s?\\d{3}$"
+    minLength: 11
+    maxLength: 14
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [australian_business_number]
+  samples:
+    - "51 824 753 556"
+    - "53004085616"
+    - "12 345 678 901"
+    - "98 765 432 109"
+  references: null
+  notes: >
+    ABN includes a check digit algorithm based on modulus 89.
+    The first two digits are derived from the check digit calculation.
+  pii: true
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: academic
+#
+# Academic and research identifiers.
+# Previously removed types (degree, university) were collapsed into
+# representation.discrete.categorical and representation.text.entity_name.
+# ORCID is a structured identifier with a distinct format.
+# ═════════════════════════════════════════════════════════════════════
+
+identity.academic.orcid:
+  title: "ORCID"
+  description: >
+    Open Researcher and Contributor ID — persistent digital identifier for
+    researchers. Format: four groups of 4 digits separated by hyphens.
+    Last character may be X (check digit representing 10).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$"
+    minLength: 19
+    maxLength: 19
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [researcher_id]
+  samples:
+    - "0000-0002-1825-0097"
+    - "0000-0002-9079-593X"
+    - "0000-0001-5000-0007"
+    - "0000-0003-1234-5678"
+  references: null
+  notes: >
+    ORCID uses ISO 27729 (ISNI) format. Check digit calculated
+    using ISO/IEC 7064:2003 MOD 11-2. X represents check digit 10.

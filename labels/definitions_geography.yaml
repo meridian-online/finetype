@@ -698,6 +698,106 @@ geography.address.postal_code:
     FR (5 digits), etc.
 
 # ═════════════════════════════════════════════════════════════════════
+# CATEGORY: format
+#
+# Geospatial serialisation formats (WKT, GeoJSON).
+# ═════════════════════════════════════════════════════════════════════
+
+geography.format.wkt:
+  title: "Well-Known Text Geometry"
+  description: >
+    OGC Well-Known Text (WKT) representation of geometry objects.
+    Strings begin with a geometry type keyword (POINT, LINESTRING, POLYGON,
+    MULTIPOINT, MULTILINESTRING, MULTIPOLYGON, GEOMETRYCOLLECTION) optionally
+    followed by Z/M/ZM dimension suffix.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "ST_GeomFromText({col})"
+  decompose: null
+  validation:
+    type: string
+    pattern: "^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\\s*(Z|M|ZM)?\\s*(\\(|EMPTY)"
+  tier: [VARCHAR, format]
+  release_priority: 3
+  aliases: [well_known_text]
+  samples:
+    - "POINT (30 10)"
+    - "LINESTRING (30 10, 10 30, 40 40)"
+    - "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))"
+    - "MULTIPOINT ((10 40), (40 30), (20 20), (30 10))"
+    - "POINT EMPTY"
+  references: null
+  notes: >
+    OGC Simple Features standard (ISO 19125). DuckDB spatial extension
+    provides ST_GeomFromText for parsing.
+
+geography.format.geojson:
+  title: "GeoJSON Geometry"
+  description: >
+    RFC 7946 GeoJSON object. Valid JSON containing a "type" key whose value
+    is one of: Point, LineString, Polygon, MultiPoint, MultiLineString,
+    MultiPolygon, GeometryCollection, Feature, FeatureCollection.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "ST_GeomFromGeoJSON({col})"
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\{\\s*\"type\"\\s*:\\s*\"(Point|LineString|Polygon|MultiPoint|MultiLineString|MultiPolygon|GeometryCollection|Feature|FeatureCollection)\""
+  tier: [VARCHAR, format]
+  release_priority: 3
+  aliases: null
+  samples:
+    - '{"type": "Point", "coordinates": [125.6, 10.1]}'
+    - '{"type": "LineString", "coordinates": [[102.0, 0.0], [103.0, 1.0]]}'
+    - '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
+    - '{"type": "Feature", "geometry": {"type": "Point", "coordinates": [102.0, 0.5]}, "properties": {"name": "example"}}'
+  references: null
+  notes: >
+    RFC 7946. DuckDB spatial extension provides ST_GeomFromGeoJSON for parsing.
+
+# ═════════════════════════════════════════════════════════════════════
+# CATEGORY: index
+#
+# Spatial indexing systems (H3, S2, etc.).
+# ═════════════════════════════════════════════════════════════════════
+
+geography.index.h3:
+  title: "H3 Hex Index"
+  description: >
+    Uber H3 hierarchical hexagonal spatial index. A 15-character lowercase
+    hexadecimal string encoding resolution (0-15) and cell position.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: "h3_cell_to_lat(h3_string_to_h3({col}))"
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9a-f]{15}$"
+  tier: [VARCHAR, index]
+  release_priority: 3
+  aliases: [h3_index, h3_cell]
+  samples:
+    - "8928308280fffff"
+    - "891f1d4c6c7ffff"
+    - "8a2a1072b59ffff"
+    - "872830828ffffff"
+    - "8e28308280f0e4f"
+  references: null
+  notes: >
+    Uber H3 geospatial indexing system. Resolution 0 (coarsest) to 15 (finest).
+    DuckDB h3 extension provides conversion functions.
+
+# ═════════════════════════════════════════════════════════════════════
 # CATEGORY: coordinate
 #
 # Geographic coordinates (latitude, longitude) and precise location data.
@@ -797,6 +897,130 @@ geography.coordinate.coordinates:
     POINT type (DuckDB spatial). Decompose extracts lat and lon separately.
     Format: "lat,lon" or "lat lon".
 
+geography.coordinate.geohash:
+  title: "Geohash"
+  description: >
+    Base-32 encoded geographic area. 4-12 characters using the Geohash
+    alphabet (0-9, b-h, j, k, m, n, p-z — excludes a, i, l, o).
+    Longer strings represent smaller, more precise areas.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[0-9b-hjkmnp-z]{4,12}$"
+  tier: [VARCHAR, coordinate]
+  release_priority: 3
+  aliases: null
+  samples:
+    - "9q8yyk8yuv"
+    - "u4pruydqqvj"
+    - "dr5ru7c02wnm"
+    - "gbsuv7ztq"
+    - "ezs42"
+  references: null
+  notes: >
+    Invented by Gustavo Niemeyer. Public-domain algorithm. Each additional
+    character divides the cell into 32 sub-cells.
+
+geography.coordinate.plus_code:
+  title: "Plus Code (Open Location Code)"
+  description: >
+    Google Open Location Code. 8 characters from the OLC alphabet followed
+    by '+' and 2 or more refining characters. Encodes latitude/longitude
+    into a short, human-readable string.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[23456789CFGHJMPQRVWX]{8}\\+[23456789CFGHJMPQRVWX]{2,}$"
+  tier: [VARCHAR, coordinate]
+  release_priority: 3
+  aliases: [open_location_code]
+  samples:
+    - "849VCWC8+R9"
+    - "87G8Q2PQ+QV"
+    - "8FVC9G8F+6W"
+    - "9F4MGC94+MC"
+    - "7FG49W00+2V"
+  references: null
+  notes: >
+    Google Open Location Code (github.com/google/open-location-code).
+    Apache 2.0 licensed. 20-character alphabet: 23456789CFGHJMPQRVWX.
+
+geography.coordinate.dms:
+  title: "Degrees Minutes Seconds"
+  description: >
+    Geographic coordinates in degrees, minutes, and seconds with cardinal
+    direction indicators. Format: D°M'S"N D°M'S"W (latitude then longitude).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    latitude_deg: "CAST(REGEXP_EXTRACT({col}, '^(\\d+)°') AS INTEGER)"
+    latitude_min: "CAST(REGEXP_EXTRACT({col}, '°(\\d+)''') AS INTEGER)"
+    longitude_deg: "CAST(REGEXP_EXTRACT({col}, '\\s+(\\d+)°') AS INTEGER)"
+  validation:
+    type: string
+    pattern: "^\\d{1,3}°\\d{1,2}'\\d{1,2}(\\.\\d+)?\"[NS]\\s+\\d{1,3}°\\d{1,2}'\\d{1,2}(\\.\\d+)?\"[EW]$"
+  tier: [VARCHAR, coordinate]
+  release_priority: 3
+  aliases: [degrees_minutes_seconds]
+  samples:
+    - "40°26'46\"N 79°58'56\"W"
+    - "51°30'26\"N 0°07'39\"W"
+    - "35°41'22\"N 139°41'30\"E"
+    - "33°51'54\"S 151°12'36\"E"
+    - "48°51'24\"N 2°21'07\"E"
+  references: null
+  notes: >
+    Traditional geographic coordinate notation. Latitude (N/S) followed by
+    longitude (E/W). Each component has degrees, arc-minutes, arc-seconds.
+
+geography.coordinate.mgrs:
+  title: "Military Grid Reference System"
+  description: >
+    NATO Military Grid Reference System coordinate. Composed of grid zone
+    designator (1-2 digit zone number + latitude band letter C-X excluding
+    I and O), 100km grid square (2 letters), and easting/northing digits
+    (2-10 digits, equal halves).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{1,2}[C-X][A-HJ-NP-Z]{2}\\d{2,10}$"
+  tier: [VARCHAR, coordinate]
+  release_priority: 3
+  aliases: null
+  samples:
+    - "18SUJ2348306479"
+    - "33UUP0490171890"
+    - "4QFJ1234567890"
+    - "54SUE8765043210"
+    - "32TQM5678901234"
+  references: null
+  notes: >
+    Based on UTM and UPS grids. Used by NATO military forces. Zone 1-60,
+    latitude band C-X (excluding I and O), grid square AA-ZZ (excluding
+    I and O), precision 1m (10 digits) to 10km (2 digits).
+
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: transportation
 #
@@ -863,6 +1087,99 @@ geography.transportation.icao_code:
     v1 migration: Was address.icao_code. Transform uppercases.
     4-letter code. Examples: KJFK (New York), KLAX (Los Angeles),
     LFPG (Paris), EGLL (London), RJTT (Tokyo).
+
+geography.transportation.iso6346:
+  title: "Shipping Container Code (ISO 6346)"
+  description: >
+    International shipping container identification code per ISO 6346.
+    Owner code (3 uppercase letters) + equipment category (U, J, or Z) +
+    serial number (6 digits) + check digit (1 digit). Total 11 characters.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z]{3}[UJZ]\\d{7}$"
+  tier: [VARCHAR, transportation]
+  release_priority: 3
+  aliases: [container_code, bic_code]
+  samples:
+    - "MSCU1234567"
+    - "HLXU3456789"
+    - "CMAU6543210"
+    - "TRIU7890123"
+    - "MSKU2345678"
+  references: null
+  notes: >
+    ISO 6346:1995 — Freight containers. U = freight container,
+    J = detachable freight container-related equipment,
+    Z = trailer/chassis. 7th digit is a check digit (mod 11).
+
+geography.transportation.hs_code:
+  title: "HS Tariff Code"
+  description: >
+    World Customs Organization Harmonized System code for classifying
+    traded products. 6 digits at HS level, up to 10 digits for national
+    sub-headings. May include dot separators between groups.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}\\.?\\d{2}(\\.?\\d{2}){0,2}$"
+  tier: [VARCHAR, transportation]
+  release_priority: 3
+  aliases: [harmonized_system, tariff_code]
+  samples:
+    - "8471.30"
+    - "6110.20.20"
+    - "0901.11.00.10"
+    - "8517.12"
+    - "3004.90.92"
+  references: null
+  notes: >
+    HS is maintained by the World Customs Organization. First 6 digits
+    are internationally standardised; additional digits are country-specific.
+
+geography.transportation.unlocode:
+  title: "UN/LOCODE"
+  description: >
+    United Nations Code for Trade and Transport Locations. 5-character code:
+    2-letter ISO 3166-1 country code followed by 3-character location code
+    (uppercase letters or digits 2-9).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "UPPER(CAST({col} AS VARCHAR))"
+  transform_ext: null
+  decompose:
+    country: "SUBSTRING({col}, 1, 2)"
+    location: "SUBSTRING({col}, 3, 3)"
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}[A-Z2-9]{3}$"
+  tier: [VARCHAR, transportation]
+  release_priority: 3
+  aliases: [un_locode]
+  samples:
+    - "USLAX"
+    - "GBLON"
+    - "DEHAM"
+    - "SGSIN"
+    - "NLRTM"
+  references: null
+  notes: >
+    UNECE Recommendation 16. Over 100,000 locations worldwide. Used in
+    shipping, trade documentation, and customs declarations.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: contact

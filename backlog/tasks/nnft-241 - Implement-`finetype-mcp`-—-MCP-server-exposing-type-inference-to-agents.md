@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-07 03:03'
-updated_date: '2026-03-07 03:26'
+updated_date: '2026-03-07 03:28'
 labels:
   - feature
   - mcp
@@ -170,7 +170,7 @@ AI agents (Claude Code, Cursor, etc.) can now use FineType for type inference wi
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
 - [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

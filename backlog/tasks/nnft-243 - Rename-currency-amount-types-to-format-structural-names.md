@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-07 03:53'
-updated_date: '2026-03-07 04:20'
+updated_date: '2026-03-07 04:21'
 labels:
   - taxonomy
   - naming
@@ -128,6 +128,6 @@ Renamed 7 currency amount types from locale/country-based names to format-struct
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

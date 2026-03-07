@@ -26,8 +26,13 @@ ENVSUBST_VARS  := '$$EXTENSION_PATH $$EVAL_OUTPUT $$SOTAB_DIR $$SOTAB_SPLIT'
 .PHONY: setup
 
 setup:
+	@if command -v rustup >/dev/null 2>&1; then \
+		rustup update stable; \
+	elif command -v brew >/dev/null 2>&1; then \
+		brew upgrade rust 2>/dev/null || true; \
+	fi
 	git config core.hooksPath .githooks
-	@echo "✓ Git hooks installed (.githooks/pre-commit)"
+	@echo "✓ Rust updated, git hooks installed (.githooks/pre-commit)"
 
 # ─── CI (run locally before pushing) ─────────
 .PHONY: ci lint fmt clippy
