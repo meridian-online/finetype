@@ -218,6 +218,7 @@ geography.address.full_address:
     v1 migration: Was address.address. Locale-specific for address format
     (US format vs European format, etc.). Decompose extracts components but
     requires more sophisticated parsing for reliability.
+  pii: true
 
 # geography.address.street_number: REMOVED in v0.5.2 (NNFT-192)
 # Indistinguishable from plain integers. Values fall to integer_number or alphanumeric_id.

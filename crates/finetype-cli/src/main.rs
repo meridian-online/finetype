@@ -1822,6 +1822,7 @@ fn definition_to_full_json(key: &str, d: &finetype_core::Definition) -> serde_js
     obj.insert("tier".into(), json!(d.tier));
     obj.insert("release_priority".into(), json!(d.release_priority));
     obj.insert("aliases".into(), json!(d.aliases));
+    obj.insert("pii".into(), json!(d.pii));
     obj.insert("notes".into(), json!(d.notes));
     obj.insert("samples".into(), json!(samples));
     obj.insert(
@@ -1978,6 +1979,12 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     // Extension: alternative format string for type variants (kept without prefix for backwards compat)
     if let Some(alt) = &def.format_string_alt {
         schema.insert("x-format-string-alt".into(), json!(alt));
+    }
+    if let Some(transform_ext) = &def.transform_ext {
+        schema.insert("x-finetype-transform-ext".into(), json!(transform_ext));
+    }
+    if def.pii == Some(true) {
+        schema.insert("x-finetype-pii".into(), json!(true));
     }
 
     serde_json::Value::Object(schema)

@@ -1184,8 +1184,9 @@ datetime.offset.utc:
 datetime.duration.iso_8601:
   title: ISO 8601 Duration
   description: >
-    Duration in ISO 8601 format (PnYnMnDTnHnMnS). Used in
-    iCalendar, XML Schema, and many APIs.
+    Duration in ISO 8601 format (PnYnMnDTnHnMnS or PnW for weeks). Used in
+    iCalendar, XML Schema, YouTube API, Google Calendar, and many APIs.
+    Covers both compact (PT30M) and verbose (P1Y2M3DT4H5M6S) forms.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: INTERVAL
@@ -1195,19 +1196,25 @@ datetime.duration.iso_8601:
   decompose: null
   validation:
     type: string
-    pattern: "^P(\\d+Y)?(\\d+M)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$"
+    pattern: "^-?P(?=\\d|T\\d)(?:(\\d+)Y)?(?:(\\d+)M)?(?:(\\d+)[DW])?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$"
   tier: [INTERVAL, duration]
   release_priority: 3
-  aliases: [duration]
+  aliases: [duration, iso_8601_verbose]
   samples:
     - "PT30M"
     - "PT1H30M"
     - "P1DT12H"
     - "P1Y6M"
+    - "P2W"
+    - "P1Y2M3DT4H5M6S"
   references:
     - title: "ISO 8601-1:2019 Durations"
       link: "https://www.iso.org/standard/70907.html"
-  notes: "v1 name: datetime.duration. Generator only produces PT{N}M — should be expanded."
+  notes: >
+    v1 name: datetime.duration. Updated in NNFT-244.05 to cover full ISO 8601
+    duration spec including weeks (PnW), negative durations (-P...), and
+    fractional seconds (PT1.5S). Alias iso_8601_verbose added — no separate
+    type needed since same regex covers both compact and verbose forms.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: component

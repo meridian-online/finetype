@@ -64,6 +64,7 @@ identity.person.full_name:
     v1 migration: Was person.full_name. Locale-specific due to name order
     conventions. Simple decompose extracts first and last words; more sophisticated
     parsing requires NLP. Includes Unicode letter support for international names.
+  pii: true
 
 identity.person.first_name:
   title: "First Name"
@@ -94,6 +95,7 @@ identity.person.first_name:
   notes: >
     v1 migration: Was person.first_name. Locale-specific for cultural naming.
     Supports Unicode letters and common separators (apostrophes, hyphens).
+  pii: true
 
 identity.person.last_name:
   title: "Last Name"
@@ -125,6 +127,7 @@ identity.person.last_name:
   notes: >
     v1 migration: Was person.last_name (and person.surname). Locale-specific.
     Supports Unicode letters and common separators.
+  pii: true
 
 identity.person.email:
   title: "Email Address"
@@ -156,6 +159,7 @@ identity.person.email:
   notes: >
     v1 migration: Was person.email. Transform lowercases for canonical form.
     Decompose extracts local and domain parts. Pattern uses simplified RFC 5322.
+  pii: true
 
 identity.person.phone_number:
   title: "Phone Number"
@@ -437,6 +441,7 @@ identity.person.phone_number:
     v1 migration: Was person.phone_number (and person.telephone).
     Locale-specific for formatting. Decompose extracts country code, area code,
     and digits-only version. Pattern is permissive to handle various formats.
+  pii: true
 
 identity.person.username:
   title: "Username"
@@ -498,6 +503,7 @@ identity.person.password:
     v1 migration: Was person.password marked broad_characters. NEVER store
     plaintext passwords. Always hash (bcrypt, Argon2) or encrypt.
     Detection is for audit purposes only.
+  pii: true
 
 identity.person.gender:
   title: "Gender"

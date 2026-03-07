@@ -74,14 +74,20 @@ pub async fn handle(
             .unwrap_or("unknown");
         let description = def.and_then(|d| d.description.as_deref()).unwrap_or("");
 
-        matches.push(json!({
+        let pii = def.and_then(|d| d.pii).unwrap_or(false);
+
+        let mut entry = json!({
             "key": label,
             "domain": domain,
             "category": category,
             "type_name": type_name,
             "broad_type": broad_type,
             "description": description,
-        }));
+        });
+        if pii {
+            entry["pii"] = json!(true);
+        }
+        matches.push(entry);
     }
 
     // Build markdown summary

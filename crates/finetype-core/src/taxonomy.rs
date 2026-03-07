@@ -151,6 +151,9 @@ pub struct Definition {
     pub references: Option<serde_yaml::Value>,
     /// Notes about the label
     pub notes: Option<String>,
+    /// Whether this type represents personally identifiable information
+    #[serde(default)]
+    pub pii: Option<bool>,
 }
 
 /// Parsed label with domain, category, and type components.

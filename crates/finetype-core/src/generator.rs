@@ -670,15 +670,57 @@ impl Generator {
 
             // ── duration (1 type) ────────────────────────────────────────
             ("duration", "iso_8601") => {
-                let h = self.rng.gen_range(0..24);
-                let m = self.rng.gen_range(0..60);
-                let s = self.rng.gen_range(0..60);
-                if h > 0 {
-                    Ok(format!("PT{}H{}M{}S", h, m, s))
-                } else if m > 0 {
-                    Ok(format!("PT{}M{}S", m, s))
-                } else {
-                    Ok(format!("PT{}S", s))
+                // Generate diverse ISO 8601 durations:
+                // time-only (PT...), date+time (P...DT...), weeks (P...W),
+                // verbose (P1Y2M3DT...), and negative durations (-P...)
+                let variant = self.rng.gen_range(0..6);
+                let neg = if self.rng.gen_bool(0.1) { "-" } else { "" };
+                match variant {
+                    0 => {
+                        // Time-only: PT{H}H{M}M{S}S
+                        let h = self.rng.gen_range(0..24);
+                        let m = self.rng.gen_range(0..60);
+                        let s = self.rng.gen_range(0..60);
+                        if h > 0 {
+                            Ok(format!("{}PT{}H{}M{}S", neg, h, m, s))
+                        } else if m > 0 {
+                            Ok(format!("{}PT{}M{}S", neg, m, s))
+                        } else {
+                            Ok(format!("{}PT{}S", neg, s))
+                        }
+                    }
+                    1 => {
+                        // Days + time: P{D}DT{H}H{M}M
+                        let d = self.rng.gen_range(1..30);
+                        let h = self.rng.gen_range(0..24);
+                        Ok(format!("{}P{}DT{}H", neg, d, h))
+                    }
+                    2 => {
+                        // Weeks: P{W}W
+                        let w = self.rng.gen_range(1..52);
+                        Ok(format!("{}P{}W", neg, w))
+                    }
+                    3 => {
+                        // Verbose: P{Y}Y{M}M{D}DT{H}H{M}M{S}S
+                        let y = self.rng.gen_range(0..5);
+                        let mo = self.rng.gen_range(0..12);
+                        let d = self.rng.gen_range(0..30);
+                        let h = self.rng.gen_range(0..24);
+                        let m = self.rng.gen_range(0..60);
+                        let s = self.rng.gen_range(0..60);
+                        Ok(format!("{}P{}Y{}M{}DT{}H{}M{}S", neg, y, mo, d, h, m, s))
+                    }
+                    4 => {
+                        // Simple minutes: PT{M}M
+                        let m = self.rng.gen_range(1..120);
+                        Ok(format!("{}PT{}M", neg, m))
+                    }
+                    _ => {
+                        // Year+month: P{Y}Y{M}M
+                        let y = self.rng.gen_range(1..10);
+                        let mo = self.rng.gen_range(0..12);
+                        Ok(format!("{}P{}Y{}M", neg, y, mo))
+                    }
                 }
             }
 
