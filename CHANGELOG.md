@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-03-07
+
+### Fixed
+
+- **Missing taxonomy definitions** — 25 types (10 geography, 15 identity) from NNFT-244 were not embedded in the v0.6.4 binary due to uncommitted YAML files. Taxonomy now correctly includes all 250 types.
+
 ## [0.6.4] - 2026-03-07
 
 ### Added
