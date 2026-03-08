@@ -151,6 +151,11 @@ enum Commands {
         /// Random seed for deterministic training reproducibility
         #[arg(long)]
         seed: Option<u64>,
+
+        /// Enable feature-augmented training (NNFT-249). Extracts deterministic
+        /// features per sample and passes them alongside character encodings.
+        #[arg(long)]
+        use_features: bool,
     },
 
     /// Show taxonomy information
@@ -490,8 +495,17 @@ fn main() -> Result<()> {
             device,
             model_type,
             seed,
+            use_features,
         } => cmd_train(
-            data, taxonomy, output, epochs, batch_size, device, model_type, seed,
+            data,
+            taxonomy,
+            output,
+            epochs,
+            batch_size,
+            device,
+            model_type,
+            seed,
+            use_features,
         ),
 
         Commands::Taxonomy {
@@ -1474,6 +1488,7 @@ fn cmd_train(
     _device: String,
     model_type: ModelType,
     seed: Option<u64>,
+    use_features: bool,
 ) -> Result<()> {
     use finetype_core::Sample;
     use std::io::BufRead;
@@ -1535,6 +1550,7 @@ fn cmd_train(
                 weight_decay: 1e-4,
                 shuffle: true,
                 seed,
+                use_features,
             };
 
             eprintln!("Training CharCNN model");

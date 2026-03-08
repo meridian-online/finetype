@@ -1,6 +1,7 @@
 //! Training utilities for character-level CNN classifier.
 
 use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab};
+use crate::features::{extract_features, FEATURE_DIM};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarBuilder, VarMap};
 use finetype_core::{Sample, Taxonomy};
@@ -33,6 +34,10 @@ pub struct CharTrainingConfig {
     /// Optional seed for deterministic training. When set, uses a seeded RNG
     /// instead of `thread_rng()` for reproducible shuffle order.
     pub seed: Option<u64>,
+    /// Enable feature-augmented training (NNFT-249). When true, deterministic
+    /// features are extracted per sample and passed to the model alongside
+    /// character encodings. The model's `feature_dim` is set to `FEATURE_DIM`.
+    pub use_features: bool,
 }
 
 impl Default for CharTrainingConfig {
@@ -48,6 +53,7 @@ impl Default for CharTrainingConfig {
             weight_decay: 1e-4,
             shuffle: true,
             seed: None,
+            use_features: false,
         }
     }
 }
@@ -105,6 +111,12 @@ impl CharTrainer {
         let varmap = VarMap::new();
         let vb = VarBuilder::from_varmap(&varmap, DType::F32, &self.device);
 
+        let feature_dim = if self.config.use_features {
+            FEATURE_DIM
+        } else {
+            0
+        };
+
         let model_config = CharCnnConfig {
             vocab_size: self.vocab.vocab_size(),
             max_seq_length: self.config.max_seq_length,
@@ -112,16 +124,17 @@ impl CharTrainer {
             num_filters: self.config.num_filters,
             hidden_dim: self.config.hidden_dim,
             n_classes,
-            feature_dim: 0, // Legacy trainer doesn't use features
+            feature_dim,
             ..Default::default()
         };
 
         let model = CharCnn::new(model_config, vb)?;
         eprintln!(
-            "Model initialized (vocab_size={}, embed_dim={}, filters={})",
+            "Model initialized (vocab_size={}, embed_dim={}, filters={}, feature_dim={})",
             self.vocab.vocab_size(),
             self.config.embed_dim,
-            self.config.num_filters
+            self.config.num_filters,
+            feature_dim
         );
 
         // Create optimizer
@@ -152,11 +165,11 @@ impl CharTrainer {
                 let end = (start + self.config.batch_size).min(samples_vec.len());
                 let batch: Vec<&Sample> = samples_vec[start..end].to_vec();
 
-                // Prepare batch
-                let (input_ids, labels) = self.prepare_batch(&batch, &label_to_index)?;
+                // Prepare batch (includes features when use_features=true)
+                let (input_ids, features, labels) = self.prepare_batch(&batch, &label_to_index)?;
 
-                // Forward pass
-                let logits = model.forward(&input_ids)?;
+                // Forward pass with optional features (NNFT-249)
+                let logits = model.forward_with_features(&input_ids, features.as_ref())?;
                 let logits = logits.contiguous()?;
 
                 // Compute loss
@@ -210,13 +223,14 @@ impl CharTrainer {
 
         // Save config for inference
         let config_str = format!(
-            "vocab_size: {}\nmax_seq_length: {}\nembed_dim: {}\nnum_filters: {}\nhidden_dim: {}\nn_classes: {}\nmodel_type: char_cnn\n",
+            "vocab_size: {}\nmax_seq_length: {}\nembed_dim: {}\nnum_filters: {}\nhidden_dim: {}\nn_classes: {}\nfeature_dim: {}\nmodel_type: char_cnn\n",
             self.vocab.vocab_size(),
             self.config.max_seq_length,
             self.config.embed_dim,
             self.config.num_filters,
             self.config.hidden_dim,
-            n_classes
+            n_classes,
+            feature_dim
         );
         std::fs::write(output_dir.join("config.yaml"), config_str)?;
 
@@ -232,20 +246,34 @@ impl CharTrainer {
     }
 
     /// Prepare a batch for training.
+    ///
+    /// Returns `(input_ids, features, labels)`. `features` is `Some` when
+    /// `use_features` is enabled, containing the feature tensor `(batch, FEATURE_DIM)`.
     fn prepare_batch(
         &self,
         samples: &[&Sample],
         label_to_index: &std::collections::HashMap<String, usize>,
-    ) -> Result<(Tensor, Tensor), CharTrainingError> {
+    ) -> Result<(Tensor, Option<Tensor>, Tensor), CharTrainingError> {
         let batch_size = samples.len();
         let max_len = self.config.max_seq_length;
 
         let mut all_ids = Vec::with_capacity(batch_size * max_len);
+        let mut all_features: Vec<f32> = if self.config.use_features {
+            Vec::with_capacity(batch_size * FEATURE_DIM)
+        } else {
+            Vec::new()
+        };
         let mut all_labels = Vec::with_capacity(batch_size);
 
         for sample in samples {
             let ids = self.vocab.encode(&sample.text, max_len);
             all_ids.extend(ids);
+
+            // Extract deterministic features when enabled (NNFT-249)
+            if self.config.use_features {
+                let feats = extract_features(&sample.text);
+                all_features.extend_from_slice(&feats);
+            }
 
             // Try exact match first, then strip locale/UNIVERSAL suffix from generated labels
             let label_idx = label_to_index
@@ -264,7 +292,13 @@ impl CharTrainer {
         let input_ids = Tensor::new(all_ids, &self.device)?.reshape((batch_size, max_len))?;
         let labels = Tensor::new(all_labels, &self.device)?;
 
-        Ok((input_ids, labels))
+        let features = if self.config.use_features {
+            Some(Tensor::new(all_features, &self.device)?.reshape((batch_size, FEATURE_DIM))?)
+        } else {
+            None
+        };
+
+        Ok((input_ids, features, labels))
     }
 
     /// Get the best available device.

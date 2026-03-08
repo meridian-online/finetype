@@ -17,6 +17,7 @@ NUM_FILTERS=""
 HIDDEN_DIM=""
 MODEL_NAME=""
 DATA_FILE=""
+USE_FEATURES=false
 
 # ─── Architecture presets (bash 3.2 compatible — no associative arrays) ──
 preset_values() {
@@ -46,6 +47,7 @@ Options:
   --hidden-dim N      Override hidden layer dimension
   --model-name NAME   Output model directory name (default: auto char-cnn-vN)
   --data FILE         Use existing NDJSON training data (skip generation)
+  --use-features      Enable feature-augmented training (32-dim deterministic features)
   --help              Show this help
 
 Architecture presets:
@@ -72,6 +74,7 @@ while [[ $# -gt 0 ]]; do
         --hidden-dim) HIDDEN_DIM="$2"; shift 2 ;;
         --model-name) MODEL_NAME="$2"; shift 2 ;;
         --data)      DATA_FILE="$2";   shift 2 ;;
+        --use-features) USE_FEATURES=true; shift ;;
         --help|-h)   usage ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -136,8 +139,10 @@ LOG_FILE="${MODEL_DIR}/train.log"
 
 # ─── Banner ─────────────────────────────────────────────────────────
 echo ""
+FEATURES_LABEL=""
+if [[ "$USE_FEATURES" == "true" ]]; then FEATURES_LABEL=" | Features: 32-dim"; fi
 echo "CharCNN Training -- ${DEVICE_NAME} (${DEVICE_DETAIL}) -- ${SIZE} (${EMBED_DIM}/${NUM_FILTERS}/${HIDDEN_DIM})"
-echo "Model: ${MODEL_NAME} | Samples: ${SAMPLES}/type | Epochs: ${EPOCHS} | Seed: ${SEED}"
+echo "Model: ${MODEL_NAME} | Samples: ${SAMPLES}/type | Epochs: ${EPOCHS} | Seed: ${SEED}${FEATURES_LABEL}"
 echo ""
 
 # ─── Step 1: Generate training data ────────────────────────────────
@@ -174,6 +179,11 @@ TRAIN_CMD=(
     --seed "$SEED"
     --device "$(echo "$DEVICE_NAME" | tr '[:upper:]' '[:lower:]')"
 )
+
+# Add --use-features flag when enabled (NNFT-249)
+if [[ "$USE_FEATURES" == "true" ]]; then
+    TRAIN_CMD+=(--use-features)
+fi
 
 TRAIN_START_TIME=$(date +%s)
 
