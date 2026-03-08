@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-03-08
+
+### Added
+
+- **Feature-augmented inference pipeline** — 32 deterministic features (parse tests, character statistics, structural patterns) extracted per value and used for post-vote disambiguation. Three rules: F1 leading-zero detection (postal_code/cpt → numeric_code), F2 slash-segment counting (hostname → docker_ref), F3 digit-ratio + dot pattern (decimal_number → hs_code). Features are computed in the Sense→Sharpen pipeline alongside CharCNN classification. (NNFT-247, NNFT-250)
+- **CharCNN feature fusion architecture** — `feature_dim` config parameter enables parallel feature vector fusion at the classifier head (fc1 input = total_filters + feature_dim). Backward compatible: `feature_dim=0` (default) preserves existing model behaviour. Training pipeline supports `--use-features` flag. (NNFT-248, NNFT-249)
+
+### Fixed
+
+- **`finetype load` CAST for generic numeric types** — Types like `decimal_number` (DOUBLE) and `integer_number` (BIGINT) were output as bare VARCHAR because `is_generic` conflated classification uncertainty with cast safety. Now broad_type flows directly from taxonomy — all non-VARCHAR types get their CAST applied. (NNFT-252)
+
+### Accuracy
+
+- **Profile eval: 95.7% label, 97.3% domain** (178/186 columns). Feature disambiguation rules resolved cpt (100%), hs_code (100%), and docker_ref (100%) confusion pairs. (NNFT-251)
+- **Actionability eval: 99.9%** — 232,321/232,541 values transformed successfully. (NNFT-251)
+
+### Discovery
+
+- **Feature-augmented retrain (NNFT-253)** — Training CharCNN with feature_dim=32 improves training accuracy +5pp (86.6% → 91.6%) but regresses profile eval -1.6pp due to city attractor from character statistic features. Recommendation: keep feature_dim=0 with post-vote rules. See `discovery/feature-retrain/FINDING.md`.
+
 ## [0.6.6] - 2026-03-08
 
 ### Added
