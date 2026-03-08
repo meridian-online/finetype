@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-07 23:56'
-updated_date: '2026-03-08 00:58'
+updated_date: '2026-03-08 01:00'
 labels:
   - eval
   - model
@@ -127,6 +127,6 @@ Ran full evaluation suite on the feature-augmented pipeline (NNFT-247–250) and
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
