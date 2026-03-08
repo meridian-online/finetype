@@ -2134,7 +2134,6 @@ fn cmd_load(
         label: String,
         duckdb_type: String,
         transform: Option<String>,
-        is_generic: bool,
     }
 
     let mut load_cols: Vec<LoadColumn> = Vec::new();
@@ -2158,7 +2157,6 @@ fn cmd_load(
                 label: "unknown".to_string(),
                 duckdb_type: "VARCHAR".to_string(),
                 transform: None,
-                is_generic: true,
             });
             continue;
         }
@@ -2181,12 +2179,10 @@ fn cmd_load(
             ("VARCHAR".to_string(), None)
         };
 
-        // Generic predictions default to VARCHAR
-        let final_type = if result.is_generic {
-            "VARCHAR".to_string()
-        } else {
-            duckdb_type
-        };
+        // Use the taxonomy broad_type directly — is_generic controls classification
+        // behaviour (header hint yielding), not cast safety. Types like decimal_number
+        // and integer_number are generic but have meaningful non-VARCHAR casts. (NNFT-252)
+        let final_type = duckdb_type;
 
         load_cols.push(LoadColumn {
             original_name,
@@ -2194,7 +2190,6 @@ fn cmd_load(
             label: result.label,
             duckdb_type: final_type,
             transform,
-            is_generic: result.is_generic,
         });
     }
 
@@ -2239,7 +2234,6 @@ fn cmd_load(
                 &c.output_name,
                 &c.duckdb_type,
                 &c.transform,
-                c.is_generic,
             )
         })
         .collect();
@@ -2286,14 +2280,16 @@ fn build_load_expr(
     output_name: &str,
     duckdb_type: &str,
     transform: &Option<String>,
-    is_generic: bool,
 ) -> String {
     let source_ref = format_column_name(original_name);
     let alias = format_column_name(output_name);
     let needs_alias = source_ref != alias;
 
-    if is_generic || duckdb_type == "VARCHAR" {
-        // Bare column reference — no redundant CAST
+    if duckdb_type == "VARCHAR" {
+        // Bare column reference — no redundant CAST for VARCHAR types.
+        // Note: is_generic is intentionally NOT checked here. Generic types like
+        // decimal_number/integer_number have non-VARCHAR broad_types (DOUBLE/BIGINT)
+        // and should still get their CAST applied. (NNFT-252)
         if needs_alias {
             format!("{} AS {}", source_ref, alias)
         } else {
@@ -4732,5 +4728,42 @@ mod tests {
         assert!(content["seed"].is_null());
         assert!(content["parent_snapshot"].is_null());
         assert_eq!(content["model_type"], "charcnn");
+    }
+
+    // NNFT-252: Load command expression tests
+    #[test]
+    fn test_build_load_expr_varchar_no_cast() {
+        // VARCHAR types should be bare column references
+        let expr = build_load_expr("name", "name", "VARCHAR", &None);
+        assert_eq!(expr, "name");
+    }
+
+    #[test]
+    fn test_build_load_expr_varchar_with_alias() {
+        let expr = build_load_expr("First Name", "first_name", "VARCHAR", &None);
+        assert_eq!(expr, "\"First Name\" AS first_name");
+    }
+
+    #[test]
+    fn test_build_load_expr_double_with_transform() {
+        // decimal_number should get CAST even though it's a generic type
+        let transform = Some("CAST({col} AS DOUBLE)".to_string());
+        let expr = build_load_expr("ticket_price", "ticket_price", "DOUBLE", &transform);
+        assert_eq!(expr, "CAST(ticket_price AS DOUBLE) AS ticket_price");
+    }
+
+    #[test]
+    fn test_build_load_expr_bigint_with_transform() {
+        // integer_number should get CAST even though it's a generic type
+        let transform = Some("CAST({col} AS BIGINT)".to_string());
+        let expr = build_load_expr("count", "count", "BIGINT", &transform);
+        assert_eq!(expr, "CAST(count AS BIGINT) AS count");
+    }
+
+    #[test]
+    fn test_build_load_expr_no_transform_non_varchar() {
+        // Non-VARCHAR without explicit transform falls back to simple CAST
+        let expr = build_load_expr("flag", "flag", "BOOLEAN", &None);
+        assert_eq!(expr, "CAST(flag AS BOOLEAN) AS flag");
     }
 }
