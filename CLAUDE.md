@@ -29,6 +29,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
+- **Feature-augmented CharCNN pipeline** (NNFT-247–251, m-12) — 32-feature deterministic extractor (parse tests, char stats, structural), parallel fusion at CharCNN classifier head (`feature_dim` config, backward compatible), Sense→Sharpen pipeline integration with per-value + aggregated column features, 3 feature-based disambiguation rules. Profile recovered: 178/186 format-detectable (95.7% label, 97.3% domain). Actionability: 99.9%.
 - **CharCNN v14 retrain for 250-type taxonomy** (NNFT-245) — Full pipeline retrain: CharCNN-v14-250 (250 classes, 10 epochs, 372k samples at 1500/type, 86.6% training accuracy), Sense retrained (87.1% broad, 78.5% entity), Model2Vec refreshed (750 embeddings × 128 dim). 5 new eval datasets covering all 43 new types (293 manifest entries). Profile: 140/189 columns (74.1% label, 81.0% domain) — expected regression from 43 new overlapping types. 3 new false positives: cpt/postal_code (5-digit overlap), hs_code/decimal_number, docker_ref/hostname. url/urn semantic proximity noted (hardcoded hint handles correctly). Default model symlink updated.
 - **Taxonomy expansion to 250 types** (NNFT-244) — Added 43 new type definitions across all domains: geography +10 (wkt, geojson, h3, geohash, plus_code, dms, mgrs, iso6346, hs_code, unlocode), technology +11 (ulid, tsid, snowflake_id, aws_arn, s3_uri, jwt, docker_ref, git_sha, cidr, urn, data_uri), identity +15 (icd10, loinc, cpt, hcpcs, vin, eu_vat, ssn, ein, pan_india, abn, orcid, email_display, phone_e164, upc, isrc), finance +3 (figi, aba_routing, bsb), representation +4 (cas_number, inchi, smiles, color_hsl). Structural: `pii: Option<bool>` field on Definition struct (11 types tagged), `x-finetype-pii`/`x-finetype-transform-ext` in schema output, duration regex expanded to full ISO 8601 spec. Dedup: bcp47→locale_code alias, iso_8601_verbose→iso_8601 alias.
 - **Taxonomy precision cleanup** (NNFT-242/243) — Removed 2 low-precision integer-range types (http_status_code, port — false positives on plain integers). Renamed 7 currency amount types from locale-based to format-structural names (amount_us→amount, amount_eu→amount_comma, amount_accounting_us→amount_accounting, amount_eu_suffix→amount_comma_suffix, amount_space_sep→amount_space, amount_indian→amount_lakh, amount_ch→amount_apostrophe). Old names preserved in aliases. 209→207 types.
@@ -47,8 +48,8 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
-- **Post-retrain accuracy recovery for v14** — 49 misclassifications on expanded eval suite (189 columns). Key patterns: new type overlaps (cpt/postal_code, hs_code/decimal_number, docker_ref/hostname), url/urn semantic proximity, plus existing "name" ambiguity. Pipeline disambiguation rules needed for new types.
-- **Remaining accuracy gaps** — 3 legacy misclassifications (all bare "name" header ambiguity): airports.name→region (expected full_name), countries.name→city (expected country), multilingual.name→region (expected full_name). Genuinely ambiguous — "name" means different things per dataset.
+- **Feature-augmented CharCNN (m-12)** — Deterministic feature extractor (32 features, 3 tiers) + parallel fusion at classifier head + Sense pipeline integration. Feature pipeline wired end-to-end (NNFT-247–250). Profile: 178/186 format-detectable (95.7% label, 97.3% domain). Actionability: 99.9%. 8 remaining format-detectable misclassifications: 3× bare "name" ambiguity, model-level confusions (height→numeric_code, git_sha→hash, postal_code→cpt, total→hs_code, hostname→docker_ref). Feature-based disambiguation rules: leading-zero pre-filter (postal_code/cpt→numeric_code), slash-segment docker detection, HS code digit pattern.
+- **Remaining accuracy gaps** — 3 legacy misclassifications (all bare "name" header ambiguity): airports.name→region (expected full_name), world_cities.name→region (expected city), multilingual.name→country (expected full_name). Genuinely ambiguous — "name" means different things per dataset.
 
 ## Architecture
 
@@ -93,10 +94,12 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
 
 **Column-level (Sense→Sharpen, default):** Vector of strings + header → single column type:
 1. Sample 100 values, encode header + first 50 with Model2Vec
+1b. **Extract deterministic features** for all sampled values (32-dim, NNFT-250). Compute aggregated column-level features (mean). Used for CharCNN augmentation and feature-based disambiguation.
 2. Sense classify → broad category (temporal/numeric/geographic/entity/format/text) + entity subtype
-3. Run flat CharCNN batch on all 100 values, remap collapsed labels
+3. Run flat CharCNN batch on all 100 values with per-value features (passed via `classify_batch_with_features`; ignored when model has `feature_dim=0`). Remap collapsed labels.
 4. **Masked vote aggregation:** filter to category-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when all votes filtered OR when Sense confidence <0.75 and masking removes >40% of votes
 5. Apply disambiguation rules (same rules, votes already scoped). Coordinate disambiguation requires competitive vote share (prevents false-positive on decimal columns)
+5b. **Feature-based disambiguation** (NNFT-250): Rule F1 (leading-zero → numeric_code for postal_code/cpt), Rule F2 (slash-segments → docker_ref), Rule F3 (digit-ratio+dots → hs_code)
 6. Entity demotion: non-person Sense subtype + full_name → entity_name (replaces Rule 18 + EntityClassifier)
 7. **Header hints** (Model2Vec semantic + hardcoded): override generic/low-confidence predictions. Geography protection for person-name hints. Measurement disambiguation for age/height/weight
 8. Post-hoc locale detection (unchanged)
@@ -181,10 +184,10 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 97.9% label (143/146), 98.6% domain (144/146) on 25 datasets.
+**Profile eval** (`eval/profile_eval.sh`) — 95.7% label (178/186), 97.3% domain (181/186) on 30 datasets (293 manifest entries, 250-type taxonomy).
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
-**Actionability eval** (`eval-actionability` binary) — 99.3% datetime format_string parse rate (226951/228512 values). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds).
+**Actionability eval** (`eval-actionability` binary) — 99.9% transform success rate (232321/232541 values, 283 columns, 120 types). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds).
 **Precision per type** — Per-predicted-type precision: 🟢≥95%, 🟡80-95%, 🔴<80%.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 
