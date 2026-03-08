@@ -229,13 +229,20 @@ impl DdlInfo {
             // Numeric types
             "DOUBLE" => "DOUBLE".to_string(),
             "BIGINT" => "BIGINT".to_string(),
+            "SMALLINT" => "SMALLINT".to_string(),
             "DECIMAL" => "DECIMAL".to_string(),
             // Date/Time types
             "DATE" => "DATE".to_string(),
             "TIMESTAMP" => "TIMESTAMP".to_string(),
+            "TIMESTAMPTZ" => "TIMESTAMP WITH TIME ZONE".to_string(),
             "TIME" => "TIME".to_string(),
+            "INTERVAL" => "INTERVAL".to_string(),
+            // Spatial
+            "POINT" => "POINT".to_string(),
             // Boolean
             "BOOLEAN" => "BOOLEAN".to_string(),
+            // Identifiers
+            "UUID" => "UUID".to_string(),
             // JSON/Composite
             "JSON" => "JSON".to_string(),
             "STRUCT" => "STRUCT".to_string(),
