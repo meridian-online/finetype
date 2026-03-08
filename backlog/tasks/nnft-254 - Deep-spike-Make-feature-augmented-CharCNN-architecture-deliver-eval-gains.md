@@ -1,11 +1,11 @@
 ---
 id: NNFT-254
 title: 'Deep spike: Make feature-augmented CharCNN architecture deliver eval gains'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-08 04:20'
-updated_date: '2026-03-08 07:38'
+updated_date: '2026-03-08 07:39'
 labels:
   - discovery
   - model
@@ -181,5 +181,5 @@ Rules-based disambiguation (feature_dim=0 + F1-F3 + expanded hints) outperforms 
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->
