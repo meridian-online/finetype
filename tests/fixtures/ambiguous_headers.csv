@@ -1,0 +1,6 @@
+id,code,value,status,date,name
+1,ABC-001,19.99,active,2024-01-15,Alice Johnson
+2,XYZ-042,24.50,inactive,2024-02-20,Bob Smith
+3,DEF-103,7.25,pending,2024-03-10,Carol White
+4,GHI-204,155.00,active,2024-04-05,David Brown
+5,JKL-305,42.75,completed,2024-05-12,Eva Martinez

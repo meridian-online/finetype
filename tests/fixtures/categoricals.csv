@@ -1,0 +1,6 @@
+active,gender_code,priority,is_verified,color
+yes,M,high,true,red
+no,F,medium,false,blue
+yes,M,low,true,green
+no,F,high,false,yellow
+yes,M,medium,true,red

@@ -249,6 +249,9 @@ make ci                 # fmt + clippy + test + check
 cargo build -p finetype_duckdb --release  # DuckDB extension
 make eval-report        # Profile eval + actionability + dashboard
 
+# Golden integration tests (profile, load, taxonomy, schema — ~2min)
+cargo test -p finetype-cli --test cli_golden -- --ignored
+
 # Training workflow scripts (Metal auto-detected on macOS)
 ./scripts/train.sh --samples 1000 --size small --epochs 5   # Quick training run
 ./scripts/train.sh --samples 5000 --size large --epochs 15  # Large model (M1 Metal)
@@ -281,6 +284,8 @@ make eval-report        # Profile eval + actionability + dashboard
 | Schema mapping | `eval/schema_mapping.yaml` |
 | Eval binaries (report, actionability, GitTables, SOTAB) | `crates/finetype-eval/src/bin/` |
 | Smoke tests | `tests/smoke.sh` |
+| Golden integration tests | `crates/finetype-cli/tests/cli_golden.rs` (13 tests, `#[ignore]`) |
+| Test fixtures | `tests/fixtures/` (CSV + JSON fixtures) |
 | Phase 2 integration design | `discovery/architectural-pivot/PHASE2_DESIGN.md` |
 | Architectural pivot | `discovery/architectural-pivot/` |
 | Sense training (Rust) | `crates/finetype-train/src/sense_train.rs`, `crates/finetype-train/src/bin/train_sense.rs` |
