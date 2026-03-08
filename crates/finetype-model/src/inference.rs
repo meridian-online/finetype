@@ -43,6 +43,20 @@ pub trait ValueClassifier: Send + Sync {
     /// Classify a batch of text values.
     fn classify_batch(&self, texts: &[String])
         -> Result<Vec<ClassificationResult>, InferenceError>;
+
+    /// Classify a batch with pre-computed feature vectors (NNFT-250).
+    ///
+    /// Default implementation ignores features and delegates to `classify_batch`.
+    /// `CharClassifier` overrides this to pass features to the model when
+    /// `feature_dim > 0`.
+    fn classify_batch_with_features(
+        &self,
+        texts: &[String],
+        _features: &[f32],
+        _feature_dim: usize,
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        self.classify_batch(texts)
+    }
 }
 
 /// Classifier for text classification inference.
@@ -507,6 +521,101 @@ impl CharClassifier {
         Ok(results)
     }
 
+    /// Whether the loaded model supports feature-augmented inference.
+    ///
+    /// Returns `true` when the model was trained with `--use-features` and has
+    /// `feature_dim > 0` in its config. When `false`, features passed to
+    /// `classify_batch_with_features` are silently ignored. (NNFT-250)
+    pub fn has_features(&self) -> bool {
+        self.model.config().feature_dim > 0
+    }
+
+    /// Classify a batch of texts with pre-computed feature vectors (NNFT-250).
+    ///
+    /// When the model has `feature_dim > 0`, the features are passed to the CharCNN
+    /// classifier head alongside the CNN output. When `feature_dim == 0` (current
+    /// default model), features are silently ignored and this is equivalent to
+    /// `classify_batch`.
+    ///
+    /// `features` must have shape `[batch_size, FEATURE_DIM]` as a flat `Vec<f32>`.
+    pub fn classify_batch_with_features(
+        &self,
+        texts: &[String],
+        features: &[f32],
+        feature_dim: usize,
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        let batch_size = texts.len();
+
+        // Encode all inputs
+        let mut all_ids = Vec::with_capacity(batch_size * self.max_seq_length);
+        for text in texts {
+            let ids = self.vocab.encode(text, self.max_seq_length);
+            all_ids.extend(ids);
+        }
+
+        // Create input tensor
+        let input_ids =
+            Tensor::new(all_ids, &self.device)?.reshape((batch_size, self.max_seq_length))?;
+
+        // Build feature tensor when model supports it
+        let probs = if self.has_features() && feature_dim > 0 && !features.is_empty() {
+            let feat_tensor =
+                Tensor::new(features.to_vec(), &self.device)?.reshape((batch_size, feature_dim))?;
+            self.model
+                .infer_with_features(&input_ids, Some(&feat_tensor))?
+        } else {
+            self.model.infer(&input_ids)?
+        };
+        let probs = probs.to_vec2::<f32>()?;
+
+        // Convert to results (same as classify_batch)
+        let mut results = Vec::with_capacity(batch_size);
+        for prob_row in probs {
+            let (max_idx, max_prob) = prob_row
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let label = self
+                .index_to_label
+                .get(&max_idx)
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let all_scores: Vec<(String, f32)> = prob_row
+                .iter()
+                .enumerate()
+                .map(|(i, &p)| {
+                    let lbl = self
+                        .index_to_label
+                        .get(&i)
+                        .cloned()
+                        .unwrap_or_else(|| format!("class_{}", i));
+                    (lbl, p)
+                })
+                .collect();
+
+            results.push(ClassificationResult {
+                label,
+                confidence: *max_prob,
+                all_scores,
+            });
+        }
+
+        // Post-process and pattern-validate (same as classify_batch)
+        for (result, text) in results.iter_mut().zip(texts.iter()) {
+            post_process(result, text);
+        }
+        if let Some(ref patterns) = self.validation_patterns {
+            for (result, text) in results.iter_mut().zip(texts.iter()) {
+                pattern_validate(result, text.trim(), patterns);
+            }
+        }
+
+        Ok(results)
+    }
+
     /// Get the best device available.
     fn get_device() -> Device {
         #[cfg(feature = "cuda")]
@@ -537,6 +646,15 @@ impl ValueClassifier for CharClassifier {
         texts: &[String],
     ) -> Result<Vec<ClassificationResult>, InferenceError> {
         self.classify_batch(texts)
+    }
+
+    fn classify_batch_with_features(
+        &self,
+        texts: &[String],
+        features: &[f32],
+        feature_dim: usize,
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        self.classify_batch_with_features(texts, features, feature_dim)
     }
 }
 

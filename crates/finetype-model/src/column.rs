@@ -11,6 +11,7 @@
 //! - Numeric types (port, increment, postal_code, integer_number)
 
 use crate::entity::EntityClassifier;
+use crate::features::{extract_features, FEATURE_DIM};
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
@@ -18,6 +19,37 @@ use crate::semantic::SemanticHintClassifier;
 use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
 use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
+
+/// Aggregated column-level features: mean of per-value feature vectors (NNFT-250).
+///
+/// Returns `[f32; FEATURE_DIM]` with the element-wise mean across all values.
+/// Used by disambiguation rules for column-level decisions (e.g., leading-zero
+/// detection across the column).
+fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> [f32; FEATURE_DIM] {
+    let mut mean = [0.0f32; FEATURE_DIM];
+    if per_value.is_empty() {
+        return mean;
+    }
+    let n = per_value.len() as f32;
+    for features in per_value {
+        for (i, &v) in features.iter().enumerate() {
+            mean[i] += v;
+        }
+    }
+    for m in &mut mean {
+        *m /= n;
+    }
+    mean
+}
+
+/// Feature index constants for disambiguation rules (NNFT-250).
+/// Must match the indices in `features::FEATURE_NAMES`.
+mod feature_idx {
+    pub const HAS_LEADING_ZERO: usize = 3;
+    pub const DIGIT_RATIO: usize = 17;
+    pub const SEGMENT_COUNT_DOT: usize = 24;
+    pub const SEGMENT_COUNT_SLASH: usize = 26;
+}
 
 /// Strip a locale suffix from a 4-level label to get the 3-level taxonomy key.
 ///
@@ -881,6 +913,16 @@ impl ColumnClassifier {
         };
         let n_samples = sample.len();
 
+        // Step 1b: Extract deterministic features for all sampled values (NNFT-250).
+        // Runs before Sense and CharCNN — features are used both for CharCNN
+        // augmentation (when model supports it) and for disambiguation rules.
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+
+        // Compute aggregated column-level features (mean across all values).
+        // Used by disambiguation rules for column-level decisions.
+        let column_features = aggregate_features(&per_value_features);
+
         // Step 2: Run Sense — encode header + first 50 values
         let sense_values: Vec<&str> = sample.iter().take(50).map(|s| s.as_str()).collect();
         let header_opt = if header.is_empty() {
@@ -890,8 +932,12 @@ impl ColumnClassifier {
         };
         let sense_result = sense.classify(m2v, header_opt, &sense_values)?;
 
-        // Step 3: Run CharCNN batch on all sampled values
-        let results = self.classifier.classify_batch(&sample)?;
+        // Step 3: Run CharCNN batch on all sampled values.
+        // Pass per-value features for augmented inference when the model supports it.
+        let flat_features: Vec<f32> = per_value_features.iter().flatten().copied().collect();
+        let results =
+            self.classifier
+                .classify_batch_with_features(&sample, &flat_features, FEATURE_DIM)?;
 
         // Step 4: Aggregate votes — collapse 4-level locale labels to 3-level.
         let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
@@ -1053,6 +1099,11 @@ impl ColumnClassifier {
                 is_generic: false,
             }
         };
+
+        // Step 6b: Feature-based disambiguation (NNFT-250).
+        // Use aggregated deterministic features to resolve known confusion pairs
+        // that the CharCNN model struggles with.
+        feature_disambiguate(&mut result, &column_features, &votes, n_samples);
 
         // Step 7: Entity handling via Sense subtype (replaces Rule 18 + EntityClassifier).
         // When Sense predicts Entity category:
@@ -1432,6 +1483,96 @@ const CODE_ATTRACTORS: &[&str] = &[
     "finance.securities.cusip",
     "technology.internet.top_level_domain",
 ];
+
+/// Feature-based disambiguation: use aggregated column features to resolve
+/// known confusion pairs that the CharCNN model cannot distinguish (NNFT-250).
+///
+/// Runs after standard disambiguation rules. Modifies `result` in place when
+/// a feature signal is strong enough to override the current prediction.
+fn feature_disambiguate(
+    result: &mut ColumnResult,
+    column_features: &[f32; FEATURE_DIM],
+    votes: &[(String, usize)],
+    n_samples: usize,
+) {
+    // Rule F1: Leading-zero pre-filter — numeric_code vs postal_code (NNFT-250).
+    //
+    // When a significant fraction of values have leading zeros (e.g., "00123",
+    // "04500") and the winner is postal_code or cpt, override to numeric_code.
+    // Postal codes in formats like US ZIP (5 digits) overlap with numeric codes
+    // (NAICS, FIPS, ISO country numeric), but leading zeros are a strong signal
+    // for code-like data that should be preserved as VARCHAR.
+    //
+    // Deliberately excludes integer_number — integers can legitimately have
+    // occasional leading zeros (e.g., zero-padded sequences) without being codes.
+    // Only postal_code and cpt predictions warrant this override since their
+    // validation patterns overlap specifically with numeric codes.
+    let leading_zero_ratio = column_features[feature_idx::HAS_LEADING_ZERO];
+    if leading_zero_ratio >= 0.3 {
+        let code_confusion_types = ["geography.address.postal_code", "identity.medical.cpt"];
+        if code_confusion_types.contains(&result.label.as_str()) {
+            let numeric_code_label = "representation.identifier.numeric_code";
+            result.label = numeric_code_label.to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "feature_leading_zero:{:.0}%",
+                leading_zero_ratio * 100.0
+            ));
+        }
+    }
+
+    // Rule F2: docker_ref vs hostname — slash segments signal container refs.
+    //
+    // Docker refs (e.g., "docker.io/library/nginx:latest") have slash-separated
+    // segments (registry/namespace/image). Hostnames (e.g., "api.example.com")
+    // use dots but rarely slashes. A high segment_count_slash is a strong signal.
+    let slash_segments = column_features[feature_idx::SEGMENT_COUNT_SLASH];
+    if result.label == "technology.internet.hostname" && slash_segments >= 1.5 {
+        // Multiple slash segments → likely docker refs
+        let docker_in_votes = votes
+            .iter()
+            .any(|(l, _)| l == "technology.container.docker_ref");
+        if docker_in_votes {
+            result.label = "technology.container.docker_ref".to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("feature_slash_segments:{:.1}", slash_segments));
+        }
+    }
+
+    // Rule F3: hs_code vs decimal_number — HS codes are pure digits with dots.
+    //
+    // HS codes (e.g., "8471.30", "6204.62.40") have high digit_ratio and
+    // dot-separated segments. decimal_number also has dots but typically lower
+    // digit_ratio (mixed with other chars in real columns) and fewer segments.
+    let digit_ratio = column_features[feature_idx::DIGIT_RATIO];
+    let dot_segments = column_features[feature_idx::SEGMENT_COUNT_DOT];
+    if result.label == "representation.numeric.decimal_number"
+        && digit_ratio >= 0.75
+        && dot_segments >= 2.0
+    {
+        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
+        if hs_in_votes {
+            let hs_votes = votes
+                .iter()
+                .find(|(l, _)| l == "geography.trade.hs_code")
+                .map(|(_, c)| *c)
+                .unwrap_or(0);
+            let hs_frac = hs_votes as f32 / n_samples as f32;
+            if hs_frac >= 0.10 {
+                result.label = "geography.trade.hs_code".to_string();
+                result.confidence = hs_frac.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "feature_hs_code:digit_ratio={:.2},dots={:.1}",
+                    digit_ratio, dot_segments
+                ));
+            }
+        }
+    }
+}
 
 /// Apply disambiguation rules when the vote distribution contains known ambiguous pairs.
 ///
