@@ -602,7 +602,7 @@ impl TieredClassifier {
             .collect();
 
         // Parse config
-        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim) =
+        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim, feature_dim) =
             parse_config_yaml(config_str);
 
         let config = CharCnnConfig {
@@ -614,6 +614,7 @@ impl TieredClassifier {
             hidden_dim,
             n_classes,
             dropout: 0.0,
+            feature_dim,
         };
 
         let vb = VarBuilder::from_buffered_safetensors(weights.to_vec(), DType::F32, device)?;
@@ -660,12 +661,13 @@ impl ValueClassifier for TieredClassifier {
 }
 
 /// Parse a config.yaml string into model hyperparameters.
-fn parse_config_yaml(config_str: &str) -> (usize, usize, usize, usize, usize) {
+fn parse_config_yaml(config_str: &str) -> (usize, usize, usize, usize, usize, usize) {
     let mut vocab_size = 97usize;
     let mut max_seq_length = 128usize;
     let mut embed_dim = 32usize;
     let mut num_filters = 64usize;
     let mut hidden_dim = 128usize;
+    let mut feature_dim = 0usize;
 
     for line in config_str.lines() {
         if let Some((key, val)) = line.split_once(':') {
@@ -677,6 +679,7 @@ fn parse_config_yaml(config_str: &str) -> (usize, usize, usize, usize, usize) {
                 "embed_dim" => embed_dim = val.parse().unwrap_or(32),
                 "num_filters" => num_filters = val.parse().unwrap_or(64),
                 "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
+                "feature_dim" => feature_dim = val.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -688,5 +691,6 @@ fn parse_config_yaml(config_str: &str) -> (usize, usize, usize, usize, usize) {
         embed_dim,
         num_filters,
         hidden_dim,
+        feature_dim,
     )
 }

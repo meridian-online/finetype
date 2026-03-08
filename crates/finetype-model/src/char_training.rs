@@ -112,6 +112,7 @@ impl CharTrainer {
             num_filters: self.config.num_filters,
             hidden_dim: self.config.hidden_dim,
             n_classes,
+            feature_dim: 0, // Legacy trainer doesn't use features
             ..Default::default()
         };
 

@@ -266,6 +266,7 @@ impl CharClassifier {
         let mut embed_dim = 32usize;
         let mut num_filters = 64usize;
         let mut hidden_dim = 128usize;
+        let mut feature_dim = 0usize;
 
         for line in config_str.lines() {
             if let Some((key, val)) = line.split_once(':') {
@@ -277,6 +278,7 @@ impl CharClassifier {
                     "embed_dim" => embed_dim = val.parse().unwrap_or(32),
                     "num_filters" => num_filters = val.parse().unwrap_or(64),
                     "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
+                    "feature_dim" => feature_dim = val.parse().unwrap_or(0),
                     _ => {}
                 }
             }
@@ -292,6 +294,7 @@ impl CharClassifier {
             hidden_dim,
             n_classes,
             dropout: 0.0,
+            feature_dim,
         };
 
         let vb = VarBuilder::from_buffered_safetensors(weights.to_vec(), DType::F32, &device)?;
@@ -336,7 +339,7 @@ impl CharClassifier {
 
         // Load config from config.yaml if available
         let config_path = model_dir.join("config.yaml");
-        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim) =
+        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim, feature_dim) =
             if config_path.exists() {
                 let config_str = std::fs::read_to_string(&config_path)?;
                 let mut vocab_size = 97usize;
@@ -344,6 +347,7 @@ impl CharClassifier {
                 let mut embed_dim = 32usize;
                 let mut num_filters = 64usize;
                 let mut hidden_dim = 128usize;
+                let mut feature_dim = 0usize;
 
                 for line in config_str.lines() {
                     if let Some((key, val)) = line.split_once(':') {
@@ -355,6 +359,7 @@ impl CharClassifier {
                             "embed_dim" => embed_dim = val.parse().unwrap_or(32),
                             "num_filters" => num_filters = val.parse().unwrap_or(64),
                             "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
+                            "feature_dim" => feature_dim = val.parse().unwrap_or(0),
                             _ => {}
                         }
                     }
@@ -365,9 +370,10 @@ impl CharClassifier {
                     embed_dim,
                     num_filters,
                     hidden_dim,
+                    feature_dim,
                 )
             } else {
-                (97, 128, 32, 64, 128)
+                (97, 128, 32, 64, 128, 0)
             };
 
         let vocab = CharVocab::new();
@@ -381,6 +387,7 @@ impl CharClassifier {
             hidden_dim,
             n_classes,
             dropout: 0.0, // No dropout during inference
+            feature_dim,
         };
 
         // Load model weights

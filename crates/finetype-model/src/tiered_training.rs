@@ -401,6 +401,7 @@ impl TieredTrainer {
             num_filters: self.config.num_filters,
             hidden_dim: self.config.hidden_dim,
             n_classes,
+            feature_dim: 0, // Tiered trainer doesn't use features yet
             ..Default::default()
         };
 
