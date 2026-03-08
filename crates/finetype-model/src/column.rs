@@ -822,6 +822,34 @@ impl ColumnClassifier {
                 }
             }
 
+            // Cross-domain hardcoded hint override (NNFT-254):
+            // When a hardcoded hint and prediction differ in both domain AND
+            // base type name, the header is authoritative. Catches structural
+            // confusion (postal_code vs CPT, epoch vs NPI) where patterns are
+            // identical and only the header disambiguates.
+            // Does NOT fire when base type names match (uuid vs uuid).
+            if hint_is_hardcoded_legacy && result.label != hinted_type {
+                let hint_domain = hinted_type.split('.').next().unwrap_or("");
+                let pred_domain = result.label.split('.').next().unwrap_or("");
+                let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
+                let pred_base = result.label.rsplit('.').next().unwrap_or("");
+                if !hint_domain.is_empty()
+                    && !pred_domain.is_empty()
+                    && hint_domain != pred_domain
+                    && hint_base != pred_base
+                {
+                    result.label = hinted_type.to_string();
+                    result.confidence = result.confidence.max(0.5);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_cross_domain:{}",
+                        header.to_lowercase()
+                    ));
+                    self.finalize_is_generic(&mut result);
+                    return Ok(result);
+                }
+            }
+
             let original_label = result.label.clone();
 
             if (result.confidence < 0.5 || is_generic) && hint_in_votes {
@@ -1361,6 +1389,39 @@ impl ColumnClassifier {
                             }
                         }
 
+                        // Cross-domain hardcoded hint override (NNFT-254):
+                        // When a hardcoded hint and prediction differ in domain AND
+                        // the predicted type's base name differs from the hint's base
+                        // name, the header is authoritative. This catches cases where
+                        // structurally identical patterns (5-digit numbers) get
+                        // classified as the wrong type entirely:
+                        //   "postal" → postal_code vs CPT (medical code)
+                        //   "epoch" → unix_seconds vs NPI (medical ID)
+                        //   "cabin" → alphanumeric_id vs ICD10 (medical code)
+                        // Does NOT fire when the base type name matches (e.g.,
+                        // representation.identifier.uuid vs technology.identifier.uuid)
+                        // or when only the domain prefix differs for the same concept.
+                        if !geo_handled && hint_is_hardcoded && result.label != hinted_type {
+                            let hint_domain = hinted_type.split('.').next().unwrap_or("");
+                            let pred_domain = result.label.split('.').next().unwrap_or("");
+                            let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
+                            let pred_base = result.label.rsplit('.').next().unwrap_or("");
+                            if !hint_domain.is_empty()
+                                && !pred_domain.is_empty()
+                                && hint_domain != pred_domain
+                                && hint_base != pred_base
+                            {
+                                result.label = hinted_type.to_string();
+                                result.confidence = result.confidence.max(0.5);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_cross_domain:{}",
+                                    header.to_lowercase()
+                                ));
+                                geo_handled = true;
+                            }
+                        }
+
                         // General hint logic (runs for all non-person hints,
                         // and also for person hints not handled by geography protection)
                         if !geo_handled {
@@ -1387,20 +1448,28 @@ impl ColumnClassifier {
                                     "sense_header_hint_generic:{}",
                                     header.to_lowercase()
                                 ));
-                            } else if hint_is_hardcoded && result.confidence < 0.5 && !hint_in_votes
-                            {
-                                // Hardcoded hint authority (NNFT-235): hardcoded hints
-                                // are curated knowledge. At low confidence (<0.5), they
-                                // should override even when the hinted type isn't in
-                                // CharCNN votes. Example: "job_title" → categorical
-                                // when CharCNN votes are scattered across name types.
-                                result.label = hinted_type.to_string();
-                                result.confidence = 0.5;
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_hardcoded:{}",
-                                    header.to_lowercase()
-                                ));
+                            } else if hint_is_hardcoded && !hint_in_votes {
+                                // Hardcoded hint authority (NNFT-235, refined NNFT-254):
+                                // Hardcoded hints are curated knowledge. Threshold depends
+                                // on domain relationship:
+                                // - Cross-domain (hint=repr, pred=identity): 0.85 threshold
+                                //   because the header encodes semantic knowledge the model
+                                //   lacks (e.g., "age" → integer vs numeric_code at 0.78)
+                                // - Same-domain (hint=datetime, pred=datetime): 0.5 threshold
+                                //   because within-domain the model is more reliable (e.g.,
+                                //   eu_date → dmy_slash vs iso_8601, model at 0.80 is right)
+                                let h_domain = hinted_type.split('.').next().unwrap_or("");
+                                let p_domain = result.label.split('.').next().unwrap_or("");
+                                let threshold = if h_domain != p_domain { 0.85 } else { 0.5 };
+                                if result.confidence < threshold {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = 0.5;
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_hardcoded:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
                             } else if result.confidence < 0.3 && !hint_in_votes {
                                 result.label = hinted_type.to_string();
                                 result.confidence = 0.4;
@@ -2244,7 +2313,57 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "gender" | "sex" => {
             return Some("identity.person.gender");
         }
-        // "age" — REMOVED in v0.5.2 (NNFT-192); falls to integer_number
+        // "age" — type REMOVED in v0.5.2 (NNFT-192); redirect to integer_number (NNFT-254)
+        "age" | "patient age" | "customer age" | "user age" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Epoch / Unix timestamps — 10-digit integers confused with NPI (NNFT-254)
+        "epoch" | "unix epoch" | "unix timestamp" | "epoch time" | "unix time"
+        | "epoch seconds" | "unix seconds" | "epoch s" | "posix time" | "unix epoch seconds" => {
+            return Some("datetime.epoch.unix_seconds");
+        }
+        "epoch ms" | "unix ms" | "epoch milliseconds" | "unix milliseconds" => {
+            return Some("datetime.epoch.unix_milliseconds");
+        }
+        // Altitude / elevation — numeric measurements confused with numeric_code (NNFT-254)
+        "altitude" | "elevation" | "alt" | "elev" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Duration in numeric units (NNFT-254)
+        // Note: bare "duration" excluded — could be ISO 8601 (PT1H30M).
+        // Only specific numeric-unit variants match.
+        "duration minutes" | "duration min" | "duration seconds" | "duration sec"
+        | "duration hours" | "duration hrs" | "duration ms" | "elapsed" | "elapsed time" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Attendance / headcount — large integers confused with amount_minor_int (NNFT-254)
+        "attendance" | "headcount" | "participants" | "crowd size" | "capacity" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Heart rate / vital signs — numeric measurements (NNFT-254)
+        "heart rate" | "heartrate" | "hr" | "bpm" | "pulse" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Pages — book/document page counts (NNFT-254)
+        "pages" | "page count" | "num pages" | "total pages" => {
+            return Some("representation.numeric.integer_number");
+        }
+        // Language — programming or natural language names (NNFT-254)
+        "language" | "lang" | "programming language" | "spoken language" => {
+            return Some("representation.discrete.categorical");
+        }
+        // Sport / athletic discipline (NNFT-254)
+        "sport" | "discipline" | "event type" | "game type" => {
+            return Some("representation.discrete.categorical");
+        }
+        // Species / taxonomy (NNFT-254)
+        "species" | "genus" | "taxon" | "breed" | "variety" => {
+            return Some("representation.discrete.categorical");
+        }
+        // Exchange — financial exchange names (NNFT-254)
+        "exchange" | "stock exchange" | "market" | "bourse" => {
+            return Some("representation.discrete.categorical");
+        }
         "latitude" | "lat" => {
             return Some("geography.coordinate.latitude");
         }
@@ -2374,9 +2493,15 @@ fn header_hint(header: &str) -> Option<&'static str> {
         // Qualified: "display name", "user name", "account name" → full_name
         // Bare "name" is ambiguous (could be person, city, country, company) — let
         // Sense + CharCNN decide based on value evidence.
-        return Some("identity.person.full_name");
+        // Exclude datetime component names (month_name, day_name) — those are
+        // temporal, not person names (NNFT-254).
+        if h.contains("month") || h.contains("day") || h.contains("weekday") {
+            // Let the model decide — these are datetime components
+        } else {
+            return Some("identity.person.full_name");
+        }
     }
-    if h.contains("address") && !h.contains("email") && !h.contains("ip") {
+    if h.contains("address") && !h.contains("email") && !h.contains("ip") && !h.contains("mac") {
         // "street address" or "street_address" → street_address
         // "full address" → full_address
         // Bare "address" → full_address (NNFT-235: more commonly means full address)
@@ -2402,6 +2527,14 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if h.contains("sql") && (h.contains("timestamp") || h.contains("datetime")) {
         return Some("datetime.timestamp.sql_standard");
     }
+    // Epoch/Unix timestamp substrings — must precede generic date/timestamp catch-all (NNFT-254).
+    // "timestamp_unix", "unix_timestamp_ms", "epoch_created" etc.
+    if h.contains("epoch") || h.contains("unix") {
+        if h.contains("ms") || h.contains("milli") {
+            return Some("datetime.epoch.unix_milliseconds");
+        }
+        return Some("datetime.epoch.unix_seconds");
+    }
     if h.contains("date") || h.contains("timestamp") || h.contains("datetime") {
         return Some("datetime.timestamp.iso_8601");
     }
@@ -2423,7 +2556,13 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if h.contains("price") || h.contains("cost") || h.contains("amount") || h.contains("salary") {
         return Some("representation.numeric.decimal_number");
     }
-    if h.contains("count") || h.contains("quantity") || h.contains("num") {
+    // "count" must not match "country" — use word boundary check (NNFT-254)
+    if (h.contains("count") && !h.contains("country") && !h.contains("county"))
+        || h.contains("quantity")
+        || h.contains("num ")
+        || h.starts_with("num")
+        || h.ends_with(" num")
+    {
         return Some("representation.numeric.integer_number");
     }
     if h.contains("class") || h.contains("grade") || h.contains("rank") || h.contains("tier") {
@@ -2450,6 +2589,19 @@ fn header_hint(header: &str) -> Option<&'static str> {
         || h.contains("inductance")
     {
         return Some("representation.numeric.decimal_number");
+    }
+    // Response time / latency — numeric measurements (NNFT-254)
+    // "duration" excluded when it looks like ISO 8601 (duration_iso, duration_8601)
+    if h.contains("response time")
+        || h.contains("latency")
+        || h.contains("elapsed")
+        || (h.contains("duration") && !h.contains("iso") && !h.contains("8601"))
+    {
+        return Some("representation.numeric.integer_number");
+    }
+    // Payload / byte size — numeric measurements (NNFT-254)
+    if h.contains("payload") || h.contains("bytes") || h.contains("size") {
+        return Some("representation.numeric.integer_number");
     }
 
     None
@@ -4062,9 +4214,15 @@ mod tests {
     fn test_header_hint_identity() {
         assert_eq!(header_hint("gender"), Some("identity.person.gender"));
         assert_eq!(header_hint("Sex"), Some("identity.person.gender"));
-        // "age" hint removed in v0.5.2 (NNFT-192) — falls to integer_number
-        assert_eq!(header_hint("age"), None);
-        assert_eq!(header_hint("Age"), None);
+        // "age" type removed in v0.5.2 (NNFT-192), hint redirects to integer_number (NNFT-254)
+        assert_eq!(
+            header_hint("age"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("Age"),
+            Some("representation.numeric.integer_number")
+        );
     }
 
     #[test]
@@ -4097,6 +4255,87 @@ mod tests {
         assert_eq!(
             header_hint("sql_timestamp"),
             Some("datetime.timestamp.sql_standard")
+        );
+        // Epoch/Unix timestamps (NNFT-254) — exact match
+        assert_eq!(
+            header_hint("unix_epoch"),
+            Some("datetime.epoch.unix_seconds")
+        );
+        assert_eq!(
+            header_hint("epoch_time"),
+            Some("datetime.epoch.unix_seconds")
+        );
+        assert_eq!(
+            header_hint("unix_ms"),
+            Some("datetime.epoch.unix_milliseconds")
+        );
+        // Epoch/Unix — substring match
+        assert_eq!(
+            header_hint("created_epoch"),
+            Some("datetime.epoch.unix_seconds")
+        );
+        assert_eq!(
+            header_hint("timestamp_unix"),
+            Some("datetime.epoch.unix_seconds")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_categorical_nnft254() {
+        // NNFT-254: text types confused with region/country
+        assert_eq!(
+            header_hint("language"),
+            Some("representation.discrete.categorical")
+        );
+        assert_eq!(
+            header_hint("sport"),
+            Some("representation.discrete.categorical")
+        );
+        assert_eq!(
+            header_hint("species"),
+            Some("representation.discrete.categorical")
+        );
+        assert_eq!(
+            header_hint("exchange"),
+            Some("representation.discrete.categorical")
+        );
+    }
+
+    #[test]
+    fn test_header_hint_measurements_nnft254() {
+        // NNFT-254: numeric measurements confused with numeric_code
+        assert_eq!(
+            header_hint("altitude"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("elevation"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("pages"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("heart_rate"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("attendance"),
+            Some("representation.numeric.integer_number")
+        );
+        // Substring match
+        assert_eq!(
+            header_hint("response_time_ms"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("payload_size_bytes"),
+            Some("representation.numeric.integer_number")
+        );
+        assert_eq!(
+            header_hint("duration_minutes"),
+            Some("representation.numeric.integer_number")
         );
     }
 

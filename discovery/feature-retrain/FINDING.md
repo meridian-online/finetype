@@ -89,3 +89,123 @@ The feature fusion architecture (NNFT-248) is sound — the regression is a trai
 4. **Curriculum training**: Start with feature_dim=0 for N epochs, then enable features for fine-tuning.
 
 For now, the post-vote rule approach (feature_dim=0 + F1-F3) remains the better trade-off: simpler, more predictable, and higher eval accuracy.
+
+---
+
+# Deep Accuracy Spike: Header Hints + Hint Authority (NNFT-254)
+
+**Date:** 2026-03-08
+**Question:** Can expanded header hints and refined hint override authority close the remaining eval gaps without model retraining?
+**Depends on:** NNFT-253 (established that feature_dim=0 + rules is the better path)
+
+## Approach
+
+Instead of retraining the model (NNFT-253 showed diminishing returns), this spike attacked the remaining misclassifications through three experiments targeting the Sense→Sharpen pipeline's disambiguation and header hint system.
+
+## Experiments
+
+### Experiment 1: Header Hint Gap Analysis + Fixes
+
+**Method:** Profiled all 21 datasets in ~/datasets/ (213 columns total) and traced every misclassification through the pipeline.
+
+**Root causes identified:**
+
+| Category | Count | Examples |
+|---|---|---|
+| Missing header hints | 12 | epoch, age, altitude, pages, attendance, heart_rate |
+| Categorical text → geography | 5 | species→region, sport→region, language→last_name |
+| Numeric confusion (integer vs numeric_code vs amount_minor_int) | 8 | salary→amount_minor_int, response_time_ms→numeric_code |
+| Hint authority too weak | 3 | postal_code→CPT, Cabin→ICD10, epoch→NPI |
+
+**Hints added (~30 new exact-match + substring rules):**
+
+| Category | Header patterns | Target type |
+|---|---|---|
+| Epoch/Unix | epoch, unix_timestamp, unix_epoch, posix_time, epoch_ms | datetime.epoch.unix_seconds/unix_milliseconds |
+| Age | age, patient_age, customer_age | representation.numeric.integer_number |
+| Altitude/Elevation | altitude, elevation, alt, elev | representation.numeric.integer_number |
+| Duration (numeric) | duration_minutes, elapsed, elapsed_time | representation.numeric.integer_number |
+| Attendance/Count | attendance, headcount, participants, capacity | representation.numeric.integer_number |
+| Vital signs | heart_rate, bpm, pulse | representation.numeric.integer_number |
+| Pages | pages, page_count, num_pages | representation.numeric.integer_number |
+| Language | language, lang, programming_language | representation.discrete.categorical |
+| Sport | sport, discipline, event_type | representation.discrete.categorical |
+| Species | species, genus, taxon, breed | representation.discrete.categorical |
+| Exchange | exchange, stock_exchange, market | representation.discrete.categorical |
+
+**Substring fixes (7 false-positive guards):**
+- `h.contains("count")` now excludes "country"/"county"
+- `h.contains("address")` now excludes "mac"
+- `h.contains("duration")` now excludes "iso"/"8601"
+- `h.ends_with(" name")` now excludes "month name"/"day name"/"weekday name"
+- Epoch/unix substring check moved BEFORE generic date/timestamp catch-all
+
+**Result:** 178/186 → 179/186 (+1 label, +2 domain)
+
+### Experiment 2: Hardcoded Hint Authority Threshold
+
+**Problem:** Three showstopper misclassifications persisted because hardcoded hints couldn't override confident cross-domain predictions:
+- shipping_postal_code → CPT (80% confidence, geography hint vs identity.medical)
+- Cabin → ICD10 (57% confidence, representation hint vs identity.medical)
+- unix_epoch → NPI (100% confidence, datetime hint vs identity.medical)
+
+**Fix:** Cross-domain hardcoded hint override rule:
+
+```
+IF hardcoded hint exists
+AND hint domain ≠ prediction domain
+AND hint base type ≠ prediction base type (prevents uuid domain flip)
+THEN override prediction with hint
+```
+
+Plus domain-aware threshold for hint-not-in-votes:
+- Cross-domain: 0.85 threshold (header encodes semantic domain knowledge)
+- Same-domain: 0.5 threshold (model more reliable within domain)
+
+**Regressions caught and fixed:**
+- uuid (representation→technology): Fixed with `hint_base != pred_base` guard
+- currency_code (finance→identity): Same fix
+- eu_date → iso_8601 override at 0.80: Fixed by making threshold domain-aware (0.85 for cross-domain only)
+
+**Result:** Integrated into Experiment 1 numbers above
+
+### Experiment 3: Feature-Augmented Model (Not Needed)
+
+Experiments 1 and 2 achieved +1 over baseline without any model retraining. Given NNFT-253's finding that feature_dim=32 causes city attractor regression, the rule-based approach is confirmed as the better path.
+
+## Final Results
+
+| Metric | v14 baseline | After NNFT-254 | Delta |
+|---|---|---|---|
+| Profile label | 178/186 (95.7%) | 179/186 (96.2%) | **+0.5pp** |
+| Profile domain | 181/186 (97.3%) | 183/186 (98.4%) | **+1.1pp** |
+| Actionability | 232321/232541 (99.9%) | 232057/232177 (99.9%) | maintained |
+| Tests passing | 438 | 438 | maintained |
+
+### Remaining 7 Misclassifications
+
+| Dataset | Column | Predicted | Expected | Root Cause |
+|---|---|---|---|---|
+| new_technology | git_sha | hash | git_sha | Model confusion — same char distribution |
+| ecommerce_orders_json | total | hs_code | decimal_number | Model confusion — numeric overlap |
+| airports | name | region | full_name | Bare "name" ambiguity |
+| world_cities | name | region | city | Bare "name" ambiguity |
+| multilingual | name | country | full_name | Bare "name" ambiguity |
+| server_logs_json | response_time_ms | integer_number | decimal_number | Decimal values in integer-like column |
+| tech_systems | server_hostname | docker_ref | hostname | Model confusion — similar formats |
+
+Of these, 3 are the perennial "bare name" ambiguity (genuinely ambiguous — "name" means different things per dataset), 3 are model-level confusions that would require retraining to fix, and 1 (response_time_ms) is a ground truth edge case (column contains both integers and decimals).
+
+## Recommendation
+
+**Adopt the expanded rule set (feature_dim=0 + F1-F3 + NNFT-254 hints).** This is now the recommended configuration because:
+
+1. No model retraining required — zero risk of the city attractor or other regression
+2. Rules are transparent and debuggable — each fix has a clear NNFT-254 annotation
+3. The 7 remaining misclassifications are at the boundary of what header hints can solve
+4. Further accuracy gains will require either model retraining with better training data, or per-dataset ground truth refinement
+
+**Future work:**
+- NNFT-258: Expand golden tests to lock in these gains via Rust integration tests
+- Consider retraining CharCNN on harder negatives (confusable type pairs) for git_sha/hash, hs_code/decimal_number
+- The 3 bare "name" cases may benefit from a learned header→type classifier (replacing regex-based header_hint)
