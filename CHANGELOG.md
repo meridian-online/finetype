@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-03-08
+
+### Improved
+
+- **Profile accuracy: 96.2% label, 98.4% domain** (179/186 columns, up from 178/186). ~30 new header hints for epoch/unix timestamps, age, altitude, duration, attendance, categorical text (language, sport, species, exchange). Cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross-domain, 0.5 same-domain). 7 substring matching bug fixes ("count" vs "country", "address" vs "mac_address", etc.). (NNFT-254)
+
+### Added
+
+- **Golden integration test suite** — 13 structured Rust integration tests covering `profile`, `load`, `taxonomy`, and `schema` commands. 4 real-world dataset tests (datetime_formats, ecommerce_orders, titanic, people_directory), 3 focused fixture tests (ambiguous headers, numeric edge cases, categoricals), 2 load DDL tests, 2 taxonomy tests, 2 schema tests. Gated with `#[ignore]` for fast dev workflow. (NNFT-258)
+
+### Discovery
+
+- **Feature-augmented retrain confirmed: keep rules** — NNFT-254 confirmed that feature_dim=0 + expanded header hints outperforms feature-augmented CharCNN (which regresses -1.6pp due to city attractor). Decided item #22: rules over feature-augmented model.
+
 ## [0.6.7] - 2026-03-08
 
 ### Added
