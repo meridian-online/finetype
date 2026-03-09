@@ -23,12 +23,14 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 **Version:** 0.6.8
 **Taxonomy:** 250 definitions across 7 domains (container: 12, datetime: 84, finance: 31, geography: 25, identity: 34, representation: 36, technology: 28) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v14-250 flat (250 classes, 10 epochs, 372k samples), tiered-v2 fallback via `--sharp-only`.
+**Features:** 34-dim deterministic feature extractor (NNFT-248/266), column-level aggregation (mean, variance, min, max), 4 feature-based disambiguation rules (F1–F4).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent milestones
 
+- **Column feature expansion** (NNFT-266, m-13) — FEATURE_DIM 32→34 (has_colon, has_dash). ColumnFeatures struct replaces raw mean array with mean/variance/min/max aggregation. Rule F4: zero length-variance + all hex + len=40 → git_sha (not hash). Rule F3 enhanced with float-parseability Path B. Profile: 180/186 (96.8% label, 98.4% domain). 1 fewer misclassification (git_sha fixed).
 - **Deep accuracy spike** (NNFT-253/254, m-12) — NNFT-253 found feature_dim=32 regresses eval (-1.6pp city attractor). NNFT-254 expanded header hints (~30 new rules for epoch, age, altitude, categorical text, etc.), added cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross-domain / 0.5 same-domain), fixed 7 substring matching bugs. Confirmed feature_dim=0 + rules is the better path. Profile: 179/186 (96.2% label, 98.4% domain). Actionability: 99.9%.
 - **Feature-augmented CharCNN pipeline** (NNFT-247–251, m-12) — 32-feature deterministic extractor (parse tests, char stats, structural), parallel fusion at CharCNN classifier head (`feature_dim` config, backward compatible), Sense→Sharpen pipeline integration with per-value + aggregated column features, 3 feature-based disambiguation rules.
 - **CharCNN v14 retrain for 250-type taxonomy** (NNFT-245) — Full pipeline retrain: CharCNN-v14-250 (250 classes, 10 epochs, 372k samples at 1500/type, 86.6% training accuracy), Sense retrained (87.1% broad, 78.5% entity), Model2Vec refreshed (750 embeddings × 128 dim). 5 new eval datasets covering all 43 new types (293 manifest entries). Profile: 140/189 columns (74.1% label, 81.0% domain) — expected regression from 43 new overlapping types. 3 new false positives: cpt/postal_code (5-digit overlap), hs_code/decimal_number, docker_ref/hostname. url/urn semantic proximity noted (hardcoded hint handles correctly). Default model symlink updated.
@@ -50,7 +52,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ### What's in progress
 
 - **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range). Depends on NNFT-254 completion.
-- **Remaining accuracy gaps** — 7 misclassifications at 179/186: 3× bare "name" ambiguity (genuinely ambiguous), 3× model-level confusions (git_sha→hash, hs_code→decimal_number, docker_ref→hostname), 1× GT edge case (response_time_ms integer vs decimal).
+- **Remaining accuracy gaps** — 6 misclassifications at 180/186: 3× bare "name" ambiguity (genuinely ambiguous), 2× model-level confusions (hs_code→decimal_number false positive on ecommerce totals, docker_ref→hostname), 1× GT edge case (response_time_ms integer vs decimal).
 
 ## Architecture
 
@@ -100,7 +102,7 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
 3. Run flat CharCNN batch on all 100 values with per-value features (passed via `classify_batch_with_features`; ignored when model has `feature_dim=0`). Remap collapsed labels.
 4. **Masked vote aggregation:** filter to category-eligible labels via `LabelCategoryMap`. Safety valve: falls back to unmasked when all votes filtered OR when Sense confidence <0.75 and masking removes >40% of votes
 5. Apply disambiguation rules (same rules, votes already scoped). Coordinate disambiguation requires competitive vote share (prevents false-positive on decimal columns)
-5b. **Feature-based disambiguation** (NNFT-250): Rule F1 (leading-zero → numeric_code for postal_code/cpt), Rule F2 (slash-segments → docker_ref), Rule F3 (digit-ratio+dots → hs_code)
+5b. **Feature-based disambiguation** (NNFT-250/266): Rule F1 (leading-zero → numeric_code for postal_code/cpt), Rule F2 (slash-segments → docker_ref), Rule F3 (digit-ratio+dots+float-parseability → hs_code), Rule F4 (zero length-variance + all hex + len=40 → git_sha)
 6. Entity demotion: non-person Sense subtype + full_name → entity_name (replaces Rule 18 + EntityClassifier)
 7. **Header hints** (Model2Vec semantic + hardcoded): override generic/low-confidence predictions. Geography protection for person-name hints. Measurement disambiguation for age/height/weight
 8. Post-hoc locale detection (unchanged)
@@ -185,7 +187,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 96.2% label (179/186), 98.4% domain (183/186) on 30 datasets (293 manifest entries, 250-type taxonomy).
+**Profile eval** (`eval/profile_eval.sh`) — 96.8% label (180/186), 98.4% domain (183/186) on 30 datasets (293 manifest entries, 250-type taxonomy).
 **GitTables 1M** (`eval/gittables/`) — 47.1% label / 56.5% domain on format-detectable types.
 **SOTAB CTA** (`eval/sotab/`) — 43.6% label / 68.6% domain on format-detectable types.
 **Actionability eval** (`eval-actionability` binary) — 99.9% transform success rate (232321/232541 values, 283 columns, 120 types). Supports `format_string_alt` for type variants (e.g., ISO 8601 with/without fractional seconds).
@@ -236,7 +238,7 @@ Key decisions — do not revisit without good reason. See backlog decisions and 
 19. **Sense integration: flat CharCNN + output masking** — Use existing flat model with Sense-guided category masking, not per-category retraining. Sample 100/encode 50. Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). (NNFT-164, decision-006)
 20. **Pure Rust via Candle (Path A)** — Full Rust migration replacing all Python. Candle 0.8 with `half = "2.4"` pin. Validated: architecture, gradients, optimizer, safetensors round-trip. (NNFT-182/187)
 21. **MCP server via rmcp** — Official Rust MCP SDK v1.1.0, stdio transport, single binary (`finetype mcp` subcommand). 6 tools + taxonomy resources. JSON + markdown dual output. (NNFT-240/241)
-22. **Rules over feature-augmented model** — feature_dim=0 + expanded header hints + F1-F3 post-vote rules outperforms feature_dim=32 CharCNN. Feature fusion causes city attractor regression (-1.6pp). Cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross/0.5 same). (NNFT-253/254)
+22. **Rules over feature-augmented model** — feature_dim=0 + expanded header hints + F1-F4 post-vote rules outperforms feature_dim=32 CharCNN. Feature fusion causes city attractor regression (-1.6pp). Cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross/0.5 same). Column-level variance/min/max aggregation (NNFT-266) for distributional disambiguation. (NNFT-253/254/266)
 
 ## Build & Test
 

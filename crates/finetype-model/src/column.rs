@@ -20,35 +20,107 @@ use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
 use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
 
-/// Aggregated column-level features: mean of per-value feature vectors (NNFT-250).
+/// Aggregated column-level features: mean, variance, min, and max of per-value
+/// feature vectors (NNFT-250, expanded in NNFT-266).
 ///
-/// Returns `[f32; FEATURE_DIM]` with the element-wise mean across all values.
-/// Used by disambiguation rules for column-level decisions (e.g., leading-zero
-/// detection across the column).
-fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> [f32; FEATURE_DIM] {
-    let mut mean = [0.0f32; FEATURE_DIM];
-    if per_value.is_empty() {
-        return mean;
+/// Used by disambiguation rules for column-level decisions. Variance is the
+/// critical new signal: zero length-variance distinguishes git_sha from hash,
+/// and dot-segment variance distinguishes structured codes from free-form text.
+#[derive(Debug, Clone)]
+struct ColumnFeatures {
+    /// Element-wise mean across all values.
+    mean: [f32; FEATURE_DIM],
+    /// Element-wise variance across all values.
+    variance: [f32; FEATURE_DIM],
+    /// Element-wise minimum across all values.
+    /// Reserved for future disambiguation rules (e.g., min-length checks).
+    #[allow(dead_code)]
+    min: [f32; FEATURE_DIM],
+    /// Element-wise maximum across all values.
+    /// Reserved for future disambiguation rules (e.g., max-length checks).
+    #[allow(dead_code)]
+    max: [f32; FEATURE_DIM],
+}
+
+impl ColumnFeatures {
+    /// Create a zero-initialized `ColumnFeatures`.
+    fn empty() -> Self {
+        Self {
+            mean: [0.0f32; FEATURE_DIM],
+            variance: [0.0f32; FEATURE_DIM],
+            min: [0.0f32; FEATURE_DIM],
+            max: [0.0f32; FEATURE_DIM],
+        }
     }
+}
+
+/// Compute aggregated column-level features (mean, variance, min, max) from
+/// per-value feature vectors using a two-pass algorithm.
+///
+/// Pass 1: accumulate sum, track min/max → compute mean.
+/// Pass 2: accumulate squared deviations → compute variance.
+fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
+    if per_value.is_empty() {
+        return ColumnFeatures::empty();
+    }
+
     let n = per_value.len() as f32;
+
+    // Initialize min/max from first element
+    let mut mean = [0.0f32; FEATURE_DIM];
+    let mut min_vals = per_value[0];
+    let mut max_vals = per_value[0];
+
+    // Pass 1: sum + min/max
     for features in per_value {
-        for (i, &v) in features.iter().enumerate() {
-            mean[i] += v;
+        for i in 0..FEATURE_DIM {
+            mean[i] += features[i];
+            if features[i] < min_vals[i] {
+                min_vals[i] = features[i];
+            }
+            if features[i] > max_vals[i] {
+                max_vals[i] = features[i];
+            }
         }
     }
     for m in &mut mean {
         *m /= n;
     }
-    mean
+
+    // Pass 2: variance (sum of squared deviations / n)
+    let mut variance = [0.0f32; FEATURE_DIM];
+    for features in per_value {
+        for i in 0..FEATURE_DIM {
+            let diff = features[i] - mean[i];
+            variance[i] += diff * diff;
+        }
+    }
+    for v in &mut variance {
+        *v /= n;
+    }
+
+    ColumnFeatures {
+        mean,
+        variance,
+        min: min_vals,
+        max: max_vals,
+    }
 }
 
-/// Feature index constants for disambiguation rules (NNFT-250).
+/// Feature index constants for disambiguation rules (NNFT-250, expanded NNFT-266).
 /// Must match the indices in `features::FEATURE_NAMES`.
 mod feature_idx {
+    pub const IS_FLOAT: usize = 2;
     pub const HAS_LEADING_ZERO: usize = 3;
+    pub const IS_HEX_STRING: usize = 7;
+    pub const LENGTH: usize = 10;
     pub const DIGIT_RATIO: usize = 17;
     pub const SEGMENT_COUNT_DOT: usize = 24;
     pub const SEGMENT_COUNT_SLASH: usize = 26;
+    #[allow(dead_code)]
+    pub const HAS_COLON: usize = 32;
+    #[allow(dead_code)]
+    pub const HAS_DASH: usize = 33;
 }
 
 /// Strip a locale suffix from a 4-level label to get the 3-level taxonomy key.
@@ -947,7 +1019,7 @@ impl ColumnClassifier {
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
             sample.iter().map(|v| extract_features(v)).collect();
 
-        // Compute aggregated column-level features (mean across all values).
+        // Compute aggregated column-level features (mean, variance, min, max).
         // Used by disambiguation rules for column-level decisions.
         let column_features = aggregate_features(&per_value_features);
 
@@ -1558,9 +1630,12 @@ const CODE_ATTRACTORS: &[&str] = &[
 ///
 /// Runs after standard disambiguation rules. Modifies `result` in place when
 /// a feature signal is strong enough to override the current prediction.
+///
+/// NNFT-266: expanded to use variance/min/max statistics and float-parseability
+/// for git_sha/hash and hs_code/decimal_number disambiguation.
 fn feature_disambiguate(
     result: &mut ColumnResult,
-    column_features: &[f32; FEATURE_DIM],
+    column_features: &ColumnFeatures,
     votes: &[(String, usize)],
     n_samples: usize,
 ) {
@@ -1576,7 +1651,7 @@ fn feature_disambiguate(
     // occasional leading zeros (e.g., zero-padded sequences) without being codes.
     // Only postal_code and cpt predictions warrant this override since their
     // validation patterns overlap specifically with numeric codes.
-    let leading_zero_ratio = column_features[feature_idx::HAS_LEADING_ZERO];
+    let leading_zero_ratio = column_features.mean[feature_idx::HAS_LEADING_ZERO];
     if leading_zero_ratio >= 0.3 {
         let code_confusion_types = ["geography.address.postal_code", "identity.medical.cpt"];
         if code_confusion_types.contains(&result.label.as_str()) {
@@ -1596,7 +1671,7 @@ fn feature_disambiguate(
     // Docker refs (e.g., "docker.io/library/nginx:latest") have slash-separated
     // segments (registry/namespace/image). Hostnames (e.g., "api.example.com")
     // use dots but rarely slashes. A high segment_count_slash is a strong signal.
-    let slash_segments = column_features[feature_idx::SEGMENT_COUNT_SLASH];
+    let slash_segments = column_features.mean[feature_idx::SEGMENT_COUNT_SLASH];
     if result.label == "technology.internet.hostname" && slash_segments >= 1.5 {
         // Multiple slash segments → likely docker refs
         let docker_in_votes = votes
@@ -1616,12 +1691,18 @@ fn feature_disambiguate(
     // HS codes (e.g., "8471.30", "6204.62.40") have high digit_ratio and
     // dot-separated segments. decimal_number also has dots but typically lower
     // digit_ratio (mixed with other chars in real columns) and fewer segments.
-    let digit_ratio = column_features[feature_idx::DIGIT_RATIO];
-    let dot_segments = column_features[feature_idx::SEGMENT_COUNT_DOT];
-    if result.label == "representation.numeric.decimal_number"
-        && digit_ratio >= 0.75
-        && dot_segments >= 2.0
-    {
+    //
+    // NNFT-266: Enhanced with float-parseability signal. HS codes with 3+
+    // segments (e.g., "6204.62.40") don't parse as float, while decimal_number
+    // values always do. Two trigger paths:
+    //   Path A (original): digit_ratio >= 0.75 AND dot_segments >= 2.0
+    //   Path B (new):      digit_ratio >= 0.75 AND is_float_fraction < 1.0
+    let digit_ratio = column_features.mean[feature_idx::DIGIT_RATIO];
+    let dot_segments = column_features.mean[feature_idx::SEGMENT_COUNT_DOT];
+    let is_float_fraction = column_features.mean[feature_idx::IS_FLOAT];
+    let f3_path_a = digit_ratio >= 0.75 && dot_segments >= 2.0;
+    let f3_path_b = digit_ratio >= 0.75 && is_float_fraction < 1.0 && dot_segments >= 1.5;
+    if result.label == "representation.numeric.decimal_number" && (f3_path_a || f3_path_b) {
         let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
         if hs_in_votes {
             let hs_votes = votes
@@ -1635,11 +1716,44 @@ fn feature_disambiguate(
                 result.confidence = hs_frac.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!(
-                    "feature_hs_code:digit_ratio={:.2},dots={:.1}",
-                    digit_ratio, dot_segments
+                    "feature_hs_code:digit_ratio={:.2},dots={:.1},float={:.2}",
+                    digit_ratio, dot_segments, is_float_fraction
                 ));
             }
         }
+    }
+
+    // Rule F4: git_sha vs hash — length variance distinguishes uniform-length
+    // git SHAs from mixed-length hashes (NNFT-266).
+    //
+    // Git SHAs are always exactly 40 hex characters → zero length variance.
+    // General hash columns contain MD5 (32), SHA1 (40), SHA256 (64) → high
+    // length variance (822.6 per Spike A). Near-zero length variance combined
+    // with high hex ratio is a perfect separator.
+    //
+    // The CharCNN model doesn't produce git_sha votes (all 40-char hex strings
+    // score as hash), so we cannot require git_sha in the vote distribution.
+    // Instead we use a length check: mean length ~40 (SHA-1) is the definitive
+    // git SHA fingerprint. This is safe because:
+    //   - MD5 = 32 chars, SHA-256 = 64 chars — neither is 40
+    //   - RIPEMD-160 = 40 chars but exceedingly rare in tabular data
+    //   - The combination of hash prediction + zero variance + len=40 + all hex
+    //     is effectively unique to git SHAs
+    let length_variance = column_features.variance[feature_idx::LENGTH];
+    let hex_ratio = column_features.mean[feature_idx::IS_HEX_STRING];
+    let mean_length = column_features.mean[feature_idx::LENGTH];
+    if result.label == "technology.cryptographic.hash"
+        && length_variance < 0.01
+        && hex_ratio >= 0.95
+        && (mean_length - 40.0).abs() < 1.0
+    {
+        result.label = "technology.development.git_sha".to_string();
+        result.confidence = result.confidence.max(0.8);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_git_sha:len_var={:.4},hex={:.2},len={:.0}",
+            length_variance, hex_ratio, mean_length
+        ));
     }
 }
 
@@ -6829,5 +6943,253 @@ datetime.component.day_of_week:
             "country must be a location type"
         );
         // Both city and country are location types — same-domain override should apply
+    }
+
+    // ── ColumnFeatures aggregation tests (NNFT-266) ─────────────────────
+
+    #[test]
+    fn test_aggregate_features_empty() {
+        let cf = aggregate_features(&[]);
+        assert_eq!(cf.mean, [0.0f32; FEATURE_DIM]);
+        assert_eq!(cf.variance, [0.0f32; FEATURE_DIM]);
+    }
+
+    #[test]
+    fn test_aggregate_features_single_value() {
+        let features = extract_features("abc123");
+        let cf = aggregate_features(&[features]);
+        // Mean should equal the single feature vector
+        assert_eq!(cf.mean, features);
+        // Variance should be zero (single observation)
+        for v in cf.variance {
+            assert!(v.abs() < 1e-6, "variance should be ~0 for single value, got {}", v);
+        }
+        // Min/max should equal the single feature vector
+        assert_eq!(cf.min, features);
+        assert_eq!(cf.max, features);
+    }
+
+    #[test]
+    fn test_aggregate_features_variance() {
+        // Two values with different lengths → non-zero length variance
+        let f1 = extract_features("abc");   // length = 3
+        let f2 = extract_features("abcdef"); // length = 6
+        let cf = aggregate_features(&[f1, f2]);
+
+        let length_idx = feature_idx::LENGTH;
+        // Mean length = (3 + 6) / 2 = 4.5
+        assert!((cf.mean[length_idx] - 4.5).abs() < 0.01, "mean length");
+        // Variance = ((3-4.5)² + (6-4.5)²) / 2 = (2.25 + 2.25) / 2 = 2.25
+        assert!((cf.variance[length_idx] - 2.25).abs() < 0.01, "variance length");
+        // Min/max
+        assert!((cf.min[length_idx] - 3.0).abs() < 0.01, "min length");
+        assert!((cf.max[length_idx] - 6.0).abs() < 0.01, "max length");
+    }
+
+    #[test]
+    fn test_git_sha_uniform_length_zero_variance() {
+        // Git SHAs: all exactly 40 hex chars → zero length variance
+        let shas = [
+            "a" .repeat(40),
+            "b1c2d3e4f5a6b7c8d9e0a1b2c3d4e5f6a7b8c9d0".to_string(),
+            "1234567890abcdef1234567890abcdef12345678".to_string(),
+            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef".to_string(),
+        ];
+        let per_value: Vec<[f32; FEATURE_DIM]> = shas.iter().map(|s| extract_features(s)).collect();
+        let cf = aggregate_features(&per_value);
+
+        // Length variance should be exactly 0 (all same length)
+        assert!(
+            cf.variance[feature_idx::LENGTH] < 0.01,
+            "git SHA length variance should be ~0, got {}",
+            cf.variance[feature_idx::LENGTH]
+        );
+        // All should be hex
+        assert!(
+            cf.mean[feature_idx::IS_HEX_STRING] >= 0.95,
+            "git SHAs should all be hex, got {}",
+            cf.mean[feature_idx::IS_HEX_STRING]
+        );
+    }
+
+    #[test]
+    fn test_hash_mixed_length_nonzero_variance() {
+        // Mixed hashes: MD5 (32 chars) + SHA1 (40 chars) + SHA256 (64 chars)
+        let hashes = [
+            "d41d8cd98f00b204e9800998ecf8427e".to_string(),  // MD5: 32
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string(),  // SHA1: 40
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(), // SHA256: 64
+        ];
+        let per_value: Vec<[f32; FEATURE_DIM]> = hashes.iter().map(|s| extract_features(s)).collect();
+        let cf = aggregate_features(&per_value);
+
+        // Length variance should be high (32, 40, 64 → mean=45.33, var=177.56)
+        assert!(
+            cf.variance[feature_idx::LENGTH] > 100.0,
+            "mixed hash length variance should be high, got {}",
+            cf.variance[feature_idx::LENGTH]
+        );
+        // All should still be hex
+        assert!(
+            cf.mean[feature_idx::IS_HEX_STRING] >= 0.95,
+            "all hashes should be hex, got {}",
+            cf.mean[feature_idx::IS_HEX_STRING]
+        );
+    }
+
+    #[test]
+    fn test_rule_f4_git_sha_override() {
+        // Simulate: hash wins the vote, but features show zero length variance,
+        // all hex, and mean length = 40 (SHA-1 fingerprint)
+        let mut result = ColumnResult {
+            label: "technology.cryptographic.hash".to_string(),
+            confidence: 0.99,
+            vote_distribution: vec![
+                ("technology.cryptographic.hash".to_string(), 1.0),
+            ],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+        };
+
+        // Build column features with zero length variance, high hex, len=40
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
+        cf.mean[feature_idx::LENGTH] = 40.0;
+        cf.variance[feature_idx::LENGTH] = 0.0;
+
+        let votes = vec![
+            ("technology.cryptographic.hash".to_string(), 100),
+        ];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(result.label, "technology.development.git_sha");
+        assert!(result.disambiguation_applied);
+        assert!(result.disambiguation_rule.as_ref().unwrap().starts_with("feature_git_sha"));
+    }
+
+    #[test]
+    fn test_rule_f4_no_override_when_variance_high() {
+        // Hash column with mixed lengths — should NOT override to git_sha
+        let mut result = ColumnResult {
+            label: "technology.cryptographic.hash".to_string(),
+            confidence: 0.99,
+            vote_distribution: vec![
+                ("technology.cryptographic.hash".to_string(), 1.0),
+            ],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
+        cf.mean[feature_idx::LENGTH] = 45.3;
+        cf.variance[feature_idx::LENGTH] = 177.56; // high variance = mixed hash lengths
+
+        let votes = vec![
+            ("technology.cryptographic.hash".to_string(), 100),
+        ];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(result.label, "technology.cryptographic.hash", "should NOT override when length variance is high");
+        assert!(!result.disambiguation_applied);
+    }
+
+    #[test]
+    fn test_rule_f4_no_override_when_length_not_40() {
+        // Uniform-length hex but NOT length 40 (e.g., MD5 at 32) — should NOT override
+        let mut result = ColumnResult {
+            label: "technology.cryptographic.hash".to_string(),
+            confidence: 0.99,
+            vote_distribution: vec![
+                ("technology.cryptographic.hash".to_string(), 1.0),
+            ],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
+        cf.mean[feature_idx::LENGTH] = 32.0; // MD5 length
+        cf.variance[feature_idx::LENGTH] = 0.0; // zero variance
+
+        let votes = vec![
+            ("technology.cryptographic.hash".to_string(), 100),
+        ];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(result.label, "technology.cryptographic.hash", "should NOT override for non-40-char uniform hex");
+        assert!(!result.disambiguation_applied);
+    }
+
+    #[test]
+    fn test_hs_code_float_parseability() {
+        // HS codes with 3 segments don't parse as float
+        let codes = [
+            "6204.62.40",  // 3 segments → NOT float-parseable
+            "8471.30.10",
+            "8471.30",     // 2 segments → float-parseable (8471.30)
+            "6204.62",
+        ];
+        let per_value: Vec<[f32; FEATURE_DIM]> = codes.iter().map(|s| extract_features(s)).collect();
+        let cf = aggregate_features(&per_value);
+
+        // is_float should be < 1.0 (2 of 4 don't parse as float)
+        assert!(
+            cf.mean[feature_idx::IS_FLOAT] < 1.0,
+            "HS codes with 3-segment entries should have is_float < 1.0, got {}",
+            cf.mean[feature_idx::IS_FLOAT]
+        );
+        // digit_ratio should be high
+        assert!(
+            cf.mean[feature_idx::DIGIT_RATIO] > 0.7,
+            "HS codes should have high digit ratio, got {}",
+            cf.mean[feature_idx::DIGIT_RATIO]
+        );
+    }
+
+    #[test]
+    fn test_rule_f3_enhanced_float_parseability() {
+        // Simulate: decimal_number wins but float-parseability < 1.0 → hs_code override
+        let mut result = ColumnResult {
+            label: "representation.numeric.decimal_number".to_string(),
+            confidence: 0.80,
+            vote_distribution: vec![
+                ("representation.numeric.decimal_number".to_string(), 0.70),
+                ("geography.trade.hs_code".to_string(), 0.20),
+            ],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::DIGIT_RATIO] = 0.85;
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 1.8; // between 1.5 and 2.0
+        cf.mean[feature_idx::IS_FLOAT] = 0.5; // only half parse as float
+
+        let votes = vec![
+            ("representation.numeric.decimal_number".to_string(), 70),
+            ("geography.trade.hs_code".to_string(), 20),
+        ];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(result.label, "geography.trade.hs_code");
+        assert!(result.disambiguation_applied);
+        assert!(result.disambiguation_rule.as_ref().unwrap().contains("feature_hs_code"));
     }
 }

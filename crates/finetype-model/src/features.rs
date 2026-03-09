@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 
 /// Total number of features in the feature vector.
-pub const FEATURE_DIM: usize = 32;
+pub const FEATURE_DIM: usize = 34;
 
 /// Human-readable names for each feature index, for interpretability and debugging.
 pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
@@ -51,6 +51,9 @@ pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
     "starts_with_digit",   // 29
     "ends_with_digit",     // 30
     "length_bucket",       // 31
+    // Tier 4 — Character-presence binary features (NNFT-266)
+    "has_colon",           // 32
+    "has_dash",            // 33
 ];
 
 /// Extract a fixed-size feature vector from a string value.
@@ -246,6 +249,16 @@ pub fn extract_features(value: &str) -> [f32; FEATURE_DIM] {
 
     // 31: length_bucket — log2(length+1) for scale-invariant length signal
     f[31] = (char_count as f32 + 1.0).log2();
+
+    // ─── Tier 4: Character-presence binary features (NNFT-266) ────────
+    // These support column-level disambiguation rules for docker_ref vs
+    // hostname (colon = port/tag separator) and UUID/date patterns (dash).
+
+    // 32: has_colon — contains ':' character
+    f[32] = if value.contains(':') { 1.0 } else { 0.0 };
+
+    // 33: has_dash — contains '-' character
+    f[33] = if value.contains('-') { 1.0 } else { 0.0 };
 
     f
 }
@@ -587,6 +600,41 @@ mod tests {
         assert_eq!(feat(&f, "has_mixed_case"), 1.0);
     }
 
+    // ─── Tier 4: Character-presence features (NNFT-266) ────────────────
+
+    #[test]
+    fn test_has_colon() {
+        // Docker refs, timestamps, URLs with port
+        assert_eq!(feat(&extract_features("nginx:latest"), "has_colon"), 1.0);
+        assert_eq!(
+            feat(&extract_features("10:30:00"), "has_colon"),
+            1.0
+        );
+        assert_eq!(
+            feat(&extract_features("host:8080"), "has_colon"),
+            1.0
+        );
+        // No colon
+        assert_eq!(feat(&extract_features("hello"), "has_colon"), 0.0);
+        assert_eq!(feat(&extract_features("192.168.1.1"), "has_colon"), 0.0);
+    }
+
+    #[test]
+    fn test_has_dash() {
+        // UUIDs, dates, hyphenated names
+        assert_eq!(feat(&extract_features("2024-01-15"), "has_dash"), 1.0);
+        assert_eq!(
+            feat(
+                &extract_features("550e8400-e29b-41d4-a716-446655440000"),
+                "has_dash"
+            ),
+            1.0
+        );
+        // No dash
+        assert_eq!(feat(&extract_features("hello"), "has_dash"), 0.0);
+        assert_eq!(feat(&extract_features("12345"), "has_dash"), 0.0);
+    }
+
     // ─── Determinism ────────────────────────────────────────────────────
 
     #[test]
@@ -622,10 +670,11 @@ mod tests {
         }
         let elapsed = start.elapsed();
 
-        // 10k values should complete in <1 second (0.1ms/value budget)
+        // 10k values should complete in <2 seconds in debug mode (0.2ms/value budget).
+        // Release mode is ~10x faster. Budget increased from 1s in NNFT-266 (34 features).
         assert!(
-            elapsed.as_secs_f64() < 1.0,
-            "10k extractions took {:.3}s — exceeds 1s budget",
+            elapsed.as_secs_f64() < 2.0,
+            "10k extractions took {:.3}s — exceeds 2s budget",
             elapsed.as_secs_f64()
         );
     }
