@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-03-11
+
+### Fixed
+
+- **DuckDB `duckdb_type_from_broad_type` missing SMALLINT and 4 other types** — `SMALLINT`, `UTINYINT`, `USMALLINT`, `UINTEGER`, and `UBIGINT` broad types were unmapped, causing DuckDB extension to fall through to VARCHAR. All 5 now correctly map to their DuckDB types. (NNFT-261)
+
+### Added
+
+- **Hierarchical classification head** — Tree softmax replacing flat 250-class output: 7 domains → 43 categories → 250 leaf types. Multi-level CE loss (λ=0.2/0.3/0.5). Accessible via `--hierarchical` CLI flag. char-cnn-v15-250: 84.2% type, 90.9% domain, 96.5% category training accuracy. Profile eval matches flat baseline at 180/186. Backward compatible — flat head remains default. (NNFT-267)
+- **Sibling-context attention module** — 2-layer pre-norm transformer self-attention (4 heads, 128-dim, 396K params) over Model2Vec column header embeddings. Enriches per-column headers with cross-column context before Sense classification. Architecturally complete but inert until trained — no model artifact means pipeline is unchanged. Multi-column entry point: `classify_columns_with_context()`. (NNFT-268)
+- **Sherlock-style features** — FEATURE_DIM 34→36: `has_negative_prefix` (starts with '-' + digit) and `has_percent` (contains '%'). Rule F3 enhanced with negative-prefix guard and dot-variance confidence check for hs_code vs decimal_number disambiguation. (NNFT-270)
+- **Financial header hints** — `price`, `cost`, `salary`, `fare`, `fee`, `toll`, `charge`, `revenue`, `income`, `wage`, `budget`, `expense` now hint to `finance.currency.amount` instead of generic `decimal_number`. Informed by LLM distillation findings (NNFT-269). (NNFT-270)
+
+### Improved
+
+- **Column feature expansion** — FEATURE_DIM 32→34 (has_colon, has_dash). ColumnFeatures struct with mean/variance/min/max aggregation. Rule F4: zero length-variance + all hex + len=40 → git_sha. Rule F3 enhanced with float-parseability Path B. (NNFT-266)
+
+### Accuracy
+
+- **Profile eval: 96.8% label, 98.4% domain** (180/186 columns, up from 179/186 in v0.6.8). git_sha misclassification fixed by F4 rule. (NNFT-266)
+
+### Discovery
+
+- **LLM distillation** — Qwen3 8B on 5,359 columns: 97% valid labels, 20% agreement with FineType. Strong on technology domain (62%), weak on representation (17%) and finance (3%). Useful as complementary signal, not standalone teacher. Scaling recommendations documented. (NNFT-269)
+- **Sibling-context attention spike** — Validated 2-layer self-attention over Model2Vec in Candle. 396K params, 112μs–1.3ms latency, single-column graceful degradation. (NNFT-263)
+
 ## [0.6.8] - 2026-03-08
 
 ### Improved
