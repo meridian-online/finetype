@@ -615,6 +615,7 @@ impl TieredClassifier {
             n_classes,
             dropout: 0.0,
             feature_dim,
+            ..Default::default()
         };
 
         let vb = VarBuilder::from_buffered_safetensors(weights.to_vec(), DType::F32, device)?;

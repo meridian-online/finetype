@@ -22,7 +22,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.8
 **Taxonomy:** 250 definitions across 7 domains (container: 12, datetime: 84, finance: 31, geography: 25, identity: 34, representation: 36, technology: 28) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v14-250 flat (250 classes, 10 epochs, 372k samples), tiered-v2 fallback via `--sharp-only`.
+**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v14-250 flat (250 classes, 10 epochs, 372k samples), tiered-v2 fallback via `--sharp-only`. Hierarchical head available: char-cnn-v15-250 (7→43→250 tree softmax, 84.2% type / 90.9% domain / 96.5% category training accuracy).
 **Features:** 34-dim deterministic feature extractor (NNFT-248/266), column-level aggregation (mean, variance, min, max), 4 feature-based disambiguation rules (F1–F4).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
@@ -30,6 +30,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
+- **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax replacing flat 250-class output: 7 domains → 43 categories → 250 leaf types. HierarchyMap derived from label strings, HierarchicalHead with per-node Linear layers (39 non-degenerate leaf heads, 4 degenerate skipped). Multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode (Flat/Hierarchical) with backbone_forward(). char-cnn-v15-250: 84.2% type, 90.9% domain, 96.5% category. Profile: 180/186 (96.8% label, 98.4% domain) — matches flat baseline. `--hierarchical` CLI/script flag. Backward compatible.
 - **Column feature expansion** (NNFT-266, m-13) — FEATURE_DIM 32→34 (has_colon, has_dash). ColumnFeatures struct replaces raw mean array with mean/variance/min/max aggregation. Rule F4: zero length-variance + all hex + len=40 → git_sha (not hash). Rule F3 enhanced with float-parseability Path B. Profile: 180/186 (96.8% label, 98.4% domain). 1 fewer misclassification (git_sha fixed).
 - **Deep accuracy spike** (NNFT-253/254, m-12) — NNFT-253 found feature_dim=32 regresses eval (-1.6pp city attractor). NNFT-254 expanded header hints (~30 new rules for epoch, age, altitude, categorical text, etc.), added cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross-domain / 0.5 same-domain), fixed 7 substring matching bugs. Confirmed feature_dim=0 + rules is the better path. Profile: 179/186 (96.2% label, 98.4% domain). Actionability: 99.9%.
 - **Feature-augmented CharCNN pipeline** (NNFT-247–251, m-12) — 32-feature deterministic extractor (parse tests, char stats, structural), parallel fusion at CharCNN classifier head (`feature_dim` config, backward compatible), Sense→Sharpen pipeline integration with per-value + aggregated column features, 3 feature-based disambiguation rules.
@@ -239,6 +240,7 @@ Key decisions — do not revisit without good reason. See backlog decisions and 
 20. **Pure Rust via Candle (Path A)** — Full Rust migration replacing all Python. Candle 0.8 with `half = "2.4"` pin. Validated: architecture, gradients, optimizer, safetensors round-trip. (NNFT-182/187)
 21. **MCP server via rmcp** — Official Rust MCP SDK v1.1.0, stdio transport, single binary (`finetype mcp` subcommand). 6 tools + taxonomy resources. JSON + markdown dual output. (NNFT-240/241)
 22. **Rules over feature-augmented model** — feature_dim=0 + expanded header hints + F1-F4 post-vote rules outperforms feature_dim=32 CharCNN. Feature fusion causes city attractor regression (-1.6pp). Cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross/0.5 same). Column-level variance/min/max aggregation (NNFT-266) for distributional disambiguation. (NNFT-253/254/266)
+23. **Hierarchical classification head** — Tree softmax (7 domains → 43 categories → 250 leaf types) with multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode: `new()` flat (default, backward compatible), `new_hierarchical()` tree. Product probabilities p(type)=p(domain)×p(cat|domain)×p(leaf|cat). Degenerate categories (1 type) skip leaf head. 84.2% type accuracy, maintains 180/186 profile eval. (NNFT-267)
 
 ## Build & Test
 

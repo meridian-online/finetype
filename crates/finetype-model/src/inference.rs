@@ -1,6 +1,6 @@
 //! Inference utilities for text classification.
 
-use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab};
+use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType};
 use crate::model::{TextClassifier, TextClassifierConfig};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
@@ -281,6 +281,7 @@ impl CharClassifier {
         let mut num_filters = 64usize;
         let mut hidden_dim = 128usize;
         let mut feature_dim = 0usize;
+        let mut head_type_str = String::from("flat");
 
         for line in config_str.lines() {
             if let Some((key, val)) = line.split_once(':') {
@@ -293,10 +294,17 @@ impl CharClassifier {
                     "num_filters" => num_filters = val.parse().unwrap_or(64),
                     "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
                     "feature_dim" => feature_dim = val.parse().unwrap_or(0),
+                    "head_type" => head_type_str = val.to_string(),
                     _ => {}
                 }
             }
         }
+
+        let head_type = if head_type_str == "hierarchical" {
+            HeadType::Hierarchical
+        } else {
+            HeadType::Flat
+        };
 
         let vocab = CharVocab::new();
         let config = CharCnnConfig {
@@ -309,10 +317,20 @@ impl CharClassifier {
             n_classes,
             dropout: 0.0,
             feature_dim,
+            head_type,
         };
 
         let vb = VarBuilder::from_buffered_safetensors(weights.to_vec(), DType::F32, &device)?;
-        let model = CharCnn::new(config, vb)?;
+
+        // Build sorted label list for hierarchical head reconstruction
+        let mut labels_sorted: Vec<String> = index_to_label.values().cloned().collect();
+        labels_sorted.sort();
+
+        let model = if config.head_type == HeadType::Hierarchical {
+            CharCnn::new_hierarchical(config, &labels_sorted, vb)?
+        } else {
+            CharCnn::new(config, vb)?
+        };
 
         Ok(Self {
             model,
@@ -353,7 +371,7 @@ impl CharClassifier {
 
         // Load config from config.yaml if available
         let config_path = model_dir.join("config.yaml");
-        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim, feature_dim) =
+        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim, feature_dim, head_type) =
             if config_path.exists() {
                 let config_str = std::fs::read_to_string(&config_path)?;
                 let mut vocab_size = 97usize;
@@ -362,6 +380,7 @@ impl CharClassifier {
                 let mut num_filters = 64usize;
                 let mut hidden_dim = 128usize;
                 let mut feature_dim = 0usize;
+                let mut head_type_str = String::from("flat");
 
                 for line in config_str.lines() {
                     if let Some((key, val)) = line.split_once(':') {
@@ -374,10 +393,18 @@ impl CharClassifier {
                             "num_filters" => num_filters = val.parse().unwrap_or(64),
                             "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
                             "feature_dim" => feature_dim = val.parse().unwrap_or(0),
+                            "head_type" => head_type_str = val.to_string(),
                             _ => {}
                         }
                     }
                 }
+
+                let ht = if head_type_str == "hierarchical" {
+                    HeadType::Hierarchical
+                } else {
+                    HeadType::Flat
+                };
+
                 (
                     vocab_size,
                     max_seq_length,
@@ -385,9 +412,10 @@ impl CharClassifier {
                     num_filters,
                     hidden_dim,
                     feature_dim,
+                    ht,
                 )
             } else {
-                (97, 128, 32, 64, 128, 0)
+                (97, 128, 32, 64, 128, 0, HeadType::Flat)
             };
 
         let vocab = CharVocab::new();
@@ -402,6 +430,7 @@ impl CharClassifier {
             n_classes,
             dropout: 0.0, // No dropout during inference
             feature_dim,
+            head_type,
         };
 
         // Load model weights
@@ -409,7 +438,15 @@ impl CharClassifier {
         let vb =
             unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? };
 
-        let model = CharCnn::new(config, vb)?;
+        // Build sorted label list for hierarchical head reconstruction
+        let mut labels_sorted: Vec<String> = index_to_label.values().cloned().collect();
+        labels_sorted.sort();
+
+        let model = if config.head_type == HeadType::Hierarchical {
+            CharCnn::new_hierarchical(config, &labels_sorted, vb)?
+        } else {
+            CharCnn::new(config, vb)?
+        };
 
         Ok(Self {
             model,

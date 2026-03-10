@@ -19,7 +19,7 @@ pub mod tiered;
 pub mod tiered_training;
 pub mod training;
 
-pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab};
+pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchyMap};
 pub use char_training::{CharTrainer, CharTrainingConfig};
 pub use column::{ColumnClassifier, ColumnConfig, ColumnResult};
 pub use entity::EntityClassifier;

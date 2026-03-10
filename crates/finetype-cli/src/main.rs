@@ -156,6 +156,11 @@ enum Commands {
         /// features per sample and passes them alongside character encodings.
         #[arg(long)]
         use_features: bool,
+
+        /// Enable hierarchical classification head (NNFT-267). Uses tree softmax
+        /// (7 domains → 43 categories → 250 leaf types) instead of flat 250-class softmax.
+        #[arg(long)]
+        hierarchical: bool,
     },
 
     /// Show taxonomy information
@@ -496,6 +501,7 @@ fn main() -> Result<()> {
             model_type,
             seed,
             use_features,
+            hierarchical,
         } => cmd_train(
             data,
             taxonomy,
@@ -506,6 +512,7 @@ fn main() -> Result<()> {
             model_type,
             seed,
             use_features,
+            hierarchical,
         ),
 
         Commands::Taxonomy {
@@ -1489,6 +1496,7 @@ fn cmd_train(
     model_type: ModelType,
     seed: Option<u64>,
     use_features: bool,
+    hierarchical: bool,
 ) -> Result<()> {
     use finetype_core::Sample;
     use std::io::BufRead;
@@ -1551,6 +1559,7 @@ fn cmd_train(
                 shuffle: true,
                 seed,
                 use_features,
+                use_hierarchical: hierarchical,
             };
 
             eprintln!("Training CharCNN model");

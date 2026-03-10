@@ -1,6 +1,6 @@
 //! Training utilities for character-level CNN classifier.
 
-use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab};
+use crate::char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchyMap};
 use crate::features::{extract_features, FEATURE_DIM};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarBuilder, VarMap};
@@ -38,6 +38,10 @@ pub struct CharTrainingConfig {
     /// features are extracted per sample and passed to the model alongside
     /// character encodings. The model's `feature_dim` is set to `FEATURE_DIM`.
     pub use_features: bool,
+    /// Enable hierarchical classification head (NNFT-267). When true, the model
+    /// uses a tree softmax (domain → category → leaf type) instead of a flat
+    /// 250-class softmax. Training uses multi-level cross-entropy loss.
+    pub use_hierarchical: bool,
 }
 
 impl Default for CharTrainingConfig {
@@ -54,6 +58,7 @@ impl Default for CharTrainingConfig {
             shuffle: true,
             seed: None,
             use_features: false,
+            use_hierarchical: false,
         }
     }
 }
@@ -89,8 +94,27 @@ impl CharTrainer {
 
         // Create label mapping
         let label_to_index = taxonomy.label_to_index();
+        let labels_list: Vec<String> = taxonomy.labels().to_vec();
         let n_classes = taxonomy.len();
         eprintln!("Number of classes: {}", n_classes);
+
+        // Build hierarchy map if hierarchical mode (NNFT-267)
+        let hierarchy = if self.config.use_hierarchical {
+            let h = HierarchyMap::from_labels(&labels_list);
+            eprintln!(
+                "Hierarchical mode: {} domains, {} categories, {} leaf types ({} degenerate categories)",
+                h.num_domains(),
+                h.total_categories(),
+                n_classes,
+                (0..h.num_domains())
+                    .flat_map(|d| (0..h.num_categories(d)).map(move |c| (d, c)))
+                    .filter(|&(d, c)| h.is_degenerate(d, c))
+                    .count()
+            );
+            Some(h)
+        } else {
+            None
+        };
 
         // Shuffle samples if configured
         let mut samples_vec: Vec<&Sample> = samples.iter().collect();
@@ -117,6 +141,12 @@ impl CharTrainer {
             0
         };
 
+        let head_type = if self.config.use_hierarchical {
+            HeadType::Hierarchical
+        } else {
+            HeadType::Flat
+        };
+
         let model_config = CharCnnConfig {
             vocab_size: self.vocab.vocab_size(),
             max_seq_length: self.config.max_seq_length,
@@ -125,16 +155,26 @@ impl CharTrainer {
             hidden_dim: self.config.hidden_dim,
             n_classes,
             feature_dim,
+            head_type,
             ..Default::default()
         };
 
-        let model = CharCnn::new(model_config, vb)?;
+        let model = if self.config.use_hierarchical {
+            CharCnn::new_hierarchical(model_config, &labels_list, vb)?
+        } else {
+            CharCnn::new(model_config, vb)?
+        };
         eprintln!(
-            "Model initialized (vocab_size={}, embed_dim={}, filters={}, feature_dim={})",
+            "Model initialized (vocab_size={}, embed_dim={}, filters={}, feature_dim={}, head={})",
             self.vocab.vocab_size(),
             self.config.embed_dim,
             self.config.num_filters,
-            feature_dim
+            feature_dim,
+            if self.config.use_hierarchical {
+                "hierarchical"
+            } else {
+                "flat"
+            }
         );
 
         // Create optimizer
@@ -159,6 +199,9 @@ impl CharTrainer {
             let mut total_loss = 0.0;
             let mut num_correct = 0usize;
             let mut num_total = 0usize;
+            // Per-level accuracy tracking for hierarchical mode (NNFT-267)
+            let mut domain_correct = 0usize;
+            let mut cat_correct = 0usize;
 
             for batch_idx in 0..num_batches {
                 let start = batch_idx * self.config.batch_size;
@@ -166,14 +209,196 @@ impl CharTrainer {
                 let batch: Vec<&Sample> = samples_vec[start..end].to_vec();
 
                 // Prepare batch (includes features when use_features=true)
-                let (input_ids, features, labels) = self.prepare_batch(&batch, &label_to_index)?;
+                let (input_ids, features, labels) =
+                    self.prepare_batch(&batch, &label_to_index)?;
 
-                // Forward pass with optional features (NNFT-249)
-                let logits = model.forward_with_features(&input_ids, features.as_ref())?;
-                let logits = logits.contiguous()?;
+                let loss = if self.config.use_hierarchical {
+                    // Hierarchical training: multi-level cross-entropy (NNFT-267)
+                    let hier = hierarchy.as_ref().unwrap();
+                    let hier_head = model.hierarchical_head().unwrap();
 
-                // Compute loss
-                let loss = candle_nn::loss::cross_entropy(&logits, &labels)?;
+                    // Get backbone hidden representation
+                    let hidden = model.backbone_forward(&input_ids, features.as_ref())?;
+
+                    // Get per-level logits
+                    let (domain_logits, cat_logits_all, leaf_logits_all) =
+                        hier_head.forward_levels(&hidden)?;
+
+                    // Prepare per-level targets from flat labels
+                    let flat_labels: Vec<u32> = labels.to_vec1()?;
+                    let batch_len = flat_labels.len();
+
+                    let mut domain_targets = Vec::with_capacity(batch_len);
+                    let mut cat_targets_by_domain: Vec<Vec<u32>> =
+                        vec![Vec::new(); hier.num_domains()];
+                    let mut cat_sample_indices_by_domain: Vec<Vec<usize>> =
+                        vec![Vec::new(); hier.num_domains()];
+                    let mut leaf_targets_by_cat: Vec<Vec<Vec<u32>>> = Vec::new();
+                    let mut leaf_sample_indices_by_cat: Vec<Vec<Vec<usize>>> = Vec::new();
+
+                    for d in 0..hier.num_domains() {
+                        leaf_targets_by_cat
+                            .push(vec![Vec::new(); hier.num_categories(d)]);
+                        leaf_sample_indices_by_cat
+                            .push(vec![Vec::new(); hier.num_categories(d)]);
+                    }
+
+                    for (i, &flat_idx) in flat_labels.iter().enumerate() {
+                        let (d, c, t) = hier.flat_to_hier(flat_idx as usize);
+                        domain_targets.push(d as u32);
+                        cat_targets_by_domain[d].push(c as u32);
+                        cat_sample_indices_by_domain[d].push(i);
+                        leaf_targets_by_cat[d][c].push(t as u32);
+                        leaf_sample_indices_by_cat[d][c].push(i);
+                    }
+
+                    // Domain loss (all samples)
+                    let domain_target_tensor =
+                        Tensor::new(domain_targets.clone(), &self.device)?;
+                    let domain_loss = candle_nn::loss::cross_entropy(
+                        &domain_logits,
+                        &domain_target_tensor,
+                    )?;
+
+                    // Track domain accuracy
+                    let domain_preds = domain_logits.argmax(1)?;
+                    let d_correct = domain_preds
+                        .eq(&domain_target_tensor)?
+                        .to_dtype(DType::F32)?
+                        .sum_all()?
+                        .to_scalar::<f32>()?;
+                    domain_correct += d_correct as usize;
+
+                    // Category loss (grouped by GT domain)
+                    let mut cat_loss_sum = Tensor::new(0.0f32, &self.device)?;
+                    let mut cat_count = 0usize;
+
+                    for d in 0..hier.num_domains() {
+                        if cat_targets_by_domain[d].is_empty() {
+                            continue;
+                        }
+                        let indices: Vec<u32> = cat_sample_indices_by_domain[d]
+                            .iter()
+                            .map(|&i| i as u32)
+                            .collect();
+                        let idx_tensor = Tensor::new(indices, &self.device)?;
+                        let cat_logits_subset =
+                            cat_logits_all[d].index_select(&idx_tensor, 0)?;
+                        let cat_target_tensor =
+                            Tensor::new(cat_targets_by_domain[d].clone(), &self.device)?;
+                        let cl = candle_nn::loss::cross_entropy(
+                            &cat_logits_subset,
+                            &cat_target_tensor,
+                        )?;
+                        let n = cat_targets_by_domain[d].len() as f32;
+                        cat_loss_sum =
+                            (cat_loss_sum + cl.broadcast_mul(&Tensor::new(n, &self.device)?))?;
+                        cat_count += cat_targets_by_domain[d].len();
+
+                        // Track category accuracy
+                        let cat_preds = cat_logits_subset.argmax(1)?;
+                        let c_correct = cat_preds
+                            .eq(&cat_target_tensor)?
+                            .to_dtype(DType::F32)?
+                            .sum_all()?
+                            .to_scalar::<f32>()?;
+                        cat_correct += c_correct as usize;
+                    }
+
+                    let cat_loss = if cat_count > 0 {
+                        cat_loss_sum.broadcast_div(
+                            &Tensor::new(cat_count as f32, &self.device)?,
+                        )?
+                    } else {
+                        Tensor::new(0.0f32, &self.device)?
+                    };
+
+                    // Leaf loss (grouped by GT domain+category, skip degenerate)
+                    let mut leaf_loss_sum = Tensor::new(0.0f32, &self.device)?;
+                    let mut leaf_count = 0usize;
+
+                    for d in 0..hier.num_domains() {
+                        for c in 0..hier.num_categories(d) {
+                            if hier.is_degenerate(d, c)
+                                || leaf_targets_by_cat[d][c].is_empty()
+                            {
+                                continue;
+                            }
+                            let leaf_logits_opt = &leaf_logits_all[d][c];
+                            if let Some(ref leaf_logits) = leaf_logits_opt {
+                                let indices: Vec<u32> = leaf_sample_indices_by_cat[d][c]
+                                    .iter()
+                                    .map(|&i| i as u32)
+                                    .collect();
+                                let idx_tensor = Tensor::new(indices, &self.device)?;
+                                let leaf_logits_subset =
+                                    leaf_logits.index_select(&idx_tensor, 0)?;
+                                let leaf_target_tensor = Tensor::new(
+                                    leaf_targets_by_cat[d][c].clone(),
+                                    &self.device,
+                                )?;
+                                let ll = candle_nn::loss::cross_entropy(
+                                    &leaf_logits_subset,
+                                    &leaf_target_tensor,
+                                )?;
+                                let n = leaf_targets_by_cat[d][c].len() as f32;
+                                leaf_loss_sum = (leaf_loss_sum
+                                    + ll.broadcast_mul(
+                                        &Tensor::new(n, &self.device)?,
+                                    ))?;
+                                leaf_count += leaf_targets_by_cat[d][c].len();
+                            }
+                        }
+                    }
+
+                    let leaf_loss = if leaf_count > 0 {
+                        leaf_loss_sum.broadcast_div(
+                            &Tensor::new(leaf_count as f32, &self.device)?,
+                        )?
+                    } else {
+                        Tensor::new(0.0f32, &self.device)?
+                    };
+
+                    // Weighted combination: λ = (0.2, 0.3, 0.5)
+                    let total = (domain_loss
+                        .broadcast_mul(&Tensor::new(0.2f32, &self.device)?)?
+                        + cat_loss
+                            .broadcast_mul(&Tensor::new(0.3f32, &self.device)?)?
+                        + leaf_loss
+                            .broadcast_mul(&Tensor::new(0.5f32, &self.device)?)?)?;
+
+                    // Track flat accuracy via product probabilities
+                    let probs =
+                        model.forward_with_features(&input_ids, features.as_ref())?;
+                    let predictions = probs.argmax(1)?;
+                    let correct = predictions
+                        .eq(&labels)?
+                        .to_dtype(DType::F32)?
+                        .sum_all()?
+                        .to_scalar::<f32>()?;
+                    num_correct += correct as usize;
+                    num_total += batch.len();
+
+                    total
+                } else {
+                    // Flat training: standard cross-entropy (existing path)
+                    let logits =
+                        model.forward_with_features(&input_ids, features.as_ref())?;
+                    let logits = logits.contiguous()?;
+                    let loss = candle_nn::loss::cross_entropy(&logits, &labels)?;
+
+                    // Compute accuracy
+                    let predictions = logits.argmax(1)?;
+                    let correct = predictions
+                        .eq(&labels)?
+                        .to_dtype(DType::F32)?
+                        .sum_all()?
+                        .to_scalar::<f32>()?;
+                    num_correct += correct as usize;
+                    num_total += batch.len();
+
+                    loss
+                };
 
                 // Backward pass
                 optimizer.backward_step(&loss)?;
@@ -181,16 +406,6 @@ impl CharTrainer {
                 // Track metrics
                 let loss_val = loss.to_scalar::<f32>()?;
                 total_loss += loss_val;
-
-                // Compute accuracy
-                let predictions = logits.argmax(1)?;
-                let correct = predictions
-                    .eq(&labels)?
-                    .to_dtype(DType::F32)?
-                    .sum_all()?
-                    .to_scalar::<f32>()?;
-                num_correct += correct as usize;
-                num_total += batch.len();
 
                 // Print progress
                 if (batch_idx + 1) % 10 == 0 || batch_idx == num_batches - 1 {
@@ -207,13 +422,27 @@ impl CharTrainer {
             let avg_loss = total_loss / num_batches as f32;
             let accuracy = num_correct as f32 / num_total as f32;
 
-            eprintln!(
-                "Epoch {}/{}: loss={:.4}, accuracy={:.2}%",
-                epoch + 1,
-                self.config.epochs,
-                avg_loss,
-                accuracy * 100.0
-            );
+            if self.config.use_hierarchical {
+                let domain_acc = domain_correct as f32 / num_total as f32;
+                let cat_acc = cat_correct as f32 / num_total as f32;
+                eprintln!(
+                    "Epoch {}/{}: loss={:.4}, type_acc={:.2}%, domain_acc={:.2}%, cat_acc={:.2}%",
+                    epoch + 1,
+                    self.config.epochs,
+                    avg_loss,
+                    accuracy * 100.0,
+                    domain_acc * 100.0,
+                    cat_acc * 100.0
+                );
+            } else {
+                eprintln!(
+                    "Epoch {}/{}: loss={:.4}, accuracy={:.2}%",
+                    epoch + 1,
+                    self.config.epochs,
+                    avg_loss,
+                    accuracy * 100.0
+                );
+            }
         }
 
         // Save model
@@ -222,15 +451,21 @@ impl CharTrainer {
         varmap.save(output_dir.join("model.safetensors"))?;
 
         // Save config for inference
+        let head_type_str = if self.config.use_hierarchical {
+            "hierarchical"
+        } else {
+            "flat"
+        };
         let config_str = format!(
-            "vocab_size: {}\nmax_seq_length: {}\nembed_dim: {}\nnum_filters: {}\nhidden_dim: {}\nn_classes: {}\nfeature_dim: {}\nmodel_type: char_cnn\n",
+            "vocab_size: {}\nmax_seq_length: {}\nembed_dim: {}\nnum_filters: {}\nhidden_dim: {}\nn_classes: {}\nfeature_dim: {}\nhead_type: {}\nmodel_type: char_cnn\n",
             self.vocab.vocab_size(),
             self.config.max_seq_length,
             self.config.embed_dim,
             self.config.num_filters,
             self.config.hidden_dim,
             n_classes,
-            feature_dim
+            feature_dim,
+            head_type_str
         );
         std::fs::write(output_dir.join("config.yaml"), config_str)?;
 
