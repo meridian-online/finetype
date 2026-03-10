@@ -30,6 +30,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent milestones
 
+- **Sibling-context attention module** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention over Model2Vec column embeddings. Enriches per-column headers with cross-column context before Sense classification. 396,800 params (1.51 MB), 108μs–1.4ms latency. Architecturally complete but inert until trained — no model artifact means pipeline is unchanged (zero regression, 180/186 profile eval). Multi-column entry point: `classify_columns_with_context()`. Profile command uses batch path when sibling context available. Training data pipeline designed (GitTables). Addresses 3/7 remaining bare-name ambiguity errors.
 - **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax replacing flat 250-class output: 7 domains → 43 categories → 250 leaf types. HierarchyMap derived from label strings, HierarchicalHead with per-node Linear layers (39 non-degenerate leaf heads, 4 degenerate skipped). Multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode (Flat/Hierarchical) with backbone_forward(). char-cnn-v15-250: 84.2% type, 90.9% domain, 96.5% category. Profile: 180/186 (96.8% label, 98.4% domain) — matches flat baseline. `--hierarchical` CLI/script flag. Backward compatible.
 - **Column feature expansion** (NNFT-266, m-13) — FEATURE_DIM 32→34 (has_colon, has_dash). ColumnFeatures struct replaces raw mean array with mean/variance/min/max aggregation. Rule F4: zero length-variance + all hex + len=40 → git_sha (not hash). Rule F3 enhanced with float-parseability Path B. Profile: 180/186 (96.8% label, 98.4% domain). 1 fewer misclassification (git_sha fixed).
 - **Deep accuracy spike** (NNFT-253/254, m-12) — NNFT-253 found feature_dim=32 regresses eval (-1.6pp city attractor). NNFT-254 expanded header hints (~30 new rules for epoch, age, altitude, categorical text, etc.), added cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross-domain / 0.5 same-domain), fixed 7 substring matching bugs. Confirmed feature_dim=0 + rules is the better path. Profile: 179/186 (96.2% label, 98.4% domain). Actionability: 99.9%.
@@ -97,6 +98,7 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
 **Value-level:** Single string → type label via `CharClassifier` (flat, 163 classes) or `TieredClassifier` (46 CharCNN models in T0→T1→T2 graph). Both implement `ValueClassifier` trait.
 
 **Column-level (Sense→Sharpen, default):** Vector of strings + header → single column type:
+0. **(Multi-column only, NNFT-268):** When sibling-context attention is loaded, encode all column headers → `[N_cols, 128]`, run self-attention → enriched `[N_cols, 128]`. Each column's enriched header is passed to Sense instead of raw Model2Vec encoding. Falls back to per-column when no model.
 1. Sample 100 values, encode header + first 50 with Model2Vec
 1b. **Extract deterministic features** for all sampled values (32-dim, NNFT-250). Compute aggregated column-level features (mean). Used for CharCNN augmentation and feature-based disambiguation.
 2. Sense classify → broad category (temporal/numeric/geographic/entity/format/text) + entity subtype
@@ -241,6 +243,7 @@ Key decisions — do not revisit without good reason. See backlog decisions and 
 21. **MCP server via rmcp** — Official Rust MCP SDK v1.1.0, stdio transport, single binary (`finetype mcp` subcommand). 6 tools + taxonomy resources. JSON + markdown dual output. (NNFT-240/241)
 22. **Rules over feature-augmented model** — feature_dim=0 + expanded header hints + F1-F4 post-vote rules outperforms feature_dim=32 CharCNN. Feature fusion causes city attractor regression (-1.6pp). Cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross/0.5 same). Column-level variance/min/max aggregation (NNFT-266) for distributional disambiguation. (NNFT-253/254/266)
 23. **Hierarchical classification head** — Tree softmax (7 domains → 43 categories → 250 leaf types) with multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode: `new()` flat (default, backward compatible), `new_hierarchical()` tree. Product probabilities p(type)=p(domain)×p(cat|domain)×p(leaf|cat). Degenerate categories (1 type) skip leaf head. 84.2% type accuracy, maintains 180/186 profile eval. (NNFT-267)
+24. **Sibling-context attention** — 2-layer pre-norm transformer self-attention (4 heads, 128-dim, 396K params) over Model2Vec column header embeddings. Enriches per-column headers with cross-column context before Sense. `classify_columns_with_context()` multi-column entry point; falls back to per-column when no model artifact. N=1 degrades gracefully via residual. Safetensors load/save. 108μs–1.4ms latency. Training requires GitTables multi-column table data. (NNFT-268)
 
 ## Build & Test
 
@@ -273,6 +276,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Semantic hint classifier | `crates/finetype-model/src/semantic.rs` |
 | Entity classifier (Rust) | `crates/finetype-model/src/entity.rs` |
 | Sense classifier (Rust) | `crates/finetype-model/src/sense.rs` |
+| Sibling-context attention | `crates/finetype-model/src/sibling_context.rs` |
 | Shared Model2Vec resources | `crates/finetype-model/src/model2vec_shared.rs` |
 | Label → category map | `crates/finetype-model/src/label_category_map.rs` |
 | Model2Vec artifacts | `models/model2vec/` |

@@ -209,8 +209,7 @@ impl CharTrainer {
                 let batch: Vec<&Sample> = samples_vec[start..end].to_vec();
 
                 // Prepare batch (includes features when use_features=true)
-                let (input_ids, features, labels) =
-                    self.prepare_batch(&batch, &label_to_index)?;
+                let (input_ids, features, labels) = self.prepare_batch(&batch, &label_to_index)?;
 
                 let loss = if self.config.use_hierarchical {
                     // Hierarchical training: multi-level cross-entropy (NNFT-267)
@@ -237,10 +236,8 @@ impl CharTrainer {
                     let mut leaf_sample_indices_by_cat: Vec<Vec<Vec<usize>>> = Vec::new();
 
                     for d in 0..hier.num_domains() {
-                        leaf_targets_by_cat
-                            .push(vec![Vec::new(); hier.num_categories(d)]);
-                        leaf_sample_indices_by_cat
-                            .push(vec![Vec::new(); hier.num_categories(d)]);
+                        leaf_targets_by_cat.push(vec![Vec::new(); hier.num_categories(d)]);
+                        leaf_sample_indices_by_cat.push(vec![Vec::new(); hier.num_categories(d)]);
                     }
 
                     for (i, &flat_idx) in flat_labels.iter().enumerate() {
@@ -253,12 +250,9 @@ impl CharTrainer {
                     }
 
                     // Domain loss (all samples)
-                    let domain_target_tensor =
-                        Tensor::new(domain_targets.clone(), &self.device)?;
-                    let domain_loss = candle_nn::loss::cross_entropy(
-                        &domain_logits,
-                        &domain_target_tensor,
-                    )?;
+                    let domain_target_tensor = Tensor::new(domain_targets.clone(), &self.device)?;
+                    let domain_loss =
+                        candle_nn::loss::cross_entropy(&domain_logits, &domain_target_tensor)?;
 
                     // Track domain accuracy
                     let domain_preds = domain_logits.argmax(1)?;
@@ -282,14 +276,11 @@ impl CharTrainer {
                             .map(|&i| i as u32)
                             .collect();
                         let idx_tensor = Tensor::new(indices, &self.device)?;
-                        let cat_logits_subset =
-                            cat_logits_all[d].index_select(&idx_tensor, 0)?;
+                        let cat_logits_subset = cat_logits_all[d].index_select(&idx_tensor, 0)?;
                         let cat_target_tensor =
                             Tensor::new(cat_targets_by_domain[d].clone(), &self.device)?;
-                        let cl = candle_nn::loss::cross_entropy(
-                            &cat_logits_subset,
-                            &cat_target_tensor,
-                        )?;
+                        let cl =
+                            candle_nn::loss::cross_entropy(&cat_logits_subset, &cat_target_tensor)?;
                         let n = cat_targets_by_domain[d].len() as f32;
                         cat_loss_sum =
                             (cat_loss_sum + cl.broadcast_mul(&Tensor::new(n, &self.device)?))?;
@@ -306,9 +297,7 @@ impl CharTrainer {
                     }
 
                     let cat_loss = if cat_count > 0 {
-                        cat_loss_sum.broadcast_div(
-                            &Tensor::new(cat_count as f32, &self.device)?,
-                        )?
+                        cat_loss_sum.broadcast_div(&Tensor::new(cat_count as f32, &self.device)?)?
                     } else {
                         Tensor::new(0.0f32, &self.device)?
                     };
@@ -319,9 +308,7 @@ impl CharTrainer {
 
                     for d in 0..hier.num_domains() {
                         for c in 0..hier.num_categories(d) {
-                            if hier.is_degenerate(d, c)
-                                || leaf_targets_by_cat[d][c].is_empty()
-                            {
+                            if hier.is_degenerate(d, c) || leaf_targets_by_cat[d][c].is_empty() {
                                 continue;
                             }
                             let leaf_logits_opt = &leaf_logits_all[d][c];
@@ -333,28 +320,23 @@ impl CharTrainer {
                                 let idx_tensor = Tensor::new(indices, &self.device)?;
                                 let leaf_logits_subset =
                                     leaf_logits.index_select(&idx_tensor, 0)?;
-                                let leaf_target_tensor = Tensor::new(
-                                    leaf_targets_by_cat[d][c].clone(),
-                                    &self.device,
-                                )?;
+                                let leaf_target_tensor =
+                                    Tensor::new(leaf_targets_by_cat[d][c].clone(), &self.device)?;
                                 let ll = candle_nn::loss::cross_entropy(
                                     &leaf_logits_subset,
                                     &leaf_target_tensor,
                                 )?;
                                 let n = leaf_targets_by_cat[d][c].len() as f32;
                                 leaf_loss_sum = (leaf_loss_sum
-                                    + ll.broadcast_mul(
-                                        &Tensor::new(n, &self.device)?,
-                                    ))?;
+                                    + ll.broadcast_mul(&Tensor::new(n, &self.device)?))?;
                                 leaf_count += leaf_targets_by_cat[d][c].len();
                             }
                         }
                     }
 
                     let leaf_loss = if leaf_count > 0 {
-                        leaf_loss_sum.broadcast_div(
-                            &Tensor::new(leaf_count as f32, &self.device)?,
-                        )?
+                        leaf_loss_sum
+                            .broadcast_div(&Tensor::new(leaf_count as f32, &self.device)?)?
                     } else {
                         Tensor::new(0.0f32, &self.device)?
                     };
@@ -362,14 +344,11 @@ impl CharTrainer {
                     // Weighted combination: λ = (0.2, 0.3, 0.5)
                     let total = (domain_loss
                         .broadcast_mul(&Tensor::new(0.2f32, &self.device)?)?
-                        + cat_loss
-                            .broadcast_mul(&Tensor::new(0.3f32, &self.device)?)?
-                        + leaf_loss
-                            .broadcast_mul(&Tensor::new(0.5f32, &self.device)?)?)?;
+                        + cat_loss.broadcast_mul(&Tensor::new(0.3f32, &self.device)?)?
+                        + leaf_loss.broadcast_mul(&Tensor::new(0.5f32, &self.device)?)?)?;
 
                     // Track flat accuracy via product probabilities
-                    let probs =
-                        model.forward_with_features(&input_ids, features.as_ref())?;
+                    let probs = model.forward_with_features(&input_ids, features.as_ref())?;
                     let predictions = probs.argmax(1)?;
                     let correct = predictions
                         .eq(&labels)?
@@ -382,8 +361,7 @@ impl CharTrainer {
                     total
                 } else {
                     // Flat training: standard cross-entropy (existing path)
-                    let logits =
-                        model.forward_with_features(&input_ids, features.as_ref())?;
+                    let logits = model.forward_with_features(&input_ids, features.as_ref())?;
                     let logits = logits.contiguous()?;
                     let loss = candle_nn::loss::cross_entropy(&logits, &labels)?;
 

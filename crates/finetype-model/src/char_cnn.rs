@@ -170,8 +170,10 @@ impl HierarchyMap {
     /// sorted (as produced by `Taxonomy::labels()`).
     pub fn from_labels(labels: &[String]) -> Self {
         // Group labels by domain → category → type
-        let mut domain_map: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<String>>> =
-            std::collections::BTreeMap::new();
+        let mut domain_map: std::collections::BTreeMap<
+            String,
+            std::collections::BTreeMap<String, Vec<String>>,
+        > = std::collections::BTreeMap::new();
 
         for label in labels {
             let parts: Vec<&str> = label.splitn(3, '.').collect();
@@ -339,18 +341,10 @@ pub struct HierarchicalHead {
 
 impl HierarchicalHead {
     /// Create a new hierarchical head.
-    pub fn new(
-        hidden_dim: usize,
-        labels: &[String],
-        vb: VarBuilder,
-    ) -> Result<Self> {
+    pub fn new(hidden_dim: usize, labels: &[String], vb: VarBuilder) -> Result<Self> {
         let hierarchy = HierarchyMap::from_labels(labels);
 
-        let domain_head = linear(
-            hidden_dim,
-            hierarchy.num_domains(),
-            vb.pp("hier.domain"),
-        )?;
+        let domain_head = linear(hidden_dim, hierarchy.num_domains(), vb.pp("hier.domain"))?;
 
         let mut category_heads = Vec::with_capacity(hierarchy.num_domains());
         for d in 0..hierarchy.num_domains() {
@@ -421,8 +415,7 @@ impl HierarchicalHead {
                     // Single type → probability = domain_prob * cat_prob * 1.0
                     let flat_idx = self.hierarchy.hier_to_flat(d, c, 0);
                     for b in 0..batch_size {
-                        flat_probs[b][flat_idx] =
-                            domain_probs_vec[b][d] * cat_probs_vec[b][c];
+                        flat_probs[b][flat_idx] = domain_probs_vec[b][d] * cat_probs_vec[b][c];
                     }
                 } else {
                     // Leaf probabilities: (batch, num_types_in_cat)
@@ -434,9 +427,8 @@ impl HierarchicalHead {
                     for t in 0..self.hierarchy.num_types(d, c) {
                         let flat_idx = self.hierarchy.hier_to_flat(d, c, t);
                         for b in 0..batch_size {
-                            flat_probs[b][flat_idx] = domain_probs_vec[b][d]
-                                * cat_probs_vec[b][c]
-                                * leaf_probs_vec[b][t];
+                            flat_probs[b][flat_idx] =
+                                domain_probs_vec[b][d] * cat_probs_vec[b][c] * leaf_probs_vec[b][t];
                         }
                     }
                 }

@@ -421,6 +421,41 @@ impl SenseClassifier {
         self.forward(&header_emb, has_header, &value_embs, &mask)
     }
 
+    /// Classify a column using a pre-computed context-enriched header embedding.
+    ///
+    /// Used by the sibling-context attention module (NNFT-268): the header embedding
+    /// has already been enriched with cross-column context before being passed here.
+    /// The enriched embedding is used directly as the header, skipping `encode_batch`.
+    ///
+    /// `enriched_header_emb` should be a `[D]` tensor from the sibling-context module.
+    pub fn classify_with_enriched_header(
+        &self,
+        resources: &Model2VecResources,
+        enriched_header_emb: &Tensor,
+        values: &[&str],
+    ) -> Result<SenseResult, InferenceError> {
+        let max_values = 50;
+
+        // Encode values (same as classify)
+        let n_values = values.len().min(max_values);
+        let value_texts: Vec<&str> = values.iter().take(n_values).copied().collect();
+        let value_embs = resources.encode_batch(&value_texts)?; // [N, D]
+
+        // Build mask: true for real values (non-zero rows)
+        let mask: Vec<bool> = (0..n_values)
+            .map(|i| {
+                let row: Vec<f32> = value_embs.get(i).unwrap().to_vec1().unwrap_or_default();
+                row.iter().any(|&v| v.abs() > 1e-8)
+            })
+            .collect();
+
+        // Check if enriched header is non-zero (has_header = true)
+        let norm: f32 = enriched_header_emb.sqr()?.sum_all()?.sqrt()?.to_scalar()?;
+        let has_header = norm > 1e-8;
+
+        self.forward(enriched_header_emb, has_header, &value_embs, &mask)
+    }
+
     /// Run the forward pass.
     ///
     /// Input shapes (single column, B=1):

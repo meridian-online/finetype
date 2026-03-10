@@ -52,8 +52,8 @@ pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
     "ends_with_digit",     // 30
     "length_bucket",       // 31
     // Tier 4 — Character-presence binary features (NNFT-266)
-    "has_colon",           // 32
-    "has_dash",            // 33
+    "has_colon", // 32
+    "has_dash",  // 33
 ];
 
 /// Extract a fixed-size feature vector from a string value.
@@ -606,14 +606,8 @@ mod tests {
     fn test_has_colon() {
         // Docker refs, timestamps, URLs with port
         assert_eq!(feat(&extract_features("nginx:latest"), "has_colon"), 1.0);
-        assert_eq!(
-            feat(&extract_features("10:30:00"), "has_colon"),
-            1.0
-        );
-        assert_eq!(
-            feat(&extract_features("host:8080"), "has_colon"),
-            1.0
-        );
+        assert_eq!(feat(&extract_features("10:30:00"), "has_colon"), 1.0);
+        assert_eq!(feat(&extract_features("host:8080"), "has_colon"), 1.0);
         // No colon
         assert_eq!(feat(&extract_features("hello"), "has_colon"), 0.0);
         assert_eq!(feat(&extract_features("192.168.1.1"), "has_colon"), 0.0);

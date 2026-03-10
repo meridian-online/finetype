@@ -371,52 +371,59 @@ impl CharClassifier {
 
         // Load config from config.yaml if available
         let config_path = model_dir.join("config.yaml");
-        let (vocab_size, max_seq_length, embed_dim, num_filters, hidden_dim, feature_dim, head_type) =
-            if config_path.exists() {
-                let config_str = std::fs::read_to_string(&config_path)?;
-                let mut vocab_size = 97usize;
-                let mut max_seq_length = 128usize;
-                let mut embed_dim = 32usize;
-                let mut num_filters = 64usize;
-                let mut hidden_dim = 128usize;
-                let mut feature_dim = 0usize;
-                let mut head_type_str = String::from("flat");
+        let (
+            vocab_size,
+            max_seq_length,
+            embed_dim,
+            num_filters,
+            hidden_dim,
+            feature_dim,
+            head_type,
+        ) = if config_path.exists() {
+            let config_str = std::fs::read_to_string(&config_path)?;
+            let mut vocab_size = 97usize;
+            let mut max_seq_length = 128usize;
+            let mut embed_dim = 32usize;
+            let mut num_filters = 64usize;
+            let mut hidden_dim = 128usize;
+            let mut feature_dim = 0usize;
+            let mut head_type_str = String::from("flat");
 
-                for line in config_str.lines() {
-                    if let Some((key, val)) = line.split_once(':') {
-                        let key = key.trim();
-                        let val = val.trim();
-                        match key {
-                            "vocab_size" => vocab_size = val.parse().unwrap_or(97),
-                            "max_seq_length" => max_seq_length = val.parse().unwrap_or(128),
-                            "embed_dim" => embed_dim = val.parse().unwrap_or(32),
-                            "num_filters" => num_filters = val.parse().unwrap_or(64),
-                            "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
-                            "feature_dim" => feature_dim = val.parse().unwrap_or(0),
-                            "head_type" => head_type_str = val.to_string(),
-                            _ => {}
-                        }
+            for line in config_str.lines() {
+                if let Some((key, val)) = line.split_once(':') {
+                    let key = key.trim();
+                    let val = val.trim();
+                    match key {
+                        "vocab_size" => vocab_size = val.parse().unwrap_or(97),
+                        "max_seq_length" => max_seq_length = val.parse().unwrap_or(128),
+                        "embed_dim" => embed_dim = val.parse().unwrap_or(32),
+                        "num_filters" => num_filters = val.parse().unwrap_or(64),
+                        "hidden_dim" => hidden_dim = val.parse().unwrap_or(128),
+                        "feature_dim" => feature_dim = val.parse().unwrap_or(0),
+                        "head_type" => head_type_str = val.to_string(),
+                        _ => {}
                     }
                 }
+            }
 
-                let ht = if head_type_str == "hierarchical" {
-                    HeadType::Hierarchical
-                } else {
-                    HeadType::Flat
-                };
-
-                (
-                    vocab_size,
-                    max_seq_length,
-                    embed_dim,
-                    num_filters,
-                    hidden_dim,
-                    feature_dim,
-                    ht,
-                )
+            let ht = if head_type_str == "hierarchical" {
+                HeadType::Hierarchical
             } else {
-                (97, 128, 32, 64, 128, 0, HeadType::Flat)
+                HeadType::Flat
             };
+
+            (
+                vocab_size,
+                max_seq_length,
+                embed_dim,
+                num_filters,
+                hidden_dim,
+                feature_dim,
+                ht,
+            )
+        } else {
+            (97, 128, 32, 64, 128, 0, HeadType::Flat)
+        };
 
         let vocab = CharVocab::new();
 

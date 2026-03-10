@@ -17,6 +17,7 @@ use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
 use crate::semantic::SemanticHintClassifier;
 use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
+use crate::sibling_context::SiblingContextAttention;
 use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
 
@@ -395,6 +396,12 @@ pub struct ColumnClassifier {
     /// Label → category mapping for Sense output masking.
     /// Required when `sense` is Some.
     label_map: Option<LabelCategoryMap>,
+    /// Optional sibling-context attention module (NNFT-268).
+    /// When present and Sense is active, enriches column header embeddings with
+    /// cross-column context before Sense classification. Requires `model2vec` to
+    /// encode headers. Without a trained model artifact, this is None and the
+    /// pipeline is unchanged.
+    sibling_context: Option<SiblingContextAttention>,
 }
 
 impl ColumnClassifier {
@@ -409,6 +416,7 @@ impl ColumnClassifier {
             sense: None,
             model2vec: None,
             label_map: None,
+            sibling_context: None,
         }
     }
 
@@ -436,6 +444,7 @@ impl ColumnClassifier {
             sense: None,
             model2vec: None,
             label_map: None,
+            sibling_context: None,
         }
     }
 
@@ -482,6 +491,20 @@ impl ColumnClassifier {
     /// Check whether the Sense→Sharpen pipeline is active.
     pub fn has_sense(&self) -> bool {
         self.sense.is_some() && self.model2vec.is_some() && self.label_map.is_some()
+    }
+
+    /// Attach a sibling-context attention module (NNFT-268).
+    ///
+    /// When present and Sense is active, `classify_columns_with_context` will
+    /// encode all column headers with Model2Vec, run sibling-context attention
+    /// to enrich them, then pass enriched headers to Sense.
+    pub fn set_sibling_context(&mut self, sibling: SiblingContextAttention) {
+        self.sibling_context = Some(sibling);
+    }
+
+    /// Check whether sibling-context attention is available.
+    pub fn has_sibling_context(&self) -> bool {
+        self.sibling_context.is_some()
     }
 
     /// Classify a column of values, returning a single type prediction.
@@ -692,6 +715,49 @@ impl ColumnClassifier {
     /// Get a reference to the underlying classifier.
     pub fn classifier(&self) -> &dyn ValueClassifier {
         &*self.classifier
+    }
+
+    /// Classify multiple columns with sibling context (NNFT-268).
+    ///
+    /// When sibling-context attention is available and Sense is active:
+    /// 1. Encode all column headers with Model2Vec → `[N_cols, 128]`
+    /// 2. Run sibling-context attention → `[N_cols, 128]` (enriched)
+    /// 3. For each column: run Sense with enriched header → CharCNN → disambiguation
+    ///
+    /// When sibling context is NOT available (no trained model), falls back to
+    /// per-column `classify_column_with_header` — producing identical results.
+    pub fn classify_columns_with_context(
+        &self,
+        columns: &[(Vec<String>, String)], // (values, header) per column
+    ) -> Result<Vec<ColumnResult>, InferenceError> {
+        // Fast path: no sibling context or no Sense → per-column classification
+        if !self.has_sibling_context() || !self.has_sense() {
+            return columns
+                .iter()
+                .map(|(values, header)| self.classify_column_with_header(values, header))
+                .collect();
+        }
+
+        let sibling_ctx = self.sibling_context.as_ref().unwrap();
+        let m2v = self.model2vec.as_ref().unwrap();
+
+        // Step 1: Encode all column headers with Model2Vec
+        let headers: Vec<&str> = columns.iter().map(|(_, h)| h.as_str()).collect();
+        let header_embs = m2v.encode_batch(&headers)?; // [N_cols, D]
+
+        // Step 2: Run sibling-context attention → enriched [N_cols, D]
+        let enriched = sibling_ctx.forward(&header_embs)?;
+
+        // Step 3: For each column, run Sense→Sharpen with enriched header
+        let mut results = Vec::with_capacity(columns.len());
+        for (i, (values, header)) in columns.iter().enumerate() {
+            let enriched_header = enriched.get(i)?; // [D]
+            let result =
+                self.classify_sense_sharpen_with_context(values, header, &enriched_header)?;
+            results.push(result);
+        }
+
+        Ok(results)
     }
 
     /// Classify a column of values with an optional header name hint.
@@ -985,6 +1051,33 @@ impl ColumnClassifier {
         values: &[String],
         header: &str,
     ) -> Result<ColumnResult, InferenceError> {
+        self.classify_sense_sharpen_inner(values, header, None)
+    }
+
+    /// Sense → Sharpen with a pre-computed context-enriched header (NNFT-268).
+    ///
+    /// Same as `classify_sense_sharpen` but uses the enriched header embedding
+    /// from sibling-context attention instead of encoding the header from scratch.
+    fn classify_sense_sharpen_with_context(
+        &self,
+        values: &[String],
+        header: &str,
+        enriched_header_emb: &candle_core::Tensor,
+    ) -> Result<ColumnResult, InferenceError> {
+        self.classify_sense_sharpen_inner(values, header, Some(enriched_header_emb))
+    }
+
+    /// Inner implementation of the Sense → Sharpen pipeline.
+    ///
+    /// When `enriched_header_emb` is Some, uses the pre-computed context-enriched
+    /// header for Sense classification (NNFT-268). When None, encodes the header
+    /// normally via Model2Vec (standard path).
+    fn classify_sense_sharpen_inner(
+        &self,
+        values: &[String],
+        header: &str,
+        enriched_header_emb: Option<&candle_core::Tensor>,
+    ) -> Result<ColumnResult, InferenceError> {
         let sense = self.sense.as_ref().unwrap();
         let m2v = self.model2vec.as_ref().unwrap();
         let label_map = self.label_map.as_ref().unwrap();
@@ -1025,12 +1118,18 @@ impl ColumnClassifier {
 
         // Step 2: Run Sense — encode header + first 50 values
         let sense_values: Vec<&str> = sample.iter().take(50).map(|s| s.as_str()).collect();
-        let header_opt = if header.is_empty() {
-            None
+        let sense_result = if let Some(enriched_emb) = enriched_header_emb {
+            // NNFT-268: use pre-computed context-enriched header embedding
+            sense.classify_with_enriched_header(m2v, enriched_emb, &sense_values)?
         } else {
-            Some(header)
+            // Standard path: encode header from scratch
+            let header_opt = if header.is_empty() {
+                None
+            } else {
+                Some(header)
+            };
+            sense.classify(m2v, header_opt, &sense_values)?
         };
-        let sense_result = sense.classify(m2v, header_opt, &sense_values)?;
 
         // Step 3: Run CharCNN batch on all sampled values.
         // Pass per-value features for augmented inference when the model supports it.
@@ -6962,7 +7061,11 @@ datetime.component.day_of_week:
         assert_eq!(cf.mean, features);
         // Variance should be zero (single observation)
         for v in cf.variance {
-            assert!(v.abs() < 1e-6, "variance should be ~0 for single value, got {}", v);
+            assert!(
+                v.abs() < 1e-6,
+                "variance should be ~0 for single value, got {}",
+                v
+            );
         }
         // Min/max should equal the single feature vector
         assert_eq!(cf.min, features);
@@ -6972,7 +7075,7 @@ datetime.component.day_of_week:
     #[test]
     fn test_aggregate_features_variance() {
         // Two values with different lengths → non-zero length variance
-        let f1 = extract_features("abc");   // length = 3
+        let f1 = extract_features("abc"); // length = 3
         let f2 = extract_features("abcdef"); // length = 6
         let cf = aggregate_features(&[f1, f2]);
 
@@ -6980,7 +7083,10 @@ datetime.component.day_of_week:
         // Mean length = (3 + 6) / 2 = 4.5
         assert!((cf.mean[length_idx] - 4.5).abs() < 0.01, "mean length");
         // Variance = ((3-4.5)² + (6-4.5)²) / 2 = (2.25 + 2.25) / 2 = 2.25
-        assert!((cf.variance[length_idx] - 2.25).abs() < 0.01, "variance length");
+        assert!(
+            (cf.variance[length_idx] - 2.25).abs() < 0.01,
+            "variance length"
+        );
         // Min/max
         assert!((cf.min[length_idx] - 3.0).abs() < 0.01, "min length");
         assert!((cf.max[length_idx] - 6.0).abs() < 0.01, "max length");
@@ -6990,7 +7096,7 @@ datetime.component.day_of_week:
     fn test_git_sha_uniform_length_zero_variance() {
         // Git SHAs: all exactly 40 hex chars → zero length variance
         let shas = [
-            "a" .repeat(40),
+            "a".repeat(40),
             "b1c2d3e4f5a6b7c8d9e0a1b2c3d4e5f6a7b8c9d0".to_string(),
             "1234567890abcdef1234567890abcdef12345678".to_string(),
             "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef".to_string(),
@@ -7016,11 +7122,12 @@ datetime.component.day_of_week:
     fn test_hash_mixed_length_nonzero_variance() {
         // Mixed hashes: MD5 (32 chars) + SHA1 (40 chars) + SHA256 (64 chars)
         let hashes = [
-            "d41d8cd98f00b204e9800998ecf8427e".to_string(),  // MD5: 32
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string(),  // SHA1: 40
+            "d41d8cd98f00b204e9800998ecf8427e".to_string(), // MD5: 32
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string(), // SHA1: 40
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(), // SHA256: 64
         ];
-        let per_value: Vec<[f32; FEATURE_DIM]> = hashes.iter().map(|s| extract_features(s)).collect();
+        let per_value: Vec<[f32; FEATURE_DIM]> =
+            hashes.iter().map(|s| extract_features(s)).collect();
         let cf = aggregate_features(&per_value);
 
         // Length variance should be high (32, 40, 64 → mean=45.33, var=177.56)
@@ -7044,9 +7151,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "technology.cryptographic.hash".to_string(),
             confidence: 0.99,
-            vote_distribution: vec![
-                ("technology.cryptographic.hash".to_string(), 1.0),
-            ],
+            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 100,
@@ -7060,15 +7165,17 @@ datetime.component.day_of_week:
         cf.mean[feature_idx::LENGTH] = 40.0;
         cf.variance[feature_idx::LENGTH] = 0.0;
 
-        let votes = vec![
-            ("technology.cryptographic.hash".to_string(), 100),
-        ];
+        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
         assert_eq!(result.label, "technology.development.git_sha");
         assert!(result.disambiguation_applied);
-        assert!(result.disambiguation_rule.as_ref().unwrap().starts_with("feature_git_sha"));
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_git_sha"));
     }
 
     #[test]
@@ -7077,9 +7184,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "technology.cryptographic.hash".to_string(),
             confidence: 0.99,
-            vote_distribution: vec![
-                ("technology.cryptographic.hash".to_string(), 1.0),
-            ],
+            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 100,
@@ -7092,13 +7197,14 @@ datetime.component.day_of_week:
         cf.mean[feature_idx::LENGTH] = 45.3;
         cf.variance[feature_idx::LENGTH] = 177.56; // high variance = mixed hash lengths
 
-        let votes = vec![
-            ("technology.cryptographic.hash".to_string(), 100),
-        ];
+        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
-        assert_eq!(result.label, "technology.cryptographic.hash", "should NOT override when length variance is high");
+        assert_eq!(
+            result.label, "technology.cryptographic.hash",
+            "should NOT override when length variance is high"
+        );
         assert!(!result.disambiguation_applied);
     }
 
@@ -7108,9 +7214,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "technology.cryptographic.hash".to_string(),
             confidence: 0.99,
-            vote_distribution: vec![
-                ("technology.cryptographic.hash".to_string(), 1.0),
-            ],
+            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 100,
@@ -7123,13 +7227,14 @@ datetime.component.day_of_week:
         cf.mean[feature_idx::LENGTH] = 32.0; // MD5 length
         cf.variance[feature_idx::LENGTH] = 0.0; // zero variance
 
-        let votes = vec![
-            ("technology.cryptographic.hash".to_string(), 100),
-        ];
+        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
-        assert_eq!(result.label, "technology.cryptographic.hash", "should NOT override for non-40-char uniform hex");
+        assert_eq!(
+            result.label, "technology.cryptographic.hash",
+            "should NOT override for non-40-char uniform hex"
+        );
         assert!(!result.disambiguation_applied);
     }
 
@@ -7137,12 +7242,13 @@ datetime.component.day_of_week:
     fn test_hs_code_float_parseability() {
         // HS codes with 3 segments don't parse as float
         let codes = [
-            "6204.62.40",  // 3 segments → NOT float-parseable
+            "6204.62.40", // 3 segments → NOT float-parseable
             "8471.30.10",
-            "8471.30",     // 2 segments → float-parseable (8471.30)
+            "8471.30", // 2 segments → float-parseable (8471.30)
             "6204.62",
         ];
-        let per_value: Vec<[f32; FEATURE_DIM]> = codes.iter().map(|s| extract_features(s)).collect();
+        let per_value: Vec<[f32; FEATURE_DIM]> =
+            codes.iter().map(|s| extract_features(s)).collect();
         let cf = aggregate_features(&per_value);
 
         // is_float should be < 1.0 (2 of 4 don't parse as float)
@@ -7190,6 +7296,10 @@ datetime.component.day_of_week:
 
         assert_eq!(result.label, "geography.trade.hs_code");
         assert!(result.disambiguation_applied);
-        assert!(result.disambiguation_rule.as_ref().unwrap().contains("feature_hs_code"));
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .contains("feature_hs_code"));
     }
 }

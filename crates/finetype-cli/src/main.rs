@@ -829,6 +829,7 @@ fn cmd_infer(
         // Wire up Sense classifier (Sense → Sharpen pipeline)
         if !sharp_only {
             wire_sense(&mut column_classifier);
+            wire_sibling_context(&mut column_classifier);
         }
 
         let result = if let Some(ref hdr) = header {
@@ -1098,6 +1099,7 @@ fn cmd_infer_batch(
     // Wire up Sense classifier (Sense → Sharpen pipeline)
     if !sharp_only {
         wire_sense(&mut column_classifier);
+        wire_sibling_context(&mut column_classifier);
     }
 
     let load_elapsed = t_start.elapsed();
@@ -1424,6 +1426,29 @@ fn wire_sense(cc: &mut finetype_model::ColumnClassifier) {
     let label_map = finetype_model::LabelCategoryMap::new();
     eprintln!("Loaded Sense classifier (broad category prediction)");
     cc.set_sense(sense, m2v, label_map);
+}
+
+/// Load and wire the sibling-context attention module (NNFT-268).
+///
+/// Looks for `models/sibling-context/model.safetensors`. When found,
+/// attaches to the column classifier. When absent, the pipeline is unchanged.
+fn wire_sibling_context(cc: &mut finetype_model::ColumnClassifier) {
+    let model_dir = std::path::PathBuf::from("models/sibling-context");
+    if !model_dir.join("model.safetensors").exists() {
+        return; // Silent — model is optional
+    }
+    match finetype_model::SiblingContextAttention::load(&model_dir) {
+        Ok(sibling) => {
+            eprintln!(
+                "Loaded sibling-context attention ({} params)",
+                sibling.param_count()
+            );
+            cc.set_sibling_context(sibling);
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to load sibling-context model: {e}");
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2114,6 +2139,7 @@ fn cmd_load(
     // Wire up Sense classifier
     if !sharp_only {
         wire_sense(&mut column_classifier);
+        wire_sibling_context(&mut column_classifier);
     }
 
     eprintln!("Reading {:?}", file);
@@ -2913,6 +2939,7 @@ fn cmd_profile(
     // Wire up Sense classifier (Sense → Sharpen pipeline)
     if !sharp_only {
         wire_sense(&mut column_classifier);
+        wire_sibling_context(&mut column_classifier);
     }
 
     eprintln!("Reading {:?}", file);
@@ -2969,79 +2996,175 @@ fn cmd_profile(
 
     let mut profiles: Vec<ColProfile> = Vec::new();
 
-    for (i, col_values) in columns.iter().enumerate() {
-        let name = headers
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("col_{}", i));
-        let null_count = row_count - col_values.len();
+    // NNFT-268: When sibling-context attention is available, classify all columns
+    // together so each column benefits from cross-column context.
+    if column_classifier.has_sibling_context() && !no_header_hint {
+        // Build column descriptors for all non-empty columns
+        let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new(); // (index, values, header_hint, name, null_count)
+        let mut empty_profiles: Vec<(usize, ColProfile)> = Vec::new();
 
-        if col_values.is_empty() {
-            profiles.push(ColProfile {
-                name,
-                label: "unknown".to_string(),
-                confidence: 0.0,
-                samples_used: 0,
-                non_null_count: 0,
-                null_count,
-                disambiguation_applied: false,
-                disambiguation_rule: None,
-                detected_locale: None,
-                broad_type: None,
-                format_string: None,
-                transform: None,
-                is_generic: false,
-                quality: None,
-            });
-            continue;
+        for (i, col_values) in columns.iter().enumerate() {
+            let name = headers
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("col_{}", i));
+            let null_count = row_count - col_values.len();
+
+            if col_values.is_empty() {
+                empty_profiles.push((
+                    i,
+                    ColProfile {
+                        name,
+                        label: "unknown".to_string(),
+                        confidence: 0.0,
+                        samples_used: 0,
+                        non_null_count: 0,
+                        null_count,
+                        disambiguation_applied: false,
+                        disambiguation_rule: None,
+                        detected_locale: None,
+                        broad_type: None,
+                        format_string: None,
+                        transform: None,
+                        is_generic: false,
+                        quality: None,
+                    },
+                ));
+            } else {
+                let header_hint = if is_json_input {
+                    path_leaf(&name)
+                } else {
+                    name.clone()
+                };
+                col_inputs.push((i, col_values.clone(), header_hint, name, null_count));
+            }
         }
 
-        // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
-        let header_hint = if is_json_input {
-            path_leaf(&name)
-        } else {
-            name.clone()
-        };
+        // Classify all non-empty columns with sibling context
+        let context_columns: Vec<(Vec<String>, String)> = col_inputs
+            .iter()
+            .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
+            .collect();
+        let context_results = column_classifier.classify_columns_with_context(&context_columns)?;
 
-        let result = if no_header_hint {
-            column_classifier.classify_column(col_values)?
-        } else {
-            column_classifier.classify_column_with_header(col_values, &header_hint)?
-        };
-
-        // Look up taxonomy contract fields for the predicted label
-        let (broad_type, format_string, transform) = if let Some(ref taxonomy) = enrichment_taxonomy
+        // Merge results back in original order
+        let mut all_entries: Vec<(usize, ColProfile)> = Vec::new();
+        all_entries.extend(empty_profiles);
+        for ((idx, values, _, name, null_count), result) in
+            col_inputs.into_iter().zip(context_results)
         {
-            if let Some(def) = taxonomy.get(&result.label) {
-                (
-                    def.broad_type.clone(),
-                    def.format_string.clone(),
-                    def.transform.clone(),
-                )
-            } else {
-                (None, None, None)
-            }
-        } else {
-            (None, None, None)
-        };
+            let (broad_type, format_string, transform) =
+                if let Some(ref taxonomy) = enrichment_taxonomy {
+                    if let Some(def) = taxonomy.get(&result.label) {
+                        (
+                            def.broad_type.clone(),
+                            def.format_string.clone(),
+                            def.transform.clone(),
+                        )
+                    } else {
+                        (None, None, None)
+                    }
+                } else {
+                    (None, None, None)
+                };
+            all_entries.push((
+                idx,
+                ColProfile {
+                    name,
+                    label: result.label,
+                    confidence: result.confidence,
+                    samples_used: result.samples_used,
+                    non_null_count: values.len(),
+                    null_count,
+                    disambiguation_applied: result.disambiguation_applied,
+                    disambiguation_rule: result.disambiguation_rule,
+                    detected_locale: result.detected_locale,
+                    broad_type,
+                    format_string,
+                    transform,
+                    is_generic: result.is_generic,
+                    quality: None,
+                },
+            ));
+        }
+        all_entries.sort_by_key(|(idx, _)| *idx);
+        profiles = all_entries.into_iter().map(|(_, p)| p).collect();
+    } else {
+        // Per-column classification (standard path)
+        for (i, col_values) in columns.iter().enumerate() {
+            let name = headers
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("col_{}", i));
+            let null_count = row_count - col_values.len();
 
-        profiles.push(ColProfile {
-            name,
-            label: result.label,
-            confidence: result.confidence,
-            samples_used: result.samples_used,
-            non_null_count: col_values.len(),
-            null_count,
-            disambiguation_applied: result.disambiguation_applied,
-            disambiguation_rule: result.disambiguation_rule,
-            detected_locale: result.detected_locale,
-            broad_type,
-            format_string,
-            transform,
-            is_generic: result.is_generic,
-            quality: None,
-        });
-    }
+            if col_values.is_empty() {
+                profiles.push(ColProfile {
+                    name,
+                    label: "unknown".to_string(),
+                    confidence: 0.0,
+                    samples_used: 0,
+                    non_null_count: 0,
+                    null_count,
+                    disambiguation_applied: false,
+                    disambiguation_rule: None,
+                    detected_locale: None,
+                    broad_type: None,
+                    format_string: None,
+                    transform: None,
+                    is_generic: false,
+                    quality: None,
+                });
+                continue;
+            }
+
+            // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
+            let header_hint = if is_json_input {
+                path_leaf(&name)
+            } else {
+                name.clone()
+            };
+
+            let result = if no_header_hint {
+                column_classifier.classify_column(col_values)?
+            } else {
+                column_classifier.classify_column_with_header(col_values, &header_hint)?
+            };
+
+            // Look up taxonomy contract fields for the predicted label
+            let (broad_type, format_string, transform) =
+                if let Some(ref taxonomy) = enrichment_taxonomy {
+                    if let Some(def) = taxonomy.get(&result.label) {
+                        (
+                            def.broad_type.clone(),
+                            def.format_string.clone(),
+                            def.transform.clone(),
+                        )
+                    } else {
+                        (None, None, None)
+                    }
+                } else {
+                    (None, None, None)
+                };
+
+            profiles.push(ColProfile {
+                name,
+                label: result.label,
+                confidence: result.confidence,
+                samples_used: result.samples_used,
+                non_null_count: col_values.len(),
+                null_count,
+                disambiguation_applied: result.disambiguation_applied,
+                disambiguation_rule: result.disambiguation_rule,
+                detected_locale: result.detected_locale,
+                broad_type,
+                format_string,
+                transform,
+                is_generic: result.is_generic,
+                quality: None,
+            });
+        }
+    } // end else (per-column path)
 
     // Validation pass (NNFT-212): run JSON Schema validation per column
     if validate {
