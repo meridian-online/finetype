@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 
 /// Total number of features in the feature vector.
-pub const FEATURE_DIM: usize = 34;
+pub const FEATURE_DIM: usize = 36;
 
 /// Human-readable names for each feature index, for interpretability and debugging.
 pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
@@ -54,6 +54,9 @@ pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
     // Tier 4 — Character-presence binary features (NNFT-266)
     "has_colon", // 32
     "has_dash",  // 33
+    // Tier 5 — Semantic binary features (NNFT-270)
+    "has_negative_prefix", // 34 — starts with '-' followed by digit (negative number)
+    "has_percent",         // 35 — contains '%' character
 ];
 
 /// Extract a fixed-size feature vector from a string value.
@@ -259,6 +262,23 @@ pub fn extract_features(value: &str) -> [f32; FEATURE_DIM] {
 
     // 33: has_dash — contains '-' character
     f[33] = if value.contains('-') { 1.0 } else { 0.0 };
+
+    // ─── Tier 5: Semantic binary features (NNFT-270) ─────────────────
+    // These support disambiguation rules that require semantic understanding
+    // of value meaning, not just character presence.
+
+    // 34: has_negative_prefix — starts with '-' followed by a digit
+    // Distinguishes negative numbers from dash-containing codes (HS codes,
+    // dates). HS codes never have negative values; financial columns often do.
+    f[34] = if chars.len() >= 2 && chars[0] == '-' && chars[1].is_ascii_digit() {
+        1.0
+    } else {
+        0.0
+    };
+
+    // 35: has_percent — contains '%' character
+    // Supports percentage detection and future percentage rules.
+    f[35] = if value.contains('%') { 1.0 } else { 0.0 };
 
     f
 }
@@ -629,6 +649,44 @@ mod tests {
         assert_eq!(feat(&extract_features("12345"), "has_dash"), 0.0);
     }
 
+    // ─── Tier 5: Semantic binary features (NNFT-270) ───────────────────
+
+    #[test]
+    fn test_has_negative_prefix() {
+        // Negative numbers
+        assert_eq!(feat(&extract_features("-42"), "has_negative_prefix"), 1.0);
+        assert_eq!(feat(&extract_features("-3.14"), "has_negative_prefix"), 1.0);
+        assert_eq!(feat(&extract_features("-0.5"), "has_negative_prefix"), 1.0);
+        // Not negative prefix: dash in non-leading position, or not followed by digit
+        assert_eq!(
+            feat(&extract_features("2024-01-15"), "has_negative_prefix"),
+            0.0
+        );
+        assert_eq!(feat(&extract_features("-abc"), "has_negative_prefix"), 0.0);
+        assert_eq!(
+            feat(&extract_features("8471.30"), "has_negative_prefix"),
+            0.0
+        );
+        // HS codes never have negative prefix
+        assert_eq!(
+            feat(&extract_features("6204.62.40"), "has_negative_prefix"),
+            0.0
+        );
+        // Edge: single dash
+        assert_eq!(feat(&extract_features("-"), "has_negative_prefix"), 0.0);
+        // Edge: empty
+        assert_eq!(feat(&extract_features(""), "has_negative_prefix"), 0.0);
+    }
+
+    #[test]
+    fn test_has_percent() {
+        assert_eq!(feat(&extract_features("50%"), "has_percent"), 1.0);
+        assert_eq!(feat(&extract_features("3.14%"), "has_percent"), 1.0);
+        assert_eq!(feat(&extract_features("100"), "has_percent"), 0.0);
+        assert_eq!(feat(&extract_features("hello"), "has_percent"), 0.0);
+        assert_eq!(feat(&extract_features(""), "has_percent"), 0.0);
+    }
+
     // ─── Determinism ────────────────────────────────────────────────────
 
     #[test]
@@ -665,7 +723,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         // 10k values should complete in <2 seconds in debug mode (0.2ms/value budget).
-        // Release mode is ~10x faster. Budget increased from 1s in NNFT-266 (34 features).
+        // Release mode is ~10x faster. Budget increased from 1s in NNFT-266 (34→36 features in NNFT-270).
         assert!(
             elapsed.as_secs_f64() < 2.0,
             "10k extractions took {:.3}s — exceeds 2s budget",

@@ -122,6 +122,9 @@ mod feature_idx {
     pub const HAS_COLON: usize = 32;
     #[allow(dead_code)]
     pub const HAS_DASH: usize = 33;
+    pub const HAS_NEGATIVE_PREFIX: usize = 34;
+    #[allow(dead_code)]
+    pub const HAS_PERCENT: usize = 35;
 }
 
 /// Strip a locale suffix from a 4-level label to get the 3-level taxonomy key.
@@ -1796,12 +1799,28 @@ fn feature_disambiguate(
     // values always do. Two trigger paths:
     //   Path A (original): digit_ratio >= 0.75 AND dot_segments >= 2.0
     //   Path B (new):      digit_ratio >= 0.75 AND is_float_fraction < 1.0
+    //
+    // NNFT-270: Enhanced with two guards to reduce false positives:
+    //   Guard 1 — Negative prefix: HS codes never have negative values. If any
+    //     values start with '-' followed by a digit, this is a financial/numeric
+    //     column, not HS codes. Uses has_negative_prefix mean > 0 as the signal.
+    //   Guard 2 — Dot-segment variance: HS code columns have consistent dot
+    //     structure (all "XX.XX" or all "XXXX.XX.XX"). High dot-segment variance
+    //     indicates mixed formats typical of decimal_number columns.
     let digit_ratio = column_features.mean[feature_idx::DIGIT_RATIO];
     let dot_segments = column_features.mean[feature_idx::SEGMENT_COUNT_DOT];
     let is_float_fraction = column_features.mean[feature_idx::IS_FLOAT];
+    let has_neg_prefix = column_features.mean[feature_idx::HAS_NEGATIVE_PREFIX];
+    let dot_segment_variance = column_features.variance[feature_idx::SEGMENT_COUNT_DOT];
     let f3_path_a = digit_ratio >= 0.75 && dot_segments >= 2.0;
     let f3_path_b = digit_ratio >= 0.75 && is_float_fraction < 1.0 && dot_segments >= 1.5;
-    if result.label == "representation.numeric.decimal_number" && (f3_path_a || f3_path_b) {
+    let f3_neg_guard = has_neg_prefix > 0.0; // Any negative values → not HS codes
+    let f3_dot_var_guard = dot_segment_variance > 0.5; // Inconsistent dot structure → not HS codes
+    if result.label == "representation.numeric.decimal_number"
+        && (f3_path_a || f3_path_b)
+        && !f3_neg_guard
+        && !f3_dot_var_guard
+    {
         let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
         if hs_in_votes {
             let hs_votes = votes
@@ -1815,8 +1834,8 @@ fn feature_disambiguate(
                 result.confidence = hs_frac.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!(
-                    "feature_hs_code:digit_ratio={:.2},dots={:.1},float={:.2}",
-                    digit_ratio, dot_segments, is_float_fraction
+                    "feature_hs_code:digit_ratio={:.2},dots={:.1},float={:.2},neg={:.2},dot_var={:.2}",
+                    digit_ratio, dot_segments, is_float_fraction, has_neg_prefix, dot_segment_variance
                 ));
             }
         }
@@ -2671,9 +2690,9 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "cabin" | "room" | "compartment" | "berth" | "seat" => {
             return Some("representation.alphanumeric.alphanumeric_id");
         }
-        // Fare / fee columns
+        // Fare / fee columns (NNFT-270: → finance.currency.amount)
         "fare" | "fee" | "toll" | "charge" => {
-            return Some("representation.numeric.decimal_number");
+            return Some("finance.currency.amount");
         }
         _ => {}
     }
@@ -2766,8 +2785,17 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if h.contains("url") || h.contains("uri") || h.contains("link") || h.contains("href") {
         return Some("technology.internet.url");
     }
-    if h.contains("price") || h.contains("cost") || h.contains("amount") || h.contains("salary") {
-        return Some("representation.numeric.decimal_number");
+    if h.contains("price")
+        || h.contains("cost")
+        || h.contains("amount")
+        || h.contains("salary")
+        || h.contains("revenue")
+        || h.contains("income")
+        || h.contains("wage")
+        || h.contains("budget")
+        || h.contains("expense")
+    {
+        return Some("finance.currency.amount");
     }
     // "count" must not match "country" — use word boundary check (NNFT-254)
     if (h.contains("count") && !h.contains("country") && !h.contains("county"))
@@ -2785,7 +2813,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("representation.alphanumeric.alphanumeric_id");
     }
     if h.contains("fare") || h.contains("fee") || h.contains("charge") || h.contains("toll") {
-        return Some("representation.numeric.decimal_number");
+        return Some("finance.currency.amount");
     }
     // Scientific / engineering measurement keywords → decimal_number (NNFT-188).
     // Numeric measurement columns like "pressure_atm" get misclassified as
@@ -4554,14 +4582,15 @@ mod tests {
 
     #[test]
     fn test_header_hint_numeric() {
-        assert_eq!(
-            header_hint("price"),
-            Some("representation.numeric.decimal_number")
-        );
-        assert_eq!(
-            header_hint("amount"),
-            Some("representation.numeric.decimal_number")
-        );
+        // Financial hints → finance.currency.amount (NNFT-270)
+        assert_eq!(header_hint("price"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("amount"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("salary"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("revenue"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("income"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("expense"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("fare"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("fee"), Some("finance.currency.amount"));
         assert_eq!(
             header_hint("count"),
             Some("representation.numeric.integer_number")
@@ -4820,14 +4849,8 @@ mod tests {
 
     #[test]
     fn test_header_hint_fare() {
-        assert_eq!(
-            header_hint("Fare"),
-            Some("representation.numeric.decimal_number")
-        );
-        assert_eq!(
-            header_hint("fee"),
-            Some("representation.numeric.decimal_number")
-        );
+        assert_eq!(header_hint("Fare"), Some("finance.currency.amount"));
+        assert_eq!(header_hint("fee"), Some("finance.currency.amount"));
     }
 
     #[test]
