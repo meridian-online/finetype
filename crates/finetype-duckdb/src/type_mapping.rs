@@ -192,6 +192,10 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "representation.boolean.initials"
         | "representation.boolean.terms" => "BOOLEAN",
 
+        // ── representation.discrete ────────────────────────────────
+        // ENUM broad_type in taxonomy, but extension can't CREATE TYPE
+        "representation.discrete.categorical" | "representation.discrete.ordinal" => "VARCHAR",
+
         // ── representation.identifier ────────────────────────────────
         "representation.identifier.uuid" => "UUID",
         "representation.identifier.alphanumeric_id" | "representation.identifier.numeric_code" => {

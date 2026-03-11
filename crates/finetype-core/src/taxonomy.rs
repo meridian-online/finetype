@@ -247,6 +247,9 @@ impl DdlInfo {
             "JSON" => "JSON".to_string(),
             "STRUCT" => "STRUCT".to_string(),
             "LIST" => "LIST".to_string(),
+            // ENUM — requires CREATE TYPE at DDL time; falls back to VARCHAR
+            // in contexts that don't handle ENUM specially (schema export, etc.)
+            "ENUM" => "VARCHAR".to_string(),
             // If not recognized, default to VARCHAR
             _ => "VARCHAR".to_string(),
         }

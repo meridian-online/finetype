@@ -245,6 +245,10 @@ enum Commands {
         /// Disable DuckDB normalize_names (preserve original column names)
         #[arg(long)]
         no_normalize_names: bool,
+
+        /// Cardinality threshold for ENUM columns (0 = disable ENUM, use VARCHAR)
+        #[arg(long, default_value = "50")]
+        enum_threshold: usize,
     },
 
     /// Validate generator ↔ taxonomy alignment
@@ -342,6 +346,14 @@ enum Commands {
         /// Run JSON Schema validation after classification
         #[arg(long)]
         validate: bool,
+
+        /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR)
+        #[arg(long, default_value = "50")]
+        enum_threshold: usize,
+
+        /// Show additional detail (e.g., unique values for categorical columns in JSON output)
+        #[arg(long)]
+        verbose: bool,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -541,6 +553,7 @@ fn main() -> Result<()> {
             sharp_only,
             limit,
             no_normalize_names,
+            enum_threshold,
         } => cmd_load(
             file,
             table_name,
@@ -552,6 +565,7 @@ fn main() -> Result<()> {
             sharp_only,
             limit,
             no_normalize_names,
+            enum_threshold,
         ),
 
         Commands::Check {
@@ -591,6 +605,8 @@ fn main() -> Result<()> {
             model_type,
             sharp_only,
             validate,
+            enum_threshold,
+            verbose,
         } => cmd_profile(
             file,
             model,
@@ -601,6 +617,8 @@ fn main() -> Result<()> {
             model_type,
             sharp_only,
             validate,
+            enum_threshold,
+            verbose,
         ),
 
         Commands::EvalGittables {
@@ -2096,6 +2114,7 @@ fn cmd_load(
     sharp_only: bool,
     limit: usize,
     no_normalize_names: bool,
+    enum_threshold: usize,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
@@ -2169,6 +2188,8 @@ fn cmd_load(
         label: String,
         duckdb_type: String,
         transform: Option<String>,
+        /// Sorted unique values for ENUM columns (None if not ENUM or above threshold)
+        enum_values: Option<Vec<String>>,
     }
 
     let mut load_cols: Vec<LoadColumn> = Vec::new();
@@ -2192,6 +2213,7 @@ fn cmd_load(
                 label: "unknown".to_string(),
                 duckdb_type: "VARCHAR".to_string(),
                 transform: None,
+                enum_values: None,
             });
             continue;
         }
@@ -2204,20 +2226,36 @@ fn cmd_load(
         };
 
         // Look up DDL info from taxonomy
-        let (duckdb_type, transform) = if let Some(ref tax) = taxonomy {
-            if let Some(ddl) = tax.ddl_info(&result.label) {
-                (ddl.duckdb_type, ddl.transform)
+        let (duckdb_type, transform, raw_broad_type) = if let Some(ref tax) = taxonomy {
+            if let Some(def) = tax.get(&result.label) {
+                let ddl = tax.ddl_info(&result.label).unwrap();
+                let raw_bt = def.broad_type.clone().unwrap_or_default();
+                (ddl.duckdb_type, ddl.transform, raw_bt)
             } else {
-                ("VARCHAR".to_string(), None)
+                ("VARCHAR".to_string(), None, String::new())
             }
         } else {
-            ("VARCHAR".to_string(), None)
+            ("VARCHAR".to_string(), None, String::new())
         };
 
         // Use the taxonomy broad_type directly — is_generic controls classification
         // behaviour (header hint yielding), not cast safety. Types like decimal_number
         // and integer_number are generic but have meaningful non-VARCHAR casts. (NNFT-252)
-        let final_type = duckdb_type;
+
+        // NNFT-273: Collect ENUM values for categorical columns
+        let enum_values = if raw_broad_type == "ENUM" {
+            collect_unique_values_if_categorical(&result.label, col_values, enum_threshold)
+        } else {
+            None
+        };
+
+        // If ENUM with values, override duckdb_type to the enum type name
+        let final_type = if enum_values.is_some() {
+            // Will be resolved to the CREATE TYPE name during DDL generation
+            "ENUM".to_string()
+        } else {
+            duckdb_type
+        };
 
         load_cols.push(LoadColumn {
             original_name,
@@ -2225,6 +2263,7 @@ fn cmd_load(
             label: result.label,
             duckdb_type: final_type,
             transform,
+            enum_values,
         });
     }
 
@@ -2256,6 +2295,27 @@ fn cmd_load(
         n_cols
     );
 
+    // NNFT-273: Emit CREATE TYPE statements for ENUM columns
+    let mut enum_type_names: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+    for (i, col) in load_cols.iter().enumerate() {
+        if let Some(ref values) = col.enum_values {
+            let type_name = format!("{}_t", col.output_name);
+            let escaped_values: Vec<String> = values
+                .iter()
+                .map(|v| format!("'{}'", v.replace('\'', "''")))
+                .collect();
+            println!(
+                "CREATE TYPE {} AS ENUM ({});",
+                type_name,
+                escaped_values.join(", ")
+            );
+            enum_type_names.insert(i, type_name);
+        }
+    }
+    if !enum_type_names.is_empty() {
+        println!();
+    }
+
     // CTAS statement
     println!("CREATE TABLE {} AS", table);
     println!("SELECT");
@@ -2263,13 +2323,23 @@ fn cmd_load(
     // Build all expressions first to calculate alignment
     let exprs: Vec<String> = load_cols
         .iter()
-        .map(|c| {
-            build_load_expr(
-                &c.original_name,
-                &c.output_name,
-                &c.duckdb_type,
-                &c.transform,
-            )
+        .enumerate()
+        .map(|(i, c)| {
+            if let Some(type_name) = enum_type_names.get(&i) {
+                // ENUM column: cast to the CREATE TYPE name
+                build_load_expr_enum(
+                    &c.original_name,
+                    &c.output_name,
+                    type_name,
+                )
+            } else {
+                build_load_expr(
+                    &c.original_name,
+                    &c.output_name,
+                    &c.duckdb_type,
+                    &c.transform,
+                )
+            }
         })
         .collect();
 
@@ -2338,6 +2408,19 @@ fn build_load_expr(
         // No transform but non-VARCHAR — simple CAST
         format!("CAST({} AS {}) AS {}", source_ref, duckdb_type, alias)
     }
+}
+
+/// Build a SELECT expression for an ENUM column in the CTAS.
+///
+/// Casts the source column to the named ENUM type created by CREATE TYPE.
+fn build_load_expr_enum(
+    original_name: &str,
+    output_name: &str,
+    enum_type_name: &str,
+) -> String {
+    let source_ref = format_column_name(original_name);
+    let alias = format_column_name(output_name);
+    format!("CAST({} AS {}) AS {}", source_ref, enum_type_name, alias)
 }
 
 /// Sanitise a string for use as a SQL identifier.
@@ -2882,6 +2965,50 @@ fn cmd_validate(
 // PROFILE — Detect column types in a CSV file
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Collect sorted unique values for categorical columns when under the enum threshold.
+///
+/// Returns `Some(sorted_values)` when the label is `representation.discrete.categorical`
+/// and the cardinality is ≤ `enum_threshold`. Returns `None` otherwise.
+fn collect_unique_values_if_categorical(
+    label: &str,
+    values: &[String],
+    enum_threshold: usize,
+) -> Option<Vec<String>> {
+    if label != "representation.discrete.categorical" || enum_threshold == 0 {
+        return None;
+    }
+    let mut unique: Vec<String> = values
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .cloned()
+        .collect();
+    unique.sort();
+    if unique.len() <= enum_threshold {
+        Some(unique)
+    } else {
+        None
+    }
+}
+
+/// Resolve the display broad_type for a profile column, accounting for ENUM threshold.
+///
+/// When the taxonomy says ENUM but the column's cardinality exceeds the threshold
+/// (or threshold is 0), downgrade to VARCHAR for display.
+fn resolve_broad_type_display<'a>(broad_type: Option<&'a str>, unique_values: &Option<Vec<String>>) -> &'a str {
+    match broad_type {
+        Some("ENUM") => {
+            if unique_values.is_some() {
+                "ENUM"
+            } else {
+                "VARCHAR"
+            }
+        }
+        Some(bt) => bt,
+        None => "—",
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn cmd_profile(
     file: PathBuf,
@@ -2893,6 +3020,8 @@ fn cmd_profile(
     model_type: ModelType,
     sharp_only: bool,
     validate: bool,
+    enum_threshold: usize,
+    verbose: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
@@ -2979,6 +3108,8 @@ fn cmd_profile(
         is_generic: bool,
         // Validation quality fields (NNFT-212, NNFT-213)
         quality: Option<ColProfileQuality>,
+        // Unique values for ENUM/categorical columns (NNFT-273)
+        unique_values: Option<Vec<String>>,
     }
 
     /// Per-column validation + quality data.
@@ -3028,6 +3159,7 @@ fn cmd_profile(
                         transform: None,
                         is_generic: false,
                         quality: None,
+                        unique_values: None,
                     },
                 ));
             } else {
@@ -3067,6 +3199,11 @@ fn cmd_profile(
                 } else {
                     (None, None, None)
                 };
+            let unique_values = collect_unique_values_if_categorical(
+                &result.label,
+                &values,
+                enum_threshold,
+            );
             all_entries.push((
                 idx,
                 ColProfile {
@@ -3084,6 +3221,7 @@ fn cmd_profile(
                     transform,
                     is_generic: result.is_generic,
                     quality: None,
+                    unique_values,
                 },
             ));
         }
@@ -3114,6 +3252,7 @@ fn cmd_profile(
                     transform: None,
                     is_generic: false,
                     quality: None,
+                    unique_values: None,
                 });
                 continue;
             }
@@ -3147,6 +3286,11 @@ fn cmd_profile(
                     (None, None, None)
                 };
 
+            let unique_values = collect_unique_values_if_categorical(
+                &result.label,
+                col_values,
+                enum_threshold,
+            );
             profiles.push(ColProfile {
                 name,
                 label: result.label,
@@ -3162,6 +3306,7 @@ fn cmd_profile(
                 transform,
                 is_generic: result.is_generic,
                 quality: None,
+                unique_values,
             });
         }
     } // end else (per-column path)
@@ -3262,7 +3407,7 @@ fn cmd_profile(
                 } else {
                     "—".to_string()
                 };
-                let broad = p.broad_type.as_deref().unwrap_or("—");
+                let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
                 let disambig = if p.disambiguation_applied {
                     format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
                 } else {
@@ -3322,9 +3467,11 @@ fn cmd_profile(
                     obj.insert("column".to_string(), json!(p.name));
                     obj.insert("type".to_string(), json!(p.label));
                     obj.insert("confidence".to_string(), json!(p.confidence));
-                    if let Some(bt) = &p.broad_type {
-                        obj.insert("broad_type".to_string(), json!(bt));
-                    }
+                    let resolved_broad = resolve_broad_type_display(
+                        p.broad_type.as_deref(),
+                        &p.unique_values,
+                    );
+                    obj.insert("broad_type".to_string(), json!(resolved_broad));
                     if let Some(fs) = &p.format_string {
                         obj.insert("format_string".to_string(), json!(fs));
                     }
@@ -3343,6 +3490,12 @@ fn cmd_profile(
                     }
                     if let Some(locale) = &p.detected_locale {
                         obj.insert("locale".to_string(), json!(locale));
+                    }
+                    // NNFT-273: Include unique values for categorical columns in verbose mode
+                    if verbose {
+                        if let Some(ref uv) = p.unique_values {
+                            obj.insert("unique_values".to_string(), json!(uv));
+                        }
                     }
                     if validate {
                         match &p.quality {
@@ -3462,7 +3615,7 @@ fn cmd_profile(
                 } else {
                     "—".to_string()
                 };
-                let broad = p.broad_type.as_deref().unwrap_or("—");
+                let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
                 if validate {
                     let (valid_str, score_str) = match &p.quality {
                         Some(q) => (

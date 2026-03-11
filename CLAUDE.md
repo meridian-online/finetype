@@ -180,13 +180,13 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 | Command | Purpose |
 |---|---|
 | `finetype infer` | Classify values (single/column/batch mode) |
-| `finetype profile <file>` | Profile all columns in CSV/Parquet (`-o plain\|json\|csv\|markdown\|arrow`) |
+| `finetype profile <file>` | Profile all columns in CSV/Parquet (`-o plain\|json\|csv\|markdown\|arrow`, `--enum-threshold N`, `--verbose`) |
 | `finetype check` | Validate taxonomy ↔ generator alignment |
 | `finetype generate` | Generate synthetic training data |
 | `finetype train` | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
 | `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
 | `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns, `x-finetype-*` DDL fields) |
-| `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`) |
+| `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`, `--enum-threshold N`) |
 | `finetype mcp` | Start MCP server over stdio (6 tools: profile, infer, ddl, taxonomy, schema, generate) |
 
 ### Evaluation infrastructure

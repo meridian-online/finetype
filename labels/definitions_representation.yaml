@@ -1002,11 +1002,12 @@ representation.discrete.categorical:
   description: >
     Discrete string value from a small, unordered set (e.g., "male"/"female",
     "S"/"C"/"Q", "red"/"blue"/"green", "active"/"inactive").
-    Typical cardinality: 2-20 unique values. Transforms to VARCHAR.
+    Typical cardinality: 2-20 unique values. Transforms to ENUM when cardinality
+    is below --enum-threshold (default 50), otherwise VARCHAR.
     Column-level identification relies on low cardinality detection.
   designation: universal
   locales: [UNIVERSAL]
-  broad_type: VARCHAR
+  broad_type: ENUM
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
