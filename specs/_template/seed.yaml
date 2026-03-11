@@ -1,0 +1,36 @@
+goal: >
+  {Clear primary objective — what must be true when this work is done.}
+
+constraints:
+  - "{Hard limitation 1}"
+  - "{Hard limitation 2}"
+
+acceptance_criteria:
+  - id: ac-1
+    criterion: "{Measurable criterion 1}"
+    verification: "{How to check it}"
+
+  - id: ac-2
+    criterion: "{Measurable criterion 2}"
+    verification: "{How to check it}"
+
+evaluation_principles:
+  - principle: "{Quality dimension 1}"
+    weight: 0.40
+  - principle: "{Quality dimension 2}"
+    weight: 0.30
+  - principle: "{Quality dimension 3}"
+    weight: 0.30
+
+exit_conditions:
+  - "{When to stop iterating}"
+
+decisions:
+  - id: d-1
+    decision: "{Reference to decisions/NNNN-title.md if applicable}"
+
+metadata:
+  version: "1.0"
+  timestamp: "YYYY-MM-DDTHH:MM:SSZ"
+  ambiguity_score: 0.0
+  interview_ref: "specs/YYYY-MM-topic/interview.md"
