@@ -1873,6 +1873,28 @@ fn feature_disambiguate(
             length_variance, hex_ratio, mean_length
         ));
     }
+
+    // Rule F5: numeric_code without leading zeros → integer_number (NNFT-272).
+    //
+    // numeric_code exists to preserve leading zeros (ZIP codes, NAICS, FIPS).
+    // Without leading zeros, the values are plain integers and should be typed
+    // as integer_number (BIGINT) instead. This is the inverse of F1: F1 promotes
+    // postal_code/cpt → numeric_code when leading zeros are present; F5 demotes
+    // numeric_code → integer_number when they're absent.
+    //
+    // Threshold 0.01 (rather than 0.0) accounts for float imprecision in the
+    // mean aggregation. Effectively requires zero leading-zero values.
+    if result.label == "representation.identifier.numeric_code"
+        && leading_zero_ratio < 0.01
+    {
+        result.label = "representation.numeric.integer_number".to_string();
+        result.confidence = result.confidence.max(0.7);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_no_leading_zero:{:.2}",
+            leading_zero_ratio
+        ));
+    }
 }
 
 /// Apply disambiguation rules when the vote distribution contains known ambiguous pairs.
@@ -7257,6 +7279,78 @@ datetime.component.day_of_week:
         assert_eq!(
             result.label, "technology.cryptographic.hash",
             "should NOT override for non-40-char uniform hex"
+        );
+        assert!(!result.disambiguation_applied);
+    }
+
+    #[test]
+    fn test_rule_f5_numeric_code_demoted_without_leading_zeros() {
+        // numeric_code winner with no leading zeros → should demote to integer_number
+        // e.g., duration_minutes column with values: 180, 90, 120, 60
+        let mut result = ColumnResult {
+            label: "representation.identifier.numeric_code".to_string(),
+            confidence: 1.0,
+            vote_distribution: vec![(
+                "representation.identifier.numeric_code".to_string(),
+                1.0,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.0; // no leading zeros
+
+        let votes = vec![(
+            "representation.identifier.numeric_code".to_string(),
+            100,
+        )];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(result.label, "representation.numeric.integer_number");
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_no_leading_zero"));
+    }
+
+    #[test]
+    fn test_rule_f5_numeric_code_kept_with_leading_zeros() {
+        // numeric_code winner with leading zeros → should NOT demote
+        // e.g., ZIP-like codes: 00123, 04500
+        let mut result = ColumnResult {
+            label: "representation.identifier.numeric_code".to_string(),
+            confidence: 1.0,
+            vote_distribution: vec![(
+                "representation.identifier.numeric_code".to_string(),
+                1.0,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.5; // 50% have leading zeros
+
+        let votes = vec![(
+            "representation.identifier.numeric_code".to_string(),
+            100,
+        )];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(
+            result.label, "representation.identifier.numeric_code",
+            "should NOT demote when leading zeros are present"
         );
         assert!(!result.disambiguation_applied);
     }
