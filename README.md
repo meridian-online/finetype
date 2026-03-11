@@ -282,8 +282,8 @@ finetype/
 ├── labels/                     # Taxonomy definitions (250 types, 7 domains, YAML)
 ├── models/                     # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
 ├── eval/                       # Evaluation infrastructure (GitTables, SOTAB, profile)
-├── discovery/                  # Spike findings and research
-├── backlog/                    # Project tasks and decisions (Backlog.md format)
+├── specs/                      # Spike findings and research
+├── decisions/                  # Architectural decision records (MADR format)
 └── .github/workflows/          # CI/CD: fmt, clippy, test, check; release cross-compile
 ```
 

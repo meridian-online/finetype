@@ -1,3 +1,12 @@
+# Mission
+
+Build reliable, well-tested software through clarity of intent and rigorous verification.
+Every session starts aligned on purpose. Every change ships with evidence it works.
+
+**Values:** Clarity over ceremony. Testing over trust. Decisions captured, not forgotten.
+
+---
+
 # FineType
 
 FineType is a type inference engine that detects and classifies data types in tabular datasets. It's the core analytical engine of the Meridian project.
@@ -286,7 +295,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | MCP server | `crates/finetype-mcp/src/lib.rs` |
 | MCP tool handlers | `crates/finetype-mcp/src/tools/*.rs` (6 tools) |
 | MCP taxonomy resources | `crates/finetype-mcp/src/resources.rs` |
-| MCP spike report | `discovery/mcp-server/SPIKE.md` |
+| MCP spike report | `specs/mcp-server/SPIKE.md` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |
 | CI workflow | `.github/workflows/ci.yml` |
 | Eval config | `eval/config.env` |
@@ -295,8 +304,8 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Smoke tests | `tests/smoke.sh` |
 | Golden integration tests | `crates/finetype-cli/tests/cli_golden.rs` (13 tests, `#[ignore]`) |
 | Test fixtures | `tests/fixtures/` (CSV + JSON fixtures) |
-| Phase 2 integration design | `discovery/architectural-pivot/PHASE2_DESIGN.md` |
-| Architectural pivot | `discovery/architectural-pivot/` |
+| Phase 2 integration design | `specs/architectural-pivot/PHASE2_DESIGN.md` |
+| Architectural pivot | `specs/architectural-pivot/` |
 | Sense training (Rust) | `crates/finetype-train/src/sense_train.rs`, `crates/finetype-train/src/bin/train_sense.rs` |
 | Entity training (Rust) | `crates/finetype-train/src/entity.rs`, `crates/finetype-train/src/bin/train_entity.rs` |
 | Data pipeline (Rust) | `crates/finetype-train/src/data.rs`, `crates/finetype-train/src/bin/prepare_sense_data.rs` |
@@ -306,7 +315,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Sense A/B eval report | `eval/eval_output/sense_ab_diff.json` |
 | Collapsed type remapping | `crates/finetype-model/src/column.rs` (search `remap_collapsed_label`) |
 | Candle training spike | `crates/finetype-candle-spike/` (models, data, training, tests) |
-| Candle spike summary | `discovery/candle-feasibility-spike/SUMMARY.md` |
+| Candle spike summary | `specs/candle-feasibility-spike/SUMMARY.md` |
 | DuckDB metadata tool | `crates/finetype-build-tools/src/lib.rs`, `crates/finetype-build-tools/src/bin/append_duckdb_metadata.rs` |
 | Training script | `scripts/train.sh` |
 | Eval script | `scripts/eval.sh` |
