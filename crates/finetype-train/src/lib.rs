@@ -12,6 +12,9 @@ pub mod entity;
 pub mod model2vec_prep;
 pub mod sense;
 pub mod sense_train;
+pub mod sibling_context;
+pub mod sibling_data;
+pub mod sibling_train;
 pub mod training;
 
 pub use device::get_device;

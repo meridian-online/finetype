@@ -62,6 +62,10 @@ path = "src/bin/prepare_sense_data.rs"
 name = "prepare-model2vec"
 path = "src/bin/prepare_model2vec.rs"
 
+[[bin]]
+name = "train-sibling-context"
+path = "src/bin/train_sibling_context.rs"
+
 [lib]
 name = "finetype_train"
 path = "src/lib.rs"
