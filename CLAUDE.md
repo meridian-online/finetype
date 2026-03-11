@@ -37,7 +37,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
-### Recent milestones
+### Recent work
 
 - **Sibling-context attention module** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention over Model2Vec column embeddings. Enriches per-column headers with cross-column context before Sense classification. 396,800 params (1.51 MB), 108μs–1.4ms latency. Architecturally complete but inert until trained — no model artifact means pipeline is unchanged (zero regression, 180/186 profile eval). Multi-column entry point: `classify_columns_with_context()`. Profile command uses batch path when sibling context available. Training data pipeline designed (GitTables). Addresses 3/7 remaining bare-name ambiguity errors.
 - **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax replacing flat 250-class output: 7 domains → 43 categories → 250 leaf types. HierarchyMap derived from label strings, HierarchicalHead with per-node Linear layers (39 non-degenerate leaf heads, 4 degenerate skipped). Multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode (Flat/Hierarchical) with backbone_forward(). char-cnn-v15-250: 84.2% type, 90.9% domain, 96.5% category. Profile: 180/186 (96.8% label, 98.4% domain) — matches flat baseline. `--hierarchical` CLI/script flag. Backward compatible.
@@ -218,42 +218,19 @@ All eval pipelines use `eval/config.env` + `envsubst` for dataset paths.
 
 GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable columns.
 
-## Priority Order
+## Sprint Goal
 
-1. ✅ **Accuracy lift** — Completed NNFT-188: 117/119 (98.3% label). Remaining 2 ambiguous cases (countries.name, long_full_month_date) deferred to follow-up task.
-2. **DuckDB extension metadata** — Replace last Python script in build chain (NNFT-183)
-3. **Documentation** — README update, CHANGELOG (NNFT-095, NNFT-096)
-4. **Distribution** — Homebrew tap, crates.io current, v0.5.1 release
-5. **Optional: further actionability improvements** — At 96.0% (target met). Remaining gaps: long_full_month_date (misclassification), multilingual.date (mixed formats)
+**Architecture evolution (m-13):** Sibling-context attention training on GitTables, hierarchical head accuracy parity, golden test expansion.
 
-## Decided Items
+**Remaining accuracy gaps:** 6 misclassifications at 180/186 — 3× bare "name" ambiguity (genuinely ambiguous), 2× model-level confusions (hs_code, docker_ref), 1× GT edge case (response_time_ms).
 
-Key decisions — do not revisit without good reason. See backlog decisions and task details for full context.
+## Decision Register
 
-1. **Tiered model as default** — T0→T1→T2 for CLI; flat for DuckDB extension throughput. (NNFT-084/087/089)
-2. **Taxonomy labels** — `domain.category.type` dotted hierarchy. Locale is a YAML field, not label. (NNFT-001)
-3. **YAML transformation contracts** — Each type specifies DuckDB broad_type, transform SQL, validation. (NNFT-001)
-4. **CharCNN via Candle** — Rust training and inference. No Python at runtime. (NNFT-003)
-5. **Column-mode disambiguation** — Majority vote + hardcoded rules. Header hints override generic predictions. Geography protection + measurement disambiguation guards. (NNFT-065/091/102/127/128/156)
-6. **Model2Vec semantic hints** — potion-base-4M, max-sim K=3 FPS matching, 0.65 threshold. Falls back to hardcoded `header_hint()`. (NNFT-110/122/124)
-7. **Models on HuggingFace** — `hughcameron/finetype`. CI downloads via script. Not in git. (NNFT-020/088)
-8. **Attractor demotion (Rule 15)** — Three signals: validation failure, confidence, cardinality. Locale-confirmed skips Signals 2-3. Universal validation can reject but cannot confirm. (NNFT-115/131/132)
-9. **Duration override (Rule 14)** — SEDOL + P-prefix → duration. Before attractor demotion. (NNFT-131)
-10. **JSON Schema validation** — `jsonschema` crate, Draft 2020-12. Pre-compiled validators cached. (NNFT-116)
-11. **Locale-specific validation** — `validation_by_locale` for 5 types: postal_code (14 locales), phone_number (15), calling_code (17), month_name (6), day_of_week (6). Embedded in YAML. (NNFT-118/121/136/141)
-12. **Validation precision** — For `locale_specific` types: locale validation confirms, universal validation can only reject. (NNFT-132)
-13. **`is_generic` determination** — Five additive signals. Hardcoded list always applies; taxonomy designation adds more. (NNFT-139/156)
-14. **Post-hoc locale detection** — Composable add-on after classification (decision-002 Option B). (NNFT-140/141)
-15. **UTC offset override (Rule 17)** — `[+-]HH:MM` ≥80% → utc offset. Between Rules 14 and 15. (NNFT-143)
-16. **Entity classifier (Rule 18)** — Deep Sets MLP (300→4 classes). Demotes full_name → entity_name when non-person >0.6. Entity demotion guard skips header hints. (NNFT-150-152, decision-003)
-17. **Snapshot Learning** — Auto-snapshot before overwriting models. `--seed N` deterministic training. `manifest.json` provenance. (NNFT-146)
-18. **Sense Architecture A** — Cross-attention over Model2Vec beats transformer encoder: +1.6pp accuracy, 23.7x faster, simpler Candle port. (NNFT-163, decision-005)
-19. **Sense integration: flat CharCNN + output masking** — Use existing flat model with Sense-guided category masking, not per-category retraining. Sample 100/encode 50. Sense absorbs 6 behaviours (header hints, entity demotion, geography protection). (NNFT-164, decision-006)
-20. **Pure Rust via Candle (Path A)** — Full Rust migration replacing all Python. Candle 0.8 with `half = "2.4"` pin. Validated: architecture, gradients, optimizer, safetensors round-trip. (NNFT-182/187)
-21. **MCP server via rmcp** — Official Rust MCP SDK v1.1.0, stdio transport, single binary (`finetype mcp` subcommand). 6 tools + taxonomy resources. JSON + markdown dual output. (NNFT-240/241)
-22. **Rules over feature-augmented model** — feature_dim=0 + expanded header hints + F1-F5 post-vote rules outperforms feature_dim=32 CharCNN. Feature fusion causes city attractor regression (-1.6pp). Cross-domain hardcoded hint override with domain-aware thresholds (0.85 cross/0.5 same). Column-level variance/min/max aggregation (NNFT-266) for distributional disambiguation. F5 demotes numeric_code → integer_number when no leading zeros (NNFT-272). (NNFT-253/254/266/272)
-23. **Hierarchical classification head** — Tree softmax (7 domains → 43 categories → 250 leaf types) with multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode: `new()` flat (default, backward compatible), `new_hierarchical()` tree. Product probabilities p(type)=p(domain)×p(cat|domain)×p(leaf|cat). Degenerate categories (1 type) skip leaf head. 84.2% type accuracy, maintains 180/186 profile eval. (NNFT-267)
-24. **Sibling-context attention** — 2-layer pre-norm transformer self-attention (4 heads, 128-dim, 396K params) over Model2Vec column header embeddings. Enriches per-column headers with cross-column context before Sense. `classify_columns_with_context()` multi-column entry point; falls back to per-column when no model artifact. N=1 degrades gracefully via residual. Safetensors load/save. 108μs–1.4ms latency. Training requires GitTables multi-column table data. (NNFT-268)
+30 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
+
+Browse: `ls decisions/` or use Ctrl+B (fzf + glow preview).
+
+Covers: inference pipeline, model architecture, embeddings & hints, rules & disambiguation, taxonomy, validation, training, evaluation methodology, and distribution.
 
 ## Build & Test
 
@@ -322,9 +299,10 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Package script | `scripts/package.sh` |
 | Device auto-detection (train) | `crates/finetype-train/src/device.rs` |
 
-## Backlog Discipline
+## Workflow
 
-**Every bug fix, feature, and release MUST have a corresponding backlog task.** Create retroactively with status `Done` if already complete.
+**Seed-driven:** interview → decision → seed → implement via PR → evaluate. No backlog, no task tracking.
+**Specs** live in `specs/`. **Decisions** live in `decisions/`. **Code changes** ship via PRs.
 
 <!-- ooo:START -->
 <!-- ooo:VERSION:0.14.0 -->
