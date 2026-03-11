@@ -104,8 +104,8 @@ fn table_forward(
         .iter()
         .flat_map(|c| c.header_embed.iter().copied())
         .collect();
-    let header_embeds = Tensor::new(header_flat.as_slice(), device)?
-        .reshape((n_cols, EMBED_DIM))?;
+    let header_embeds =
+        Tensor::new(header_flat.as_slice(), device)?.reshape((n_cols, EMBED_DIM))?;
 
     // 2. Run attention: [N_cols, 128] → [N_cols, 128]
     let enriched_headers = attn_model.forward(&header_embeds)?;
@@ -520,8 +520,7 @@ mod tests {
 
         let attn_varmap = VarMap::new();
         let attn_config = SiblingContextConfig::default();
-        let attn_model =
-            SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
+        let attn_model = SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
 
         let (_tmp, sense_path) = save_random_sense(&device);
         let sense_model = FrozenSense::load(&sense_path, &device).unwrap();
@@ -530,8 +529,7 @@ mod tests {
         let table = &tables[0];
         let n_cols = table.columns.len();
 
-        let (logits, labels) =
-            table_forward(table, &attn_model, &sense_model, &device).unwrap();
+        let (logits, labels) = table_forward(table, &attn_model, &sense_model, &device).unwrap();
         assert_eq!(logits.dims(), &[n_cols, N_BROAD]);
         assert_eq!(labels.dims(), &[n_cols]);
     }
@@ -545,8 +543,7 @@ mod tests {
 
         let attn_varmap = VarMap::new();
         let attn_config = SiblingContextConfig::default();
-        let attn_model =
-            SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
+        let attn_model = SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
 
         let (_tmp, sense_path) = save_random_sense(&device);
         let sense_model = FrozenSense::load(&sense_path, &device).unwrap();
@@ -579,8 +576,7 @@ mod tests {
 
         let attn_varmap = VarMap::new();
         let attn_config = SiblingContextConfig::default();
-        let attn_model =
-            SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
+        let attn_model = SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
 
         let (_tmp, sense_path) = save_random_sense(&device);
         let sense_model = FrozenSense::load(&sense_path, &device).unwrap();
@@ -596,8 +592,7 @@ mod tests {
         let tables = make_synthetic_tables(1, 99);
         let table = &tables[0];
 
-        let (logits, labels) =
-            table_forward(table, &attn_model, &sense_model, &device).unwrap();
+        let (logits, labels) = table_forward(table, &attn_model, &sense_model, &device).unwrap();
         let loss = cross_entropy_loss(&logits, &labels).unwrap();
 
         // Check gradients exist for attention vars

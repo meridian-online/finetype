@@ -29,7 +29,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.6.9
+**Version:** 0.6.10
 **Taxonomy:** 250 definitions across 7 domains (container: 12, datetime: 84, finance: 31, geography: 25, identity: 34, representation: 36, technology: 28) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v14-250 flat (250 classes, 10 epochs, 372k samples), tiered-v2 fallback via `--sharp-only`. Hierarchical head available: char-cnn-v15-250 (7→43→250 tree softmax, 84.2% type / 90.9% domain / 96.5% category training accuracy).
 **Features:** 36-dim deterministic feature extractor (NNFT-248/266/270), column-level aggregation (mean, variance, min, max), 5 feature-based disambiguation rules (F1–F5). Financial header hints (NNFT-270).
@@ -39,7 +39,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent work
 
-- **Sibling-context attention module** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention over Model2Vec column embeddings. Enriches per-column headers with cross-column context before Sense classification. 396,800 params (1.51 MB), 108μs–1.4ms latency. Architecturally complete but inert until trained — no model artifact means pipeline is unchanged (zero regression, 180/186 profile eval). Multi-column entry point: `classify_columns_with_context()`. Profile command uses batch path when sibling context available. Training data pipeline designed (GitTables). Addresses 3/7 remaining bare-name ambiguity errors.
+- **Sibling-context attention training** (NNFT-268, m-13) — Trained 2-layer pre-norm transformer self-attention (396,800 params, 1.51 MB) on 509 real-world CSVs. Enriches per-column Model2Vec headers with cross-column context before Sense classification. Training pipeline: CSV → Model2Vec encoding + Sense silver labels → JSONL cache → attention training with frozen Sense. Key discovery: Candle's VarMap-backed Var tensors block gradient propagation — solved with FrozenSense (constant-tensor implementation). 48 epochs, lr=3e-4, val accuracy 78.0%. Profile: 170/174 (97.7% label, 98.9% domain). Multi-column entry point: `classify_columns_with_context()`. Profile command uses batch path when sibling context available. Training binary: `train-sibling-context`.
 - **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax replacing flat 250-class output: 7 domains → 43 categories → 250 leaf types. HierarchyMap derived from label strings, HierarchicalHead with per-node Linear layers (39 non-degenerate leaf heads, 4 degenerate skipped). Multi-level CE loss (λ=0.2/0.3/0.5). CharCnn dual-mode (Flat/Hierarchical) with backbone_forward(). char-cnn-v15-250: 84.2% type, 90.9% domain, 96.5% category. Profile: 180/186 (96.8% label, 98.4% domain) — matches flat baseline. `--hierarchical` CLI/script flag. Backward compatible.
 - **Sherlock-style features + financial hints** (NNFT-270, m-12) — FEATURE_DIM 34→36 (has_negative_prefix, has_percent). Rule F3 enhanced with negative-prefix guard and dot-variance confidence check for hs_code vs decimal_number. Financial header hints (`price/cost/salary/fare/fee/revenue/income/wage/budget/expense`) changed from `decimal_number` to `finance.currency.amount`. Profile: 180/186 (zero regression).
 - **Column feature expansion** (NNFT-266, m-13) — FEATURE_DIM 32→34 (has_colon, has_dash). ColumnFeatures struct replaces raw mean array with mean/variance/min/max aggregation. Rule F4: zero length-variance + all hex + len=40 → git_sha (not hash). Rule F3 enhanced with float-parseability Path B. Profile: 180/186 (96.8% label, 98.4% domain). 1 fewer misclassification (git_sha fixed).
@@ -64,7 +64,8 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ### What's in progress
 
 - **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range). Depends on NNFT-254 completion.
-- **Remaining accuracy gaps** — 6 misclassifications at 180/186: 3× bare "name" ambiguity (genuinely ambiguous), 2× model-level confusions (hs_code→decimal_number false positive on ecommerce totals, docker_ref→hostname), 1× GT edge case (response_time_ms integer vs decimal).
+- **Eval baseline reconciliation** — Profile eval count shifted from 186 to 174 matchable predictions. Need to identify cause (manifest changes, schema mapping updates, or sibling-context side effect).
+- **Remaining accuracy gaps** — 4 misclassifications at 170/174: 3× bare "name" ambiguity (sibling context shifts to geographic types), 1× docker_ref→hostname.
 
 ## Architecture
 
@@ -220,9 +221,9 @@ GT labels: lowercase with spaces. Current: 21 CSV files, 120 format-detectable c
 
 ## Sprint Goal
 
-**Architecture evolution (m-13):** Sibling-context attention training on GitTables, hierarchical head accuracy parity, golden test expansion.
+**Architecture evolution (m-13):** Sibling-context attention trained and shipped (v0.6.10). Hierarchical head accuracy parity, golden test expansion.
 
-**Remaining accuracy gaps:** 6 misclassifications at 180/186 — 3× bare "name" ambiguity (genuinely ambiguous), 2× model-level confusions (hs_code, docker_ref), 1× GT edge case (response_time_ms).
+**Remaining accuracy gaps:** 4 misclassifications at 170/174 — 3× bare "name" ambiguity (genuinely ambiguous, sibling context shifts these to geographic types), 1× docker_ref/hostname confusion.
 
 ## Decision Register
 
