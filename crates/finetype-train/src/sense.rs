@@ -198,8 +198,7 @@ impl FrozenSense {
     /// All tensors are loaded as constants (not variables), allowing gradients
     /// to flow through this model's forward pass to upstream trainable parameters.
     pub fn load(model_path: &std::path::Path, device: &Device) -> Result<Self> {
-        let tensors =
-            candle_core::safetensors::load(model_path, device)?;
+        let tensors = candle_core::safetensors::load(model_path, device)?;
 
         let get = |name: &str| -> Result<Tensor> {
             tensors

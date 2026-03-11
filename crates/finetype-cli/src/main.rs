@@ -2296,7 +2296,8 @@ fn cmd_load(
     );
 
     // NNFT-273: Emit CREATE TYPE statements for ENUM columns
-    let mut enum_type_names: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+    let mut enum_type_names: std::collections::HashMap<usize, String> =
+        std::collections::HashMap::new();
     for (i, col) in load_cols.iter().enumerate() {
         if let Some(ref values) = col.enum_values {
             let type_name = format!("{}_t", col.output_name);
@@ -2327,11 +2328,7 @@ fn cmd_load(
         .map(|(i, c)| {
             if let Some(type_name) = enum_type_names.get(&i) {
                 // ENUM column: cast to the CREATE TYPE name
-                build_load_expr_enum(
-                    &c.original_name,
-                    &c.output_name,
-                    type_name,
-                )
+                build_load_expr_enum(&c.original_name, &c.output_name, type_name)
             } else {
                 build_load_expr(
                     &c.original_name,
@@ -2413,11 +2410,7 @@ fn build_load_expr(
 /// Build a SELECT expression for an ENUM column in the CTAS.
 ///
 /// Casts the source column to the named ENUM type created by CREATE TYPE.
-fn build_load_expr_enum(
-    original_name: &str,
-    output_name: &str,
-    enum_type_name: &str,
-) -> String {
+fn build_load_expr_enum(original_name: &str, output_name: &str, enum_type_name: &str) -> String {
     let source_ref = format_column_name(original_name);
     let alias = format_column_name(output_name);
     format!("CAST({} AS {}) AS {}", source_ref, enum_type_name, alias)
@@ -2995,7 +2988,10 @@ fn collect_unique_values_if_categorical(
 ///
 /// When the taxonomy says ENUM but the column's cardinality exceeds the threshold
 /// (or threshold is 0), downgrade to VARCHAR for display.
-fn resolve_broad_type_display<'a>(broad_type: Option<&'a str>, unique_values: &Option<Vec<String>>) -> &'a str {
+fn resolve_broad_type_display<'a>(
+    broad_type: Option<&'a str>,
+    unique_values: &Option<Vec<String>>,
+) -> &'a str {
     match broad_type {
         Some("ENUM") => {
             if unique_values.is_some() {
@@ -3199,11 +3195,8 @@ fn cmd_profile(
                 } else {
                     (None, None, None)
                 };
-            let unique_values = collect_unique_values_if_categorical(
-                &result.label,
-                &values,
-                enum_threshold,
-            );
+            let unique_values =
+                collect_unique_values_if_categorical(&result.label, &values, enum_threshold);
             all_entries.push((
                 idx,
                 ColProfile {
@@ -3286,11 +3279,8 @@ fn cmd_profile(
                     (None, None, None)
                 };
 
-            let unique_values = collect_unique_values_if_categorical(
-                &result.label,
-                col_values,
-                enum_threshold,
-            );
+            let unique_values =
+                collect_unique_values_if_categorical(&result.label, col_values, enum_threshold);
             profiles.push(ColProfile {
                 name,
                 label: result.label,
@@ -3467,10 +3457,8 @@ fn cmd_profile(
                     obj.insert("column".to_string(), json!(p.name));
                     obj.insert("type".to_string(), json!(p.label));
                     obj.insert("confidence".to_string(), json!(p.confidence));
-                    let resolved_broad = resolve_broad_type_display(
-                        p.broad_type.as_deref(),
-                        &p.unique_values,
-                    );
+                    let resolved_broad =
+                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
                     obj.insert("broad_type".to_string(), json!(resolved_broad));
                     if let Some(fs) = &p.format_string {
                         obj.insert("format_string".to_string(), json!(fs));

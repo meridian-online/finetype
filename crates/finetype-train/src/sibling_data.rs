@@ -106,11 +106,7 @@ impl SiblingDataset {
     }
 
     /// Split into train/val by table index.
-    pub fn train_val_split(
-        self,
-        val_fraction: f64,
-        seed: u64,
-    ) -> (SiblingDataset, SiblingDataset) {
+    pub fn train_val_split(self, val_fraction: f64, seed: u64) -> (SiblingDataset, SiblingDataset) {
         use rand::SeedableRng;
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         let mut indices: Vec<usize> = (0..self.tables.len()).collect();
@@ -148,10 +144,7 @@ impl SiblingDataset {
 /// A raw table: (filename, headers, column_values).
 pub type RawTable = (String, Vec<String>, Vec<Vec<String>>);
 
-pub fn load_csv_tables(
-    csv_dir: &Path,
-    max_values: usize,
-) -> Result<Vec<RawTable>> {
+pub fn load_csv_tables(csv_dir: &Path, max_values: usize) -> Result<Vec<RawTable>> {
     let mut entries: Vec<_> = std::fs::read_dir(csv_dir)
         .with_context(|| format!("Failed to read CSV directory: {}", csv_dir.display()))?
         .filter_map(|e| e.ok())
@@ -195,20 +188,13 @@ pub fn load_csv_tables(
 }
 
 /// Read a single CSV file, returning headers and column values.
-fn read_csv_columns(
-    path: &Path,
-    max_values: usize,
-) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+fn read_csv_columns(path: &Path, max_values: usize) -> Result<(Vec<String>, Vec<Vec<String>>)> {
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .flexible(true)
         .from_path(path)?;
 
-    let headers: Vec<String> = rdr
-        .headers()?
-        .iter()
-        .map(|h| h.to_string())
-        .collect();
+    let headers: Vec<String> = rdr.headers()?.iter().map(|h| h.to_string()).collect();
 
     if headers.is_empty() {
         bail!("No headers found");
@@ -284,7 +270,11 @@ pub fn prepare_table_samples(
 
             // Encode values (up to max_values)
             let n_values = col_values.len().min(max_values);
-            let value_strs: Vec<&str> = col_values.iter().take(n_values).map(|s| s.as_str()).collect();
+            let value_strs: Vec<&str> = col_values
+                .iter()
+                .take(n_values)
+                .map(|s| s.as_str())
+                .collect();
             let value_embs_tensor = m2v.encode_batch(&value_strs)?; // [N, 128]
 
             // Build value mask (non-zero embeddings)
@@ -300,10 +290,7 @@ pub fn prepare_table_samples(
             // Classify with Sense to get silver label
             let sense_result = sense.classify(m2v, Some(header.as_str()), &value_strs)?;
             let broad_idx = sense_result.broad_category as usize;
-            let entity_idx = sense_result
-                .entity_subtype
-                .map(|e| e as usize)
-                .unwrap_or(0);
+            let entity_idx = sense_result.entity_subtype.map(|e| e as usize).unwrap_or(0);
 
             table_columns.push(SiblingColumn {
                 header: header.clone(),

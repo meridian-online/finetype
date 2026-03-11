@@ -14,9 +14,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
-use finetype_train::sibling_data::{
-    load_csv_tables, prepare_table_samples, SiblingDataset,
-};
+use finetype_train::sibling_data::{load_csv_tables, prepare_table_samples, SiblingDataset};
 use finetype_train::sibling_train::{train_sibling_context, SiblingTrainConfig};
 
 #[derive(Parser, Debug)]
@@ -96,11 +94,15 @@ fn main() -> Result<()> {
 
         // Load Model2Vec resources
         tracing::info!("Loading Model2Vec from {}", args.model2vec.display());
-        let m2v = finetype_model::Model2VecResources::load(&args.model2vec)
-            .with_context(|| format!("Failed to load Model2Vec from {}", args.model2vec.display()))?;
+        let m2v = finetype_model::Model2VecResources::load(&args.model2vec).with_context(|| {
+            format!("Failed to load Model2Vec from {}", args.model2vec.display())
+        })?;
 
         // Load Sense classifier (inference version for silver labels)
-        tracing::info!("Loading Sense classifier from {}", args.sense_model.display());
+        tracing::info!(
+            "Loading Sense classifier from {}",
+            args.sense_model.display()
+        );
         let sense = finetype_model::SenseClassifier::load(&args.sense_model)
             .with_context(|| format!("Failed to load Sense from {}", args.sense_model.display()))?;
 

@@ -60,11 +60,7 @@ impl SiblingContextTrainable {
     ///
     /// Key names match the inference model exactly (e.g., `blocks.0.attn.wq`),
     /// so `varmap.save()` produces artifacts loadable by `SiblingContextAttention::load()`.
-    pub fn new(
-        varmap: &VarMap,
-        config: &SiblingContextConfig,
-        device: &Device,
-    ) -> Result<Self> {
+    pub fn new(varmap: &VarMap, config: &SiblingContextConfig, device: &Device) -> Result<Self> {
         let d = config.embed_dim;
         let ff = d * 4;
         let n_heads = config.n_heads;
@@ -77,41 +73,172 @@ impl SiblingContextTrainable {
             let prefix = format!("blocks.{}", i);
 
             let norm1 = TrainableLayerNorm {
-                weight: varmap.get((d,), &format!("{prefix}.norm1.weight"), Init::Const(1.0), DType::F32, device)?,
-                bias: varmap.get((d,), &format!("{prefix}.norm1.bias"), Init::Const(0.0), DType::F32, device)?,
+                weight: varmap.get(
+                    (d,),
+                    &format!("{prefix}.norm1.weight"),
+                    Init::Const(1.0),
+                    DType::F32,
+                    device,
+                )?,
+                bias: varmap.get(
+                    (d,),
+                    &format!("{prefix}.norm1.bias"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
             };
 
             let attn = TrainableMultiHeadAttention {
-                wq: varmap.get((d, d), &format!("{prefix}.attn.wq"), Init::Randn { mean: 0.0, stdev: scale }, DType::F32, device)?,
-                bq: varmap.get((d,), &format!("{prefix}.attn.bq"), Init::Const(0.0), DType::F32, device)?,
-                wk: varmap.get((d, d), &format!("{prefix}.attn.wk"), Init::Randn { mean: 0.0, stdev: scale }, DType::F32, device)?,
-                bk: varmap.get((d,), &format!("{prefix}.attn.bk"), Init::Const(0.0), DType::F32, device)?,
-                wv: varmap.get((d, d), &format!("{prefix}.attn.wv"), Init::Randn { mean: 0.0, stdev: scale }, DType::F32, device)?,
-                bv: varmap.get((d,), &format!("{prefix}.attn.bv"), Init::Const(0.0), DType::F32, device)?,
-                out_weight: varmap.get((d, d), &format!("{prefix}.attn.out_weight"), Init::Randn { mean: 0.0, stdev: scale }, DType::F32, device)?,
-                out_bias: varmap.get((d,), &format!("{prefix}.attn.out_bias"), Init::Const(0.0), DType::F32, device)?,
+                wq: varmap.get(
+                    (d, d),
+                    &format!("{prefix}.attn.wq"),
+                    Init::Randn {
+                        mean: 0.0,
+                        stdev: scale,
+                    },
+                    DType::F32,
+                    device,
+                )?,
+                bq: varmap.get(
+                    (d,),
+                    &format!("{prefix}.attn.bq"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
+                wk: varmap.get(
+                    (d, d),
+                    &format!("{prefix}.attn.wk"),
+                    Init::Randn {
+                        mean: 0.0,
+                        stdev: scale,
+                    },
+                    DType::F32,
+                    device,
+                )?,
+                bk: varmap.get(
+                    (d,),
+                    &format!("{prefix}.attn.bk"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
+                wv: varmap.get(
+                    (d, d),
+                    &format!("{prefix}.attn.wv"),
+                    Init::Randn {
+                        mean: 0.0,
+                        stdev: scale,
+                    },
+                    DType::F32,
+                    device,
+                )?,
+                bv: varmap.get(
+                    (d,),
+                    &format!("{prefix}.attn.bv"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
+                out_weight: varmap.get(
+                    (d, d),
+                    &format!("{prefix}.attn.out_weight"),
+                    Init::Randn {
+                        mean: 0.0,
+                        stdev: scale,
+                    },
+                    DType::F32,
+                    device,
+                )?,
+                out_bias: varmap.get(
+                    (d,),
+                    &format!("{prefix}.attn.out_bias"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
                 n_heads,
                 head_dim,
             };
 
             let norm2 = TrainableLayerNorm {
-                weight: varmap.get((d,), &format!("{prefix}.norm2.weight"), Init::Const(1.0), DType::F32, device)?,
-                bias: varmap.get((d,), &format!("{prefix}.norm2.bias"), Init::Const(0.0), DType::F32, device)?,
+                weight: varmap.get(
+                    (d,),
+                    &format!("{prefix}.norm2.weight"),
+                    Init::Const(1.0),
+                    DType::F32,
+                    device,
+                )?,
+                bias: varmap.get(
+                    (d,),
+                    &format!("{prefix}.norm2.bias"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
             };
 
             let ffn = TrainableFFN {
-                w1: varmap.get((ff, d), &format!("{prefix}.ffn.w1"), Init::Randn { mean: 0.0, stdev: scale }, DType::F32, device)?,
-                b1: varmap.get((ff,), &format!("{prefix}.ffn.b1"), Init::Const(0.0), DType::F32, device)?,
-                w2: varmap.get((d, ff), &format!("{prefix}.ffn.w2"), Init::Randn { mean: 0.0, stdev: scale }, DType::F32, device)?,
-                b2: varmap.get((d,), &format!("{prefix}.ffn.b2"), Init::Const(0.0), DType::F32, device)?,
+                w1: varmap.get(
+                    (ff, d),
+                    &format!("{prefix}.ffn.w1"),
+                    Init::Randn {
+                        mean: 0.0,
+                        stdev: scale,
+                    },
+                    DType::F32,
+                    device,
+                )?,
+                b1: varmap.get(
+                    (ff,),
+                    &format!("{prefix}.ffn.b1"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
+                w2: varmap.get(
+                    (d, ff),
+                    &format!("{prefix}.ffn.w2"),
+                    Init::Randn {
+                        mean: 0.0,
+                        stdev: scale,
+                    },
+                    DType::F32,
+                    device,
+                )?,
+                b2: varmap.get(
+                    (d,),
+                    &format!("{prefix}.ffn.b2"),
+                    Init::Const(0.0),
+                    DType::F32,
+                    device,
+                )?,
             };
 
-            blocks.push(TrainableTransformerBlock { norm1, attn, norm2, ffn });
+            blocks.push(TrainableTransformerBlock {
+                norm1,
+                attn,
+                norm2,
+                ffn,
+            });
         }
 
         let final_norm = TrainableLayerNorm {
-            weight: varmap.get((d,), "final_norm.weight", Init::Const(1.0), DType::F32, device)?,
-            bias: varmap.get((d,), "final_norm.bias", Init::Const(0.0), DType::F32, device)?,
+            weight: varmap.get(
+                (d,),
+                "final_norm.weight",
+                Init::Const(1.0),
+                DType::F32,
+                device,
+            )?,
+            bias: varmap.get(
+                (d,),
+                "final_norm.bias",
+                Init::Const(0.0),
+                DType::F32,
+                device,
+            )?,
         };
 
         Ok(Self {
@@ -137,8 +264,7 @@ impl SiblingContextTrainable {
     pub fn param_count(&self) -> usize {
         let d = self.embed_dim;
         let ff = d * 4;
-        let per_block =
-            4 * (d * d + d) +  // MHA: Q, K, V, Out (weight + bias)
+        let per_block = 4 * (d * d + d) +  // MHA: Q, K, V, Out (weight + bias)
             2 * (d + d) +      // LayerNorm x2
             (ff * d + ff) + (d * ff + d); // FFN
         let final_norm = d + d;
@@ -168,7 +294,9 @@ impl TrainableLayerNorm {
         let var = ((&diff * &diff)?.sum(1)? / d as f64)?;
         let std = (var + eps)?.sqrt()?.unsqueeze(1)?;
         let normed = diff.broadcast_div(&std)?;
-        Ok(normed.broadcast_mul(&self.weight)?.broadcast_add(&self.bias)?)
+        Ok(normed
+            .broadcast_mul(&self.weight)?
+            .broadcast_add(&self.bias)?)
     }
 }
 
@@ -199,7 +327,9 @@ impl TrainableMultiHeadAttention {
         let attn_out = attn_probs.matmul(&v)?;
         let attn_out = attn_out.transpose(0, 1)?.reshape((n, d))?;
 
-        Ok(attn_out.matmul(&self.out_weight.t()?)?.broadcast_add(&self.out_bias)?)
+        Ok(attn_out
+            .matmul(&self.out_weight.t()?)?
+            .broadcast_add(&self.out_bias)?)
     }
 }
 
@@ -224,7 +354,9 @@ mod tests {
         let model = SiblingContextTrainable::new(&varmap, &config, &device).unwrap();
         assert_eq!(model.param_count(), 396800);
 
-        let varmap_params: usize = varmap.all_vars().iter()
+        let varmap_params: usize = varmap
+            .all_vars()
+            .iter()
             .map(|v| v.as_tensor().elem_count())
             .sum();
         assert_eq!(varmap_params, 396800);
@@ -265,8 +397,20 @@ mod tests {
         assert_eq!(loaded.param_count(), 396800);
 
         let input = Tensor::randn(0.0f32, 1.0, (5, 128), &device).unwrap();
-        let out_train: Vec<f32> = model.forward(&input).unwrap().flatten_all().unwrap().to_vec1().unwrap();
-        let out_infer: Vec<f32> = loaded.forward(&input).unwrap().flatten_all().unwrap().to_vec1().unwrap();
+        let out_train: Vec<f32> = model
+            .forward(&input)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
+        let out_infer: Vec<f32> = loaded
+            .forward(&input)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
 
         for (a, b) in out_train.iter().zip(out_infer.iter()) {
             assert!((a - b).abs() < 1e-5, "Round-trip mismatch: {} vs {}", a, b);
@@ -289,14 +433,21 @@ mod tests {
         // Snapshot initial weight
         let initial: Vec<f32> = varmap.all_vars()[0]
             .as_tensor()
-            .flatten_all().unwrap()
-            .to_vec1().unwrap();
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
 
         // Simple loss: MSE between attention output and a target
         let input = Tensor::randn(0.0f32, 1.0, (3, 128), &device).unwrap();
         let target = Tensor::randn(0.0f32, 1.0, (3, 128), &device).unwrap();
         let output = model.forward(&input).unwrap();
-        let loss = (&output - &target).unwrap().sqr().unwrap().mean_all().unwrap();
+        let loss = (&output - &target)
+            .unwrap()
+            .sqr()
+            .unwrap()
+            .mean_all()
+            .unwrap();
 
         let adamw_params = ParamsAdamW {
             lr: 1e-2,
@@ -309,13 +460,21 @@ mod tests {
         // Verify weights changed
         let updated: Vec<f32> = varmap.all_vars()[0]
             .as_tensor()
-            .flatten_all().unwrap()
-            .to_vec1().unwrap();
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
 
-        let max_diff: f32 = initial.iter().zip(updated.iter())
+        let max_diff: f32 = initial
+            .iter()
+            .zip(updated.iter())
             .map(|(a, b)| (a - b).abs())
             .fold(0.0f32, f32::max);
 
-        assert!(max_diff > 1e-8, "Weights should change after backward_step, max_diff={}", max_diff);
+        assert!(
+            max_diff > 1e-8,
+            "Weights should change after backward_step, max_diff={}",
+            max_diff
+        );
     }
 }

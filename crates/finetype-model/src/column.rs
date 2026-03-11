@@ -1884,16 +1884,12 @@ fn feature_disambiguate(
     //
     // Threshold 0.01 (rather than 0.0) accounts for float imprecision in the
     // mean aggregation. Effectively requires zero leading-zero values.
-    if result.label == "representation.identifier.numeric_code"
-        && leading_zero_ratio < 0.01
-    {
+    if result.label == "representation.identifier.numeric_code" && leading_zero_ratio < 0.01 {
         result.label = "representation.numeric.integer_number".to_string();
         result.confidence = result.confidence.max(0.7);
         result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!(
-            "feature_no_leading_zero:{:.2}",
-            leading_zero_ratio
-        ));
+        result.disambiguation_rule =
+            Some(format!("feature_no_leading_zero:{:.2}", leading_zero_ratio));
     }
 }
 
@@ -7290,10 +7286,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "representation.identifier.numeric_code".to_string(),
             confidence: 1.0,
-            vote_distribution: vec![(
-                "representation.identifier.numeric_code".to_string(),
-                1.0,
-            )],
+            vote_distribution: vec![("representation.identifier.numeric_code".to_string(), 1.0)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 100,
@@ -7304,10 +7297,7 @@ datetime.component.day_of_week:
         let mut cf = ColumnFeatures::empty();
         cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.0; // no leading zeros
 
-        let votes = vec![(
-            "representation.identifier.numeric_code".to_string(),
-            100,
-        )];
+        let votes = vec![("representation.identifier.numeric_code".to_string(), 100)];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
@@ -7327,10 +7317,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "representation.identifier.numeric_code".to_string(),
             confidence: 1.0,
-            vote_distribution: vec![(
-                "representation.identifier.numeric_code".to_string(),
-                1.0,
-            )],
+            vote_distribution: vec![("representation.identifier.numeric_code".to_string(), 1.0)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 100,
@@ -7341,10 +7328,7 @@ datetime.component.day_of_week:
         let mut cf = ColumnFeatures::empty();
         cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.5; // 50% have leading zeros
 
-        let votes = vec![(
-            "representation.identifier.numeric_code".to_string(),
-            100,
-        )];
+        let votes = vec![("representation.identifier.numeric_code".to_string(), 100)];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
