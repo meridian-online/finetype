@@ -1,7 +1,7 @@
 ---
 id: NNFT-263
 title: 'Spike: Sibling-context attention prototype in Candle'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-08 21:57'
@@ -111,5 +111,5 @@ Tests: cargo test (281 pass), cargo run -- check (250/250 types pass). Discovery
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [x] #4 Decision record created if plan involved choosing between approaches
 - [x] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

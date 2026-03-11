@@ -1,11 +1,11 @@
 ---
 id: NNFT-267
 title: Implement hierarchical classification head (7→43→250 tree softmax)
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-09 00:56'
-updated_date: '2026-03-10 01:25'
+updated_date: '2026-03-10 01:26'
 labels:
   - architecture
   - model
@@ -179,6 +179,6 @@ Implemented hierarchical classification head (7→43→250 tree softmax) as Phas
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

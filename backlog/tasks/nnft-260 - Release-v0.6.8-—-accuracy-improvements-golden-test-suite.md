@@ -1,10 +1,11 @@
 ---
 id: NNFT-260
 title: 'Release v0.6.8 — accuracy improvements, golden test suite'
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-08 09:39'
+updated_date: '2026-03-08 09:41'
 labels:
   - release
 dependencies: []
@@ -24,18 +25,24 @@ Changes since v0.6.7:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Version bumped to 0.6.8 in Cargo.toml
-- [ ] #2 CHANGELOG.md updated with v0.6.8 entry
-- [ ] #3 All tests pass (cargo test + taxonomy check)
-- [ ] #4 Release tag created and CI triggered
+- [x] #1 Version bumped to 0.6.8 in Cargo.toml
+- [x] #2 CHANGELOG.md updated with v0.6.8 entry
+- [x] #3 All tests pass (cargo test + taxonomy check)
+- [x] #4 Release tag created and CI triggered
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Released v0.6.8 with NNFT-254 accuracy improvements and NNFT-258 golden test suite. Tag pushed, CI triggered.
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
-- [ ] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
-- [ ] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
+- [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
+- [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
+- [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
 - [ ] #4 Decision record created if plan involved choosing between approaches
 - [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

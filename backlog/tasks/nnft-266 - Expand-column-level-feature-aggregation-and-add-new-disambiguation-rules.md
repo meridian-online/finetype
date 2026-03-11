@@ -1,11 +1,11 @@
 ---
 id: NNFT-266
 title: Expand column-level feature aggregation and add new disambiguation rules
-status: In Progress
+status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-09 00:56'
-updated_date: '2026-03-09 08:12'
+updated_date: '2026-03-09 08:13'
 labels:
   - accuracy
   - features
@@ -96,7 +96,7 @@ Expanded column-level feature aggregation from mean-only to (mean, variance, min
 - [x] #1 Tests pass — cargo test + taxonomy check (cargo run -- check) confirm no regressions
 - [x] #2 Final Summary written (PR-quality — what changed / why / impact / tests)
 - [x] #3 CLAUDE.md updated if Current State / Architecture / Priority Order affected
-- [ ] #4 Decision record created if plan involved choosing between approaches
-- [ ] #5 Daily memory log updated with session outcomes
-- [ ] #6 Changes committed with task ID in commit message
+- [x] #4 Decision record created if plan involved choosing between approaches
+- [x] #5 Daily memory log updated with session outcomes
+- [x] #6 Changes committed with task ID in commit message
 <!-- DOD:END -->

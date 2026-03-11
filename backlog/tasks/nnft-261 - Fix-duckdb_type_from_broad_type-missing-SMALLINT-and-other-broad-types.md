@@ -5,6 +5,7 @@ status: Done
 assignee:
   - '@nightingale'
 created_date: '2026-03-08 10:04'
+updated_date: '2026-03-08 10:05'
 labels:
   - bugfix
   - load
@@ -26,10 +27,18 @@ Root cause: the match only covered VARCHAR, DOUBLE, BIGINT, DECIMAL, DATE, TIMES
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 duckdb_type_from_broad_type handles SMALLINT, TIMESTAMPTZ, INTERVAL, POINT, UUID
-- [ ] #2 year column in datetime_formats.csv loads as SMALLINT not VARCHAR
-- [ ] #3 All existing tests pass
+- [x] #1 duckdb_type_from_broad_type handles SMALLINT, TIMESTAMPTZ, INTERVAL, POINT, UUID
+- [x] #2 year column in datetime_formats.csv loads as SMALLINT not VARCHAR
+- [x] #3 All existing tests pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Prevention note:** When adding new `broad_type` values to taxonomy YAML definitions, the corresponding match arm must also be added to `DdlInfo::duckdb_type_from_broad_type()` in `crates/finetype-core/src/taxonomy.rs`. The `_ => VARCHAR` fallback silently swallows unknown types — consider adding a `cargo test` or `finetype check` assertion that all broad_types in the taxonomy are covered by the match.
+
+**Affected commands:** `load` (most visible — skips CAST), `schema` (incorrect DuckDB type in JSON Schema output). `profile` was unaffected because it reads `def.broad_type` directly from the YAML, not through this mapping function.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
