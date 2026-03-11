@@ -1,8 +1,8 @@
 # FineType
 
-FineType is a type inference engine that detects and classifies data types in tabular datasets. It's the core analytical engine of the Noon project.
+FineType is a type inference engine that detects and classifies data types in tabular datasets. It's the core analytical engine of the Meridian project.
 
-## The Noon Pillars
+## The Meridian Pillars
 
 Every decision in this repo should reflect these principles:
 

@@ -124,4 +124,4 @@ echo "Contents:"
 tar -tzf "$ARCHIVE_PATH" | sed 's/^/  /'
 echo ""
 echo "To upload to HuggingFace:"
-echo "  huggingface-cli upload hughcameron/finetype ${ARCHIVE_PATH}"
+echo "  huggingface-cli upload meridian-online/finetype ${ARCHIVE_PATH}"

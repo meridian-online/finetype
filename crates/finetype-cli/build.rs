@@ -14,7 +14,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const HF_REPO: &str = "https://huggingface.co/noon-org/finetype-char-cnn/resolve/main";
+const HF_REPO: &str = "https://huggingface.co/meridian-online/finetype-char-cnn/resolve/main";
 const CACHE_VERSION: &str = "0.5.3";
 
 /// Convert a path to a string safe for use inside `include_bytes!()` / `include_str!()`.

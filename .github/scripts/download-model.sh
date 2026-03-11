@@ -4,7 +4,7 @@
 # Supports both flat models (single dir) and tiered models (multiple subdirs).
 set -euo pipefail
 
-REPO="https://huggingface.co/noon-org/finetype-char-cnn/resolve/main"
+REPO="https://huggingface.co/meridian-online/finetype-char-cnn/resolve/main"
 # readlink works on Linux/macOS; fall back to cat for Windows where
 # git may check out symlinks as plain text files.
 MODEL_DIR=$(readlink models/default 2>/dev/null || cat models/default)

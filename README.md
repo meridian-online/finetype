@@ -1,6 +1,6 @@
 # FineType
 
-[![Project Page](https://img.shields.io/badge/noon.sh-FineType-blue)](https://noon.sh/projects/finetype/)
+[![Project Page](https://img.shields.io/badge/meridian.online-FineType-blue)](https://meridian.online/projects/finetype/)
 
 Precision format detection for text data. FineType classifies strings into a rich taxonomy of 250 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
@@ -33,7 +33,7 @@ identity.person.email
 ### Homebrew (macOS)
 
 ```bash
-brew install noon-org/tap/finetype
+brew install meridian-online/tap/finetype
 ```
 
 ### Cargo
@@ -45,7 +45,7 @@ cargo install finetype-cli
 ### From Source
 
 ```bash
-git clone https://github.com/noon-org/finetype
+git clone https://github.com/meridian-online/finetype
 cd finetype
 cargo build --release
 ./target/release/finetype --version
@@ -379,7 +379,7 @@ Contributions welcome! Please open an issue or PR.
 
 ## Credits
 
-Part of the [Noon](https://noon.sh) project. See the [FineType project page](https://noon.sh/projects/finetype/) for an overview.
+Part of the [Meridian](https://meridian.online) project. See the [FineType project page](https://meridian.online/projects/finetype/) for an overview.
 
 Built with:
 - [Candle](https://github.com/huggingface/candle) — Rust ML framework

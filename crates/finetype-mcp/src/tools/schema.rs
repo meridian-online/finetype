@@ -28,7 +28,7 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     );
     schema.insert(
         "$id".into(),
-        json!(format!("https://noon.sh/schemas/{}", key)),
+        json!(format!("https://meridian.online/schemas/{}", key)),
     );
 
     if let Some(title) = &def.title {

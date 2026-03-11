@@ -124,5 +124,5 @@ If the build tool is unavailable, `make build-release` falls back to copying the
 
 ## Related Repositories
 
-- **noon-org/finetype** (this repo) — Production codebase. Candle-based, DuckDB integration.
+- **meridian-online/finetype** (this repo) — Production codebase. Candle-based, DuckDB integration.
 - **hughcameron/finetype** — v1 experiments. Burn+LibTorch training, Python data generation with mimesis.
