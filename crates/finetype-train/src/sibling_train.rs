@@ -15,7 +15,7 @@ use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::sense::{SenseModelA, EMBED_DIM, MAX_VALUES};
+use crate::sense::{FrozenSense, EMBED_DIM, MAX_VALUES};
 use crate::sibling_context::SiblingContextTrainable;
 use crate::sibling_data::{SiblingDataset, TableSample};
 use crate::training::{
@@ -93,7 +93,7 @@ pub struct SiblingTrainConfigSnapshot {
 fn table_forward(
     table: &TableSample,
     attn_model: &SiblingContextTrainable,
-    sense_model: &SenseModelA,
+    sense_model: &FrozenSense,
     device: &Device,
 ) -> Result<(Tensor, Tensor)> {
     let n_cols = table.columns.len();
@@ -160,7 +160,7 @@ fn table_forward(
 fn validate(
     tables: &[TableSample],
     attn_model: &SiblingContextTrainable,
-    sense_model: &SenseModelA,
+    sense_model: &FrozenSense,
     device: &Device,
 ) -> Result<(f32, f32)> {
     let mut total_correct = 0.0f64;
@@ -223,19 +223,20 @@ pub fn train_sibling_context(
     let n_params = attn_model.param_count();
     tracing::info!("Attention parameters: {}", n_params);
 
-    // 2. Load frozen Sense model
-    // We create a VarMap for Sense but never pass its vars to the optimizer.
-    let mut sense_varmap = VarMap::new();
-    let sense_model = SenseModelA::new(&sense_varmap, &device)?;
+    // 2. Load frozen Sense model as constant tensors (not Var-backed).
+    // This is critical: VarMap-backed Vars act as leaf nodes in Candle's autograd,
+    // blocking gradient flow to upstream attention variables. Loading weights as
+    // constant tensors makes Sense gradient-transparent — gradients flow through
+    // its operations back to the trainable attention parameters.
     let sense_path = config.sense_model_dir.join("model.safetensors");
-    sense_varmap.load(&sense_path).with_context(|| {
+    let sense_model = FrozenSense::load(&sense_path, &device).with_context(|| {
         format!(
             "Failed to load frozen Sense model from {}",
             sense_path.display()
         )
     })?;
     tracing::info!(
-        "Loaded frozen Sense model from {}",
+        "Loaded frozen Sense model (constant tensors) from {}",
         config.sense_model_dir.display()
     );
 
@@ -442,7 +443,7 @@ pub fn train_sibling_context(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sense::N_BROAD;
+    use crate::sense::{SenseModelA, N_BROAD};
     use crate::sibling_data::SiblingColumn;
 
     /// Create synthetic table samples for testing.
@@ -503,48 +504,53 @@ mod tests {
             .collect()
     }
 
+    /// Helper: save random Sense weights to a temp file, return path.
+    fn save_random_sense(device: &Device) -> (tempfile::TempDir, std::path::PathBuf) {
+        let sense_varmap = VarMap::new();
+        let _sense = SenseModelA::new(&sense_varmap, device).unwrap();
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let path = tmp_dir.path().join("model.safetensors");
+        sense_varmap.save(&path).unwrap();
+        (tmp_dir, path)
+    }
+
     #[test]
     fn test_table_forward_shapes() {
         let device = Device::Cpu;
 
-        // Create attention model
         let attn_varmap = VarMap::new();
         let attn_config = SiblingContextConfig::default();
-        let attn_model = SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
+        let attn_model =
+            SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
 
-        // Create Sense model (random weights — just testing shapes)
-        let sense_varmap = VarMap::new();
-        let sense_model = SenseModelA::new(&sense_varmap, &device).unwrap();
+        let (_tmp, sense_path) = save_random_sense(&device);
+        let sense_model = FrozenSense::load(&sense_path, &device).unwrap();
 
         let tables = make_synthetic_tables(1, 42);
         let table = &tables[0];
         let n_cols = table.columns.len();
 
-        let (logits, labels) = table_forward(table, &attn_model, &sense_model, &device).unwrap();
+        let (logits, labels) =
+            table_forward(table, &attn_model, &sense_model, &device).unwrap();
         assert_eq!(logits.dims(), &[n_cols, N_BROAD]);
         assert_eq!(labels.dims(), &[n_cols]);
     }
 
     #[test]
     fn test_end_to_end_pipeline() {
-        // Verify the full training pipeline compiles and runs without errors.
-        // Does NOT assert loss decrease (random Sense weights won't give useful gradients).
         let device = Device::Cpu;
 
         let train_tables = make_synthetic_tables(5, 42);
         let train_data = SiblingDataset::from_tables(train_tables);
 
-        // Create attention model
         let attn_varmap = VarMap::new();
         let attn_config = SiblingContextConfig::default();
         let attn_model =
             SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
 
-        // Create Sense model (random weights for test — just verifying shapes)
-        let sense_varmap = VarMap::new();
-        let sense_model = SenseModelA::new(&sense_varmap, &device).unwrap();
+        let (_tmp, sense_path) = save_random_sense(&device);
+        let sense_model = FrozenSense::load(&sense_path, &device).unwrap();
 
-        // Run forward pass on every table and verify shapes
         for table in &train_data.tables {
             if table.columns.is_empty() {
                 continue;
@@ -560,5 +566,80 @@ mod tests {
             assert!(loss_val.is_finite(), "Loss should be finite");
             assert!(loss_val > 0.0, "Loss should be positive");
         }
+    }
+
+    /// Verify gradients flow from loss through frozen Sense to attention vars.
+    ///
+    /// This is the critical test: FrozenSense uses constant tensors (not Vars),
+    /// so Candle's autograd treats them as pass-through nodes. Gradients must
+    /// flow back through Sense's computation to the attention variables.
+    #[test]
+    fn test_gradient_flow_through_frozen_sense() {
+        let device = Device::Cpu;
+
+        let attn_varmap = VarMap::new();
+        let attn_config = SiblingContextConfig::default();
+        let attn_model =
+            SiblingContextTrainable::new(&attn_varmap, &attn_config, &device).unwrap();
+
+        let (_tmp, sense_path) = save_random_sense(&device);
+        let sense_model = FrozenSense::load(&sense_path, &device).unwrap();
+
+        // Snapshot initial weight
+        let initial: Vec<f32> = attn_varmap.all_vars()[0]
+            .as_tensor()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
+
+        let tables = make_synthetic_tables(1, 99);
+        let table = &tables[0];
+
+        let (logits, labels) =
+            table_forward(table, &attn_model, &sense_model, &device).unwrap();
+        let loss = cross_entropy_loss(&logits, &labels).unwrap();
+
+        // Check gradients exist for attention vars
+        let grads = loss.backward().unwrap();
+        let attn_vars = attn_varmap.all_vars();
+        let mut has_grad_count = 0;
+        for var in &attn_vars {
+            if grads.get(var).is_some() {
+                has_grad_count += 1;
+            }
+        }
+
+        // Do optimizer step
+        let adamw_params = ParamsAdamW {
+            lr: 1e-2,
+            weight_decay: 0.0,
+            ..Default::default()
+        };
+        let mut optimizer = AdamW::new(attn_varmap.all_vars(), adamw_params).unwrap();
+        optimizer.backward_step(&loss).unwrap();
+
+        let updated: Vec<f32> = attn_varmap.all_vars()[0]
+            .as_tensor()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
+        let max_diff: f32 = initial
+            .iter()
+            .zip(updated.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+
+        assert!(
+            has_grad_count > 0,
+            "Attention vars should have gradients through FrozenSense (got 0/{})",
+            attn_vars.len()
+        );
+        assert!(
+            max_diff > 1e-10,
+            "Attention weights should change after backward_step, max_diff={:.6e}",
+            max_diff
+        );
     }
 }

@@ -1,0 +1,14 @@
+{
+  "embed_dim": 128,
+  "n_heads": 4,
+  "n_layers": 2,
+  "n_params": 396800,
+  "best_epoch": 32,
+  "val_accuracy": 0.7804196,
+  "training_config": {
+    "epochs": 100,
+    "lr": 0.0003,
+    "patience": 15,
+    "grad_accum_steps": 4
+  }
+}
