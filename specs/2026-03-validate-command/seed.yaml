@@ -1,0 +1,212 @@
+goal: >
+  Separate validation from profiling into a standalone, schema-driven quality gate.
+  Extend `finetype schema` to auto-generate table-level JSON Schema from CSV data.
+  New `finetype validate` consumes that schema to produce predictable sidecar files.
+  Remove the old validate command and profile --validate flag.
+
+constraints:
+  - "JSON Schema Draft 2020-12 as the schema standard"
+  - "finetype schema detects input: type key → type-level, file path → table-level"
+  - "Sidecar files (.valid.csv, .invalid.csv, .errors.jsonl) always written by default"
+  - "--summary-only flag suppresses sidecar file creation; stdout summary always prints"
+  - "Error detail as JSONL — one object per invalid row, streamable"
+  - "Replace existing validate command entirely — no quarantine/repair strategies"
+  - "Remove --validate flag from profile command"
+  - "Exit code 0 = all valid, exit code 1 = has errors"
+  - "All-valid case must produce predictable output (no conditional file creation)"
+  - "Validation engine: jsonschema-rs crate (same as qsv, supports Draft 2020-12)"
+
+acceptance_criteria:
+  # --- Schema generation (table-level) ---
+  - id: AC-1
+    description: >
+      `finetype schema data.csv` profiles the CSV and emits a JSON Schema
+      document with per-column properties derived from FineType taxonomy
+      definitions (type, validation pattern, format, broad_type).
+    verification: "Run on 3+ test CSVs; output validates against JSON Schema meta-schema"
+
+  - id: AC-2
+    description: >
+      `finetype schema data.csv --stats` adds observed data constraints
+      (min, max, cardinality, null rate) to the type-level schema.
+    verification: "Compare schema with/without --stats; stats schema has additional keywords"
+
+  - id: AC-3
+    description: >
+      `finetype schema <type-key>` continues to work as today for type-level
+      JSON Schema export, including glob patterns.
+    verification: "Existing schema tests pass unchanged"
+
+  - id: AC-4
+    description: >
+      Table-level schema includes x-finetype-* extension fields per column
+      (x-finetype-label, x-finetype-domain, x-finetype-confidence) for
+      round-trip with other FineType commands.
+    verification: "Schema contains x-finetype-label matching profile output for each column"
+
+  # --- Validate command ---
+  - id: AC-5
+    description: >
+      `finetype validate data.csv schema.json` produces three sidecar files:
+      data.csv.valid.csv, data.csv.invalid.csv, data.csv.errors.jsonl.
+      Summary report prints to stdout.
+    verification: "Run on test CSV with known invalid rows; verify file contents"
+
+  - id: AC-6
+    description: >
+      When all rows are valid: .valid.csv = full input, .invalid.csv = headers
+      only (0 data rows), .errors.jsonl = empty file. Exit code 0.
+    verification: "Run on fully valid CSV; verify all three files exist with correct contents"
+
+  - id: AC-7
+    description: >
+      When some rows are invalid: .valid.csv contains only valid rows,
+      .invalid.csv contains only invalid rows (with headers), .errors.jsonl
+      contains one JSONL object per invalid row with row_index, column,
+      error message, and original value. Exit code 1.
+    verification: "Run on CSV with mixed valid/invalid; verify row counts sum correctly"
+
+  - id: AC-8
+    description: >
+      `finetype validate data.csv schema.json --summary-only` prints the
+      summary report to stdout but creates no sidecar files.
+    verification: "Run with --summary-only; verify no .valid/.invalid/.errors files created"
+
+  - id: AC-9
+    description: >
+      Summary report includes: total rows, valid count, invalid count,
+      per-column pass rate, and file-level grade (A/B/C/D/F).
+    verification: "Parse stdout summary; verify all fields present and consistent"
+
+  # --- Cleanup ---
+  - id: AC-10
+    description: >
+      Old `finetype validate` command (NDJSON/plain text, quarantine/repair
+      strategies) is removed. `--validate` flag removed from `profile`.
+    verification: "Old validate flags produce helpful error/help text; no dead code remains"
+
+  # --- MCP integration ---
+  - id: AC-11
+    description: >
+      MCP server exposes a `validate` tool that accepts CSV data (path or
+      inline) plus a JSON Schema, returns validation results as JSON.
+    verification: "MCP tool call returns valid/invalid counts and error details"
+
+  - id: AC-12
+    description: >
+      MCP `schema` tool extended to accept file paths, returning table-level
+      JSON Schema (same as CLI `finetype schema data.csv`).
+    verification: "MCP schema tool with file path returns same schema as CLI"
+
+  # --- DuckDB integration ---
+  - id: AC-13
+    description: >
+      DuckDB extension exposes `finetype_validate(col, schema_json)` or
+      equivalent function for schema-driven validation within SQL queries.
+    verification: "SQL query using finetype_validate returns expected valid/invalid classification"
+
+ontology_schema:
+  name: "ValidateCommand"
+  description: "Schema-driven CSV validation pipeline with predictable sidecar output"
+  fields:
+    - name: "table_schema"
+      type: "object"
+      description: >
+        JSON Schema Draft 2020-12 document describing a table. Properties map
+        column names to type constraints. Contains $schema, $id, properties,
+        required, and x-finetype-* extension fields.
+
+    - name: "error_record"
+      type: "object"
+      description: >
+        Single JSONL error entry: { row_index: number, column: string,
+        value: string|null, error: string, schema_path: string }.
+        One entry per validation failure per row.
+
+    - name: "validation_summary"
+      type: "object"
+      description: >
+        Stdout summary: { total_rows: number, valid_rows: number,
+        invalid_rows: number, columns: [{ name, pass_rate, error_count }],
+        grade: string (A/B/C/D/F) }.
+
+    - name: "sidecar_files"
+      type: "object"
+      description: >
+        Three output files: <input>.valid.csv (valid rows with headers),
+        <input>.invalid.csv (invalid rows with headers), <input>.errors.jsonl
+        (one error_record per line). All always created unless --summary-only.
+
+evaluation_principles:
+  - principle: "Predictability — output files always created, exit codes consistent"
+    weight: 0.30
+  - principle: "Accuracy — validation correctly applies JSON Schema rules to CSV data"
+    weight: 0.30
+  - principle: "Composability — schema is a reusable artefact across CLI, MCP, DuckDB"
+    weight: 0.25
+  - principle: "Error clarity — each error message identifies row, column, value, and rule"
+    weight: 0.15
+
+exit_conditions:
+  - "All 13 acceptance criteria pass"
+  - "Profile eval maintains ≥ 97% label accuracy (no regression)"
+  - "CI passes (fmt, clippy, test, check)"
+  - "Old validate code fully removed, no dead code"
+
+decisions_to_record:
+  - title: "Table-level schema via finetype schema <file>"
+    context: >
+      finetype schema currently only handles type-level keys. Extending it to
+      accept file paths for table-level schema generation (auto-detecting input
+      type) keeps the CLI surface minimal while adding a major capability.
+    decision: "Extend schema command to detect file paths and run profile internally"
+
+  - title: "Replace validate command with schema-driven quality gate"
+    context: >
+      Existing validate command does per-value repair (quarantine/null/ffill/bfill).
+      This conflates quality assessment with data transformation. The new validate
+      is purely a quality gate producing sidecar files, following qsv conventions.
+    decision: "Replace entirely — validation is pass/fail, not repair"
+
+  - title: "Sidecar file output contract for validate"
+    context: >
+      qsv #1728 showed that conditional file creation breaks CI/CD pipelines.
+      DuckDB rejects tables always exist. Always creating sidecar files with
+      --summary-only opt-out provides predictability with flexibility.
+    decision: "Always write sidecar files by default; --summary-only suppresses them"
+
+open_questions:
+  - id: OQ-1
+    question: "Should finetype schema <file> write to sidecar (.schema.json) or stdout?"
+    recommendation: "Sidecar by default (matches qsv), --stdout flag for piping"
+
+  - id: OQ-2
+    question: "Error object shape — per-row or per-cell?"
+    recommendation: >
+      Per-row with array of column errors (hybrid of qsv per-row and DuckDB per-cell).
+      Example: { row_index: 3, errors: [{ column: "age", value: "-5", error: "minimum 0" }] }
+
+  - id: OQ-3
+    question: "How does validate handle schema/data column mismatches?"
+    recommendation: >
+      Extra columns in data: ignored (warn to stderr).
+      Missing columns from schema: treated as validation failure for those columns.
+
+  - id: OQ-4
+    question: "Should load accept a pre-existing schema to skip re-profiling?"
+    recommendation: "Yes, via --schema flag. Deferred to follow-up work."
+
+  - id: OQ-5
+    question: "JSON Schema $id convention for generated table schemas?"
+    recommendation: "Use finetype://<filename> as $id (local, not URL-resolvable)"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-12T12:00:00Z"
+  ambiguity_score: 0.11
+  interview_ref: "specs/2026-03-validate-command/interview.md"
+  references:
+    - "qsv schema: https://github.com/dathere/qsv/blob/master/docs/help/schema.md"
+    - "qsv validate: https://github.com/dathere/qsv/blob/master/docs/Validate.md"
+    - "qsv #1728: https://github.com/dathere/qsv/issues/1728"
+    - "DuckDB rejects: https://duckdb.org/docs/stable/data/csv/reading_faulty_csv_files"
