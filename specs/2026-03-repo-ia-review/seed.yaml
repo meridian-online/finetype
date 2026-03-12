@@ -1,0 +1,72 @@
+goal: >
+  Restructure FineType's user-facing documentation for end users (analysts/data engineers).
+  Fix all broken links, update stale content, trim the README from ~390 to ~200 lines by
+  moving architecture/contributor content to docs/, and align file placement with Rust
+  ecosystem conventions (delta/bat/fd pattern).
+
+constraints:
+  - "Scope: README.md, DEVELOPMENT.md, TAXONOMY_QUICK_REFERENCE.md, and docs/ files only"
+  - "Do not modify CLAUDE.md, specs/, decisions/, or CHANGELOG.md"
+  - "All CLI examples remain unchanged (verified passing)"
+  - "No code changes — documentation only"
+  - "README follows delta/bat/fd pattern: hero → install → usage → taxonomy → perf → limitations"
+
+acceptance_criteria:
+  - "AC1: Zero broken links — all markdown URLs return 200, all relative paths resolve"
+  - "AC2: Zero stale type counts — all references say 250 types, 7 domains, 43 categories"
+  - "AC3: Zero stale version references — no v0.5.x references in user-facing docs"
+  - "AC4: Zero 'Noon' brand references — all say 'Meridian'"
+  - "AC5: README.md is ≤220 lines (currently 389)"
+  - "AC6: Architecture content (mermaid diagram, pipeline stages table, crate table, repo tree, Why Sense→Sharpen, Why Candle) lives in docs/ARCHITECTURE.md, linked from README"
+  - "AC7: TAXONOMY_QUICK_REFERENCE.md removed from root (content is stale beyond repair)"
+  - "AC8: DEVELOPMENT.md moved to docs/DEVELOPMENT.md"
+  - "AC9: README accuracy stats match current eval (170/174 label, 97.7%)"
+  - "AC10: backlog/ references removed from all files"
+
+ontology_schema:
+  name: "DocumentationStructure"
+  description: "The information architecture of user-facing repo documentation"
+  fields:
+    - name: "readme"
+      type: "object"
+      description: "Top-level README targeting end users"
+    - name: "architecture_doc"
+      type: "object"
+      description: "Contributor-facing architecture reference in docs/"
+    - name: "development_doc"
+      type: "object"
+      description: "Training and build guide in docs/"
+    - name: "locale_guide"
+      type: "object"
+      description: "User-facing locale support documentation"
+    - name: "broken_links"
+      type: "array"
+      description: "Links that return non-200 or point to missing files"
+    - name: "stale_references"
+      type: "array"
+      description: "Content referencing outdated type counts, versions, or brand"
+
+evaluation_principles:
+  - principle: "Link integrity — zero broken links"
+    weight: 0.25
+  - principle: "Content accuracy — all stats, counts, and versions current"
+    weight: 0.25
+  - principle: "README conciseness — end-user focused, ≤220 lines"
+    weight: 0.25
+  - principle: "File organisation — clean root, contributor content in docs/"
+    weight: 0.15
+  - principle: "No regressions — CLI examples, working links, and useful content preserved"
+    weight: 0.10
+
+exit_conditions:
+  - "All 10 acceptance criteria met"
+  - "Link checker reports zero broken links"
+  - "grep for stale type counts (159|163|164|172|207|209|216) returns zero hits in user-facing docs"
+  - "README line count ≤ 220"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-12T01:00:00Z"
+  ambiguity_score: 0.06
+  interview_ref: "specs/2026-03-repo-ia-review/interview.md"
+  audit_ref: "specs/2026-03-repo-ia-review/audit.md"

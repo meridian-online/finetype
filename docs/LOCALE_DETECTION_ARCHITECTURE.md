@@ -104,7 +104,7 @@ This leads to a clean architectural separation:
 
 ### The Composability Argument
 
-This separation aligns with Noon's second pillar: *Write programs that do one thing
+This separation aligns with Meridian's second pillar: *Write programs that do one thing
 and do it well.*
 
 - The classifier does one thing: identify the semantic type
@@ -157,7 +157,7 @@ roadmap for expanding validation coverage to more types and locales.
 
 ## References
 
-- **Decision record:** `backlog/decisions/decision-002`
+- **Decision record:** `decisions/0002-locale-detection-post-hoc-validation.md`
 - **Old prototype:** `hughcameron/finetype` (Python + Burn Transformer)
 - **Tiered-v3 training log:** NNFT-126 implementation notes
 - **Precision Principle:** NNFT-132, decision-001

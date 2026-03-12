@@ -120,15 +120,6 @@ At production base rates (~96% of full_name predictions are non-person):
 **Training data:** 2,911 SOTAB validation columns (person 816, place 719, org 647, creative_work 729)
 **Test data:** 2,117 SOTAB test columns (person 595, place 462, org 466, creative_work 594)
 
-## Rust Implementation Checklist
+## Implementation Status
 
-For the follow-up integration task:
-
-1. [ ] Load `model.safetensors` via Candle (Linear + BatchNorm1d layers)
-2. [ ] Reuse existing Model2Vec from `SemanticHintClassifier` for value encoding
-3. [ ] Implement `compute_entity_features()` in Rust (44 statistical features)
-4. [ ] Port regex patterns (ORG_SUFFIXES, PERSON_PATTERNS, PLACE_PATTERNS, CREATIVE_PATTERNS)
-5. [ ] Add `EntityClassifier` field to `ColumnClassifier` struct
-6. [ ] Wire into `classify_column()` after disambiguation, before header hints
-7. [ ] Add `--entity-model` CLI flag or auto-detect from model directory
-8. [ ] Test with profile eval — verify full_name overcall reduction
+All integration tasks are complete as of v0.6. The entity classifier is implemented in `crates/finetype-model/src/entity.rs` with shared Model2Vec resources, statistical feature computation, and auto-detection from model directory.
