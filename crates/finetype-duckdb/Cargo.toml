@@ -19,3 +19,4 @@ libduckdb-sys = { workspace = true }
 finetype-core = { workspace = true }
 finetype-model = { workspace = true }
 serde_json = { workspace = true }
+jsonschema = { workspace = true }
