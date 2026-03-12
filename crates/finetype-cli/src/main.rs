@@ -2262,8 +2262,7 @@ fn cmd_schema_table(
                 continue;
             }
 
-            let result =
-                column_classifier.classify_column_with_header(col_values, &name)?;
+            let result = column_classifier.classify_column_with_header(col_values, &name)?;
 
             col_results.push(ColResult {
                 name,
@@ -2323,8 +2322,7 @@ fn cmd_schema_table(
                 json!((col.confidence * 1000.0).round() / 1000.0),
             );
             if let Some(broad_type) = &def.broad_type {
-                let duckdb_type =
-                    finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
+                let duckdb_type = finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
                 prop.insert("x-finetype-broad-type".into(), json!(duckdb_type));
             }
             if let Some(transform) = &def.transform {
@@ -2391,7 +2389,8 @@ fn cmd_schema_table(
             } else {
                 // String columns: minLength, maxLength from observed data
                 let lengths: Vec<usize> = col.values.iter().map(|v| v.len()).collect();
-                if let (Some(&min_len), Some(&max_len)) = (lengths.iter().min(), lengths.iter().max())
+                if let (Some(&min_len), Some(&max_len)) =
+                    (lengths.iter().min(), lengths.iter().max())
                 {
                     prop.insert("minLength".into(), json!(min_len));
                     prop.insert("maxLength".into(), json!(max_len));
@@ -2402,10 +2401,7 @@ fn cmd_schema_table(
             if enum_threshold > 0 && cardinality <= enum_threshold {
                 let mut enum_vals: Vec<&str> = unique.into_iter().collect();
                 enum_vals.sort();
-                prop.insert(
-                    "enum".into(),
-                    json!(enum_vals),
-                );
+                prop.insert("enum".into(), json!(enum_vals));
             }
         }
 
@@ -2425,10 +2421,7 @@ fn cmd_schema_table(
     schema.insert("$id".into(), json!(format!("finetype://{}", file_name)));
     schema.insert("title".into(), json!(file_stem));
     schema.insert("type".into(), json!("object"));
-    schema.insert(
-        "properties".into(),
-        serde_json::Value::Object(properties),
-    );
+    schema.insert("properties".into(), serde_json::Value::Object(properties));
     if !required.is_empty() {
         required.sort();
         schema.insert("required".into(), json!(required));
