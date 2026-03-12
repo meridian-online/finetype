@@ -11,7 +11,7 @@ FineType recognizes **region-specific data formats**. A phone number valid in th
 
 This guide explains what you can do with FineType's locale capabilities and how to use them.
 
-## Current Locale Coverage (v0.5.3)
+## Current Locale Coverage (v0.6)
 
 As of March 2026, FineType supports 65+ locales across validation and generation:
 
@@ -235,7 +235,7 @@ jq '.columns[] | {name, detected_locale: .locale}' profile.json
 
 ## Locale Coverage Expansion
 
-FineType continuously expands locale support. As of v0.5.3, the expansion roadmap includes:
+FineType continuously expands locale support. As of v0.6, the expansion roadmap includes:
 
 ### Phase 1: Core Types ✅ Complete
 - ✅ Phone numbers (46 locales)

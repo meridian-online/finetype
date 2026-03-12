@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Sense & Sharpen pipeline** is FineType's default inference method, delivering **98.3% label accuracy** on real-world datasets. It combines Model2Vec semantic understanding with CharCNN pattern recognition and intelligent vote masking to resolve ambiguous column types.
+The **Sense & Sharpen pipeline** is FineType's default inference method, delivering **97.7% label accuracy** on real-world datasets. It combines Model2Vec semantic understanding with CharCNN pattern recognition and intelligent vote masking to resolve ambiguous column types.
 
 This two-stage approach separates the problem: Sense answers "what *category* is this column?" (temporal, numeric, geographic, person, format, text), and Sharpen answers "what *specific type* within that category?"
 
@@ -51,7 +51,7 @@ Broad type: "temporal" or "numeric" or
 All 100 values
         ↓
   CharCNN flat
-(163-class classifier)
+(250-class classifier)
         ↓
   Vote aggregation
 (histogram of type votes)
@@ -70,7 +70,7 @@ Disambiguation rules
 
 **What Sharpen does:**
 
-1. **CharCNN inference:** Runs all ~100 column values through a flat neural network trained to recognize 163 semantic types. CharCNN works via character-level patterns — emails have `@`, phone numbers have parentheses/hyphens, ISO dates have dashes and T separators, etc.
+1. **CharCNN inference:** Runs all ~100 column values through a flat neural network trained to recognize 250 semantic types. CharCNN works via character-level patterns — emails have `@`, phone numbers have parentheses/hyphens, ISO dates have dashes and T separators, etc.
 
 2. **Vote aggregation:** Counts how many values were classified as each type. Example: 95 values → "year", 5 values → "integer_number".
 
@@ -117,7 +117,7 @@ Example: sports_events.venue → city (Sense routed to geographic,
 
 ## Configuration
 
-The Sense & Sharpen pipeline is the **default** in FineType v0.5.3+. You're using it automatically when you run:
+The Sense & Sharpen pipeline is the **default** in FineType v0.6+. You're using it automatically when you run:
 
 ```bash
 finetype profile data.csv
@@ -139,7 +139,7 @@ This runs CharCNN without category masking — faster, but lower accuracy on amb
 ### 1. Separation of Concerns
 - **Sense** answers a binary question: which broad *category*?
 - **Sharpen** answers a fine-grained question: which *specific type*?
-- Each model trains on a simpler task than trying to predict 163 types from scratch.
+- Each model trains on a simpler task than trying to predict 250 types from scratch.
 
 ### 2. Human-Aligned Reasoning
 Analysts use context (headers, distribution) before narrowing in. Sense captures that context, Sharpen captures pattern details. The pipeline mirrors how humans think about data.

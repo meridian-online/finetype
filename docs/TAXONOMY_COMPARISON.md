@@ -1,6 +1,6 @@
 # Taxonomy Comparison: FineType vs External Type Systems
 
-FineType's taxonomy of 159 types classifies data by **format** — the character-level structure of values. This document compares it to three external type systems that classify data by **semantics** — what the data represents.
+FineType's taxonomy of 250 types classifies data by **format** — the character-level structure of values. This document compares it to three external type systems that classify data by **semantics** — what the data represents.
 
 Understanding these differences helps users know what FineType can and can't detect, and where it fits in the broader data ecosystem.
 
@@ -221,7 +221,7 @@ This layered approach is the direction FineType's column-name heuristic (NNFT-06
 
 ## References
 
-- [FineType Taxonomy](../labels/) — Full YAML definitions for all 159 types
+- [FineType Taxonomy](../labels/) — Full YAML definitions for all 250 types
 - [GitTables Benchmark](https://zenodo.org/record/5706316) — 1M+ tables with schema.org and DBpedia annotations
 - [schema.org Full Hierarchy](https://schema.org/docs/full.html) — Complete schema.org type system
 - [Wikidata Property Constraints](https://www.wikidata.org/wiki/Help:Property_constraints_portal) — Property format expectations

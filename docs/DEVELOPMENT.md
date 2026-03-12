@@ -72,7 +72,7 @@ After training, verify accuracy on profile eval:
 make eval-report
 ```
 
-Target: ≥116/120 label accuracy (96.7%), 120/120 domain accuracy (100%).
+Target: ≥170/174 label accuracy (97.7%).
 
 ### Architecture
 
