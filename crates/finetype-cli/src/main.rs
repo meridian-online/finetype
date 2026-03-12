@@ -294,35 +294,21 @@ enum Commands {
         output: OutputFormat,
     },
 
-    /// Validate data quality against taxonomy schemas
+    /// Validate CSV data against a JSON Schema (quality gate)
     Validate {
-        /// Input file (NDJSON with value/label fields, or plain text with --label)
-        #[arg(short, long)]
+        /// Input CSV file
         file: PathBuf,
 
-        /// Validate all values against this label (for plain text input)
-        #[arg(short, long)]
-        label: Option<String>,
+        /// JSON Schema file to validate against
+        schema: PathBuf,
 
-        /// Taxonomy file or directory
-        #[arg(short, long, default_value = "labels")]
-        taxonomy: PathBuf,
-
-        /// Strategy for handling invalid values
-        #[arg(long, default_value = "quarantine")]
-        strategy: ValidateStrategy,
-
-        /// Output format for quality report (plain, json, csv)
+        /// Output format for summary report (plain, json)
         #[arg(short, long, default_value = "plain")]
         output: OutputFormat,
 
-        /// Quarantine file path (quarantine strategy only)
-        #[arg(long, default_value = "quarantine.ndjson")]
-        quarantine_file: PathBuf,
-
-        /// Cleaned output file path (null/ffill/bfill strategies)
-        #[arg(long, default_value = "cleaned.ndjson")]
-        cleaned_file: PathBuf,
+        /// Print summary only — do not write sidecar files (.valid.csv, .invalid.csv, .errors.jsonl)
+        #[arg(long)]
+        summary_only: bool,
     },
 
     /// Profile a CSV file — detect column types using column-mode inference
@@ -358,10 +344,6 @@ enum Commands {
         /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
         #[arg(long)]
         sharp_only: bool,
-
-        /// Run JSON Schema validation after classification
-        #[arg(long)]
-        validate: bool,
 
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR)
         #[arg(long, default_value = "50")]
@@ -448,28 +430,7 @@ enum InferenceMode {
     Column,
 }
 
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
-enum ValidateStrategy {
-    /// Quarantine invalid values to a separate file (default)
-    Quarantine,
-    /// Replace invalid values with NULL
-    Null,
-    /// Forward-fill: replace invalid with last valid value
-    Ffill,
-    /// Backward-fill: replace invalid with next valid value
-    Bfill,
-}
 
-impl ValidateStrategy {
-    fn name(&self) -> &'static str {
-        match self {
-            Self::Quarantine => "quarantine",
-            Self::Null => "null",
-            Self::Ffill => "ffill",
-            Self::Bfill => "bfill",
-        }
-    }
-}
 
 fn main() -> Result<()> {
     // Initialize logging
@@ -627,21 +588,10 @@ fn main() -> Result<()> {
 
         Commands::Validate {
             file,
-            label,
-            taxonomy,
-            strategy,
+            schema,
             output,
-            quarantine_file,
-            cleaned_file,
-        } => cmd_validate(
-            file,
-            label,
-            taxonomy,
-            strategy,
-            output,
-            quarantine_file,
-            cleaned_file,
-        ),
+            summary_only,
+        } => cmd_validate_table(file, schema, output, summary_only),
 
         Commands::Profile {
             file,
@@ -652,7 +602,6 @@ fn main() -> Result<()> {
             no_header_hint,
             model_type,
             sharp_only,
-            validate,
             enum_threshold,
             verbose,
         } => cmd_profile(
@@ -664,7 +613,6 @@ fn main() -> Result<()> {
             no_header_hint,
             model_type,
             sharp_only,
-            validate,
             enum_threshold,
             verbose,
         ),
@@ -2967,385 +2915,174 @@ fn cmd_check(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// VALIDATE — Validate data quality against taxonomy schemas
+// VALIDATE — Schema-driven CSV quality gate
 // ═══════════════════════════════════════════════════════════════════════════════
 
-#[allow(clippy::too_many_arguments)]
-fn cmd_validate(
+/// Validate a CSV file against a JSON Schema.
+///
+/// Produces sidecar files (.valid.csv, .invalid.csv, .errors.jsonl) by default.
+/// Use --summary-only to suppress file creation.
+fn cmd_validate_table(
     file: PathBuf,
-    label: Option<String>,
-    taxonomy_path: PathBuf,
-    strategy: ValidateStrategy,
+    schema_path: PathBuf,
     output: OutputFormat,
-    quarantine_file: PathBuf,
-    cleaned_file: PathBuf,
+    summary_only: bool,
 ) -> Result<()> {
-    use finetype_core::{
-        validate_column_for_label, ColumnValidationResult, InvalidStrategy, ValidationCheck,
-    };
-    use std::collections::HashMap;
+    use finetype_core::table_validator::{validate_table, split_rows};
+    
 
-    // Load taxonomy
-    eprintln!("Loading taxonomy from {:?}", taxonomy_path);
-    let taxonomy = load_taxonomy(&taxonomy_path)?;
-    eprintln!("Loaded {} label definitions", taxonomy.len());
+    // Load JSON Schema
+    eprintln!("Loading schema from {:?}", schema_path);
+    let schema_content = std::fs::read_to_string(&schema_path)?;
+    let schema: serde_json::Value = serde_json::from_str(&schema_content)
+        .map_err(|e| anyhow::anyhow!("Invalid JSON Schema: {}", e))?;
 
-    // Track whether input was plain text (for output formatting)
-    let is_plain_text = label.is_some();
+    // Read CSV file
+    eprintln!("Reading {:?}", file);
+    let mut rdr = csv::Reader::from_path(&file)?;
+    let headers: Vec<String> = rdr.headers()?.iter().map(|h| h.to_string()).collect();
+    let n_cols = headers.len();
 
-    // Parse input into (row_index, value, label) tuples
-    let content = std::fs::read_to_string(&file)?;
-
-    struct InputRow {
-        row_index: usize,
-        value: Option<String>,
-        label: String,
-    }
-
-    let mut rows: Vec<InputRow> = Vec::new();
-
-    if let Some(ref lbl) = label {
-        // Plain text mode: each line is a value, all validated against the same label
-        for (i, line) in content.lines().enumerate() {
-            let value = if line.is_empty() || line == "NULL" || line == "null" {
-                None
-            } else {
-                Some(line.to_string())
-            };
-            rows.push(InputRow {
-                row_index: i,
-                value,
-                label: lbl.clone(),
-            });
-        }
-    } else {
-        // NDJSON mode: each line has value + label fields
-        for (i, line) in content.lines().enumerate() {
-            if line.is_empty() {
-                continue;
-            }
-            let record: serde_json::Value =
-                serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Line {}: {}", i + 1, e))?;
-
-            // Support both (value/label) and (input/class) field names
-            let value = record
-                .get("value")
-                .or_else(|| record.get("input"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-
-            let lbl = record
-                .get("label")
-                .or_else(|| record.get("class"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Line {}: missing 'label' or 'class' field", i + 1))?
-                .to_string();
-
-            rows.push(InputRow {
-                row_index: i,
-                value,
-                label: lbl,
-            });
-        }
-    }
-
-    if rows.is_empty() {
-        eprintln!("No input data");
-        return Ok(());
-    }
-
-    eprintln!("Read {} rows", rows.len());
-
-    // Group by label, preserving original row indices
-    let mut groups: HashMap<String, Vec<(usize, Option<String>)>> = HashMap::new();
-    for row in &rows {
-        groups
-            .entry(row.label.clone())
-            .or_default()
-            .push((row.row_index, row.value.clone()));
-    }
-
-    // Map CLI strategy to core strategy
-    let core_strategy = match strategy {
-        ValidateStrategy::Quarantine => InvalidStrategy::Quarantine,
-        ValidateStrategy::Null => InvalidStrategy::SetNull,
-        ValidateStrategy::Ffill => InvalidStrategy::ForwardFill,
-        ValidateStrategy::Bfill => InvalidStrategy::BackwardFill,
-    };
-
-    // Validate each group
-    struct GroupResult {
-        label: String,
-        result: ColumnValidationResult,
-        original_row_indices: Vec<usize>,
-    }
-
-    let mut group_results: Vec<GroupResult> = Vec::new();
-    let mut any_invalid = false;
-
-    let mut sorted_labels: Vec<String> = groups.keys().cloned().collect();
-    sorted_labels.sort();
-
-    for lbl in &sorted_labels {
-        let entries = groups.get(lbl).unwrap();
-        let original_indices: Vec<usize> = entries.iter().map(|(idx, _)| *idx).collect();
-        let values: Vec<Option<&str>> = entries.iter().map(|(_, v)| v.as_deref()).collect();
-
-        match validate_column_for_label(&values, lbl, &taxonomy, core_strategy) {
-            Ok(result) => {
-                if result.stats.invalid_count > 0 {
-                    any_invalid = true;
-                }
-                group_results.push(GroupResult {
-                    label: lbl.clone(),
-                    result,
-                    original_row_indices: original_indices,
-                });
-            }
-            Err(e) => {
-                eprintln!("Warning: skipping label '{}': {}", lbl, e);
-            }
-        }
-    }
-
-    // Aggregate totals
-    let total_values: usize = group_results
-        .iter()
-        .map(|g| g.result.stats.total_count)
-        .sum();
-    let total_valid: usize = group_results
-        .iter()
-        .map(|g| g.result.stats.valid_count)
-        .sum();
-    let total_invalid: usize = group_results
-        .iter()
-        .map(|g| g.result.stats.invalid_count)
-        .sum();
-    let total_null: usize = group_results
-        .iter()
-        .map(|g| g.result.stats.null_count)
-        .sum();
-
-    // ── Output quality report ──────────────────────────────────────────────
-    match output {
-        OutputFormat::Plain | OutputFormat::Arrow => {
-            println!("Data Quality Report");
-            println!("{}", "═".repeat(60));
-            println!();
-
-            for gr in &group_results {
-                let s = &gr.result.stats;
-                let valid_pct = if s.total_count > 0 {
-                    s.valid_count as f64 / s.total_count as f64 * 100.0
+    let mut rows: Vec<Vec<Option<String>>> = Vec::new();
+    for result in rdr.records() {
+        let record = result?;
+        let row: Vec<Option<String>> = (0..n_cols)
+            .map(|i| {
+                let val = record.get(i).unwrap_or("").trim();
+                if val.is_empty() || val == "NULL" || val == "null" {
+                    None
                 } else {
-                    0.0
-                };
-                let invalid_pct = if s.total_count > 0 {
-                    s.invalid_count as f64 / s.total_count as f64 * 100.0
-                } else {
-                    0.0
-                };
-                let null_pct = if s.total_count > 0 {
-                    s.null_count as f64 / s.total_count as f64 * 100.0
-                } else {
-                    0.0
-                };
-
-                println!("Column: {} ({} values)", gr.label, s.total_count);
-                println!("  Valid:    {:>6} ({:>5.1}%)", s.valid_count, valid_pct);
-                println!("  Invalid:  {:>6} ({:>5.1}%)", s.invalid_count, invalid_pct);
-                println!("  Null:     {:>6} ({:>5.1}%)", s.null_count, null_pct);
-                println!(
-                    "  Validity: {:>5.1}% (of non-null)",
-                    s.validity_rate() * 100.0
-                );
-
-                if !s.error_patterns.is_empty() {
-                    println!("  Top errors:");
-                    let mut sorted: Vec<(&ValidationCheck, &usize)> =
-                        s.error_patterns.iter().collect();
-                    sorted.sort_by(|a, b| b.1.cmp(a.1));
-                    for (check, count) in sorted {
-                        let pct = if s.invalid_count > 0 {
-                            *count as f64 / s.invalid_count as f64 * 100.0
-                        } else {
-                            0.0
-                        };
-                        println!("    {:<12} {:>4} ({:>5.1}%)", check, count, pct);
-                    }
+                    Some(val.to_string())
                 }
-                println!();
-            }
-
-            println!("{}", "═".repeat(60));
-            println!(
-                "OVERALL: {} values, {} valid, {} invalid, {} null",
-                total_values, total_valid, total_invalid, total_null
-            );
-            println!("Strategy: {}", strategy.name());
-
-            if matches!(strategy, ValidateStrategy::Quarantine) {
-                let q_count: usize = group_results
-                    .iter()
-                    .map(|g| g.result.quarantined.len())
-                    .sum();
-                if q_count > 0 {
-                    println!("Quarantine file: {:?} ({} rows)", quarantine_file, q_count);
-                }
-            } else {
-                println!("Cleaned file: {:?}", cleaned_file);
-            }
-        }
-        OutputFormat::Json => {
-            let columns: Vec<serde_json::Value> = group_results
-                .iter()
-                .map(|gr| {
-                    let s = &gr.result.stats;
-                    let errors: serde_json::Map<String, serde_json::Value> = s
-                        .error_patterns
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), json!(*v)))
-                        .collect();
-                    json!({
-                        "label": gr.label,
-                        "total": s.total_count,
-                        "valid": s.valid_count,
-                        "invalid": s.invalid_count,
-                        "null": s.null_count,
-                        "validity_rate": s.validity_rate(),
-                        "error_patterns": errors,
-                    })
-                })
-                .collect();
-
-            let report = json!({
-                "columns": columns,
-                "summary": {
-                    "total": total_values,
-                    "valid": total_valid,
-                    "invalid": total_invalid,
-                    "null": total_null,
-                    "strategy": strategy.name(),
-                },
-            });
-            println!("{}", serde_json::to_string_pretty(&report)?);
-        }
-        OutputFormat::Csv => {
-            println!("label,total,valid,invalid,null,validity_rate");
-            for gr in &group_results {
-                let s = &gr.result.stats;
-                println!(
-                    "\"{}\",{},{},{},{},{:.4}",
-                    gr.label,
-                    s.total_count,
-                    s.valid_count,
-                    s.invalid_count,
-                    s.null_count,
-                    s.validity_rate()
-                );
-            }
-        }
-        OutputFormat::Markdown => {
-            println!("## Data Quality Report\n");
-            println!("| Label | Total | Valid | Invalid | Null | Validity Rate |");
-            println!("|-------|------:|------:|--------:|-----:|--------------:|");
-            for gr in &group_results {
-                let s = &gr.result.stats;
-                println!(
-                    "| {} | {} | {} | {} | {} | {:.1}% |",
-                    gr.label,
-                    s.total_count,
-                    s.valid_count,
-                    s.invalid_count,
-                    s.null_count,
-                    s.validity_rate() * 100.0
-                );
-            }
-            println!(
-                "\n**Overall:** {} values, {} valid, {} invalid, {} null — Strategy: {}",
-                total_values,
-                total_valid,
-                total_invalid,
-                total_null,
-                strategy.name()
-            );
-        }
+            })
+            .collect();
+        rows.push(row);
     }
 
-    // ── Write quarantine file (quarantine strategy) ────────────────────────
-    if matches!(strategy, ValidateStrategy::Quarantine) {
-        let mut quarantine_rows: Vec<serde_json::Value> = Vec::new();
-        for gr in &group_results {
-            for q in &gr.result.quarantined {
-                let orig_row = gr.original_row_indices[q.row_index];
-                let error_msgs: Vec<String> = q.errors.iter().map(|e| e.message.clone()).collect();
-                quarantine_rows.push(json!({
-                    "row": orig_row,
-                    "value": q.value,
-                    "label": gr.label,
-                    "errors": error_msgs,
-                }));
-            }
-        }
-        if !quarantine_rows.is_empty() {
-            quarantine_rows.sort_by_key(|r| r["row"].as_u64().unwrap_or(0));
-            let mut qfile = std::fs::File::create(&quarantine_file)?;
-            for row in &quarantine_rows {
-                writeln!(qfile, "{}", row)?;
-            }
-            eprintln!(
-                "Wrote {} quarantined rows to {:?}",
-                quarantine_rows.len(),
-                quarantine_file
-            );
-        }
-    }
+    eprintln!("Read {} rows, {} columns", rows.len(), n_cols);
 
-    // ── Write cleaned file (null/ffill/bfill strategies) ───────────────────
-    if !matches!(strategy, ValidateStrategy::Quarantine) {
-        // Reassemble cleaned data in original row order
-        let mut cleaned_rows: Vec<(usize, Option<String>, String)> = Vec::new();
-        for gr in &group_results {
-            for (i, cleaned_val) in gr.result.values.iter().enumerate() {
-                let orig_row = gr.original_row_indices[i];
-                cleaned_rows.push((orig_row, cleaned_val.clone(), gr.label.clone()));
-            }
-        }
-        cleaned_rows.sort_by_key(|(row, _, _)| *row);
+    // Validate
+    let result = validate_table(&headers, &rows, &schema)?;
 
-        let mut cfile = std::fs::File::create(&cleaned_file)?;
-        if is_plain_text {
-            // Plain text output: one value per line
-            for (_, value, _) in &cleaned_rows {
-                match value {
-                    Some(v) => writeln!(cfile, "{}", v)?,
-                    None => writeln!(cfile, "NULL")?,
-                }
+    // Split rows into valid/invalid
+    let (valid_rows, invalid_rows) = split_rows(&headers, &rows, &result);
+    let has_errors = result.invalid_rows > 0;
+
+    // Write sidecar files unless --summary-only
+    if !summary_only {
+        // Write .valid.csv
+        let valid_path = {
+            let mut name = file.file_name().unwrap().to_os_string();
+            name.push(".valid.csv");
+            file.with_file_name(name)
+        };
+        {
+            let mut wtr = csv::Writer::from_path(&valid_path)?;
+            wtr.write_record(&headers)?;
+            for row in &valid_rows {
+                wtr.write_record(row)?;
             }
-        } else {
-            // NDJSON output
-            for (_, value, lbl) in &cleaned_rows {
-                match value {
-                    Some(v) => writeln!(cfile, "{}", json!({"value": v, "label": lbl}))?,
-                    None => {
-                        writeln!(
-                            cfile,
-                            "{}",
-                            json!({"value": serde_json::Value::Null, "label": lbl})
-                        )?;
-                    }
-                }
+            wtr.flush()?;
+        }
+
+        // Write .invalid.csv
+        let invalid_path = {
+            let mut name = file.file_name().unwrap().to_os_string();
+            name.push(".invalid.csv");
+            file.with_file_name(name)
+        };
+        {
+            let mut wtr = csv::Writer::from_path(&invalid_path)?;
+            wtr.write_record(&headers)?;
+            for row in &invalid_rows {
+                wtr.write_record(row)?;
+            }
+            wtr.flush()?;
+        }
+
+        // Write .errors.jsonl
+        let errors_path = {
+            let mut name = file.file_name().unwrap().to_os_string();
+            name.push(".errors.jsonl");
+            file.with_file_name(name)
+        };
+        {
+            let mut f = std::fs::File::create(&errors_path)?;
+            for row_err in &result.row_errors {
+                let json_line = serde_json::to_string(row_err)?;
+                writeln!(f, "{}", json_line)?;
             }
         }
+
         eprintln!(
-            "Wrote {} cleaned rows to {:?}",
-            cleaned_rows.len(),
-            cleaned_file
+            "Wrote {} → .valid.csv ({} rows), .invalid.csv ({} rows), .errors.jsonl ({} errors)",
+            file.display(),
+            result.valid_rows,
+            result.invalid_rows,
+            result.row_errors.len()
         );
     }
 
+    // Summary report (always printed to stdout)
+    match output {
+        OutputFormat::Plain | OutputFormat::Arrow | OutputFormat::Csv | OutputFormat::Markdown => {
+            println!("Validation Report");
+            println!("{}", "═".repeat(60));
+            println!();
+            println!("  Total rows:   {:>6}", result.total_rows);
+            println!(
+                "  Valid rows:   {:>6}  ({:.1}%)",
+                result.valid_rows,
+                if result.total_rows > 0 {
+                    result.valid_rows as f64 / result.total_rows as f64 * 100.0
+                } else {
+                    100.0
+                }
+            );
+            println!(
+                "  Invalid rows: {:>6}  ({:.1}%)",
+                result.invalid_rows,
+                if result.total_rows > 0 {
+                    result.invalid_rows as f64 / result.total_rows as f64 * 100.0
+                } else {
+                    0.0
+                }
+            );
+            println!("  Grade:        {}", result.grade);
+            println!();
+
+            if !result.columns.is_empty() {
+                println!(
+                    "  {:<25} {:>8} {:>8} {:>8} {:>8}",
+                    "COLUMN", "VALID", "INVALID", "NULL", "PASS%"
+                );
+                println!("  {}", "─".repeat(57));
+                for col in &result.columns {
+                    println!(
+                        "  {:<25} {:>8} {:>8} {:>8} {:>7.1}%",
+                        col.name, col.valid, col.invalid, col.null,
+                        col.pass_rate * 100.0
+                    );
+                }
+            }
+            println!();
+            println!("{}", "═".repeat(60));
+        }
+        OutputFormat::Json => {
+            let report = json!({
+                "total_rows": result.total_rows,
+                "valid_rows": result.valid_rows,
+                "invalid_rows": result.invalid_rows,
+                "grade": result.grade,
+                "columns": result.columns,
+                "errors": result.row_errors,
+            });
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+    }
+
     // Exit code: 0 = all valid, 1 = some invalid
-    if any_invalid {
+    if has_errors {
         std::process::exit(1);
     }
 
@@ -3413,7 +3150,6 @@ fn cmd_profile(
     no_header_hint: bool,
     model_type: ModelType,
     sharp_only: bool,
-    validate: bool,
     enum_threshold: usize,
     verbose: bool,
 ) -> Result<()> {
@@ -3699,74 +3435,6 @@ fn cmd_profile(
         }
     } // end else (per-column path)
 
-    // Validation pass (NNFT-212): run JSON Schema validation per column
-    if validate {
-        use finetype_core::{validate_column_for_label, InvalidStrategy};
-
-        // Reuse enrichment_taxonomy (already loaded) — need compiled validators
-        let validation_taxonomy = if let Some(ref tax) = enrichment_taxonomy {
-            let mut t = tax.clone();
-            t.compile_validators();
-            Some(t)
-        } else {
-            let tp = std::path::PathBuf::from("labels");
-            if let Ok(mut t) = load_taxonomy(&tp) {
-                t.compile_validators();
-                Some(t)
-            } else {
-                None
-            }
-        };
-
-        if let Some(ref tax) = validation_taxonomy {
-            for (i, profile) in profiles.iter_mut().enumerate() {
-                if profile.label == "unknown" {
-                    continue;
-                }
-                let col_values = &columns[i];
-                // Build Option<&str> slice: non-null sample values + nulls
-                let mut val_refs: Vec<Option<&str>> =
-                    col_values.iter().map(|v| Some(v.as_str())).collect();
-                // Append nulls to match total row count
-                for _ in 0..profile.null_count {
-                    val_refs.push(None);
-                }
-
-                match validate_column_for_label(
-                    &val_refs,
-                    &profile.label,
-                    tax,
-                    InvalidStrategy::Quarantine,
-                ) {
-                    Ok(result) => {
-                        let s = &result.stats;
-                        let score = finetype_core::compute_column_quality(
-                            s.valid_count,
-                            s.invalid_count,
-                            s.null_count,
-                        );
-                        let invalid_samples: Vec<String> = result
-                            .quarantined
-                            .iter()
-                            .take(5)
-                            .map(|q| q.value.clone())
-                            .collect();
-                        profile.quality = Some(ColProfileQuality {
-                            valid_count: s.valid_count,
-                            invalid_count: s.invalid_count,
-                            null_count: s.null_count,
-                            score,
-                            invalid_samples,
-                        });
-                    }
-                    Err(_) => {
-                        // No schema available for this label — quality stays None
-                    }
-                }
-            }
-        }
-    }
-
     // Output results
     match output {
         OutputFormat::Plain => {
@@ -3776,7 +3444,7 @@ fn cmd_profile(
             );
             println!("{}", "═".repeat(80));
             println!();
-            if validate {
+            if false { // validate removed (AC-10)
                 println!(
                     "  {:<25} {:<38} {:>8} {:>6} {:>8}",
                     "COLUMN", "TYPE", "BROAD", "CONF", "VALID"
@@ -3806,7 +3474,7 @@ fn cmd_profile(
                 } else {
                     String::new()
                 };
-                let quality_str = if validate {
+                let quality_str = if false { // validate removed (AC-10)
                     match &p.quality {
                         Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
                         None => "      —".to_string(),
@@ -3819,7 +3487,7 @@ fn cmd_profile(
                     p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
                 );
                 // Show top 3 invalid samples inline (plain output, validate mode)
-                if validate {
+                if false { // validate removed (AC-10)
                     if let Some(ref q) = p.quality {
                         for sample in q.invalid_samples.iter().take(3) {
                             println!("  {:>25} ⚠ \"{}\"", "", sample);
@@ -3830,7 +3498,7 @@ fn cmd_profile(
 
             println!();
             let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            if validate {
+            if false { // validate removed (AC-10)
                 let scores: Vec<_> = profiles
                     .iter()
                     .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
@@ -3883,7 +3551,7 @@ fn cmd_profile(
                             obj.insert("unique_values".to_string(), json!(uv));
                         }
                     }
-                    if validate {
+                    if false { // validate removed (AC-10)
                         match &p.quality {
                             Some(q) => {
                                 let r = |v: f64| (v * 10000.0).round() / 10000.0;
@@ -3916,7 +3584,7 @@ fn cmd_profile(
                 .collect();
 
             // Compute file-level grade when validation is active
-            let file_grade = if validate {
+            let file_grade = if false { // validate removed (AC-10)
                 let scores: Vec<_> = profiles
                     .iter()
                     .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
@@ -3988,7 +3656,7 @@ fn cmd_profile(
                 file.to_string_lossy()
             );
             println!("{} rows, {} columns\n", row_count, n_cols);
-            if validate {
+            if false { // validate removed (AC-10)
                 println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
                 println!("|--------|------|-----------|----------:|-----------:|--------:|");
             } else {
@@ -4002,7 +3670,7 @@ fn cmd_profile(
                     "—".to_string()
                 };
                 let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                if validate {
+                if false { // validate removed (AC-10)
                     let (valid_str, score_str) = match &p.quality {
                         Some(q) => (
                             format!("{:.1}%", q.score.type_conforming_rate * 100.0),
@@ -4019,7 +3687,7 @@ fn cmd_profile(
                 }
             }
             let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            if validate {
+            if false { // validate removed (AC-10)
                 let scores: Vec<_> = profiles
                     .iter()
                     .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
