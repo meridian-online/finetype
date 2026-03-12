@@ -190,9 +190,9 @@ enum Commands {
         full: bool,
     },
 
-    /// Export JSON Schema for a type
+    /// Export JSON Schema for a type or table
     Schema {
-        /// Type key (e.g., "identity.person.email") or glob pattern ("identity.person.*")
+        /// Type key (e.g., "identity.person.email"), glob pattern ("identity.person.*"), or CSV file path
         type_key: String,
 
         /// Taxonomy file or directory
@@ -202,6 +202,22 @@ enum Commands {
         /// Pretty-print JSON output
         #[arg(long)]
         pretty: bool,
+
+        /// Include observed data statistics (min, max, cardinality, null rate) — table mode only
+        #[arg(long)]
+        stats: bool,
+
+        /// Print to stdout instead of writing sidecar file — table mode only
+        #[arg(long)]
+        stdout: bool,
+
+        /// Model directory — table mode only
+        #[arg(short, long, default_value = "models/default")]
+        model: PathBuf,
+
+        /// Cardinality threshold for ENUM columns (0 = disable) — table mode only
+        #[arg(long, default_value = "50")]
+        enum_threshold: usize,
     },
 
     /// Generate runnable DuckDB CTAS from file profiling
@@ -540,7 +556,39 @@ fn main() -> Result<()> {
             type_key,
             file,
             pretty,
-        } => cmd_schema(type_key, file, pretty),
+            stats,
+            stdout,
+            model,
+            enum_threshold,
+        } => {
+            // Detect if type_key is a file path (CSV/TSV/Parquet) or a type key
+            let input_path = Path::new(&type_key);
+            let is_file = input_path.exists()
+                && input_path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| {
+                        matches!(
+                            e.to_lowercase().as_str(),
+                            "csv" | "tsv" | "parquet" | "json" | "ndjson" | "jsonl"
+                        )
+                    })
+                    .unwrap_or(false);
+
+            if is_file {
+                cmd_schema_table(
+                    input_path.to_path_buf(),
+                    file,
+                    model,
+                    pretty,
+                    stats,
+                    stdout,
+                    enum_threshold,
+                )
+            } else {
+                cmd_schema(type_key, file, pretty)
+            }
+        }
 
         Commands::Load {
             file,
@@ -2055,6 +2103,363 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     }
 
     serde_json::Value::Object(schema)
+}
+
+/// Generate a table-level JSON Schema from a CSV file by profiling all columns.
+///
+/// Profiles the file using the same inference pipeline as `cmd_profile`, then
+/// builds a JSON Schema document with per-column properties derived from taxonomy
+/// definitions. Writes to `<input>.schema.json` by default, or stdout with `--stdout`.
+#[allow(clippy::too_many_arguments)]
+fn cmd_schema_table(
+    input: PathBuf,
+    taxonomy_path: PathBuf,
+    model: PathBuf,
+    pretty: bool,
+    stats: bool,
+    to_stdout: bool,
+    enum_threshold: usize,
+) -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+    use std::collections::BTreeSet;
+
+    // Load model + taxonomy (same setup as cmd_profile)
+    eprintln!("Loading model from {:?}", model);
+    let classifier: Box<dyn ValueClassifier> = Box::new(load_char_classifier(&model)?);
+
+    let config = ColumnConfig {
+        sample_size: 100,
+        ..Default::default()
+    };
+    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
+        eprintln!("Loaded semantic hint classifier (Model2Vec)");
+        let entity = load_entity_classifier(&semantic);
+        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+        if let Some(entity) = entity {
+            eprintln!("Loaded entity classifier (full_name demotion gate)");
+            cc.set_entity_classifier(entity);
+        }
+        cc
+    } else {
+        ColumnClassifier::new(classifier, config)
+    };
+
+    // Load taxonomy for validation-based attractor demotion
+    let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path)?;
+    enrichment_taxonomy.compile_validators();
+    enrichment_taxonomy.compile_locale_validators();
+    eprintln!(
+        "Loaded taxonomy ({} types)",
+        enrichment_taxonomy.labels().len()
+    );
+    column_classifier.set_taxonomy(enrichment_taxonomy.clone());
+
+    // Wire up Sense classifier
+    wire_sense(&mut column_classifier);
+    wire_sibling_context(&mut column_classifier);
+
+    // Read the input file
+    eprintln!("Reading {:?}", input);
+    let (headers, columns, row_count) = read_csv_input(&input, None)?;
+    eprintln!("Read {} rows, {} columns", row_count, headers.len());
+
+    // Classify columns with sibling context if available
+    struct ColResult {
+        name: String,
+        label: String,
+        confidence: f32,
+        values: Vec<String>,
+        null_count: usize,
+    }
+
+    let mut col_results: Vec<ColResult> = Vec::new();
+
+    if column_classifier.has_sibling_context() {
+        // Build context inputs for all non-empty columns
+        let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new();
+
+        for (i, col_values) in columns.iter().enumerate() {
+            let name = headers
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("col_{}", i));
+            let null_count = row_count - col_values.len();
+
+            if col_values.is_empty() {
+                col_results.push(ColResult {
+                    name,
+                    label: "unknown".to_string(),
+                    confidence: 0.0,
+                    values: vec![],
+                    null_count,
+                });
+            } else {
+                col_inputs.push((i, col_values.clone(), name.clone(), name, null_count));
+            }
+        }
+
+        let context_columns: Vec<(Vec<String>, String)> = col_inputs
+            .iter()
+            .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
+            .collect();
+        let context_results = column_classifier.classify_columns_with_context(&context_columns)?;
+
+        // Merge back in order
+        let mut ordered: Vec<(usize, ColResult)> = Vec::new();
+        // Add empty columns at their original indices
+        let _empty_idx = 0;
+        for (i, col_values) in columns.iter().enumerate() {
+            if col_values.is_empty() {
+                // Already pushed to col_results above; track index
+                ordered.push((
+                    i,
+                    ColResult {
+                        name: headers
+                            .get(i)
+                            .cloned()
+                            .unwrap_or_else(|| format!("col_{}", i)),
+                        label: "unknown".to_string(),
+                        confidence: 0.0,
+                        values: vec![],
+                        null_count: row_count,
+                    },
+                ));
+            }
+        }
+        for ((idx, values, _, name, null_count), result) in
+            col_inputs.into_iter().zip(context_results)
+        {
+            ordered.push((
+                idx,
+                ColResult {
+                    name,
+                    label: result.label,
+                    confidence: result.confidence,
+                    values,
+                    null_count,
+                },
+            ));
+        }
+        ordered.sort_by_key(|(idx, _)| *idx);
+        col_results = ordered.into_iter().map(|(_, r)| r).collect();
+    } else {
+        // Per-column classification
+        for (i, col_values) in columns.iter().enumerate() {
+            let name = headers
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("col_{}", i));
+            let null_count = row_count - col_values.len();
+
+            if col_values.is_empty() {
+                col_results.push(ColResult {
+                    name,
+                    label: "unknown".to_string(),
+                    confidence: 0.0,
+                    values: vec![],
+                    null_count,
+                });
+                continue;
+            }
+
+            let result =
+                column_classifier.classify_column_with_header(col_values, &name)?;
+
+            col_results.push(ColResult {
+                name,
+                label: result.label,
+                confidence: result.confidence,
+                values: col_values.clone(),
+                null_count,
+            });
+        }
+    }
+
+    // Build the table-level JSON Schema
+    let file_stem = input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("table");
+    let file_name = input
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("data.csv");
+
+    let mut properties = serde_json::Map::new();
+    let mut required: Vec<String> = Vec::new();
+
+    for col in &col_results {
+        if col.label == "unknown" {
+            // Still include unknown columns as plain string
+            let mut prop = serde_json::Map::new();
+            prop.insert("type".into(), json!("string"));
+            prop.insert("x-finetype-label".into(), json!("unknown"));
+            properties.insert(col.name.clone(), serde_json::Value::Object(prop));
+            continue;
+        }
+
+        // Build per-column schema from taxonomy definition
+        let mut prop = serde_json::Map::new();
+
+        if let Some(def) = enrichment_taxonomy.get(&col.label) {
+            // Merge validation keywords from the type definition
+            if let Some(validation) = &def.validation {
+                let val_schema = validation.to_json_schema();
+                if let serde_json::Value::Object(val_obj) = val_schema {
+                    for (k, v) in val_obj {
+                        prop.insert(k, v);
+                    }
+                }
+            } else {
+                prop.insert("type".into(), json!("string"));
+            }
+
+            // x-finetype extension fields (AC-4)
+            prop.insert("x-finetype-label".into(), json!(col.label));
+            let domain = col.label.split('.').next().unwrap_or("");
+            prop.insert("x-finetype-domain".into(), json!(domain));
+            prop.insert(
+                "x-finetype-confidence".into(),
+                json!((col.confidence * 1000.0).round() / 1000.0),
+            );
+            if let Some(broad_type) = &def.broad_type {
+                let duckdb_type =
+                    finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
+                prop.insert("x-finetype-broad-type".into(), json!(duckdb_type));
+            }
+            if let Some(transform) = &def.transform {
+                prop.insert("x-finetype-transform".into(), json!(transform));
+            }
+            if let Some(fmt) = &def.format_string {
+                prop.insert("x-finetype-format-string".into(), json!(fmt));
+            }
+        } else {
+            // Label not found in taxonomy — basic string schema
+            prop.insert("type".into(), json!("string"));
+            prop.insert("x-finetype-label".into(), json!(col.label));
+            let domain = col.label.split('.').next().unwrap_or("");
+            prop.insert("x-finetype-domain".into(), json!(domain));
+            prop.insert(
+                "x-finetype-confidence".into(),
+                json!((col.confidence * 1000.0).round() / 1000.0),
+            );
+        }
+
+        // --stats: observed data constraints (AC-2)
+        if stats && !col.values.is_empty() {
+            let total = col.values.len() + col.null_count;
+            let null_rate = if total > 0 {
+                col.null_count as f64 / total as f64
+            } else {
+                0.0
+            };
+            prop.insert(
+                "x-finetype-null-rate".into(),
+                json!((null_rate * 10000.0).round() / 10000.0),
+            );
+
+            let unique: BTreeSet<&str> = col.values.iter().map(|s| s.as_str()).collect();
+            let cardinality = unique.len();
+            prop.insert("x-finetype-cardinality".into(), json!(cardinality));
+
+            // Check if numeric column (broad_type contains INT or DOUBLE or DECIMAL)
+            let is_numeric = enrichment_taxonomy
+                .get(&col.label)
+                .and_then(|d| d.broad_type.as_ref())
+                .map(|bt| {
+                    let bt_upper = bt.to_uppercase();
+                    bt_upper.contains("INT")
+                        || bt_upper.contains("DOUBLE")
+                        || bt_upper.contains("FLOAT")
+                        || bt_upper.contains("DECIMAL")
+                        || bt_upper.contains("NUMERIC")
+                })
+                .unwrap_or(false);
+
+            if is_numeric {
+                // Try to parse as f64 for min/max
+                let mut nums: Vec<f64> = col
+                    .values
+                    .iter()
+                    .filter_map(|v| v.replace(',', "").parse::<f64>().ok())
+                    .collect();
+                if !nums.is_empty() {
+                    nums.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                    prop.insert("minimum".into(), json!(nums[0]));
+                    prop.insert("maximum".into(), json!(nums[nums.len() - 1]));
+                }
+            } else {
+                // String columns: minLength, maxLength from observed data
+                let lengths: Vec<usize> = col.values.iter().map(|v| v.len()).collect();
+                if let (Some(&min_len), Some(&max_len)) = (lengths.iter().min(), lengths.iter().max())
+                {
+                    prop.insert("minLength".into(), json!(min_len));
+                    prop.insert("maxLength".into(), json!(max_len));
+                }
+            }
+
+            // Enum values if cardinality is low
+            if enum_threshold > 0 && cardinality <= enum_threshold {
+                let mut enum_vals: Vec<&str> = unique.into_iter().collect();
+                enum_vals.sort();
+                prop.insert(
+                    "enum".into(),
+                    json!(enum_vals),
+                );
+            }
+        }
+
+        // All non-null columns are required
+        if col.null_count == 0 {
+            required.push(col.name.clone());
+        }
+
+        properties.insert(col.name.clone(), serde_json::Value::Object(prop));
+    }
+
+    let mut schema = serde_json::Map::new();
+    schema.insert(
+        "$schema".into(),
+        json!("https://json-schema.org/draft/2020-12/schema"),
+    );
+    schema.insert("$id".into(), json!(format!("finetype://{}", file_name)));
+    schema.insert("title".into(), json!(file_stem));
+    schema.insert("type".into(), json!("object"));
+    schema.insert(
+        "properties".into(),
+        serde_json::Value::Object(properties),
+    );
+    if !required.is_empty() {
+        required.sort();
+        schema.insert("required".into(), json!(required));
+    }
+
+    let schema_value = serde_json::Value::Object(schema);
+
+    let json_str = if pretty {
+        serde_json::to_string_pretty(&schema_value)?
+    } else {
+        serde_json::to_string(&schema_value)?
+    };
+
+    if to_stdout {
+        println!("{}", json_str);
+    } else {
+        // Write to sidecar file: <input>.schema.json
+        let output_path = input.with_extension("schema.json");
+        // Handle case where input already has an extension (e.g., data.csv → data.schema.json)
+        let output_path = if input.extension().is_some() {
+            let mut name = input.file_stem().unwrap().to_os_string();
+            name.push(".schema.json");
+            input.with_file_name(name)
+        } else {
+            output_path
+        };
+        std::fs::write(&output_path, &json_str)?;
+        eprintln!("Wrote table schema to {:?}", output_path);
+    }
+
+    Ok(())
 }
 
 /// Simple Levenshtein distance for type name suggestions.
