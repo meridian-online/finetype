@@ -101,13 +101,23 @@ impl FineTypeServer {
     }
 
     #[tool(
-        description = "Export the JSON Schema validation contract for a specific type. Returns the schema that defines valid values for the given type key."
+        description = "Export JSON Schema for a type key or a CSV file. Pass a type_key for per-type schema, or path/data for table-level schema generation via column profiling."
     )]
     async fn schema(
         &self,
         Parameters(request): Parameters<tools::schema::SchemaRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         tools::schema::handle(self, request).await
+    }
+
+    #[tool(
+        description = "Validate CSV data against a JSON Schema. Returns per-row and per-column validation results with a quality grade."
+    )]
+    async fn validate(
+        &self,
+        Parameters(request): Parameters<tools::validate::ValidateRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::validate::handle(self, request).await
     }
 
     #[tool(
@@ -134,7 +144,8 @@ impl ServerHandler for FineTypeServer {
         .with_instructions(
             "FineType — semantic type inference engine for tabular data.\n\n\
              Tools: profile (file -> column types), infer (values -> type), ddl (file -> CREATE TABLE), \
-             taxonomy (browse types), schema (JSON Schema export), generate (sample data).\n\n\
+             taxonomy (browse types), schema (type or file -> JSON Schema), validate (CSV + schema -> quality report), \
+             generate (sample data).\n\n\
              Resources: finetype://taxonomy for browsing type definitions.",
         )
     }

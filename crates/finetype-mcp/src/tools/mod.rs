@@ -11,6 +11,7 @@ pub mod infer;
 pub mod profile;
 pub mod schema;
 pub mod taxonomy;
+pub mod validate;
 
 use rmcp::model::{CallToolResult, Content};
 

@@ -18,6 +18,7 @@ use std::error::Error;
 use std::ffi::CString;
 
 mod type_mapping;
+mod validate;
 
 #[cfg(feature = "embed-models")]
 mod column_fn;
@@ -70,7 +71,6 @@ fn get_classifier() -> &'static finetype_model::CharClassifier {
 /// Read a VARCHAR value from a DuckDB data chunk at a specific column and row.
 ///
 /// Returns None if the value is NULL.
-#[cfg(feature = "embed-models")]
 unsafe fn read_varchar(
     input: &mut DataChunkHandle,
     col_idx: usize,
@@ -455,6 +455,62 @@ impl VScalar for FineTypeUnpack {
     }
 }
 
+/// `finetype_validate(value VARCHAR, schema_json VARCHAR) → VARCHAR`
+///
+/// Validates a value against a JSON Schema fragment. Returns 'valid' if the value
+/// passes, or the first validation error message if it fails.
+///
+/// The schema is parsed and cached for performance — the same schema string
+/// is compiled only once across all rows.
+///
+/// Examples:
+/// - `finetype_validate('test@example.com', '{"type":"string","pattern":"^[^@]+@[^@]+$"}')` → `'valid'`
+/// - `finetype_validate('not-an-email', '{"type":"string","pattern":"^[^@]+@[^@]+$"}')` → error message
+/// - `finetype_validate('abc', '{"type":"string","minLength":5}')` → error message
+struct FineTypeValidate;
+
+impl VScalar for FineTypeValidate {
+    type State = ();
+
+    unsafe fn invoke(
+        _state: &Self::State,
+        input: &mut DataChunkHandle,
+        output: &mut dyn WritableVector,
+    ) -> Result<(), Box<dyn Error>> {
+        let len = input.len();
+        let mut output_vec = output.flat_vector();
+
+        for i in 0..len {
+            let value = read_varchar(input, 0, i);
+            let schema = read_varchar(input, 1, i);
+
+            match (value, schema) {
+                (Some(val), Some(sch)) => {
+                    let result = validate::validate_value(&val, &sch);
+                    let cstr = CString::new(result)?;
+                    output_vec.insert(i, cstr);
+                }
+                _ => {
+                    // NULL input → NULL output
+                    output_vec.set_null(i);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn signatures() -> Vec<ScalarFunctionSignature> {
+        vec![ScalarFunctionSignature::exact(
+            vec![
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+                LogicalTypeHandle::from(LogicalTypeId::Varchar),
+            ],
+            LogicalTypeHandle::from(LogicalTypeId::Varchar),
+        )]
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXTENSION ENTRYPOINT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -467,6 +523,9 @@ impl VScalar for FineTypeUnpack {
 pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dyn Error>> {
     con.register_scalar_function::<FineTypeVersion>("finetype_version")
         .expect("Failed to register finetype_version");
+
+    con.register_scalar_function::<FineTypeValidate>("finetype_validate")
+        .expect("Failed to register finetype_validate");
 
     #[cfg(feature = "embed-models")]
     {
