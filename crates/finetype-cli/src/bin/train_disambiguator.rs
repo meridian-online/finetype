@@ -13,8 +13,6 @@ use std::collections::HashMap;
 
 /// Number of aggregated feature columns (36 features × 4 aggregations).
 const N_FEATURES: usize = 144;
-/// Number of vote distribution entries (top 5, label + fraction = 10 columns).
-const N_VOTE_COLS: usize = 10;
 /// Number of cross-validation folds.
 const N_FOLDS: usize = 5;
 
@@ -24,7 +22,7 @@ fn main() -> Result<()> {
         .unwrap_or_else(|| "specs/2026-03-disambiguator-spike/features.csv".to_string());
 
     eprintln!("Reading features from: {}", features_path);
-    let (samples, label_index, index_to_label) = load_features(&features_path)?;
+    let (samples, label_index, _index_to_label) = load_features(&features_path)?;
     let n_classes = label_index.len();
     eprintln!(
         "Loaded {} samples, {} unique predicted labels",
@@ -35,17 +33,12 @@ fn main() -> Result<()> {
     // ── Experiment 1: Logistic Regression (AC-4) ────────────────────────
     eprintln!("\n═══ Experiment 1: Logistic Regression ═══");
     let logreg_results = cross_validate(&samples, n_classes, &label_index, N_FOLDS, false)?;
-    print_results(
-        "Logistic Regression",
-        &logreg_results,
-        &samples,
-        &index_to_label,
-    );
+    print_results("Logistic Regression", &logreg_results, &samples);
 
     // ── Experiment 2: MLP (AC-5) ────────────────────────────────────────
     eprintln!("\n═══ Experiment 2: MLP (1 hidden layer, 64 units) ═══");
     let mlp_results = cross_validate(&samples, n_classes, &label_index, N_FOLDS, true)?;
-    print_results("MLP", &mlp_results, &samples, &index_to_label);
+    print_results("MLP", &mlp_results, &samples);
 
     // ── Experiment 3: Feature Importance via Logistic Regression (AC-6) ──
     eprintln!("\n═══ Feature Importance (Logistic Regression weights) ═══");
@@ -78,6 +71,7 @@ fn main() -> Result<()> {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Spike binary — fields retained for debugging
 struct Sample {
     dataset: String,
     column_name: String,
@@ -99,8 +93,10 @@ struct FoldResult {
     per_sample: Vec<(usize, bool)>, // (sample_index, correct)
 }
 
+type FeatureData = (Vec<Sample>, HashMap<String, usize>, Vec<String>);
+
 /// Load features.csv and parse into samples.
-fn load_features(path: &str) -> Result<(Vec<Sample>, HashMap<String, usize>, Vec<String>)> {
+fn load_features(path: &str) -> Result<FeatureData> {
     let mut rdr = ReaderBuilder::new().from_path(path)?;
     let headers: Vec<String> = rdr.headers()?.iter().map(|h| h.to_string()).collect();
 
@@ -391,12 +387,7 @@ fn compute_feature_importance(
     Ok(named_importance)
 }
 
-fn print_results(
-    model_name: &str,
-    results: &[FoldResult],
-    samples: &[Sample],
-    index_to_label: &[String],
-) {
+fn print_results(model_name: &str, results: &[FoldResult], samples: &[Sample]) {
     let total_correct: usize = results.iter().map(|r| r.correct).sum();
     let total: usize = results.iter().map(|r| r.total).sum();
     eprintln!(
