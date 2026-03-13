@@ -1211,6 +1211,10 @@ impl ColumnClassifier {
         // 1. All votes masked out (category completely wrong)
         // 2. Low Sense confidence (<0.75) AND masking removes >40% of total
         //    votes — Sense is uncertain and masking discards too much signal
+        // 3. Masking removes >90% of votes regardless of Sense confidence —
+        //    when the model overwhelmingly votes for types outside the Sense
+        //    category, the mask is discarding too much signal (NNFT-xxx:
+        //    earthquake horizontalError: 98% decimal_number masked by Text)
         let total_unmasked: usize = vote_counts_3level.values().sum();
         let total_masked: usize = masked_votes.iter().map(|(_, c)| *c).sum();
         let masked_out_frac = if total_unmasked > 0 {
@@ -1220,7 +1224,8 @@ impl ColumnClassifier {
         };
         let should_fallback = masked_votes.is_empty()
             || masked_votes[0].1 == 0
-            || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4);
+            || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4)
+            || masked_out_frac > 0.9;
         // Trace point 3: Mask application
         tracing::debug!(
             column = %header,
