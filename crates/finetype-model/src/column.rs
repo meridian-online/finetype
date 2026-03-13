@@ -121,6 +121,7 @@ mod feature_idx {
     pub const HAS_COLON: usize = 32;
     #[allow(dead_code)]
     pub const HAS_DASH: usize = 33;
+    pub const ALPHA_RATIO: usize = 18;
     pub const HAS_NEGATIVE_PREFIX: usize = 34;
     #[allow(dead_code)]
     pub const HAS_PERCENT: usize = 35;
@@ -1902,6 +1903,46 @@ fn feature_disambiguate(
         result.disambiguation_applied = true;
         result.disambiguation_rule =
             Some(format!("feature_no_leading_zero:{:.2}", leading_zero_ratio));
+    }
+
+    // Rule F6: Short alphabetic codes misclassified as file.extension.
+    //
+    // Short 2-3 letter alphabetic codes (e.g., earthquake magnitude types "mb",
+    // "ms", network codes "us", "ci", "nc") get classified as file.extension by
+    // the CharCNN because they resemble file extensions without the dot. Real file
+    // extensions in tabular data would contain dots (e.g., ".csv", ".json") or
+    // appear in longer paths.
+    //
+    // Trigger conditions (all must hold):
+    //   - Winner is representation.file.extension
+    //   - Mean value length <= 4.0 (short codes)
+    //   - Mean dot-segment count close to 1.0 (no dots — segment_count_dot counts
+    //     parts split by '.', so 1.0 means zero dots)
+    //   - High alpha ratio (>= 0.8, predominantly alphabetic)
+    //
+    // Action: demote to the next vote (typically categorical or ordinal). If no
+    // viable second vote exists, fall back to representation.categorical.categorical.
+    let feat_mean_length = column_features.mean[feature_idx::LENGTH];
+    let feat_dot_segments = column_features.mean[feature_idx::SEGMENT_COUNT_DOT];
+    let feat_alpha_ratio = column_features.mean[feature_idx::ALPHA_RATIO];
+    if result.label == "representation.file.extension"
+        && feat_mean_length <= 4.0
+        && feat_dot_segments < 1.1
+        && feat_alpha_ratio >= 0.8
+    {
+        let next_label = votes
+            .iter()
+            .find(|(l, _)| l != "representation.file.extension")
+            .map(|(l, _)| l.clone());
+        let fallback = "representation.categorical.categorical".to_string();
+        let chosen = next_label.unwrap_or(fallback);
+        result.label = chosen;
+        result.confidence = result.confidence.max(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_short_code_not_extension:len={:.1},dots={:.2},alpha={:.2}",
+            feat_mean_length, feat_dot_segments, feat_alpha_ratio
+        ));
     }
 }
 
@@ -7418,5 +7459,140 @@ datetime.component.day_of_week:
             .as_ref()
             .unwrap()
             .contains("feature_hs_code"));
+    }
+
+    #[test]
+    fn test_rule_f6_short_code_demoted_from_file_extension() {
+        // Short alphabetic codes like earthquake magType ("mb", "ms", "ml")
+        // misclassified as file.extension → should demote to next vote
+        let mut result = ColumnResult {
+            label: "representation.file.extension".to_string(),
+            confidence: 0.85,
+            vote_distribution: vec![
+                ("representation.file.extension".to_string(), 0.70),
+                ("representation.categorical.categorical".to_string(), 0.20),
+            ],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::LENGTH] = 2.5; // short codes: "mb", "ms", "ml", "mww"
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 1.0; // no dots at all
+        cf.mean[feature_idx::ALPHA_RATIO] = 1.0; // purely alphabetic
+
+        let votes = vec![
+            ("representation.file.extension".to_string(), 70),
+            ("representation.categorical.categorical".to_string(), 20),
+        ];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(result.label, "representation.categorical.categorical");
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .contains("feature_short_code_not_extension"));
+    }
+
+    #[test]
+    fn test_rule_f6_real_extension_not_demoted() {
+        // Real file extensions with dots (e.g., ".csv", ".json") should NOT be demoted
+        let mut result = ColumnResult {
+            label: "representation.file.extension".to_string(),
+            confidence: 0.90,
+            vote_distribution: vec![("representation.file.extension".to_string(), 1.0)],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::LENGTH] = 4.0; // ".csv" length
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 2.0; // has dots
+        cf.mean[feature_idx::ALPHA_RATIO] = 0.75;
+
+        let votes = vec![("representation.file.extension".to_string(), 90)];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(
+            result.label, "representation.file.extension",
+            "should NOT demote when values contain dots"
+        );
+        assert!(!result.disambiguation_applied);
+    }
+
+    #[test]
+    fn test_rule_f6_long_values_not_demoted() {
+        // Longer strings classified as file.extension should NOT be demoted
+        // (e.g., "dockerfile", "makefile" — longer than typical short codes)
+        let mut result = ColumnResult {
+            label: "representation.file.extension".to_string(),
+            confidence: 0.85,
+            vote_distribution: vec![("representation.file.extension".to_string(), 1.0)],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::LENGTH] = 8.0; // longer values
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 1.0; // no dots
+        cf.mean[feature_idx::ALPHA_RATIO] = 1.0;
+
+        let votes = vec![("representation.file.extension".to_string(), 85)];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(
+            result.label, "representation.file.extension",
+            "should NOT demote when mean length > 4"
+        );
+        assert!(!result.disambiguation_applied);
+    }
+
+    #[test]
+    fn test_rule_f6_fallback_to_categorical() {
+        // When file.extension is the only vote, should fallback to categorical
+        let mut result = ColumnResult {
+            label: "representation.file.extension".to_string(),
+            confidence: 0.90,
+            vote_distribution: vec![("representation.file.extension".to_string(), 1.0)],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::LENGTH] = 2.0;
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 1.0;
+        cf.mean[feature_idx::ALPHA_RATIO] = 1.0;
+
+        // Only file.extension in votes — no second option
+        let votes = vec![("representation.file.extension".to_string(), 100)];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(
+            result.label, "representation.categorical.categorical",
+            "should fallback to categorical when no second vote exists"
+        );
+        assert!(result.disambiguation_applied);
     }
 }
