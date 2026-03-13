@@ -16,7 +16,7 @@ FineType is a type inference engine that detects and classifies data types in ta
 Every decision in this repo should reflect these principles:
 
 1. **Spark joy for analysts** — Type inference should feel magical, not tedious. Clear output, helpful error messages, sensible defaults.
-2. **Write programs that do one thing and do it well** — FineType infers types. It doesn't validate, transform, or visualise. Those are separate concerns for separate tools.
+2. **Write programs that do one thing and do it well** — Each command has one job: `profile` discovers, `schema` generates, `validate` enforces, `load` transforms. Separate concerns for separate tools.
 3. **Design for the future, for it will be here sooner than you think** — The type taxonomy, model architecture, and extension interfaces should accommodate new data types and formats without breaking existing behaviour.
 
 ### Precision Principle
@@ -29,24 +29,24 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.6.10
+**Version:** 0.6.11
 **Taxonomy:** 250 definitions across 7 domains (container: 12, datetime: 84, finance: 31, geography: 25, identity: 34, representation: 36, technology: 28) — all generators pass, 100% alignment
 **Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v14-250 flat (250 classes, 10 epochs, 372k samples), tiered-v2 fallback via `--sharp-only`. Hierarchical head available: char-cnn-v15-250 (7→43→250 tree softmax, 84.2% type / 90.9% domain / 96.5% category training accuracy).
-**Features:** 36-dim deterministic feature extractor (NNFT-248/266/270), column-level aggregation (mean, variance, min, max), 5 feature-based disambiguation rules (F1–F5). Financial header hints (NNFT-270).
+**Features:** 36-dim deterministic feature extractor (NNFT-248/266/270), column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6). Financial header hints (NNFT-270).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent work
 
+- **Schema-driven validate command** — Standalone quality gate: `finetype schema data.csv` generates table-level JSON Schema, `finetype validate data.csv schema.json` enforces it with predictable sidecar output (`.valid.csv`, `.invalid.csv`, `.errors.jsonl`). Old repair-based validate removed. MCP `validate` tool + DuckDB `finetype_validate()` function. Decisions 0031–0033.
 - **Sibling-context attention** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention on 509 real-world CSVs. Enriches per-column headers with cross-column context before Sense classification. Profile: 170/174 (97.7% label, 98.9% domain). Entry point: `classify_columns_with_context()`.
 - **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax (7 domains → 43 categories → 250 types). char-cnn-v15-250: 84.2% type accuracy. Matches flat baseline on profile eval. `--hierarchical` flag.
-- **Sherlock-style features** (NNFT-270, m-12) — FEATURE_DIM 36 with financial header hints. Rules F1–F5 for disambiguation.
 
 ### What's in progress
 
-- **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range). Depends on NNFT-254 completion.
-- **Eval baseline reconciliation** — Profile eval count shifted from 186 to 174 matchable predictions. Need to identify cause (manifest changes, schema mapping updates, or sibling-context side effect).
+- **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema, validate commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range).
+- **Dead code cleanup** — `if false { // validate removed }` blocks in `cmd_profile` output formatting (harmless but noisy).
 - **Remaining accuracy gaps** — 4 misclassifications at 170/174: 3× bare "name" ambiguity (sibling context shifts to geographic types), 1× docker_ref→hostname.
 
 ## Architecture
@@ -56,10 +56,10 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ```
 finetype/
   crates/
-    finetype-core/     # Taxonomy, generators, validation, tokenizer
+    finetype-core/     # Taxonomy, generators, validation, tokenizer, table_validator
     finetype-model/    # CharCNN, tiered classifier, column disambiguation, training
     finetype-cli/      # CLI binary (infer, profile, generate, check, train, mcp)
-    finetype-mcp/      # MCP server (rmcp v1.1.0, 6 tools, taxonomy resources)
+    finetype-mcp/      # MCP server (rmcp v1.1.0, 8 tools, taxonomy resources)
     finetype-duckdb/   # DuckDB loadable extension (scalar functions)
     finetype-eval/     # Evaluation binaries (report, actionability, GitTables, SOTAB)
     finetype-candle-spike/  # ML training feasibility spike (Candle 0.8)
@@ -125,15 +125,16 @@ Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB t
 | `finetype_detail(col)` / `finetype_detail(list, header?)` | Full detail (JSON) |
 | `finetype_cast(value)` | Normalize value for TRY_CAST |
 | `finetype_unpack(json)` | Recursively classify JSON fields |
+| `finetype_validate(value, schema_json)` | Schema-driven validation (returns 'valid' or error message) |
 | `finetype_version()` | Version string |
 
-Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
+Uses flat CharCNN with chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
 
 ### MCP server
 
 `finetype mcp` starts an MCP server over stdio transport (rmcp v1.1.0). AI agents launch it as a subprocess.
 
-**Tools (6):**
+**Tools (8):**
 
 | Tool | Purpose |
 |---|---|
@@ -141,7 +142,8 @@ Uses flat CharCNN with chunk-aware column classification (~2048-row chunks).
 | `profile` | Profile all columns in CSV file (path or inline data) |
 | `ddl` | Generate CREATE TABLE DDL from file profiling |
 | `taxonomy` | Search/filter type taxonomy by domain/category/query |
-| `schema` | Export JSON Schema contract for type(s), supports globs |
+| `schema` | Export JSON Schema — type-level (by key) or table-level (by file path/data) |
+| `validate` | Schema-driven CSV validation — returns valid/invalid counts + error details |
 | `generate` | Generate synthetic sample data for a type |
 
 **Resources:** `finetype://taxonomy`, `finetype://taxonomy/{domain}`, `finetype://taxonomy/{d}.{c}.{t}`
@@ -158,9 +160,10 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 | `finetype generate` | Generate synthetic training data |
 | `finetype train` | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
 | `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
-| `finetype schema <key>` | Export JSON Schema (`--pretty`, glob patterns, `x-finetype-*` DDL fields) |
+| `finetype schema <key\|file>` | Type-level JSON Schema (by key/glob) or table-level (by file path, `--stats`, `--stdout`) |
+| `finetype validate <file> <schema>` | Schema-driven quality gate → `.valid.csv`, `.invalid.csv`, `.errors.jsonl` (`--summary-only`) |
 | `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`, `--enum-threshold N`) |
-| `finetype mcp` | Start MCP server over stdio (6 tools: profile, infer, ddl, taxonomy, schema, generate) |
+| `finetype mcp` | Start MCP server over stdio (8 tools: profile, infer, ddl, taxonomy, schema, validate, generate) |
 
 ### Evaluation infrastructure
 
@@ -173,17 +176,17 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Architecture evolution (m-13):** Sibling-context attention trained and shipped (v0.6.10). Hierarchical head accuracy parity, golden test expansion.
+**Schema-driven validation (m-14):** `finetype schema <file>` + `finetype validate` shipped and merged. Table-level JSON Schema generation, sidecar file output, MCP validate tool, DuckDB `finetype_validate()`. Decisions 0031–0033.
 
 **Remaining accuracy gaps:** 4 misclassifications at 170/174 — 3× bare "name" ambiguity (genuinely ambiguous, sibling context shifts these to geographic types), 1× docker_ref/hostname confusion.
 
 ## Decision Register
 
-30 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
+33 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
 
 Browse: `ls decisions/` or use Ctrl+B (fzf + glow preview).
 
-Covers: inference pipeline, model architecture, embeddings & hints, rules & disambiguation, taxonomy, validation, training, evaluation methodology, and distribution.
+Covers: inference pipeline, model architecture, embeddings & hints, rules & disambiguation, taxonomy, validation, schema & validate command (0031–0033), training, evaluation methodology, and distribution.
 
 ## Build & Test
 
@@ -215,6 +218,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Sense classifier | `crates/finetype-model/src/sense.rs` |
 | Header hints (semantic) | `crates/finetype-model/src/semantic.rs` |
 | Sibling-context attention | `crates/finetype-model/src/sibling_context.rs` |
+| Table validator (core engine) | `crates/finetype-core/src/table_validator.rs` |
 | CLI entry point | `crates/finetype-cli/src/main.rs` |
 | MCP server + tools | `crates/finetype-mcp/src/` |
 | DuckDB extension | `crates/finetype-duckdb/src/` |
