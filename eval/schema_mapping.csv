@@ -18,6 +18,7 @@ ean,profile,identity.commerce.ean,identity,direct,false
 first name,profile,identity.person.first_name,identity,direct,false
 last name,profile,identity.person.last_name,identity,direct,false
 hash,profile,technology.cryptographic.hash,technology,direct,false
+http status code,profile,representation.numeric.integer_number,representation,close,false
 iata,profile,geography.transportation.iata_code,geography,direct,false
 icao,profile,geography.transportation.icao_code,geography,direct,false
 hostname,profile,technology.internet.hostname,technology,direct,false
@@ -26,50 +27,99 @@ mac address,profile,technology.internet.mac_address,technology,direct,false
 measurement unit,profile,representation.scientific.measurement_unit,representation,direct,false
 month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
+port,profile,representation.numeric.integer_number,representation,close,false
 street number,profile,representation.numeric.integer_number,representation,close,false
 uuid,profile,representation.identifier.uuid,representation,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
 decimal number,profile,representation.numeric.decimal_number,representation,direct,false
+decimal number,profile,representation.numeric.integer_number,representation,direct,false
 swift code,profile,finance.banking.swift_bic,finance,direct,false
-name,both,identity.person.full_name,identity,close,false
+name,both,identity.person.full_name,,close,false
+name,both,representation.text.entity_name,,close,false
+name,both,geography.location.country,,close,false
+name,both,geography.location.city,,close,false
+name,both,geography.location.region,,close,false
+name,both,geography.location.state,,close,false
 entity name,profile,representation.text.entity_name,representation,direct,false
-author,both,identity.person.full_name,identity,close,false
+author,both,identity.person.full_name,,close,false
+author,both,representation.text.entity_name,,close,false
 speaker,dbpedia,identity.person.full_name,identity,close,false
 writer,dbpedia,identity.person.full_name,identity,close,false
-publisher,dbpedia,identity.person.full_name,identity,close,false
+publisher,dbpedia,identity.person.full_name,,close,false
+publisher,dbpedia,representation.text.entity_name,,close,false
 producer,both,identity.person.full_name,identity,close,false
 manufacturer,both,representation.text.word,representation,close,false
 address,dbpedia,geography.address.full_address,geography,close,false
+address,dbpedia,geography.address.street_address,geography,close,false
+address,dbpedia,geography.coordinate.coordinates,geography,close,false
 county,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
+region,dbpedia,geography.location.state,geography,close,false
+region,dbpedia,geography.location.continent,geography,close,false
 location,both,geography.location.city,geography,close,false
 age,dbpedia,representation.numeric.integer_number,representation,close,false
 height,both,identity.person.height,identity,close,false
 weight,dbpedia,identity.person.weight,identity,close,false
 sentence,dbpedia,representation.text.sentence,representation,close,false
 occupation,profile,representation.discrete.categorical,representation,close,false
-timestamp,profile,,datetime,partial,false
+timestamp,profile,datetime.timestamp.iso_8601,datetime,partial,false
+timestamp,profile,datetime.timestamp.iso_8601_milliseconds,datetime,partial,false
+timestamp,profile,datetime.timestamp.iso_8601_microseconds,datetime,partial,false
+timestamp,profile,datetime.timestamp.sql_standard,datetime,partial,false
+timestamp,profile,datetime.timestamp.rfc_2822,datetime,partial,false
+timestamp,profile,datetime.timestamp.mdy_12h,datetime,partial,false
+timestamp,profile,datetime.timestamp.dmy_hm,datetime,partial,false
 sql timestamp,profile,datetime.timestamp.sql_standard,datetime,direct,false
-time 24h,profile,,datetime,partial,false
-date,dbpedia,,datetime,partial,false
+time 24h,profile,datetime.time.hm_24h,datetime,partial,false
+time 24h,profile,datetime.time.hms_24h,datetime,partial,false
+date,dbpedia,datetime.date.iso,datetime,partial,false
+date,dbpedia,datetime.date.iso_date,datetime,partial,false
+date,dbpedia,datetime.date.mdy_slash,datetime,partial,false
+date,dbpedia,datetime.date.dmy_slash,datetime,partial,false
+date,dbpedia,datetime.date.dmy_dot,datetime,partial,false
+date,dbpedia,datetime.date.abbreviated_month,datetime,partial,false
+date,dbpedia,datetime.date.long_full_month,datetime,partial,false
+date,dbpedia,datetime.timestamp.iso_8601,datetime,partial,false
 created,dbpedia,,datetime,partial,false
 updated,dbpedia,,datetime,partial,false
 start date,dbpedia,,datetime,partial,false
 end date,dbpedia,,datetime,partial,false
 start time,both,,datetime,partial,false
 end time,both,,datetime,partial,false
-time,both,,datetime,partial,false
+time,both,datetime.epoch.unix_seconds,datetime,partial,false
+time,both,datetime.epoch.unix_milliseconds,datetime,partial,false
+time,both,datetime.time.hm_24h,datetime,partial,false
+time,both,datetime.time.hms_24h,datetime,partial,false
+time,both,datetime.time.hm_12h,datetime,partial,false
+time,both,datetime.time.hms_12h,datetime,partial,false
 date issued,schema,,datetime,partial,false
 purchase date,schema,,datetime,partial,false
 duration,both,datetime.duration.iso_8601,datetime,partial,false
 id,both,representation.identifier.increment,representation,partial,false
-code,both,representation.identifier.alphanumeric_id,representation,partial,false
+id,both,representation.identifier.alphanumeric_id,representation,partial,false
+id,both,representation.identifier.uuid,representation,partial,false
+id,both,representation.identifier.numeric_code,representation,partial,false
+id,both,representation.numeric.integer_number,representation,partial,false
+code,both,representation.identifier.alphanumeric_id,,partial,false
+code,both,representation.identifier.numeric_code,,partial,false
+code,both,representation.discrete.ordinal,,partial,false
+code,both,geography.location.country_code,,partial,false
+code,both,finance.banking.iban,,partial,false
+code,both,identity.government.ssn,,partial,false
+code,both,identity.medical.icd10,,partial,false
+code,both,technology.internet.url,,partial,false
+code,both,container.key_value.query_string,,partial,false
 number,dbpedia,representation.numeric.integer_number,representation,partial,false
+number,dbpedia,representation.numeric.decimal_number,representation,partial,false
+number,dbpedia,representation.identifier.increment,representation,partial,false
+number,dbpedia,finance.currency.amount_minor_int,representation,partial,false
 file format,schema,representation.file.mime_type,representation,partial,false
 content type,schema,representation.file.mime_type,representation,partial,false
-color,schema,representation.text.color_hex,representation,partial,false
+color,schema,representation.format.color_hex,representation,partial,false
+color,schema,representation.format.color_hsl,representation,partial,false
 version,both,technology.development.version,technology,partial,false
-language,both,technology.code.locale_code,technology,partial,true
+language,both,technology.code.locale_code,,partial,true
+language,both,representation.discrete.categorical,,partial,true
 isbn,schema,identity.commerce.isbn,identity,partial,false
 sex,dbpedia,identity.person.gender,identity,partial,false
 coordinates,schema,geography.coordinate.coordinates,geography,partial,false
@@ -77,34 +127,67 @@ long name,dbpedia,identity.person.full_name,identity,partial,false
 common name,dbpedia,representation.text.word,representation,partial,false
 scientific name,dbpedia,representation.text.word,representation,partial,false
 telephone,schema,identity.person.phone_number,identity,direct,false
-title,both,,representation,semantic_only,false
-description,both,,representation,semantic_only,false
+telephone,schema,identity.person.phone_e164,identity,direct,false
+title,both,representation.text.entity_name,representation,partial,false
+title,both,representation.text.plain_text,representation,partial,false
+title,both,representation.text.sentence,representation,partial,false
+description,both,representation.text.plain_text,representation,partial,false
+description,both,representation.text.sentence,representation,partial,false
 abstract,both,,representation,semantic_only,false
 comment,both,,representation,semantic_only,false
 note,dbpedia,,representation,semantic_only,false
 notes,dbpedia,,representation,semantic_only,false
 text,schema,,representation,semantic_only,false
 message,schema,,representation,semantic_only,false
-category,both,,representation,semantic_only,false
-class,both,,representation,semantic_only,false
-classification,dbpedia,,representation,semantic_only,false
-type,dbpedia,,representation,semantic_only,false
-status,both,,representation,semantic_only,false
-rating,both,,representation,semantic_only,false
-score,dbpedia,,representation,semantic_only,false
-rank,dbpedia,,representation,semantic_only,false
-order,dbpedia,,representation,semantic_only,false
-value,both,,representation,semantic_only,false
-price,both,,representation,semantic_only,false
-cost,dbpedia,,representation,semantic_only,false
-depth,both,,representation,semantic_only,false
-width,both,,representation,semantic_only,false
-size,schema,,representation,semantic_only,false
-length,dbpedia,,representation,semantic_only,false
-min,dbpedia,,representation,semantic_only,false
-volume,dbpedia,,representation,semantic_only,false
-frequency,dbpedia,,representation,semantic_only,false
-temperature,dbpedia,,representation,semantic_only,false
+category,both,representation.discrete.categorical,representation,partial,false
+category,both,representation.discrete.ordinal,representation,partial,false
+category,both,representation.file.extension,representation,partial,false
+category,both,technology.internet.http_method,representation,partial,false
+category,both,geography.location.continent,representation,partial,false
+class,both,representation.discrete.categorical,representation,partial,false
+class,both,representation.discrete.ordinal,representation,partial,false
+classification,dbpedia,representation.discrete.categorical,representation,partial,false
+classification,dbpedia,representation.discrete.ordinal,representation,partial,false
+type,dbpedia,representation.discrete.categorical,representation,partial,false
+type,dbpedia,representation.discrete.ordinal,representation,partial,false
+status,both,representation.discrete.categorical,representation,partial,false
+status,both,representation.discrete.ordinal,representation,partial,false
+rating,both,representation.discrete.ordinal,representation,partial,false
+rating,both,representation.numeric.decimal_number,representation,partial,false
+rating,both,representation.numeric.integer_number,representation,partial,false
+score,dbpedia,representation.numeric.decimal_number,representation,partial,false
+score,dbpedia,representation.numeric.integer_number,representation,partial,false
+rank,dbpedia,representation.numeric.integer_number,representation,partial,false
+rank,dbpedia,representation.discrete.ordinal,representation,partial,false
+order,dbpedia,representation.numeric.integer_number,representation,partial,false
+order,dbpedia,representation.discrete.ordinal,representation,partial,false
+value,both,representation.numeric.decimal_number,representation,partial,false
+value,both,representation.numeric.integer_number,representation,partial,false
+value,both,representation.numeric.si_number,representation,partial,false
+value,both,finance.currency.amount,representation,partial,false
+price,both,finance.currency.amount,finance,partial,false
+price,both,representation.numeric.decimal_number,finance,partial,false
+price,both,representation.numeric.integer_number,finance,partial,false
+cost,dbpedia,finance.currency.amount,finance,partial,false
+cost,dbpedia,representation.numeric.decimal_number,finance,partial,false
+cost,dbpedia,representation.numeric.integer_number,finance,partial,false
+depth,both,representation.numeric.decimal_number,representation,partial,false
+depth,both,representation.numeric.integer_number,representation,partial,false
+width,both,representation.numeric.decimal_number,representation,partial,false
+width,both,representation.numeric.integer_number,representation,partial,false
+size,schema,representation.numeric.decimal_number,representation,partial,false
+size,schema,representation.numeric.integer_number,representation,partial,false
+size,schema,representation.discrete.ordinal,representation,partial,false
+length,dbpedia,representation.numeric.decimal_number,representation,partial,false
+length,dbpedia,representation.numeric.integer_number,representation,partial,false
+min,dbpedia,representation.numeric.decimal_number,representation,partial,false
+min,dbpedia,representation.numeric.integer_number,representation,partial,false
+volume,dbpedia,representation.numeric.decimal_number,representation,partial,false
+volume,dbpedia,representation.numeric.integer_number,representation,partial,false
+frequency,dbpedia,representation.numeric.decimal_number,representation,partial,false
+frequency,dbpedia,representation.numeric.integer_number,representation,partial,false
+temperature,dbpedia,representation.numeric.decimal_number,representation,partial,false
+temperature,dbpedia,representation.numeric.integer_number,representation,partial,false
 capacity,dbpedia,,representation,semantic_only,false
 parent,both,,representation,semantic_only,false
 object,schema,,representation,semantic_only,false
@@ -186,6 +269,7 @@ country code,dbpedia,geography.location.country_code,geography,direct,false
 time zone,dbpedia,datetime.offset.iana,datetime,close,false
 flag,dbpedia,representation.boolean.terms,representation,partial,false
 boolean,dbpedia,representation.boolean.binary,representation,direct,false
+boolean,dbpedia,representation.boolean.terms,representation,direct,false
 keywords,dbpedia,,representation,semantic_only,false
 image,dbpedia,technology.internet.url,technology,partial,false
 citation,dbpedia,,representation,semantic_only,true
