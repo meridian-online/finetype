@@ -1142,6 +1142,15 @@ impl ColumnClassifier {
             sense.classify(m2v, header_opt, &sense_values)?
         };
 
+        // Trace point 1: Sense prediction
+        tracing::debug!(
+            column = %header,
+            sense_category = %sense_result.broad_category,
+            sense_confidence = sense_result.broad_confidence,
+            entity_subtype = ?sense_result.entity_subtype,
+            "Sense prediction"
+        );
+
         // Step 3: Run CharCNN batch on all sampled values.
         // Pass per-value features for augmented inference when the model supports it.
         let flat_features: Vec<f32> = per_value_features.iter().flatten().copied().collect();
@@ -1178,6 +1187,14 @@ impl ColumnClassifier {
             v
         };
 
+        // Trace point 2: Raw CharCNN votes before masking
+        tracing::debug!(
+            column = %header,
+            top_votes = ?unmasked_votes.iter().take(5).collect::<Vec<_>>(),
+            total_votes = n_samples,
+            "Raw CharCNN votes (before mask)"
+        );
+
         // Step 5: Masked vote aggregation — only count votes for types
         // eligible under the Sense-predicted category.
         let category = sense_result.broad_category;
@@ -1204,6 +1221,18 @@ impl ColumnClassifier {
         let should_fallback = masked_votes.is_empty()
             || masked_votes[0].1 == 0
             || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4);
+        // Trace point 3: Mask application
+        tracing::debug!(
+            column = %header,
+            masked_top_votes = ?masked_votes.iter().take(5).collect::<Vec<_>>(),
+            total_unmasked = total_unmasked,
+            total_masked = total_masked,
+            masked_out_fraction = %format!("{:.2}", masked_out_frac),
+            sense_confidence = sense_result.broad_confidence,
+            safety_valve_fired = should_fallback,
+            "Mask application"
+        );
+
         let (mut votes, mask_applied) = if should_fallback {
             let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
             all_votes.sort_by(|a, b| b.1.cmp(&a.1));
@@ -1399,6 +1428,7 @@ impl ColumnClassifier {
         // Sense narrows the broad category, but header hints resolve
         // within-category ambiguity. Skipped when Sense entity demotion
         // was applied (the entity classifier's decision is authoritative).
+        let label_before_hints = result.label.clone();
         let entity_demoted = result
             .disambiguation_rule
             .as_ref()
@@ -1683,12 +1713,34 @@ impl ColumnClassifier {
             }
         }
 
+        // Trace point 4: Header hint outcome
+        if result.label != label_before_hints {
+            tracing::debug!(
+                column = %header,
+                hint_rule = ?result.disambiguation_rule,
+                old_label = %label_before_hints,
+                new_label = %result.label,
+                "Header hint applied"
+            );
+        }
+
         // Step 9: Post-hoc locale detection (unchanged from legacy pipeline)
         if let Some(taxonomy) = self.taxonomy.as_ref() {
             if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
                 result.detected_locale = Some(locale);
             }
         }
+
+        // Trace point 6: Final column classification result
+        tracing::debug!(
+            column = %header,
+            final_label = %result.label,
+            confidence = result.confidence,
+            disambiguation_rule = ?result.disambiguation_rule,
+            samples_used = result.samples_used,
+            detected_locale = ?result.detected_locale,
+            "Column classification complete"
+        );
 
         self.finalize_is_generic(&mut result);
         Ok(result)
@@ -1754,6 +1806,8 @@ fn feature_disambiguate(
     votes: &[(String, usize)],
     n_samples: usize,
 ) {
+    let label_before = result.label.clone();
+
     // Rule F1: Leading-zero pre-filter — numeric_code vs postal_code (NNFT-250).
     //
     // When a significant fraction of values have leading zeros (e.g., "00123",
@@ -1943,6 +1997,16 @@ fn feature_disambiguate(
             "feature_short_code_not_extension:len={:.1},dots={:.2},alpha={:.2}",
             feat_mean_length, feat_dot_segments, feat_alpha_ratio
         ));
+    }
+
+    // Trace point 5: Feature rule outcome
+    if result.label != label_before {
+        tracing::debug!(
+            rule = ?result.disambiguation_rule,
+            old_label = %label_before,
+            new_label = %result.label,
+            "Feature rule applied"
+        );
     }
 }
 
