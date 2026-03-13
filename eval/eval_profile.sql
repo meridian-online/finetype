@@ -80,82 +80,109 @@ FROM ground_truth;
 .print '          JOINING PREDICTIONS WITH GROUND TRUTH                   '
 .print '═══════════════════════════════════════════════════════════════════'
 
+-- Note: schema_mapping may have multiple rows per gt_label (finetype_labels list).
+-- We join all candidates, compute match per candidate, then keep the best match per column.
 CREATE OR REPLACE TABLE eval_joined AS
+WITH candidates AS (
+    SELECT
+        pr.dataset,
+        pr.column_name,
+        pr.predicted_type,
+        pr.confidence,
+        gt.gt_label,
+        sm.finetype_label AS expected_ft_label,
+        sm.finetype_domain AS expected_ft_domain,
+        sm.match_quality,
+        sm.expand AS expansion_candidate,
+        split_part(pr.predicted_type, '.', 1) AS predicted_domain,
+        -- Scoring: label-level match
+        CASE
+            WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
+                 AND pr.predicted_type = sm.finetype_label
+            THEN true
+            -- Boolean sub-types are interchangeable: binary/terms/initials all satisfy
+            -- a generic "boolean" GT label (the GT doesn't distinguish sub-types)
+            WHEN sm.finetype_label LIKE 'representation.boolean.%'
+                 AND pr.predicted_type LIKE 'representation.boolean.%'
+            THEN true
+            -- Time sub-types are interchangeable: hm_24h ~ hms_24h (GT "time 24h"
+            -- does not distinguish whether seconds are present)
+            WHEN sm.finetype_label LIKE 'datetime.time.%'
+                 AND pr.predicted_type LIKE 'datetime.time.%'
+            THEN true
+            -- Geographic hierarchy: continent ~ region ~ state are interchangeable
+            -- (GT "region" covers continent-level through state-level subdivisions)
+            WHEN sm.finetype_label IN (
+                     'geography.location.region',
+                     'geography.location.state',
+                     'geography.location.continent'
+                 )
+                 AND pr.predicted_type IN (
+                     'geography.location.region',
+                     'geography.location.state',
+                     'geography.location.continent'
+                 )
+            THEN true
+            -- Timestamp sub-types are interchangeable: iso_8601 ~ iso_8601_microseconds
+            -- (GT "timestamp" does not distinguish microsecond precision)
+            WHEN sm.finetype_label LIKE 'datetime.timestamp.%'
+                 AND pr.predicted_type LIKE 'datetime.timestamp.%'
+            THEN true
+            -- Name types: full_name ~ entity_name -- GT "name" covers both person
+            -- names and entity names (organisations, venues, products). NNFT-137
+            -- added entity_name as a separate type.
+            WHEN sm.finetype_label = 'identity.person.full_name'
+                 AND pr.predicted_type = 'representation.text.entity_name'
+            THEN true
+            ELSE false
+        END AS label_match,
+        -- Scoring: domain-level match
+        CASE
+            -- If label matches exactly, domain is implicitly correct
+            WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
+                 AND pr.predicted_type = sm.finetype_label
+            THEN true
+            WHEN sm.finetype_domain IS NOT NULL AND sm.finetype_domain != ''
+                 AND split_part(pr.predicted_type, '.', 1) = sm.finetype_domain
+            THEN true
+            -- entity_name in representation domain satisfies identity-domain "name" GT
+            WHEN sm.finetype_label = 'identity.person.full_name'
+                 AND pr.predicted_type = 'representation.text.entity_name'
+            THEN true
+            ELSE false
+        END AS domain_match,
+        -- Is this a type FineType should be able to detect?
+        CASE
+            WHEN sm.match_quality IN ('direct', 'close') THEN 'format_detectable'
+            WHEN sm.match_quality = 'partial' THEN 'partially_detectable'
+            WHEN sm.match_quality = 'semantic_only' THEN 'semantic_only'
+            ELSE 'unmapped'
+        END AS detectability
+    FROM profile_results pr
+    LEFT JOIN ground_truth gt
+        ON pr.dataset = gt.dataset AND pr.column_name = gt.column_name
+    LEFT JOIN schema_mapping sm
+        ON gt.gt_label = sm.gt_label
+)
+-- Deduplicate: keep the best match per (dataset, column_name).
+-- If any candidate matched, report that match; otherwise report the first candidate.
 SELECT
-    pr.dataset,
-    pr.column_name,
-    pr.predicted_type,
-    pr.confidence,
-    gt.gt_label,
-    sm.finetype_label AS expected_ft_label,
-    sm.finetype_domain AS expected_ft_domain,
-    sm.match_quality,
-    sm.expand AS expansion_candidate,
-    split_part(pr.predicted_type, '.', 1) AS predicted_domain,
-    -- Scoring: label-level match
-    CASE
-        WHEN sm.finetype_label IS NOT NULL AND sm.finetype_label != ''
-             AND pr.predicted_type = sm.finetype_label
-        THEN true
-        -- Boolean sub-types are interchangeable: binary/terms/initials all satisfy
-        -- a generic "boolean" GT label (the GT doesn't distinguish sub-types)
-        WHEN sm.finetype_label LIKE 'representation.boolean.%'
-             AND pr.predicted_type LIKE 'representation.boolean.%'
-        THEN true
-        -- Time sub-types are interchangeable: hm_24h ≈ hms_24h (GT "time 24h"
-        -- doesn't distinguish whether seconds are present)
-        WHEN sm.finetype_label LIKE 'datetime.time.%'
-             AND pr.predicted_type LIKE 'datetime.time.%'
-        THEN true
-        -- Geographic hierarchy: continent ≈ region ≈ state are interchangeable
-        -- (GT "region" covers continent-level through state-level subdivisions)
-        WHEN sm.finetype_label IN (
-                 'geography.location.region',
-                 'geography.location.state',
-                 'geography.location.continent'
-             )
-             AND pr.predicted_type IN (
-                 'geography.location.region',
-                 'geography.location.state',
-                 'geography.location.continent'
-             )
-        THEN true
-        -- Timestamp sub-types are interchangeable: iso_8601 ≈ iso_8601_microseconds
-        -- (GT "timestamp" doesn't distinguish microsecond precision)
-        WHEN sm.finetype_label LIKE 'datetime.timestamp.%'
-             AND pr.predicted_type LIKE 'datetime.timestamp.%'
-        THEN true
-        -- Name types: full_name ≈ entity_name — GT "name" covers both person
-        -- names and entity names (organisations, venues, products). NNFT-137
-        -- added entity_name as a separate type.
-        WHEN sm.finetype_label = 'identity.person.full_name'
-             AND pr.predicted_type = 'representation.text.entity_name'
-        THEN true
-        ELSE false
-    END AS label_match,
-    -- Scoring: domain-level match
-    CASE
-        WHEN sm.finetype_domain IS NOT NULL AND sm.finetype_domain != ''
-             AND split_part(pr.predicted_type, '.', 1) = sm.finetype_domain
-        THEN true
-        -- entity_name in representation domain satisfies identity-domain "name" GT
-        WHEN sm.finetype_label = 'identity.person.full_name'
-             AND pr.predicted_type = 'representation.text.entity_name'
-        THEN true
-        ELSE false
-    END AS domain_match,
-    -- Is this a type FineType should be able to detect?
-    CASE
-        WHEN sm.match_quality IN ('direct', 'close') THEN 'format_detectable'
-        WHEN sm.match_quality = 'partial' THEN 'partially_detectable'
-        WHEN sm.match_quality = 'semantic_only' THEN 'semantic_only'
-        ELSE 'unmapped'
-    END AS detectability
-FROM profile_results pr
-LEFT JOIN ground_truth gt
-    ON pr.dataset = gt.dataset AND pr.column_name = gt.column_name
-LEFT JOIN schema_mapping sm
-    ON gt.gt_label = sm.gt_label;
+    dataset,
+    column_name,
+    predicted_type,
+    confidence,
+    gt_label,
+    -- Pick the matching label if one matched, else first candidate
+    FIRST(expected_ft_label ORDER BY label_match DESC, expected_ft_label) AS expected_ft_label,
+    FIRST(expected_ft_domain ORDER BY label_match DESC, expected_ft_label) AS expected_ft_domain,
+    FIRST(match_quality ORDER BY label_match DESC, expected_ft_label) AS match_quality,
+    FIRST(expansion_candidate ORDER BY label_match DESC, expected_ft_label) AS expansion_candidate,
+    predicted_domain,
+    MAX(label_match) AS label_match,
+    MAX(domain_match) AS domain_match,
+    FIRST(detectability ORDER BY label_match DESC, expected_ft_label) AS detectability
+FROM candidates
+GROUP BY dataset, column_name, predicted_type, confidence, gt_label, predicted_domain;
 
 SELECT
     count(*) AS total_joined,

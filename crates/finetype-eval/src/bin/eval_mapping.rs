@@ -28,8 +28,13 @@ struct MappingEntry {
     gt_label: String,
     source: String,
     finetype_label: Option<String>,
+    /// Optional list of acceptable FineType labels for coarse GT labels.
+    /// When present, each label generates a separate CSV row so the eval SQL
+    /// can match any of them.
     #[serde(default)]
-    finetype_domain: String,
+    finetype_labels: Vec<String>,
+    #[serde(default)]
+    finetype_domain: Option<String>,
     match_quality: String,
     #[serde(default)]
     expand: bool,
@@ -57,15 +62,32 @@ fn main() -> Result<()> {
 
     for m in &mapping.mappings {
         let expand_str = if m.expand { "true" } else { "false" };
-        let finetype_label = m.finetype_label.as_deref().unwrap_or("");
-        wtr.write_record([
-            m.gt_label.as_str(),
-            m.source.as_str(),
-            finetype_label,
-            m.finetype_domain.as_str(),
-            m.match_quality.as_str(),
-            expand_str,
-        ])?;
+        let domain = m.finetype_domain.as_deref().unwrap_or("");
+
+        if m.finetype_labels.is_empty() {
+            // Single label (or null): one row
+            let finetype_label = m.finetype_label.as_deref().unwrap_or("");
+            wtr.write_record([
+                m.gt_label.as_str(),
+                m.source.as_str(),
+                finetype_label,
+                domain,
+                m.match_quality.as_str(),
+                expand_str,
+            ])?;
+        } else {
+            // Multiple acceptable labels: one row per label
+            for label in &m.finetype_labels {
+                wtr.write_record([
+                    m.gt_label.as_str(),
+                    m.source.as_str(),
+                    label.as_str(),
+                    domain,
+                    m.match_quality.as_str(),
+                    expand_str,
+                ])?;
+            }
+        }
     }
 
     wtr.flush()?;

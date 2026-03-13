@@ -190,7 +190,13 @@ mappings:
     expand: false
     notes: Cryptographic hash (SHA-256, MD5, etc.)
 
-  # http status code: REMOVED in NNFT-242
+  - gt_label: http status code
+    source: profile
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: close
+    expand: false
+    notes: HTTP status codes (200, 404, etc.); FineType sees as integer_number
 
   - gt_label: iata
     source: profile
@@ -256,7 +262,13 @@ mappings:
     expand: false
     notes: National Provider Identifier (10-digit)
 
-  # port: REMOVED in NNFT-242
+  - gt_label: port
+    source: profile
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: close
+    expand: false
+    notes: Network port numbers (80, 443, 8080); FineType sees as integer_number
 
   - gt_label: street number
     source: profile
@@ -285,10 +297,13 @@ mappings:
   - gt_label: decimal number
     source: profile
     finetype_label: representation.numeric.decimal_number
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
     match_quality: direct
     expand: false
-    notes: Decimal/floating-point numbers
+    notes: Decimal/floating-point numbers; integer accepted when all values lack fractional part
 
   - gt_label: swift code
     source: profile
@@ -305,10 +320,17 @@ mappings:
   - gt_label: name
     source: both
     finetype_label: identity.person.full_name
-    finetype_domain: identity
+    finetype_labels:
+      - identity.person.full_name
+      - representation.text.entity_name
+      - geography.location.country
+      - geography.location.city
+      - geography.location.region
+      - geography.location.state
+    finetype_domain: null
     match_quality: close
     expand: false
-    notes: "schema:name is broader (includes org names); FineType detects person name format"
+    notes: "Generic name; could be person name, entity name, or geographic name depending on context"
 
   - gt_label: entity name
     source: profile
@@ -321,10 +343,13 @@ mappings:
   - gt_label: author
     source: both
     finetype_label: identity.person.full_name
-    finetype_domain: identity
+    finetype_labels:
+      - identity.person.full_name
+      - representation.text.entity_name
+    finetype_domain: null
     match_quality: close
     expand: false
-    notes: Semantic role (who wrote it) but format is person name
+    notes: Semantic role; format is person name or entity name
 
   - gt_label: speaker
     source: dbpedia
@@ -345,10 +370,13 @@ mappings:
   - gt_label: publisher
     source: dbpedia
     finetype_label: identity.person.full_name
-    finetype_domain: identity
+    finetype_labels:
+      - identity.person.full_name
+      - representation.text.entity_name
+    finetype_domain: null
     match_quality: close
     expand: false
-    notes: Could be person or org name
+    notes: Could be person or org name; FineType detects both
 
   - gt_label: producer
     source: both
@@ -369,10 +397,14 @@ mappings:
   - gt_label: address
     source: dbpedia
     finetype_label: geography.address.full_address
+    finetype_labels:
+      - geography.address.full_address
+      - geography.address.street_address
+      - geography.coordinate.coordinates
     finetype_domain: geography
     match_quality: close
     expand: false
-    notes: Full address strings; FineType has full_address type
+    notes: Full address strings; FineType detects as full_address, street_address, or coordinates
 
   - gt_label: county
     source: dbpedia
@@ -385,10 +417,14 @@ mappings:
   - gt_label: region
     source: dbpedia
     finetype_label: geography.location.region
+    finetype_labels:
+      - geography.location.region
+      - geography.location.state
+      - geography.location.continent
     finetype_domain: geography
     match_quality: close
     expand: false
-    notes: Direct concept match
+    notes: Geographic subdivision; region, state, and continent are interchangeable
 
   - gt_label: location
     source: both
@@ -445,6 +481,14 @@ mappings:
   - gt_label: timestamp
     source: profile
     finetype_label: null
+    finetype_labels:
+      - datetime.timestamp.iso_8601
+      - datetime.timestamp.iso_8601_milliseconds
+      - datetime.timestamp.iso_8601_microseconds
+      - datetime.timestamp.sql_standard
+      - datetime.timestamp.rfc_2822
+      - datetime.timestamp.mdy_12h
+      - datetime.timestamp.dmy_hm
     finetype_domain: datetime
     match_quality: partial
     expand: false
@@ -461,6 +505,9 @@ mappings:
   - gt_label: time 24h
     source: profile
     finetype_label: null
+    finetype_labels:
+      - datetime.time.hm_24h
+      - datetime.time.hms_24h
     finetype_domain: datetime
     match_quality: partial
     expand: false
@@ -469,10 +516,19 @@ mappings:
   - gt_label: date
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - datetime.date.iso
+      - datetime.date.iso_date
+      - datetime.date.mdy_slash
+      - datetime.date.dmy_slash
+      - datetime.date.dmy_dot
+      - datetime.date.abbreviated_month
+      - datetime.date.long_full_month
+      - datetime.timestamp.iso_8601
     finetype_domain: datetime
     match_quality: partial
     expand: false
-    notes: "Maps to many FineType date types: iso, mdy_slash, dmy_slash, etc."
+    notes: "Maps to many FineType date types: iso, mdy_slash, dmy_slash, etc. Also accepts timestamp if date column contains timestamps."
 
   - gt_label: created
     source: dbpedia
@@ -525,10 +581,17 @@ mappings:
   - gt_label: time
     source: both
     finetype_label: null
+    finetype_labels:
+      - datetime.epoch.unix_seconds
+      - datetime.epoch.unix_milliseconds
+      - datetime.time.hm_24h
+      - datetime.time.hms_24h
+      - datetime.time.hm_12h
+      - datetime.time.hms_12h
     finetype_domain: datetime
     match_quality: partial
     expand: false
-    notes: Could be time, timestamp, or duration
+    notes: Could be epoch time, clock time, or duration
 
   - gt_label: date issued
     source: schema
@@ -557,26 +620,47 @@ mappings:
   - gt_label: id
     source: both
     finetype_label: representation.identifier.increment
+    finetype_labels:
+      - representation.identifier.increment
+      - representation.identifier.alphanumeric_id
+      - representation.identifier.uuid
+      - representation.identifier.numeric_code
+      - representation.numeric.integer_number
     finetype_domain: representation
     match_quality: partial
     expand: false
-    notes: Sequential integers map to increment; UUIDs to uuid; mixed formats vary
+    notes: Sequential integers map to increment; UUIDs to uuid; alphanumeric IDs to alphanumeric_id
 
   - gt_label: code
     source: both
     finetype_label: representation.identifier.alphanumeric_id
-    finetype_domain: representation
+    finetype_labels:
+      - representation.identifier.alphanumeric_id
+      - representation.identifier.numeric_code
+      - representation.discrete.ordinal
+      - geography.location.country_code
+      - finance.banking.iban
+      - identity.government.ssn
+      - identity.medical.icd10
+      - technology.internet.url
+      - container.key_value.query_string
+    finetype_domain: null
     match_quality: partial
     expand: false
-    notes: Some codes are alphanumeric IDs; others are arbitrary strings
+    notes: Generic code; could be alphanumeric ID, country code, IBAN, SSN, or other structured identifier
 
   - gt_label: number
     source: dbpedia
     finetype_label: representation.numeric.integer_number
+    finetype_labels:
+      - representation.numeric.integer_number
+      - representation.numeric.decimal_number
+      - representation.identifier.increment
+      - finance.currency.amount_minor_int
     finetype_domain: representation
     match_quality: partial
     expand: false
-    notes: Generic number; could be integer, decimal, or increment
+    notes: Generic number; could be integer, decimal, increment, or amount
 
   - gt_label: file format
     source: schema
@@ -596,11 +680,14 @@ mappings:
 
   - gt_label: color
     source: schema
-    finetype_label: representation.text.color_hex
+    finetype_label: representation.format.color_hex
+    finetype_labels:
+      - representation.format.color_hex
+      - representation.format.color_hsl
     finetype_domain: representation
     match_quality: partial
     expand: false
-    notes: Hex colors detectable; named colors (red, blue) are text
+    notes: Hex and HSL colors detectable; named colors (red, blue) are text
 
   - gt_label: version
     source: both
@@ -613,10 +700,13 @@ mappings:
   - gt_label: language
     source: both
     finetype_label: technology.code.locale_code
-    finetype_domain: technology
+    finetype_labels:
+      - technology.code.locale_code
+      - representation.discrete.categorical
+    finetype_domain: null
     match_quality: partial
     expand: true
-    notes: ISO 639 codes detectable; full language names are text. Candidate for ISO 639 type.
+    notes: ISO 639 codes detectable; full language names detected as categorical. Candidate for ISO 639 type.
 
   - gt_label: isbn
     source: schema
@@ -669,10 +759,13 @@ mappings:
   - gt_label: telephone
     source: schema
     finetype_label: identity.person.phone_number
+    finetype_labels:
+      - identity.person.phone_number
+      - identity.person.phone_e164
     finetype_domain: identity
     match_quality: direct
     expand: false
-    notes: Phone number format
+    notes: Phone number format; includes E.164 format
 
   # ═══════════════════════════════════════════════════════════════════════════
   # SEMANTIC-ONLY — No format signal; purely about meaning
@@ -681,18 +774,25 @@ mappings:
   - gt_label: title
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.text.entity_name
+      - representation.text.plain_text
+      - representation.text.sentence
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Free text title; same format as any text string
+    notes: Title text; FineType detects as entity name or plain text
 
   - gt_label: description
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.text.plain_text
+      - representation.text.sentence
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Free text; FineType sees as sentence or plain_text
+    notes: Free text description; FineType detects as plain_text or sentence
 
   - gt_label: abstract
     source: both
@@ -745,160 +845,229 @@ mappings:
   - gt_label: category
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.discrete.categorical
+      - representation.discrete.ordinal
+      - representation.file.extension
+      - technology.internet.http_method
+      - geography.location.continent
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Arbitrary category labels; FineType has discrete.categorical
+    notes: Arbitrary category labels; FineType detects as categorical, ordinal, or specific type
 
   - gt_label: class
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.discrete.categorical
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Arbitrary class labels; same format as any text
+    notes: Arbitrary class labels; FineType detects as categorical or ordinal
 
   - gt_label: classification
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.discrete.categorical
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Arbitrary classification strings
+    notes: Classification labels; FineType detects as categorical or ordinal
 
   - gt_label: type
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.discrete.categorical
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Arbitrary type labels
+    notes: Type labels; FineType detects as categorical or ordinal
 
   - gt_label: status
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.discrete.categorical
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Arbitrary status values
+    notes: Status values; FineType detects as categorical or ordinal
 
   - gt_label: rating
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.discrete.ordinal
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric but meaning-dependent; FineType sees decimal/integer
+    notes: Numeric rating values; FineType detects as ordinal, decimal, or integer
 
   - gt_label: score
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric values with semantic meaning
+    notes: Numeric score values; FineType detects as decimal or integer
 
   - gt_label: rank
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.integer_number
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Ordinal numbers with semantic role
+    notes: Ranking values; FineType detects as integer or ordinal
 
   - gt_label: order
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.integer_number
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Ordering/sequence number or taxonomic order
+    notes: Ordering/sequence numbers; FineType detects as integer or ordinal
 
   - gt_label: value
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
+      - representation.numeric.si_number
+      - finance.currency.amount
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Generic value; format varies completely
+    notes: Generic value; could be decimal, integer, SI number, or currency amount
 
   - gt_label: price
     source: both
     finetype_label: null
-    finetype_domain: representation
-    match_quality: semantic_only
+    finetype_labels:
+      - finance.currency.amount
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
+    finetype_domain: finance
+    match_quality: partial
     expand: false
-    notes: Decimal numbers with monetary meaning; FineType sees decimal_number
+    notes: Monetary values; FineType detects as currency amount or decimal number
 
   - gt_label: cost
     source: dbpedia
     finetype_label: null
-    finetype_domain: representation
-    match_quality: semantic_only
+    finetype_labels:
+      - finance.currency.amount
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
+    finetype_domain: finance
+    match_quality: partial
     expand: false
-    notes: Same as price — decimal with monetary meaning
+    notes: Monetary values; FineType detects as currency amount or decimal number
 
   - gt_label: depth
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric measurement; FineType sees decimal_number
+    notes: Numeric measurement; FineType detects as decimal or integer
 
   - gt_label: width
     source: both
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric measurement; FineType sees decimal_number
+    notes: Numeric measurement; FineType detects as decimal or integer
 
   - gt_label: size
     source: schema
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
+      - representation.discrete.ordinal
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Various formats (numeric, text sizes like S/M/L)
+    notes: Various formats; numeric sizes detected as decimal/integer, text sizes as ordinal
 
   - gt_label: length
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric measurement
+    notes: Numeric measurement; FineType detects as decimal or integer
 
   - gt_label: min
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric minimum value
+    notes: Numeric minimum value; FineType detects as decimal or integer
 
   - gt_label: volume
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric measurement or publication volume number
+    notes: Numeric measurement or volume number; FineType detects as decimal or integer
 
   - gt_label: frequency
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
-    notes: Numeric frequency value
+    notes: Numeric frequency value; FineType detects as decimal or integer
 
   - gt_label: temperature
     source: dbpedia
     finetype_label: null
+    finetype_labels:
+      - representation.numeric.decimal_number
+      - representation.numeric.integer_number
     finetype_domain: representation
-    match_quality: semantic_only
+    match_quality: partial
     expand: false
     notes: Numeric measurement with unit context
 
@@ -1553,6 +1722,9 @@ mappings:
   - gt_label: boolean
     source: dbpedia
     finetype_label: representation.boolean.binary
+    finetype_labels:
+      - representation.boolean.binary
+      - representation.boolean.terms
     finetype_domain: representation
     match_quality: direct
     expand: false
