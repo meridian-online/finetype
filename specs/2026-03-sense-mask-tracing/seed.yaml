@@ -1,0 +1,173 @@
+goal: >
+  Add permanent tracing instrumentation to the Sense→Sharpen column
+  classification pipeline, then use the trace output to diagnose and fix
+  the horizontalError misclassification (decimal numbers → boolean.initials).
+  Two PRs: tracing first, bug fix second.
+
+constraints:
+  - "Use tracing::debug! — zero-cost when no subscriber is active"
+  - "Activation: RUST_LOG=finetype_model=debug OR --verbose CLI flag"
+  - "Two separate PRs: tracing instrumentation, then bug fix"
+  - "Instrument all 6 pipeline decision points in classify_sense_sharpen_inner"
+  - "Must not affect performance when tracing is disabled"
+  - "Must not regress profile eval below 97% label accuracy"
+
+acceptance_criteria:
+  # --- PR 1: Tracing instrumentation ---
+  - id: AC-1
+    description: >
+      Add tracing::debug! at Sense prediction point: log column name,
+      predicted category, confidence, entity subtype (if applicable).
+    verification: >
+      RUST_LOG=finetype_model=debug finetype profile -f earthquakes_2024.csv
+      shows Sense category and confidence for each column.
+
+  - id: AC-2
+    description: >
+      Add tracing::debug! at vote aggregation point: log top 5 CharCNN
+      votes with counts before any masking is applied.
+    verification: "Raw vote counts visible in trace output for each column."
+
+  - id: AC-3
+    description: >
+      Add tracing::debug! at mask application point: log which votes
+      survived the Sense mask, which were removed, total masked-out
+      fraction, safety valve decision (fired or not), and Sense
+      confidence used in the threshold check.
+    verification: >
+      Trace output for horizontalError shows the exact safety valve
+      decision path — why it did or didn't fall back to unmasked votes.
+
+  - id: AC-4
+    description: >
+      Add tracing::debug! at header hint point: log which hint matched
+      (if any), what label it proposed, whether it was accepted.
+    verification: "Header hint decisions visible in trace output."
+
+  - id: AC-5
+    description: >
+      Add tracing::debug! at feature rules (F1–F6) point: log which
+      rule fired, the feature values that triggered it, and the label
+      change.
+    verification: "Feature rule F6 firing visible for magType column."
+
+  - id: AC-6
+    description: >
+      Add tracing::debug! at final result point: log final label,
+      confidence, full disambiguation trail, detected locale.
+    verification: "Final result summary visible for each column."
+
+  - id: AC-7
+    description: >
+      Add --verbose / -v flag to profile and load CLI commands that
+      enables debug-level tracing for the finetype-model crate without
+      requiring RUST_LOG to be set.
+    verification: >
+      finetype profile -f earthquakes_2024.csv --verbose produces
+      trace output identical to RUST_LOG=finetype_model=debug.
+
+  - id: AC-8
+    description: >
+      All existing tests pass. No performance regression when tracing
+      is not enabled.
+    verification: "cargo test passes. Profile eval unchanged."
+
+  # --- PR 2: Bug fix (informed by tracing) ---
+  - id: AC-9
+    description: >
+      Using trace output, identify the exact failure path for
+      horizontalError: Sense category, confidence, votes before/after
+      mask, safety valve decision.
+    verification: "Documented failure path with trace evidence."
+
+  - id: AC-10
+    description: >
+      Fix the misclassification so horizontalError is classified as
+      decimal_number (or another numeric type), not boolean.initials.
+    verification: >
+      finetype load -f earthquakes_2024.csv | duckdb executes without
+      error. horizontalError is DOUBLE, not BOOLEAN.
+
+  - id: AC-11
+    description: >
+      Fix does not regress any other earthquake column or profile eval
+      accuracy.
+    verification: "Profile eval ≥ 97.9% label accuracy (190 columns)."
+
+ontology_schema:
+  name: "PipelineTrace"
+  description: "Structured trace of column classification decisions"
+  fields:
+    - name: "column_name"
+      type: "string"
+      description: "Column being classified"
+    - name: "sense_category"
+      type: "string"
+      description: "Broad category predicted by Sense (Entity/Format/Temporal/Numeric/Geographic/Text)"
+    - name: "sense_confidence"
+      type: "number"
+      description: "Sense classifier confidence (0.0–1.0)"
+    - name: "raw_votes"
+      type: "array"
+      description: "Top 5 CharCNN votes before masking: [(label, count)]"
+    - name: "masked_votes"
+      type: "array"
+      description: "Votes after Sense mask: [(label, count)]"
+    - name: "masked_out_fraction"
+      type: "number"
+      description: "Fraction of total votes removed by mask (0.0–1.0)"
+    - name: "safety_valve_fired"
+      type: "boolean"
+      description: "Whether the fallback to unmasked votes was triggered"
+    - name: "header_hint"
+      type: "string"
+      description: "Header hint that fired (null if none)"
+    - name: "feature_rule"
+      type: "string"
+      description: "Feature rule that fired (null if none)"
+    - name: "final_label"
+      type: "string"
+      description: "Final classification result"
+    - name: "final_confidence"
+      type: "number"
+      description: "Final confidence (0.0–1.0)"
+
+evaluation_principles:
+  - principle: "Diagnostic power — trace output sufficient to diagnose any pipeline misclassification"
+    weight: 0.35
+  - principle: "Zero overhead — no performance impact when tracing disabled"
+    weight: 0.25
+  - principle: "Correctness — bug fix resolves horizontalError without regressions"
+    weight: 0.25
+  - principle: "Discoverability — --verbose flag makes tracing accessible to non-developers"
+    weight: 0.15
+
+exit_conditions:
+  - "PR 1 merged: tracing instrumentation with --verbose flag"
+  - "PR 2 merged: horizontalError classified as numeric type"
+  - "Profile eval ≥ 97.9% label accuracy maintained"
+
+decisions_to_record:
+  - title: "Add permanent pipeline tracing instrumentation"
+    context: >
+      The Sense→Sharpen pipeline makes sequential decisions (Sense routing,
+      vote masking, disambiguation rules, header hints, feature rules) with
+      no intermediate visibility. Debugging requires reading source code and
+      guessing which decision failed. This pipeline has been debugged manually
+      across multiple milestones.
+    decision: >
+      Add tracing::debug! at all 6 decision points, activated via RUST_LOG
+      or --verbose CLI flag. Decision 0035.
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-13T18:15:00Z"
+  ambiguity_score: 0.09
+  interview_ref: "specs/2026-03-sense-mask-tracing/interview.md"
+  references:
+    - "Decision 0035: Pipeline tracing instrumentation"
+    - "Sense→Sharpen pipeline: crates/finetype-model/src/column.rs"
+    - "Sense classifier: crates/finetype-model/src/sense.rs"
+    - "Label category map: crates/finetype-model/src/label_category_map.rs"
+    - "Safety valve: column.rs line 1204 (should_fallback)"
+    - "Bug: earthquake horizontalError → boolean.initials at 1% confidence"

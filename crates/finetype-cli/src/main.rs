@@ -265,6 +265,10 @@ enum Commands {
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, use VARCHAR)
         #[arg(long, default_value = "50")]
         enum_threshold: usize,
+
+        /// Enable pipeline tracing (shows Sense, mask, hint, and feature rule decisions)
+        #[arg(short, long)]
+        verbose: bool,
     },
 
     /// Validate generator ↔ taxonomy alignment
@@ -349,8 +353,8 @@ enum Commands {
         #[arg(long, default_value = "50")]
         enum_threshold: usize,
 
-        /// Show additional detail (e.g., unique values for categorical columns in JSON output)
-        #[arg(long)]
+        /// Show additional detail and enable pipeline tracing (Sense, mask, hint, feature rule decisions)
+        #[arg(short, long)]
         verbose: bool,
     },
 
@@ -431,12 +435,29 @@ enum InferenceMode {
 }
 
 fn main() -> Result<()> {
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
-
     let cli = Cli::parse();
+
+    // Initialize tracing: RUST_LOG takes precedence, then --verbose enables
+    // debug-level tracing for the inference pipeline, otherwise use defaults.
+    let verbose_tracing = match &cli.command {
+        Commands::Profile { verbose, .. } => *verbose,
+        Commands::Load { verbose, .. } => *verbose,
+        _ => false,
+    };
+    if std::env::var("RUST_LOG").is_ok() {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .init();
+    } else if verbose_tracing {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::new("finetype_model=debug"))
+            .with_target(false)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .init();
+    }
 
     match cli.command {
         Commands::Infer {
@@ -561,6 +582,7 @@ fn main() -> Result<()> {
             limit,
             no_normalize_names,
             enum_threshold,
+            verbose: _,
         } => cmd_load(
             file,
             table_name,
