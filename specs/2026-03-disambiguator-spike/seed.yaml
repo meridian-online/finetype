@@ -1,0 +1,191 @@
+goal: >
+  Investigate whether a learned disambiguator can replace the hardcoded rule
+  cascade (75+ header hints, 5 feature rules) in FineType's column classification
+  pipeline. The spike produces evidence and a recommendation, not shipped code.
+  Immediate action: remove the harmful "id" → increment header hint.
+
+constraints:
+  - "Spike outcome is knowledge (findings document), not production code"
+  - "Use profile eval's 174 labelled columns as ground truth"
+  - "Disambiguation model must be small: logistic regression, shallow MLP, or decision tree"
+  - "Must not regress profile eval below 97% label accuracy (170/174)"
+  - "Pure Rust — no Python dependencies in the inference path"
+  - "Remove id → increment header hint as immediate prerequisite"
+  - "Earthquake dataset (USGS 2024, 22 columns) added to eval set as regression test"
+
+acceptance_criteria:
+  # --- Immediate fix ---
+  - id: AC-1
+    description: >
+      Remove the "id" | "identifier" → increment hardcoded header hint from
+      column.rs. The model should classify "id" columns based on values, not
+      header assumption.
+    verification: >
+      Profile earthquake CSV: id column no longer typed as increment/BIGINT.
+      Profile eval maintains ≥ 97% label accuracy.
+
+  # --- Data collection ---
+  - id: AC-2
+    description: >
+      Extract per-column disambiguation inputs for all 174 profile eval columns:
+      36-dim aggregated features (mean, variance, min, max = 144 values),
+      header embedding (Model2Vec), vote distribution (top-K types + fractions),
+      and ground truth label.
+    verification: "CSV/Parquet file with 174 rows, all feature columns populated"
+
+  - id: AC-3
+    description: >
+      Extract the same disambiguation inputs for the earthquake dataset's 22
+      columns with manually annotated ground truth labels.
+    verification: "Earthquake columns added to dataset with correct ground truth"
+
+  # --- Model experiments ---
+  - id: AC-4
+    description: >
+      Train a logistic regression disambiguator on the extracted features.
+      Report accuracy, per-domain accuracy, and comparison against the current
+      rule cascade (which columns flip correct/incorrect).
+    verification: "Accuracy table: learned model vs rule cascade, per column"
+
+  - id: AC-5
+    description: >
+      Train a shallow MLP (1–2 hidden layers, ≤64 units) disambiguator.
+      Compare against logistic regression and the rule cascade.
+    verification: "Accuracy comparison across all three approaches"
+
+  - id: AC-6
+    description: >
+      Identify the top 10 most predictive features for disambiguation using
+      feature importance (coefficients for logistic regression, permutation
+      importance for MLP).
+    verification: "Ranked feature importance list with scores"
+
+  # --- Analysis ---
+  - id: AC-7
+    description: >
+      Analyse failure modes: which columns does the learned model get wrong
+      that rules get right, and vice versa? Categorise by: header hint
+      dependent, feature dependent, vote distribution dependent.
+    verification: "Error analysis table with categories"
+
+  - id: AC-8
+    description: >
+      Assess whether 174 columns is sufficient training data or whether
+      supplementary data (LLM distillation's 5,359 columns, synthetic
+      generation) would be needed for a production disambiguator.
+    verification: "Learning curve analysis: accuracy vs training set size"
+
+  # --- Recommendation ---
+  - id: AC-9
+    description: >
+      Produce a findings document with a clear recommendation: proceed with
+      learned disambiguator (and which architecture), or keep rules with
+      targeted fixes, or hybrid approach.
+    verification: "Findings document in specs/2026-03-disambiguator-spike/"
+
+  - id: AC-10
+    description: >
+      If recommending a learned disambiguator: outline the implementation
+      plan including training data strategy, model format, integration
+      points in column.rs, and taxonomy YAML header_patterns migration.
+    verification: "Implementation plan section in findings document"
+
+ontology_schema:
+  name: "DisambiguatorSpike"
+  description: "Feature-based learned disambiguator replacing hardcoded rules"
+  fields:
+    - name: "column_features"
+      type: "object"
+      description: >
+        Per-column feature vector: 36-dim deterministic features aggregated
+        to 144 values (mean/var/min/max), plus header embedding vector,
+        plus vote distribution (top-K types with fractions).
+
+    - name: "disambiguation_input"
+      type: "object"
+      description: >
+        Full input to the disambiguation model: column_features + header
+        string + model's top prediction + confidence score. One per column
+        in the evaluation dataset.
+
+    - name: "experiment_result"
+      type: "object"
+      description: >
+        Result of one model experiment: model type (logreg/mlp), accuracy,
+        per-domain accuracy, confusion matrix, feature importances,
+        columns that flipped vs rule cascade.
+
+    - name: "findings"
+      type: "object"
+      description: >
+        Final spike output: recommendation (proceed/keep-rules/hybrid),
+        evidence summary, implementation plan if proceeding, data
+        sufficiency assessment.
+
+evaluation_principles:
+  - principle: "Evidence quality — conclusions supported by measured data, not intuition"
+    weight: 0.35
+  - principle: "Accuracy parity — learned model matches or exceeds rule cascade on eval"
+    weight: 0.30
+  - principle: "Practicality — recommendation accounts for training data, maintenance cost, Rust integration"
+    weight: 0.20
+  - principle: "Completeness — all failure modes analysed, not just aggregate accuracy"
+    weight: 0.15
+
+exit_conditions:
+  - "All 10 acceptance criteria addressed (findings + recommendation produced)"
+  - "id → increment hint removed and profile eval still passes"
+  - "Clear go/no-go recommendation for learned disambiguator"
+
+decisions_to_record:
+  - title: "Remove id → increment hardcoded header hint"
+    context: >
+      The "id" | "identifier" → increment mapping assumes all ID columns are
+      numeric sequences. Real-world ID columns include UUIDs, alphanumeric
+      codes (us6000pgkh), slugs, and sequential numbers. The model classifies
+      correctly without the hint. Removing it fixes the earthquake dataset
+      regression and reduces hardcoded rule surface area.
+    decision: "Remove the mapping; let the model decide based on values"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-13T12:00:00Z"
+  ambiguity_score: 0.13
+  interview_ref: "specs/2026-03-disambiguator-spike/interview.md"
+  references:
+    - "Blog post: Less Typing, More Signal (web/content/blog/less-typing-more-signal.mdx)"
+    - "LLM distillation findings: specs/llm-distillation/FINDINGS.md"
+    - "Feature extractor: crates/finetype-model/src/features.rs (36-dim, NNFT-248/266/270)"
+    - "Header hints: crates/finetype-model/src/column.rs line 2542 (header_hint function)"
+    - "Feature rules F1–F5: crates/finetype-model/src/column.rs line 1744"
+    - "Profile eval: eval/profile_eval.sh (174 columns, 97.7% baseline)"
+
+open_questions:
+  - id: OQ-1
+    question: "Is 174 columns enough training data for a learned disambiguator?"
+    recommendation: >
+      Start with 174, measure learning curve. If insufficient, consider:
+      (a) LLM distillation data (5,359 columns, noisy labels),
+      (b) synthetic column generation from taxonomy definitions,
+      (c) leave-one-out cross-validation to maximise signal from small data.
+
+  - id: OQ-2
+    question: "Should the semantic hint classifier (Model2Vec) be replaced or integrated?"
+    recommendation: >
+      Integrate — Model2Vec provides header embeddings as features to the
+      disambiguator. The learned model decides how much to weight them,
+      replacing the current override logic.
+
+  - id: OQ-3
+    question: "What model architecture is most practical for Rust inference?"
+    recommendation: >
+      Logistic regression is trivially implementable in Rust (matrix multiply).
+      Shallow MLP adds a ReLU layer. Decision trees are also simple. All are
+      viable — the spike should test which architecture best fits the data.
+
+  - id: OQ-4
+    question: "How to handle the transition from rules to learned model?"
+    recommendation: >
+      If spike succeeds: Phase 1 = learned model + keep unambiguous hints
+      (email, URL) as hard overrides. Phase 2 = migrate all hints to taxonomy
+      YAML with regex patterns. Phase 3 = remove hard overrides, fully learned.

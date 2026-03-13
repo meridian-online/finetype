@@ -2636,9 +2636,8 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "currency" | "currency code" => {
             return Some("identity.financial.currency_code");
         }
-        "id" | "identifier" => {
-            return Some("representation.identifier.increment");
-        }
+        // "id" | "identifier" — REMOVED (decision 0034). ID columns are genuinely
+        // ambiguous (numeric, UUID, alphanumeric). Let the model decide from values.
         // Count / frequency columns — small integers representing quantities
         "sibsp" | "parch" | "siblings" | "parents" | "children" | "dependents" | "qty"
         | "quantity" => {
@@ -4613,10 +4612,8 @@ mod tests {
             header_hint("count"),
             Some("representation.numeric.integer_number")
         );
-        assert_eq!(
-            header_hint("id"),
-            Some("representation.identifier.increment")
-        );
+        // "id" hint removed (decision 0034) — genuinely ambiguous
+        assert_eq!(header_hint("id"), None);
     }
 
     #[test]
