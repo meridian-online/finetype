@@ -83,9 +83,8 @@ pub async fn handle(
     let (headers, rows) = parse_csv_rows(&csv_data)?;
 
     // Run validation
-    let result = validate_table(&headers, &rows, &schema).map_err(|e| {
-        ErrorData::invalid_params(format!("Validation error: {e}"), None)
-    })?;
+    let result = validate_table(&headers, &rows, &schema)
+        .map_err(|e| ErrorData::invalid_params(format!("Validation error: {e}"), None))?;
 
     // Build JSON output
     let columns_json: Vec<serde_json::Value> = result

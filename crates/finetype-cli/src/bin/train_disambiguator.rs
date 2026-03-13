@@ -35,7 +35,12 @@ fn main() -> Result<()> {
     // ── Experiment 1: Logistic Regression (AC-4) ────────────────────────
     eprintln!("\n═══ Experiment 1: Logistic Regression ═══");
     let logreg_results = cross_validate(&samples, n_classes, &label_index, N_FOLDS, false)?;
-    print_results("Logistic Regression", &logreg_results, &samples, &index_to_label);
+    print_results(
+        "Logistic Regression",
+        &logreg_results,
+        &samples,
+        &index_to_label,
+    );
 
     // ── Experiment 2: MLP (AC-5) ────────────────────────────────────────
     eprintln!("\n═══ Experiment 2: MLP (1 hidden layer, 64 units) ═══");
@@ -51,7 +56,10 @@ fn main() -> Result<()> {
     eprintln!("\n═══ Summary ═══");
     let logreg_acc = logreg_results.iter().map(|r| r.accuracy).sum::<f32>() / N_FOLDS as f32;
     let mlp_acc = mlp_results.iter().map(|r| r.accuracy).sum::<f32>() / N_FOLDS as f32;
-    eprintln!("Logistic Regression: {:.1}% mean accuracy", logreg_acc * 100.0);
+    eprintln!(
+        "Logistic Regression: {:.1}% mean accuracy",
+        logreg_acc * 100.0
+    );
     eprintln!("MLP (64 hidden):     {:.1}% mean accuracy", mlp_acc * 100.0);
 
     // Count how many the current rules get right (predicted_label matches gt)
@@ -97,7 +105,10 @@ fn load_features(path: &str) -> Result<(Vec<Sample>, HashMap<String, usize>, Vec
     let headers: Vec<String> = rdr.headers()?.iter().map(|h| h.to_string()).collect();
 
     // Find column indices
-    let feat_start = headers.iter().position(|h| h == "feat_mean_is_numeric").unwrap();
+    let feat_start = headers
+        .iter()
+        .position(|h| h == "feat_mean_is_numeric")
+        .unwrap();
     let vote_start = headers.iter().position(|h| h == "vote1_label").unwrap();
 
     let mut samples = Vec::new();
@@ -287,7 +298,11 @@ fn cross_validate(
 
     for fold in 0..k {
         let test_start = fold * fold_size;
-        let test_end = if fold == k - 1 { n } else { test_start + fold_size };
+        let test_end = if fold == k - 1 {
+            n
+        } else {
+            test_start + fold_size
+        };
 
         let test_indices: Vec<usize> = (test_start..test_end).collect();
         let train_samples: Vec<&Sample> = (0..n)
@@ -296,7 +311,13 @@ fn cross_validate(
             .collect();
         let test_samples: Vec<&Sample> = test_indices.iter().map(|&i| &samples[i]).collect();
 
-        eprint!("  Fold {}/{}: train={}, test={}  ", fold + 1, k, train_samples.len(), test_samples.len());
+        eprint!(
+            "  Fold {}/{}: train={}, test={}  ",
+            fold + 1,
+            k,
+            train_samples.len(),
+            test_samples.len()
+        );
         let result = train_and_eval(
             &train_samples,
             &test_samples,
@@ -305,7 +326,12 @@ fn cross_validate(
             label_index,
             use_mlp,
         )?;
-        eprintln!("  accuracy: {:.1}% ({}/{})", result.accuracy * 100.0, result.correct, result.total);
+        eprintln!(
+            "  accuracy: {:.1}% ({}/{})",
+            result.accuracy * 100.0,
+            result.correct,
+            result.total
+        );
         results.push(result);
     }
 
@@ -452,7 +478,9 @@ fn labels_match(predicted: &str, gt: &str) -> bool {
     // Common gt_label → FineType type mappings
     match gt.to_lowercase().as_str() {
         "number" | "integer" => {
-            pred_type == "integer_number" || pred_type == "decimal_number" || pred_type == "increment"
+            pred_type == "integer_number"
+                || pred_type == "decimal_number"
+                || pred_type == "increment"
         }
         "decimal number" => pred_type == "decimal_number",
         "category" | "categorical" => {
@@ -464,7 +492,11 @@ fn labels_match(predicted: &str, gt: &str) -> bool {
                 || pred_type == "categorical"
                 || pred_type == "ordinal"
         }
-        "id" => pred_type == "increment" || pred_type == "alphanumeric_id" || pred_type == "integer_number",
+        "id" => {
+            pred_type == "increment"
+                || pred_type == "alphanumeric_id"
+                || pred_type == "integer_number"
+        }
         "alphanumeric id" => pred_type == "alphanumeric_id" || pred_type == "categorical",
         "boolean" => pred_type == "binary" || pred_type == "initials",
         "name" | "entity name" => {

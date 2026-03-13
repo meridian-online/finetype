@@ -78,17 +78,12 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
 }
 
 /// Handle type-key based schema lookup (original behaviour).
-fn handle_type_key(
-    server: &FineTypeServer,
-    type_key: &str,
-) -> Result<CallToolResult, ErrorData> {
+fn handle_type_key(server: &FineTypeServer, type_key: &str) -> Result<CallToolResult, ErrorData> {
     let taxonomy = server.taxonomy();
 
     let schemas: Vec<(String, serde_json::Value)> = if type_key.contains('*') {
         // Glob pattern matching
-        let prefix = type_key
-            .trim_end_matches(".*")
-            .trim_end_matches('*');
+        let prefix = type_key.trim_end_matches(".*").trim_end_matches('*');
 
         let mut matched: Vec<(String, serde_json::Value)> = taxonomy
             .labels()
@@ -183,9 +178,7 @@ async fn handle_file(
 
     let headers: Vec<String> = reader
         .headers()
-        .map_err(|e| {
-            ErrorData::invalid_params(format!("Failed to parse CSV headers: {e}"), None)
-        })?
+        .map_err(|e| ErrorData::invalid_params(format!("Failed to parse CSV headers: {e}"), None))?
         .iter()
         .map(|h| h.to_string())
         .collect();
@@ -237,9 +230,7 @@ async fn handle_file(
 
         let result = classifier
             .classify_column_with_header(values, header)
-            .map_err(|e| {
-                ErrorData::internal_error(format!("Classification error: {e}"), None)
-            })?;
+            .map_err(|e| ErrorData::internal_error(format!("Classification error: {e}"), None))?;
 
         let mut prop = serde_json::Map::new();
 
@@ -265,8 +256,7 @@ async fn handle_file(
                 json!((result.confidence * 1000.0).round() / 1000.0),
             );
             if let Some(broad_type) = &def.broad_type {
-                let duckdb_type =
-                    finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
+                let duckdb_type = finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
                 prop.insert("x-finetype-broad-type".into(), json!(duckdb_type));
             }
             if let Some(transform) = &def.transform {
@@ -304,10 +294,7 @@ async fn handle_file(
     schema.insert("$id".into(), json!(format!("finetype://{}", schema_id)));
     schema.insert("title".into(), json!(table_title));
     schema.insert("type".into(), json!("object"));
-    schema.insert(
-        "properties".into(),
-        serde_json::Value::Object(properties),
-    );
+    schema.insert("properties".into(), serde_json::Value::Object(properties));
     if !required.is_empty() {
         let mut req_sorted = required;
         req_sorted.sort();

@@ -87,7 +87,11 @@ fn main() -> Result<()> {
 
     let total_columns: usize = file_columns.values().map(|c| c.len()).sum();
     let mut processed = 0;
-    eprintln!("Processing {} columns across {} files", total_columns, file_columns.len());
+    eprintln!(
+        "Processing {} columns across {} files",
+        total_columns,
+        file_columns.len()
+    );
 
     for (file_path, columns) in &file_columns {
         // Read the CSV file
@@ -191,10 +195,7 @@ fn main() -> Result<()> {
     }
 
     wtr.flush()?;
-    eprintln!(
-        "Done. Wrote {} columns to {}",
-        processed, output_path
-    );
+    eprintln!("Done. Wrote {} columns to {}", processed, output_path);
 
     Ok(())
 }
@@ -289,9 +290,7 @@ fn load_semantic_hint() -> Option<SemanticHintClassifier> {
     None
 }
 
-fn load_entity_classifier(
-    semantic: &SemanticHintClassifier,
-) -> Option<EntityClassifier> {
+fn load_entity_classifier(semantic: &SemanticHintClassifier) -> Option<EntityClassifier> {
     let model_dir = PathBuf::from("models/entity-classifier");
     if model_dir.join("model.safetensors").exists() {
         return EntityClassifier::load(

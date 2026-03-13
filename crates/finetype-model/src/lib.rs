@@ -22,7 +22,9 @@ pub mod training;
 
 pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchyMap};
 pub use char_training::{CharTrainer, CharTrainingConfig};
-pub use column::{aggregate_features, ColumnClassifier, ColumnConfig, ColumnFeatures, ColumnResult};
+pub use column::{
+    aggregate_features, ColumnClassifier, ColumnConfig, ColumnFeatures, ColumnResult,
+};
 pub use entity::EntityClassifier;
 pub use features::{extract_features, FEATURE_DIM, FEATURE_NAMES};
 pub use inference::{

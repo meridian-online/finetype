@@ -430,8 +430,6 @@ enum InferenceMode {
     Column,
 }
 
-
-
 fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt()
@@ -2928,8 +2926,7 @@ fn cmd_validate_table(
     output: OutputFormat,
     summary_only: bool,
 ) -> Result<()> {
-    use finetype_core::table_validator::{validate_table, split_rows};
-    
+    use finetype_core::table_validator::{split_rows, validate_table};
 
     // Load JSON Schema
     eprintln!("Loading schema from {:?}", schema_path);
@@ -3060,7 +3057,10 @@ fn cmd_validate_table(
                 for col in &result.columns {
                     println!(
                         "  {:<25} {:>8} {:>8} {:>8} {:>7.1}%",
-                        col.name, col.valid, col.invalid, col.null,
+                        col.name,
+                        col.valid,
+                        col.invalid,
+                        col.null,
                         col.pass_rate * 100.0
                     );
                 }
@@ -3444,7 +3444,8 @@ fn cmd_profile(
             );
             println!("{}", "═".repeat(80));
             println!();
-            if false { // validate removed (AC-10)
+            if false {
+                // validate removed (AC-10)
                 println!(
                     "  {:<25} {:<38} {:>8} {:>6} {:>8}",
                     "COLUMN", "TYPE", "BROAD", "CONF", "VALID"
@@ -3474,7 +3475,8 @@ fn cmd_profile(
                 } else {
                     String::new()
                 };
-                let quality_str = if false { // validate removed (AC-10)
+                let quality_str = if false {
+                    // validate removed (AC-10)
                     match &p.quality {
                         Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
                         None => "      —".to_string(),
@@ -3487,7 +3489,8 @@ fn cmd_profile(
                     p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
                 );
                 // Show top 3 invalid samples inline (plain output, validate mode)
-                if false { // validate removed (AC-10)
+                if false {
+                    // validate removed (AC-10)
                     if let Some(ref q) = p.quality {
                         for sample in q.invalid_samples.iter().take(3) {
                             println!("  {:>25} ⚠ \"{}\"", "", sample);
@@ -3498,7 +3501,8 @@ fn cmd_profile(
 
             println!();
             let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            if false { // validate removed (AC-10)
+            if false {
+                // validate removed (AC-10)
                 let scores: Vec<_> = profiles
                     .iter()
                     .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
@@ -3551,7 +3555,8 @@ fn cmd_profile(
                             obj.insert("unique_values".to_string(), json!(uv));
                         }
                     }
-                    if false { // validate removed (AC-10)
+                    if false {
+                        // validate removed (AC-10)
                         match &p.quality {
                             Some(q) => {
                                 let r = |v: f64| (v * 10000.0).round() / 10000.0;
@@ -3584,7 +3589,8 @@ fn cmd_profile(
                 .collect();
 
             // Compute file-level grade when validation is active
-            let file_grade = if false { // validate removed (AC-10)
+            let file_grade = if false {
+                // validate removed (AC-10)
                 let scores: Vec<_> = profiles
                     .iter()
                     .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
@@ -3656,7 +3662,8 @@ fn cmd_profile(
                 file.to_string_lossy()
             );
             println!("{} rows, {} columns\n", row_count, n_cols);
-            if false { // validate removed (AC-10)
+            if false {
+                // validate removed (AC-10)
                 println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
                 println!("|--------|------|-----------|----------:|-----------:|--------:|");
             } else {
@@ -3670,7 +3677,8 @@ fn cmd_profile(
                     "—".to_string()
                 };
                 let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                if false { // validate removed (AC-10)
+                if false {
+                    // validate removed (AC-10)
                     let (valid_str, score_str) = match &p.quality {
                         Some(q) => (
                             format!("{:.1}%", q.score.type_conforming_rate * 100.0),
@@ -3687,7 +3695,8 @@ fn cmd_profile(
                 }
             }
             let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            if false { // validate removed (AC-10)
+            if false {
+                // validate removed (AC-10)
                 let scores: Vec<_> = profiles
                     .iter()
                     .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
