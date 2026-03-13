@@ -27,20 +27,19 @@ use std::collections::HashMap;
 /// Used by disambiguation rules for column-level decisions. Variance is the
 /// critical new signal: zero length-variance distinguishes git_sha from hash,
 /// and dot-segment variance distinguishes structured codes from free-form text.
+/// Aggregated column-level features: per-feature mean, variance, min, max
+/// across all sampled values. Used by disambiguation rules and the spike
+/// disambiguator model (AC-2).
 #[derive(Debug, Clone)]
-struct ColumnFeatures {
+pub struct ColumnFeatures {
     /// Element-wise mean across all values.
-    mean: [f32; FEATURE_DIM],
+    pub mean: [f32; FEATURE_DIM],
     /// Element-wise variance across all values.
-    variance: [f32; FEATURE_DIM],
+    pub variance: [f32; FEATURE_DIM],
     /// Element-wise minimum across all values.
-    /// Reserved for future disambiguation rules (e.g., min-length checks).
-    #[allow(dead_code)]
-    min: [f32; FEATURE_DIM],
+    pub min: [f32; FEATURE_DIM],
     /// Element-wise maximum across all values.
-    /// Reserved for future disambiguation rules (e.g., max-length checks).
-    #[allow(dead_code)]
-    max: [f32; FEATURE_DIM],
+    pub max: [f32; FEATURE_DIM],
 }
 
 impl ColumnFeatures {
@@ -60,7 +59,7 @@ impl ColumnFeatures {
 ///
 /// Pass 1: accumulate sum, track min/max → compute mean.
 /// Pass 2: accumulate squared deviations → compute variance.
-fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
+pub fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
     if per_value.is_empty() {
         return ColumnFeatures::empty();
     }
@@ -367,6 +366,10 @@ pub struct ColumnResult {
     /// boolean, or designation-based). Generic predictions yield to header hints
     /// and indicate the type may not be precise enough for downstream transforms.
     pub is_generic: bool,
+    /// Aggregated column-level features (mean, variance, min, max of 36-dim
+    /// per-value features). Available for disambiguation analysis and the
+    /// learned disambiguator spike.
+    pub column_features: Option<ColumnFeatures>,
 }
 
 /// Column-mode classifier that wraps a single-value classifier.
@@ -529,6 +532,7 @@ impl ColumnClassifier {
                 samples_used: 0,
                 detected_locale: None,
                 is_generic: false,
+                column_features: None,
             });
         }
 
@@ -645,6 +649,7 @@ impl ColumnClassifier {
                 samples_used: n_samples,
                 detected_locale: disambig_locale,
                 is_generic: false,
+                column_features: None,
             }
         } else {
             // No disambiguation needed — use majority vote
@@ -663,6 +668,7 @@ impl ColumnClassifier {
                 samples_used: n_samples,
                 detected_locale,
                 is_generic: false,
+                column_features: None,
             }
         };
 
@@ -1095,6 +1101,7 @@ impl ColumnClassifier {
                 samples_used: 0,
                 detected_locale: None,
                 is_generic: false,
+                column_features: None,
             });
         }
 
@@ -1279,6 +1286,7 @@ impl ColumnClassifier {
                 samples_used: n_samples,
                 detected_locale: disambig_locale,
                 is_generic: false,
+                column_features: None,
             }
         } else {
             let confidence = if majority_fraction >= self.config.min_agreement {
@@ -1299,8 +1307,12 @@ impl ColumnClassifier {
                 samples_used: n_samples,
                 detected_locale,
                 is_generic: false,
+                column_features: None,
             }
         };
+
+        // Attach column features to result for downstream analysis (spike AC-2).
+        result.column_features = Some(column_features.clone());
 
         // Step 6b: Feature-based disambiguation (NNFT-250).
         // Use aggregated deterministic features to resolve known confusion pairs
@@ -4049,6 +4061,7 @@ mod tests {
             samples_used: 0,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
         assert_eq!(result.label, "unknown");
         assert_eq!(result.samples_used, 0);
@@ -7195,6 +7208,7 @@ datetime.component.day_of_week:
             samples_used: 100,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
 
         // Build column features with zero length variance, high hex, len=40
@@ -7228,6 +7242,7 @@ datetime.component.day_of_week:
             samples_used: 100,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
 
         let mut cf = ColumnFeatures::empty();
@@ -7258,6 +7273,7 @@ datetime.component.day_of_week:
             samples_used: 100,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
 
         let mut cf = ColumnFeatures::empty();
@@ -7289,6 +7305,7 @@ datetime.component.day_of_week:
             samples_used: 100,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
 
         let mut cf = ColumnFeatures::empty();
@@ -7320,6 +7337,7 @@ datetime.component.day_of_week:
             samples_used: 100,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
 
         let mut cf = ColumnFeatures::empty();
@@ -7378,6 +7396,7 @@ datetime.component.day_of_week:
             samples_used: 100,
             detected_locale: None,
             is_generic: false,
+            column_features: None,
         };
 
         let mut cf = ColumnFeatures::empty();
