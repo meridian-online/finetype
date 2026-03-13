@@ -206,3 +206,19 @@ jobs:
           git diff --staged --quiet && echo "No changes" && exit 0
           git commit -m "Update finetype to ${{ steps.version.outputs.version }}"
           git push
+
+  update-install-site:
+    name: Update Install Site
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dispatch to install.meridian.online
+        run: |
+          SCRIPT_CONTENT=$(base64 -w 0 scripts/install.sh)
+          curl -fsSL -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.INSTALL_SITE_TOKEN }}" \
+            "https://api.github.com/repos/meridian-online/install.meridian.online/dispatches" \
+            -d "{\"event_type\":\"update-install-script\",\"client_payload\":{\"tag\":\"${GITHUB_REF_NAME}\",\"repo\":\"${GITHUB_REPOSITORY}\",\"script_base64\":\"${SCRIPT_CONTENT}\"}}"
