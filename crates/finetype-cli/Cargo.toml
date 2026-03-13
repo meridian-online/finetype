@@ -13,6 +13,14 @@ description = "CLI for FineType semantic type classification"
 name = "finetype"
 path = "src/main.rs"
 
+[[bin]]
+name = "extract-features"
+path = "src/bin/extract_features.rs"
+
+[[bin]]
+name = "train-disambiguator"
+path = "src/bin/train_disambiguator.rs"
+
 [features]
 default = ["cpu", "embed-models"]
 cpu = ["finetype-model/cpu"]
@@ -31,6 +39,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
 indexmap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

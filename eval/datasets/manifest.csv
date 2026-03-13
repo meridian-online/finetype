@@ -291,3 +291,25 @@ new_representation,eval/datasets/csv/new_representation.csv,cas_number,cas numbe
 new_representation,eval/datasets/csv/new_representation.csv,inchi,inchi
 new_representation,eval/datasets/csv/new_representation.csv,smiles,smiles
 new_representation,eval/datasets/csv/new_representation.csv,color_hsl,color hsl
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,time,iso timestamp milliseconds
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,latitude,latitude
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,longitude,longitude
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,depth,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,mag,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,magType,category
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,nst,number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,gap,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,dmin,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,rms,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,net,category
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,id,alphanumeric id
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,updated,iso timestamp milliseconds
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,place,address
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,type,category
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,horizontalError,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,depthError,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,magError,decimal number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,magNst,number
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,status,status
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,locationSource,category
+earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,magSource,category
