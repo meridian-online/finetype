@@ -220,5 +220,5 @@ jobs:
           curl -fsSL -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.INSTALL_SITE_TOKEN }}" \
-            "https://api.github.com/repos/meridian-online/install.meridian.online/dispatches" \
+            "https://api.github.com/repos/meridian-online/install/dispatches" \
             -d "{\"event_type\":\"update-install-script\",\"client_payload\":{\"tag\":\"${GITHUB_REF_NAME}\",\"repo\":\"${GITHUB_REPOSITORY}\",\"script_base64\":\"${SCRIPT_CONTENT}\"}}"
