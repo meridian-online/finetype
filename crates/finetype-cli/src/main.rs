@@ -2443,31 +2443,6 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
 // LOAD — Profile file → runnable DuckDB CTAS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Normalise a column name for analyst-friendly SQL output:
-/// lowercase, spaces→underscores, strip hyphens, prefix leading digit with underscore.
-///
-/// We apply normalization ourselves via SQL aliases rather than using DuckDB's
-/// `normalize_names=true` parameter, because DuckDB additionally prefixes reserved
-/// words (name→_name, value→_value) which we can't reliably replicate. Using aliases
-/// gives us full control and reserved words work fine in alias position.
-fn normalize_column_name(name: &str) -> String {
-    let mut result = String::with_capacity(name.len());
-    for ch in name.chars() {
-        if ch == ' ' {
-            result.push('_');
-        } else if ch == '-' {
-            // Strip hyphens (matches DuckDB behaviour)
-        } else {
-            result.push(ch.to_ascii_lowercase());
-        }
-    }
-    // Prefix leading digits with underscore
-    if result.starts_with(|c: char| c.is_ascii_digit()) {
-        result.insert(0, '_');
-    }
-    result
-}
-
 #[allow(clippy::too_many_arguments)]
 fn cmd_load(
     file: PathBuf,
@@ -2549,8 +2524,6 @@ fn cmd_load(
     struct LoadColumn {
         /// Original column name from the CSV header
         original_name: String,
-        /// Normalized column name (or same as original if --no-normalize-names)
-        output_name: String,
         label: String,
         duckdb_type: String,
         transform: Option<String>,
@@ -2566,16 +2539,9 @@ fn cmd_load(
             .cloned()
             .unwrap_or_else(|| format!("col_{}", i));
 
-        let output_name = if normalize {
-            normalize_column_name(&original_name)
-        } else {
-            original_name.clone()
-        };
-
         if col_values.is_empty() {
             load_cols.push(LoadColumn {
                 original_name,
-                output_name,
                 label: "unknown".to_string(),
                 duckdb_type: "VARCHAR".to_string(),
                 transform: None,
@@ -2625,7 +2591,6 @@ fn cmd_load(
 
         load_cols.push(LoadColumn {
             original_name,
-            output_name,
             label: result.label,
             duckdb_type: final_type,
             transform,
@@ -2639,7 +2604,15 @@ fn cmd_load(
     // all_varchar=true ensures FineType controls all type casting via transforms.
     // Without it, DuckDB auto_detect may cast columns (e.g., dates) before our
     // transform expressions can operate on them.
-    let read_csv_params = format!("read_csv('{}', all_varchar=true)", file_str);
+    // normalize_names=true delegates column name normalization to DuckDB (decision 0036).
+    let read_csv_params = if normalize {
+        format!(
+            "read_csv('{}', all_varchar=true, normalize_names=true)",
+            file_str
+        )
+    } else {
+        format!("read_csv('{}', all_varchar=true)", file_str)
+    };
 
     // Header comment
     let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
@@ -2666,7 +2639,7 @@ fn cmd_load(
         std::collections::HashMap::new();
     for (i, col) in load_cols.iter().enumerate() {
         if let Some(ref values) = col.enum_values {
-            let type_name = format!("{}_t", col.output_name);
+            let type_name = format!("{}_t", sanitise_identifier(&col.original_name));
             let escaped_values: Vec<String> = values
                 .iter()
                 .map(|v| format!("'{}'", v.replace('\'', "''")))
@@ -2694,11 +2667,10 @@ fn cmd_load(
         .map(|(i, c)| {
             if let Some(type_name) = enum_type_names.get(&i) {
                 // ENUM column: cast to the CREATE TYPE name
-                build_load_expr_enum(&c.original_name, &c.output_name, type_name)
+                build_load_expr_enum(&c.original_name, type_name)
             } else {
                 build_load_expr(
                     &c.original_name,
-                    &c.output_name,
                     &c.duckdb_type,
                     &c.transform,
                 )
@@ -2740,46 +2712,39 @@ fn cmd_load(
 
 /// Build a SELECT expression for a column in the CTAS.
 ///
-/// Uses the original column name (quoted if needed) to reference the source,
-/// and adds an AS alias when the output name differs (normalization).
+/// Uses the original column name (quoted if needed) to reference the source.
+/// Column name normalization is delegated to DuckDB's `normalize_names=true`
+/// in the `read_csv()` call (decision 0036).
 /// VARCHAR/generic columns use bare column ref; typed columns use the transform.
 fn build_load_expr(
     original_name: &str,
-    output_name: &str,
     duckdb_type: &str,
     transform: &Option<String>,
 ) -> String {
-    let source_ref = format_column_name(original_name);
-    let alias = format_column_name(output_name);
-    let needs_alias = source_ref != alias;
+    let col_ref = format_column_name(original_name);
 
     if duckdb_type == "VARCHAR" {
         // Bare column reference — no redundant CAST for VARCHAR types.
         // Note: is_generic is intentionally NOT checked here. Generic types like
         // decimal_number/integer_number have non-VARCHAR broad_types (DOUBLE/BIGINT)
         // and should still get their CAST applied. (NNFT-252)
-        if needs_alias {
-            format!("{} AS {}", source_ref, alias)
-        } else {
-            source_ref
-        }
+        col_ref
     } else if let Some(tf) = transform {
         // Substitute {col} in transform expression
-        let cast_expr = tf.replace("{col}", &source_ref);
-        format!("{} AS {}", cast_expr, alias)
+        let cast_expr = tf.replace("{col}", &col_ref);
+        format!("{} AS {}", cast_expr, col_ref)
     } else {
         // No transform but non-VARCHAR — simple CAST
-        format!("CAST({} AS {}) AS {}", source_ref, duckdb_type, alias)
+        format!("CAST({} AS {}) AS {}", col_ref, duckdb_type, col_ref)
     }
 }
 
 /// Build a SELECT expression for an ENUM column in the CTAS.
 ///
 /// Casts the source column to the named ENUM type created by CREATE TYPE.
-fn build_load_expr_enum(original_name: &str, output_name: &str, enum_type_name: &str) -> String {
-    let source_ref = format_column_name(original_name);
-    let alias = format_column_name(output_name);
-    format!("CAST({} AS {}) AS {}", source_ref, enum_type_name, alias)
+fn build_load_expr_enum(original_name: &str, enum_type_name: &str) -> String {
+    let col_ref = format_column_name(original_name);
+    format!("CAST({} AS {}) AS {}", col_ref, enum_type_name, col_ref)
 }
 
 /// Sanitise a string for use as a SQL identifier.
@@ -5100,25 +5065,27 @@ mod tests {
         assert_eq!(content["model_type"], "charcnn");
     }
 
-    // NNFT-252: Load command expression tests
+    // NNFT-252: Load command expression tests (updated for decision 0036 —
+    // normalization delegated to DuckDB, no more alias-based normalization)
     #[test]
     fn test_build_load_expr_varchar_no_cast() {
         // VARCHAR types should be bare column references
-        let expr = build_load_expr("name", "name", "VARCHAR", &None);
+        let expr = build_load_expr("name", "VARCHAR", &None);
         assert_eq!(expr, "name");
     }
 
     #[test]
-    fn test_build_load_expr_varchar_with_alias() {
-        let expr = build_load_expr("First Name", "first_name", "VARCHAR", &None);
-        assert_eq!(expr, "\"First Name\" AS first_name");
+    fn test_build_load_expr_varchar_quoted() {
+        // Column names with spaces need quoting but no alias (DuckDB normalizes)
+        let expr = build_load_expr("First Name", "VARCHAR", &None);
+        assert_eq!(expr, "\"First Name\"");
     }
 
     #[test]
     fn test_build_load_expr_double_with_transform() {
         // decimal_number should get CAST even though it's a generic type
         let transform = Some("CAST({col} AS DOUBLE)".to_string());
-        let expr = build_load_expr("ticket_price", "ticket_price", "DOUBLE", &transform);
+        let expr = build_load_expr("ticket_price", "DOUBLE", &transform);
         assert_eq!(expr, "CAST(ticket_price AS DOUBLE) AS ticket_price");
     }
 
@@ -5126,14 +5093,14 @@ mod tests {
     fn test_build_load_expr_bigint_with_transform() {
         // integer_number should get CAST even though it's a generic type
         let transform = Some("CAST({col} AS BIGINT)".to_string());
-        let expr = build_load_expr("count", "count", "BIGINT", &transform);
+        let expr = build_load_expr("count", "BIGINT", &transform);
         assert_eq!(expr, "CAST(count AS BIGINT) AS count");
     }
 
     #[test]
     fn test_build_load_expr_no_transform_non_varchar() {
         // Non-VARCHAR without explicit transform falls back to simple CAST
-        let expr = build_load_expr("flag", "flag", "BOOLEAN", &None);
+        let expr = build_load_expr("flag", "BOOLEAN", &None);
         assert_eq!(expr, "CAST(flag AS BOOLEAN) AS flag");
     }
 }
