@@ -220,8 +220,22 @@ print_path_help() {
 
 main() {
   echo ""
+  echo "           ☼☼☼☼               "
+  echo "        ☼☼☼☼☼☼☼☼              "
+  echo "                ☼☼☼☼☼☼☼☼☼☼    "
+  echo "                  ☼☼☼☼☼☼☼☼☼☼  "
+  echo "   ☼☼☼☼☼☼☼☼☼☼☼☼               "
+  echo "  ☼☼☼☼☼☼☼☼☼☼☼☼☼☼              "
+  echo "                ☼☼☼☼☼☼☼☼☼☼☼☼☼☼"
+  echo "                 ☼☼☼☼☼☼☼☼☼☼☼☼ "
+  echo "     ☼☼☼☼☼☼☼☼☼☼               "
+  echo "      ☼☼☼☼☼☼☼☼☼☼              "
+  echo "                ☼☼☼☼☼☼☼☼      "
+  echo "                 ☼☼☼☼         "
+  echo ""
+  echo "          MERIDIAN"
+  echo ""
   echo "  FineType installer"
-  echo "  =================="
   echo ""
 
   # Check dependencies
