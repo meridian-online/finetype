@@ -2669,11 +2669,7 @@ fn cmd_load(
                 // ENUM column: cast to the CREATE TYPE name
                 build_load_expr_enum(&c.original_name, type_name)
             } else {
-                build_load_expr(
-                    &c.original_name,
-                    &c.duckdb_type,
-                    &c.transform,
-                )
+                build_load_expr(&c.original_name, &c.duckdb_type, &c.transform)
             }
         })
         .collect();
@@ -2716,11 +2712,7 @@ fn cmd_load(
 /// Column name normalization is delegated to DuckDB's `normalize_names=true`
 /// in the `read_csv()` call (decision 0036).
 /// VARCHAR/generic columns use bare column ref; typed columns use the transform.
-fn build_load_expr(
-    original_name: &str,
-    duckdb_type: &str,
-    transform: &Option<String>,
-) -> String {
+fn build_load_expr(original_name: &str, duckdb_type: &str, transform: &Option<String>) -> String {
     let col_ref = format_column_name(original_name);
 
     if duckdb_type == "VARCHAR" {
