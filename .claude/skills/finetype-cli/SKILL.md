@@ -79,10 +79,10 @@ finetype validate <FILE> <SCHEMA> [OPTIONS]
 | `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json` |
 | `--summary-only` | — | Print summary only — do not write sidecar files |
 
-**Sidecar outputs:**
-- `<file>.valid.csv` — rows passing all rules
-- `<file>.invalid.csv` — rows failing one or more rules
-- `<file>.errors.jsonl` — machine-readable error records
+**Sidecar outputs** (appended to the full filename including extension):
+- `<file>.csv.valid.csv` — rows passing all rules
+- `<file>.csv.invalid.csv` — rows failing one or more rules
+- `<file>.csv.errors.jsonl` — machine-readable error records
 
 **Exit code:** 1 if any rows are invalid, 0 if all pass.
 
@@ -250,7 +250,7 @@ finetype load -f data.csv | duckdb mydb.db
 finetype profile -f data.csv
 finetype schema data.csv
 finetype validate data.csv data.schema.json
-finetype load -f data.valid.csv > load.sql
+finetype load -f data.csv.valid.csv > load.sql
 duckdb mydb.db < load.sql
 
 # Classify values in column mode (better accuracy for ambiguous data)

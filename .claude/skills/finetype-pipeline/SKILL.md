@@ -79,10 +79,13 @@ Run every row through the schema as a quality gate:
 finetype validate data.csv data.schema.json
 ```
 
-This produces three sidecar files:
-- `data.valid.csv` — rows that pass all validation rules (ready to load)
-- `data.invalid.csv` — rows that fail one or more rules (need attention)
-- `data.errors.jsonl` — machine-readable error records (row, column, rule, value)
+This produces three sidecar files (named after the input file):
+- `data.csv.valid.csv` — rows that pass all validation rules (ready to load)
+- `data.csv.invalid.csv` — rows that fail one or more rules (need attention)
+- `data.csv.errors.jsonl` — machine-readable error records (row, column, rule, value)
+
+**Note:** `finetype validate` exits with code 1 when any rows are invalid. This is a
+data quality signal, not a command failure — check the report before deciding what to do.
 
 **Read the validation report:**
 - **Grade** (A–F) based on overall pass rate
@@ -93,8 +96,8 @@ This produces three sidecar files:
 
 | Situation | Action |
 |-----------|--------|
-| Grade A/B (>80% valid) | Load `data.valid.csv`, review invalids separately |
-| Grade C/D (50–80%) | Investigate `data.errors.jsonl` — the schema may be too strict or the data needs cleaning |
+| Grade A/B (>80% valid) | Load `data.csv.valid.csv`, review invalids separately |
+| Grade C/D (50–80%) | Investigate `data.csv.errors.jsonl` — the schema may be too strict or the data needs cleaning |
 | Grade F (<50%) | Do not load. Check if the delimiter or encoding is wrong, or if the data needs preprocessing |
 
 **Options:**
@@ -106,13 +109,13 @@ This produces three sidecar files:
 Generate a `CREATE TABLE AS SELECT` with correct casts for every column:
 
 ```bash
-finetype load -f data.valid.csv
+finetype load -f data.csv.valid.csv
 ```
 
 This prints runnable SQL to stdout. Pipe it to DuckDB:
 
 ```bash
-finetype load -f data.valid.csv > load.sql
+finetype load -f data.csv.valid.csv > load.sql
 duckdb mydb.db < load.sql
 ```
 
@@ -136,11 +139,11 @@ finetype profile -f contacts.csv
 # 2. Schema — capture as a contract
 finetype schema contacts.csv
 
-# 3. Validate — quality gate
+# 3. Validate — quality gate (exit code 1 = invalid rows found, not a failure)
 finetype validate contacts.csv contacts.schema.json
 
 # 4. Load the clean rows
-finetype load -f contacts.valid.csv > load.sql
+finetype load -f contacts.csv.valid.csv > load.sql
 duckdb contacts.db < load.sql
 ```
 
@@ -191,7 +194,7 @@ finetype taxonomy --full -o json
 ## Key Principles
 
 1. **Profile is step 1, not the destination.** Always continue to schema → validate → load.
-2. **Confidence below 90% is a signal.** Investigate the outlier values, don't ignore them.
+2. **Confidence below 90% is a signal.** Investigate the outlier values with `finetype infer -i "suspect_value" --confidence`. If the *type itself* is wrong (not just dirty values), edit the schema manually before validating.
 3. **Validate before loading.** The quality gate catches issues that will cause silent failures in DuckDB.
-4. **Use the valid CSV for loading.** `data.valid.csv` is guaranteed to cast cleanly.
+4. **Use the valid CSV for loading.** `data.csv.valid.csv` is guaranteed to cast cleanly.
 5. **Schema is the contract.** Save it alongside your data — it documents what the data should look like.
