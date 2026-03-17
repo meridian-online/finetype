@@ -231,7 +231,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 
 ## Workflow
 
-**Seed-driven:** interview → decision → seed → implement via PR → evaluate. No backlog, no task tracking.
+**Spec-driven:** interview → decision → spec → implement via PR → evaluate. No backlog, no task tracking.
 **Specs** live in `specs/`. **Decisions** live in `decisions/`. **Code changes** ship via PRs.
 
 <!-- ooo:START -->

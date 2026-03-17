@@ -68,5 +68,5 @@ metadata:
   version: "1.0"
   timestamp: "2026-03-12T01:00:00Z"
   ambiguity_score: 0.06
-  interview_ref: "specs/2026-03-repo-ia-review/interview.md"
-  audit_ref: "specs/2026-03-repo-ia-review/audit.md"
+  interview_ref: "specs/2026-03-12-repo-ia-review/interview.md"
+  audit_ref: "specs/2026-03-12-repo-ia-review/audit.md"

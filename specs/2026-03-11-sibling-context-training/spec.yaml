@@ -64,7 +64,7 @@ metadata:
   version: "1.0"
   timestamp: "2026-03-11T10:00:00Z"
   ambiguity_score: 0.085
-  interview_ref: "specs/2026-03-sibling-context-training/interview.md"
+  interview_ref: "specs/2026-03-11-sibling-context-training/interview.md"
   related_tasks:
     - "NNFT-268: sibling-context attention module (architecturally complete)"
     - "NNFT-269: LLM distillation findings (data source)"
