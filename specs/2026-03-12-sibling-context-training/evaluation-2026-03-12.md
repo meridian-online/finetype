@@ -1,7 +1,7 @@
 # Evaluation Report
 
 **Date:** 2026-03-12
-**Spec:** specs/2026-03-11-sibling-context-training/spec.yaml
+**Spec:** specs/2026-03-12-sibling-context-training/spec.yaml
 **Artifact:** crates/finetype-train/src/sibling_{context,data,train}.rs + models/sibling-context/
 
 ---
