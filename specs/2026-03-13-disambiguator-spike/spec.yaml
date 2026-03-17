@@ -81,7 +81,7 @@ acceptance_criteria:
       Produce a findings document with a clear recommendation: proceed with
       learned disambiguator (and which architecture), or keep rules with
       targeted fixes, or hybrid approach.
-    verification: "Findings document in specs/2026-03-disambiguator-spike/"
+    verification: "Findings document in specs/2026-03-13-disambiguator-spike/"
 
   - id: AC-10
     description: >
@@ -151,7 +151,7 @@ metadata:
   version: "1.0"
   timestamp: "2026-03-13T12:00:00Z"
   ambiguity_score: 0.13
-  interview_ref: "specs/2026-03-disambiguator-spike/interview.md"
+  interview_ref: "specs/2026-03-13-disambiguator-spike/interview.md"
   references:
     - "Blog post: Less Typing, More Signal (web/content/blog/less-typing-more-signal.mdx)"
     - "LLM distillation findings: specs/llm-distillation/FINDINGS.md"

@@ -1,7 +1,7 @@
 # Disambiguator Spike: Findings
 
 **Date:** 2026-03-13
-**Seed:** `specs/2026-03-disambiguator-spike/seed.yaml`
+**Spec:** `specs/2026-03-13-disambiguator-spike/spec.yaml`
 **Decision:** `decisions/0034-remove-id-increment-header-hint.md`
 
 ---

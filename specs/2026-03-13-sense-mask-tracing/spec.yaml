@@ -163,7 +163,7 @@ metadata:
   version: "1.0"
   timestamp: "2026-03-13T18:15:00Z"
   ambiguity_score: 0.09
-  interview_ref: "specs/2026-03-sense-mask-tracing/interview.md"
+  interview_ref: "specs/2026-03-13-sense-mask-tracing/interview.md"
   references:
     - "Decision 0035: Pipeline tracing instrumentation"
     - "Sense→Sharpen pipeline: crates/finetype-model/src/column.rs"

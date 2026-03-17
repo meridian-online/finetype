@@ -33,4 +33,4 @@ metadata:
   version: "1.0"
   timestamp: "YYYY-MM-DDTHH:MM:SSZ"
   ambiguity_score: 0.0
-  interview_ref: "specs/YYYY-MM-topic/interview.md"
+  interview_ref: "specs/YYYY-MM-DD-topic/interview.md"
