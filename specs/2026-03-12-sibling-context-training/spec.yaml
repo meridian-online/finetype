@@ -1,0 +1,75 @@
+goal: >
+  Train the sibling-context attention module (NNFT-268) to improve Sense
+  classification accuracy by enriching Model2Vec column embeddings with
+  cross-column context from real-world tables. Ship a trained model artifact
+  that the existing pipeline loads automatically.
+
+constraints:
+  - "Frozen Model2Vec embeddings — no gradient flows through Model2Vec"
+  - "Frozen Sense classifier weights — only attention parameters (396,800) are trainable"
+  - "Silver labels from FineType profile on 508 existing CSVs (~5,359 columns) — no manual labelling"
+  - "Training binary lives in finetype-train crate as train_sibling_context.rs"
+  - "Table-level batching: 1 table = 1 training example, variable column count via padding/masking"
+  - "Must run on M1 MacBook (Metal or CPU) in under 1 hour"
+  - "No new external data collection — use data/csvs/ as-is"
+  - "Zero regression on single-column (N=1) inputs — attention is identity-like for single columns"
+
+acceptance_criteria:
+  - "Data pipeline: reads 508 CSVs from data/csvs/, runs FineType profile to extract per-column Sense labels, produces training dataset (table_id, column_headers, model2vec_embeddings, sense_labels)"
+  - "Training loop: forward pass through attention → frozen Sense → cross-entropy loss against silver labels; backward pass updates only attention weights"
+  - "Padding/masking: variable column counts (1–191) handled correctly — padding columns do not contribute to loss or attention scores"
+  - "Train/validation split: 80/20 random split by table (not column), validation loss logged each epoch"
+  - "Model artifact: trained weights saved to models/sibling-context/ as safetensors + config.yaml"
+  - "Profile eval delta: at least 1 improvement on the 6 remaining misclassifications (target 181+/186)"
+  - "No regression: profile eval ≥ 180/186 with attention model loaded vs without"
+  - "N=1 invariance: single-column tables produce identical Sense predictions with and without attention"
+  - "cargo test passes — no compilation errors, existing tests unbroken"
+
+ontology_schema:
+  name: "SiblingContextTrainingPipeline"
+  description: "End-to-end pipeline from raw CSVs to trained attention weights"
+  fields:
+    - name: "data_preparation"
+      type: "object"
+      description: "Step 1: Profile CSVs → extract (table_id, headers[], model2vec_embeddings[], sense_labels[])"
+    - name: "training_dataset"
+      type: "object"
+      description: "Serialised training data — pre-computed embeddings and labels, train/val split"
+    - name: "training_loop"
+      type: "object"
+      description: "Forward: embed → attend → sense_forward → loss. Backward: update attention only"
+    - name: "model_artifact"
+      type: "object"
+      description: "Trained safetensors + config.yaml in models/sibling-context/"
+    - name: "evaluation"
+      type: "object"
+      description: "Profile eval before/after, N=1 invariance check"
+
+evaluation_principles:
+  - principle: "Accuracy improvement — profile eval delta on the 6 remaining misclassifications"
+    weight: 0.35
+  - principle: "Safety — no regression on existing 180/186 correct predictions or N=1 inputs"
+    weight: 0.30
+  - principle: "Pipeline completeness — data prep → train → save → load → evaluate all work end-to-end"
+    weight: 0.20
+  - principle: "Code quality — fits finetype-train patterns, reuses existing infrastructure, clean Rust"
+    weight: 0.15
+
+exit_conditions:
+  - "Profile eval ≥ 181/186 with trained attention model loaded"
+  - "OR: profile eval = 180/186 (no improvement) but pipeline is complete and validated — ship the pipeline, diagnose the accuracy gap separately"
+  - "No regression: all existing profile eval correct predictions remain correct"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-11T10:00:00Z"
+  ambiguity_score: 0.085
+  interview_ref: "specs/2026-03-12-sibling-context-training/interview.md"
+  related_tasks:
+    - "NNFT-268: sibling-context attention module (architecturally complete)"
+    - "NNFT-269: LLM distillation findings (data source)"
+  related_decisions:
+    - "0009: pure Rust via Candle"
+    - "0011: rules over feature-augmented model"
+    - "0013: hierarchical classification head"
+    - "0022: training data — 1500 synthetic samples"
