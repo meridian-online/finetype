@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
-"""Download GitTables and SOTAB datasets to ~/datasets/ with resume support.
+"""Download benchmark datasets to ~/datasets/ with resume support.
 
 Uses aria2c for resilient downloads with automatic resume. Verifies MD5
 checksums after download. Fully idempotent — skips already-verified files.
 
-Usage:
-    python3 scripts/download_datasets.py                    # Download all
-    python3 scripts/download_datasets.py --dataset gittables  # GitTables only
-    python3 scripts/download_datasets.py --dataset sotab       # SOTAB only
-    python3 scripts/download_datasets.py --topic steerageway   # Single GitTables topic
-    python3 scripts/download_datasets.py --list-topics         # List available topics
-    python3 scripts/download_datasets.py --no-extract          # Download only, skip unzip
-    python3 scripts/download_datasets.py --dry-run             # Show what would be downloaded
+Datasets:
+    gittables   — GitTables 1M parquet tables (Zenodo, 15 GB, 96 topics)
+    sotab       — SOTAB V2 column type annotations (Zenodo, 4 GB)
+    sherlock    — Sherlock/VizNet raw column data + 78-type labels (Google Drive, 308 MB)
+    sportstables — SportsTables scraper + annotations (GitHub clone, 4 MB)
 
-Requires: aria2c, python3 (no pip dependencies)
+Usage:
+    python3 scripts/download_datasets.py                        # Download all
+    python3 scripts/download_datasets.py --dataset gittables    # GitTables only
+    python3 scripts/download_datasets.py --dataset sotab        # SOTAB only
+    python3 scripts/download_datasets.py --dataset sherlock     # Sherlock only
+    python3 scripts/download_datasets.py --dataset sportstables # SportsTables only
+    python3 scripts/download_datasets.py --topic steerageway    # Single GitTables topic
+    python3 scripts/download_datasets.py --list-topics          # List available topics
+    python3 scripts/download_datasets.py --no-extract           # Download only, skip unzip
+    python3 scripts/download_datasets.py --dry-run              # Show what would be downloaded
+
+Requires: aria2c, git, python3 (no pip dependencies)
 
 Directory layout after download:
     ~/datasets/
@@ -23,6 +31,10 @@ Directory layout after download:
         sotab/
             downloads/          # Raw ZIP archive
             cta/                # Extracted SOTAB V2 data
+        sherlock/
+            downloads/          # data.zip from Google Drive
+            data/               # Extracted raw column data + labels
+        sportstables/           # Cloned git repo (scrapers + metadata.json)
 """
 
 import argparse
@@ -53,6 +65,17 @@ GITTABLES_PARQUET = GITTABLES_DIR / "parquet"
 SOTAB_DIR = DATASETS_DIR / "sotab"
 SOTAB_DOWNLOADS = SOTAB_DIR / "downloads"
 SOTAB_EXTRACT = SOTAB_DIR / "cta"
+
+# Sherlock: raw column data + 78-type labels from VizNet corpus
+# Google Drive file ID for data.zip (308 MB)
+SHERLOCK_GDRIVE_ID = "1-g0zbKFAXz7zKZc0Dnh74uDBpZCv4YqU"
+SHERLOCK_DIR = DATASETS_DIR / "sherlock"
+SHERLOCK_DOWNLOADS = SHERLOCK_DIR / "downloads"
+SHERLOCK_DATA = SHERLOCK_DIR / "data"
+
+# SportsTables: web scrapers + semantic type annotations for sports data
+SPORTSTABLES_REPO = "https://github.com/DHBWMosbachWI/SportsTables.git"
+SPORTSTABLES_DIR = DATASETS_DIR / "sportstables"
 
 # aria2c settings for resilience
 ARIA2C_OPTS = [
@@ -298,6 +321,116 @@ def download_sotab(extract: bool = True, dry_run: bool = False) -> list[dict]:
     return results
 
 
+def download_sherlock(extract: bool = True, dry_run: bool = False) -> list[dict]:
+    """Download Sherlock/VizNet raw column data from Google Drive.
+
+    The data.zip (308 MB) contains raw column values and ground truth labels
+    for 686,765 columns across 78 semantic types. This is the dataset behind
+    the Sherlock (KDD 2019) and Sato (VLDB 2020) papers.
+
+    Google Drive large files require a confirmation parameter to bypass the
+    virus scan warning page. We use the direct usercontent URL with confirm=t.
+    """
+    print("\n═══ Sherlock / VizNet (Raw Column Data) ═══")
+
+    dest = SHERLOCK_DOWNLOADS / "data.zip"
+    url = (
+        f"https://drive.usercontent.google.com/download"
+        f"?id={SHERLOCK_GDRIVE_ID}&export=download&confirm=t"
+    )
+
+    if dry_run:
+        if dest.exists():
+            print(f"  ✓ Have: data.zip ({human_size(dest.stat().st_size)})")
+        else:
+            print("  → Need: data.zip (~308 MB)")
+        return [{"key": "data.zip", "action": "dry_run"}]
+
+    # Check if already downloaded (size-based — no checksum from Google Drive)
+    if dest.exists() and dest.stat().st_size > 300_000_000:
+        print(f"  ✓ data.zip ({human_size(dest.stat().st_size)}) — already downloaded")
+        if extract:
+            extract_zip(dest, SHERLOCK_DATA)
+        return [{"key": "data.zip", "action": "verified"}]
+
+    # Download via aria2c
+    print(f"  ↓ Downloading data.zip (~308 MB) from Google Drive...")
+    SHERLOCK_DOWNLOADS.mkdir(parents=True, exist_ok=True)
+    if not download_file(url, dest):
+        print("  ✗ Download failed: data.zip")
+        return [{"key": "data.zip", "action": "failed"}]
+
+    # Sanity check — Google Drive can return HTML error pages silently
+    if dest.stat().st_size < 1_000_000:
+        print("  ✗ Downloaded file too small — likely an error page, not data.zip")
+        print("    Try: pip install gdown && gdown 1-g0zbKFAXz7zKZc0Dnh74uDBpZCv4YqU")
+        dest.unlink(missing_ok=True)
+        return [{"key": "data.zip", "action": "failed"}]
+
+    print(f"  ✓ data.zip ({human_size(dest.stat().st_size)})")
+
+    if extract:
+        extract_zip(dest, SHERLOCK_DATA)
+
+    return [{"key": "data.zip", "action": "downloaded"}]
+
+
+def download_sportstables(dry_run: bool = False) -> list[dict]:
+    """Clone the SportsTables repository from GitHub.
+
+    SportsTables contains web scraping scripts + metadata.json annotations
+    for 5 sports (baseball, basketball, football, hockey, soccer). ~86% of
+    columns are numerical — uniquely valuable for numeric type disambiguation.
+
+    The metadata.json files provide semantic type annotations in hierarchical
+    format (e.g., "baseball.manager.total_wins"). The actual data must be
+    generated by running the scraping scripts (separate step).
+
+    Paper: "SportsTables: A New Corpus for Semantic Type Detection"
+           (Datenbank-Spektrum, 2023)
+    """
+    print("\n═══ SportsTables (Scrapers + Annotations) ═══")
+
+    if dry_run:
+        if SPORTSTABLES_DIR.exists() and (SPORTSTABLES_DIR / ".git").exists():
+            print(f"  ✓ Have: {SPORTSTABLES_DIR}")
+        else:
+            print(f"  → Need: git clone {SPORTSTABLES_REPO}")
+        return [{"key": "SportsTables", "action": "dry_run"}]
+
+    # Check if already cloned
+    if SPORTSTABLES_DIR.exists() and (SPORTSTABLES_DIR / ".git").exists():
+        print(f"  ✓ Already cloned: {SPORTSTABLES_DIR}")
+        # Pull latest
+        result = subprocess.run(
+            ["git", "-C", str(SPORTSTABLES_DIR), "pull", "--ff-only"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            pull_msg = result.stdout.strip()
+            if "Already up to date" not in pull_msg:
+                print(f"  ↑ Updated: {pull_msg}")
+        return [{"key": "SportsTables", "action": "verified"}]
+
+    # Clone
+    print(f"  ↓ Cloning {SPORTSTABLES_REPO}...")
+    SPORTSTABLES_DIR.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        ["git", "clone", SPORTSTABLES_REPO, str(SPORTSTABLES_DIR)],
+        capture_output=False,
+    )
+    if result.returncode != 0:
+        print("  ✗ Clone failed")
+        return [{"key": "SportsTables", "action": "failed"}]
+
+    # Count metadata files
+    metadata_files = list(SPORTSTABLES_DIR.glob("*/metadata.json"))
+    print(f"  ✓ Cloned ({len(metadata_files)} sport metadata files)")
+    print("  ℹ Run scraping scripts to generate data — see SportsTables/README.md")
+    return [{"key": "SportsTables", "action": "downloaded"}]
+
+
 def list_topics():
     """Fetch and print all available GitTables topics."""
     manifest = fetch_manifest(GITTABLES_RECORD)
@@ -321,7 +454,7 @@ def main():
     )
     parser.add_argument(
         "--dataset",
-        choices=["gittables", "sotab", "all"],
+        choices=["gittables", "sotab", "sherlock", "sportstables", "all"],
         default="all",
         help="Which dataset to download (default: all)",
     )
@@ -356,6 +489,8 @@ def main():
     # Update paths if custom dest
     global GITTABLES_DIR, GITTABLES_DOWNLOADS, GITTABLES_PARQUET
     global SOTAB_DIR, SOTAB_DOWNLOADS, SOTAB_EXTRACT
+    global SHERLOCK_DIR, SHERLOCK_DOWNLOADS, SHERLOCK_DATA
+    global SPORTSTABLES_DIR
     if args.dest != DATASETS_DIR:
         base = args.dest
         GITTABLES_DIR = base / "gittables"
@@ -364,6 +499,10 @@ def main():
         SOTAB_DIR = base / "sotab"
         SOTAB_DOWNLOADS = SOTAB_DIR / "downloads"
         SOTAB_EXTRACT = SOTAB_DIR / "cta"
+        SHERLOCK_DIR = base / "sherlock"
+        SHERLOCK_DOWNLOADS = SHERLOCK_DIR / "downloads"
+        SHERLOCK_DATA = SHERLOCK_DIR / "data"
+        SPORTSTABLES_DIR = base / "sportstables"
 
     # Check aria2c
     if not shutil.which("aria2c"):
@@ -385,6 +524,12 @@ def main():
 
     if args.dataset in ("sotab", "all") and not args.topic:
         download_sotab(extract=extract, dry_run=args.dry_run)
+
+    if args.dataset in ("sherlock", "all") and not args.topic:
+        download_sherlock(extract=extract, dry_run=args.dry_run)
+
+    if args.dataset in ("sportstables", "all") and not args.topic:
+        download_sportstables(dry_run=args.dry_run)
 
     print("\n✓ Done.")
 
