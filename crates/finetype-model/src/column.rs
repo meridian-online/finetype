@@ -806,6 +806,19 @@ impl ColumnClassifier {
             return Ok(result);
         }
 
+        // Epoch seconds detection (legacy pipeline).
+        // Runs before header hints to prevent "created_date" → iso_8601 mismatch.
+        if !result.label.starts_with("datetime.") {
+            if let Some(epoch_label) = detect_epoch_seconds(values) {
+                result.label = epoch_label;
+                result.confidence = 0.85;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+        }
+
         // Apply header hint: hardcoded first (curated knowledge), then Model2Vec.
         // Hardcoded hints have been curated through NNFT-065/091/102/127/128/156
         // and cover known cases precisely. Model2Vec adds value for unknown headers
@@ -1013,14 +1026,19 @@ impl ColumnClassifier {
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
             } else if is_generic && !hint_in_votes {
-                // Generic prediction (integer, username, etc.) + header hint:
-                // trust the header even when the model doesn't vote for the
-                // hinted type — the header name is a strong enough signal
-                result.label = hinted_type.to_string();
-                result.confidence = 0.5;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule =
-                    Some(format!("header_hint_generic:{}", header.to_lowercase()));
+                // Financial model2vec guard: block model2vec financial hints when
+                // the CharCNN saw no financial signal in values. See Sense pipeline
+                // for detailed rationale.
+                let is_financial_hint = hinted_type.starts_with("finance.");
+                if is_financial_hint && !hint_is_hardcoded_legacy {
+                    // Model2vec financial hint with no value evidence — skip.
+                } else {
+                    result.label = hinted_type.to_string();
+                    result.confidence = 0.5;
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule =
+                        Some(format!("header_hint_generic:{}", header.to_lowercase()));
+                }
             } else if result.confidence < 0.3 && !hint_in_votes {
                 // Very low confidence and hint type not even in votes —
                 // still apply hint but with low confidence
@@ -1429,6 +1447,21 @@ impl ColumnClassifier {
             }
         }
 
+        // Step 7c: Epoch seconds detection.
+        // 10-digit integers in the Unix epoch range (2000-01-01 to 2050-01-01)
+        // are consistently misclassified as NPI or other identity types by
+        // CharCNN. Value-range detection is high-confidence and runs before
+        // header hints to prevent "created_date" → iso_8601 mismatch.
+        if !result.label.starts_with("datetime.") {
+            let epoch_result = detect_epoch_seconds(&sample);
+            if let Some(epoch_label) = epoch_result {
+                result.label = epoch_label;
+                result.confidence = 0.85;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
+            }
+        }
+
         // Step 8: Header hint application (complements Sense masking).
         // Sense narrows the broad category, but header hints resolve
         // within-category ambiguity. Skipped when Sense entity demotion
@@ -1663,13 +1696,34 @@ impl ColumnClassifier {
                                 result.disambiguation_rule =
                                     Some(format!("sense_header_hint:{}", header.to_lowercase()));
                             } else if is_generic && !hint_in_votes {
-                                result.label = hinted_type.to_string();
-                                result.confidence = 0.5;
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_generic:{}",
-                                    header.to_lowercase()
-                                ));
+                                // Financial model2vec guard: when model2vec suggests a
+                                // financial type (basis_points, yield, amount variants)
+                                // but the CharCNN saw zero financial signal in values
+                                // (hint NOT in votes), don't override. Headers like
+                                // "points" (vote counts), "yield" (crop yield), "pct"
+                                // (general percentages) trigger false financial hints.
+                                // Only block model2vec financial hints — hardcoded hints
+                                // are curated and handled separately below.
+                                let is_financial_hint =
+                                    hinted_type.starts_with("finance.");
+                                if is_financial_hint && !hint_is_hardcoded {
+                                    // Model2vec financial hint with no value evidence —
+                                    // skip, let the generic prediction stand.
+                                    tracing::debug!(
+                                        column = %header,
+                                        blocked_hint = %hinted_type,
+                                        current_label = %result.label,
+                                        "Financial model2vec hint blocked (no vote evidence)"
+                                    );
+                                } else {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = 0.5;
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_generic:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
                             } else if hint_is_hardcoded && !hint_in_votes {
                                 // Hardcoded hint authority (NNFT-235, refined NNFT-254):
                                 // Hardcoded hints are curated knowledge. Threshold depends
@@ -2366,11 +2420,25 @@ fn disambiguate_boolean_subtype(
         ))
     } else if binary_frac >= 0.8 {
         let unique_values: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
-        if unique_values.len() <= 2 {
-            Some((
-                "representation.boolean.binary".to_string(),
-                "boolean_subtype_binary".to_string(),
-            ))
+        // Require exactly 2 unique values (both 0 AND 1 present). All-zero or all-one
+        // columns are count/sentinel data, not boolean. Also reject when one value
+        // dominates >95% of samples — not meaningful boolean variation.
+        if unique_values.len() == 2 {
+            let dominant_frac = non_empty
+                .iter()
+                .filter(|&&v| v == "0")
+                .count()
+                .max(non_empty.iter().filter(|&&v| v == "1").count())
+                as f64
+                / n;
+            if dominant_frac <= 0.95 {
+                Some((
+                    "representation.boolean.binary".to_string(),
+                    "boolean_subtype_binary".to_string(),
+                ))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -2512,6 +2580,33 @@ fn disambiguate_boolean_override(
         let n_unique = unique.len();
         let min = *unique.first().unwrap();
         let max = *unique.last().unwrap();
+
+        // All-zero or single-value columns are not boolean — they're counts,
+        // sentinels, or constant columns. Require ≥2 distinct values for
+        // boolean classification to stand. (Distillation v2: 175 cases)
+        if n_unique < 2 {
+            return Some((
+                "representation.numeric.integer_number".to_string(),
+                "boolean_override_single_value".to_string(),
+            ));
+        }
+
+        // If one value dominates >95% of samples, it's not meaningful boolean data.
+        // For n_unique==2, one of {count(==first), count(!=first)} is the majority;
+        // .max() picks whichever is larger regardless of which value came first in
+        // the parsed vector.
+        let dominant_count = parsed
+            .iter()
+            .filter(|&&v| v == parsed[0])
+            .count()
+            .max(parsed.iter().filter(|&&v| v != parsed[0]).count());
+        let dominant_frac = dominant_count as f64 / parsed.len() as f64;
+        if n_unique == 2 && dominant_frac > 0.95 {
+            return Some((
+                "representation.numeric.integer_number".to_string(),
+                "boolean_override_skewed".to_string(),
+            ));
+        }
 
         // If >2 unique integer values and spread > 1, it's not boolean
         if n_unique > 2 && (max - min) > 1 {
@@ -2985,6 +3080,74 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
 
     None
+}
+
+/// Detect Unix epoch seconds from value ranges.
+///
+/// 10-digit integers in the range 946684800–2524608000 (2000-01-01 to 2050-01-01)
+/// are Unix epoch seconds. CharCNN consistently misclassifies these as NPI or other
+/// identity types because the digit pattern overlaps.
+///
+/// Also detects epoch milliseconds (13-digit integers in range
+/// 946684800000–2524608000000).
+///
+/// Requires ≥80% of non-empty values to be parseable as epoch timestamps,
+/// allowing some nulls or header rows.
+fn detect_epoch_seconds(values: &[String]) -> Option<String> {
+    const EPOCH_MIN: i64 = 946_684_800; // 2000-01-01T00:00:00Z
+    const EPOCH_MAX: i64 = 2_524_608_000; // 2050-01-01T00:00:00Z
+    const EPOCH_MS_MIN: i64 = EPOCH_MIN * 1000;
+    const EPOCH_MS_MAX: i64 = EPOCH_MAX * 1000;
+
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let mut epoch_sec_count = 0usize;
+    let mut epoch_ms_count = 0usize;
+    let mut parseable_count = 0usize;
+
+    for val in &non_empty {
+        // Try parsing as integer first, then as float with .0 fractional part
+        let num: Option<i64> = val.parse::<i64>().ok().or_else(|| {
+            val.parse::<f64>().ok().and_then(|f| {
+                if f.fract() == 0.0 {
+                    Some(f as i64)
+                } else {
+                    None
+                }
+            })
+        });
+
+        if let Some(n) = num {
+            parseable_count += 1;
+            if (EPOCH_MIN..=EPOCH_MAX).contains(&n) {
+                epoch_sec_count += 1;
+            } else if (EPOCH_MS_MIN..=EPOCH_MS_MAX).contains(&n) {
+                epoch_ms_count += 1;
+            }
+        }
+    }
+
+    // Require ≥80% parseable as numbers and ≥80% of those in epoch range
+    let n = non_empty.len();
+    if parseable_count < n * 80 / 100 {
+        return None;
+    }
+
+    if epoch_sec_count >= parseable_count * 80 / 100 {
+        Some("datetime.epoch.unix_seconds".to_string())
+    } else if epoch_ms_count >= parseable_count * 80 / 100 {
+        Some("datetime.epoch.unix_milliseconds".to_string())
+    } else {
+        None
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5380,7 +5543,274 @@ mod tests {
         assert_eq!(label, "representation.boolean.binary");
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Distillation v2 fix tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // --- Fix 1: Boolean binary heuristic ---
+
+    #[test]
+    fn test_boolean_override_all_zeros() {
+        // All-zero column: not boolean, it's a count/sentinel column
+        let values: Vec<String> = vec!["0", "0", "0", "0", "0", "0", "0", "0"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_some(), "All-zero column should be overridden");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_single_value");
+    }
+
+    #[test]
+    fn test_boolean_override_all_ones() {
+        // All-ones column: also a single-value column, not boolean
+        let values: Vec<String> = vec!["1", "1", "1", "1", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_some(), "All-ones column should be overridden");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_single_value");
+    }
+
+    #[test]
+    fn test_boolean_override_skewed_95pct() {
+        // 19 zeros and 1 one = 95% dominant → borderline, should still be binary
+        let mut values: Vec<String> = vec!["0"; 19].into_iter().map(String::from).collect();
+        values.push("1".to_string());
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        // At exactly 95% (19/20), dominant_frac = 0.95 which is NOT > 0.95
+        assert!(
+            result.is_none(),
+            "95% skew should still allow binary (boundary)"
+        );
+    }
+
+    #[test]
+    fn test_boolean_override_skewed_above_95pct() {
+        // 96 zeros and 4 ones → 96% dominant → too skewed for binary
+        let mut values: Vec<String> = vec!["0"; 48].into_iter().map(String::from).collect();
+        for _ in 0..2 {
+            values.push("1".to_string());
+        }
+        // 48 zeros, 2 ones = 96% dominant
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(
+            result.is_some(),
+            "96% skew should override binary to integer"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_skewed");
+    }
+
+    #[test]
+    fn test_boolean_override_balanced_binary_preserved() {
+        // Balanced 0/1 column should remain binary
+        let values: Vec<String> = vec!["0", "1", "0", "1", "0", "1", "0", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_none(), "Balanced binary should not be overridden");
+    }
+
+    #[test]
+    fn test_boolean_subtype_all_zeros_rejected() {
+        // All-zero column through the subtype path — requires exactly 2 unique values
+        let values: Vec<String> = vec!["0", "0", "0", "0", "0"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        // unique_values.len() == 1, not 2, so binary subtype should not fire
+        assert!(
+            result.is_none(),
+            "All-zero through subtype path should return None"
+        );
+    }
+
+    // --- Fix 6: Epoch seconds detection ---
+
+    #[test]
+    fn test_epoch_seconds_in_range() {
+        // Unix timestamps from 2020-2024
+        let values: Vec<String> = vec![
+            "1577836800",  // 2020-01-01
+            "1609459200",  // 2021-01-01
+            "1640995200",  // 2022-01-01
+            "1672531200",  // 2023-01-01
+            "1704067200",  // 2024-01-01
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(result, Some("datetime.epoch.unix_seconds".to_string()));
+    }
+
+    #[test]
+    fn test_epoch_seconds_pre_2000_not_detected() {
+        // Timestamps before 2000 are below EPOCH_MIN
+        let values: Vec<String> = vec![
+            "631152000",   // 1990-01-01
+            "662688000",   // 1991-01-01
+            "694224000",   // 1992-01-01
+            "725846400",   // 1993-01-01
+            "757382400",   // 1994-01-01
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Pre-2000 timestamps should not be detected");
+    }
+
+    #[test]
+    fn test_epoch_seconds_post_2050_not_detected() {
+        // Timestamps after 2050 are above EPOCH_MAX
+        let values: Vec<String> = vec![
+            "2524608001",  // Just past 2050-01-01
+            "2556144000",  // 2051
+            "2587680000",  // 2052
+            "2619216000",  // 2053
+            "2650752000",  // 2054
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Post-2050 timestamps should not be detected");
+    }
+
+    #[test]
+    fn test_epoch_milliseconds_detected() {
+        // 13-digit Unix millisecond timestamps
+        let values: Vec<String> = vec![
+            "1577836800000",  // 2020-01-01 in ms
+            "1609459200000",  // 2021-01-01 in ms
+            "1640995200000",  // 2022-01-01 in ms
+            "1672531200000",  // 2023-01-01 in ms
+            "1704067200000",  // 2024-01-01 in ms
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(
+            result,
+            Some("datetime.epoch.unix_milliseconds".to_string())
+        );
+    }
+
+    #[test]
+    fn test_epoch_seconds_threshold_boundary() {
+        // 4 in-range, 1 out-of-range: 80% → should still detect
+        let values: Vec<String> = vec![
+            "1577836800",  // 2020 (in range)
+            "1609459200",  // 2021 (in range)
+            "1640995200",  // 2022 (in range)
+            "1672531200",  // 2023 (in range)
+            "12345",       // Out of range
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(
+            result,
+            Some("datetime.epoch.unix_seconds".to_string()),
+            "80% in-range should still detect"
+        );
+    }
+
+    #[test]
+    fn test_epoch_seconds_below_threshold() {
+        // 2 in-range, 3 out-of-range: 40% → should not detect
+        let values: Vec<String> = vec![
+            "1577836800",  // In range
+            "1609459200",  // In range
+            "12345",       // Out of range
+            "67890",       // Out of range
+            "99999",       // Out of range
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "40% in-range should not detect");
+    }
+
+    #[test]
+    fn test_epoch_seconds_small_integers_not_detected() {
+        // Small integers (vote counts, scores) should not be detected as epoch
+        let values: Vec<String> = vec!["100", "200", "50", "75", "150"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Small integers should not be epoch");
+    }
+
+    #[test]
+    fn test_epoch_seconds_floats_with_zero_fract() {
+        // Float-stored epoch values (pandas nullable int → float64)
+        let values: Vec<String> = vec![
+            "1577836800.0",
+            "1609459200.0",
+            "1640995200.0",
+            "1672531200.0",
+            "1704067200.0",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(
+            result,
+            Some("datetime.epoch.unix_seconds".to_string()),
+            "Float-stored epoch values should be detected"
+        );
+    }
+
+    #[test]
+    fn test_epoch_seconds_too_few_values() {
+        // Less than 3 non-empty values → should not fire
+        let values: Vec<String> = vec!["1577836800", "1609459200"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Too few values should not detect");
+    }
+
     /// Integration test: verify that semantic hint classifier influences column classification.
+
     /// Skips if Model2Vec model files are not present.
     #[test]
     fn test_classify_column_with_semantic_hint() {
