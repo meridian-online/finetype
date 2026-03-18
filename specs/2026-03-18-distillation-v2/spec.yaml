@@ -1,0 +1,169 @@
+goal: >
+  Re-run LLM distillation using Claude Code batch agents (Max 20x subscription)
+  with a blind-first adjudication design on 10K+ columns across GitTables, SOTAB,
+  and real-world datasets. Triple objective: improve CharCNN training data,
+  expand the eval manifest with verified ground truth, and identify systematic
+  FineType inference gaps.
+
+constraints:
+  - "Max 20x plan: ~220K tokens per 5-hour rolling window, weekly caps apply"
+  - "Use Sonnet model to preserve Opus caps for other work"
+  - "Blind-first design: Claude classifies independently before seeing FineType prediction"
+  - "All 250 taxonomy labels visible in prompt (no domain cut-down)"
+  - "Output to output/distillation-v2/ — one CSV per batch, merged summary"
+  - "Phased execution: pilot → scale → wild. Each phase gates the next"
+
+phases:
+  - name: "Phase 1 — Pilot"
+    scope: "500 columns from existing data/csvs/ corpus"
+    goals:
+      - "Validate prompt design and blind-first adjudication workflow"
+      - "Measure actual Max 20x plan impact (tokens per agent, agents per window)"
+      - "Compare Claude Sonnet vs Qwen3 8B on overlapping columns"
+      - "Calibrate confidence distribution (high/medium/low)"
+    gate: "Proceed to Phase 2 if >50% agreement, <5% invalid, plan impact sustainable"
+
+  - name: "Phase 2 — Scale"
+    scope: "5K+ columns across full GitTables + SOTAB"
+    goals:
+      - "Generate silver-standard training labels at volume"
+      - "Identify systematic FineType gaps by domain"
+      - "Build disagreement corpus for targeted model improvement"
+    gate: "Proceed to Phase 3 if gap analysis yields actionable improvements"
+
+  - name: "Phase 3 — Wild Expansion"
+    scope: "Kaggle, government open data, new real-world datasets"
+    goals:
+      - "Add ≥50 new columns to eval manifest with verified ground truth"
+      - "Test FineType robustness on data 'from the wild'"
+      - "Identify type taxonomy gaps (types that exist in the wild but not in taxonomy)"
+
+approach:
+  name: "Blind-First Adjudication"
+  description: >
+    Each batch agent processes a CSV file (or group of small files) with two
+    passes per column to avoid anchoring bias.
+  passes:
+    - name: "Pass 1 — Blind Classification"
+      description: >
+        Claude classifies the column from header + sample values + full 250-label
+        taxonomy. No FineType prediction is shown. The agent has never seen
+        FineType's output for this column.
+      outputs:
+        - "blind_label: the type label Claude selects independently"
+        - "blind_confidence: high | medium | low"
+    - name: "Pass 2 — Adjudication"
+      description: >
+        FineType's prediction is revealed (via `finetype infer --mode column`).
+        If blind_label disagrees with finetype_label, Claude writes brief reasoning
+        for which label is correct and selects a final_label.
+      outputs:
+        - "finetype_label: FineType's column-level prediction"
+        - "agreement: yes | no"
+        - "final_label: the adjudicated label (equals blind_label if agree)"
+        - "reasoning: brief explanation when disagreement occurs"
+
+execution:
+  agent_type: "Spawned Claude Code agents via Agent tool"
+  model: "sonnet"
+  parallelism: "5-10 agents per batch (within 5-hour window budget)"
+  batch_size: "1 CSV file per agent (or ~50-100 columns for large files)"
+  resume: "Agents write per-file CSVs; already-processed files are skipped on re-run"
+  orchestrator: >
+    A coordinator agent (or skill) manages the queue of CSV files,
+    spawns batch agents, collects results, and merges into summary CSV.
+
+  agent_prompt_template: |
+    You are a data type classifier for tabular data. You will classify columns
+    into FineType's 250-type taxonomy.
+
+    TAXONOMY (250 types):
+    {taxonomy_labels}
+
+    For each column in the file, perform TWO passes:
+
+    PASS 1 — BLIND CLASSIFICATION:
+    Given only the column header and sample values, classify into exactly one
+    type from the taxonomy. Assign confidence: high (unambiguous structural
+    match), medium (likely but context-dependent), low (genuinely ambiguous).
+
+    PASS 2 — ADJUDICATION:
+    Run `finetype infer --mode column --header "{header}"` with the sample
+    values piped to stdin. Compare your blind classification with FineType's
+    prediction. If they disagree, write 1-2 sentences explaining which is
+    correct and why. Select a final label.
+
+    Output one JSON object per column with fields:
+    source_file, column_name, sample_values, blind_label, blind_confidence,
+    finetype_label, agreement, final_label, reasoning
+
+output:
+  location: "output/distillation-v2/"
+  per_batch: "{source_file}.labels.csv"
+  merged: "output/distillation-v2/merged_labels.csv"
+  schema:
+    - name: "source_file"
+      type: "string"
+      description: "CSV filename (basename)"
+    - name: "column_name"
+      type: "string"
+      description: "Column header from source CSV"
+    - name: "sample_values"
+      type: "string"
+      description: "JSON array of up to 20 sample values"
+    - name: "blind_label"
+      type: "string"
+      description: "Claude's independent classification (must be valid taxonomy key)"
+    - name: "blind_confidence"
+      type: "string"
+      description: "high | medium | low"
+    - name: "finetype_label"
+      type: "string"
+      description: "FineType's column-level prediction via CLI"
+    - name: "agreement"
+      type: "string"
+      description: "yes | no"
+    - name: "final_label"
+      type: "string"
+      description: "Adjudicated label (blind_label if agree, reasoned choice if not)"
+    - name: "reasoning"
+      type: "string"
+      description: "Brief explanation when blind_label != finetype_label (empty if agree)"
+
+acceptance_criteria:
+  - "Phase 1 pilot completes on 500 columns with measurable plan impact data"
+  - "Claude exact agreement with FineType >50% (vs Qwen3 8B baseline of 20%)"
+  - "Invalid label rate <5% (vs Qwen3 8B baseline of 2.3%)"
+  - "Blind-first design produces genuine independent classifications (not rubber-stamping)"
+  - "Disagreement cases include actionable reasoning text"
+  - "Per-phase gate review before proceeding to next phase"
+  - "Phase 3 adds ≥50 new columns to eval manifest with human-verified ground truth"
+  - "Final deliverable: gap analysis report identifying top FineType weaknesses by domain"
+
+evaluation_principles:
+  - principle: "Classification accuracy (agreement with human ground truth)"
+    weight: 0.35
+  - principle: "Bias independence (blind label != anchored to FineType)"
+    weight: 0.25
+  - principle: "Actionability (disagreements produce usable training signal)"
+    weight: 0.25
+  - principle: "Efficiency (plan usage proportional to value generated)"
+    weight: 0.15
+
+exit_conditions:
+  - "All three phases complete with gate reviews passed"
+  - "OR: Phase 1 shows Claude agreement is not meaningfully better than Qwen3 8B (pivot to API-based approach)"
+  - "OR: Plan usage impact is unsustainable (pivot to Anthropic API with credits)"
+
+open_questions_deferred_to_phase_1:
+  - "Optimal sample values per column (v1 used 10; test 10 vs 20)"
+  - "Whether sibling column context (other headers from same file) improves accuracy"
+  - "Threshold for promoting Claude labels to eval manifest (human review step TBD)"
+  - "Weekly cap behaviour under sustained batch agent usage"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-18T12:00:00Z"
+  ambiguity_score: 0.13
+  interview_ref: "specs/2026-03-18-distillation-v2/interview.md"
+  prior_work_ref: "specs/2026-03-11-llm-distillation/FINDINGS.md"
