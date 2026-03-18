@@ -1,0 +1,197 @@
+goal: >
+  Implement 9 fixes identified by distillation v2 findings to improve FineType's
+  agreement rate from 36% (1,983/5,364) toward ~52%, shipped as 3 PR groups with
+  offline re-scoring after each group.
+
+constraints:
+  - "Default behaviour changes directly — no feature flags"
+  - "Offline re-score against banked distillation labels (no new Claude calls)"
+  - "Re-score after each PR group for incremental attribution"
+  - "Phase 3 wild expansion blocked until all fixes land"
+  - "Profile eval regressions permitted if justified by distillation evidence (Decision 0037)"
+  - "Pre-1.0 project — no stable API users, no migration path required"
+
+acceptance_criteria:
+  - id: AC-1
+    description: "Distillation agreement increases from 1,983/5,364 baseline after PR group 1"
+    verification: "Offline re-score script: finetype profile on 507 CSVs, join against merged_labels.csv by (source_file, column_name)"
+    minimum_delta: "+150 agreements"
+  - id: AC-2
+    description: "Distillation agreement increases further after PR group 2"
+    verification: "Same offline re-score method"
+    minimum_delta: "+100 agreements"
+  - id: AC-3
+    description: "Profile eval (170/174) does not regress, or regressions are explained and eval updated"
+    verification: "make eval-report after each PR group"
+  - id: AC-4
+    description: "All 9 fixes from priority table implemented and merged"
+    verification: "3 PRs merged to main"
+  - id: AC-5
+    description: "Before/after metrics documented"
+    verification: "Final re-score results committed to specs/2026-03-18-distillation-v2-fixes/"
+  - id: AC-6
+    description: "Offline re-score script committed and reusable for Phase 3"
+    verification: "Script in scripts/ that takes a merged_labels.csv and produces agreement counts"
+
+pr_groups:
+  - id: PR-1
+    name: "Pipeline guard fixes"
+    description: >
+      Value-pattern post-guards for model2vec financial hints, epoch seconds
+      detection, and boolean binary heuristic. Spike finding: the misfiring
+      hints (points, yield, pct) come from model2vec, not header_hint() —
+      there is nothing to migrate to taxonomy YAML.
+    fixes:
+      - id: fix-3
+        title: "\"points\" model2vec guard"
+        problem: "model2vec routes \"points\" header to finance.rate.basis_points on vote counts, game scores"
+        source: "model2vec semantic classifier (sense_header_hint_generic:points)"
+        estimated_impact: "+114 agreements"
+        approach: >
+          Add value-pattern post-guard in column.rs: when model2vec suggests
+          basis_points, verify values match basis point patterns (small decimals,
+          or integers with 'bps'/'bp' suffix). Reject if values are plain integers
+          in count-like ranges.
+      - id: fix-6
+        title: "Epoch seconds detection"
+        problem: >
+          Two sub-cases: (1) bare "created"/"created_at" — no hint fires, CharCNN
+          classifies 10-digit integers as NPI. (2) "created_date"/"timestamp" —
+          hardcoded h.contains("date") routes to iso_8601 when values are epoch seconds.
+        source: "Case 1: CharCNN only. Case 2: hardcoded header_hint() via h.contains(\"date\")"
+        estimated_impact: "+79 agreements"
+        approach: >
+          Add epoch seconds value-range detection rule in disambiguation pipeline:
+          if all numeric values fall in 946684800–2524608000 (2000-01-01 to 2050-01-01),
+          classify as datetime.epoch.unix_seconds regardless of header hint. This covers
+          both sub-cases. Runs before header hint application.
+      - id: fix-9
+        title: "Financial model2vec guard"
+        problem: "model2vec routes \"yield\", \"pct_change\", \"rate\" to finance.rate.yield on general decimals"
+        source: "model2vec semantic classifier (sense_header_hint_generic:yield/pct_change)"
+        estimated_impact: "+66 agreements"
+        approach: >
+          Add value-pattern post-guard: when model2vec suggests yield or basis_points,
+          require co-occurrence of financial signals (currency symbols, 'bps'/'bp' suffix,
+          percentage signs, or values in typical financial ranges). If absent, fall back
+          to decimal_number.
+      - id: fix-1
+        title: "Boolean binary heuristic"
+        problem: "All-zero/low-variance columns trigger boolean.binary classification"
+        source: "disambiguate_boolean_override() and disambiguate_boolean_subtype() in column.rs"
+        estimated_impact: "+175 agreements"
+        approach: >
+          Require ≥2 distinct values in sample. Reject columns where one value
+          comprises >95% of samples. This catches all-zero count columns and
+          sentinel-value columns.
+    files_touched:
+      - "crates/finetype-model/src/column.rs — post-guards for model2vec hints, epoch detection, boolean heuristic"
+    note: >
+      Taxonomy YAML migration dropped from this PR. Spike (spike-header-hint-sources.md)
+      showed the misfiring hints come from model2vec, not header_hint(). The hardcoded
+      header_hint() table is well-curated. YAML migration may be revisited later as a
+      separate architectural improvement.
+
+  - id: PR-2
+    name: "Column heuristic fixes"
+    fixes:
+      - id: fix-2
+        title: "Categorical vs ordinal default"
+        problem: "Low-cardinality string columns default to ordinal when categorical is correct"
+        estimated_impact: "+123 agreements"
+        approach: >
+          Default to categorical unless ordering evidence present (numbers in values,
+          known ordinal patterns like low/medium/high, header containing level/rank/grade).
+          Note: needs sampling of the 123 disagreement cases to confirm how many come from
+          CharCNN votes vs fallback disambiguation — impact may be lower than estimated if
+          ordinal is a strong CharCNN prediction.
+      - id: fix-4
+        title: "Username demotion guard"
+        problem: "Cardinality demotion reclassifies usernames as categorical"
+        estimated_impact: "+92 agreements"
+        approach: >
+          Guard demotion with entity-type awareness: if CharCNN classifies individual
+          values as identity types (username, email, identifier), cardinality alone
+          doesn't override to categorical/ordinal.
+      - id: fix-5
+        title: "Float-stored integer ID detection"
+        problem: "Numeric IDs stored as floats (1700247.0) classified as decimal_number"
+        estimated_impact: "+83 agreements"
+        approach: >
+          If all float values have .0 fractional parts and the column header suggests
+          an identifier (ID, parent, story, key), prefer identifier classification.
+      - id: fix-7
+        title: "Sequential ID detection"
+        problem: "Auto-incrementing integer IDs matched by amount_minor_int currency pattern"
+        estimated_impact: "+77 agreements"
+        approach: >
+          Extend disambiguate_numeric() trigger list to include amount_minor_int. When
+          sequential increment properties hold (monotonically increasing, starting near
+          0 or 1), suppress financial pattern matches. The detection logic already exists
+          in disambiguate_numeric — it just doesn't trigger for amount_minor_int.
+      - id: fix-8
+        title: "Sentence vs entity_name length heuristic"
+        problem: "Headlines/titles classified as entity_name instead of sentence"
+        estimated_impact: "+71 agreements"
+        approach: "If average token count >5, prefer sentence over entity_name."
+    files_touched:
+      - "crates/finetype-model/src/column.rs — disambiguation logic changes"
+
+  - id: PR-3
+    name: "Eval update + combined re-score"
+    tasks:
+      - "Build offline re-score script (reusable for Phase 3)"
+      - "Update profile eval expectations if any regressions justified by D-0037"
+      - "Final combined distillation re-score"
+      - "Document before/after metrics in specs/2026-03-18-distillation-v2-fixes/"
+    files_touched:
+      - "scripts/ — offline re-score script"
+      - "eval/ — updated expectations, re-score results"
+      - "specs/2026-03-18-distillation-v2-fixes/ — metrics documentation"
+    note: >
+      The re-score script should be built early (before PR-1 merges) since AC-1
+      depends on it. Consider building it as a prerequisite task.
+
+evaluation_principles:
+  - principle: "Agreement improvement"
+    weight: 0.4
+    measure: "Distillation agreement count vs 1,983 baseline"
+  - principle: "Profile eval stability"
+    weight: 0.3
+    measure: "Profile eval score vs 170/174 baseline (regressions require justification per D-0037)"
+  - principle: "Correctness of guards"
+    weight: 0.2
+    measure: "Post-guards have clear preconditions; no false suppression of legitimate financial data"
+  - principle: "No new regressions"
+    weight: 0.1
+    measure: "Actionability eval pass rate maintained"
+
+exit_conditions:
+  - "All 9 fixes merged across 3 PRs"
+  - "Final distillation re-score shows improvement over 1,983/5,364 baseline"
+  - "Profile eval stable or regressions explained per Decision 0037"
+  - "Before/after metrics committed"
+  - "If a PR group regresses profile eval on a column not in the distillation corpus, the regression is reverted or the fix scoped to exclude that case"
+
+decisions:
+  - id: "0037"
+    title: "Eval serves the engine"
+    summary: "Distillation evidence can override profile eval expectations when a fix is correct"
+
+spike_findings:
+  - file: "spike-header-hint-sources.md"
+    date: "2026-03-18"
+    key_result: >
+      Fixes 3 and 9 (points, yield, pct) come from model2vec semantic classifier,
+      not header_hint(). Fix 6 (created/epoch) is mixed: bare "created" has no hint
+      at all (CharCNN problem), "created_date" hits hardcoded h.contains("date").
+      Taxonomy YAML migration dropped — nothing to migrate.
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-18T23:00:00Z"
+  ambiguity_score: 0.07
+  interview_ref: "specs/2026-03-18-distillation-v2-fixes/interview.md"
+  findings_ref: "specs/2026-03-18-distillation-v2/FINDINGS.md"
+  review_ref: "specs/2026-03-18-distillation-v2-fixes/review-spec-2026-03-18.md"
+  spike_ref: "specs/2026-03-18-distillation-v2-fixes/spike-header-hint-sources.md"

@@ -806,6 +806,19 @@ impl ColumnClassifier {
             return Ok(result);
         }
 
+        // Epoch seconds detection (legacy pipeline).
+        // Runs before header hints to prevent "created_date" → iso_8601 mismatch.
+        if !result.label.starts_with("datetime.") {
+            if let Some(epoch_label) = detect_epoch_seconds(values) {
+                result.label = epoch_label;
+                result.confidence = 0.85;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+        }
+
         // Apply header hint: hardcoded first (curated knowledge), then Model2Vec.
         // Hardcoded hints have been curated through NNFT-065/091/102/127/128/156
         // and cover known cases precisely. Model2Vec adds value for unknown headers
@@ -1013,14 +1026,19 @@ impl ColumnClassifier {
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
             } else if is_generic && !hint_in_votes {
-                // Generic prediction (integer, username, etc.) + header hint:
-                // trust the header even when the model doesn't vote for the
-                // hinted type — the header name is a strong enough signal
-                result.label = hinted_type.to_string();
-                result.confidence = 0.5;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule =
-                    Some(format!("header_hint_generic:{}", header.to_lowercase()));
+                // Financial model2vec guard: block model2vec financial hints when
+                // the CharCNN saw no financial signal in values. See Sense pipeline
+                // for detailed rationale.
+                let is_financial_hint = hinted_type.starts_with("finance.");
+                if is_financial_hint && !hint_is_hardcoded_legacy {
+                    // Model2vec financial hint with no value evidence — skip.
+                } else {
+                    result.label = hinted_type.to_string();
+                    result.confidence = 0.5;
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule =
+                        Some(format!("header_hint_generic:{}", header.to_lowercase()));
+                }
             } else if result.confidence < 0.3 && !hint_in_votes {
                 // Very low confidence and hint type not even in votes —
                 // still apply hint but with low confidence
@@ -1429,6 +1447,21 @@ impl ColumnClassifier {
             }
         }
 
+        // Step 7c: Epoch seconds detection.
+        // 10-digit integers in the Unix epoch range (2000-01-01 to 2050-01-01)
+        // are consistently misclassified as NPI or other identity types by
+        // CharCNN. Value-range detection is high-confidence and runs before
+        // header hints to prevent "created_date" → iso_8601 mismatch.
+        if !result.label.starts_with("datetime.") {
+            let epoch_result = detect_epoch_seconds(&sample);
+            if let Some(epoch_label) = epoch_result {
+                result.label = epoch_label;
+                result.confidence = 0.85;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
+            }
+        }
+
         // Step 8: Header hint application (complements Sense masking).
         // Sense narrows the broad category, but header hints resolve
         // within-category ambiguity. Skipped when Sense entity demotion
@@ -1663,13 +1696,34 @@ impl ColumnClassifier {
                                 result.disambiguation_rule =
                                     Some(format!("sense_header_hint:{}", header.to_lowercase()));
                             } else if is_generic && !hint_in_votes {
-                                result.label = hinted_type.to_string();
-                                result.confidence = 0.5;
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_generic:{}",
-                                    header.to_lowercase()
-                                ));
+                                // Financial model2vec guard: when model2vec suggests a
+                                // financial type (basis_points, yield, amount variants)
+                                // but the CharCNN saw zero financial signal in values
+                                // (hint NOT in votes), don't override. Headers like
+                                // "points" (vote counts), "yield" (crop yield), "pct"
+                                // (general percentages) trigger false financial hints.
+                                // Only block model2vec financial hints — hardcoded hints
+                                // are curated and handled separately below.
+                                let is_financial_hint =
+                                    hinted_type.starts_with("finance.");
+                                if is_financial_hint && !hint_is_hardcoded {
+                                    // Model2vec financial hint with no value evidence —
+                                    // skip, let the generic prediction stand.
+                                    tracing::debug!(
+                                        column = %header,
+                                        blocked_hint = %hinted_type,
+                                        current_label = %result.label,
+                                        "Financial model2vec hint blocked (no vote evidence)"
+                                    );
+                                } else {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = 0.5;
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_generic:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
                             } else if hint_is_hardcoded && !hint_in_votes {
                                 // Hardcoded hint authority (NNFT-235, refined NNFT-254):
                                 // Hardcoded hints are curated knowledge. Threshold depends
@@ -2366,11 +2420,25 @@ fn disambiguate_boolean_subtype(
         ))
     } else if binary_frac >= 0.8 {
         let unique_values: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
-        if unique_values.len() <= 2 {
-            Some((
-                "representation.boolean.binary".to_string(),
-                "boolean_subtype_binary".to_string(),
-            ))
+        // Require exactly 2 unique values (both 0 AND 1 present). All-zero or all-one
+        // columns are count/sentinel data, not boolean. Also reject when one value
+        // dominates >95% of samples — not meaningful boolean variation.
+        if unique_values.len() == 2 {
+            let dominant_frac = non_empty
+                .iter()
+                .filter(|&&v| v == "0")
+                .count()
+                .max(non_empty.iter().filter(|&&v| v == "1").count())
+                as f64
+                / n;
+            if dominant_frac <= 0.95 {
+                Some((
+                    "representation.boolean.binary".to_string(),
+                    "boolean_subtype_binary".to_string(),
+                ))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -2512,6 +2580,30 @@ fn disambiguate_boolean_override(
         let n_unique = unique.len();
         let min = *unique.first().unwrap();
         let max = *unique.last().unwrap();
+
+        // All-zero or single-value columns are not boolean — they're counts,
+        // sentinels, or constant columns. Require ≥2 distinct values for
+        // boolean classification to stand. (Distillation v2: 175 cases)
+        if n_unique < 2 {
+            return Some((
+                "representation.numeric.integer_number".to_string(),
+                "boolean_override_single_value".to_string(),
+            ));
+        }
+
+        // If one value dominates >95% of samples, it's not meaningful boolean data
+        let dominant_count = parsed
+            .iter()
+            .filter(|&&v| v == parsed[0])
+            .count()
+            .max(parsed.iter().filter(|&&v| v != parsed[0]).count());
+        let dominant_frac = dominant_count as f64 / parsed.len() as f64;
+        if n_unique == 2 && dominant_frac > 0.95 {
+            return Some((
+                "representation.numeric.integer_number".to_string(),
+                "boolean_override_skewed".to_string(),
+            ));
+        }
 
         // If >2 unique integer values and spread > 1, it's not boolean
         if n_unique > 2 && (max - min) > 1 {
@@ -2985,6 +3077,74 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
 
     None
+}
+
+/// Detect Unix epoch seconds from value ranges.
+///
+/// 10-digit integers in the range 946684800–2524608000 (2000-01-01 to 2050-01-01)
+/// are Unix epoch seconds. CharCNN consistently misclassifies these as NPI or other
+/// identity types because the digit pattern overlaps.
+///
+/// Also detects epoch milliseconds (13-digit integers in range
+/// 946684800000–2524608000000).
+///
+/// Requires ≥80% of non-empty values to be parseable as epoch timestamps,
+/// allowing some nulls or header rows.
+fn detect_epoch_seconds(values: &[String]) -> Option<String> {
+    const EPOCH_MIN: i64 = 946_684_800; // 2000-01-01T00:00:00Z
+    const EPOCH_MAX: i64 = 2_524_608_000; // 2050-01-01T00:00:00Z
+    const EPOCH_MS_MIN: i64 = EPOCH_MIN * 1000;
+    const EPOCH_MS_MAX: i64 = EPOCH_MAX * 1000;
+
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+
+    if non_empty.len() < 3 {
+        return None;
+    }
+
+    let mut epoch_sec_count = 0usize;
+    let mut epoch_ms_count = 0usize;
+    let mut parseable_count = 0usize;
+
+    for val in &non_empty {
+        // Try parsing as integer first, then as float with .0 fractional part
+        let num: Option<i64> = val.parse::<i64>().ok().or_else(|| {
+            val.parse::<f64>().ok().and_then(|f| {
+                if f.fract() == 0.0 {
+                    Some(f as i64)
+                } else {
+                    None
+                }
+            })
+        });
+
+        if let Some(n) = num {
+            parseable_count += 1;
+            if n >= EPOCH_MIN && n <= EPOCH_MAX {
+                epoch_sec_count += 1;
+            } else if n >= EPOCH_MS_MIN && n <= EPOCH_MS_MAX {
+                epoch_ms_count += 1;
+            }
+        }
+    }
+
+    // Require ≥80% parseable as numbers and ≥80% of those in epoch range
+    let n = non_empty.len();
+    if parseable_count < n * 80 / 100 {
+        return None;
+    }
+
+    if epoch_sec_count >= parseable_count * 80 / 100 {
+        Some("datetime.epoch.unix_seconds".to_string())
+    } else if epoch_ms_count >= parseable_count * 80 / 100 {
+        Some("datetime.epoch.unix_milliseconds".to_string())
+    } else {
+        None
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
