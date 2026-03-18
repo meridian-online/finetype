@@ -74,11 +74,29 @@ All datasets live under `/home/hugh/datasets/`.
 | UCI ML Repository | Classic ML datasets with known schemas | Direct download |
 | World Bank Open Data | Economic development, demographics | CSV export |
 
+### GitTables Scale
+
+Phase 2 processed **488 CSVs from ~368,064 parquet files (0.13%)** — barely scratching the surface. The full corpus spans 96 topics with significant variation:
+
+| Topic | Parquet files | Notes |
+|-------|--------------|-------|
+| question_time | 35,786 | Largest topic |
+| in_time | 35,557 | |
+| data_rate | 30,595 | |
+| running_time | 28,810 | |
+| quick_time | 20,506 | |
+| ... (96 topics total) | ... | |
+| Total | 368,064 | |
+
+Extracted so far: mainly `steerageway` (29 files) and `episcopate` (2 files) topics, plus scattered samples from other topics.
+
 ### Phase 3 Tracks
 
-**Track A — SOTAB distillation:** Extract columns from SOTAB JSON tables, run through blind-first adjudication. Compare Claude labels against both FineType and SOTAB ground truth (Schema.org labels). This gives us a three-way comparison.
+**Track A — GitTables broad sample:** Extract 5-10 random parquet files from each of the 96 topics → ~500-1,000 new CSVs. Quick win using local data — no downloads needed. Gives topic diversity we currently lack.
 
-**Track B — Wild CSV sourcing:** Download 20-30 diverse CSVs from Kaggle/gov/UCI, add to `data/csvs/`, run through existing pipeline. Include earthquakes_2024.csv.
+**Track B — SOTAB distillation:** Extract columns from SOTAB JSON tables (5,732 validation files), run through blind-first adjudication. Compare Claude labels against both FineType and SOTAB ground truth (Schema.org labels). Three-way comparison.
+
+**Track C — Wild CSV sourcing:** Download 20-30 diverse CSVs from Kaggle/gov/UCI, add to `data/csvs/`, run through existing pipeline. Include earthquakes_2024.csv. Targets data provenance diversity (government, scientific, commercial) that GitTables doesn't cover.
 
 ### Open Questions
 - Exact dataset selection criteria (file size limits? column count?)
