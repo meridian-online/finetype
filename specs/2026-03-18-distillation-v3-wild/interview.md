@@ -44,7 +44,27 @@ Run the distillation pipeline on 20-30 diverse real-world datasets from outside 
 - Comparison of gap patterns against Phase 2 findings
 - Updated fix priority list if wild data changes the ranking
 
-### Data Sources to Investigate
+### Data Sources
+
+All datasets live under `/home/hugh/datasets/`.
+
+**Already local:**
+
+| Source | Location | Format | Status |
+|--------|----------|--------|--------|
+| GitTables | `/home/hugh/datasets/gittables/` | CSV (extracted from parquet) | ✅ Phase 2 done (507/509 files) |
+| SOTAB CTA | `/home/hugh/datasets/sotab/cta/` | JSON tables (gzipped) | ❌ Not yet in distillation |
+| Earthquakes | `/home/hugh/datasets/earthquakes_2024.csv` | CSV | ❌ Not yet in distillation |
+| Curated eval | `/home/hugh/datasets/*.csv` (21 files) | CSV | ✅ Phase 2 done |
+
+**SOTAB details:**
+- Validation split: 5,732 JSON table files in `/home/hugh/datasets/sotab/cta/validation/Validation/`
+- Test split: available as `CTA_Test.zip`
+- Ground truth: `CTA_validation_gt.csv` (table_name, column_index, label — Schema.org types)
+- Pre-extracted: `column_values.parquet` may already have column data ready
+- Needs JSON→JSONL extraction step (different from CSV pipeline)
+
+**To source for Phase 3:**
 
 | Source | Domain coverage | Access |
 |--------|----------------|--------|
@@ -52,12 +72,17 @@ Run the distillation pipeline on 20-30 diverse real-world datasets from outside 
 | data.gov.au / ABS | Census, economic indicators, public services | Direct CSV download |
 | data.gov (US) | Transport, environment, education, federal | Direct CSV download |
 | UCI ML Repository | Classic ML datasets with known schemas | Direct download |
-| Earthquakes dataset | Geoscience (from disambiguator spike) | Already local |
 | World Bank Open Data | Economic development, demographics | CSV export |
-| CKAN portals | Various government open data | API |
+
+### Phase 3 Tracks
+
+**Track A — SOTAB distillation:** Extract columns from SOTAB JSON tables, run through blind-first adjudication. Compare Claude labels against both FineType and SOTAB ground truth (Schema.org labels). This gives us a three-way comparison.
+
+**Track B — Wild CSV sourcing:** Download 20-30 diverse CSVs from Kaggle/gov/UCI, add to `data/csvs/`, run through existing pipeline. Include earthquakes_2024.csv.
 
 ### Open Questions
 - Exact dataset selection criteria (file size limits? column count?)
 - Whether to include non-English datasets (multilingual.csv already in Phase 2)
-- How to handle datasets that need preprocessing (Excel, JSON, nested CSVs)
+- SOTAB extraction: use existing `column_values.parquet` or re-extract from JSON?
 - Whether to run FineType fixes between Phase 2 and Phase 3 or keep the same baseline
+- How to map Schema.org labels to FineType taxonomy for three-way comparison
