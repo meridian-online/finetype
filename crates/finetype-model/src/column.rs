@@ -2591,7 +2591,10 @@ fn disambiguate_boolean_override(
             ));
         }
 
-        // If one value dominates >95% of samples, it's not meaningful boolean data
+        // If one value dominates >95% of samples, it's not meaningful boolean data.
+        // For n_unique==2, one of {count(==first), count(!=first)} is the majority;
+        // .max() picks whichever is larger regardless of which value came first in
+        // the parsed vector.
         let dominant_count = parsed
             .iter()
             .filter(|&&v| v == parsed[0])
@@ -3124,9 +3127,9 @@ fn detect_epoch_seconds(values: &[String]) -> Option<String> {
 
         if let Some(n) = num {
             parseable_count += 1;
-            if n >= EPOCH_MIN && n <= EPOCH_MAX {
+            if (EPOCH_MIN..=EPOCH_MAX).contains(&n) {
                 epoch_sec_count += 1;
-            } else if n >= EPOCH_MS_MIN && n <= EPOCH_MS_MAX {
+            } else if (EPOCH_MS_MIN..=EPOCH_MS_MAX).contains(&n) {
                 epoch_ms_count += 1;
             }
         }
@@ -5540,7 +5543,274 @@ mod tests {
         assert_eq!(label, "representation.boolean.binary");
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Distillation v2 fix tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // --- Fix 1: Boolean binary heuristic ---
+
+    #[test]
+    fn test_boolean_override_all_zeros() {
+        // All-zero column: not boolean, it's a count/sentinel column
+        let values: Vec<String> = vec!["0", "0", "0", "0", "0", "0", "0", "0"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_some(), "All-zero column should be overridden");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_single_value");
+    }
+
+    #[test]
+    fn test_boolean_override_all_ones() {
+        // All-ones column: also a single-value column, not boolean
+        let values: Vec<String> = vec!["1", "1", "1", "1", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_some(), "All-ones column should be overridden");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_single_value");
+    }
+
+    #[test]
+    fn test_boolean_override_skewed_95pct() {
+        // 19 zeros and 1 one = 95% dominant → borderline, should still be binary
+        let mut values: Vec<String> = vec!["0"; 19].into_iter().map(String::from).collect();
+        values.push("1".to_string());
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        // At exactly 95% (19/20), dominant_frac = 0.95 which is NOT > 0.95
+        assert!(
+            result.is_none(),
+            "95% skew should still allow binary (boundary)"
+        );
+    }
+
+    #[test]
+    fn test_boolean_override_skewed_above_95pct() {
+        // 96 zeros and 4 ones → 96% dominant → too skewed for binary
+        let mut values: Vec<String> = vec!["0"; 48].into_iter().map(String::from).collect();
+        for _ in 0..2 {
+            values.push("1".to_string());
+        }
+        // 48 zeros, 2 ones = 96% dominant
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(
+            result.is_some(),
+            "96% skew should override binary to integer"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert_eq!(rule, "boolean_override_skewed");
+    }
+
+    #[test]
+    fn test_boolean_override_balanced_binary_preserved() {
+        // Balanced 0/1 column should remain binary
+        let values: Vec<String> = vec!["0", "1", "0", "1", "0", "1", "0", "1"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_override(&values, &top_labels);
+        assert!(result.is_none(), "Balanced binary should not be overridden");
+    }
+
+    #[test]
+    fn test_boolean_subtype_all_zeros_rejected() {
+        // All-zero column through the subtype path — requires exactly 2 unique values
+        let values: Vec<String> = vec!["0", "0", "0", "0", "0"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let top_labels = vec!["representation.boolean.binary"];
+
+        let result = disambiguate_boolean_subtype(&values, &top_labels);
+        // unique_values.len() == 1, not 2, so binary subtype should not fire
+        assert!(
+            result.is_none(),
+            "All-zero through subtype path should return None"
+        );
+    }
+
+    // --- Fix 6: Epoch seconds detection ---
+
+    #[test]
+    fn test_epoch_seconds_in_range() {
+        // Unix timestamps from 2020-2024
+        let values: Vec<String> = vec![
+            "1577836800",  // 2020-01-01
+            "1609459200",  // 2021-01-01
+            "1640995200",  // 2022-01-01
+            "1672531200",  // 2023-01-01
+            "1704067200",  // 2024-01-01
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(result, Some("datetime.epoch.unix_seconds".to_string()));
+    }
+
+    #[test]
+    fn test_epoch_seconds_pre_2000_not_detected() {
+        // Timestamps before 2000 are below EPOCH_MIN
+        let values: Vec<String> = vec![
+            "631152000",   // 1990-01-01
+            "662688000",   // 1991-01-01
+            "694224000",   // 1992-01-01
+            "725846400",   // 1993-01-01
+            "757382400",   // 1994-01-01
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Pre-2000 timestamps should not be detected");
+    }
+
+    #[test]
+    fn test_epoch_seconds_post_2050_not_detected() {
+        // Timestamps after 2050 are above EPOCH_MAX
+        let values: Vec<String> = vec![
+            "2524608001",  // Just past 2050-01-01
+            "2556144000",  // 2051
+            "2587680000",  // 2052
+            "2619216000",  // 2053
+            "2650752000",  // 2054
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Post-2050 timestamps should not be detected");
+    }
+
+    #[test]
+    fn test_epoch_milliseconds_detected() {
+        // 13-digit Unix millisecond timestamps
+        let values: Vec<String> = vec![
+            "1577836800000",  // 2020-01-01 in ms
+            "1609459200000",  // 2021-01-01 in ms
+            "1640995200000",  // 2022-01-01 in ms
+            "1672531200000",  // 2023-01-01 in ms
+            "1704067200000",  // 2024-01-01 in ms
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(
+            result,
+            Some("datetime.epoch.unix_milliseconds".to_string())
+        );
+    }
+
+    #[test]
+    fn test_epoch_seconds_threshold_boundary() {
+        // 4 in-range, 1 out-of-range: 80% → should still detect
+        let values: Vec<String> = vec![
+            "1577836800",  // 2020 (in range)
+            "1609459200",  // 2021 (in range)
+            "1640995200",  // 2022 (in range)
+            "1672531200",  // 2023 (in range)
+            "12345",       // Out of range
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(
+            result,
+            Some("datetime.epoch.unix_seconds".to_string()),
+            "80% in-range should still detect"
+        );
+    }
+
+    #[test]
+    fn test_epoch_seconds_below_threshold() {
+        // 2 in-range, 3 out-of-range: 40% → should not detect
+        let values: Vec<String> = vec![
+            "1577836800",  // In range
+            "1609459200",  // In range
+            "12345",       // Out of range
+            "67890",       // Out of range
+            "99999",       // Out of range
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "40% in-range should not detect");
+    }
+
+    #[test]
+    fn test_epoch_seconds_small_integers_not_detected() {
+        // Small integers (vote counts, scores) should not be detected as epoch
+        let values: Vec<String> = vec!["100", "200", "50", "75", "150"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Small integers should not be epoch");
+    }
+
+    #[test]
+    fn test_epoch_seconds_floats_with_zero_fract() {
+        // Float-stored epoch values (pandas nullable int → float64)
+        let values: Vec<String> = vec![
+            "1577836800.0",
+            "1609459200.0",
+            "1640995200.0",
+            "1672531200.0",
+            "1704067200.0",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert_eq!(
+            result,
+            Some("datetime.epoch.unix_seconds".to_string()),
+            "Float-stored epoch values should be detected"
+        );
+    }
+
+    #[test]
+    fn test_epoch_seconds_too_few_values() {
+        // Less than 3 non-empty values → should not fire
+        let values: Vec<String> = vec!["1577836800", "1609459200"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = detect_epoch_seconds(&values);
+        assert!(result.is_none(), "Too few values should not detect");
+    }
+
     /// Integration test: verify that semantic hint classifier influences column classification.
+
     /// Skips if Model2Vec model files are not present.
     #[test]
     fn test_classify_column_with_semantic_hint() {
