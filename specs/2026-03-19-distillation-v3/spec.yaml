@@ -60,13 +60,18 @@ datasets:
     total_files: 1018649
     filtered_files: "1,000,885 (≤50 columns — 98% pass filter)"
     filtered_columns: 10876589
+    sampled_files: "~4,700 (50 random files per topic, 94 topics)"
+    sampled_columns: "~50K (estimated from 10.6 avg cols/file)"
     extraction: >
       Read parquet files, extract column headers + sample values.
-      Filter: skip files with >50 columns. Sample up to 20 values per column.
-      Convert to JSONL format for distillation pipeline.
+      Filter: skip files with >50 columns. Random sample: 50 files per topic.
+      Sample up to 20 values per column. Convert to JSONL format.
     notes: >
-      Phase 2 processed 507 files (0.13%). This run covers all topics
-      with the column-count filter. Expect significantly more files.
+      Phase 2 processed 507 files (0.13%). Full corpus is 1M files / 10.9M
+      columns — too large to distill completely. 50/topic gives all 94 topics
+      covered with enough depth per topic to spot topic-specific weaknesses.
+      Wave 2 can target specific topics if the broad pass reveals rich
+      weakness-triggering data in particular topics.
 
   - name: "Eval CSVs"
     priority: 4
@@ -222,7 +227,7 @@ exit_conditions:
   - "OR: Extraction step reveals dataset is unsuitable (corrupt, format mismatch)"
 
 open_questions:
-  - "GitTables is 1M files / 10.9M columns — needs aggressive sampling or phased approach"
+  - "GitTables sampled at 50 files/topic — Wave 2 targeting if specific topics are rich"
   - "SOTAB JSON table format — need to verify column extraction approach"
   - "Sherlock columns have no header — how does this affect FineType column-mode inference?"
   - "Token budget allocation: Sherlock 687K columns at ~100 cols/batch = ~6,900 batches"
