@@ -1,0 +1,238 @@
+goal: >
+  Distill all downloaded benchmark datasets (Sherlock, SOTAB, GitTables, eval CSVs)
+  using the Phase 2 blind-first adjudication protocol. Bank comprehensive
+  disagreement data while Claude Max token budget allows. Triple objective:
+  (1) establish a baseline for PR-2 rescore, (2) identify FineType weaknesses
+  across diverse external benchmarks, (3) map Sherlock's 78-type ground truth
+  against FineType's 250-type taxonomy to find coverage gaps.
+
+constraints:
+  - "Claude Max 20x plan — weekly token cap, resets on rolling schedule"
+  - "Beelink mini PC: 16GB RAM, 5 concurrent agents max"
+  - "Blind-first adjudication: Claude classifies independently before seeing FineType prediction"
+  - "All 250 taxonomy labels visible in prompt (no domain cut-down)"
+  - "Sherlock ground truth compared offline — not shown to distillation agents"
+  - "SportsTables excluded (requires live scraping, fragile dependency)"
+  - "GitTables filtered: parquet files with ≤50 columns only"
+  - "Output to output/distillation-v3/ — one CSV per batch, merged summary"
+  - "Use Sonnet model to preserve Opus caps for other work"
+
+datasets:
+  - name: "Sherlock / VizNet"
+    priority: 1
+    location: "~/datasets/sherlock/data/data/raw/"
+    format: "Parquet (train/val/test splits with values + labels)"
+    columns: 686765
+    ground_truth: "78 DBpedia-derived semantic types"
+    extraction: "Read parquet directly — values column contains JSON arrays of strings"
+    notes: >
+      Three-way comparison: Sherlock ground truth vs Claude blind vs FineType.
+      Ground truth NOT shown to agents — compared offline. Requires building
+      a Sherlock→FineType 78→250 type mapping (programmatic, pre-distillation).
+
+  - name: "SOTAB V2 CTA"
+    priority: 2
+    location: "~/datasets/sotab/cta/SOTAB V2 for SemTab 2023/"
+    format: "Nested ZIPs containing JSON.gz table files + CSV ground truth"
+    tables: 70678
+    ground_truth: "Schema.org types (40-82 labels depending on round)"
+    extraction: >
+      Two-step: (1) unzip inner archives to get JSON.gz table files,
+      (2) extract column headers + values from JSON tables into JSONL format
+      compatible with distillation pipeline. Ground truth CSVs provide
+      table_name, column_index, label mappings.
+    splits:
+      round1_train: 55361
+      round1_val: 598
+      round1_test: 591
+      round2_train: 115563
+      round2_val: 1173
+      round2_test: 1113
+    notes: >
+      Use Round 2 (82 Schema.org types, 44K tables) as primary.
+      Round 1 (40 types, 26K tables) as supplementary.
+      Schema.org→FineType type mapping needed for three-way comparison.
+
+  - name: "GitTables 1M"
+    priority: 3
+    location: "~/datasets/gittables/parquet/"
+    format: "Parquet files across 94 topic directories"
+    total_files: "~368K (94 topics)"
+    filtered_files: "TBD (≤50 columns filter — scan in progress)"
+    extraction: >
+      Read parquet files, extract column headers + sample values.
+      Filter: skip files with >50 columns. Sample up to 20 values per column.
+      Convert to JSONL format for distillation pipeline.
+    notes: >
+      Phase 2 processed 507 files (0.13%). This run covers all topics
+      with the column-count filter. Expect significantly more files.
+
+  - name: "Eval CSVs"
+    priority: 4
+    location: "eval/datasets/csv/"
+    format: "CSV"
+    files: 27
+    columns: "~174 (from eval manifest)"
+    extraction: "Already in CSV format — direct input to distillation pipeline"
+    notes: >
+      Smallest dataset. Useful as regression anchor — compare v3 distillation
+      labels against prior eval manifest ground truth.
+
+approach:
+  name: "Blind-First Adjudication (v2 protocol)"
+  description: >
+    Same protocol as distillation v2. Each batch agent processes columns
+    with two passes per column to avoid anchoring bias.
+  passes:
+    - name: "Pass 1 — Blind Classification"
+      description: >
+        Claude classifies the column from header + sample values + full 250-label
+        taxonomy. No FineType prediction is shown.
+      outputs:
+        - "blind_label: the type label Claude selects independently"
+        - "blind_confidence: high | medium | low"
+    - name: "Pass 2 — Adjudication"
+      description: >
+        FineType's prediction is revealed (via `finetype infer --mode column`).
+        If blind_label disagrees with finetype_label, Claude writes brief reasoning
+        for which label is correct and selects a final_label.
+      outputs:
+        - "finetype_label: FineType's column-level prediction"
+        - "agreement: yes | no"
+        - "final_label: the adjudicated label (equals blind_label if agree)"
+        - "reasoning: brief explanation when disagreement occurs"
+
+execution:
+  order:
+    - "Sherlock (687K columns) — highest priority, external benchmark anchor"
+    - "SOTAB (70K+ tables) — requires extraction step before distillation"
+    - "GitTables (filtered ≤50 cols) — largest volume, lowest priority"
+    - "Eval CSVs (27 files) — small, slot in at the end or between larger runs"
+  agent_type: "Spawned Claude Code agents via Agent tool"
+  model: "sonnet"
+  parallelism: "5 agents max (hardware constraint)"
+  batch_size: "~50-100 columns per agent"
+  resume: "Agents write per-batch CSVs; already-processed batches skipped on re-run"
+
+  pre_distillation_steps:
+    - name: "Sherlock type mapping"
+      description: >
+        Build a programmatic mapping from Sherlock's 78 types to FineType's
+        250-type taxonomy. Output: sherlock_type_mapping.csv with columns
+        sherlock_type, finetype_type, mapping_confidence (exact/partial/unmapped).
+      blocking: false
+      notes: "Can run in parallel with distillation. Needed for offline comparison."
+
+    - name: "Sherlock extraction"
+      description: >
+        Read train/val/test parquet files. Each row has a 'values' column
+        (list of strings) and a corresponding label. Extract into JSONL format:
+        {source: "sherlock", split: "train", index: N, header: "", values: [...],
+        sherlock_label: "type"}.
+      blocking: true
+
+    - name: "SOTAB extraction"
+      description: >
+        Unzip inner Round2-SOTAB-CTA-Tables.zip. For each JSON.gz table file,
+        extract column headers and sample values. Join with ground truth CSV
+        to attach Schema.org labels. Output JSONL format compatible with
+        distillation pipeline.
+      blocking: true
+
+    - name: "GitTables extraction"
+      description: >
+        Scan all parquet files across 94 topics. Filter files with ≤50 columns.
+        For each file, read column headers + sample up to 20 values per column.
+        Output JSONL format. Track source topic for per-topic analysis.
+      blocking: true
+
+output:
+  location: "output/distillation-v3/"
+  per_batch: "batch_{NNN}.csv"
+  merged: "output/distillation-v3/merged_labels.csv"
+  schema:
+    - name: "source"
+      type: "string"
+      description: "Dataset source: sherlock | sotab | gittables | eval"
+    - name: "source_file"
+      type: "string"
+      description: "Source filename or identifier"
+    - name: "column_name"
+      type: "string"
+      description: "Column header from source data"
+    - name: "sample_values"
+      type: "string"
+      description: "JSON array of up to 20 sample values"
+    - name: "blind_label"
+      type: "string"
+      description: "Claude's independent classification (must be valid taxonomy key)"
+    - name: "blind_confidence"
+      type: "string"
+      description: "high | medium | low"
+    - name: "finetype_label"
+      type: "string"
+      description: "FineType's column-level prediction via CLI"
+    - name: "agreement"
+      type: "string"
+      description: "yes | no"
+    - name: "final_label"
+      type: "string"
+      description: "Adjudicated label (blind_label if agree, reasoned choice if not)"
+    - name: "reasoning"
+      type: "string"
+      description: "Brief explanation when disagreement (empty if agree)"
+    - name: "ground_truth_label"
+      type: "string"
+      description: "External ground truth if available (Sherlock type, Schema.org type, or empty)"
+    - name: "ground_truth_source"
+      type: "string"
+      description: "Source of ground truth: sherlock | sotab | eval_manifest | empty"
+
+  supplementary:
+    - "output/distillation-v3/sherlock_type_mapping.csv — 78→250 type mapping"
+    - "output/distillation-v3/sotab_type_mapping.csv — Schema.org→FineType mapping"
+    - "output/distillation-v3/gap_analysis.md — per-weakness disagreement breakdown"
+
+acceptance_criteria:
+  - "All four datasets distilled with merged_labels.csv containing source column"
+  - "Sherlock: all 687K columns distilled with three-way comparison available"
+  - "SOTAB: Round 2 CTA tables (44K) extracted and distilled"
+  - "GitTables: all ≤50-column files extracted and distilled"
+  - "Eval CSVs: all 27 files distilled"
+  - "Invalid label rate <5% across all datasets"
+  - "Per-dataset agreement rates computed and reported"
+  - "Sherlock→FineType type mapping identifies coverage gaps"
+  - "Disagreement breakdown by PR-2 weakness category (numeric, categorical/ordinal, float-stored int, username demotion, sentence vs entity)"
+  - "Data sufficient to run rescore_distillation.py for PR-2 before/after comparison"
+
+evaluation_principles:
+  - principle: "Coverage (proportion of downloaded data successfully distilled)"
+    weight: 0.30
+  - principle: "Classification quality (invalid label rate, confidence distribution)"
+    weight: 0.25
+  - principle: "Weakness signal (disagreements map to known PR-2 fix categories)"
+    weight: 0.25
+  - principle: "Benchmark alignment (FineType vs external ground truth accuracy)"
+    weight: 0.20
+
+exit_conditions:
+  - "All four datasets distilled with merged output"
+  - "OR: Token budget exhausted — partial results saved, resume on next reset"
+  - "OR: Extraction step reveals dataset is unsuitable (corrupt, format mismatch)"
+
+open_questions:
+  - "Exact GitTables file count after ≤50-column filter (scan in progress)"
+  - "SOTAB JSON table format — need to verify column extraction approach"
+  - "Sherlock columns have no header — how does this affect FineType column-mode inference?"
+  - "Token budget allocation: Sherlock 687K columns at ~100 cols/batch = ~6,900 batches"
+  - "Whether to distill Sherlock train+val+test or test-only"
+  - "How to structure eval suite update after distillation (deferred per interview)"
+  - "Schema.org→FineType type mapping complexity (82 Schema.org types, many won't map)"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-03-19T09:00:00Z"
+  ambiguity_score: 0.12
+  interview_ref: "specs/2026-03-19-distillation-v3/interview.md"
+  prior_work_ref: "specs/2026-03-18-distillation-v2/spec.yaml"
+  dataset_survey_ref: "specs/2026-03-18-distillation-v3-wild/dataset-survey.md"
