@@ -57,8 +57,9 @@ datasets:
     priority: 3
     location: "~/datasets/gittables/parquet/"
     format: "Parquet files across 94 topic directories"
-    total_files: "~368K (94 topics)"
-    filtered_files: "TBD (≤50 columns filter — scan in progress)"
+    total_files: 1018649
+    filtered_files: "1,000,885 (≤50 columns — 98% pass filter)"
+    filtered_columns: 10876589
     extraction: >
       Read parquet files, extract column headers + sample values.
       Filter: skip files with >50 columns. Sample up to 20 values per column.
@@ -221,7 +222,7 @@ exit_conditions:
   - "OR: Extraction step reveals dataset is unsuitable (corrupt, format mismatch)"
 
 open_questions:
-  - "Exact GitTables file count after ≤50-column filter (scan in progress)"
+  - "GitTables is 1M files / 10.9M columns — needs aggressive sampling or phased approach"
   - "SOTAB JSON table format — need to verify column extraction approach"
   - "Sherlock columns have no header — how does this affect FineType column-mode inference?"
   - "Token budget allocation: Sherlock 687K columns at ~100 cols/batch = ~6,900 batches"
