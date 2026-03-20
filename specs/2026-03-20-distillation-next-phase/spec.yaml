@@ -1,0 +1,175 @@
+goal: >
+  Build a Tier 2 evaluation benchmark from distilled and synthetic data.
+  2,500 columns covering all 250 taxonomy types (~10 per type). Distilled
+  types use all adjudicated rows from sherlock_distilled.csv.gz (any row with
+  a final_label, regardless of agreement status); missing types use FineType's
+  generators. Output is a reproducible benchmark that the retraining spike
+  (Spec 2) will measure against.
+
+constraints:
+  - "Algorithmic — no human review. Can be rebuilt when more distillation data arrives."
+  - "Profile eval (170/174, Tier 1) remains the regression floor — Tier 2 supplements, never replaces."
+  - "All 250 taxonomy types must be represented. 122 from distilled data (62 fully, 60 partial after ≥5 values filter), 128 from generators. 1 type (password) has no generator — 249/250 covered."
+  - "Distilled samples drawn from all adjudicated rows with a final_label — agreement and disagreement alike. The adjudication process is the quality gate, not the agreement status."
+  - "Generator samples use finetype generate — correct by construction. Grouped into columns of 10 values each (headerless, matching Sherlock's characteristics)."
+  - "Benchmark must be deterministic: same seed → same output."
+  - "Don't block on pipeline completion — use current 85K data. Benchmark rebuilds later with more data."
+  - "Minimum 5 values per column for distilled samples. Rows with fewer values or unparseable JSON excluded."
+  - "Synthetic columns are headerless to match the distilled data distribution (Sherlock has no headers)."
+
+acceptance_criteria:
+  - id: AC-1
+    description: "Benchmark contains ~2,500 columns covering all 250 taxonomy types"
+    verification: >
+      Output CSV has columns: type_key, source (distilled|synthetic), values (JSON array),
+      header (string or empty), expected_label, source_agreement (yes|no|synthetic).
+      Row count between 2,400–2,600. Every taxonomy type appears at least once.
+      Types with sufficient distilled data have 10 columns; types with fewer fill
+      remainder from generators.
+    example_rows: |
+      type_key,source,values,header,expected_label,source_agreement
+      identity.person.username,distilled,"[""jsmith42"",""xXdragon"",""user_2891"",""alice.b"",""root""]",,identity.person.username,no
+      finance.currency.amount,synthetic,"[""$1,234.56"",""€99.00"",""¥5,000"",""£12.50"",""$0.99"",""€1,000.00"",""$42.00"",""£300.00"",""$7.89"",""€25.00""]",,finance.currency.amount,synthetic
+  - id: AC-2
+    description: "Distilled samples have valid provenance"
+    verification: >
+      For each distilled sample: (a) final_label in source row matches expected_label,
+      (b) values field matches sample_values from source row (byte-identical after JSON
+      parse + re-serialize), (c) sample_values parses as JSON array with ≥5 elements.
+      No rows with unparseable or empty sample_values.
+  - id: AC-3
+    description: "Build script is reproducible and documented"
+    verification: >
+      scripts/build_tier2_benchmark.py exists. Running it with --seed 42 produces
+      identical output on repeated runs. Script has --help with clear usage.
+  - id: AC-4
+    description: "Scoring script measures model accuracy against Tier 2"
+    verification: >
+      scripts/score_tier2.py exists. Invokes finetype via batch mode
+      (finetype infer --mode column --batch, JSONL over stdin) for performance.
+      Outputs: overall accuracy, per-type accuracy (sorted worst-first),
+      per-domain accuracy, distilled-vs-synthetic accuracy split,
+      agreement-vs-disagreement accuracy split. Script has --help.
+  - id: AC-5
+    description: "Baseline score established for current model"
+    verification: >
+      Current model (char-cnn-v14-250 + Sense→Sharpen pipeline) scored against
+      Tier 2. Results committed to specs/2026-03-20-distillation-next-phase/baseline.md
+      with overall accuracy, per-domain breakdown, worst-performing types, and
+      agreement vs disagreement accuracy comparison.
+  - id: AC-6
+    description: "Sampling is stratified and fair"
+    verification: >
+      For distilled types with >10 rows (≥5 values each): random sample of 10 (seeded).
+      For distilled types with ≤10 qualifying rows: all available, remainder from
+      generators. For missing types (78): all 10 from generators (10 values per column,
+      headerless). Sampling logic documented in script comments.
+
+implementation:
+  steps:
+    - id: S-1
+      description: "Analyse distilled data availability per type"
+      detail: >
+        Count all rows with final_label per type in sherlock_distilled.csv.gz,
+        filtering to rows with parseable sample_values containing ≥5 elements.
+        Identify:
+        (a) types with ≥10 qualifying rows (fully distilled — expected ~72),
+        (b) types with 1–9 qualifying rows (partial — fill from generators),
+        (c) types with 0 qualifying rows (fully synthetic — expected ~78).
+        Include agreement/disagreement breakdown per type.
+        Commit analysis to specs/2026-03-20-distillation-next-phase/type_coverage.md.
+    - id: S-2
+      description: "Write benchmark build script"
+      detail: >
+        scripts/build_tier2_benchmark.py:
+        1. Load sherlock_distilled.csv.gz, filter to rows with final_label and
+           parseable sample_values with ≥5 elements (all agreement statuses)
+        2. Group by final_label, sample up to 10 per type (seeded random)
+        3. For types with <10 qualifying rows, generate remainder via
+           finetype generate: run `finetype generate --type <key> --samples 10`,
+           parse NDJSON output, group into columns of 10 values each (headerless)
+        4. For 78 missing types, generate all 10 columns the same way
+        5. Output: eval/tier2_benchmark.csv with columns:
+           type_key, source, values, header, expected_label, source_agreement
+        6. Deterministic with --seed flag (default 42)
+    - id: S-3
+      description: "Write scoring script"
+      detail: >
+        scripts/score_tier2.py:
+        1. Load benchmark CSV
+        2. Build JSONL batch: for each row, emit {"values": [...], "header": "..."}
+        3. Pipe to `finetype infer --mode column --batch` (single process, fast)
+        4. Compare predicted label vs expected_label
+        5. Output report: overall accuracy, per-type accuracy (sorted worst-first),
+           per-domain accuracy, distilled vs synthetic split,
+           agreement vs disagreement split
+        6. Exit code 0 if run succeeds (no pass/fail gate — measurement tool)
+    - id: S-4
+      description: "Build benchmark and run baseline"
+      detail: >
+        Execute build script, verify AC-1/AC-2/AC-6. Run scoring script against
+        current model. Commit benchmark CSV and baseline results.
+    - id: S-5
+      description: "Create PR"
+      detail: >
+        PR with: benchmark CSV, build script, scoring script, type coverage analysis,
+        baseline results. PR description references this spec and Decision 0038.
+
+future_work:
+  - id: FW-1
+    title: "Retraining spike (Spec 2)"
+    description: >
+      Train CharCNN variants on synthetic-only, distilled-only, and blended data.
+      Measure against Tier 2 benchmark. Goal: improve accuracy on common types.
+  - id: FW-2
+    title: "Rule removal spike (Spec 3)"
+    description: >
+      Using the best retrained model from Spec 2, systematically disable F1–F6
+      disambiguation rules one-by-one. Measure Tier 2 + Tier 1 after each removal.
+      Goal: identify rules the model has absorbed.
+  - id: FW-3
+    title: "Benchmark refresh"
+    description: >
+      When pipeline completes (more Sherlock, Eval, GitTables, SOTAB), rebuild
+      Tier 2 with richer distilled data. More types shift from synthetic to distilled.
+
+evaluation_principles:
+  - principle: "Type coverage"
+    weight: 0.3
+    measure: "All 250 types represented in benchmark with ≥1 column each"
+  - principle: "Sample quality"
+    weight: 0.3
+    measure: "Distilled samples from adjudicated rows; provenance verified; ≥5 values per column"
+  - principle: "Reproducibility"
+    weight: 0.2
+    measure: "Same seed produces identical benchmark and scores across runs"
+  - principle: "Actionability"
+    weight: 0.2
+    measure: "Baseline results identify specific weak types that retraining should target"
+
+exit_conditions:
+  - "Tier 2 benchmark CSV committed with 250 types, ~2,500 columns"
+  - "Build and scoring scripts committed with --help and --seed support"
+  - "Baseline score for current model committed"
+  - "PR merged"
+
+decisions:
+  - id: "0039"
+    title: "Use all adjudicated distillation rows, not just agreement"
+    summary: >
+      Agreement-only filtering biases the benchmark toward cases the current model
+      already handles. The adjudication process (blind Claude classification +
+      FineType classification + reasoned adjudication) is the quality gate.
+      Disagreement rows are more valuable — they represent the 80 types FineType
+      consistently misclassifies (username, first_name, currency amounts, date
+      formats). Using all adjudicated rows gives 172 types from 85K rows vs
+      92 types from 24K rows.
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-20T23:00:00Z"
+  ambiguity_score: 0.09
+  interview_ref: "specs/2026-03-20-distillation-next-phase/interview.md"
+  decision_ref: "decisions/0038-supersede-v2-fixes-with-retraining.md"
+  review_ref: "specs/2026-03-20-distillation-next-phase/review-spec-2026-03-20.md"
+  sequence: "Spec 1 of 3 (Tier 2 Benchmark → Retraining Spike → Rule Removal Spike)"
