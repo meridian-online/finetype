@@ -13,9 +13,10 @@ constraints:
   - "All 250 taxonomy labels visible in prompt (no domain cut-down)"
   - "Sherlock ground truth compared offline — not shown to distillation agents"
   - "SportsTables excluded (requires live scraping, fragile dependency)"
-  - "GitTables filtered: parquet files with ≤50 columns only"
+  - "GitTables sampled: 50 random files per topic, 94 topics"
   - "Output to output/distillation-v3/ — one CSV per batch, merged summary"
   - "Use Sonnet model to preserve Opus caps for other work"
+  - "Per-batch CSVs committed to branch after each agent wave to prevent data loss"
 
 datasets:
   - name: "Sherlock / VizNet"
@@ -23,12 +24,24 @@ datasets:
     location: "~/datasets/sherlock/data/data/raw/"
     format: "Parquet (train/val/test splits with values + labels)"
     columns: 686765
+    columns_phase1: "137,353 (test split — standard benchmark partition)"
+    columns_phase2: "549,412 (train + val — if token budget allows)"
     ground_truth: "78 DBpedia-derived semantic types"
     extraction: "Read parquet directly — values column contains JSON arrays of strings"
+    header_strategy: >
+      Sherlock columns have no headers. FineType runs with empty header,
+      measuring value-only classification strength. This is intentional:
+      reducing reliance on header hints is a strategic goal. The Claude
+      blind classifier also receives no header, so the Claude vs Sherlock
+      comparison is fair. The FineType vs Sherlock comparison measures
+      value-only inference — expect lower agreement than headed datasets.
+      Document this clearly in results.
     notes: >
       Three-way comparison: Sherlock ground truth vs Claude blind vs FineType.
       Ground truth NOT shown to agents — compared offline. Requires building
-      a Sherlock→FineType 78→250 type mapping (programmatic, pre-distillation).
+      a Sherlock→FineType 78→250 type mapping (hand-authored with LLM assist,
+      reviewed by Hugh). Test split distilled first (standard benchmark
+      partition), then train+val if budget allows.
 
   - name: "SOTAB V2 CTA"
     priority: 2
@@ -40,7 +53,12 @@ datasets:
       Two-step: (1) unzip inner archives to get JSON.gz table files,
       (2) extract column headers + values from JSON tables into JSONL format
       compatible with distillation pipeline. Ground truth CSVs provide
-      table_name, column_index, label mappings.
+      table_name, column_index, label mappings. Validate extraction on
+      100-table sample before full run (schema check: required fields
+      present, values arrays non-empty, ground truth labels attached).
+    extraction_fallback: >
+      If extraction complexity exceeds 2 hours of implementation work,
+      defer SOTAB to Wave 2 and proceed with Sherlock + GitTables.
     splits:
       round1_train: 55361
       round1_val: 598
@@ -58,14 +76,13 @@ datasets:
     location: "~/datasets/gittables/parquet/"
     format: "Parquet files across 94 topic directories"
     total_files: 1018649
-    filtered_files: "1,000,885 (≤50 columns — 98% pass filter)"
-    filtered_columns: 10876589
     sampled_files: "~4,700 (50 random files per topic, 94 topics)"
     sampled_columns: "~50K (estimated from 10.6 avg cols/file)"
     extraction: >
       Read parquet files, extract column headers + sample values.
-      Filter: skip files with >50 columns. Random sample: 50 files per topic.
+      Random sample: 50 files per topic (deterministic seed for reproducibility).
       Sample up to 20 values per column. Convert to JSONL format.
+      Track source topic for per-topic analysis.
     notes: >
       Phase 2 processed 507 files (0.13%). Full corpus is 1M files / 10.9M
       columns — too large to distill completely. 50/topic gives all 94 topics
@@ -92,8 +109,8 @@ approach:
   passes:
     - name: "Pass 1 — Blind Classification"
       description: >
-        Claude classifies the column from header + sample values + full 250-label
-        taxonomy. No FineType prediction is shown.
+        Claude classifies the column from header (if available) + sample values
+        + full 250-label taxonomy. No FineType prediction is shown.
       outputs:
         - "blind_label: the type label Claude selects independently"
         - "blind_confidence: high | medium | low"
@@ -110,22 +127,31 @@ approach:
 
 execution:
   order:
-    - "Sherlock (687K columns) — highest priority, external benchmark anchor"
+    - "Sherlock test split (137K columns) — highest priority, external benchmark"
     - "SOTAB (70K+ tables) — requires extraction step before distillation"
-    - "GitTables (filtered ≤50 cols) — largest volume, lowest priority"
+    - "GitTables (50/topic, ~50K columns) — topic diversity pass"
     - "Eval CSVs (27 files) — small, slot in at the end or between larger runs"
+    - "Sherlock train+val (549K columns) — if token budget allows after above"
   agent_type: "Spawned Claude Code agents via Agent tool"
   model: "sonnet"
   parallelism: "5 agents max (hardware constraint)"
   batch_size: "~50-100 columns per agent"
-  resume: "Agents write per-batch CSVs; already-processed batches skipped on re-run"
+  resume: >
+    Agents write per-batch CSVs. Completion tracked via batch_{NNN}.done
+    marker files written atomically after CSV validation (row count check,
+    required fields present). Skip logic checks .done marker, not CSV
+    existence, to prevent partial-write corruption. Per-batch CSVs
+    committed to branch after each wave of agents.
 
   pre_distillation_steps:
     - name: "Sherlock type mapping"
       description: >
-        Build a programmatic mapping from Sherlock's 78 types to FineType's
-        250-type taxonomy. Output: sherlock_type_mapping.csv with columns
-        sherlock_type, finetype_type, mapping_confidence (exact/partial/unmapped).
+        Build a mapping from Sherlock's 78 types to FineType's 250-type
+        taxonomy. Method: LLM-assisted draft, reviewed and finalised by Hugh.
+        Output: sherlock_type_mapping.csv with columns sherlock_type,
+        finetype_type, mapping_confidence (exact/partial/unmapped).
+        Expect non-trivial unmapped fraction — Sherlock types like
+        "jockey", "album", "club" have no FineType equivalent.
       blocking: false
       notes: "Can run in parallel with distillation. Needed for offline comparison."
 
@@ -133,28 +159,48 @@ execution:
       description: >
         Read train/val/test parquet files. Each row has a 'values' column
         (list of strings) and a corresponding label. Extract into JSONL format:
-        {source: "sherlock", split: "train", index: N, header: "", values: [...],
-        sherlock_label: "type"}.
+        {source: "sherlock", split: "test", index: N, header: "", values: [...],
+        sherlock_label: "type"}. Test split first, then train+val.
       blocking: true
 
     - name: "SOTAB extraction"
       description: >
         Unzip inner Round2-SOTAB-CTA-Tables.zip. For each JSON.gz table file,
         extract column headers and sample values. Join with ground truth CSV
-        to attach Schema.org labels. Output JSONL format compatible with
-        distillation pipeline.
+        to attach Schema.org labels. Output JSONL format. Validate on 100-table
+        sample before full extraction.
       blocking: true
 
     - name: "GitTables extraction"
       description: >
-        Scan all parquet files across 94 topics. Filter files with ≤50 columns.
-        For each file, read column headers + sample up to 20 values per column.
-        Output JSONL format. Track source topic for per-topic analysis.
+        Sample 50 random files per topic (deterministic seed). For each file,
+        read column headers + sample up to 20 values per column. Output JSONL
+        format. Track source topic for per-topic analysis.
       blocking: true
+
+  durability:
+    description: >
+      v2 distillation output was lost because it lived only on local disk
+      in output/distillation-v2/ and was never committed. v3 mitigates this:
+    measures:
+      - "Per-batch CSVs committed to the feature branch after each wave of agents"
+      - "Batch completion tracked via .done marker files (not CSV existence)"
+      - "Merge step is a separate script, not part of the agent loop"
+      - "Extracted JSONL files committed before distillation begins"
+      - "output/distillation-v3/ added to .gitignore EXCLUSION (force-tracked)"
+
+  label_validation:
+    description: >
+      Post-merge validation script (scripts/validate_distillation.py) that:
+      (1) joins blind_label, finetype_label, and final_label against the
+      250-label taxonomy key list, (2) reports invalid label counts and rate,
+      (3) flags rows with missing required fields. Run incrementally after
+      each wave and before final merge.
 
 output:
   location: "output/distillation-v3/"
   per_batch: "batch_{NNN}.csv"
+  batch_marker: "batch_{NNN}.done"
   merged: "output/distillation-v3/merged_labels.csv"
   schema:
     - name: "source"
@@ -165,7 +211,7 @@ output:
       description: "Source filename or identifier"
     - name: "column_name"
       type: "string"
-      description: "Column header from source data"
+      description: "Column header from source data (empty for Sherlock)"
     - name: "sample_values"
       type: "string"
       description: "JSON array of up to 20 sample values"
@@ -201,18 +247,19 @@ output:
 
 acceptance_criteria:
   - "All four datasets distilled with merged_labels.csv containing source column"
-  - "Sherlock: all 687K columns distilled with three-way comparison available"
-  - "SOTAB: Round 2 CTA tables (44K) extracted and distilled"
-  - "GitTables: all ≤50-column files extracted and distilled"
+  - "Sherlock: test split (137K columns) distilled with three-way comparison available"
+  - "SOTAB: Round 2 CTA tables (44K) extracted and distilled, or deferred with documented reason"
+  - "GitTables: 50 files per topic (~4,700 files, ~50K columns) extracted and distilled"
   - "Eval CSVs: all 27 files distilled"
-  - "Invalid label rate <5% across all datasets"
+  - "Invalid label rate <5% across all datasets (validated by scripts/validate_distillation.py)"
   - "Per-dataset agreement rates computed and reported"
-  - "Sherlock→FineType type mapping identifies coverage gaps"
-  - "Disagreement breakdown by PR-2 weakness category (numeric, categorical/ordinal, float-stored int, username demotion, sentence vs entity)"
+  - "Sherlock→FineType type mapping reviewed by Hugh, coverage gaps identified"
+  - "Disagreement breakdown by PR-2 weakness category via post-merge tagging script"
   - "Data sufficient to run rescore_distillation.py for PR-2 before/after comparison"
+  - "Per-batch CSVs committed to branch — no output exists only on local disk"
 
 evaluation_principles:
-  - principle: "Coverage (proportion of downloaded data successfully distilled)"
+  - principle: "Coverage (proportion of target data successfully distilled)"
     weight: 0.30
   - principle: "Classification quality (invalid label rate, confidence distribution)"
     weight: 0.25
@@ -223,22 +270,51 @@ evaluation_principles:
 
 exit_conditions:
   - "All four datasets distilled with merged output"
-  - "OR: Token budget exhausted — partial results saved, resume on next reset"
+  - "OR: Token budget exhausted — partial results saved and committed, resume on next reset"
   - "OR: Extraction step reveals dataset is unsuitable (corrupt, format mismatch)"
 
+resolved_from_review:
+  - question: "Sherlock columns have no header"
+    resolution: >
+      Empty header, intentional. Measures value-only classification strength.
+      Reducing reliance on header hints is a strategic goal. Document in results
+      that Sherlock comparison reflects headerless inference.
+  - question: "Token budget for 687K Sherlock columns"
+    resolution: >
+      Distill test split first (137K columns, standard benchmark partition).
+      Expand to train+val (549K) if token budget allows after SOTAB + GitTables.
+  - question: "GitTables scope"
+    resolution: >
+      50 random files per topic, 94 topics (~4,700 files, ~50K columns).
+      Deterministic seed for reproducibility.
+  - question: "Durability of output"
+    resolution: >
+      Per-batch CSVs committed to branch after each wave. Batch completion
+      tracked via .done markers. Merge step separate from agent loop.
+  - question: "Label validation"
+    resolution: >
+      Post-merge validation script checks all labels against taxonomy key list.
+      Run incrementally after each wave.
+  - question: "Resume integrity"
+    resolution: >
+      .done marker files written atomically after CSV validation. Skip logic
+      checks marker, not CSV existence.
+  - question: "Type mapping methodology"
+    resolution: >
+      LLM-assisted draft, reviewed and finalised by Hugh. Unmapped types
+      expected and counted in gap analysis.
+
 open_questions:
-  - "GitTables sampled at 50 files/topic — Wave 2 targeting if specific topics are rich"
-  - "SOTAB JSON table format — need to verify column extraction approach"
-  - "Sherlock columns have no header — how does this affect FineType column-mode inference?"
-  - "Token budget allocation: Sherlock 687K columns at ~100 cols/batch = ~6,900 batches"
-  - "Whether to distill Sherlock train+val+test or test-only"
+  - "Whether to distill Sherlock train+val after test (depends on remaining token budget)"
   - "How to structure eval suite update after distillation (deferred per interview)"
   - "Schema.org→FineType type mapping complexity (82 Schema.org types, many won't map)"
+  - "SOTAB JSON table internal format — validated during extraction step"
 
 metadata:
-  version: "1.0"
-  timestamp: "2026-03-19T09:00:00Z"
-  ambiguity_score: 0.12
+  version: "2.0"
+  timestamp: "2026-03-19T10:00:00Z"
+  ambiguity_score: 0.08
   interview_ref: "specs/2026-03-19-distillation-v3/interview.md"
+  review_ref: "specs/2026-03-19-distillation-v3/review-spec-2026-03-19.md"
   prior_work_ref: "specs/2026-03-18-distillation-v2/spec.yaml"
   dataset_survey_ref: "specs/2026-03-18-distillation-v3-wild/dataset-survey.md"

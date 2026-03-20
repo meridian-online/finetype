@@ -189,9 +189,12 @@ spike_findings:
 
 metadata:
   version: "2.0"
+  status: "superseded by Decision 0038 — retraining path replaces PR-2/PR-3 heuristic fixes"
   timestamp: "2026-03-18T23:00:00Z"
   ambiguity_score: 0.07
   interview_ref: "specs/2026-03-18-distillation-v2-fixes/interview.md"
   findings_ref: "specs/2026-03-18-distillation-v2/FINDINGS.md"
   review_ref: "specs/2026-03-18-distillation-v2-fixes/review-spec-2026-03-18.md"
   spike_ref: "specs/2026-03-18-distillation-v2-fixes/spike-header-hint-sources.md"
+  superseded_by: "decisions/0038-supersede-v2-fixes-with-retraining.md"
+  note: "PR-1 (pipeline guards) shipped as 54bb26a. PR-2 and PR-3 superseded — problems carried forward as retraining spike test cases."

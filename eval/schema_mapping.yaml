@@ -5,7 +5,8 @@
 # Sources:
 #   - schema_labels.csv: 59 schema.org annotation labels
 #   - dbpedia_labels.csv: 122 DBpedia ontology annotation labels
-#   - Combined unique labels: 181 (some labels appear in both sources)
+#   - sherlock: 78 DBpedia-derived types from Sherlock/VizNet benchmark
+#   - Combined unique labels: 211 (some labels appear in multiple sources)
 #
 # Match quality levels:
 #   direct    — GT label maps 1:1 to a FineType label (same concept, same format)
@@ -2348,3 +2349,256 @@ mappings:
     finetype_domain: representation
     match_quality: direct
     expand: false
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SHERLOCK/VIZNET — 30 types not already covered by Schema.org/DBpedia
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 48 of Sherlock's 78 types were already mapped above via their DBpedia or
+  # Schema.org equivalents. These 30 are unique to the Sherlock benchmark.
+  # Source: Sherlock/VizNet (Hulsebos et al. 2019), DBpedia-derived types.
+
+  # --- Direct/Close matches ---
+
+  - gt_label: birth date
+    source: sherlock
+    finetype_label: datetime.date.iso
+    finetype_domain: datetime
+    match_quality: close
+    expand: false
+    notes: Birth dates in various formats; mapped to generic ISO date
+
+  - gt_label: birth place
+    source: sherlock
+    finetype_label: geography.location.city
+    finetype_domain: geography
+    match_quality: close
+    expand: false
+    notes: Birth places are typically city names
+
+  - gt_label: continent
+    source: sherlock
+    finetype_label: geography.location.continent
+    finetype_domain: geography
+    match_quality: direct
+    expand: false
+    notes: Direct 1:1 mapping
+
+  - gt_label: day
+    source: sherlock
+    finetype_label: datetime.component.day_of_week
+    finetype_domain: datetime
+    match_quality: close
+    expand: false
+    notes: Could be day name or day number; mapped to day_of_week
+
+  - gt_label: director
+    source: sherlock
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Director names are person names
+
+  - gt_label: file size
+    source: sherlock
+    finetype_label: representation.file.file_size
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+    notes: File size values with units
+
+  - gt_label: owner
+    source: sherlock
+    finetype_label: identity.person.full_name
+    finetype_domain: identity
+    match_quality: close
+    expand: false
+    notes: Owner names are typically person names
+
+  - gt_label: sales
+    source: sherlock
+    finetype_label: finance.currency.amount
+    finetype_domain: finance
+    match_quality: close
+    expand: false
+    notes: Sales figures are currency amounts
+
+  - gt_label: symbol
+    source: sherlock
+    finetype_label: finance.currency.currency_symbol
+    finetype_domain: finance
+    match_quality: partial
+    expand: false
+    notes: Could be currency, stock ticker, or other symbol type
+
+  # --- Partial matches (format-dependent) ---
+
+  - gt_label: elevation
+    source: sherlock
+    finetype_label: representation.numeric.decimal_number
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Numeric elevation values; detectable as decimal but not as elevation specifically
+
+  - gt_label: grades
+    source: sherlock
+    finetype_label: representation.discrete.ordinal
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Grade values may be ordinal (A/B/C) or numeric
+
+  - gt_label: nationality
+    source: sherlock
+    finetype_label: geography.location.country
+    finetype_domain: geography
+    match_quality: partial
+    expand: false
+    notes: Nationality strings often overlap with country names
+
+  - gt_label: organisation
+    source: sherlock
+    finetype_label: null
+    finetype_domain: identity
+    match_quality: partial
+    expand: true
+    notes: Organisation names — no FineType equivalent but domain is identity. Candidate for entity_name expansion.
+
+  - gt_label: ranking
+    source: sherlock
+    finetype_label: representation.discrete.ordinal
+    finetype_domain: representation
+    match_quality: partial
+    expand: false
+    notes: Ranking values map to ordinal when numeric
+
+  # --- Semantic-only (no format detectability) ---
+
+  - gt_label: affiliate
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Affiliate entity names — purely semantic, no format signal
+
+  - gt_label: affiliation
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Organizational affiliation — purely semantic
+
+  - gt_label: album
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Music album names — no format distinguishing from other text
+
+  - gt_label: area
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Geographic area names — too generic
+
+  - gt_label: club
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Club/team names — no format signal
+
+  - gt_label: command
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Command strings — no consistent format
+
+  - gt_label: creator
+    source: sherlock
+    finetype_label: null
+    finetype_domain: identity
+    match_quality: semantic_only
+    expand: false
+    notes: Creator names overlap with person names but too ambiguous
+
+  - gt_label: credit
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Credit/attribution strings
+
+  - gt_label: education
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Education level or institution — no format signal
+
+  - gt_label: jockey
+    source: sherlock
+    finetype_label: null
+    finetype_domain: identity
+    match_quality: semantic_only
+    expand: false
+    notes: Jockey names are person names but semantically specific
+
+  - gt_label: plays
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Sports position or instrument — purely semantic
+
+  - gt_label: religion
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Religion names — no format signal
+
+  - gt_label: requirement
+    source: sherlock
+    finetype_label: null
+    finetype_domain: representation
+    match_quality: semantic_only
+    expand: false
+    notes: Requirement text — free-form sentences
+
+  - gt_label: result
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Result values — too generic for format detection
+
+  - gt_label: service
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Service names — no format signal
+
+  - gt_label: team name
+    source: sherlock
+    finetype_label: null
+    finetype_domain: null
+    match_quality: semantic_only
+    expand: false
+    notes: Team names — no format signal (duplicate concept with 'team')
