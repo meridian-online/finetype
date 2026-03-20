@@ -4,6 +4,7 @@
 **Model:** char-cnn-v14-250 + Sense→Sharpen pipeline (v0.6.12)
 **Benchmark:** eval/tier2_benchmark.csv (2,490 columns, 249 types, seed 42)
 **Note:** identity.person.password excluded (no generator, no distilled data)
+**Note:** Scoring has ~0.2% variance between runs due to FineType's internal value sampling. Numbers below are from a single representative run.
 
 ## Overall
 

@@ -9,7 +9,7 @@ goal: >
 constraints:
   - "Algorithmic — no human review. Can be rebuilt when more distillation data arrives."
   - "Profile eval (170/174, Tier 1) remains the regression floor — Tier 2 supplements, never replaces."
-  - "All 250 taxonomy types must be represented. 172 from distilled data, 78 from generators."
+  - "All 250 taxonomy types must be represented. 122 from distilled data (62 fully, 60 partial after ≥5 values filter), 128 from generators. 1 type (password) has no generator — 249/250 covered."
   - "Distilled samples drawn from all adjudicated rows with a final_label — agreement and disagreement alike. The adjudication process is the quality gate, not the agreement status."
   - "Generator samples use finetype generate — correct by construction. Grouped into columns of 10 values each (headerless, matching Sherlock's characteristics)."
   - "Benchmark must be deterministic: same seed → same output."
