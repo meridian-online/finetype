@@ -102,47 +102,37 @@ fi
 # ─── Extract Tier 1 score from profile eval output ──────────────────
 extract_tier1() {
     # Runs make eval-profile and captures output
-    local output
-    output="$(make eval-profile 2>&1)" || true
+    local output_file
+    output_file="$(mktemp)"
+    make eval-profile 2>&1 | tee "$output_file" || true
 
-    # Parse the DuckDB table output for "format_detectable" row
-    # Output format: | format_detectable | N | M | ... |
-    # Also look for "Headline accuracy" section output
+    # Parse the DuckDB table output for headline accuracy row:
+    # │ Format-detectable (direct + close) │ 190 │ 180 │ 94.7 │ 189 │ 99.5 │
     python3 -c "
-import re, sys
+import re
 
-output = '''$output'''
+with open('$output_file') as f:
+    output = f.read()
 
-# Strategy 1: Parse the 'Headline accuracy' table
-# Looks for: format_detectable (direct + close) | columns | label_correct | pct | domain_correct | pct
 label_correct = 0
 label_total = 0
 domain_correct = 0
 domain_total = 0
 
 for line in output.splitlines():
-    # Match lines with pipe-separated fields containing numbers
-    # Headline row: Format-detectable (direct + close) | N | M | pct | D | pct
-    if 'direct + close' in line.lower() or 'format_detectable' in line.lower():
-        nums = re.findall(r'(\d+)', line)
+    if 'direct + close' in line.lower() or ('format-detectable' in line.lower() and '│' in line):
+        # Extract all integers from the pipe-separated row
+        nums = re.findall(r'\b(\d+)\b', line)
         if len(nums) >= 3:
             label_total = int(nums[0])
             label_correct = int(nums[1])
-            domain_correct = int(nums[2]) if len(nums) > 3 else label_correct
-            break
+        if len(nums) >= 4:
+            domain_correct = int(nums[3])
+        break
 
-# Strategy 2: Parse profile_results.csv directly
-if label_total == 0:
-    import csv, os
-    results_path = 'eval/eval_output/profile_results.csv'
-    gt_path = 'eval/eval_output/ground_truth.csv'
-    mapping_path = 'eval/schema_mapping.csv'
-    if os.path.exists(results_path) and os.path.exists(gt_path):
-        # Simple approach: count matches from results vs ground truth
-        pass  # fallback not needed if DuckDB output is available
-
-print(f'{label_correct}/{label_total} {domain_correct}/{domain_total}')
+print(f'{label_correct}/{label_total} {domain_correct}/{label_total}')
 "
+    rm -f "$output_file"
 }
 
 # ─── Run one experiment ─────────────────────────────────────────────
