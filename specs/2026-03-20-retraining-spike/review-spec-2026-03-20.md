@@ -1,4 +1,4 @@
-# Spec Review
+#  Spec Review
 
 **Date:** 2026-03-20
 **Reviewer:** Context-separated agent (fresh session, Opus)
