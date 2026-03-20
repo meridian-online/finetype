@@ -37,6 +37,10 @@ __pycache__/
 # Eval outputs (generated data, not source)
 eval/eval_output/
 
+# Spike experiment outputs
+output/spike-training/
+output/spike-results/
+
 # External repos (submodules / symlinks)
 duckdb-finetype/
 homebrew-tap/

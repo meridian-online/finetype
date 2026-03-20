@@ -1,0 +1,233 @@
+goal: >
+  Run a controlled retraining experiment: train CharCNN on synthetic-only (baseline),
+  distilled-only, and multiple blended data mixes, measuring each against Tier 2
+  benchmark and Tier 1 profile eval. Identify which data mix improves real-world
+  accuracy (especially disagreement rows) without regressing. Architecture and
+  hyperparameters held constant — the only variable is training data.
+
+constraints:
+  - "Pure Rust training pipeline (Decision 0009) — Python only for data preparation and scoring"
+  - "Architecture held constant: CharCNN flat, 10 epochs, batch 32, seed 42, same config as char-cnn-v14-250 (embed=32, filters=64, hidden=128)"
+  - "Tier 1 profile eval (170/174, 97.7%) is the regression floor — retrained models must not drop below this"
+  - "Tier 2 benchmark (eval/tier2_benchmark.csv, 2,490 columns, 249 types) is the primary comparison metric"
+  - "Distilled data quality investigation required before finalising training data scope (85K = 58K qualifying + 26K sparse + ~500 parse errors)"
+  - "Column-level types (categorical, ordinal, increment) included in most experiments but one experiment explicitly excludes them to measure negative transfer"
+  - "Spike is investigative — no commitment to ship a retrained model"
+  - "Training data format: NDJSON with {\"text\": value, \"classification\": \"domain.category.type\"}"
+  - "Each experiment produces a model in models/spike-<mix-name>/ — not overwriting production model"
+  - "Model resolution via models/default symlink — run_spike.sh owns all symlink swaps with pre-flight and post-flight assertions that it points to char-cnn-v14-250"
+
+acceptance_criteria:
+  - id: AC-1
+    description: "Data quality investigation completed with clear recommendation"
+    verification: >
+      Markdown report in specs/2026-03-20-retraining-spike/data-investigation.md
+      comparing 85K full rows vs 58K qualifying rows: agreement rates, confidence
+      distributions, type coverage, JSON parse error characterisation, and
+      recommendation on which set to use.
+  - id: AC-2
+    description: "Training data preparation script produces reproducible NDJSON mixes"
+    verification: >
+      scripts/prepare_spike_data.py generates NDJSON training files for each experiment.
+      Each file is valid NDJSON with {text, classification} fields. Labels match the
+      250-type taxonomy (rows with empty final_label filtered out). Reproducible with
+      --seed flag. Supports: synthetic-only, distilled-only (with synthetic backfill),
+      blended mixes at configurable ratios, and column-type exclusion.
+  - id: AC-3
+    description: "Experiment runner automates the full train→eval loop"
+    verification: >
+      scripts/run_spike.sh trains each data mix using scripts/train.sh --data FILE,
+      scores each model against Tier 2 (scripts/score_tier2.py) and Tier 1
+      (make eval-profile), and writes results to a structured log.
+      Single command runs all experiments end-to-end. Symlink management is
+      centralised in this script — not delegated to eval.sh.
+  - id: AC-4
+    description: "Minimum 6 experiments completed with comparable results"
+    verification: >
+      At least 6 models trained and scored:
+      (1) synthetic-only baseline (retrained, not v14 — controls for randomness),
+      (2) distilled + synthetic-backfill (distilled where available, synthetic for ~77 missing types),
+      (3) blended 50/50 (synthetic/distilled per type),
+      (4) blended 70/30 (distilled-heavy),
+      (5) blended 30/70 (synthetic-heavy),
+      (6) blended 70/30 excluding column-level types (categorical, ordinal, increment removed from distilled data).
+      Each has Tier 1 score (N/174) and Tier 2 scores (overall, agreement,
+      disagreement, synthetic, per-domain).
+  - id: AC-5
+    description: "Comparison table and findings document produced"
+    verification: >
+      specs/2026-03-20-retraining-spike/findings.md contains:
+      (a) comparison table with all experiments side-by-side,
+      (b) analysis of column-level types impact — compare experiment 4 vs 6,
+      (c) indirect negative transfer measurement: do types sharing value patterns
+          with categorical (boolean, gender, enum-like) degrade when categorical
+          training data is included? Name specific proxy types tracked,
+      (d) clear signal on whether any mix outperforms synthetic-only,
+      (e) recommendation for next steps (rule removal spike, more data, or abandon).
+  - id: AC-6
+    description: "No production model regression"
+    verification: >
+      models/default symlink unchanged (still points to char-cnn-v14-250).
+      Spike models stored in models/spike-*/ directories. Production model untouched.
+      run_spike.sh asserts symlink target at start and end of execution.
+
+implementation:
+  steps:
+    - id: S-0
+      description: "Investigate distilled data quality (85K vs 58K)"
+      detail: >
+        Python script to analyse output/distillation-v3/sherlock_distilled.csv.gz.
+        Three-way split: 58K qualifying (≥5 values), 26K sparse (<5 values),
+        ~500 JSON parse errors. Compare agreement rates, blind_confidence
+        distributions, type coverage, and value count distributions across groups.
+        Characterise the parse error rows (which types, what's malformed).
+        Output: data-investigation.md with recommendation.
+        Key question: do sparse rows have different label quality?
+    - id: S-1
+      description: "Build training data preparation script"
+      detail: >
+        scripts/prepare_spike_data.py reads sherlock_distilled.csv.gz and explodes
+        column-level rows into individual value→label training samples (NDJSON).
+        For each row: parse sample_values JSON array, emit one {text, classification}
+        record per value using final_label as classification. Rows with empty
+        final_label or unparseable sample_values are skipped with a warning log.
+
+        Generates these NDJSON files in output/spike-training/:
+        - synthetic.ndjson — from finetype generate (baseline, same params as v14)
+        - distilled-backfill.ndjson — distilled where available, synthetic backfill
+          for the ~77 types with zero distilled data (all 250 types covered)
+        - blend-50-50.ndjson — for each type, 50% synthetic + 50% distilled samples
+        - blend-70-30.ndjson — 70% distilled + 30% synthetic per type
+        - blend-30-70.ndjson — 30% distilled + 70% synthetic per type
+        - blend-70-30-no-coltype.ndjson — same as blend-70-30 but with categorical,
+          ordinal, and increment removed from distilled source (these 3 types use
+          100% synthetic instead)
+
+        Blending strategy — per-type, capped (no oversampling):
+        - Target: --samples-per-type N (default: 1500, matching v14's ~1488/type avg)
+        - For each type, compute distilled_share = floor(N * ratio)
+        - If distilled samples < distilled_share: use all distilled, fill remainder
+          with synthetic. Never duplicate/oversample distilled values.
+        - If synthetic samples < synthetic_share: use all synthetic, fill remainder
+          with distilled (unlikely given generators produce unlimited data).
+        - Types with zero distilled data: 100% synthetic in all mixes.
+        - Types with no generator AND no distilled data (password): skipped with warning.
+
+        The script logs column-level type counts per mix for later analysis:
+        how many categorical, ordinal, and increment values in each NDJSON.
+
+        Flags: --seed, --distilled PATH, --output-dir, --samples-per-type N,
+        --dry-run, --min-values (filter from S-0 recommendation),
+        --exclude-column-types (for experiment 6).
+    - id: S-2
+      description: "Build experiment runner script"
+      detail: >
+        scripts/run_spike.sh orchestrates the full experiment loop.
+
+        Symlink management (centralised — addresses review F1/F2):
+        - Pre-flight: assert models/default → char-cnn-v14-250, save target
+        - Per experiment: ln -sfn models/spike-<mix> models/default
+        - Run scoring (both Tier 2 and Tier 1 use the symlink)
+        - Post-experiment: restore symlink to production model
+        - Post-flight: assert models/default → char-cnn-v14-250
+        - Trap on EXIT to restore symlink if script fails mid-run
+
+        For each NDJSON mix file in output/spike-training/:
+          1. Train: scripts/train.sh --data FILE --model-name spike-<mix> --epochs 10 --seed 42
+          2. Swap symlink: ln -sfn spike-<mix> models/default
+          3. Score Tier 2: python3 scripts/score_tier2.py --benchmark eval/tier2_benchmark.csv
+             --finetype ./target/release/finetype --format json
+             --output output/spike-results/<mix>_tier2.json
+          4. Score Tier 1: make eval-profile (bypasses eval.sh's symlink logic)
+             Parse score from eval output
+          5. Restore symlink: ln -sfn char-cnn-v14-250 models/default
+          6. Log: append row to output/spike-results/comparison.csv
+
+        Comparison CSV columns: mix, n_samples, n_types, tier1_score, tier2_overall,
+        tier2_agreement, tier2_disagreement, tier2_synthetic, tier2_per_domain (JSON),
+        training_time_sec.
+
+        The script should be resumable — skip mixes that already have results.
+    - id: S-3
+      description: "Run all experiments"
+      detail: >
+        Execute scripts/run_spike.sh. Monitor for failures. Expected runtime:
+        hardware-dependent (Metal ~45min/model, CPU ~2-3hrs/model).
+        6 experiments total.
+        Models saved to models/spike-synthetic, models/spike-distilled-backfill,
+        models/spike-blend-50-50, models/spike-blend-70-30, models/spike-blend-30-70,
+        models/spike-blend-70-30-no-coltype.
+    - id: S-4
+      description: "Analyse results and write findings"
+      detail: >
+        Read output/spike-results/comparison.csv. Produce findings.md with:
+        (a) Side-by-side comparison table (all metrics, all mixes).
+        (b) Column-level type analysis: direct comparison of experiment 4 (blend-70-30)
+            vs experiment 6 (blend-70-30-no-coltype). Same blend ratio, only difference
+            is column-level types removed. If 6 outperforms 4, column-level types hurt.
+        (c) Indirect negative transfer: track proxy types that share value patterns
+            with categorical (boolean, binary, gender, gender_code, terms, initials)
+            and compare their accuracy across experiments 1 vs 4 vs 6.
+        (d) Per-domain breakdown: which domains benefit most from distilled data?
+        (e) Disagreement row analysis: how much did each mix improve the 18.6% baseline?
+        (f) Recommendation: which mix (if any) is worth pursuing, and whether the
+            rule removal spike (Spec 3) should proceed.
+
+future_work:
+  - id: FW-1
+    title: "Rule removal spike (Spec 3)"
+    description: >
+      If a retrained model improves accuracy, systematically disable F1–F6
+      disambiguation rules one-by-one and measure Tier 2 impact. Goal: identify
+      which rules the model has absorbed. Separate spec required.
+  - id: FW-2
+    title: "Pipeline completion"
+    description: >
+      522 Sherlock batches + SOTAB + GitTables + Eval sources remain. More distilled
+      data could improve blended training. Re-run experiments when more data arrives.
+  - id: FW-3
+    title: "Architecture changes"
+    description: >
+      If data-only retraining shows limited improvement, explore: hierarchical head
+      (v15), more epochs, larger model, feature augmentation. Separate spike.
+  - id: FW-4
+    title: "Column-level model"
+    description: >
+      If column-level types (categorical, ordinal, increment) show negative transfer
+      from value-level training, consider a separate column-level classifier that
+      uses aggregate features rather than individual characters.
+
+evaluation_principles:
+  - principle: "Experimental rigour"
+    weight: 0.35
+    measure: "Single variable (training data) changed. Architecture, hyperparameters, seed held constant. Results reproducible."
+  - principle: "Measurement quality"
+    weight: 0.30
+    measure: "Both Tier 1 (regression) and Tier 2 (improvement) measured. Stratified analysis by agreement status and domain."
+  - principle: "Actionable findings"
+    weight: 0.25
+    measure: "Findings document gives a clear recommendation. Not just numbers — interpretation and next steps."
+  - principle: "Production safety"
+    weight: 0.10
+    measure: "Production model untouched. Spike models isolated. No risk of regression in shipped product."
+
+exit_conditions:
+  - "All 6 experiments completed with Tier 1 and Tier 2 scores"
+  - "Findings document produced with comparison table and recommendation"
+  - "Clear signal on whether distilled/blended training improves disagreement accuracy"
+  - "Column-level type impact measured via experiment 4 vs 6 comparison"
+  - "Production model (char-cnn-v14-250) unchanged"
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-20T23:00:00Z"
+  ambiguity_score: 0.07
+  interview_ref: "specs/2026-03-20-retraining-spike/interview.md"
+  review_ref: "specs/2026-03-20-retraining-spike/review-spec-2026-03-20.md"
+  decision_refs:
+    - "decisions/0009-pure-rust-via-candle.md"
+    - "decisions/0038-supersede-v2-fixes-with-retraining.md"
+    - "decisions/0039-use-all-adjudicated-distillation-rows.md"
+  depends_on:
+    - "eval/tier2_benchmark.csv (PR #17)"
+    - "output/distillation-v3/sherlock_distilled.csv.gz (PR #16)"

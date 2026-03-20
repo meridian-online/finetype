@@ -156,7 +156,7 @@ if [[ -n "$DATA_FILE" ]]; then
 else
     TRAINING_DATA="training.ndjson"
     echo "[1/3] Generating training data (${SAMPLES} samples/type)..."
-    cargo run -p finetype-cli ${CARGO_FEATURES} --release -- generate \
+    cargo run --bin finetype ${CARGO_FEATURES} --release -- generate \
         --samples "$SAMPLES" \
         --seed "$SEED" \
         --output "$TRAINING_DATA"
@@ -166,7 +166,7 @@ fi
 # ─── Step 2: Build CLI with correct features ───────────────────────
 echo ""
 echo "[2/3] Building with ${CARGO_FEATURES}..."
-cargo build -p finetype-cli ${CARGO_FEATURES} --release
+cargo build --bin finetype ${CARGO_FEATURES} --release
 
 # ─── Step 3: Train ─────────────────────────────────────────────────
 echo ""
@@ -175,7 +175,7 @@ mkdir -p "$MODEL_DIR"
 
 # Build the train command
 TRAIN_CMD=(
-    cargo run -p finetype-cli ${CARGO_FEATURES} --release --
+    cargo run --bin finetype ${CARGO_FEATURES} --release --
     train
     --data "$TRAINING_DATA"
     --output "$MODEL_DIR"
