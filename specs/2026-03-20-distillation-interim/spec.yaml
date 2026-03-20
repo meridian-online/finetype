@@ -1,0 +1,163 @@
+goal: >
+  Land distillation v3 interim data as a clean, minimal PR. Concatenate batch
+  CSVs into one gzipped file per source, squash branch history, and merge.
+  This establishes the data foundation for Tier 2 benchmark and retraining spike
+  (separate specs).
+
+constraints:
+  - "PR contains data + pipeline scripts only — no analysis, no eval integration"
+  - "Individual batch CSVs deleted after concatenation; .done markers preserved for pipeline resume"
+  - "Branch history squashed to a single commit before merge"
+  - "Bad batches excluded by design: only batches with a .done marker are concatenated"
+  - "Pipeline continues in background after PR merges — new data lands in future PRs"
+  - "Background pipeline is safe: distill_run.py only reads .done markers, never batch CSVs. New batches write to new files that don't conflict with the concatenated output."
+  - "Distillation v2 fixes spec superseded (Decision 0038); PR-1 guards already shipped"
+
+acceptance_criteria:
+  - id: AC-1
+    description: "Concatenated gzipped CSV exists per source with correct schema"
+    verification: >
+      output/distillation-v3/sherlock_distilled.csv.gz exists, gunzips cleanly,
+      has 13 columns (source, source_file, column_name, sample_values, blind_label,
+      blind_confidence, finetype_label, finetype_confidence, agreement, final_label,
+      reasoning, ground_truth_label, ground_truth_source), and row count matches
+      sum of valid batch .done markers. No duplicate rows (by source_file + column_name key).
+  - id: AC-2
+    description: "Individual batch CSV files removed from the repo"
+    verification: >
+      No sherlock_batch_*.csv files in output/distillation-v3/ after concatenation.
+      Transient files also removed: *.claimed, gen_batch_*.py, sherlock_batch_test.*.
+  - id: AC-3
+    description: ".done marker files preserved and pipeline resume verified by execution"
+    verification: >
+      All sherlock_batch_*.done files remain. Verified by active test:
+      (a) python3 scripts/distill_run.py status reports correct done count,
+      (b) python3 scripts/distill_run.py next --count 1 returns the correct
+      next pending batch (skipping all completed batches).
+  - id: AC-4
+    description: "Bad batch 0055 excluded by design"
+    verification: >
+      sherlock_batch_0055.done does not exist. Concat script only includes
+      batches with a .done marker, so batch 0055 is naturally excluded.
+      Verified: grep for batch 0055's offset range in concatenated output
+      returns 0 rows.
+  - id: AC-5
+    description: "Data quality gate passes"
+    verification: >
+      All rows in concatenated CSV have: (a) valid 3-part final_label from taxonomy
+      (domain.category.type) or empty, (b) blind_confidence in {high, medium, low},
+      (c) agreement in {yes, no}. Rows failing validation are logged to
+      output/distillation-v3/distill_concat.log with row number and reason.
+      If >1% of rows excluded, concatenation fails and requires manual review.
+  - id: AC-6
+    description: "Branch squashed to single commit"
+    verification: >
+      PR shows 1 commit. Commit message summarises scope and row counts.
+      Method: git reset --soft main && git commit.
+  - id: AC-7
+    description: "Pipeline scripts included and functional"
+    verification: >
+      scripts/distill_run.py, scripts/distill_agent_prompt.py, scripts/distill_batch.py,
+      scripts/distill_concat.py present and functional. distill_run.py status reports
+      correct counts post-merge.
+
+implementation:
+  steps:
+    - id: S-1
+      description: "Write concatenation script"
+      detail: >
+        scripts/distill_concat.py: for each source, finds batch CSVs that have a
+        matching .done marker (batches without .done are skipped — this is how bad
+        batches are excluded). Validates each row: schema check (13 columns),
+        label validity (3-part domain.category.type or empty), confidence values
+        (high/medium/low), agreement (yes/no). Detects and excludes duplicate rows
+        (by source_file + column_name). Concatenates valid rows into one CSV per
+        source, gzips the result. Logs all excluded rows with reasons to
+        distill_concat.log. Fails if >1% of rows excluded.
+    - id: S-1.5
+      description: "Test concatenation script on sample"
+      detail: >
+        Run distill_concat.py on a 5-batch sample before full execution.
+        Verify: row count matches, schema correct, no duplicates, label
+        validation catches known-bad patterns (the column-shifted rows from
+        batch 0055 would fail validation). Manual spot-check of output.
+    - id: S-2
+      description: "Run concatenation on current data"
+      detail: >
+        Execute for sherlock source. Output: output/distillation-v3/sherlock_distilled.csv.gz.
+        Review distill_concat.log for any excluded rows.
+    - id: S-3
+      description: "Remove individual batch CSVs and transient files"
+      detail: >
+        Delete from output/distillation-v3/:
+        - sherlock_batch_*.csv (batch output files)
+        - *.claimed (parallel coordination markers)
+        - gen_batch_*.py (agent-generated scripts)
+        - sherlock_batch_test.csv, sherlock_batch_test.done (test artifacts)
+        Keep: *.done markers, *.jsonl source files, *_distilled.csv.gz.
+    - id: S-4
+      description: "Squash branch and create PR"
+      detail: >
+        git reset --soft main && git commit (single squashed commit).
+        Commit message includes: scope summary, row counts, excluded row count,
+        reference to this spec and Decision 0038. Push and create PR.
+    - id: S-5
+      description: "Post-merge pipeline resume test"
+      detail: >
+        After merge, run: python3 scripts/distill_run.py status (verify counts),
+        python3 scripts/distill_run.py next --count 1 (verify correct next batch).
+        Restart background pipeline and confirm it picks up where it left off.
+
+future_work:
+  - id: FW-1
+    title: "Tier 2 distillation benchmark"
+    description: >
+      Stratified sample from distilled data (~500-1000 columns). N columns per
+      FineType type, balanced by agreement/disagreement. Becomes the new eval target
+      for retraining. Needs its own interview and spec.
+  - id: FW-2
+    title: "Retraining spike"
+    description: >
+      Train CharCNN variants on synthetic-only, distilled-only, and blended data.
+      Evaluate against Tier 2 benchmark. Goal: absorb disambiguation rules into
+      the model. Needs its own interview and spec.
+  - id: FW-3
+    title: "Continue distillation pipeline"
+    description: >
+      Complete Sherlock (541 remaining), then Eval CSVs (3 batches), SOTAB (3,611),
+      GitTables (448). Each source gets its own _distilled.csv.gz in future PRs.
+  - id: FW-4
+    title: "v2 fix problems as test cases"
+    description: >
+      PR-2 problems from superseded spec (categorical/ordinal, username demotion,
+      float-stored IDs, sequential IDs, sentence/entity_name) carried forward as
+      retraining spike evaluation targets per Decision 0038.
+
+evaluation_principles:
+  - principle: "Data integrity"
+    weight: 0.4
+    measure: "All rows pass schema validation; bad batches excluded; row counts match; no duplicates"
+  - principle: "Pipeline continuity"
+    weight: 0.3
+    measure: ".done markers preserved; distill_run.py status and next work correctly post-merge"
+  - principle: "Clean history"
+    weight: 0.2
+    measure: "Single squashed commit; no batch-by-batch noise in git log"
+  - principle: "Minimal scope"
+    weight: 0.1
+    measure: "PR contains only data + scripts; no analysis, eval changes, or code changes"
+
+exit_conditions:
+  - "PR merged to main with single squashed commit"
+  - "sherlock_distilled.csv.gz validates against AC-1 and AC-5"
+  - "Pipeline resume verified by execution (AC-3, S-5)"
+  - "No individual batch CSVs in repo (AC-2)"
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-20T17:00:00Z"
+  ambiguity_score: 0.08
+  interview_ref: "specs/2026-03-20-distillation-interim/interview.md"
+  decision_ref: "decisions/0038-supersede-v2-fixes-with-retraining.md"
+  review_ref: "specs/2026-03-20-distillation-interim/review-spec-2026-03-20.md"
+  supersedes: "specs/2026-03-18-distillation-v2-fixes/spec.yaml (PR-2 and PR-3 only)"
