@@ -23,7 +23,7 @@ pub mod tiered;
 pub mod tiered_training;
 pub mod training;
 
-pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchyMap};
+pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchicalHead, HierarchyMap};
 pub use char_distribution::{extract_char_distribution, CHAR_DIST_DIM, CHAR_DIST_NAMES};
 pub use char_training::{CharTrainer, CharTrainingConfig};
 pub use column::{

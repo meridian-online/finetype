@@ -11,6 +11,7 @@
 //!                    BatchNorm → Dense(500, ReLU) → Dropout → Dense(500, ReLU) → Dropout
 //!                             ↓
 //! Head (flat):       Dense(250, softmax)
+//! Head (hier):       Tree softmax (7 domains → 43 categories → 250 types)
 //! ```
 //!
 //! Training data is stored in a custom binary format (FTMB) with per-record
@@ -22,6 +23,7 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::{
     batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder, VarMap,
 };
+use finetype_model::char_cnn::{HierarchicalHead, HierarchyMap};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -157,7 +159,7 @@ impl BranchWeights {
 ///
 /// Three independent branches process their respective feature vectors, then outputs
 /// are concatenated and passed through a shared merge trunk with BatchNorm, followed
-/// by a classification head.
+/// by a classification head (flat softmax or hierarchical tree softmax).
 pub struct MultiBranchModel {
     char_branch: BranchWeights,
     embed_branch: BranchWeights,
@@ -165,17 +167,66 @@ pub struct MultiBranchModel {
     merge_bn: BatchNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
-    head: Linear,
+    /// Flat classification head (250-class softmax). None when hierarchical.
+    head: Option<Linear>,
+    /// Hierarchical tree softmax head (7→43→250). None when flat.
+    hierarchical: Option<HierarchicalHead>,
     config: MultiBranchConfig,
 }
 
 impl MultiBranchModel {
-    /// Create a new multi-branch model with randomly initialized weights.
+    /// Create a new multi-branch model with a flat classification head.
     pub fn new(config: &MultiBranchConfig, vb: VarBuilder) -> candle_core::Result<Self> {
-        if config.head_type != HeadType::Flat {
-            candle_core::bail!("Only HeadType::Flat is currently implemented");
-        }
+        let (char_branch, embed_branch, stats_branch, merge_bn, merge_linear1, merge_linear2) =
+            Self::build_trunk(config, &vb)?;
 
+        let head = linear(config.merge_hidden[1], config.n_classes, vb.pp("head"))?;
+
+        Ok(Self {
+            char_branch,
+            embed_branch,
+            stats_branch,
+            merge_bn,
+            merge_linear1,
+            merge_linear2,
+            head: Some(head),
+            hierarchical: None,
+            config: config.clone(),
+        })
+    }
+
+    /// Create a new multi-branch model with a hierarchical tree softmax head.
+    ///
+    /// `labels` must be the sorted list of all type labels in `domain.category.type` format.
+    pub fn new_hierarchical(
+        config: &MultiBranchConfig,
+        labels: &[String],
+        vb: VarBuilder,
+    ) -> candle_core::Result<Self> {
+        let (char_branch, embed_branch, stats_branch, merge_bn, merge_linear1, merge_linear2) =
+            Self::build_trunk(config, &vb)?;
+
+        let hier_head = HierarchicalHead::new(config.merge_hidden[1], labels, vb.pp("hier"))?;
+
+        Ok(Self {
+            char_branch,
+            embed_branch,
+            stats_branch,
+            merge_bn,
+            merge_linear1,
+            merge_linear2,
+            head: None,
+            hierarchical: Some(hier_head),
+            config: config.clone(),
+        })
+    }
+
+    /// Build the shared trunk (branches + merge layers). Used by both constructors.
+    fn build_trunk(
+        config: &MultiBranchConfig,
+        vb: &VarBuilder,
+    ) -> candle_core::Result<(BranchWeights, BranchWeights, BranchWeights, BatchNorm, Linear, Linear)>
+    {
         let char_branch = BranchWeights::new(
             config.char_dim,
             config.char_hidden,
@@ -204,27 +255,20 @@ impl MultiBranchModel {
             vb.pp("merge_l2"),
         )?;
 
-        let head = linear(config.merge_hidden[1], config.n_classes, vb.pp("head"))?;
-
-        Ok(Self {
+        Ok((
             char_branch,
             embed_branch,
             stats_branch,
             merge_bn,
             merge_linear1,
             merge_linear2,
-            head,
-            config: config.clone(),
-        })
+        ))
     }
 
-    /// Forward pass. Returns logits (pre-softmax) of shape `[B, n_classes]`.
+    /// Forward pass through the trunk only (branches → merge → hidden).
     ///
-    /// - `char_feats`: `[B, char_dim]` (960)
-    /// - `embed_feats`: `[B, embed_dim]` (512)
-    /// - `stats_feats`: `[B, stats_dim]` (27)
-    /// - `train`: when true, enables dropout and training-mode BatchNorm
-    pub fn forward(
+    /// Returns the hidden representation `[B, merge_hidden[1]]` before the classification head.
+    pub fn forward_trunk(
         &self,
         char_feats: &Tensor,
         embed_feats: &Tensor,
@@ -254,14 +298,67 @@ impl MultiBranchModel {
         };
         let h = self.merge_linear2.forward_t(&h, false)?;
         let h = h.relu()?;
-        let h = if train {
-            candle_nn::ops::dropout(&h, self.config.dropout)?
+        if train {
+            candle_nn::ops::dropout(&h, self.config.dropout)
         } else {
-            h
-        };
+            Ok(h)
+        }
+    }
 
-        // Classification head: logits
-        self.head.forward_t(&h, false)
+    /// Forward pass. Returns output of shape `[B, n_classes]`.
+    ///
+    /// - For flat head: returns logits (pre-softmax).
+    /// - For hierarchical head: returns product probabilities.
+    ///
+    /// In both cases, `argmax(dim=1)` gives predicted class indices.
+    pub fn forward(
+        &self,
+        char_feats: &Tensor,
+        embed_feats: &Tensor,
+        stats_feats: &Tensor,
+        train: bool,
+    ) -> candle_core::Result<Tensor> {
+        let hidden = self.forward_trunk(char_feats, embed_feats, stats_feats, train)?;
+
+        if let Some(ref head) = self.head {
+            // Flat head: logits
+            head.forward_t(&hidden, false)
+        } else if let Some(ref hier) = self.hierarchical {
+            // Hierarchical head: product probabilities
+            hier.forward(&hidden, self.config.n_classes)
+        } else {
+            candle_core::bail!("No classification head configured");
+        }
+    }
+
+    /// Forward pass returning per-level logits for hierarchical training loss.
+    ///
+    /// Returns `(domain_logits, category_logits_per_domain, leaf_logits_per_category)`.
+    /// Only available when the model has a hierarchical head.
+    #[allow(clippy::type_complexity)]
+    pub fn forward_levels(
+        &self,
+        char_feats: &Tensor,
+        embed_feats: &Tensor,
+        stats_feats: &Tensor,
+        train: bool,
+    ) -> candle_core::Result<(Tensor, Vec<Tensor>, Vec<Vec<Option<Tensor>>>)> {
+        let hidden = self.forward_trunk(char_feats, embed_feats, stats_feats, train)?;
+
+        match &self.hierarchical {
+            Some(ref hier) => hier.forward_levels(&hidden),
+            None => candle_core::bail!("forward_levels() requires a hierarchical head"),
+        }
+    }
+
+    /// Access the hierarchical head (if present).
+    pub fn hierarchical_head(&self) -> Option<&HierarchicalHead> {
+        self.hierarchical.as_ref()
+    }
+
+    /// Whether this model uses a hierarchical classification head.
+    pub fn is_hierarchical(&self) -> bool {
+        self.hierarchical.is_some()
     }
 
     /// Get the model config.
@@ -631,15 +728,131 @@ fn count_parameters(varmap: &VarMap) -> usize {
         .sum()
 }
 
+/// Compute hierarchical multi-level cross-entropy loss.
+///
+/// Decomposes flat label indices into domain/category/type targets using the
+/// hierarchy map, computes per-level cross-entropy, and returns a weighted sum:
+/// `0.2 * domain_loss + 0.3 * category_loss + 0.5 * leaf_loss`.
+///
+/// Also returns the flat-space accuracy for metric tracking.
+fn compute_hierarchical_loss(
+    domain_logits: &Tensor,
+    cat_logits_all: &[Tensor],
+    leaf_logits_all: &[Vec<Option<Tensor>>],
+    flat_labels: &Tensor,
+    hierarchy: &HierarchyMap,
+    device: &Device,
+) -> candle_core::Result<Tensor> {
+    let flat_labels_vec: Vec<u32> = flat_labels.to_vec1()?;
+    let batch_len = flat_labels_vec.len();
+
+    // Decompose flat labels into per-level targets
+    let mut domain_targets = Vec::with_capacity(batch_len);
+    let mut cat_targets_by_domain: Vec<Vec<u32>> = vec![Vec::new(); hierarchy.num_domains()];
+    let mut cat_sample_indices_by_domain: Vec<Vec<usize>> =
+        vec![Vec::new(); hierarchy.num_domains()];
+    let mut leaf_targets_by_cat: Vec<Vec<Vec<u32>>> = Vec::new();
+    let mut leaf_sample_indices_by_cat: Vec<Vec<Vec<usize>>> = Vec::new();
+
+    for d in 0..hierarchy.num_domains() {
+        leaf_targets_by_cat.push(vec![Vec::new(); hierarchy.num_categories(d)]);
+        leaf_sample_indices_by_cat.push(vec![Vec::new(); hierarchy.num_categories(d)]);
+    }
+
+    for (i, &flat_idx) in flat_labels_vec.iter().enumerate() {
+        let (d, c, t) = hierarchy.flat_to_hier(flat_idx as usize);
+        domain_targets.push(d as u32);
+        cat_targets_by_domain[d].push(c as u32);
+        cat_sample_indices_by_domain[d].push(i);
+        leaf_targets_by_cat[d][c].push(t as u32);
+        leaf_sample_indices_by_cat[d][c].push(i);
+    }
+
+    // Domain loss (all samples)
+    let domain_target_tensor = Tensor::new(domain_targets, device)?;
+    let domain_loss = candle_nn::loss::cross_entropy(domain_logits, &domain_target_tensor)?;
+
+    // Category loss (grouped by ground-truth domain)
+    let mut cat_loss_sum = Tensor::new(0.0f32, device)?;
+    let mut cat_count = 0usize;
+
+    for d in 0..hierarchy.num_domains() {
+        if cat_targets_by_domain[d].is_empty() {
+            continue;
+        }
+        let indices: Vec<u32> = cat_sample_indices_by_domain[d]
+            .iter()
+            .map(|&i| i as u32)
+            .collect();
+        let idx_tensor = Tensor::new(indices, device)?;
+        let cat_logits_subset = cat_logits_all[d].index_select(&idx_tensor, 0)?;
+        let cat_target_tensor = Tensor::new(cat_targets_by_domain[d].clone(), device)?;
+        let cl = candle_nn::loss::cross_entropy(&cat_logits_subset, &cat_target_tensor)?;
+        let n = cat_targets_by_domain[d].len() as f32;
+        cat_loss_sum = (cat_loss_sum + cl.broadcast_mul(&Tensor::new(n, device)?))?;
+        cat_count += cat_targets_by_domain[d].len();
+    }
+
+    let cat_loss = if cat_count > 0 {
+        cat_loss_sum.broadcast_div(&Tensor::new(cat_count as f32, device)?)?
+    } else {
+        Tensor::new(0.0f32, device)?
+    };
+
+    // Leaf loss (grouped by ground-truth domain + category, skip degenerate)
+    let mut leaf_loss_sum = Tensor::new(0.0f32, device)?;
+    let mut leaf_count = 0usize;
+
+    for d in 0..hierarchy.num_domains() {
+        for c in 0..hierarchy.num_categories(d) {
+            if hierarchy.is_degenerate(d, c) || leaf_targets_by_cat[d][c].is_empty() {
+                continue;
+            }
+            if let Some(ref leaf_logits) = leaf_logits_all[d][c] {
+                let indices: Vec<u32> = leaf_sample_indices_by_cat[d][c]
+                    .iter()
+                    .map(|&i| i as u32)
+                    .collect();
+                let idx_tensor = Tensor::new(indices, device)?;
+                let leaf_logits_subset = leaf_logits.index_select(&idx_tensor, 0)?;
+                let leaf_target_tensor =
+                    Tensor::new(leaf_targets_by_cat[d][c].clone(), device)?;
+                let ll = candle_nn::loss::cross_entropy(&leaf_logits_subset, &leaf_target_tensor)?;
+                let n = leaf_targets_by_cat[d][c].len() as f32;
+                leaf_loss_sum =
+                    (leaf_loss_sum + ll.broadcast_mul(&Tensor::new(n, device)?))?;
+                leaf_count += leaf_targets_by_cat[d][c].len();
+            }
+        }
+    }
+
+    let leaf_loss = if leaf_count > 0 {
+        leaf_loss_sum.broadcast_div(&Tensor::new(leaf_count as f32, device)?)?
+    } else {
+        Tensor::new(0.0f32, device)?
+    };
+
+    // Weighted combination: 0.2 * domain + 0.3 * category + 0.5 * leaf
+    let total = (domain_loss.broadcast_mul(&Tensor::new(0.2f32, device)?)?
+        + cat_loss.broadcast_mul(&Tensor::new(0.3f32, device)?)?
+        + leaf_loss.broadcast_mul(&Tensor::new(0.5f32, device)?)?)?;
+
+    Ok(total)
+}
+
 /// Train the multi-branch model.
 ///
 /// Loads feature-vector training data, runs forward/backward passes with Adam,
 /// logs loss per epoch, and saves the best model weights in safetensors format.
+///
+/// When `model_config.head_type == HeadType::Hierarchical`, `labels` must be
+/// provided (sorted list of all type labels). For flat head, `labels` is ignored.
 pub fn train_multi_branch(
     config: &MultiBranchTrainConfig,
     model_config: &MultiBranchConfig,
     train_data: &MultiBranchDataset,
     val_data: &MultiBranchDataset,
+    labels: Option<&[String]>,
 ) -> Result<crate::training::TrainingSummary> {
     use crate::training::{
         compute_accuracy, shuffled_batches, CosineScheduler, EarlyStopping, EpochMetrics,
@@ -651,19 +864,30 @@ pub fn train_multi_branch(
     let device = crate::get_device();
     let mut rng = StdRng::seed_from_u64(config.seed);
 
+    let is_hierarchical = model_config.head_type == HeadType::Hierarchical;
+
     tracing::info!(
-        "Starting multi-branch training: {} train, {} val, {} epochs, batch_size={}, lr={}",
+        "Starting multi-branch training: {} train, {} val, {} epochs, batch_size={}, lr={}, head={}",
         train_data.len(),
         val_data.len(),
         config.epochs,
         config.batch_size,
         config.lr,
+        if is_hierarchical { "hierarchical" } else { "flat" },
     );
 
     // Create model
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
-    let model = MultiBranchModel::new(model_config, vb)?;
+    let model = if is_hierarchical {
+        let labels = labels.ok_or_else(|| {
+            anyhow::anyhow!("Hierarchical head requires sorted labels list")
+        })?;
+        MultiBranchModel::new_hierarchical(model_config, labels, vb)?
+    } else {
+        MultiBranchModel::new(model_config, vb)?
+    };
+
     let n_params = count_parameters(&varmap);
     tracing::info!("Model parameters: {}", n_params);
     tracing::info!(
@@ -675,6 +899,20 @@ pub fn train_multi_branch(
         model_config.merge_hidden[0], model_config.merge_hidden[1],
         model_config.n_classes,
     );
+
+    if is_hierarchical {
+        let hier = model.hierarchical_head().unwrap();
+        let h = hier.hierarchy();
+        tracing::info!(
+            "Hierarchical: {} domains, {} categories, {} degenerate",
+            h.num_domains(),
+            h.total_categories(),
+            (0..h.num_domains())
+                .flat_map(|d| (0..h.num_categories(d)).map(move |c| (d, c)))
+                .filter(|&(d, c)| h.is_degenerate(d, c))
+                .count()
+        );
+    }
 
     // Create optimizer (AdamW with weight_decay for L2 regularization)
     let adamw_params = ParamsAdamW {
@@ -716,16 +954,34 @@ pub fn train_multi_branch(
         // Training loop
         for batch_idx in &batches {
             let (char_t, embed_t, stats_t, labels_t) = train_data.batch(batch_idx, &device)?;
+            let bs = batch_idx.len();
 
-            let logits = model.forward(&char_t, &embed_t, &stats_t, true)?;
-            let loss = candle_nn::loss::cross_entropy(&logits, &labels_t)?;
+            let loss = if is_hierarchical {
+                let hier = model.hierarchical_head().unwrap();
+                let hierarchy = hier.hierarchy();
+                let (domain_logits, cat_logits, leaf_logits) =
+                    model.forward_levels(&char_t, &embed_t, &stats_t, true)?;
+                compute_hierarchical_loss(
+                    &domain_logits,
+                    &cat_logits,
+                    &leaf_logits,
+                    &labels_t,
+                    hierarchy,
+                    &device,
+                )?
+            } else {
+                let logits = model.forward(&char_t, &embed_t, &stats_t, true)?;
+                candle_nn::loss::cross_entropy(&logits, &labels_t)?
+            };
 
             optimizer.backward_step(&loss)?;
 
-            let bs = batch_idx.len();
             let loss_val: f32 = loss.to_scalar()?;
             train_loss_sum += loss_val as f64 * bs as f64;
-            let acc = compute_accuracy(&logits, &labels_t)?;
+
+            // Accuracy via forward (product probabilities for hier, logits for flat)
+            let output = model.forward(&char_t, &embed_t, &stats_t, false)?;
+            let acc = compute_accuracy(&output, &labels_t)?;
             train_correct_sum += acc as f64 * bs as f64;
             train_samples += bs;
         }
@@ -747,12 +1003,32 @@ pub fn train_multi_branch(
 
             for batch_idx in &val_batches {
                 let (char_t, embed_t, stats_t, labels_t) = val_data.batch(batch_idx, &device)?;
-                let logits = model.forward(&char_t, &embed_t, &stats_t, false)?;
-                let loss = candle_nn::loss::cross_entropy(&logits, &labels_t)?;
                 let bs = batch_idx.len();
-                let loss_val: f32 = loss.to_scalar()?;
+
+                let loss_val = if is_hierarchical {
+                    let hier = model.hierarchical_head().unwrap();
+                    let hierarchy = hier.hierarchy();
+                    let (domain_logits, cat_logits, leaf_logits) =
+                        model.forward_levels(&char_t, &embed_t, &stats_t, false)?;
+                    let loss = compute_hierarchical_loss(
+                        &domain_logits,
+                        &cat_logits,
+                        &leaf_logits,
+                        &labels_t,
+                        hierarchy,
+                        &device,
+                    )?;
+                    loss.to_scalar::<f32>()?
+                } else {
+                    let logits = model.forward(&char_t, &embed_t, &stats_t, false)?;
+                    let loss = candle_nn::loss::cross_entropy(&logits, &labels_t)?;
+                    loss.to_scalar::<f32>()?
+                };
+
                 val_loss_sum += loss_val as f64 * bs as f64;
-                let acc = compute_accuracy(&logits, &labels_t)?;
+
+                let output = model.forward(&char_t, &embed_t, &stats_t, false)?;
+                let acc = compute_accuracy(&output, &labels_t)?;
                 val_correct_sum += acc as f64 * bs as f64;
                 val_samples += bs;
             }
@@ -1119,7 +1395,8 @@ mod tests {
             min_lr: 1e-6,
         };
 
-        let summary = train_multi_branch(&train_config, &config, &train_data, &val_data).unwrap();
+        let summary =
+            train_multi_branch(&train_config, &config, &train_data, &val_data, None).unwrap();
 
         assert_eq!(summary.total_epochs, 5);
         assert_eq!(summary.epoch_metrics.len(), 5);
@@ -1146,19 +1423,237 @@ mod tests {
         assert_eq!(config.merged_dim(), 300 + 200 + 64); // 564
     }
 
+    // ── Hierarchical head tests ──────────────────────────────────────
+
+    /// Generate a minimal set of sorted labels spanning multiple domains/categories.
+    fn make_hier_labels() -> Vec<String> {
+        vec![
+            "container.array.comma_separated".to_string(),
+            "container.array.pipe_separated".to_string(),
+            "container.object.json".to_string(),
+            "datetime.date.iso".to_string(),
+            "datetime.date.ymd_slash".to_string(),
+            "datetime.time.hms_24h".to_string(),
+            "geography.location.city".to_string(),
+            "geography.location.country".to_string(),
+            "identity.person.email".to_string(),
+            "identity.person.full_name".to_string(),
+        ]
+    }
+
     #[test]
-    fn test_head_type_hierarchical_rejected() {
+    fn test_hierarchical_forward_pass_shape() {
+        let labels = make_hier_labels();
         let config = MultiBranchConfig {
-            head_type: HeadType::Hierarchical,
+            n_classes: labels.len(),
             ..Default::default()
         };
         let device = Device::Cpu;
         let varmap = VarMap::new();
         let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
-        let result = MultiBranchModel::new(&config, vb);
+        let model = MultiBranchModel::new_hierarchical(&config, &labels, vb).unwrap();
+
+        assert!(model.is_hierarchical());
+
+        let batch_size = 5;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+
+        // forward() returns product probabilities [B, n_classes]
+        let output = model
+            .forward(&char_feats, &embed_feats, &stats_feats, false)
+            .unwrap();
+        assert_eq!(output.dims(), &[batch_size, labels.len()]);
+
+        // forward_levels() returns per-level logits
+        let (domain_logits, cat_logits, leaf_logits) = model
+            .forward_levels(&char_feats, &embed_feats, &stats_feats, false)
+            .unwrap();
+
+        // 4 domains: container, datetime, geography, identity
+        assert_eq!(domain_logits.dims()[0], batch_size);
+        assert_eq!(domain_logits.dims()[1], 4);
+        assert_eq!(cat_logits.len(), 4);
+        assert_eq!(leaf_logits.len(), 4);
+    }
+
+    #[test]
+    fn test_hierarchical_gradient_flow() {
+        let labels = make_hier_labels();
+        let config = MultiBranchConfig {
+            n_classes: labels.len(),
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new_hierarchical(&config, &labels, vb).unwrap();
+
+        let batch_size = 4;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        // Target labels: one per sample, spread across domains
+        let targets = Tensor::new(&[0u32, 3, 6, 8], &device).unwrap();
+
+        let vars = varmap.all_vars();
+        let initial_values: Vec<Vec<f32>> = vars
+            .iter()
+            .map(|v| {
+                v.as_tensor()
+                    .flatten_all()
+                    .unwrap()
+                    .to_vec1::<f32>()
+                    .unwrap()
+            })
+            .collect();
+
+        // Compute hierarchical loss
+        let hier = model.hierarchical_head().unwrap();
+        let hierarchy = hier.hierarchy();
+        let (domain_logits, cat_logits, leaf_logits) = model
+            .forward_levels(&char_feats, &embed_feats, &stats_feats, true)
+            .unwrap();
+        let loss = compute_hierarchical_loss(
+            &domain_logits,
+            &cat_logits,
+            &leaf_logits,
+            &targets,
+            hierarchy,
+            &device,
+        )
+        .unwrap();
+
+        let adamw_params = candle_nn::ParamsAdamW {
+            lr: 0.01,
+            ..Default::default()
+        };
+        let mut optimizer = candle_nn::AdamW::new(varmap.all_vars(), adamw_params).unwrap();
+        optimizer.backward_step(&loss).unwrap();
+
+        let updated_values: Vec<Vec<f32>> = vars
+            .iter()
+            .map(|v| {
+                v.as_tensor()
+                    .flatten_all()
+                    .unwrap()
+                    .to_vec1::<f32>()
+                    .unwrap()
+            })
+            .collect();
+
+        let n_changed: usize = initial_values
+            .iter()
+            .zip(updated_values.iter())
+            .filter(|(a, b)| a != b)
+            .count();
         assert!(
-            result.is_err(),
-            "Hierarchical head should be rejected for now"
+            n_changed > 5,
+            "Expected many parameters to change after hierarchical backward, only {} changed out of {}",
+            n_changed,
+            vars.len()
         );
+    }
+
+    #[test]
+    fn test_hierarchical_training_loop_small() {
+        let labels = make_hier_labels();
+        let n_classes = labels.len();
+        let config = MultiBranchConfig {
+            n_classes,
+            head_type: HeadType::Hierarchical,
+            ..Default::default()
+        };
+
+        // Create synthetic data with class-dependent features
+        let mut records = Vec::new();
+        for i in 0..30 {
+            let class_idx = i % n_classes;
+            let bias = class_idx as f32;
+            records.push(TrainingRecord {
+                label: labels[class_idx].clone(),
+                char_features: (0..960)
+                    .map(|j| {
+                        if j % n_classes == class_idx {
+                            1.0 + bias
+                        } else {
+                            0.1
+                        }
+                    })
+                    .collect(),
+                embed_features: (0..512)
+                    .map(|j| {
+                        if j % n_classes == class_idx {
+                            1.0 + bias
+                        } else {
+                            0.1
+                        }
+                    })
+                    .collect(),
+                stats_features: (0..27)
+                    .map(|j| {
+                        if j % n_classes == class_idx {
+                            1.0 + bias
+                        } else {
+                            0.1
+                        }
+                    })
+                    .collect(),
+            });
+        }
+
+        let mut label_to_idx = std::collections::HashMap::new();
+        for (i, label) in labels.iter().enumerate() {
+            label_to_idx.insert(label.clone(), i as u32);
+        }
+
+        let train_data =
+            MultiBranchDataset::from_records(&records[..20], &label_to_idx, 960, 512, 27).unwrap();
+        let val_data =
+            MultiBranchDataset::from_records(&records[20..], &label_to_idx, 960, 512, 27).unwrap();
+
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let train_config = MultiBranchTrainConfig {
+            output_dir: tmp_dir.path().to_path_buf(),
+            epochs: 5,
+            batch_size: 10,
+            lr: 1e-3,
+            weight_decay: 1e-4,
+            patience: 10,
+            seed: 42,
+            min_lr: 1e-6,
+        };
+
+        let summary = train_multi_branch(
+            &train_config,
+            &config,
+            &train_data,
+            &val_data,
+            Some(&labels),
+        )
+        .unwrap();
+
+        assert_eq!(summary.total_epochs, 5);
+
+        // Loss should decrease
+        let loss_0 = summary.epoch_metrics[0].train_loss;
+        let loss_4 = summary.epoch_metrics[4].train_loss;
+        assert!(
+            loss_4 < loss_0,
+            "Hierarchical training loss should decrease: epoch 0 = {}, epoch 4 = {}",
+            loss_0,
+            loss_4,
+        );
+
+        // Model artifacts should exist
+        assert!(tmp_dir.path().join("model.safetensors").exists());
+        assert!(tmp_dir.path().join("config.json").exists());
     }
 }
