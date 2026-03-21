@@ -799,7 +799,7 @@ fn cmd_train_multi_branch(
     };
 
     // Load taxonomy to get sorted labels
-    let taxonomy = Taxonomy::from_path(&taxonomy)?;
+    let taxonomy = Taxonomy::from_directory(&taxonomy)?;
     let labels_list: Vec<String> = taxonomy.labels().to_vec();
     let label_to_idx: std::collections::HashMap<String, u32> = taxonomy
         .label_to_index()
