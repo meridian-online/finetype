@@ -188,9 +188,13 @@ mod tests {
             "Michael Brown Jr.", "Alexandra Petrova",
             // More numbers
             "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+            // Padding to reach 100
+            "alpha", "beta", "gamma", "delta", "epsilon",
+            "zeta", "eta", "theta", "iota", "kappa",
+            "lambda", "mu", "nu", "xi", "omicron",
         ];
 
-        assert!(values.len() >= 100, "Need at least 100 values for test");
+        assert!(values.len() >= 100, "Need at least 100 values for test, got {}", values.len());
 
         let result = extract_embedding_aggregation(&values, &resources);
         assert!(result.is_some(), "Should produce a result for diverse values");
