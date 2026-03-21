@@ -81,20 +81,23 @@ if [[ "$SKIP_BASELINE" == "false" ]]; then
     echo " Started: $(date)"
     echo "════════════════════════════════════════════════════════════════"
 
-    mkdir -p output/baseline-training
+    SPIKE_DIR="output/spike-training"
 
-    echo "[PRE-1] Generating blended training data..."
-    python3 scripts/prepare_spike_data.py \
-        --distilled output/distillation-v3/sherlock_distilled.csv.gz \
-        --ratio-distilled 0.3 \
-        --samples-per-type 1500 \
-        --seed 42 \
-        --output output/baseline-training/blend-30-70.ndjson
+    if [[ -f "$SPIKE_DIR/blend-30-70.ndjson" ]]; then
+        echo "[PRE-1] Blended training data already exists at $SPIKE_DIR/blend-30-70.ndjson"
+    else
+        echo "[PRE-1] Generating blended training data (all mixes)..."
+        python3 scripts/prepare_spike_data.py \
+            --distilled output/distillation-v3/sherlock_distilled.csv.gz \
+            --output-dir "$SPIKE_DIR" \
+            --samples-per-type 1500 \
+            --seed 42
+    fi
 
     echo ""
     echo "[PRE-1] Training CharCNN baseline..."
     ./scripts/train.sh \
-        --data output/baseline-training/blend-30-70.ndjson \
+        --data "$SPIKE_DIR/blend-30-70.ndjson" \
         --size large \
         --epochs 10 \
         --seed 42 \
