@@ -8,6 +8,7 @@ pub mod char_cnn;
 pub mod char_distribution;
 pub mod char_training;
 pub mod column;
+pub mod embedding_aggregation;
 pub mod entity;
 pub mod features;
 pub mod inference;
@@ -27,6 +28,7 @@ pub use char_training::{CharTrainer, CharTrainingConfig};
 pub use column::{
     aggregate_features, ColumnClassifier, ColumnConfig, ColumnFeatures, ColumnResult,
 };
+pub use embedding_aggregation::{extract_embedding_aggregation, EMBED_AGG_DIM, EMBED_DIM};
 pub use entity::EntityClassifier;
 pub use features::{extract_features, FEATURE_DIM, FEATURE_NAMES};
 pub use inference::{
