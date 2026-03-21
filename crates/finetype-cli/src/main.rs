@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
 use finetype_model::Classifier;
 use serde_json::json;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -381,6 +381,18 @@ enum Commands {
     /// Start MCP server for AI agent integration (stdio transport)
     Mcp,
 
+    /// Extract multi-branch feature vectors from a column of values (stdin)
+    #[command(name = "extract-features", hide = true)]
+    ExtractFeatures {
+        /// Column header name (used for embedding context)
+        #[arg(long)]
+        header: Option<String>,
+
+        /// Read input as a JSON array instead of one value per line
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Evaluate model accuracy on a test set
     #[command(hide = true)]
     Eval {
@@ -654,6 +666,8 @@ fn main() -> Result<()> {
         } => cmd_eval(data, model, taxonomy, model_type, top_confusions, output),
 
         Commands::Mcp => cmd_mcp(),
+
+        Commands::ExtractFeatures { header, json } => cmd_extract_features(header, json),
     }
 }
 
@@ -680,6 +694,72 @@ fn cmd_mcp() -> Result<()> {
 
     // Run the async server
     tokio::runtime::Runtime::new()?.block_on(server.serve_stdio())?;
+
+    Ok(())
+}
+
+/// Extract multi-branch feature vectors from a column of values read from stdin.
+///
+/// Reads values (one per line, or JSON array with --json), then extracts:
+/// - char: 960-dim character distribution features
+/// - embed: 512-dim Model2Vec embedding aggregation features
+/// - stats: 27-dim column-level statistics
+///
+/// Outputs JSON to stdout.
+fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> {
+    use finetype_model::{
+        extract_char_distribution, extract_column_stats, extract_embedding_aggregation,
+        CHAR_DIST_DIM, COLUMN_STATS_DIM, EMBED_AGG_DIM,
+    };
+
+    // Read values from stdin
+    let stdin = io::stdin();
+    let values: Vec<String> = if json_input {
+        let mut buf = String::new();
+        stdin.lock().read_to_string(&mut buf)?;
+        let parsed: Vec<String> = serde_json::from_str(&buf)
+            .map_err(|e| anyhow::anyhow!("Failed to parse JSON array from stdin: {}", e))?;
+        parsed
+    } else {
+        stdin.lock().lines().collect::<Result<Vec<_>, _>>()?
+    };
+
+    if values.is_empty() {
+        anyhow::bail!("No values provided on stdin");
+    }
+
+    let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
+
+    // 1. Character distribution (960-dim, deterministic, no model needed)
+    let char_features = extract_char_distribution(&value_refs)
+        .unwrap_or([0.0f32; CHAR_DIST_DIM]);
+
+    // 2. Embedding aggregation (512-dim, requires Model2Vec)
+    let embed_features = match load_model2vec_resources() {
+        Some(m2v) => extract_embedding_aggregation(&value_refs, &m2v)
+            .unwrap_or([0.0f32; EMBED_AGG_DIM]),
+        None => {
+            eprintln!("Warning: Model2Vec not available, embedding features will be zeros");
+            [0.0f32; EMBED_AGG_DIM]
+        }
+    };
+
+    // 3. Column statistics (27-dim, deterministic)
+    let stats_features = extract_column_stats(&value_refs)
+        .unwrap_or([0.0f32; COLUMN_STATS_DIM]);
+
+    // Output as JSON
+    let output = json!({
+        "char": char_features.to_vec(),
+        "embed": embed_features.to_vec(),
+        "stats": stats_features.to_vec(),
+        "header": header,
+        "n_values": values.len(),
+    });
+
+    let stdout = io::stdout();
+    serde_json::to_writer(stdout.lock(), &output)?;
+    println!();
 
     Ok(())
 }
