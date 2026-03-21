@@ -381,6 +381,58 @@ enum Commands {
     /// Start MCP server for AI agent integration (stdio transport)
     Mcp,
 
+    /// Train a multi-branch Sherlock-style model from FTMB feature data
+    #[command(name = "train-multi-branch", hide = true)]
+    TrainMultiBranch {
+        /// FTMB binary training data file
+        #[arg(short, long)]
+        data: PathBuf,
+
+        /// Output directory for model artifacts
+        #[arg(short, long, default_value = "models/multi-branch-v1")]
+        output: PathBuf,
+
+        /// Number of training epochs
+        #[arg(short, long, default_value = "10")]
+        epochs: usize,
+
+        /// Batch size
+        #[arg(long, default_value = "32")]
+        batch_size: usize,
+
+        /// Learning rate (AdamW)
+        #[arg(long, default_value = "0.0001")]
+        lr: f64,
+
+        /// L2 regularization weight (AdamW weight_decay)
+        #[arg(long, default_value = "0.0001")]
+        weight_decay: f64,
+
+        /// Dropout probability
+        #[arg(long, default_value = "0.35")]
+        dropout: f32,
+
+        /// Random seed
+        #[arg(long, default_value = "42")]
+        seed: u64,
+
+        /// Classification head type: flat or hierarchical
+        #[arg(long, default_value = "flat")]
+        head: String,
+
+        /// Early stopping patience (epochs without improvement)
+        #[arg(long, default_value = "10")]
+        patience: usize,
+
+        /// Taxonomy directory (needed for label list)
+        #[arg(long, default_value = "labels")]
+        taxonomy: PathBuf,
+
+        /// Validation split fraction (0.0-1.0)
+        #[arg(long, default_value = "0.15")]
+        val_split: f32,
+    },
+
     /// Extract multi-branch feature vectors from a column of values (stdin)
     #[command(name = "extract-features", hide = true)]
     ExtractFeatures {
@@ -667,6 +719,24 @@ fn main() -> Result<()> {
 
         Commands::Mcp => cmd_mcp(),
 
+        Commands::TrainMultiBranch {
+            data,
+            output,
+            epochs,
+            batch_size,
+            lr,
+            weight_decay,
+            dropout,
+            seed,
+            head,
+            patience,
+            taxonomy,
+            val_split,
+        } => cmd_train_multi_branch(
+            data, output, epochs, batch_size, lr, weight_decay, dropout, seed, head, patience,
+            taxonomy, val_split,
+        ),
+
         Commands::ExtractFeatures { header, json } => cmd_extract_features(header, json),
     }
 }
@@ -694,6 +764,138 @@ fn cmd_mcp() -> Result<()> {
 
     // Run the async server
     tokio::runtime::Runtime::new()?.block_on(server.serve_stdio())?;
+
+    Ok(())
+}
+
+/// Train a multi-branch Sherlock-style model from FTMB feature-vector data.
+#[allow(clippy::too_many_arguments)]
+fn cmd_train_multi_branch(
+    data: PathBuf,
+    output: PathBuf,
+    epochs: usize,
+    batch_size: usize,
+    lr: f64,
+    weight_decay: f64,
+    dropout: f32,
+    seed: u64,
+    head: String,
+    patience: usize,
+    taxonomy: PathBuf,
+    val_split: f32,
+) -> Result<()> {
+    use finetype_train::multi_branch::{
+        HeadType, MultiBranchConfig, MultiBranchDataset, MultiBranchTrainConfig,
+        read_training_data, train_multi_branch,
+    };
+    use rand::seq::SliceRandom;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let head_type = match head.as_str() {
+        "flat" => HeadType::Flat,
+        "hierarchical" => HeadType::Hierarchical,
+        _ => anyhow::bail!("Unknown head type '{}'. Use 'flat' or 'hierarchical'.", head),
+    };
+
+    // Load taxonomy to get sorted labels
+    let taxonomy = Taxonomy::from_path(&taxonomy)?;
+    let labels_list: Vec<String> = taxonomy.labels().to_vec();
+    let label_to_idx: std::collections::HashMap<String, u32> = taxonomy
+        .label_to_index()
+        .into_iter()
+        .map(|(k, v)| (k, v as u32))
+        .collect();
+    let n_classes = taxonomy.len();
+
+    eprintln!("Loading training data from {}...", data.display());
+    let (header, records) = read_training_data(&data)?;
+    eprintln!(
+        "Loaded {} records ({} char, {} embed, {} stats dims)",
+        records.len(),
+        header.char_dim,
+        header.embed_dim,
+        header.stats_dim,
+    );
+
+    // Filter records to only include labels present in taxonomy
+    let valid_records: Vec<_> = records
+        .into_iter()
+        .filter(|r| label_to_idx.contains_key(&r.label))
+        .collect();
+    eprintln!(
+        "{} records match taxonomy ({} classes)",
+        valid_records.len(),
+        n_classes,
+    );
+
+    // Split into train/val
+    let mut indices: Vec<usize> = (0..valid_records.len()).collect();
+    let mut rng = StdRng::seed_from_u64(seed);
+    indices.shuffle(&mut rng);
+    let val_size = (valid_records.len() as f32 * val_split) as usize;
+    let (val_indices, train_indices) = indices.split_at(val_size);
+
+    let train_records: Vec<_> = train_indices.iter().map(|&i| valid_records[i].clone()).collect();
+    let val_records: Vec<_> = val_indices.iter().map(|&i| valid_records[i].clone()).collect();
+
+    eprintln!("Train: {} | Val: {}", train_records.len(), val_records.len());
+
+    let char_dim = header.char_dim as usize;
+    let embed_dim = header.embed_dim as usize;
+    let stats_dim = header.stats_dim as usize;
+
+    let train_data = MultiBranchDataset::from_records(
+        &train_records,
+        &label_to_idx,
+        char_dim,
+        embed_dim,
+        stats_dim,
+    )?;
+    let val_data = MultiBranchDataset::from_records(
+        &val_records,
+        &label_to_idx,
+        char_dim,
+        embed_dim,
+        stats_dim,
+    )?;
+
+    let model_config = MultiBranchConfig {
+        char_dim,
+        embed_dim,
+        stats_dim,
+        n_classes,
+        dropout,
+        head_type: head_type.clone(),
+        ..Default::default()
+    };
+
+    let train_config = MultiBranchTrainConfig {
+        output_dir: output.clone(),
+        epochs,
+        batch_size,
+        lr,
+        weight_decay,
+        patience,
+        seed,
+        ..Default::default()
+    };
+
+    let labels_opt = if head_type == HeadType::Hierarchical {
+        Some(labels_list.as_slice())
+    } else {
+        None
+    };
+
+    let summary = train_multi_branch(&train_config, &model_config, &train_data, &val_data, labels_opt)?;
+
+    eprintln!();
+    eprintln!("Training complete:");
+    eprintln!("  Best epoch: {}", summary.best_epoch + 1);
+    eprintln!("  Best val accuracy: {:.2}%", summary.best_val_accuracy * 100.0);
+    eprintln!("  Total epochs: {}", summary.total_epochs);
+    eprintln!("  Total time: {:.1}s", summary.total_time_secs);
+    eprintln!("  Model saved to: {}", output.display());
 
     Ok(())
 }

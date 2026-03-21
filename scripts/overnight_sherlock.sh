@@ -185,12 +185,8 @@ else
         --dropout 0.35 \
         --seed 42 \
         --head flat \
-    2>&1 || {
-        echo ""
-        echo "WARN: train-multi-branch CLI not yet wired up."
-        echo "Run training manually via Nightingale on the Mac."
-        echo "The Rust code is ready — just needs a CLI subcommand."
-    }
+        --patience 10 \
+    2>&1
 fi
 
 echo ""
@@ -216,11 +212,8 @@ if [[ "$FLAT_ONLY" == "false" ]]; then
             --dropout 0.35 \
             --seed 42 \
             --head hierarchical \
-        2>&1 || {
-            echo ""
-            echo "WARN: train-multi-branch CLI not yet wired up."
-            echo "Run training manually via Nightingale on the Mac."
-        }
+            --patience 10 \
+        2>&1
     fi
 
     echo ""
