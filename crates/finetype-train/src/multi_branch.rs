@@ -19,7 +19,9 @@
 
 use anyhow::{bail, Context, Result};
 use candle_core::{DType, Device, Tensor};
-use candle_nn::{batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder, VarMap};
+use candle_nn::{
+    batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder, VarMap,
+};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -196,8 +198,11 @@ impl MultiBranchModel {
         let merged_dim = config.merged_dim();
         let merge_bn = batch_norm(merged_dim, BatchNormConfig::default(), vb.pp("merge_bn"))?;
         let merge_linear1 = linear(merged_dim, config.merge_hidden[0], vb.pp("merge_l1"))?;
-        let merge_linear2 =
-            linear(config.merge_hidden[0], config.merge_hidden[1], vb.pp("merge_l2"))?;
+        let merge_linear2 = linear(
+            config.merge_hidden[0],
+            config.merge_hidden[1],
+            vb.pp("merge_l2"),
+        )?;
 
         let head = linear(config.merge_hidden[1], config.n_classes, vb.pp("head"))?;
 
@@ -608,12 +613,9 @@ impl MultiBranchDataset {
             label_batch.push(self.labels[i]);
         }
 
-        let char_t =
-            Tensor::new(char_batch.as_slice(), device)?.reshape((bs, self.char_dim))?;
-        let embed_t =
-            Tensor::new(embed_batch.as_slice(), device)?.reshape((bs, self.embed_dim))?;
-        let stats_t =
-            Tensor::new(stats_batch.as_slice(), device)?.reshape((bs, self.stats_dim))?;
+        let char_t = Tensor::new(char_batch.as_slice(), device)?.reshape((bs, self.char_dim))?;
+        let embed_t = Tensor::new(embed_batch.as_slice(), device)?.reshape((bs, self.embed_dim))?;
+        let stats_t = Tensor::new(stats_batch.as_slice(), device)?.reshape((bs, self.stats_dim))?;
         let labels_t = Tensor::new(label_batch.as_slice(), device)?;
 
         Ok((char_t, embed_t, stats_t, labels_t))
@@ -664,6 +666,15 @@ pub fn train_multi_branch(
     let model = MultiBranchModel::new(model_config, vb)?;
     let n_params = count_parameters(&varmap);
     tracing::info!("Model parameters: {}", n_params);
+    tracing::info!(
+        "Architecture: char [{} → {} → {}] | embed [{} → {} → {}] | stats [{} → {} → {}] | merge [{} → {} → {}] | head → {}",
+        model_config.char_dim, model_config.char_hidden[0], model_config.char_hidden[1],
+        model_config.embed_dim, model_config.embed_hidden[0], model_config.embed_hidden[1],
+        model_config.stats_dim, model_config.stats_hidden[0], model_config.stats_hidden[1],
+        model_config.char_hidden[1] + model_config.embed_hidden[1] + model_config.stats_hidden[1],
+        model_config.merge_hidden[0], model_config.merge_hidden[1],
+        model_config.n_classes,
+    );
 
     // Create optimizer (AdamW with weight_decay for L2 regularization)
     let adamw_params = ParamsAdamW {
@@ -893,7 +904,13 @@ mod tests {
         let vars = varmap.all_vars();
         let initial_values: Vec<Vec<f32>> = vars
             .iter()
-            .map(|v| v.as_tensor().flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .map(|v| {
+                v.as_tensor()
+                    .flatten_all()
+                    .unwrap()
+                    .to_vec1::<f32>()
+                    .unwrap()
+            })
             .collect();
 
         // Forward + backward
@@ -913,7 +930,13 @@ mod tests {
         // Verify parameters changed (gradient flow through all branches)
         let updated_values: Vec<Vec<f32>> = vars
             .iter()
-            .map(|v| v.as_tensor().flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .map(|v| {
+                v.as_tensor()
+                    .flatten_all()
+                    .unwrap()
+                    .to_vec1::<f32>()
+                    .unwrap()
+            })
             .collect();
 
         let mut any_changed = false;
@@ -923,7 +946,10 @@ mod tests {
                 break;
             }
         }
-        assert!(any_changed, "At least some parameters should have changed after backward pass");
+        assert!(
+            any_changed,
+            "At least some parameters should have changed after backward pass"
+        );
 
         // More specifically, check that parameters in each branch changed
         // The VarMap stores vars in insertion order; we check that not all are identical
@@ -1130,6 +1156,9 @@ mod tests {
         let varmap = VarMap::new();
         let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
         let result = MultiBranchModel::new(&config, vb);
-        assert!(result.is_err(), "Hierarchical head should be rejected for now");
+        assert!(
+            result.is_err(),
+            "Hierarchical head should be rejected for now"
+        );
     }
 }

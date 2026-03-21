@@ -146,58 +146,141 @@ mod tests {
 
         let values: Vec<&str> = vec![
             // Names
-            "John Smith", "Jane Doe", "Robert Johnson", "Maria Garcia",
-            "Ahmed Hassan", "Yuki Tanaka", "Priya Sharma", "Liam O'Brien",
-            "Chen Wei", "Fatima Al-Rashid",
+            "John Smith",
+            "Jane Doe",
+            "Robert Johnson",
+            "Maria Garcia",
+            "Ahmed Hassan",
+            "Yuki Tanaka",
+            "Priya Sharma",
+            "Liam O'Brien",
+            "Chen Wei",
+            "Fatima Al-Rashid",
             // Numbers
-            "42", "3.14159", "1,000,000", "-273.15", "0.001",
-            "99.99", "12345", "7.5e6", "100%", "50/50",
+            "42",
+            "3.14159",
+            "1,000,000",
+            "-273.15",
+            "0.001",
+            "99.99",
+            "12345",
+            "7.5e6",
+            "100%",
+            "50/50",
             // Dates
-            "2024-01-15", "March 3, 2023", "01/01/2000", "15-Dec-1999",
-            "2023-12-31T23:59:59", "Jan 2024", "Q1 2023", "FY2024",
-            "1999-12-31", "2000/01/01",
+            "2024-01-15",
+            "March 3, 2023",
+            "01/01/2000",
+            "15-Dec-1999",
+            "2023-12-31T23:59:59",
+            "Jan 2024",
+            "Q1 2023",
+            "FY2024",
+            "1999-12-31",
+            "2000/01/01",
             // Emails
-            "user@example.com", "admin@test.org", "hello@world.net",
-            "first.last@company.co.uk", "info@domain.io",
+            "user@example.com",
+            "admin@test.org",
+            "hello@world.net",
+            "first.last@company.co.uk",
+            "info@domain.io",
             // URLs
-            "https://example.com", "http://test.org/path",
-            "www.google.com", "ftp://files.server.net",
+            "https://example.com",
+            "http://test.org/path",
+            "www.google.com",
+            "ftp://files.server.net",
             // Addresses
-            "123 Main Street", "456 Oak Avenue, Suite 200",
-            "London, UK", "Tokyo, Japan", "New York, NY 10001",
+            "123 Main Street",
+            "456 Oak Avenue, Suite 200",
+            "London, UK",
+            "Tokyo, Japan",
+            "New York, NY 10001",
             // Codes
-            "USD", "EUR", "GBP", "JPY", "AUD",
-            "US", "GB", "JP", "DE", "FR",
+            "USD",
+            "EUR",
+            "GBP",
+            "JPY",
+            "AUD",
+            "US",
+            "GB",
+            "JP",
+            "DE",
+            "FR",
             // IDs
             "550e8400-e29b-41d4-a716-446655440000",
-            "ABC-123", "ID-00001", "REF/2024/001",
+            "ABC-123",
+            "ID-00001",
+            "REF/2024/001",
             // Misc
-            "true", "false", "null", "N/A", "#REF!",
+            "true",
+            "false",
+            "null",
+            "N/A",
+            "#REF!",
             // Phone-like
-            "+1-555-0123", "(212) 555-1234", "+44 20 7946 0958",
+            "+1-555-0123",
+            "(212) 555-1234",
+            "+44 20 7946 0958",
             // IP addresses
-            "192.168.1.1", "10.0.0.1", "172.16.0.0",
+            "192.168.1.1",
+            "10.0.0.1",
+            "172.16.0.0",
             // Long text
             "The quick brown fox jumps over the lazy dog",
             "Lorem ipsum dolor sit amet consectetur",
             "This is a moderately long sentence with several words in it",
             // Short
-            "a", "b", "c", "AB", "XY",
+            "a",
+            "b",
+            "c",
+            "AB",
+            "XY",
             // More names for variety
-            "Dr. Emily Chen", "Prof. Mark Davis", "Mrs. Sarah Williams",
-            "Michael Brown Jr.", "Alexandra Petrova",
+            "Dr. Emily Chen",
+            "Prof. Mark Davis",
+            "Mrs. Sarah Williams",
+            "Michael Brown Jr.",
+            "Alexandra Petrova",
             // More numbers
-            "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
             // Padding to reach 100
-            "alpha", "beta", "gamma", "delta", "epsilon",
-            "zeta", "eta", "theta", "iota", "kappa",
-            "lambda", "mu", "nu", "xi", "omicron",
+            "alpha",
+            "beta",
+            "gamma",
+            "delta",
+            "epsilon",
+            "zeta",
+            "eta",
+            "theta",
+            "iota",
+            "kappa",
+            "lambda",
+            "mu",
+            "nu",
+            "xi",
+            "omicron",
         ];
 
-        assert!(values.len() >= 100, "Need at least 100 values for test, got {}", values.len());
+        assert!(
+            values.len() >= 100,
+            "Need at least 100 values for test, got {}",
+            values.len()
+        );
 
         let result = extract_embedding_aggregation(&values, &resources);
-        assert!(result.is_some(), "Should produce a result for diverse values");
+        assert!(
+            result.is_some(),
+            "Should produce a result for diverse values"
+        );
 
         let features = result.unwrap();
         assert_eq!(features.len(), EMBED_AGG_DIM);
@@ -214,19 +297,49 @@ mod tests {
         };
 
         let names: Vec<&str> = vec![
-            "John Smith", "Jane Doe", "Robert Johnson", "Mary Williams",
-            "James Brown", "Patricia Davis", "Michael Miller", "Jennifer Wilson",
-            "David Taylor", "Linda Anderson", "William Thomas", "Barbara Jackson",
-            "Richard White", "Susan Harris", "Joseph Martin", "Margaret Thompson",
-            "Charles Garcia", "Dorothy Martinez", "Thomas Robinson", "Lisa Clark",
+            "John Smith",
+            "Jane Doe",
+            "Robert Johnson",
+            "Mary Williams",
+            "James Brown",
+            "Patricia Davis",
+            "Michael Miller",
+            "Jennifer Wilson",
+            "David Taylor",
+            "Linda Anderson",
+            "William Thomas",
+            "Barbara Jackson",
+            "Richard White",
+            "Susan Harris",
+            "Joseph Martin",
+            "Margaret Thompson",
+            "Charles Garcia",
+            "Dorothy Martinez",
+            "Thomas Robinson",
+            "Lisa Clark",
         ];
 
         let dates: Vec<&str> = vec![
-            "2024-01-15", "2023-03-22", "2022-07-04", "2021-11-30",
-            "2020-06-15", "2019-09-01", "2018-12-25", "2017-04-10",
-            "2024-02-28", "2023-08-14", "2022-01-01", "2021-05-20",
-            "2020-10-31", "2019-03-17", "2018-07-04", "2017-12-31",
-            "2024-06-21", "2023-11-11", "2022-04-15", "2021-09-23",
+            "2024-01-15",
+            "2023-03-22",
+            "2022-07-04",
+            "2021-11-30",
+            "2020-06-15",
+            "2019-09-01",
+            "2018-12-25",
+            "2017-04-10",
+            "2024-02-28",
+            "2023-08-14",
+            "2022-01-01",
+            "2021-05-20",
+            "2020-10-31",
+            "2019-03-17",
+            "2018-07-04",
+            "2017-12-31",
+            "2024-06-21",
+            "2023-11-11",
+            "2022-04-15",
+            "2021-09-23",
         ];
 
         let names_features = extract_embedding_aggregation(&names, &resources)
@@ -327,9 +440,6 @@ mod tests {
 
         let empties: Vec<&str> = vec!["", "", "", ""];
         let result = extract_embedding_aggregation(&empties, &resources);
-        assert!(
-            result.is_none(),
-            "All-empty column should return None"
-        );
+        assert!(result.is_none(), "All-empty column should return None");
     }
 }

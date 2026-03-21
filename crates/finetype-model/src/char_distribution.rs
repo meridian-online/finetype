@@ -1,7 +1,7 @@
 //! Column-level character distribution feature extractor.
 //!
 //! Computes Sherlock-style character distribution features for a column of string values.
-//! For each of 96 printable ASCII characters (bytes 32-126), calculates 10 aggregation
+//! For each of 96 printable ASCII characters (bytes 32–127, space through DEL), calculates 10 aggregation
 //! statistics over per-value character frequencies:
 //!
 //! - `any`: whether the character appears in any value
@@ -181,7 +181,7 @@ const FEATURE_NAME_TABLE: [&str; CHAR_DIST_DIM] = char_stat_names![
 
 /// Extract 960-dim character distribution features from a column of values.
 ///
-/// For each of 96 printable ASCII characters (bytes 32-126), computes per-value
+/// For each of 96 printable ASCII characters (bytes 32–127, space through DEL), computes per-value
 /// character frequencies and then aggregates them into 10 column-level statistics.
 ///
 /// Returns `None` if `values` is empty.
@@ -405,8 +405,11 @@ mod tests {
         );
 
         // variance (population)
-        let expected_var: f64 =
-            a_freqs.iter().map(|f| (f - expected_mean).powi(2)).sum::<f64>() / 10.0;
+        let expected_var: f64 = a_freqs
+            .iter()
+            .map(|f| (f - expected_mean).powi(2))
+            .sum::<f64>()
+            / 10.0;
         assert!(
             (feat(&features, "a_variance") as f64 - expected_var).abs() < 1e-5,
             "a_variance: got {}, expected {}",
@@ -512,7 +515,7 @@ mod tests {
         assert_eq!(feat(&features, "h_any"), 1.0);
 
         // Emoji/CJK chars (byte > 126) should not show up anywhere.
-        // The function only tracks bytes 32-126, so high bytes are simply skipped.
+        // The function only tracks bytes 32–127, space through DEL, so high bytes are simply skipped.
         // Verify no NaN or Inf in output
         for &f in features.iter() {
             assert!(f.is_finite(), "Non-finite value in features");

@@ -19,36 +19,36 @@ pub const COLUMN_STATS_DIM: usize = 27;
 /// Human-readable names for each feature index.
 pub const COLUMN_STATS_NAMES: [&str; COLUMN_STATS_DIM] = [
     // Entropy & Cardinality (4)
-    "col_entropy",       // 0
-    "frac_unique",       // 1
-    "n_values",          // 2
-    "frac_empty",        // 3
+    "col_entropy", // 0
+    "frac_unique", // 1
+    "n_values",    // 2
+    "frac_empty",  // 3
     // Value Length Statistics (8)
-    "length_mean",       // 4
-    "length_variance",   // 5
-    "length_min",        // 6
-    "length_max",        // 7
-    "length_median",     // 8
-    "length_skewness",   // 9
-    "length_kurtosis",   // 10
-    "length_sum",        // 11
+    "length_mean",     // 4
+    "length_variance", // 5
+    "length_min",      // 6
+    "length_max",      // 7
+    "length_median",   // 8
+    "length_skewness", // 9
+    "length_kurtosis", // 10
+    "length_sum",      // 11
     // Character Composition (10)
-    "frac_numeric_cells",  // 12
-    "frac_alpha_cells",    // 13
-    "frac_special_cells",  // 14
-    "avg_digit_count",     // 15
-    "std_digit_count",     // 16
-    "avg_alpha_count",     // 17
-    "std_alpha_count",     // 18
-    "avg_special_count",   // 19
-    "std_special_count",   // 20
-    "avg_word_count",      // 21
+    "frac_numeric_cells", // 12
+    "frac_alpha_cells",   // 13
+    "frac_special_cells", // 14
+    "avg_digit_count",    // 15
+    "std_digit_count",    // 16
+    "avg_alpha_count",    // 17
+    "std_alpha_count",    // 18
+    "avg_special_count",  // 19
+    "std_special_count",  // 20
+    "avg_word_count",     // 21
     // Structural (5)
-    "std_word_count",      // 22
-    "frac_starts_upper",   // 23
-    "frac_all_upper",      // 24
-    "frac_all_lower",      // 25
-    "frac_mixed_case",     // 26
+    "std_word_count",    // 22
+    "frac_starts_upper", // 23
+    "frac_all_upper",    // 24
+    "frac_all_lower",    // 25
+    "frac_mixed_case",   // 26
 ];
 
 /// Extract column-level statistical features from a set of values.
@@ -88,7 +88,11 @@ pub fn extract_column_stats(values: &[&str]) -> Option<[f32; COLUMN_STATS_DIM]> 
         .values()
         .map(|&count| {
             let p = count as f64 / n_f;
-            if p > 0.0 { -p * p.ln() } else { 0.0 }
+            if p > 0.0 {
+                -p * p.ln()
+            } else {
+                0.0
+            }
         })
         .sum();
 
@@ -274,7 +278,11 @@ fn skewness(values: &[f64], mean: f64, std_dev: f64) -> f64 {
         return 0.0;
     }
     let n = values.len() as f64;
-    let m3: f64 = values.iter().map(|&x| ((x - mean) / std_dev).powi(3)).sum::<f64>() / n;
+    let m3: f64 = values
+        .iter()
+        .map(|&x| ((x - mean) / std_dev).powi(3))
+        .sum::<f64>()
+        / n;
     m3
 }
 
@@ -284,7 +292,11 @@ fn kurtosis(values: &[f64], mean: f64, std_dev: f64) -> f64 {
         return 0.0;
     }
     let n = values.len() as f64;
-    let m4: f64 = values.iter().map(|&x| ((x - mean) / std_dev).powi(4)).sum::<f64>() / n;
+    let m4: f64 = values
+        .iter()
+        .map(|&x| ((x - mean) / std_dev).powi(4))
+        .sum::<f64>()
+        / n;
     m4 - 3.0 // excess kurtosis
 }
 
@@ -551,7 +563,7 @@ mod tests {
         let stats = extract_column_stats(&values).unwrap();
 
         assert_eq!(stat(&stats, "frac_empty"), 0.0); // neither is empty
-        // avg_word_count: (0 + 1) / 2 = 0.5
+                                                     // avg_word_count: (0 + 1) / 2 = 0.5
         assert!((stat(&stats, "avg_word_count") - 0.5).abs() < 0.001);
     }
 

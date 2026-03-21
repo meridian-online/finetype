@@ -731,13 +731,13 @@ fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> 
     let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
     // 1. Character distribution (960-dim, deterministic, no model needed)
-    let char_features = extract_char_distribution(&value_refs)
-        .unwrap_or([0.0f32; CHAR_DIST_DIM]);
+    let char_features = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
 
     // 2. Embedding aggregation (512-dim, requires Model2Vec)
     let embed_features = match load_model2vec_resources() {
-        Some(m2v) => extract_embedding_aggregation(&value_refs, &m2v)
-            .unwrap_or([0.0f32; EMBED_AGG_DIM]),
+        Some(m2v) => {
+            extract_embedding_aggregation(&value_refs, &m2v).unwrap_or([0.0f32; EMBED_AGG_DIM])
+        }
         None => {
             eprintln!("Warning: Model2Vec not available, embedding features will be zeros");
             [0.0f32; EMBED_AGG_DIM]
@@ -745,8 +745,7 @@ fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> 
     };
 
     // 3. Column statistics (27-dim, deterministic)
-    let stats_features = extract_column_stats(&value_refs)
-        .unwrap_or([0.0f32; COLUMN_STATS_DIM]);
+    let stats_features = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
     // Output as JSON
     let output = json!({
