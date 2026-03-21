@@ -133,11 +133,13 @@ def cmd_plan(batch_size=DEFAULT_BATCH_SIZE):
     print(f"\n{len(batches)} total batches, {len(batches) - len(pending)} done, {len(pending)} pending")
 
 
-def cmd_next(count=5, batch_size=DEFAULT_BATCH_SIZE):
+def cmd_next(count=5, batch_size=DEFAULT_BATCH_SIZE, source=None):
     """Print next N pending batches as JSON (for agent consumption)."""
     batches = get_batch_plan(batch_size)
     completed = get_completed_batches()
     pending = [b for b in batches if b["batch_id"] not in completed]
+    if source:
+        pending = [b for b in pending if b["source"] == source]
 
     for b in pending[:count]:
         print(json.dumps(b))
@@ -161,12 +163,16 @@ def main():
     # Parse --batch-size from remaining args
     i = 1
     count = 5
+    source = None
     while i < len(args):
         if args[i] == "--batch-size":
             batch_size = int(args[i + 1])
             i += 2
         elif args[i] == "--count":
             count = int(args[i + 1])
+            i += 2
+        elif args[i] == "--source":
+            source = args[i + 1]
             i += 2
         else:
             i += 1
@@ -176,7 +182,7 @@ def main():
     elif command == "plan":
         cmd_plan(batch_size)
     elif command == "next":
-        cmd_next(count, batch_size)
+        cmd_next(count, batch_size, source=source)
     elif command in ("-h", "--help", "help"):
         print(__doc__)
     else:
