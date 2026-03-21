@@ -5,6 +5,7 @@
 //! Supports both flat (single model) and tiered (hierarchical model graph) inference.
 
 pub mod char_cnn;
+pub mod char_distribution;
 pub mod char_training;
 pub mod column;
 pub mod entity;
@@ -21,6 +22,7 @@ pub mod tiered_training;
 pub mod training;
 
 pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchyMap};
+pub use char_distribution::{extract_char_distribution, CHAR_DIST_DIM, CHAR_DIST_NAMES};
 pub use char_training::{CharTrainer, CharTrainingConfig};
 pub use column::{
     aggregate_features, ColumnClassifier, ColumnConfig, ColumnFeatures, ColumnResult,
