@@ -1704,8 +1704,7 @@ impl ColumnClassifier {
                                 // (general percentages) trigger false financial hints.
                                 // Only block model2vec financial hints — hardcoded hints
                                 // are curated and handled separately below.
-                                let is_financial_hint =
-                                    hinted_type.starts_with("finance.");
+                                let is_financial_hint = hinted_type.starts_with("finance.");
                                 if is_financial_hint && !hint_is_hardcoded {
                                     // Model2vec financial hint with no value evidence —
                                     // skip, let the generic prediction stand.
@@ -5652,11 +5651,11 @@ mod tests {
     fn test_epoch_seconds_in_range() {
         // Unix timestamps from 2020-2024
         let values: Vec<String> = vec![
-            "1577836800",  // 2020-01-01
-            "1609459200",  // 2021-01-01
-            "1640995200",  // 2022-01-01
-            "1672531200",  // 2023-01-01
-            "1704067200",  // 2024-01-01
+            "1577836800", // 2020-01-01
+            "1609459200", // 2021-01-01
+            "1640995200", // 2022-01-01
+            "1672531200", // 2023-01-01
+            "1704067200", // 2024-01-01
         ]
         .into_iter()
         .map(String::from)
@@ -5670,68 +5669,71 @@ mod tests {
     fn test_epoch_seconds_pre_2000_not_detected() {
         // Timestamps before 2000 are below EPOCH_MIN
         let values: Vec<String> = vec![
-            "631152000",   // 1990-01-01
-            "662688000",   // 1991-01-01
-            "694224000",   // 1992-01-01
-            "725846400",   // 1993-01-01
-            "757382400",   // 1994-01-01
+            "631152000", // 1990-01-01
+            "662688000", // 1991-01-01
+            "694224000", // 1992-01-01
+            "725846400", // 1993-01-01
+            "757382400", // 1994-01-01
         ]
         .into_iter()
         .map(String::from)
         .collect();
 
         let result = detect_epoch_seconds(&values);
-        assert!(result.is_none(), "Pre-2000 timestamps should not be detected");
+        assert!(
+            result.is_none(),
+            "Pre-2000 timestamps should not be detected"
+        );
     }
 
     #[test]
     fn test_epoch_seconds_post_2050_not_detected() {
         // Timestamps after 2050 are above EPOCH_MAX
         let values: Vec<String> = vec![
-            "2524608001",  // Just past 2050-01-01
-            "2556144000",  // 2051
-            "2587680000",  // 2052
-            "2619216000",  // 2053
-            "2650752000",  // 2054
+            "2524608001", // Just past 2050-01-01
+            "2556144000", // 2051
+            "2587680000", // 2052
+            "2619216000", // 2053
+            "2650752000", // 2054
         ]
         .into_iter()
         .map(String::from)
         .collect();
 
         let result = detect_epoch_seconds(&values);
-        assert!(result.is_none(), "Post-2050 timestamps should not be detected");
+        assert!(
+            result.is_none(),
+            "Post-2050 timestamps should not be detected"
+        );
     }
 
     #[test]
     fn test_epoch_milliseconds_detected() {
         // 13-digit Unix millisecond timestamps
         let values: Vec<String> = vec![
-            "1577836800000",  // 2020-01-01 in ms
-            "1609459200000",  // 2021-01-01 in ms
-            "1640995200000",  // 2022-01-01 in ms
-            "1672531200000",  // 2023-01-01 in ms
-            "1704067200000",  // 2024-01-01 in ms
+            "1577836800000", // 2020-01-01 in ms
+            "1609459200000", // 2021-01-01 in ms
+            "1640995200000", // 2022-01-01 in ms
+            "1672531200000", // 2023-01-01 in ms
+            "1704067200000", // 2024-01-01 in ms
         ]
         .into_iter()
         .map(String::from)
         .collect();
 
         let result = detect_epoch_seconds(&values);
-        assert_eq!(
-            result,
-            Some("datetime.epoch.unix_milliseconds".to_string())
-        );
+        assert_eq!(result, Some("datetime.epoch.unix_milliseconds".to_string()));
     }
 
     #[test]
     fn test_epoch_seconds_threshold_boundary() {
         // 4 in-range, 1 out-of-range: 80% → should still detect
         let values: Vec<String> = vec![
-            "1577836800",  // 2020 (in range)
-            "1609459200",  // 2021 (in range)
-            "1640995200",  // 2022 (in range)
-            "1672531200",  // 2023 (in range)
-            "12345",       // Out of range
+            "1577836800", // 2020 (in range)
+            "1609459200", // 2021 (in range)
+            "1640995200", // 2022 (in range)
+            "1672531200", // 2023 (in range)
+            "12345",      // Out of range
         ]
         .into_iter()
         .map(String::from)
@@ -5749,11 +5751,11 @@ mod tests {
     fn test_epoch_seconds_below_threshold() {
         // 2 in-range, 3 out-of-range: 40% → should not detect
         let values: Vec<String> = vec![
-            "1577836800",  // In range
-            "1609459200",  // In range
-            "12345",       // Out of range
-            "67890",       // Out of range
-            "99999",       // Out of range
+            "1577836800", // In range
+            "1609459200", // In range
+            "12345",      // Out of range
+            "67890",      // Out of range
+            "99999",      // Out of range
         ]
         .into_iter()
         .map(String::from)
