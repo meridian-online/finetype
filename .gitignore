@@ -41,6 +41,15 @@ eval/eval_output/
 output/spike-training/
 output/spike-results/
 
+# Distillation batch files (rolled into *_distilled.csv.gz)
+output/distillation-v3/sherlock_batch_*.csv
+output/distillation-v3/sherlock_batch_*.done
+output/distillation-v3/distill_concat.log
+
+# Agent-generated temp scripts
+classify_batch_*.py
+write_batch_*.py
+
 # External repos (submodules / symlinks)
 duckdb-finetype/
 homebrew-tap/

@@ -1,0 +1,243 @@
+goal: >
+  Build a Sherlock-style multi-branch neural network that replaces CharCNN as
+  FineType's primary column-type classifier. The new model combines character
+  distribution features, Model2Vec value embeddings, and statistical features
+  into a multi-branch architecture targeting 250 types. Train with blend-30-70
+  data (30% distilled, 70% synthetic). Ablation study: 4 configurations
+  (flat/hierarchical × with/without sibling-context). Redefine the pipeline
+  so Sense = this model, Sharpen = deterministic corrections.
+
+constraints:
+  - "Pure Rust implementation — zero Python dependencies at build or inference time"
+  - "Model2Vec-potion-base-4M (128d, ~8MB) for embeddings — no GloVe, no Doc2Vec"
+  - "New model artifact ≤ 50 MB (branch weights + merge weights; Model2Vec shared, not counted)"
+  - "Train on existing 119K distilled Sherlock rows + synthetic generators (no new distillation)"
+  - "M1 Pro hardware for training — must complete each training run within ~2 hours"
+  - "Inference latency: ≤ 50ms per column (100 values) on M1 — no worse than current pipeline"
+  - "Backward-compatible CLI: finetype profile / infer commands produce same output format"
+  - "Existing Sharpen rules (F1–F6, leading-zero, locale detection) preserved as post-inference stage"
+  - "DuckDB extension deferred to follow-up sprint — continues using CharCNN during this work"
+  - "Two-sprint timeline (2 weeks total)"
+
+prerequisites:
+  - id: PRE-1
+    description: >
+      Retrain blend-30-70 CharCNN (flat, 250 types) as the official baseline
+      artifact. Save model directory. Run Tier 2 eval AND Tier 1 profile eval.
+      This provides the reproducible comparison point for all ablation experiments
+      and captures the Tier 1 score that was missing from the spike.
+    verification: >
+      Model directory saved as models/char-cnn-v16-baseline/. Tier 2 JSON and
+      profile eval results committed. Overall accuracy matches spike findings
+      (80.6% ± 1pp, accounting for seed/data differences).
+
+acceptance_criteria:
+  # ── Architecture ──────────────────────────────────────────────
+  - id: AC-1
+    description: >
+      Character distribution feature extractor implemented in Rust. For each of
+      96 printable ASCII characters, compute per-value character frequency
+      (count of char c in value / length of value), then aggregate across all
+      sampled column values using 10 statistics: any (>0 in any value), all
+      (>0 in all values), mean, variance, min, max, median, sum, skewness,
+      kurtosis. Output: 960-dim feature vector per column (96 chars × 10 stats).
+    verification: >
+      Unit tests: (1) extract features from a known 10-value column, assert
+      dimensions = 960. (2) Spot-check character frequencies and all 10 stats
+      for 3 characters against hand-calculated values. (3) Edge cases: column
+      of identical values, column with empty strings, column with non-ASCII
+      characters (should be ignored — only 96 printable ASCII counted).
+
+  - id: AC-2
+    description: >
+      Model2Vec value embedding branch implemented. For each sampled value in a
+      column, compute Model2Vec embedding (128d). Aggregate across column using
+      mean, variance, min, max (4 × 128 = 512 dims). Output: 512-dim feature
+      vector per column. Benchmarked: ~1ms for 100 values on x86 CPU (verified
+      in pre-implementation benchmark).
+    verification: >
+      Unit test: embed a column of 100 values, assert output dimensions = 512.
+      Verify embeddings differ for semantically different columns (cosine
+      similarity < 0.8 between a names column and a dates column).
+
+  - id: AC-3
+    description: >
+      Statistical feature branch implemented with its own hidden layer
+      (36→128→64, not passthrough). Column-level statistics including: entropy,
+      fraction unique, fraction numeric/text/special cells, avg/std word count,
+      value length stats (mean, var, min, max, median, skew, kurtosis), null
+      fraction. Output: 36-dim feature vector per column (extends current
+      36-dim extractor with any additional Sherlock-inspired stats).
+    verification: >
+      Unit test: extract stats from known column, assert dimensions and spot-check
+      entropy and fraction_unique against hand-calculated values.
+
+  - id: AC-4
+    description: >
+      Multi-branch model architecture implemented in finetype-train. Three
+      branches (char: 960→300→300, embedding: 512→200→200, stats: 36→128→64)
+      with ReLU + dropout per branch. Branches merge via concatenation (300+200+64
+      = 564 dims) → BatchNorm → shared layers (564→500→500) → head. Separate
+      subnetwork per branch with independent hidden dimensions matching Sherlock
+      proportions.
+    verification: >
+      Model compiles, trains for 1 epoch on 1000 samples without error.
+      Architecture summary printed shows correct input/hidden/output dimensions
+      per branch. Gradient flow check: verify nonzero gradients for all three
+      branch inputs after one backward pass.
+
+  - id: AC-5
+    description: >
+      Training data pipeline produces feature vectors (not raw text). The
+      prepare script reads distilled CSV + synthetic NDJSON, extracts all three
+      feature branches per column, and writes binary feature-vector training
+      files. On-disk format: one record per column containing label (string),
+      char_features ([f32; 960]), embed_features ([f32; 512]), stat_features
+      ([f32; 36]). Full-scale test on 119K distilled rows with wall-clock
+      time reported.
+    verification: >
+      (1) Dry-run produces correct sample counts and type coverage.
+      (2) Full-scale run completes in <60 minutes on M1.
+      (3) Feature vectors load and have expected dimensions (960 + 512 + 36
+      = 1508 per sample). (4) Spot-check 10 random records: features match
+      independent extraction from the same source column.
+
+  # ── Training & Evaluation ────────────────────────────────────
+  - id: AC-6
+    description: >
+      Ablation study: 4 experiments on blend-30-70 data with the multi-branch
+      architecture. All use same hyperparameters (seed 42, batch 32, 10 epochs,
+      L2 reg 0.0001, dropout 0.35, Adam lr 0.0001).
+      (1) Flat head, no sibling-context.
+      (2) Flat head, with sibling-context enriching headers before embedding branch.
+      (3) Hierarchical head (7→43→250), no sibling-context.
+      (4) Hierarchical head, with sibling-context.
+    verification: >
+      Four trained model directories produced. Training logs show convergence
+      (loss decreasing across epochs). All models loadable for inference.
+
+  - id: AC-7
+    description: >
+      Tier 2 evaluation: best ablation experiment exceeds 85% overall accuracy
+      on the 2,490-column benchmark. No individual type regresses by more than
+      3 columns compared to the PRE-1 baseline artifact. Pivot threshold: if
+      best experiment scores <82%, findings document recommends next approach.
+    verification: >
+      Tier 2 eval JSON files produced for all 4 experiments. Comparison table
+      vs PRE-1 baseline shows per-type deltas. Overall accuracy, per-domain,
+      and per-agreement-category results reported.
+
+  - id: AC-8
+    description: >
+      Tier 1 profile evaluation shows no regression from PRE-1 baseline
+      (expected ≥170/174, 97.7%).
+    verification: >
+      Profile eval run on 30 datasets for best model. Score ≥ 170/174 label
+      accuracy. If sibling-context-off experiments regress on the 3 bare-name
+      cases, this is documented as expected.
+
+  # ── Pipeline Integration ─────────────────────────────────────
+  - id: AC-9
+    description: >
+      Pipeline redefined: Sense stage uses the new multi-branch model for
+      direct 250-type classification. When profiling multi-column CSVs,
+      sibling-context attention (if enabled) enriches header embeddings before
+      the embedding branch. Sharpen stage applies existing deterministic
+      corrections (leading-zero, locale detection, pandas artifact cleanup,
+      cardinality checks). No Sense→category routing.
+    verification: >
+      finetype profile on 5 test CSVs produces correct output. Sharpen
+      corrections verified on known edge cases (leading-zero ZIP codes,
+      pandas .0 integers, low-cardinality categorical columns).
+
+  - id: AC-10
+    description: >
+      Inference latency within budget. Column classification (100 values)
+      completes in ≤ 50ms on M1. Full CSV profile (20 columns) completes
+      in ≤ 2 seconds. Benchmark on x86 CPU also reported.
+    verification: >
+      Benchmark 100 columns, report p50/p95/p99 latency on M1 and x86.
+      Assert p95 ≤ 50ms on M1.
+
+rollback:
+  description: >
+    If best multi-branch model scores <80% Tier 2 overall OR <170/174 Tier 1
+    profile eval, production model remains char-cnn-v14-250 (or PRE-1 baseline
+    if it ships first). Findings document recommends whether to iterate on
+    the architecture or fall back to blend-30-70 CharCNN retrain.
+
+ontology_schema:
+  name: "MultiBranchClassifier"
+  description: "Sherlock-style multi-branch neural network for column-type classification"
+  fields:
+    - name: "char_features"
+      type: "array"
+      description: "960-dim character distribution features (96 chars × 10 aggregations per char)"
+    - name: "embedding_features"
+      type: "array"
+      description: "512-dim Model2Vec value embedding aggregations (128d × 4 stats: mean/var/min/max)"
+    - name: "stat_features"
+      type: "array"
+      description: "36-dim statistical features (entropy, cardinality, length stats, etc.)"
+    - name: "branch_hidden_dims"
+      type: "object"
+      description: "Per-branch hidden dimensions: {char: [300, 300], embedding: [200, 200], stats: [128, 64]}"
+    - name: "merge_hidden_dim"
+      type: "number"
+      description: "Hidden dimension of shared layers after branch concatenation (500)"
+    - name: "head_type"
+      type: "string"
+      description: "Classification head: 'flat' (250-softmax) or 'hierarchical' (7→43→250 tree)"
+    - name: "sibling_context"
+      type: "boolean"
+      description: "Whether sibling-context attention enriches headers before embedding branch"
+    - name: "n_classes"
+      type: "number"
+      description: "Number of output classes (250)"
+
+evaluation_principles:
+  - principle: "Accuracy — Tier 2 overall classification accuracy on 2,490-column benchmark"
+    weight: 0.35
+  - principle: "Robustness — no individual type regression > 3 columns vs PRE-1 baseline"
+    weight: 0.25
+  - principle: "Profile eval — Tier 1 real-world CSV accuracy (170/174 floor)"
+    weight: 0.20
+  - principle: "Latency — inference within 50ms/column budget on M1"
+    weight: 0.10
+  - principle: "Simplicity — fewer pipeline stages, cleaner Sense/Sharpen separation"
+    weight: 0.10
+
+exit_conditions:
+  - "PRE-1 baseline artifact trained and evaluated (prerequisite before ablation)"
+  - "All 4 ablation experiments trained and evaluated"
+  - "Best model exceeds 85% Tier 2 overall OR findings document explains why and recommends next steps"
+  - "If best model <82% Tier 2: pivot decision documented"
+  - "If best model <80% Tier 2 OR <170/174 Tier 1: rollback to production model, no ship"
+  - "Profile eval confirms no Tier 1 regression for best model"
+  - "Pipeline integration tested on 5+ real CSVs"
+  - "Findings document committed with full ablation matrix, per-type analysis, and production recommendation"
+
+known_risks:
+  - "Distilled data contains 72% disagreement rows; unix_seconds label noise may persist (spike showed -10 regression). Acknowledged as out of scope — data quality improvements deferred to next distillation round."
+  - "85% target is aspirational — no prior evidence that Sherlock-style features improve FineType's 250-type taxonomy. The 82% pivot threshold and 80% rollback threshold provide safety nets."
+  - "DuckDB extension deferred — will continue using CharCNN until multi-branch model is validated and ported."
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-21T14:00:00Z"
+  ambiguity_score: 0.07
+  interview_ref: "specs/2026-03-21-sherlock-architecture/interview.md"
+  review_ref: "specs/2026-03-21-sherlock-architecture/review-spec-2026-03-21.md"
+  risk_tier: "HIGH"
+  related_decisions:
+    - "decisions/0040-sherlock-first-defer-remaining-distillation.md"
+  related_specs:
+    - "specs/2026-03-20-retraining-spike/spec.yaml"
+    - "specs/2026-03-11-sense-architecture-challenge/FINDINGS.md"
+  prior_art:
+    - "Sherlock (KDD 2019): 1588-dim multi-branch NN, 78 types, GloVe+Doc2Vec+char features"
+    - "FineType retraining spike: blend-30-70 = 80.6% Tier 2 (+5.6pp over synthetic baseline)"
+    - "FineType architecture review: Spike A (Sherlock features) proposed but never executed"
+  benchmarks:
+    - "Model2Vec: 100 values in 1.1ms (Intel N150), ~0.5ms estimated (M1 Pro)"
+    - "Sibling-context: 20 columns in 1.3ms (2-layer, Intel N150)"
