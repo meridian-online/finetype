@@ -488,6 +488,7 @@ enum ModelType {
     Transformer,
     CharCnn,
     Tiered,
+    MultiBranch,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -889,6 +890,12 @@ fn cmd_train_multi_branch(
 
     let summary = train_multi_branch(&train_config, &model_config, &train_data, &val_data, labels_opt)?;
 
+    // Save label_map.json (index → label mapping, required for inference)
+    let label_map_path = output.join("label_map.json");
+    let label_map_json = serde_json::to_string_pretty(&labels_list)?;
+    std::fs::write(&label_map_path, label_map_json)?;
+    eprintln!("Saved label map ({} labels) to {}", labels_list.len(), label_map_path.display());
+
     eprintln!();
     eprintln!("Training complete:");
     eprintln!("  Best epoch: {}", summary.best_epoch + 1);
@@ -1111,26 +1118,32 @@ fn cmd_infer(
 
     // Column mode: treat all inputs as one column, return single prediction
     if matches!(mode, InferenceMode::Column) {
-        let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
-            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-        };
         let config = ColumnConfig {
             sample_size,
             ..Default::default()
         };
-        let semantic_hint = load_semantic_hint();
-        let mut column_classifier = if let Some(semantic) = semantic_hint {
-            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-            if let Some(entity) = entity {
-                cc.set_entity_classifier(entity);
-            }
-            cc
+        let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
+            let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+            ColumnClassifier::with_multi_branch(mb, config)
         } else {
-            ColumnClassifier::new(classifier, config)
+            let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
+                ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+                ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+                ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+                ModelType::MultiBranch => unreachable!(),
+            };
+            let semantic_hint = load_semantic_hint();
+            if let Some(semantic) = semantic_hint {
+                // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+                let entity = load_entity_classifier(&semantic);
+                let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+                if let Some(entity) = entity {
+                    cc.set_entity_classifier(entity);
+                }
+                cc
+            } else {
+                ColumnClassifier::new(classifier, config)
+            }
         };
 
         // Load taxonomy for validation-based attractor demotion (Rule 14)
@@ -1142,7 +1155,7 @@ fn cmd_infer(
         }
 
         // Wire up Sense classifier (Sense → Sharpen pipeline)
-        if !sharp_only {
+        if !sharp_only && !column_classifier.has_multi_branch() {
             wire_sense(&mut column_classifier);
             wire_sibling_context(&mut column_classifier);
         }
@@ -1218,6 +1231,11 @@ fn cmd_infer(
     }
 
     // Row mode: classify each value independently
+    if matches!(model_type, ModelType::MultiBranch) {
+        anyhow::bail!(
+            "Multi-branch models are column-level only. Use --mode column or `finetype profile` instead."
+        );
+    }
     match model_type {
         ModelType::Transformer => {
             let classifier = Classifier::load(&model)?;
@@ -1330,6 +1348,7 @@ fn cmd_infer(
                 }
             }
         }
+        ModelType::MultiBranch => unreachable!("guarded above"),
     }
 
     if bench {
@@ -1370,31 +1389,38 @@ fn cmd_infer_batch(
 
     let t_start = Instant::now();
 
-    // Load value-level classifier
-    let classifier: Box<dyn ValueClassifier> = match model_type {
-        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-    };
-
     let config = ColumnConfig {
         sample_size,
         ..Default::default()
     };
 
-    // Wire up semantic hint (Model2Vec) — same as profile command
-    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
-        eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-        let entity = load_entity_classifier(&semantic);
-        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-        if let Some(entity) = entity {
-            eprintln!("Loaded entity classifier (full_name demotion gate)");
-            cc.set_entity_classifier(entity);
-        }
-        cc
+    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
+        let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+        eprintln!("Loaded multi-branch classifier ({} classes)", mb.n_classes());
+        ColumnClassifier::with_multi_branch(mb, config)
     } else {
-        ColumnClassifier::new(classifier, config)
+        // Load value-level classifier
+        let classifier: Box<dyn ValueClassifier> = match model_type {
+            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+            ModelType::MultiBranch => unreachable!(),
+        };
+
+        // Wire up semantic hint (Model2Vec) — same as profile command
+        if let Some(semantic) = load_semantic_hint() {
+            eprintln!("Loaded semantic hint classifier (Model2Vec)");
+            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+            if let Some(entity) = entity {
+                eprintln!("Loaded entity classifier (full_name demotion gate)");
+                cc.set_entity_classifier(entity);
+            }
+            cc
+        } else {
+            ColumnClassifier::new(classifier, config)
+        }
     };
 
     // Load taxonomy for validation-based attractor demotion (Rule 14)
@@ -1412,7 +1438,7 @@ fn cmd_infer_batch(
     }
 
     // Wire up Sense classifier (Sense → Sharpen pipeline)
-    if !sharp_only {
+    if !sharp_only && !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -1930,6 +1956,11 @@ fn cmd_train(
             let trainer = TieredTrainer::new(config);
             let report = trainer.train_all(&taxonomy, &samples, &output)?;
             eprintln!("{}", report);
+        }
+        ModelType::MultiBranch => {
+            anyhow::bail!(
+                "Multi-branch training uses `finetype train-multi-branch`, not `finetype train`."
+            );
         }
     }
 
@@ -2741,27 +2772,33 @@ fn cmd_load(
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
     eprintln!("Loading model from {:?}", model);
-    let classifier: Box<dyn ValueClassifier> = match model_type {
-        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-    };
-
     let config = ColumnConfig {
         sample_size,
         ..Default::default()
     };
-    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
-        eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        let entity = load_entity_classifier(&semantic);
-        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-        if let Some(entity) = entity {
-            eprintln!("Loaded entity classifier (full_name demotion gate)");
-            cc.set_entity_classifier(entity);
-        }
-        cc
+    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
+        let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+        eprintln!("Loaded multi-branch classifier ({} classes)", mb.n_classes());
+        ColumnClassifier::with_multi_branch(mb, config)
     } else {
-        ColumnClassifier::new(classifier, config)
+        let classifier: Box<dyn ValueClassifier> = match model_type {
+            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+            ModelType::MultiBranch => unreachable!(),
+        };
+        if let Some(semantic) = load_semantic_hint() {
+            eprintln!("Loaded semantic hint classifier (Model2Vec)");
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+            if let Some(entity) = entity {
+                eprintln!("Loaded entity classifier (full_name demotion gate)");
+                cc.set_entity_classifier(entity);
+            }
+            cc
+        } else {
+            ColumnClassifier::new(classifier, config)
+        }
     };
 
     // Load taxonomy for validation-based attractor demotion
@@ -2778,7 +2815,7 @@ fn cmd_load(
     }
 
     // Wire up Sense classifier
-    if !sharp_only {
+    if !sharp_only && !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -3416,28 +3453,34 @@ fn cmd_profile(
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
     eprintln!("Loading model from {:?}", model);
-    let classifier: Box<dyn ValueClassifier> = match model_type {
-        ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-        ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-        ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-    };
-
     let config = ColumnConfig {
         sample_size,
         ..Default::default()
     };
-    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
-        eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-        let entity = load_entity_classifier(&semantic);
-        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-        if let Some(entity) = entity {
-            eprintln!("Loaded entity classifier (full_name demotion gate)");
-            cc.set_entity_classifier(entity);
-        }
-        cc
+    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
+        let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+        eprintln!("Loaded multi-branch classifier ({} classes)", mb.n_classes());
+        ColumnClassifier::with_multi_branch(mb, config)
     } else {
-        ColumnClassifier::new(classifier, config)
+        let classifier: Box<dyn ValueClassifier> = match model_type {
+            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+            ModelType::MultiBranch => unreachable!(),
+        };
+        if let Some(semantic) = load_semantic_hint() {
+            eprintln!("Loaded semantic hint classifier (Model2Vec)");
+            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+            if let Some(entity) = entity {
+                eprintln!("Loaded entity classifier (full_name demotion gate)");
+                cc.set_entity_classifier(entity);
+            }
+            cc
+        } else {
+            ColumnClassifier::new(classifier, config)
+        }
     };
 
     // Load taxonomy for validation-based attractor demotion (Rule 14)
@@ -3456,7 +3499,7 @@ fn cmd_profile(
     }
 
     // Wire up Sense classifier (Sense → Sharpen pipeline)
-    if !sharp_only {
+    if !sharp_only && !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -4913,6 +4956,11 @@ fn cmd_eval(
                 let batch_results = classifier.classify_batch(chunk)?;
                 predictions.extend(batch_results);
             }
+        }
+        ModelType::MultiBranch => {
+            anyhow::bail!(
+                "Multi-branch models are column-level only and cannot be evaluated with value-level test data."
+            );
         }
     }
 
