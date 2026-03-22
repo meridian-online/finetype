@@ -269,7 +269,7 @@ impl MultiBranchClassifier {
         let (max_idx, max_prob) = probs_vec
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap();
 
         let label = self.labels.get(max_idx).cloned().unwrap_or_else(|| {

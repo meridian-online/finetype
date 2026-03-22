@@ -589,6 +589,11 @@ impl ColumnClassifier {
     /// 4. Apply disambiguation rules for known ambiguous pairs
     /// 5. Return the final label with confidence
     pub fn classify_column(&self, values: &[String]) -> Result<ColumnResult, InferenceError> {
+        // Multi-branch: delegate to column-level classifier (no header context)
+        if let Some(ref mb) = self.multi_branch {
+            return self.classify_multi_branch(mb, values, "");
+        }
+
         if values.is_empty() {
             return Ok(ColumnResult {
                 label: "unknown".to_string(),

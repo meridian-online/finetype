@@ -95,6 +95,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ─── Auto-detect model type ───────────────────────────────────
+# If the model directory contains label_map.json + config.json with
+# multi-branch fields, export FINETYPE_MODEL_TYPE for profile_eval.sh.
+ACTUAL_MODEL_DIR="${MODEL_DIR:-models/default}"
+if [[ -L "$ACTUAL_MODEL_DIR" ]]; then
+    ACTUAL_MODEL_DIR="models/$(readlink "$ACTUAL_MODEL_DIR")"
+fi
+if [[ -f "${ACTUAL_MODEL_DIR}/label_map.json" ]] && [[ -f "${ACTUAL_MODEL_DIR}/config.json" ]]; then
+    if grep -q '"char_dim"' "${ACTUAL_MODEL_DIR}/config.json" 2>/dev/null; then
+        export FINETYPE_MODEL_TYPE="multi-branch"
+        echo "Auto-detected model type: multi-branch"
+    fi
+fi
+
 echo ""
 
 # ─── Step 1: Profile eval ──────────────────────────────────────────
