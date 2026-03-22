@@ -853,6 +853,7 @@ pub fn train_multi_branch(
     train_data: &MultiBranchDataset,
     val_data: &MultiBranchDataset,
     labels: Option<&[String]>,
+    renderer: Option<Box<dyn crate::tui::TrainingRenderer>>,
 ) -> Result<crate::training::TrainingSummary> {
     use crate::training::{
         compute_accuracy, shuffled_batches, CosineScheduler, EarlyStopping, EpochMetrics,
@@ -937,6 +938,14 @@ pub fn train_multi_branch(
     let mut epoch_metrics = Vec::new();
     let total_start = std::time::Instant::now();
 
+    // Initialize renderer (fall back to LogRenderer if None)
+    let mut renderer: Box<dyn crate::tui::TrainingRenderer> =
+        renderer.unwrap_or_else(|| Box::new(crate::tui::LogRenderer::new()));
+
+    // Compute initial batches count for renderer (will be recomputed each epoch due to shuffling)
+    let initial_batch_count = (train_data.len() + config.batch_size - 1) / config.batch_size;
+    renderer.on_train_start(config.epochs, initial_batch_count);
+
     for epoch in 0..config.epochs {
         let epoch_start = std::time::Instant::now();
 
@@ -952,7 +961,8 @@ pub fn train_multi_branch(
         let mut train_samples = 0usize;
 
         // Training loop
-        for batch_idx in &batches {
+        let total_batches = batches.len();
+        for (batch_num, batch_idx) in batches.iter().enumerate() {
             let (char_t, embed_t, stats_t, labels_t) = train_data.batch(batch_idx, &device)?;
             let bs = batch_idx.len();
 
@@ -984,6 +994,8 @@ pub fn train_multi_branch(
             let acc = compute_accuracy(&output, &labels_t)?;
             train_correct_sum += acc as f64 * bs as f64;
             train_samples += bs;
+
+            renderer.on_batch_end(epoch, batch_num + 1, total_batches);
         }
 
         let train_loss = (train_loss_sum / train_samples as f64) as f32;
@@ -1040,7 +1052,7 @@ pub fn train_multi_branch(
 
         let epoch_time = epoch_start.elapsed().as_secs_f32();
 
-        epoch_metrics.push(EpochMetrics {
+        let metrics = EpochMetrics {
             epoch,
             train_loss,
             val_loss,
@@ -1048,7 +1060,9 @@ pub fn train_multi_branch(
             val_accuracy,
             learning_rate: lr,
             epoch_time_secs: epoch_time,
-        });
+        };
+        renderer.on_epoch_end(&metrics);
+        epoch_metrics.push(metrics);
 
         tracing::info!(
             "Epoch {:>3}/{}: train_loss={:.4} val_loss={:.4} train_acc={:.3} val_acc={:.3} lr={:.2e} ({:.1}s)",
@@ -1081,6 +1095,8 @@ pub fn train_multi_branch(
             break;
         }
     }
+
+    renderer.on_train_end();
 
     let total_time = total_start.elapsed().as_secs_f32();
 
@@ -1396,7 +1412,7 @@ mod tests {
         };
 
         let summary =
-            train_multi_branch(&train_config, &config, &train_data, &val_data, None).unwrap();
+            train_multi_branch(&train_config, &config, &train_data, &val_data, None, None).unwrap();
 
         assert_eq!(summary.total_epochs, 5);
         assert_eq!(summary.epoch_metrics.len(), 5);
@@ -1637,6 +1653,7 @@ mod tests {
             &train_data,
             &val_data,
             Some(&labels),
+            None,
         )
         .unwrap();
 

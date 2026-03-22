@@ -17,5 +17,6 @@ pub mod sibling_context;
 pub mod sibling_data;
 pub mod sibling_train;
 pub mod training;
+pub mod tui;
 
 pub use device::get_device;

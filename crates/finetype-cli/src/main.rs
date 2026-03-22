@@ -431,6 +431,10 @@ enum Commands {
         /// Validation split fraction (0.0-1.0)
         #[arg(long, default_value = "0.15")]
         val_split: f32,
+
+        /// Disable TUI dashboard (log to stderr instead)
+        #[arg(long)]
+        no_tui: bool,
     },
 
     /// Extract multi-branch feature vectors from a column of values (stdin)
@@ -733,9 +737,10 @@ fn main() -> Result<()> {
             patience,
             taxonomy,
             val_split,
+            no_tui,
         } => cmd_train_multi_branch(
             data, output, epochs, batch_size, lr, weight_decay, dropout, seed, head, patience,
-            taxonomy, val_split,
+            taxonomy, val_split, no_tui,
         ),
 
         Commands::ExtractFeatures { header, json } => cmd_extract_features(header, json),
@@ -784,11 +789,13 @@ fn cmd_train_multi_branch(
     patience: usize,
     taxonomy: PathBuf,
     val_split: f32,
+    no_tui: bool,
 ) -> Result<()> {
     use finetype_train::multi_branch::{
         HeadType, MultiBranchConfig, MultiBranchDataset, MultiBranchTrainConfig,
         read_training_data, train_multi_branch,
     };
+    use finetype_train::tui::{LogRenderer, TrainingRenderer};
     use rand::seq::SliceRandom;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -888,7 +895,28 @@ fn cmd_train_multi_branch(
         None
     };
 
-    let summary = train_multi_branch(&train_config, &model_config, &train_data, &val_data, labels_opt)?;
+    // Create renderer: TUI dashboard by default, log-only with --no-tui
+    let renderer: Option<Box<dyn TrainingRenderer>> = if no_tui {
+        Some(Box::new(LogRenderer::new()))
+    } else {
+        let head_label = match &model_config.head_type {
+            HeadType::Flat => "Flat",
+            HeadType::Hierarchical => "Hierarchical",
+        };
+        let title = format!(
+            "Multi-Branch {} ({} classes, {} epochs)",
+            head_label, model_config.n_classes, train_config.epochs
+        );
+        match finetype_train::tui::TuiRenderer::new(title) {
+            Ok(tui) => Some(Box::new(tui)),
+            Err(e) => {
+                eprintln!("TUI init failed ({e}), falling back to log output");
+                Some(Box::new(LogRenderer::new()))
+            }
+        }
+    };
+
+    let summary = train_multi_branch(&train_config, &model_config, &train_data, &val_data, labels_opt, renderer)?;
 
     // Save label_map.json (index → label mapping, required for inference)
     let label_map_path = output.join("label_map.json");

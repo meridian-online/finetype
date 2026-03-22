@@ -198,3 +198,5 @@ Contributions welcome! Please open an issue or PR.
 Part of the [Meridian](https://meridian.online) project.
 
 Built with [Candle](https://github.com/huggingface/candle) (Rust ML), [DuckDB](https://duckdb.org), [QSV](https://github.com/dathere/qsv) (CSV toolkit), [rmcp](https://github.com/modelcontextprotocol/rust-sdk) (MCP SDK), and [Serde](https://serde.rs).
+
+Training TUI dashboard inspired by [Burn](https://github.com/tracel-ai/burn)'s training renderer ([`burn-train`](https://github.com/tracel-ai/burn/tree/main/crates/burn-train/src/renderer/tui)).

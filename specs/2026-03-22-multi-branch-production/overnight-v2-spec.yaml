@@ -1,0 +1,236 @@
+goal: >
+  Automated overnight pipeline that prepares 300k+ column-level training data
+  (with label remapping), trains flat and hierarchical multi-branch models with
+  20+ epochs on M1 Pro Metal, evaluates both against Tier 1 profile eval, and
+  displays live training progress via a ratatui TUI dashboard inspired by Burn.
+  Implements milestones M-3 through M-6 from the parent spec in a single
+  unattended run.
+
+constraints:
+  - "Runs unattended on M1 Pro with Metal acceleration — no interactive input"
+  - "Total pipeline time ≤ 4 hours (data ~45min, flat ~60min, hier ~150min, eval ~10min)"
+  - "Training TUI is display-only — no keyboard capture, safe for overnight runs"
+  - "TUI is default on, --no-tui flag to disable for CI/scripts/overnight"
+  - "Label remap table as separate file: data/label_remap.json"
+  - "Both flat + hierarchical heads trained and evaluated"
+  - "Pure Rust training (Candle + Metal) — Python only for data prep"
+  - "Acknowledge Burn (tracel-ai/burn) in README for TUI design inspiration"
+  - "All changes ship as a single PR for easy pull to Mac"
+  - "Overnight script uses --no-tui to avoid ANSI escape codes in log files"
+
+milestones:
+  - id: OV2-1
+    name: "Label remap table"
+    description: >
+      First, extract the authoritative list of non-canonical distilled labels by
+      scanning sherlock_distilled.csv.gz for labels not in the taxonomy. Commit
+      this list for reference.
+
+      Then create data/label_remap.json mapping each non-canonical label to its
+      canonical FineType taxonomy equivalent. Update prepare_multibranch_data.py
+      to load and apply the remap in load_distilled_columns() before blending.
+    gate: >
+      Authoritative list of non-canonical labels extracted and committed.
+      Remap table covers all mappable labels (unmappable ones documented with
+      justification). prepare_multibranch_data.py --dry-run shows ≥180
+      taxonomy-matched types (up from 153).
+    files:
+      - data/label_remap.json
+      - scripts/prepare_multibranch_data.py
+
+  - id: OV2-2
+    name: "Data scaling to 300k+"
+    description: >
+      Fix the synthetic column volume calculation. The current code passes
+      `--samples-per-type N` to `finetype generate`, which generates N *values*
+      per type, yielding only N/100 columns per type after chunking. To reach
+      300k columns (1200 per type × 250 types):
+
+      Add a `--synthetic-columns-per-type` parameter (default: 1200) that
+      controls synthetic generation volume independently of the blend cap.
+      The script passes `synthetic_columns_per_type × 100` as the `--samples`
+      argument to `finetype generate` (i.e., 120,000 values per type to yield
+      1,200 columns of 100 values each).
+
+      The blend cap (`--samples-per-type`) remains at 1200 to control the
+      maximum columns per type after blending distilled + synthetic.
+
+      Add a preflight extraction sample: before the full run, extract features
+      for 10 types × 5 columns each (50 extractions). If any fail, abort with
+      a clear error rather than discovering failures 45 minutes in.
+    gate: >
+      --dry-run shows ≥300,000 blended columns across ≥249 types. No type
+      below 50 samples. Median samples-per-type ≥500. Preflight sample
+      extraction passes for all 50 test columns.
+    files:
+      - scripts/prepare_multibranch_data.py
+
+  - id: OV2-3
+    name: "Training TUI dashboard"
+    description: >
+      Add a ratatui-based training dashboard to finetype-train. Three panels:
+
+      (1) **Loss/accuracy chart** — Sparkline or line chart showing train loss,
+      val loss, train accuracy, val accuracy across epochs. Dual-axis or
+      normalised to fit one chart area.
+
+      (2) **Progress bar with ETA** — Current epoch progress (batches processed /
+      total batches) with estimated time remaining. Overall training progress
+      (epochs completed / total epochs).
+
+      (3) **Epoch summary table** — Table of completed epochs showing epoch
+      number, train loss, val loss, train acc, val acc, learning rate, time.
+      Scrolls as epochs complete.
+
+      Display-only: no keyboard event capture. Renders on a background thread
+      at ≤10 fps. Falls back gracefully to current tracing::info output when
+      --no-tui is passed or terminal doesn't support alternate screen.
+
+      **Tracing integration:** When TUI is active, replace the global tracing
+      subscriber with a file-backed appender (via tracing-appender or
+      tracing_subscriber::reload::Handle). The --no-tui path uses the existing
+      stderr subscriber. This must be set up in cmd_train_multi_branch before
+      calling train_multi_branch, not inside the training function itself.
+
+      Design inspired by Burn's TUI renderer (tracel-ai/burn, crates/burn-train/
+      src/renderer/tui/). Acknowledge in README.
+    gate: >
+      TUI renders during finetype train-multi-branch without keyboard input.
+      Falls back to log output with --no-tui. All three panels update correctly:
+      chart shows convergence pattern, progress bar shows ETA, table shows epoch
+      metrics. Tracing output goes to file when TUI is active, not to stderr.
+    files:
+      - crates/finetype-train/Cargo.toml
+      - crates/finetype-train/src/tui.rs (new)
+      - crates/finetype-train/src/multi_branch.rs
+      - crates/finetype-train/src/lib.rs
+      - crates/finetype-cli/src/main.rs (--no-tui flag + tracing redirect)
+
+  - id: OV2-4
+    name: "Overnight script v2"
+    description: >
+      Update scripts/overnight_sherlock.sh to:
+      (1) Run prepare_multibranch_data.py with --samples-per-type 1200
+          --synthetic-columns-per-type 1200
+      (2) Train flat model with 20 epochs, patience 10, --no-tui,
+          save label_map.json
+      (3) Train hierarchical model with 15 epochs, patience 7, --no-tui,
+          save label_map.json. Add epoch-1 timing check: if epoch 1
+          exceeds 10 minutes, log warning and reduce to 10 epochs.
+      (4) Run scripts/eval.sh --model on each trained model, copying
+          eval results to models/<name>/eval/ before running the next
+          eval (prevents overwriting)
+      (5) Write summary to results/overnight-v2.log with both models'
+          eval scores
+
+      Note: This deliberately trains hierarchical unconditionally, diverging
+      from parent spec M-7 which makes it conditional on flat < 95%. The
+      rationale is that overnight compute is cheap and having both numbers
+      from a single run avoids a second overnight iteration.
+    gate: >
+      Script runs end-to-end unattended. Produces two model directories with
+      model.safetensors, config.json, label_map.json, results.json. Eval
+      scores recorded for both models in separate directories. Both --no-tui
+      flags present in training invocations.
+    files:
+      - scripts/overnight_sherlock.sh
+
+acceptance_criteria:
+  - id: AC-1
+    description: >
+      Label remap recovers distilled training data. Authoritative list of
+      non-canonical labels extracted and committed. Remapped data produces
+      ≥180 taxonomy-matched types.
+    milestone: OV2-1
+
+  - id: AC-2
+    description: >
+      Training data reaches ≥300,000 records across ≥249 types. No type
+      below 50 samples. Median samples-per-type ≥500. Preflight extraction
+      sample passes before full run.
+    milestone: OV2-2
+
+  - id: AC-3
+    description: >
+      Training TUI displays live loss/accuracy chart, progress bar with ETA,
+      and epoch summary table. Display-only (no keyboard capture). Falls
+      back to log output with --no-tui. Tracing output redirected to file
+      when TUI is active.
+    milestone: OV2-3
+
+  - id: AC-4
+    description: >
+      Overnight script produces flat + hierarchical models, both evaluated
+      against Tier 1 profile eval. Eval results preserved separately for
+      each model (not overwritten). Both training invocations use --no-tui.
+    milestone: OV2-4
+
+  - id: AC-5
+    description: >
+      Burn acknowledged in README as TUI design inspiration.
+    milestone: OV2-3
+
+evaluation_principles:
+  - principle: "Pipeline reliability — runs unattended without errors or hangs"
+    weight: 0.35
+  - principle: "Data quality — correct label mapping, sufficient volume and coverage"
+    weight: 0.25
+  - principle: "TUI usefulness — dashboard provides at-a-glance training status"
+    weight: 0.20
+  - principle: "Eval integration — wake up to accuracy numbers, not just training curves"
+    weight: 0.20
+
+exit_conditions:
+  - "Overnight script runs end-to-end on M1 Pro and produces eval scores"
+  - "TUI renders correctly during training without capturing input"
+  - "Both flat and hierarchical models trained and evaluated"
+
+known_risks:
+  - risk: "300k feature extraction may exceed 1 hour"
+    severity: medium
+    mitigation: >
+      Preflight extraction sample (10 types × 5 cols) validates the pipeline
+      in <30 seconds before committing to the full run. Monitor with --dry-run
+      for volume estimates. If too slow, increase --workers or consider
+      Rust-native batch extraction.
+  - risk: "TUI rendering conflicts with tracing subscriber"
+    severity: medium
+    mitigation: >
+      TUI mode replaces the global tracing subscriber with a file-backed
+      appender before training starts. --no-tui mode uses the existing stderr
+      subscriber. Overnight script always uses --no-tui to avoid log corruption.
+  - risk: "Hierarchical training at 300k may exceed 2.5 hours"
+    severity: high
+    mitigation: >
+      Empirical: hier = 52.5s/epoch at 28.5k. At 300k (10.5×) with 15 epochs:
+      ~138 min. With patience 7, may exit earlier. Epoch-1 timing check: if
+      epoch 1 exceeds 10 min, log warning and reduce to 10 epochs. Total
+      pipeline budget extended to 4 hours to accommodate.
+  - risk: "Memory peak ~3.4 GB at 300k training records"
+    severity: medium
+    mitigation: >
+      read_training_data + from_records hold two copies simultaneously (~1.7 GB
+      each). M1 Pro has 16 GB unified memory. Consider taking Vec<TrainingRecord>
+      by value in from_records to halve peak. Pre-flight: verify ≥8 GB free
+      before starting training.
+  - risk: "Eval results overwritten between flat and hierarchical runs"
+    severity: low
+    mitigation: >
+      Overnight script copies eval/eval_output/ to models/<name>/eval/ after
+      each eval run, preserving both sets of results.
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-03-22T18:00:00Z"
+  ambiguity_score: 0.06
+  interview_ref: "specs/2026-03-22-multi-branch-production/interview-overnight-v2.md"
+  parent_spec: "specs/2026-03-22-multi-branch-production/spec.yaml"
+  risk_tier: "STANDARD"
+  implements_milestones: [M-3, M-4, M-5, M-6]
+  review_ref: "specs/2026-03-22-multi-branch-production/review-overnight-v2-spec.md"
+  divergences:
+    - from: "Parent spec M-7 (conditional hierarchical)"
+      rationale: >
+        Trains hierarchical unconditionally in the same overnight run.
+        Overnight compute is cheap; having both numbers avoids a second
+        iteration. Hierarchical results are exploratory, not gating.
