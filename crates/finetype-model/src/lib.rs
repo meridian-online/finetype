@@ -16,6 +16,7 @@ pub mod inference;
 pub mod label_category_map;
 pub mod model;
 pub mod model2vec_shared;
+pub mod multi_branch;
 pub mod semantic;
 pub mod sense;
 pub mod sibling_context;
@@ -39,6 +40,7 @@ pub use inference::{
 pub use label_category_map::LabelCategoryMap;
 pub use model::{TextClassifier, TextClassifierConfig};
 pub use model2vec_shared::Model2VecResources;
+pub use multi_branch::MultiBranchClassifier;
 pub use semantic::SemanticHintClassifier;
 pub use sense::{BroadCategory, EntitySubtype, SenseClassifier, SenseResult};
 pub use sibling_context::SiblingContextAttention;

@@ -1,0 +1,363 @@
+goal: >
+  Make multi-branch the production successor to CharCNN as FineType's primary
+  column-type classifier. Multi-branch replaces the Sense stage with deterministic
+  feature extraction (960 char + 512 embed + 27 stats = 1,499 dims) fed through
+  a multi-branch MLP. Existing Sharpen rules (F1-F6, locale detection, leading-zero,
+  entity demotion) preserved as deterministic post-processing. Single-value inference
+  degrades gracefully; CharCNN retained as lightweight fallback for n=1 if needed.
+  Ship gate: ≥95% Tier 1 label accuracy + demonstrable speed win over CharCNN.
+
+constraints:
+  - "Eval harness integration FIRST — must measure before optimising"
+  - "Milestone-driven, not time-boxed — each piece ships when it passes its quality gate"
+  - "Blend-30-70 column-level data (30% distilled bootstrapped + 70% synthetic columns)"
+  - "No new distillation until after 2026-03-28 (existing 119k rows + label remapping)"
+  - "M1 Pro training hardware (Metal acceleration), each training run ≤ 2 hours"
+  - "Pure Rust at inference time — zero Python dependencies for build or runtime. Training data pipeline may use Python."
+  - "Model artifact ≤ 50 MB (branch weights + merge; Model2Vec shared, not counted)"
+  - "Backward-compatible CLI: finetype profile / infer produce same output format"
+  - "Flat head is primary target; hierarchical head revisited after data scaling"
+  - "DuckDB extension deferred — continues using CharCNN during this work"
+
+milestones:
+  - id: M-1
+    name: "Eval harness integration"
+    description: >
+      Wire multi-branch model loading into `finetype profile` so that Tier 1
+      profile eval can run against multi-branch .safetensors models. This requires
+      four Rust changes:
+
+      (1) **ModelType variant** — Add `MultiBranch` to the `ModelType` enum in
+      `main.rs` (currently: Transformer, CharCnn, Tiered). Auto-detect from model
+      directory contents (presence of `.safetensors` + `config.json` with
+      `model_type: "multi_branch"`).
+
+      (2) **Model loader** — Implement `load_multi_branch_model(path)` that reads
+      `.safetensors` weights + `config.json` hyperparameters + `label_map.json`
+      class mapping. Returns a struct holding the loaded weights and feature
+      extraction config. Lives in `finetype-model`.
+
+      (3) **ColumnClassifier bypass** — Multi-branch is fundamentally column-level
+      (Vec<String> → features → label), not value-level. It does NOT implement
+      `ValueClassifier`. Instead, add a new `ColumnClassifier` constructor:
+      `ColumnClassifier::with_multi_branch(model, config)` that stores the
+      multi-branch model directly. When `classify_column_with_header` is called
+      and multi-branch is present, it takes a dedicated code path that:
+      samples values → extracts 3-branch features (960 char + 512 embed + 27 stats)
+      → forward pass through MLP → returns ColumnResult. This bypasses the
+      Sense→Sharpen pipeline entirely for M-1 (Sharpen integration deferred to M-8).
+
+      (4) **cmd_profile wiring** — Add `ModelType::MultiBranch` match arms in
+      `cmd_profile` and `cmd_schema` (4 sites in main.rs that match on ModelType).
+      Construct `ColumnClassifier::with_multi_branch(model, config)` instead of
+      `ColumnClassifier::new(classifier, config)`.
+
+      This does NOT require replacing the default pipeline — a `--model-type multi-branch`
+      flag or auto-detection from model directory contents is sufficient.
+    gate: >
+      `finetype profile` successfully loads a multi-branch model directory and
+      produces type predictions for all columns in at least 5 test CSVs.
+      Output format matches existing profile output (label, confidence, domain).
+    verification: >
+      Run `./scripts/eval.sh --model models/sherlock-v1-flat` and get a Tier 1
+      profile eval score (any score — we're measuring, not gating on accuracy).
+      All 30 eval datasets produce results without errors.
+
+  - id: M-2
+    name: "Baseline measurement"
+    description: >
+      Run the existing 28.5k-trained flat multi-branch model (models/sherlock-v1-flat)
+      through the newly wired Tier 1 profile eval. This establishes the true
+      multi-branch accuracy on real-world data — replacing the 60.3% val accuracy
+      figure (which is on a random 15% split of training data, not comparable to
+      CharCNN's 93.7% Tier 1 score). This number becomes the starting point for
+      all subsequent improvement work.
+    gate: >
+      Tier 1 profile eval score recorded for sherlock-v1-flat. Comparison table
+      produced: multi-branch vs CharCNN v16-baseline (93.7%) vs CharCNN v14
+      production (97.7%). Per-type breakdown identifies where multi-branch
+      succeeds and fails relative to CharCNN.
+    verification: >
+      Results committed to specs/2026-03-22-multi-branch-production/baseline-measurement.md
+      with Tier 1 scores, per-type analysis, and gap analysis vs CharCNN.
+    depends_on: [M-1]
+
+  - id: M-3
+    name: "Label remapping"
+    description: >
+      Build a mapping table from the 29 non-canonical distilled labels to their
+      canonical FineType taxonomy equivalents. Apply the mapping to the distilled
+      data before feature extraction. This recovers ~131 columns of real-world
+      training signal that were lost due to LLM adjudicator using slightly
+      different taxonomy paths than FineType's canonical labels.
+    gate: >
+      Mapping table documented. Remapped distilled data produces ≥180 taxonomy-
+      matched types (up from 153 before remapping). No unmappable labels remain
+      (or documented as intentionally excluded with justification).
+    verification: >
+      Script produces remapped data. Diff shows recovered columns per type.
+      Committed as part of the data pipeline.
+
+  - id: M-4
+    name: "Synthetic column generation"
+    description: >
+      Build a pipeline that generates column-level feature vectors from FineType's
+      existing per-type generators at scale. For each type: (1) generate N synthetic
+      columns of ~100 values each using the type's generator, (2) run the 3-branch
+      feature extraction pipeline on each column, (3) output .ftmb records. This
+      creates unlimited synthetic column-level training data for all 250 types.
+    gate: >
+      Pipeline generates .ftmb records for all 250 types. Each type has ≥100
+      synthetic columns. Total synthetic volume: ≥25,000 columns (250 types × 100).
+      Feature extraction per column ≤ 100ms. Full pipeline completes in ≤ 30 minutes.
+      M-4 gate must verify generation at M-5 target volume (~840 columns/type),
+      not just the 100-column minimum — to surface scaling issues before M-5.
+    verification: >
+      Run pipeline, verify .ftmb output dimensions (960 + 512 + 27 per record).
+      Spot-check 10 random records: features match independent extraction.
+      Type coverage report: all 250 types represented.
+
+  - id: M-5
+    name: "Data scaling to 300k+"
+    description: >
+      Produce blend-30-70 column-level training data at 300k+ total records.
+      30% from distilled data (with label remapping from M-3, bootstrapped with
+      replacement and augmented) + 70% from synthetic column generation (M-4).
+      Target: ≥1,000 samples per type where possible, minimum 100 for rare types.
+      Time budget: data pipeline at 300k columns estimated ~30-45 min (per-column
+      subprocess overhead scales linearly from 5 min @ 33k). If this exceeds
+      1 hour, consider Rust-native batch feature extraction to replace Python
+      subprocess calls.
+    gate: >
+      .ftmb training file contains ≥300,000 records across ≥249 types.
+      Distribution report shows samples-per-type histogram. No type has fewer
+      than 50 samples. Median samples-per-type ≥500.
+    verification: >
+      python3 scripts/read_ftmb.py output.ftmb --stats --verify
+      Type distribution committed to specs directory.
+    depends_on: [M-3, M-4]
+
+  - id: M-6
+    name: "Retrain flat multi-branch"
+    description: >
+      Train flat multi-branch model on the 300k+ scaled data. Hyperparameter
+      tuning: more epochs (≥20, with early stopping patience 10), learning rate
+      scheduling (cosine or step decay), potentially larger batch size. Evaluate
+      each checkpoint against Tier 1 profile eval. Back-of-envelope training
+      time: at 300k samples (10× current 28.5k), expect ~28 min/epoch. With
+      ≥20 epochs + patience 10 (worst case 30 epochs): ~87 min flat. Within
+      the 2-hour M1 Pro constraint but marginal — monitor after first epoch.
+    gate: >
+      Best flat model achieves ≥95% Tier 1 label accuracy on format-detectable
+      columns (190 columns in current eval set). No individual type regresses
+      by more than 3 columns vs CharCNN v16-baseline on Tier 2. If ≥95% not
+      achieved: findings document explains the gap and recommends next steps
+      (more data, architecture changes, or accept current accuracy + speed win).
+    verification: >
+      Profile eval results committed. Training curve shows convergence (not still
+      improving at final epoch). Comparison table vs all baselines (v14, v16, prior
+      multi-branch). Per-type delta analysis identifies remaining failure modes.
+    depends_on: [M-1, M-5]
+
+  - id: M-7
+    name: "Revisit hierarchical head"
+    description: >
+      If flat head does not reach ≥95% Tier 1, train hierarchical multi-branch
+      (7→43→250 tree softmax) on the same 300k+ data. The hierarchical head has
+      structural advantage for the taxonomy tree and may benefit more from
+      increased data volume. Compare flat vs hierarchical on same benchmark.
+    gate: >
+      If attempted: hierarchical model trained and evaluated. Comparison table
+      shows flat vs hierarchical on Tier 1 and Tier 2. Best model identified.
+      If flat already hit ≥95%: this milestone is skipped with documented rationale.
+    verification: >
+      Results committed to specs directory with full comparison.
+    depends_on: [M-6]
+    conditional: "Only if M-6 flat model < 95% Tier 1"
+
+  - id: M-8
+    name: "Production integration"
+    description: >
+      Replace the Sense stage in the column classification pipeline with the
+      best multi-branch model. Sense = multi-branch forward pass (direct 250-type
+      classification). Sharpen = existing deterministic corrections (F1-F6, locale
+      detection, leading-zero, entity demotion, header hints). Single-value path:
+      if n=1, fall back to CharCNN (if degradation testing in M-6 confirms this
+      is needed) or use multi-branch with documented lower accuracy. Update
+      `finetype infer` to be array-oriented, accepting both single strings and
+      arrays. Update default model symlink.
+    gate: >
+      `finetype profile` uses multi-branch as default Sense model. All 30 eval
+      datasets produce correct output. Inference latency ≤ 50ms per column (100
+      values) on M1. `finetype infer` works with single values and arrays.
+      Sharpen corrections verified on known edge cases.
+    verification: >
+      Tier 1 profile eval ≥95%. Latency benchmark on M1 (p50/p95/p99).
+      Golden integration tests pass. 5 real-world CSVs profiled with correct output.
+    depends_on: [M-6 or M-7]
+
+acceptance_criteria:
+  - id: AC-1
+    description: >
+      Multi-branch model loadable by `finetype profile` — eval harness produces
+      Tier 1 scores for multi-branch models without errors on all 30 eval datasets.
+    milestone: M-1
+
+  - id: AC-2
+    description: >
+      True Tier 1 baseline established for multi-branch — real-world accuracy
+      measured (not val accuracy on training split) with per-type breakdown
+      and gap analysis vs CharCNN.
+    milestone: M-2
+
+  - id: AC-3
+    description: >
+      29 non-canonical distilled labels remapped to canonical taxonomy. ~131
+      columns of real-world training signal recovered. ≥180 taxonomy-matched
+      types in training data.
+    milestone: M-3
+
+  - id: AC-4
+    description: >
+      Synthetic column generation pipeline produces column-level .ftmb records
+      for all 250 types at scale. ≥100 synthetic columns per type.
+    milestone: M-4
+
+  - id: AC-5
+    description: >
+      Blend-30-70 column-level training data at ≥300,000 records. No type
+      below 50 samples. Median samples-per-type ≥500.
+    milestone: M-5
+
+  - id: AC-6
+    description: >
+      Best multi-branch model achieves ≥95% Tier 1 label accuracy on format-
+      detectable columns (190 columns across 30 datasets — a subset of the
+      250-type taxonomy). Tier 2 per-type regression analysis covers long-tail
+      types not in the eval set. Demonstrably faster inference than CharCNN.
+    milestone: M-6
+
+  - id: AC-7
+    description: >
+      Production pipeline uses multi-branch as default Sense model with
+      Sharpen deterministic corrections preserved. Single-value inference
+      works (with documented accuracy characteristics). CLI output format
+      unchanged.
+    milestone: M-8
+
+rollback:
+  description: >
+    If best multi-branch model cannot reach ≥90% Tier 1 after M-7: production
+    model remains CharCNN (char-cnn-v14-250 or v16-baseline). Findings document
+    recommends whether to iterate (more data, architecture) or accept CharCNN
+    as the long-term production model. The eval harness integration (M-1) and
+    data scaling pipeline (M-3-M-5) are independently valuable regardless of
+    the final model choice — they ship and remain available.
+
+    Note: the ≥95% target is the ship gate for replacing CharCNN as default.
+    The ≥90% threshold is the "keep investing" gate. Below 90%, we reassess
+    the entire multi-branch approach.
+
+    Post-M-8 rollback: If a field bug surfaces after production integration,
+    repoint `models/default` symlink to the CharCNN model directory. The
+    `--model-type` flag persists after M-8, allowing per-invocation model
+    switching (e.g., `--model-type char-cnn` to force CharCNN). No code
+    rollback needed — both code paths remain functional.
+
+ontology_schema:
+  name: "MultiBranchProductionPipeline"
+  description: "Multi-branch neural network replacing CharCNN as FineType's Sense classifier"
+  fields:
+    - name: "char_features"
+      type: "array"
+      description: "960-dim character distribution features (96 ASCII × 10 aggregation stats)"
+    - name: "embed_features"
+      type: "array"
+      description: "512-dim Model2Vec embedding aggregations (128d × mean/var/min/max)"
+    - name: "stat_features"
+      type: "array"
+      description: "27-dim statistical features (entropy, uniqueness, length stats, composition)"
+    - name: "head_type"
+      type: "string"
+      description: "Classification head: 'flat' (primary) or 'hierarchical' (revisited after scaling)"
+    - name: "n_classes"
+      type: "number"
+      description: "Number of output classes (250)"
+    - name: "training_samples"
+      type: "number"
+      description: "Target: ≥300,000 column-level feature vectors"
+    - name: "blend_ratio"
+      type: "string"
+      description: "30% distilled (bootstrapped) + 70% synthetic columns"
+    - name: "inference_mode"
+      type: "string"
+      description: "Column-level (default) or single-value (graceful degradation)"
+
+evaluation_principles:
+  - principle: "Tier 1 accuracy — real-world CSV profile accuracy (≥95% label on format-detectable)"
+    weight: 0.40
+  - principle: "Inference speed — faster than CharCNN Sense→Sharpen (≤50ms/column on M1)"
+    weight: 0.20
+  - principle: "Regression safety — no per-type regression >3 columns vs CharCNN baseline on Tier 2"
+    weight: 0.15
+  - principle: "Graceful degradation — single-value inference works with documented characteristics"
+    weight: 0.10
+  - principle: "Pipeline simplicity — fewer stages, cleaner Sense/Sharpen separation"
+    weight: 0.10
+  - principle: "Data pipeline reusability — column-level feature extraction usable for future models"
+    weight: 0.05
+
+exit_conditions:
+  - "M-1 complete: eval harness loads multi-branch models and produces Tier 1 scores"
+  - "M-2 complete: true baseline established with per-type gap analysis"
+  - "M-6 complete: best flat model evaluated against ≥95% Tier 1 gate"
+  - "M-7 complete (if triggered): hierarchical model compared to flat"
+  - "Ship decision: ≥95% Tier 1 → proceed to M-8 production integration"
+  - "Hold decision: 90-95% Tier 1 → iterate with more data/tuning, document path"
+  - "Pivot decision: <90% Tier 1 after M-7 → reassess multi-branch approach entirely"
+
+known_risks:
+  - risk: "Single-value degradation worse than expected"
+    severity: medium
+    mitigation: >
+      CharCNN retained as 250KB fallback for n=1 inputs. If multi-branch produces
+      systematic misclassification for single values (not just lower confidence),
+      route n=1 through CharCNN automatically.
+  - risk: "Column-level synthetic data distribution doesn't match real-world"
+    severity: high
+    mitigation: >
+      Blend-30-70 preserves 30% real-world signal. Profile eval on real CSVs is
+      the gate, not synthetic benchmark accuracy. If synthetic columns produce
+      unrealistic feature distributions, increase distilled ratio.
+  - risk: "95% Tier 1 is too ambitious — current CharCNN took 15 epochs on 372k value-level samples"
+    severity: medium
+    mitigation: >
+      Milestone-driven approach means we learn our true ceiling at M-6. If flat
+      plateaus below 95%, hierarchical head (M-7) and additional data sources
+      (completing distillation after 2026-03-28) provide two more levers. The
+      90% hold threshold prevents premature abandonment.
+  - risk: "Eval harness integration touches column.rs — risk of regression in production path"
+    severity: medium
+    mitigation: >
+      Multi-branch is a parallel code path with --model-type flag or auto-detection.
+      Existing CharCNN path untouched until M-8. Golden integration tests catch
+      regressions.
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-03-22T14:00:00Z"
+  ambiguity_score: 0.04
+  interview_ref: "specs/2026-03-22-multi-branch-production/interview.md"
+  risk_tier: "HIGH"
+  supersedes: "specs/2026-03-21-sherlock-architecture/spec.yaml (AC-7 through AC-10)"
+  related_specs:
+    - "specs/2026-03-21-sherlock-architecture/spec.yaml"
+    - "specs/2026-03-21-sherlock-architecture/ablation-results.md"
+    - "specs/2026-03-20-retraining-spike/findings.md"
+  related_decisions:
+    - "decisions/0040-sherlock-first-defer-remaining-distillation.md"
+  prior_art:
+    - "Sherlock ablation (2026-03-21): flat 60.3%, hier 56.5% on 28.5k samples"
+    - "CharCNN v16-baseline: 93.7% Tier 1 on blend-30-70 (10 epochs, 373k values)"
+    - "CharCNN v14 production: 97.7% Tier 1 (15 epochs, 372k values)"
+    - "Retraining spike: blend-30-70 = 80.6% Tier 2 (+5.6pp over pure synthetic)"

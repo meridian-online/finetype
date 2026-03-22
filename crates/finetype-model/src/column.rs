@@ -15,11 +15,33 @@ use crate::features::{extract_features, FEATURE_DIM};
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
+use crate::multi_branch::MultiBranchClassifier;
 use crate::semantic::SemanticHintClassifier;
 use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
 use crate::sibling_context::SiblingContextAttention;
 use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
+
+/// No-op classifier used as placeholder when multi-branch is active.
+/// Never actually called — the multi-branch code path bypasses ValueClassifier.
+struct NoopClassifier;
+
+impl ValueClassifier for NoopClassifier {
+    fn classify(&self, _text: &str) -> Result<ClassificationResult, InferenceError> {
+        Err(InferenceError::InvalidPath(
+            "NoopClassifier should never be called — multi-branch bypasses ValueClassifier".into(),
+        ))
+    }
+
+    fn classify_batch(
+        &self,
+        _texts: &[String],
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        Err(InferenceError::InvalidPath(
+            "NoopClassifier should never be called — multi-branch bypasses ValueClassifier".into(),
+        ))
+    }
+}
 
 /// Aggregated column-level features: mean, variance, min, and max of per-value
 /// feature vectors (NNFT-250, expanded in NNFT-266).
@@ -409,6 +431,12 @@ pub struct ColumnClassifier {
     /// encode headers. Without a trained model artifact, this is None and the
     /// pipeline is unchanged.
     sibling_context: Option<SiblingContextAttention>,
+    /// Optional multi-branch column classifier (Sherlock-style).
+    /// When present, `classify_column_with_header` uses the multi-branch forward
+    /// pass directly (column-level features → MLP → label), bypassing both
+    /// ValueClassifier and Sense→Sharpen. The multi-branch model is fundamentally
+    /// column-level, not value-level.
+    multi_branch: Option<MultiBranchClassifier>,
 }
 
 impl ColumnClassifier {
@@ -424,6 +452,7 @@ impl ColumnClassifier {
             model2vec: None,
             label_map: None,
             sibling_context: None,
+            multi_branch: None,
         }
     }
 
@@ -452,6 +481,7 @@ impl ColumnClassifier {
             model2vec: None,
             label_map: None,
             sibling_context: None,
+            multi_branch: None,
         }
     }
 
@@ -514,6 +544,42 @@ impl ColumnClassifier {
         self.sibling_context.is_some()
     }
 
+    /// Create a column classifier using a multi-branch model.
+    ///
+    /// Multi-branch is fundamentally column-level (Vec<String> → features → label),
+    /// not value-level. It does NOT use the `ValueClassifier` trait. When
+    /// `classify_column_with_header` is called and multi-branch is present,
+    /// it takes a dedicated code path that extracts 3-branch features and runs
+    /// the MLP forward pass directly.
+    ///
+    /// A dummy `ValueClassifier` is still required for the struct field, but it
+    /// is never called when multi-branch is active.
+    pub fn with_multi_branch(
+        multi_branch: MultiBranchClassifier,
+        config: ColumnConfig,
+    ) -> Self {
+        // Use a no-op ValueClassifier as placeholder — never called when
+        // multi-branch is active.
+        let dummy = Box::new(NoopClassifier);
+        Self {
+            classifier: dummy,
+            config,
+            semantic_hint: None,
+            taxonomy: None,
+            entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
+            sibling_context: None,
+            multi_branch: Some(multi_branch),
+        }
+    }
+
+    /// Check whether the multi-branch classifier is active.
+    pub fn has_multi_branch(&self) -> bool {
+        self.multi_branch.is_some()
+    }
+
     /// Classify a column of values, returning a single type prediction.
     ///
     /// The algorithm:
@@ -523,6 +589,11 @@ impl ColumnClassifier {
     /// 4. Apply disambiguation rules for known ambiguous pairs
     /// 5. Return the final label with confidence
     pub fn classify_column(&self, values: &[String]) -> Result<ColumnResult, InferenceError> {
+        // Multi-branch: delegate to column-level classifier (no header context)
+        if let Some(ref mb) = self.multi_branch {
+            return self.classify_multi_branch(mb, values, "");
+        }
+
         if values.is_empty() {
             return Ok(ColumnResult {
                 label: "unknown".to_string(),
@@ -740,8 +811,8 @@ impl ColumnClassifier {
         &self,
         columns: &[(Vec<String>, String)], // (values, header) per column
     ) -> Result<Vec<ColumnResult>, InferenceError> {
-        // Fast path: no sibling context or no Sense → per-column classification
-        if !self.has_sibling_context() || !self.has_sense() {
+        // Fast path: multi-branch or no sibling context → per-column classification
+        if self.has_multi_branch() || !self.has_sibling_context() || !self.has_sense() {
             return columns
                 .iter()
                 .map(|(values, header)| self.classify_column_with_header(values, header))
@@ -784,6 +855,13 @@ impl ColumnClassifier {
         values: &[String],
         header: &str,
     ) -> Result<ColumnResult, InferenceError> {
+        // Multi-branch pipeline: when multi-branch is active, use it directly.
+        // Multi-branch is column-level (features → MLP → label), bypassing
+        // both ValueClassifier and Sense→Sharpen entirely.
+        if let Some(ref mb) = self.multi_branch {
+            return self.classify_multi_branch(mb, values, header);
+        }
+
         // Sense→Sharpen pipeline (NNFT-170): when Sense is active, use it
         // instead of the legacy header-hint path.
         if self.has_sense() {
@@ -1807,6 +1885,60 @@ impl ColumnClassifier {
     /// Get a reference to the configuration.
     pub fn config(&self) -> &ColumnConfig {
         &self.config
+    }
+
+    /// Multi-branch classification: extract column-level features and run
+    /// the MLP forward pass directly.
+    ///
+    /// Samples values (same as standard pipeline), then extracts 3-branch
+    /// features (960 char + 512 embed + 27 stats), runs the forward pass,
+    /// and returns a ColumnResult matching the standard output format.
+    fn classify_multi_branch(
+        &self,
+        mb: &MultiBranchClassifier,
+        values: &[String],
+        _header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Sample values (same strategy as classify_column)
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+
+        let samples_used = sample.len();
+
+        // Classify via multi-branch (feature extraction + forward pass)
+        let (label, confidence) = mb.classify_column(&sample)?;
+
+        Ok(ColumnResult {
+            label: label.clone(),
+            confidence,
+            vote_distribution: vec![(label, confidence)],
+            disambiguation_applied: false,
+            disambiguation_rule: Some("multi-branch".to_string()),
+            samples_used,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        })
     }
 }
 
