@@ -206,7 +206,7 @@ impl MultiBranchModel {
         let (char_branch, embed_branch, stats_branch, merge_bn, merge_linear1, merge_linear2) =
             Self::build_trunk(config, &vb)?;
 
-        let hier_head = HierarchicalHead::new(config.merge_hidden[1], labels, vb.pp("hier"))?;
+        let hier_head = HierarchicalHead::new(config.merge_hidden[1], labels, vb.pp(HierarchicalHead::VARBUILDER_PREFIX))?;
 
         Ok(Self {
             char_branch,

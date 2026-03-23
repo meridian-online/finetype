@@ -204,7 +204,7 @@ impl MultiBranchClassifier {
                 ClassificationHead::Flat(flat_head)
             }
             HeadType::Hierarchical => {
-                let hier_head = HierarchicalHead::new(config.merge_hidden[1], &labels, vb.pp("hier"))
+                let hier_head = HierarchicalHead::new(config.merge_hidden[1], &labels, vb.pp(HierarchicalHead::VARBUILDER_PREFIX))
                     .map_err(|e| {
                         InferenceError::InvalidPath(format!("hierarchical head: {e}"))
                     })?;
