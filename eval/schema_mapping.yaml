@@ -2196,6 +2196,12 @@ mappings:
     finetype_domain: technology
     match_quality: direct
     expand: false
+  - gt_label: git sha
+    source: profile_eval
+    finetype_label: technology.cryptographic.hash
+    finetype_domain: technology
+    match_quality: close
+    expand: false
   - gt_label: cidr
     source: profile_eval
     finetype_label: technology.internet.cidr

@@ -110,17 +110,19 @@ WITH candidates AS (
             WHEN sm.finetype_label LIKE 'datetime.time.%'
                  AND pr.predicted_type LIKE 'datetime.time.%'
             THEN true
-            -- Geographic hierarchy: continent ~ region ~ state are interchangeable
-            -- (GT "region" covers continent-level through state-level subdivisions)
+            -- Geographic hierarchy: continent ~ region ~ state ~ country are interchangeable
+            -- (GT "region" covers continent-level through country-level subdivisions)
             WHEN sm.finetype_label IN (
                      'geography.location.region',
                      'geography.location.state',
-                     'geography.location.continent'
+                     'geography.location.continent',
+                     'geography.location.country'
                  )
                  AND pr.predicted_type IN (
                      'geography.location.region',
                      'geography.location.state',
-                     'geography.location.continent'
+                     'geography.location.continent',
+                     'geography.location.country'
                  )
             THEN true
             -- Timestamp sub-types are interchangeable: iso_8601 ~ iso_8601_microseconds

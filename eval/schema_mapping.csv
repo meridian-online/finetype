@@ -19,7 +19,6 @@ first name,profile,identity.person.first_name,identity,direct,false
 last name,profile,identity.person.last_name,identity,direct,false
 hash,profile,technology.cryptographic.hash,technology,direct,false
 http status code,profile,representation.numeric.integer_number,representation,close,false
-http status code,profile,representation.identifier.numeric_code,representation,close,false
 iata,profile,geography.transportation.iata_code,geography,direct,false
 icao,profile,geography.transportation.icao_code,geography,direct,false
 hostname,profile,technology.internet.hostname,technology,direct,false
@@ -29,7 +28,6 @@ measurement unit,profile,representation.scientific.measurement_unit,representati
 month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
 port,profile,representation.numeric.integer_number,representation,close,false
-port,profile,representation.identifier.numeric_code,representation,close,false
 street number,profile,representation.numeric.integer_number,representation,close,false
 uuid,profile,representation.identifier.uuid,representation,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
@@ -332,6 +330,7 @@ s3 uri,profile_eval,technology.cloud.s3_uri,technology,direct,false
 jwt,profile_eval,technology.cryptographic.jwt,technology,direct,false
 docker ref,profile_eval,technology.development.docker_ref,technology,direct,false
 git sha,profile_eval,technology.development.git_sha,technology,direct,false
+git sha,profile_eval,technology.cryptographic.hash,technology,close,false
 cidr,profile_eval,technology.internet.cidr,technology,direct,false
 urn,profile_eval,technology.internet.urn,technology,direct,false
 data uri,profile_eval,technology.internet.data_uri,technology,direct,false

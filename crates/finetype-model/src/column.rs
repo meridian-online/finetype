@@ -767,6 +767,16 @@ impl ColumnClassifier {
             }
         }
 
+        // Step 5b: Feature-based disambiguation (NNFT-250, extended to legacy path).
+        // Compute aggregated column features and apply feature disambiguation rules
+        // (F1–F6). Previously only ran in Sense→Sharpen path; now also in legacy
+        // to fix git_sha/hash (F4) and decimal/numeric_code (F5) when Sense is absent.
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+        result.column_features = Some(column_features.clone());
+        feature_disambiguate(&mut result, &column_features, &votes, n_samples);
+
         // Step 6: Post-hoc locale detection via validation patterns (NNFT-140).
         // When taxonomy is available, run sample values against validation_by_locale
         // patterns to detect the most likely locale. This takes priority over any
@@ -2131,22 +2141,40 @@ fn feature_disambiguate(
         ));
     }
 
-    // Rule F5: numeric_code without leading zeros → integer_number (NNFT-272).
+    // Rule F5: numeric_code without leading zeros → integer_number or decimal_number
+    // (NNFT-272, extended for decimal disambiguation).
     //
     // numeric_code exists to preserve leading zeros (ZIP codes, NAICS, FIPS).
-    // Without leading zeros, the values are plain integers and should be typed
-    // as integer_number (BIGINT) instead. This is the inverse of F1: F1 promotes
-    // postal_code/cpt → numeric_code when leading zeros are present; F5 demotes
-    // numeric_code → integer_number when they're absent.
+    // Without leading zeros, the values are plain numbers and should be typed
+    // as integer_number (BIGINT) or decimal_number (DOUBLE) instead.
+    //
+    // When values contain decimal points (IS_FLOAT > 0), prefer decimal_number:
+    //   - earthquakes gap: "10.0, 100.0, 101.0" → decimal_number (not numeric_code)
+    //   - Decimal points signal measurement data, not identifier codes
+    //
+    // When no decimal points, demote to integer_number as before.
     //
     // Threshold 0.01 (rather than 0.0) accounts for float imprecision in the
     // mean aggregation. Effectively requires zero leading-zero values.
+    let is_float_ratio = column_features.mean[feature_idx::IS_FLOAT];
     if result.label == "representation.identifier.numeric_code" && leading_zero_ratio < 0.01 {
-        result.label = "representation.numeric.integer_number".to_string();
-        result.confidence = result.confidence.max(0.7);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule =
-            Some(format!("feature_no_leading_zero:{:.2}", leading_zero_ratio));
+        if is_float_ratio > 0.5 {
+            // Majority of values have decimal points → decimal_number
+            result.label = "representation.numeric.decimal_number".to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "feature_decimal_over_numeric_code:float={:.2},leading_zero={:.2}",
+                is_float_ratio, leading_zero_ratio
+            ));
+        } else {
+            // No decimal points, no leading zeros → integer_number
+            result.label = "representation.numeric.integer_number".to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("feature_no_leading_zero:{:.2}", leading_zero_ratio));
+        }
     }
 
     // Rule F6: Short alphabetic codes misclassified as file.extension.
@@ -8026,6 +8054,42 @@ datetime.component.day_of_week:
             "should NOT demote when leading zeros are present"
         );
         assert!(!result.disambiguation_applied);
+    }
+
+    #[test]
+    fn test_rule_f5_numeric_code_with_decimals_becomes_decimal_number() {
+        // numeric_code winner with no leading zeros BUT decimal points present
+        // e.g., earthquakes gap column: 10.0, 100.0, 101.0
+        let mut result = ColumnResult {
+            label: "representation.identifier.numeric_code".to_string(),
+            confidence: 1.0,
+            vote_distribution: vec![("representation.identifier.numeric_code".to_string(), 1.0)],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 100,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.0; // no leading zeros
+        cf.mean[feature_idx::IS_FLOAT] = 1.0; // all values have decimal points
+
+        let votes = vec![("representation.identifier.numeric_code".to_string(), 100)];
+
+        feature_disambiguate(&mut result, &cf, &votes, 100);
+
+        assert_eq!(
+            result.label, "representation.numeric.decimal_number",
+            "numeric_code with decimal points should become decimal_number"
+        );
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_decimal_over_numeric_code"));
     }
 
     #[test]

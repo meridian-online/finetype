@@ -22,6 +22,7 @@ pub fn is_label_match(predicted: &str, expected: &str) -> bool {
         "geography.location.region",
         "geography.location.state",
         "geography.location.continent",
+        "geography.location.country",
     ];
     if GEO_SET.contains(&expected) && GEO_SET.contains(&predicted) {
         return true;
@@ -86,6 +87,18 @@ mod tests {
         assert!(is_label_match(
             "geography.location.region",
             "geography.location.state"
+        ));
+    }
+
+    #[test]
+    fn test_geo_country_interchangeable() {
+        assert!(is_label_match(
+            "geography.location.region",
+            "geography.location.country"
+        ));
+        assert!(is_label_match(
+            "geography.location.country",
+            "geography.location.region"
         ));
     }
 

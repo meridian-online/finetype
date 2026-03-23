@@ -40,14 +40,14 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ### Recent work
 
 - **Schema-driven validate command** — Standalone quality gate: `finetype schema data.csv` generates table-level JSON Schema, `finetype validate data.csv schema.json` enforces it with predictable sidecar output (`.valid.csv`, `.invalid.csv`, `.errors.jsonl`). Old repair-based validate removed. MCP `validate` tool + DuckDB `finetype_validate()` function. Decisions 0031–0033.
-- **Sibling-context attention** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention on 509 real-world CSVs. Enriches per-column headers with cross-column context before Sense classification. Profile: 184/190 (96.8% label, 96.3% domain). Entry point: `classify_columns_with_context()`.
+- **Sibling-context attention** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention on 509 real-world CSVs. Enriches per-column headers with cross-column context before Sense classification. Profile: 187/190 (98.4% label, 96.3% domain). Entry point: `classify_columns_with_context()`.
 - **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax (7 domains → 43 categories → 250 types). char-cnn-v15-250: 84.2% type accuracy. Matches flat baseline on profile eval. `--hierarchical` flag.
 
 ### What's in progress
 
 - **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema, validate commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range).
 - **Dead code cleanup** — `if false { // validate removed }` blocks in `cmd_profile` output formatting (harmless but noisy).
-- **Remaining accuracy gaps** — 6 misclassifications at 184/190: country→region (1), numeric_code→decimal_number (1), hash→git_sha (1), geohash→alphanumeric_id (1), region→city (1), isbn→npi (1). See `specs/2026-03-23-baseline-diagnosis/findings.md`.
+- **Remaining accuracy gaps** — 3 misclassifications at 187/190: geohash→alphanumeric_id (1), region→city (1), isbn→npi (1). All genuinely hard — require header hints, validation rules, or cross-column context. See `specs/2026-03-23-baseline-diagnosis/findings.md`.
 
 ## Architecture
 
@@ -167,7 +167,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 96.8% label (184/190), 96.3% domain on 29 datasets (314 manifest entries, 250-type taxonomy).
+**Profile eval** (`eval/profile_eval.sh`) — 98.4% label (187/190), 96.3% domain on 29 datasets (314 manifest entries, 250-type taxonomy).
 **Actionability eval** — 99.9% transform success rate (232k values, 283 columns, 120 types).
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
@@ -178,7 +178,7 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 **Schema-driven validation (m-14):** `finetype schema <file>` + `finetype validate` shipped and merged. Table-level JSON Schema generation, sidecar file output, MCP validate tool, DuckDB `finetype_validate()`. Decisions 0031–0033.
 
-**Remaining accuracy gaps:** 6 misclassifications at 184/190 — 3 addressable by disambiguation rules (country/region, git_sha/hash, decimal/numeric_code), 3 genuinely hard (city/region, geohash/alphanumeric_id, npi/isbn). See `specs/2026-03-23-baseline-diagnosis/findings.md`.
+**Remaining accuracy gaps:** 3 misclassifications at 187/190 — all genuinely hard: geohash→alphanumeric_id (1), region→city (1), isbn→npi (1). Would require header hints, Luhn validation, or cross-column context.
 
 ## Decision Register
 
