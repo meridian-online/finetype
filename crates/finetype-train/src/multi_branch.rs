@@ -263,6 +263,7 @@ impl MultiBranchModel {
     }
 
     /// Build the shared trunk (branches + merge layers). Used by both constructors.
+    #[allow(clippy::type_complexity)]
     fn build_trunk(
         config: &MultiBranchConfig,
         vb: &VarBuilder,
@@ -1116,7 +1117,7 @@ pub fn train_multi_branch(
         renderer.unwrap_or_else(|| Box::new(crate::tui::LogRenderer::new()));
 
     // Compute initial batches count for renderer (will be recomputed each epoch due to shuffling)
-    let initial_batch_count = (train_data.len() + config.batch_size - 1) / config.batch_size;
+    let initial_batch_count = train_data.len().div_ceil(config.batch_size);
     renderer.on_train_start(config.epochs, initial_batch_count);
 
     for epoch in 0..config.epochs {
