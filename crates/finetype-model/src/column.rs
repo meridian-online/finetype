@@ -1113,6 +1113,18 @@ impl ColumnClassifier {
                 result.confidence = hint_fraction.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
+            } else if hint_is_hardcoded_legacy && result.confidence < 0.5 && !hint_in_votes {
+                // Hardcoded header hint with low confidence — apply even when the
+                // hinted type was eliminated from votes by validation. Hardcoded hints
+                // are curated human knowledge (e.g., header "npi" → identity.medical.npi).
+                // When the model is uncertain (< 0.5) and the header is an exact match,
+                // the header is more authoritative than validation pass rates on
+                // potentially synthetic data.
+                result.label = hinted_type.to_string();
+                result.confidence = 0.6;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
             } else if is_generic && !hint_in_votes {
                 // Financial model2vec guard: block model2vec financial hints when
                 // the CharCNN saw no financial signal in values. See Sense pipeline
