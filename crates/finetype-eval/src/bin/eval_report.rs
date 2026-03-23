@@ -27,6 +27,10 @@ struct Args {
     labels_dir: PathBuf,
     #[arg(long, short, default_value = "eval/eval_output/report.md")]
     output: PathBuf,
+    /// Also emit a JSON summary file alongside the markdown report.
+    /// If not specified, writes to the same directory as --output with name profile_results.json.
+    #[arg(long)]
+    json_output: Option<PathBuf>,
 }
 
 struct Miss {
@@ -489,6 +493,72 @@ fn main() -> Result<()> {
     std::fs::write(&args.output, &report)
         .with_context(|| format!("Failed to write report: {}", args.output.display()))?;
     println!("Report written to: {}", args.output.display());
+
+    // ── JSON output (D-3: DuckDB-queryable eval results) ──────────────
+    let json_path = args.json_output.unwrap_or_else(|| {
+        args.output
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("profile_results.json")
+    });
+
+    // Build misclassifications array for JSON
+    let json_misses: Vec<serde_json::Value> = misses
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "dataset": m.dataset,
+                "column": m.column,
+                "predicted": m.predicted,
+                "expected": m.expected,
+                "gt_label": m.gt_label,
+                "confidence": m.confidence,
+            })
+        })
+        .collect();
+
+    // Build actionability summary for JSON
+    let (action_total, action_success) = if !actionability.is_empty() {
+        let tv: i64 = actionability
+            .iter()
+            .map(|r| {
+                r.get("total_values")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .unwrap_or(0)
+            })
+            .sum();
+        let sv: i64 = actionability
+            .iter()
+            .map(|r| {
+                r.get("parse_success")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .unwrap_or(0)
+            })
+            .sum();
+        (tv, sv)
+    } else {
+        (0, 0)
+    };
+
+    let json_report = serde_json::json!({
+        "timestamp": now,
+        "label_correct": label_correct,
+        "label_total": total,
+        "label_accuracy_pct": label_acc,
+        "domain_correct": domain_correct,
+        "domain_total": total,
+        "domain_accuracy_pct": domain_acc,
+        "num_datasets": n_datasets,
+        "actionability_total": action_total,
+        "actionability_success": action_success,
+        "misclassifications": json_misses,
+    });
+
+    let json_str =
+        serde_json::to_string_pretty(&json_report).context("Failed to serialize JSON report")?;
+    std::fs::write(&json_path, &json_str)
+        .with_context(|| format!("Failed to write JSON: {}", json_path.display()))?;
+    println!("JSON summary written to: {}", json_path.display());
 
     Ok(())
 }

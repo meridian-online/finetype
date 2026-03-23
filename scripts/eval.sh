@@ -138,18 +138,21 @@ echo "========================================"
 echo "Evaluation complete"
 echo "========================================"
 
-# Extract key metrics from report
+# Extract key metrics from JSON (DuckDB-queryable, works on macOS + Linux)
+JSON_REPORT="eval/eval_output/profile_results.json"
 REPORT="eval/eval_output/report.md"
-if [[ -f "$REPORT" ]]; then
-    # Try to extract label accuracy, domain accuracy, and actionability
-    LABEL_ACC=$(grep -oP 'Label accuracy.*?(\d+\.?\d*%)' "$REPORT" 2>/dev/null | head -1 || true)
-    DOMAIN_ACC=$(grep -oP 'Domain accuracy.*?(\d+\.?\d*%)' "$REPORT" 2>/dev/null | head -1 || true)
-    ACTION=$(grep -oP 'Actionability.*?(\d+\.?\d*%)' "$REPORT" 2>/dev/null | head -1 || true)
-
-    if [[ -n "$LABEL_ACC" ]]; then echo "  $LABEL_ACC"; fi
-    if [[ -n "$DOMAIN_ACC" ]]; then echo "  $DOMAIN_ACC"; fi
-    if [[ -n "$ACTION" ]]; then echo "  $ACTION"; fi
-
+if [[ -f "$JSON_REPORT" ]] && command -v duckdb >/dev/null 2>&1; then
+    duckdb -c "SELECT
+        '  Label accuracy: ' || label_correct || '/' || label_total || ' (' || label_accuracy_pct || '%)' AS result
+      FROM read_json_auto('$JSON_REPORT')
+      UNION ALL
+      SELECT
+        '  Domain accuracy: ' || domain_correct || '/' || domain_total || ' (' || domain_accuracy_pct || '%)'
+      FROM read_json_auto('$JSON_REPORT')" -noheader -csv 2>/dev/null || true
     echo ""
     echo "Full report: ${REPORT}"
+    echo "JSON summary: ${JSON_REPORT}"
+elif [[ -f "$REPORT" ]]; then
+    echo "  (Install duckdb for structured eval summary)"
+    echo "  Full report: ${REPORT}"
 fi

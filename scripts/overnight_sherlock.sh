@@ -77,6 +77,12 @@ if [[ ! -f data/label_remap.json ]]; then
     echo "WARN: Label remap not found at data/label_remap.json (proceeding without remap)"
 fi
 
+if ! command -v duckdb >/dev/null 2>&1; then
+    echo "FAIL: duckdb CLI not found on PATH (required for eval summary)"
+    echo "  Install: brew install duckdb  or  https://duckdb.org/docs/installation/"
+    exit 1
+fi
+
 echo "[Pre-flight] Building with Metal..."
 cargo build --bin finetype --no-default-features --features metal --release 2>&1
 echo "[Pre-flight] Build OK"
@@ -243,23 +249,28 @@ echo " Log: $LOG_FILE"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-# Print eval scores summary
+# Print eval scores summary (reads JSON with DuckDB — works on macOS + Linux)
 echo "Results:"
 for model_dir in "$FLAT_MODEL" "$HIER_MODEL"; do
     model_name="$(basename "$model_dir")"
-    if [[ -f "$model_dir/eval/report.md" ]]; then
-        LABEL_ACC=$(grep -oP 'Label accuracy.*?(\d+/\d+ \(\d+\.\d+%)' "$model_dir/eval/report.md" 2>/dev/null | head -1 || true)
-        DOMAIN_ACC=$(grep -oP 'Domain accuracy.*?(\d+/\d+ \(\d+\.\d+%)' "$model_dir/eval/report.md" 2>/dev/null | head -1 || true)
+    JSON_FILE="$model_dir/eval/profile_results.json"
+    if [[ -f "$JSON_FILE" ]]; then
         echo "  $model_name:"
-        if [[ -n "$LABEL_ACC" ]]; then echo "    $LABEL_ACC"; fi
-        if [[ -n "$DOMAIN_ACC" ]]; then echo "    $DOMAIN_ACC"; fi
+        duckdb -c "SELECT
+            '    Label accuracy: ' || label_correct || '/' || label_total || ' (' || label_accuracy_pct || '%)' AS result
+          FROM read_json_auto('$JSON_FILE')
+          UNION ALL
+          SELECT
+            '    Domain accuracy: ' || domain_correct || '/' || domain_total || ' (' || domain_accuracy_pct || '%)'
+          FROM read_json_auto('$JSON_FILE')" -noheader -csv 2>/dev/null || echo "    (failed to read eval JSON)"
+    elif [[ -f "$model_dir/eval/report.md" ]]; then
+        echo "  $model_name: eval completed (no JSON summary — check eval version)"
     else
         echo "  $model_name: no eval results"
     fi
 done
 echo ""
 echo "Next steps:"
-echo "  1. Compare flat vs hierarchical Tier 1 accuracy"
-echo "  2. If best model ≥95%: proceed to M-8 production integration"
-echo "  3. If 90-95%: iterate with more data/tuning"
-echo "  4. If <90%: reassess multi-branch approach"
+echo "  1. Compare flat vs hierarchical accuracy"
+echo "  2. Run trace analysis: specs/2026-03-23-multibranch-eval-diagnosis/trace-analysis.md"
+echo "  3. Review findings before merging PR #21"

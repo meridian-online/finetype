@@ -14,8 +14,10 @@
 //!                    BatchNorm → Dense(500, ReLU) → Dense(500, ReLU)
 //!                             ↓
 //! Head (flat):       Dense(n_classes, softmax)
+//! Head (hier):       TreeSoftmax(7 domains → 43 categories → 250 types)
 //! ```
 
+use crate::char_cnn::HierarchicalHead;
 use crate::char_distribution::{extract_char_distribution, CHAR_DIST_DIM};
 use crate::column_stats::{extract_column_stats, COLUMN_STATS_DIM};
 use crate::embedding_aggregation::{extract_embedding_aggregation, EMBED_AGG_DIM};
@@ -84,6 +86,19 @@ impl BranchWeights {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Classification head (flat or hierarchical)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Classification head: either a flat linear layer or a hierarchical tree softmax.
+enum ClassificationHead {
+    /// Flat: Dense(hidden_dim → n_classes) producing logits.
+    Flat(Linear),
+    /// Hierarchical: 3-level tree softmax (domain → category → type)
+    /// producing product probabilities.
+    Hierarchical(HierarchicalHead),
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Model (inference only)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -91,6 +106,8 @@ impl BranchWeights {
 ///
 /// Loads from safetensors + config.json + label_map.json and provides
 /// column-level inference without implementing ValueClassifier.
+///
+/// Supports both flat and hierarchical classification heads.
 pub struct MultiBranchClassifier {
     char_branch: BranchWeights,
     embed_branch: BranchWeights,
@@ -98,7 +115,7 @@ pub struct MultiBranchClassifier {
     merge_bn: BatchNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
-    head: Linear,
+    head: ClassificationHead,
     config: MultiBranchConfig,
     /// Index → label mapping (sorted by index).
     labels: Vec<String>,
@@ -114,6 +131,9 @@ impl MultiBranchClassifier {
     ///
     /// Also loads Model2Vec resources from models/model2vec/ (required for
     /// embedding feature extraction).
+    ///
+    /// Supports both flat and hierarchical head types. The hierarchical head
+    /// builds its hierarchy map from the label list (domain.category.type format).
     pub fn load<P: AsRef<Path>>(model_dir: P) -> Result<Self, InferenceError> {
         let dir = model_dir.as_ref();
 
@@ -124,12 +144,6 @@ impl MultiBranchClassifier {
         let config: MultiBranchConfig = serde_json::from_slice(&config_bytes).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
         })?;
-
-        if config.head_type != HeadType::Flat {
-            return Err(InferenceError::InvalidPath(
-                "Only flat head is supported for multi-branch inference (hierarchical not yet implemented)".into(),
-            ));
-        }
 
         // Load label map
         let label_bytes = std::fs::read(dir.join("label_map.json")).map_err(|e| {
@@ -157,7 +171,7 @@ impl MultiBranchClassifier {
 
         let vb = VarBuilder::from_tensors(tensors, DType::F32, &device);
 
-        // Build model
+        // Build branches + merge trunk
         let char_branch =
             BranchWeights::new(config.char_dim, config.char_hidden, vb.pp("char"))
                 .map_err(|e| InferenceError::InvalidPath(format!("char branch: {e}")))?;
@@ -182,8 +196,21 @@ impl MultiBranchClassifier {
         )
         .map_err(|e| InferenceError::InvalidPath(format!("merge_l2: {e}")))?;
 
-        let head = linear(config.merge_hidden[1], config.n_classes, vb.pp("head"))
-            .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))?;
+        // Build classification head based on head_type
+        let head = match config.head_type {
+            HeadType::Flat => {
+                let flat_head = linear(config.merge_hidden[1], config.n_classes, vb.pp("head"))
+                    .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))?;
+                ClassificationHead::Flat(flat_head)
+            }
+            HeadType::Hierarchical => {
+                let hier_head = HierarchicalHead::new(config.merge_hidden[1], &labels, vb.clone())
+                    .map_err(|e| {
+                        InferenceError::InvalidPath(format!("hierarchical head: {e}"))
+                    })?;
+                ClassificationHead::Hierarchical(hier_head)
+            }
+        };
 
         // Load Model2Vec resources
         let m2v = Self::load_model2vec(dir)?;
@@ -226,7 +253,10 @@ impl MultiBranchClassifier {
     /// Classify a column of values, returning (label, confidence).
     ///
     /// Extracts 3-branch features from the values, runs the MLP forward pass,
-    /// and returns the predicted label with softmax confidence.
+    /// and returns the predicted label with confidence score.
+    ///
+    /// For flat heads: confidence is the softmax probability of the top prediction.
+    /// For hierarchical heads: confidence is the product probability (domain × category × type).
     pub fn classify_column(
         &self,
         values: &[String],
@@ -246,7 +276,7 @@ impl MultiBranchClassifier {
         let stats_feats =
             extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
-        // Forward pass
+        // Forward pass through trunk
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
@@ -255,16 +285,38 @@ impl MultiBranchClassifier {
         let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
 
-        let logits = self.forward(&char_t, &embed_t, &stats_t)?;
+        let hidden = self.forward_trunk(&char_t, &embed_t, &stats_t)?;
 
-        // Softmax + argmax
-        let probs = candle_nn::ops::softmax(&logits, 1)
-            .map_err(|e| InferenceError::InvalidPath(format!("softmax: {e}")))?;
-        let probs_vec: Vec<f32> = probs
-            .squeeze(0)
-            .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
-            .to_vec1()
-            .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?;
+        // Head-specific forward pass + probability extraction
+        let probs_vec = match &self.head {
+            ClassificationHead::Flat(head) => {
+                // Flat: hidden → logits → softmax → probabilities
+                let logits = head
+                    .forward_t(&hidden, false)
+                    .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))?;
+                let probs = candle_nn::ops::softmax(&logits, 1)
+                    .map_err(|e| InferenceError::InvalidPath(format!("softmax: {e}")))?;
+                probs
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?
+            }
+            ClassificationHead::Hierarchical(hier_head) => {
+                // Hierarchical: hidden → tree softmax → product probabilities
+                // forward() already returns probabilities (not logits)
+                let probs = hier_head
+                    .forward(&hidden, self.config.n_classes)
+                    .map_err(|e| {
+                        InferenceError::InvalidPath(format!("hierarchical forward: {e}"))
+                    })?;
+                probs
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?
+            }
+        };
 
         let (max_idx, max_prob) = probs_vec
             .iter()
@@ -279,8 +331,9 @@ impl MultiBranchClassifier {
         Ok((label, *max_prob))
     }
 
-    /// Forward pass through the model (inference mode, no dropout).
-    fn forward(
+    /// Forward pass through the trunk (branches + merge), returning the hidden
+    /// representation before the classification head.
+    fn forward_trunk(
         &self,
         char_feats: &Tensor,
         embed_feats: &Tensor,
@@ -325,13 +378,8 @@ impl MultiBranchClassifier {
             .merge_linear2
             .forward_t(&h, false)
             .map_err(|e| InferenceError::InvalidPath(format!("merge_l2: {e}")))?;
-        let h = h
-            .relu()
-            .map_err(|e| InferenceError::InvalidPath(format!("relu2: {e}")))?;
-
-        self.head
-            .forward_t(&h, false)
-            .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))
+        h.relu()
+            .map_err(|e| InferenceError::InvalidPath(format!("relu2: {e}")))
     }
 
     /// Return the number of output classes.
@@ -342,6 +390,11 @@ impl MultiBranchClassifier {
     /// Return the label list (index → label mapping).
     pub fn labels(&self) -> &[String] {
         &self.labels
+    }
+
+    /// Return the head type of this model.
+    pub fn head_type(&self) -> &HeadType {
+        &self.config.head_type
     }
 
     /// Check if a model directory contains a multi-branch model.
@@ -399,6 +452,25 @@ mod tests {
         assert_eq!(config.stats_dim, 27);
         assert_eq!(config.n_classes, 250);
         assert_eq!(config.merged_dim(), 564);
+    }
+
+    #[test]
+    fn test_config_deserialization_hierarchical() {
+        let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 512,
+            "stats_dim": 27,
+            "char_hidden": [300, 300],
+            "embed_hidden": [200, 200],
+            "stats_hidden": [128, 64],
+            "merge_hidden": [500, 500],
+            "n_classes": 250,
+            "dropout": 0.35,
+            "head_type": "Hierarchical"
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.head_type, HeadType::Hierarchical);
+        assert_eq!(config.n_classes, 250);
     }
 
     #[test]
