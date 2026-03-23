@@ -24,6 +24,7 @@ models/**/labels.json
 *.ndjson
 data/*
 !data/cldr/
+!data/label_remap.json
 data/cldr/json/
 
 # DuckDB extension build

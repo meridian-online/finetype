@@ -27,6 +27,10 @@ struct Args {
     labels_dir: PathBuf,
     #[arg(long, short, default_value = "eval/eval_output/report.md")]
     output: PathBuf,
+    /// Also emit a JSON summary file alongside the markdown report.
+    /// If not specified, writes to the same directory as --output with name profile_results.json.
+    #[arg(long)]
+    json_output: Option<PathBuf>,
 }
 
 struct Miss {
@@ -517,11 +521,31 @@ fn main() -> Result<()> {
         .with_context(|| format!("Failed to write report: {}", args.output.display()))?;
     println!("Report written to: {}", args.output.display());
 
-    // Write machine-readable JSON summary alongside the markdown report
-    let json_path = args.output.with_file_name("profile_results.json");
+    // ── JSON output (D-3: DuckDB-queryable eval results) ──────────────
+    let json_path = args.json_output.unwrap_or_else(|| {
+        args.output
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("profile_results.json")
+    });
 
-    // Compute actionability totals for JSON
-    let (act_total, act_success) = if !actionability.is_empty() {
+    // Build misclassifications array for JSON
+    let json_misses: Vec<serde_json::Value> = misses
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "dataset": m.dataset,
+                "column": m.column,
+                "predicted": m.predicted,
+                "expected": m.expected,
+                "gt_label": m.gt_label,
+                "confidence": m.confidence,
+            })
+        })
+        .collect();
+
+    // Build actionability summary for JSON
+    let (action_total, action_success) = if !actionability.is_empty() {
         let tv: i64 = actionability
             .iter()
             .map(|r| {
@@ -543,55 +567,25 @@ fn main() -> Result<()> {
         (0, 0)
     };
 
-    let miss_json: Vec<String> = misses
-        .iter()
-        .map(|m| {
-            format!(
-                r#"    {{
-      "dataset": "{}",
-      "column": "{}",
-      "predicted": "{}",
-      "expected": "{}",
-      "gt_label": "{}",
-      "confidence": {}
-    }}"#,
-                m.dataset, m.column, m.predicted, m.expected, m.gt_label, m.confidence
-            )
-        })
-        .collect();
+    let json_report = serde_json::json!({
+        "timestamp": now,
+        "label_correct": label_correct,
+        "label_total": total,
+        "label_accuracy_pct": label_acc,
+        "domain_correct": domain_correct,
+        "domain_total": total,
+        "domain_accuracy_pct": domain_acc,
+        "num_datasets": n_datasets,
+        "actionability_total": action_total,
+        "actionability_success": action_success,
+        "misclassifications": json_misses,
+    });
 
-    let now = Local::now().format("%Y-%m-%d %H:%M").to_string();
-    let json = format!(
-        r#"{{
-  "timestamp": "{}",
-  "label_correct": {},
-  "label_total": {},
-  "label_accuracy_pct": {},
-  "domain_correct": {},
-  "domain_total": {},
-  "domain_accuracy_pct": {},
-  "num_datasets": {},
-  "actionability_total": {},
-  "actionability_success": {},
-  "misclassifications": [
-{}
-  ]
-}}"#,
-        now,
-        label_correct,
-        total,
-        label_acc,
-        domain_correct,
-        total,
-        domain_acc,
-        n_datasets,
-        act_total,
-        act_success,
-        miss_json.join(",\n")
-    );
-    std::fs::write(&json_path, &json)
+    let json_str =
+        serde_json::to_string_pretty(&json_report).context("Failed to serialize JSON report")?;
+    std::fs::write(&json_path, &json_str)
         .with_context(|| format!("Failed to write JSON: {}", json_path.display()))?;
-    println!("JSON written to: {}", json_path.display());
+    println!("JSON summary written to: {}", json_path.display());
 
     Ok(())
 }

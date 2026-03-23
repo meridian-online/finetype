@@ -24,8 +24,8 @@ path = "src/bin/train_disambiguator.rs"
 [features]
 default = ["cpu", "embed-models"]
 cpu = ["finetype-model/cpu", "finetype-train/default"]
-cuda = ["finetype-model/cuda", "finetype-train/cuda"]
-metal = ["finetype-model/metal", "finetype-train/metal"]
+cuda = ["finetype-model/cuda", "finetype-train/cuda", "finetype-train/tui"]
+metal = ["finetype-model/metal", "finetype-train/metal", "finetype-train/tui"]
 embed-models = []
 
 [dependencies]
