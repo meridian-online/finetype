@@ -6,11 +6,11 @@
 
 ## 0. Executive Summary
 
-The reported 42 misclassifications (148/190, 77.9%) were dominated by a **single eval harness bug** that accounted for 32 of 42 failures. After fixing the bug, the true baseline accuracy is **180/190 (94.7% label, 96.3% domain)**.
+The reported 42 misclassifications (148/190, 77.9%) were dominated by a **single eval harness bug** that accounted for 34 of 42 failures. After fixing the bug, the true baseline accuracy is **184/190 (96.8% label, 96.3% domain)** with GT and mapping corrections.
 
-Of the remaining 10 failures, 2 are bad ground truth (fixable now), 3 are genuine pipeline weaknesses, and 5 are edge cases where the pipeline's answer is defensible.
+Of the remaining 6 failures, 3 are addressable by disambiguation rules and 3 are genuinely hard.
 
-## 1. Eval Harness Bug (32/42 resolved)
+## 1. Eval Harness Bug (34/42 resolved)
 
 **Root cause:** The `eval_report` binary used a `HashMap<String, Row>` to store schema_mapping entries keyed by `gt_label`. When multiple rows exist for the same `gt_label` (e.g., "decimal number" maps to both `decimal_number` and `integer_number`), `HashMap::insert` silently overwrites — **the last row wins**.
 
