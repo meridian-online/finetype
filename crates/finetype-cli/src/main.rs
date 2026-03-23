@@ -739,8 +739,19 @@ fn main() -> Result<()> {
             val_split,
             no_tui,
         } => cmd_train_multi_branch(
-            data, output, epochs, batch_size, lr, weight_decay, dropout, seed, head, patience,
-            taxonomy, val_split, no_tui,
+            data,
+            output,
+            epochs,
+            batch_size,
+            lr,
+            weight_decay,
+            dropout,
+            seed,
+            head,
+            patience,
+            taxonomy,
+            val_split,
+            no_tui,
         ),
 
         Commands::ExtractFeatures { header, json } => cmd_extract_features(header, json),
@@ -792,18 +803,21 @@ fn cmd_train_multi_branch(
     no_tui: bool,
 ) -> Result<()> {
     use finetype_train::multi_branch::{
-        HeadType, MultiBranchConfig, MultiBranchDataset, MultiBranchTrainConfig,
-        read_training_data, train_multi_branch,
+        read_training_data, train_multi_branch, HeadType, MultiBranchConfig, MultiBranchDataset,
+        MultiBranchTrainConfig,
     };
     use finetype_train::tui::{LogRenderer, TrainingRenderer};
-    use rand::seq::SliceRandom;
     use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
     use rand::SeedableRng;
 
     let head_type = match head.as_str() {
         "flat" => HeadType::Flat,
         "hierarchical" => HeadType::Hierarchical,
-        _ => anyhow::bail!("Unknown head type '{}'. Use 'flat' or 'hierarchical'.", head),
+        _ => anyhow::bail!(
+            "Unknown head type '{}'. Use 'flat' or 'hierarchical'.",
+            head
+        ),
     };
 
     // Load taxonomy to get sorted labels
@@ -844,10 +858,20 @@ fn cmd_train_multi_branch(
     let val_size = (valid_records.len() as f32 * val_split) as usize;
     let (val_indices, train_indices) = indices.split_at(val_size);
 
-    let train_records: Vec<_> = train_indices.iter().map(|&i| valid_records[i].clone()).collect();
-    let val_records: Vec<_> = val_indices.iter().map(|&i| valid_records[i].clone()).collect();
+    let train_records: Vec<_> = train_indices
+        .iter()
+        .map(|&i| valid_records[i].clone())
+        .collect();
+    let val_records: Vec<_> = val_indices
+        .iter()
+        .map(|&i| valid_records[i].clone())
+        .collect();
 
-    eprintln!("Train: {} | Val: {}", train_records.len(), val_records.len());
+    eprintln!(
+        "Train: {} | Val: {}",
+        train_records.len(),
+        val_records.len()
+    );
 
     let char_dim = header.char_dim as usize;
     let embed_dim = header.embed_dim as usize;
@@ -916,18 +940,32 @@ fn cmd_train_multi_branch(
         }
     };
 
-    let summary = train_multi_branch(&train_config, &model_config, &train_data, &val_data, labels_opt, renderer)?;
+    let summary = train_multi_branch(
+        &train_config,
+        &model_config,
+        &train_data,
+        &val_data,
+        labels_opt,
+        renderer,
+    )?;
 
     // Save label_map.json (index → label mapping, required for inference)
     let label_map_path = output.join("label_map.json");
     let label_map_json = serde_json::to_string_pretty(&labels_list)?;
     std::fs::write(&label_map_path, label_map_json)?;
-    eprintln!("Saved label map ({} labels) to {}", labels_list.len(), label_map_path.display());
+    eprintln!(
+        "Saved label map ({} labels) to {}",
+        labels_list.len(),
+        label_map_path.display()
+    );
 
     eprintln!();
     eprintln!("Training complete:");
     eprintln!("  Best epoch: {}", summary.best_epoch + 1);
-    eprintln!("  Best val accuracy: {:.2}%", summary.best_val_accuracy * 100.0);
+    eprintln!(
+        "  Best val accuracy: {:.2}%",
+        summary.best_val_accuracy * 100.0
+    );
     eprintln!("  Total epochs: {}", summary.total_epochs);
     eprintln!("  Total time: {:.1}s", summary.total_time_secs);
     eprintln!("  Model saved to: {}", output.display());
@@ -1424,7 +1462,10 @@ fn cmd_infer_batch(
 
     let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
         let mb = finetype_model::MultiBranchClassifier::load(&model)?;
-        eprintln!("Loaded multi-branch classifier ({} classes)", mb.n_classes());
+        eprintln!(
+            "Loaded multi-branch classifier ({} classes)",
+            mb.n_classes()
+        );
         ColumnClassifier::with_multi_branch(mb, config)
     } else {
         // Load value-level classifier
@@ -2806,7 +2847,10 @@ fn cmd_load(
     };
     let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
         let mb = finetype_model::MultiBranchClassifier::load(&model)?;
-        eprintln!("Loaded multi-branch classifier ({} classes)", mb.n_classes());
+        eprintln!(
+            "Loaded multi-branch classifier ({} classes)",
+            mb.n_classes()
+        );
         ColumnClassifier::with_multi_branch(mb, config)
     } else {
         let classifier: Box<dyn ValueClassifier> = match model_type {
@@ -3487,7 +3531,10 @@ fn cmd_profile(
     };
     let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
         let mb = finetype_model::MultiBranchClassifier::load(&model)?;
-        eprintln!("Loaded multi-branch classifier ({} classes)", mb.n_classes());
+        eprintln!(
+            "Loaded multi-branch classifier ({} classes)",
+            mb.n_classes()
+        );
         ColumnClassifier::with_multi_branch(mb, config)
     } else {
         let classifier: Box<dyn ValueClassifier> = match model_type {

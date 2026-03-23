@@ -554,10 +554,7 @@ impl ColumnClassifier {
     ///
     /// A dummy `ValueClassifier` is still required for the struct field, but it
     /// is never called when multi-branch is active.
-    pub fn with_multi_branch(
-        multi_branch: MultiBranchClassifier,
-        config: ColumnConfig,
-    ) -> Self {
+    pub fn with_multi_branch(multi_branch: MultiBranchClassifier, config: ColumnConfig) -> Self {
         // Use a no-op ValueClassifier as placeholder — never called when
         // multi-branch is active.
         let dummy = Box::new(NoopClassifier);
