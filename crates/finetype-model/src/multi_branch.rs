@@ -95,7 +95,7 @@ enum ClassificationHead {
     Flat(Linear),
     /// Hierarchical: 3-level tree softmax (domain → category → type)
     /// producing product probabilities.
-    Hierarchical(HierarchicalHead),
+    Hierarchical(Box<HierarchicalHead>),
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -206,7 +206,7 @@ impl MultiBranchClassifier {
                     vb.pp(HierarchicalHead::VARBUILDER_PREFIX),
                 )
                 .map_err(|e| InferenceError::InvalidPath(format!("hierarchical head: {e}")))?;
-                ClassificationHead::Hierarchical(hier_head)
+                ClassificationHead::Hierarchical(Box::new(hier_head))
             }
         };
 
