@@ -340,6 +340,13 @@ pub struct HierarchicalHead {
 }
 
 impl HierarchicalHead {
+    /// VarBuilder prefix used to namespace hierarchical head tensors.
+    ///
+    /// Both training (finetype-train) and inference (finetype-model) must pass
+    /// `vb.pp(VARBUILDER_PREFIX)` when constructing a `HierarchicalHead` so that
+    /// saved tensor names (`hier.hier.domain.weight`, etc.) match at load time.
+    pub const VARBUILDER_PREFIX: &'static str = "hier";
+
     /// Create a new hierarchical head.
     pub fn new(hidden_dim: usize, labels: &[String], vb: VarBuilder) -> Result<Self> {
         let hierarchy = HierarchyMap::from_labels(labels);

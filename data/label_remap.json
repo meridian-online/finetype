@@ -1,0 +1,44 @@
+{
+  "_comment": "Maps non-canonical distilled labels to canonical FineType taxonomy equivalents. Extracted from sherlock_distilled.csv.gz (35 non-canonical labels, ~243 columns recovered).",
+
+  "datetime.timestamp.hms_24h": "datetime.time.hms_24h",
+
+  "finance.currency.pair": "finance.currency.currency_code",
+  "finance.instrument.ticker_symbol": "representation.identifier.alphanumeric_id",
+  "finance.market.ticker": "representation.identifier.alphanumeric_id",
+
+  "geography.address.city_state": "geography.address.full_address",
+  "geography.address.county": "geography.location.region",
+  "geography.address.street_address": "geography.address.street_name",
+  "geography.admin.county": "geography.location.region",
+  "geography.admin.region": "geography.location.region",
+  "geography.admin.us_state": "geography.location.region",
+  "geography.location.county": "geography.location.region",
+  "geography.location.street_suffix": "geography.address.street_suffix",
+  "geography.location.us_state": "geography.location.region",
+  "geography.region.state_code": "geography.location.country_code",
+
+  "identity.credential.isbn": "identity.commerce.isbn",
+  "identity.organization.company_name": "representation.text.entity_name",
+  "identity.organization.name": "representation.text.entity_name",
+  "identity.person.job_title": "representation.discrete.categorical",
+  "identity.publication.isbn": "identity.commerce.isbn",
+
+  "representation.alphanumeric.alphanumeric_id": "representation.identifier.alphanumeric_id",
+  "representation.identifier.ordinal": "representation.discrete.ordinal",
+  "representation.numeric.increment": "representation.identifier.increment",
+  "representation.numeric.numeric_code": "representation.identifier.numeric_code",
+  "representation.numeric.ordinal": "representation.discrete.ordinal",
+  "representation.text.alphanumeric_id": "representation.identifier.alphanumeric_id",
+  "representation.text.categorical": "representation.discrete.categorical",
+  "representation.text.category": "representation.discrete.categorical",
+  "representation.text.description": "representation.text.sentence",
+  "representation.text.quantity": "representation.numeric.decimal_number",
+  "representation.text.range": "representation.text.plain_text",
+  "representation.text.title": "representation.text.sentence",
+
+  "technology.identifier.alphanumeric_id": "representation.identifier.alphanumeric_id",
+  "technology.identifier.locale_code": "technology.code.locale_code",
+  "technology.identifier.os_version": "representation.identifier.alphanumeric_id",
+  "technology.internet.username": "identity.person.username"
+}

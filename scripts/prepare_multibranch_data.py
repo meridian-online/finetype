@@ -12,12 +12,15 @@ Options:
     --distilled PATH        Distilled CSV (default: output/distillation-v3/sherlock_distilled.csv.gz)
     --finetype PATH         finetype binary (default: ./target/release/finetype)
     --output PATH           Output binary file (default: output/multibranch-training/blend-30-70.ftmb)
-    --samples-per-type N    Target samples per type (default: 1500)
+    --label-remap PATH      Label remap JSON (default: data/label_remap.json)
+    --samples-per-type N    Blend cap: max columns per type after blending (default: 1200)
+    --synthetic-columns N   Synthetic columns to generate per type (default: 1200)
     --ratio-distilled F     Distilled ratio 0.0-1.0 (default: 0.3)
     --min-values N          Min values per column (default: 5)
     --seed N                Random seed (default: 42)
     --workers N             Parallel feature extraction workers (default: 4)
     --dry-run               Show counts without extracting features
+    --skip-preflight        Skip preflight extraction check
     -h, --help              Show help
 """
 
@@ -74,8 +77,28 @@ def load_taxonomy_types(finetype_bin):
     return types
 
 
-def load_distilled_columns(distilled_path, min_values):
+def load_label_remap(remap_path):
+    """Load label remap table from JSON file.
+
+    Returns: dict mapping non-canonical labels to canonical taxonomy equivalents.
+    """
+    if not os.path.exists(remap_path):
+        print(f"  No label remap file at {remap_path}", file=sys.stderr)
+        return {}
+
+    with open(remap_path) as f:
+        remap = json.load(f)
+
+    # Remove comment keys
+    remap.pop("_comment", None)
+    return remap
+
+
+def load_distilled_columns(distilled_path, min_values, label_remap=None):
     """Load distilled data as columns (groups of values per type).
+
+    Args:
+        label_remap: dict mapping non-canonical labels to canonical equivalents.
 
     Returns:
         columns_by_type: dict[str, list[list[str]]] — each type has a list of columns,
@@ -83,6 +106,7 @@ def load_distilled_columns(distilled_path, min_values):
         stats: dict with counts for logging
     """
     columns_by_type = defaultdict(list)
+    label_remap = label_remap or {}
     stats = {
         "total_rows": 0,
         "qualifying_rows": 0,
@@ -90,6 +114,7 @@ def load_distilled_columns(distilled_path, min_values):
         "parse_errors": 0,
         "empty_label": 0,
         "excluded_column_types": 0,
+        "remapped_labels": 0,
         "total_values": 0,
     }
 
@@ -103,6 +128,11 @@ def load_distilled_columns(distilled_path, min_values):
             if not label:
                 stats["empty_label"] += 1
                 continue
+
+            # Apply label remap before any filtering
+            if label in label_remap:
+                label = label_remap[label]
+                stats["remapped_labels"] += 1
 
             # Skip column-level types
             if label in COLUMN_LEVEL_TYPES:
@@ -130,11 +160,20 @@ def load_distilled_columns(distilled_path, min_values):
     return dict(columns_by_type), stats
 
 
-def generate_synthetic_columns(finetype_bin, samples_per_type, seed, min_values):
+def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values):
     """Generate synthetic training data via finetype generate, grouped as columns.
 
-    Returns: dict[str, list[list[str]]] — each type has one "column" of values
+    Args:
+        synthetic_columns_per_type: target number of columns per type. Each column
+            has ~100 values, so we generate synthetic_columns_per_type * 100 values
+            per type via `finetype generate --samples`.
+
+    Returns: dict[str, list[list[str]]] — each type has a list of columns
     """
+    # Generate enough values to produce the target number of columns
+    # Each column is ~100 values, so we need N * 100 values per type
+    values_per_type = synthetic_columns_per_type * 100
+
     with tempfile.NamedTemporaryFile(suffix=".ndjson", delete=False) as tmp:
         tmp_path = tmp.name
 
@@ -144,7 +183,7 @@ def generate_synthetic_columns(finetype_bin, samples_per_type, seed, min_values)
                 finetype_bin,
                 "generate",
                 "--samples",
-                str(samples_per_type),
+                str(values_per_type),
                 "--seed",
                 str(seed),
                 "--output",
@@ -328,6 +367,36 @@ def read_ftmb(path):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+def run_preflight_check(finetype_bin, blended, num_types=10, cols_per_type=5):
+    """Run a quick feature extraction on a sample to catch failures early.
+
+    Returns True if preflight passes, False if any extraction fails.
+    """
+    print(f"\nPreflight: extracting features for {num_types} types × {cols_per_type} cols...")
+    sample_types = list(sorted(blended.keys()))[:num_types]
+    total = 0
+    errors = 0
+    start = time.time()
+
+    for type_key in sample_types:
+        cols = blended[type_key][:cols_per_type]
+        for col_values in cols:
+            features = extract_features(finetype_bin, col_values)
+            total += 1
+            if features is None:
+                errors += 1
+                print(f"  FAIL: {type_key} ({len(col_values)} values)", file=sys.stderr)
+
+    elapsed = time.time() - start
+    if errors > 0:
+        print(f"  Preflight FAILED: {errors}/{total} extractions failed ({elapsed:.1f}s)")
+        return False
+    else:
+        rate = total / elapsed if elapsed > 0 else 0
+        print(f"  Preflight PASSED: {total}/{total} OK ({elapsed:.1f}s, {rate:.1f} cols/sec)")
+        return True
+
+
 def main():
     args = sys.argv[1:]
 
@@ -335,12 +404,15 @@ def main():
     distilled_path = "output/distillation-v3/sherlock_distilled.csv.gz"
     finetype_bin = "./target/release/finetype"
     output_path = "output/multibranch-training/blend-30-70.ftmb"
-    samples_per_type = 1500
+    label_remap_path = "data/label_remap.json"
+    samples_per_type = 1200
+    synthetic_columns_per_type = 1200
     ratio_distilled = 0.3
     min_values = 5
     seed = 42
     workers = 4
     dry_run = False
+    skip_preflight = False
 
     i = 0
     while i < len(args):
@@ -353,8 +425,14 @@ def main():
         elif args[i] == "--output":
             output_path = args[i + 1]
             i += 2
+        elif args[i] == "--label-remap":
+            label_remap_path = args[i + 1]
+            i += 2
         elif args[i] == "--samples-per-type":
             samples_per_type = int(args[i + 1])
+            i += 2
+        elif args[i] == "--synthetic-columns":
+            synthetic_columns_per_type = int(args[i + 1])
             i += 2
         elif args[i] == "--ratio-distilled":
             ratio_distilled = float(args[i + 1])
@@ -371,6 +449,9 @@ def main():
         elif args[i] == "--dry-run":
             dry_run = True
             i += 1
+        elif args[i] == "--skip-preflight":
+            skip_preflight = True
+            i += 1
         elif args[i] in ("-h", "--help"):
             print(__doc__)
             sys.exit(0)
@@ -385,22 +466,31 @@ def main():
     taxonomy_types = load_taxonomy_types(finetype_bin)
     print(f"  {len(taxonomy_types)} taxonomy types")
 
+    # ─── Load label remap ─────────────────────────────────────────
+    print(f"\nLoading label remap from {label_remap_path}...")
+    label_remap = load_label_remap(label_remap_path)
+    if label_remap:
+        print(f"  {len(label_remap)} remap entries loaded")
+    else:
+        print("  No remap table (using labels as-is)")
+
     # ─── Load distilled data ───────────────────────────────────────
     print(f"\nLoading distilled data (min_values={min_values})...")
-    distilled, d_stats = load_distilled_columns(distilled_path, min_values)
+    distilled, d_stats = load_distilled_columns(distilled_path, min_values, label_remap)
     print(f"  {d_stats['total_rows']} total rows")
     print(f"  {d_stats['qualifying_rows']} qualifying rows")
     print(f"  {d_stats['sparse_rows']} sparse rows (skipped)")
     print(f"  {d_stats['parse_errors']} parse errors (skipped)")
     print(f"  {d_stats['empty_label']} empty labels (skipped)")
     print(f"  {d_stats['excluded_column_types']} column-level types (excluded)")
+    print(f"  {d_stats['remapped_labels']} labels remapped to canonical")
     total_d_cols = sum(len(cols) for cols in distilled.values())
     print(f"  {total_d_cols} columns across {len(distilled)} types")
     print(f"  {d_stats['total_values']} individual values")
 
     # ─── Generate synthetic data ───────────────────────────────────
-    print(f"\nGenerating synthetic data ({samples_per_type} samples/type)...")
-    synthetic = generate_synthetic_columns(finetype_bin, samples_per_type, seed, min_values)
+    print(f"\nGenerating synthetic data ({synthetic_columns_per_type} columns/type, {synthetic_columns_per_type * 100} values/type)...")
+    synthetic = generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values)
     total_s_cols = sum(len(cols) for cols in synthetic.values())
     print(f"  {total_s_cols} columns across {len(synthetic)} types")
 
@@ -444,6 +534,12 @@ def main():
         est_size_mb = total_blended * (CHAR_DIM + EMBED_DIM + STATS_DIM) * 4 / (1024 * 1024)
         print(f"  Estimated file size: ~{est_size_mb:.0f} MB")
         return
+
+    # ─── Preflight extraction check ──────────────────────────────
+    if not skip_preflight:
+        if not run_preflight_check(finetype_bin, blended):
+            print("\nAborting: preflight extraction failed.", file=sys.stderr)
+            sys.exit(1)
 
     # ─── Extract features ──────────────────────────────────────────
     print(f"\nExtracting features for {total_blended} columns (workers={workers})...")

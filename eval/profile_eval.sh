@@ -105,7 +105,7 @@ while IFS=, read -r dataset file_path column_name gt_label; do
     fi
     PROFILE_ERR=$(mktemp)
     PROFILE_JSON=$("$FINETYPE" profile -f "$file_path" -o json $MODEL_TYPE_FLAG 2>"$PROFILE_ERR") || {
-        ERR_MSG=$(head -1 "$PROFILE_ERR")
+        ERR_MSG=$(grep -m1 'Error:' "$PROFILE_ERR" || tail -1 "$PROFILE_ERR")
         printf " \033[31mFAILED\033[0m"
         if [ -n "$ERR_MSG" ]; then printf " (%s)" "$ERR_MSG"; fi
         printf "\n"
@@ -127,6 +127,11 @@ while IFS=, read -r dataset file_path column_name gt_label; do
 done < "$MANIFEST"
 
 printf "\n  Profiled %d datasets (%d errors)\n" "$PROFILED" "$ERRORS"
+
+if [ "$PROFILED" -eq 0 ]; then
+    printf "\n  \033[31mFATAL: No datasets profiled successfully. Aborting eval.\033[0m\n"
+    exit 1
+fi
 
 # ── Phase 2: Extract ground truth from manifest ─────────────────────────────
 
