@@ -156,15 +156,14 @@ if [[ "$FLAT_ONLY" == "false" ]] && [[ "$SKIP_ABLATION" == "false" ]]; then
     if [[ "$SKIP_DATA" == "true" ]] && [[ -f "$FTMB_NOHEADER" ]]; then
         echo "[Data] No-header ablation data exists, reusing"
     else
-        echo "[Data] Creating no-header ablation FTMB (zeroing embed features)..."
+        echo "[Data] Creating no-header ablation FTMB (zeroing header features)..."
         python3 -c "
 import struct, sys
 
-MAGIC = b'FTMB'
 src, dst = sys.argv[1], sys.argv[2]
 
 with open(src, 'rb') as fin, open(dst, 'wb') as fout:
-    # Copy header verbatim
+    # Read and copy 24-byte header verbatim
     header = fin.read(24)
     fout.write(header)
 
@@ -173,35 +172,28 @@ with open(src, 'rb') as fin, open(dst, 'wb') as fout:
     char_dim = struct.unpack_from('<H', header, 16)[0]
     embed_dim = struct.unpack_from('<H', header, 18)[0]
     stats_dim = struct.unpack_from('<H', header, 20)[0]
+    header_dim = struct.unpack_from('<H', header, 22)[0] if version >= 2 else 0
 
-    label_len_size = 4 if version >= 2 else 2
-    zero_embed = b'\x00' * (embed_dim * 4)
+    zero_header = b'\x00' * (header_dim * 4)
 
     for i in range(n_records):
-        # Read label
-        if version >= 2:
-            (llen,) = struct.unpack('<I', fin.read(4))
-            label = fin.read(llen)
-            fout.write(struct.pack('<I', llen))
-        else:
-            (llen,) = struct.unpack('<H', fin.read(2))
-            label = fin.read(llen)
-            fout.write(struct.pack('<H', llen))
+        # Read and copy label (u16 length prefix in both v1 and v2)
+        (llen,) = struct.unpack('<H', fin.read(2))
+        fout.write(struct.pack('<H', llen))
+        label = fin.read(llen)
         fout.write(label)
 
-        # Copy char features
-        char_bytes = fin.read(char_dim * 4)
-        fout.write(char_bytes)
+        # Copy char, embed, stats features unchanged
+        fout.write(fin.read(char_dim * 4))
+        fout.write(fin.read(embed_dim * 4))
+        fout.write(fin.read(stats_dim * 4))
 
-        # Zero out embed features
-        fin.read(embed_dim * 4)  # skip original
-        fout.write(zero_embed)
+        # Zero out header features (the ablation target)
+        if header_dim > 0:
+            fin.read(header_dim * 4)  # skip original
+            fout.write(zero_header)
 
-        # Copy stats features
-        stats_bytes = fin.read(stats_dim * 4)
-        fout.write(stats_bytes)
-
-    print(f'Wrote {n_records} records to {dst} with zeroed embed features')
+    print(f'Wrote {n_records} records to {dst} with zeroed header features (header_dim={header_dim})')
 " "$FTMB_FILE" "$FTMB_NOHEADER"
 
         echo "[Data] Verifying no-header ablation data..."
