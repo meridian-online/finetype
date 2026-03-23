@@ -5,16 +5,17 @@
 //!
 //! Architecture (from finetype-train):
 //! ```text
-//! Branch 1 (char):  [960] → Dense(300, ReLU) → Dense(300, ReLU) → [300]
-//! Branch 2 (embed): [512] → Dense(200, ReLU) → Dense(200, ReLU) → [200]
-//! Branch 3 (stats): [27]  → Dense(128, ReLU) → Dense(64, ReLU)  → [64]
-//!                             ↓
-//! Merge:             concat([300, 200, 64]) = [564]
-//!                             ↓
-//!                    BatchNorm → Dense(500, ReLU) → Dense(500, ReLU)
-//!                             ↓
-//! Head (flat):       Dense(n_classes, softmax)
-//! Head (hier):       TreeSoftmax(7 domains → 43 categories → 250 types)
+//! Branch 1 (char):   [960] → Dense(300, ReLU) → Dense(300, ReLU) → [300]
+//! Branch 2 (embed):  [512] → Dense(200, ReLU) → Dense(200, ReLU) → [200]
+//! Branch 3 (stats):  [27]  → Dense(128, ReLU) → Dense(64, ReLU)  → [64]
+//! Branch 4 (header): [128] → Dense(128, ReLU) → Dense(64, ReLU)  → [64]  (optional)
+//!                              ↓
+//! Merge:              concat([300, 200, 64, 64]) = [628]  (or [564] without header)
+//!                              ↓
+//!                     BatchNorm → Dense(500, ReLU) → Dense(500, ReLU)
+//!                              ↓
+//! Head (flat):        Dense(n_classes, softmax)
+//! Head (hier):        TreeSoftmax(7 domains → 43 categories → 250 types)
 //! ```
 
 use crate::char_cnn::HierarchicalHead;
@@ -46,9 +47,17 @@ pub struct MultiBranchConfig {
     pub char_dim: usize,
     pub embed_dim: usize,
     pub stats_dim: usize,
+    /// Input dimension for header embedding features (Model2Vec, 128-dim).
+    /// Defaults to 0 for backward compatibility with old configs.
+    #[serde(default)]
+    pub header_dim: usize,
     pub char_hidden: [usize; 2],
     pub embed_hidden: [usize; 2],
     pub stats_hidden: [usize; 2],
+    /// Hidden layer sizes for the header branch (2 layers).
+    /// Defaults to [0, 0] for old configs.
+    #[serde(default)]
+    pub header_hidden: [usize; 2],
     pub merge_hidden: [usize; 2],
     pub n_classes: usize,
     pub dropout: f32,
@@ -56,8 +65,18 @@ pub struct MultiBranchConfig {
 }
 
 impl MultiBranchConfig {
+    /// Whether the header branch is enabled (header_dim > 0 with valid hidden dims).
+    pub fn has_header_branch(&self) -> bool {
+        self.header_dim > 0 && self.header_hidden[0] > 0 && self.header_hidden[1] > 0
+    }
+
     fn merged_dim(&self) -> usize {
-        self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1]
+        let base = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
+        if self.has_header_branch() {
+            base + self.header_hidden[1]
+        } else {
+            base
+        }
     }
 }
 
@@ -112,6 +131,7 @@ pub struct MultiBranchClassifier {
     char_branch: BranchWeights,
     embed_branch: BranchWeights,
     stats_branch: BranchWeights,
+    header_branch: Option<BranchWeights>,
     merge_bn: BatchNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
@@ -180,7 +200,26 @@ impl MultiBranchClassifier {
             BranchWeights::new(config.stats_dim, config.stats_hidden, vb.pp("stats"))
                 .map_err(|e| InferenceError::InvalidPath(format!("stats branch: {e}")))?;
 
-        let merged_dim = config.merged_dim();
+        // Load header branch if config enables it and weights exist in safetensors
+        let header_branch = if config.has_header_branch() {
+            match BranchWeights::new(config.header_dim, config.header_hidden, vb.pp("header")) {
+                Ok(branch) => Some(branch),
+                Err(e) => {
+                    // Graceful fallback: old model without header weights
+                    tracing::warn!("Header branch configured but weights missing, disabling: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let merged_dim = if header_branch.is_some() {
+            config.merged_dim()
+        } else {
+            // Fall back to 3-branch merged dim if header branch not loaded
+            config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1]
+        };
         let merge_bn = batch_norm(merged_dim, BatchNormConfig::default(), vb.pp("merge_bn"))
             .map_err(|e| InferenceError::InvalidPath(format!("merge_bn: {e}")))?;
         let merge_linear1 = linear(merged_dim, config.merge_hidden[0], vb.pp("merge_l1"))
@@ -217,6 +256,7 @@ impl MultiBranchClassifier {
             char_branch,
             embed_branch,
             stats_branch,
+            header_branch,
             merge_bn,
             merge_linear1,
             merge_linear2,
@@ -250,12 +290,19 @@ impl MultiBranchClassifier {
 
     /// Classify a column of values, returning (label, confidence).
     ///
-    /// Extracts 3-branch features from the values, runs the MLP forward pass,
+    /// Extracts branch features from the values, runs the MLP forward pass,
     /// and returns the predicted label with confidence score.
     ///
     /// For flat heads: confidence is the softmax probability of the top prediction.
     /// For hierarchical heads: confidence is the product probability (domain × category × type).
-    pub fn classify_column(&self, values: &[String]) -> Result<(String, f32), InferenceError> {
+    ///
+    /// `header` is the column name. When non-empty and the model has a header branch,
+    /// it is embedded via Model2Vec and fed through the 4th branch.
+    pub fn classify_column(
+        &self,
+        values: &[String],
+        header: &str,
+    ) -> Result<(String, f32), InferenceError> {
         if values.is_empty() {
             return Ok(("unknown".to_string(), 0.0));
         }
@@ -277,7 +324,25 @@ impl MultiBranchClassifier {
         let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
 
-        let hidden = self.forward_trunk(&char_t, &embed_t, &stats_t)?;
+        // Extract header embedding if the model has a header branch
+        let header_t = if self.header_branch.is_some() {
+            let header_embed = if !header.is_empty() {
+                self.model2vec
+                    .encode_one(header)
+                    .and_then(|t| t.to_vec1::<f32>().ok())
+                    .unwrap_or_else(|| vec![0.0f32; self.config.header_dim])
+            } else {
+                vec![0.0f32; self.config.header_dim]
+            };
+            Some(
+                Tensor::from_slice(&header_embed, (1, self.config.header_dim), &device)
+                    .map_err(|e| InferenceError::InvalidPath(format!("header tensor: {e}")))?,
+            )
+        } else {
+            None
+        };
+
+        let hidden = self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref())?;
 
         // Head-specific forward pass + probability extraction
         let probs_vec = match &self.head {
@@ -332,6 +397,7 @@ impl MultiBranchClassifier {
         char_feats: &Tensor,
         embed_feats: &Tensor,
         stats_feats: &Tensor,
+        header_feats: Option<&Tensor>,
     ) -> Result<Tensor, InferenceError> {
         let char_out = self
             .char_branch
@@ -346,8 +412,28 @@ impl MultiBranchClassifier {
             .forward(stats_feats)
             .map_err(|e| InferenceError::InvalidPath(format!("stats forward: {e}")))?;
 
-        let merged = Tensor::cat(&[char_out, embed_out, stats_out], 1)
-            .map_err(|e| InferenceError::InvalidPath(format!("concat: {e}")))?;
+        let merged = if let Some(ref hb) = self.header_branch {
+            let batch_size = char_out
+                .dim(0)
+                .map_err(|e| InferenceError::InvalidPath(format!("batch dim: {e}")))?;
+            let header_input = match header_feats {
+                Some(hf) => hf.clone(),
+                None => Tensor::zeros(
+                    (batch_size, self.config.header_dim),
+                    candle_core::DType::F32,
+                    char_feats.device(),
+                )
+                .map_err(|e| InferenceError::InvalidPath(format!("header zeros: {e}")))?,
+            };
+            let header_out = hb
+                .forward(&header_input)
+                .map_err(|e| InferenceError::InvalidPath(format!("header forward: {e}")))?;
+            Tensor::cat(&[char_out, embed_out, stats_out, header_out], 1)
+                .map_err(|e| InferenceError::InvalidPath(format!("concat: {e}")))?
+        } else {
+            Tensor::cat(&[char_out, embed_out, stats_out], 1)
+                .map_err(|e| InferenceError::InvalidPath(format!("concat: {e}")))?
+        };
 
         // BatchNorm: [B, C] → [B, C, 1] → BN → [B, C]
         let merged_3d = merged
@@ -428,6 +514,7 @@ mod tests {
 
     #[test]
     fn test_config_deserialization() {
+        // Old-style config without header fields (backward compat via #[serde(default)])
         let json = r#"{
             "char_dim": 960,
             "embed_dim": 512,
@@ -444,8 +531,34 @@ mod tests {
         assert_eq!(config.char_dim, 960);
         assert_eq!(config.embed_dim, 512);
         assert_eq!(config.stats_dim, 27);
+        assert_eq!(config.header_dim, 0); // default
+        assert_eq!(config.header_hidden, [0, 0]); // default
+        assert!(!config.has_header_branch());
         assert_eq!(config.n_classes, 250);
-        assert_eq!(config.merged_dim(), 564);
+        assert_eq!(config.merged_dim(), 564); // 3-branch only
+    }
+
+    #[test]
+    fn test_config_deserialization_with_header() {
+        let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 512,
+            "stats_dim": 27,
+            "header_dim": 128,
+            "char_hidden": [300, 300],
+            "embed_hidden": [200, 200],
+            "stats_hidden": [128, 64],
+            "header_hidden": [128, 64],
+            "merge_hidden": [500, 500],
+            "n_classes": 250,
+            "dropout": 0.35,
+            "head_type": "Flat"
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.header_dim, 128);
+        assert_eq!(config.header_hidden, [128, 64]);
+        assert!(config.has_header_branch());
+        assert_eq!(config.merged_dim(), 628); // 300+200+64+64
     }
 
     #[test]

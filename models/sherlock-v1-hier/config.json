@@ -1,0 +1,24 @@
+{
+  "char_dim": 960,
+  "char_hidden": [
+    300,
+    300
+  ],
+  "embed_dim": 512,
+  "embed_hidden": [
+    200,
+    200
+  ],
+  "stats_dim": 27,
+  "stats_hidden": [
+    128,
+    64
+  ],
+  "merge_hidden": [
+    500,
+    500
+  ],
+  "n_classes": 250,
+  "dropout": 0.35,
+  "head_type": "Hierarchical"
+}

@@ -876,6 +876,7 @@ fn cmd_train_multi_branch(
     let char_dim = header.char_dim as usize;
     let embed_dim = header.embed_dim as usize;
     let stats_dim = header.stats_dim as usize;
+    let header_dim = header.header_dim as usize;
 
     let train_data = MultiBranchDataset::from_records(
         &train_records,
@@ -883,6 +884,7 @@ fn cmd_train_multi_branch(
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
     )?;
     let val_data = MultiBranchDataset::from_records(
         &val_records,
@@ -890,12 +892,15 @@ fn cmd_train_multi_branch(
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
     )?;
 
     let model_config = MultiBranchConfig {
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
+        header_hidden: if header_dim > 0 { [128, 64] } else { [0, 0] },
         n_classes,
         dropout,
         head_type: head_type.clone(),

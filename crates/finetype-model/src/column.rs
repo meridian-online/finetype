@@ -1916,7 +1916,7 @@ impl ColumnClassifier {
         &self,
         mb: &MultiBranchClassifier,
         values: &[String],
-        _header: &str,
+        header: &str,
     ) -> Result<ColumnResult, InferenceError> {
         if values.is_empty() {
             return Ok(ColumnResult {
@@ -1945,7 +1945,7 @@ impl ColumnClassifier {
         let samples_used = sample.len();
 
         // Classify via multi-branch (feature extraction + forward pass)
-        let (label, confidence) = mb.classify_column(&sample)?;
+        let (label, confidence) = mb.classify_column(&sample, header)?;
 
         Ok(ColumnResult {
             label: label.clone(),

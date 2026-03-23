@@ -336,15 +336,23 @@ def write_ftmb(path, records):
 
 
 def read_ftmb(path):
-    """Read a .ftmb binary file, yielding (label, char_feat, embed_feat, stats_feat) tuples."""
+    """Read a .ftmb binary file (v1 or v2), yielding (label, char_feat, embed_feat, stats_feat) tuples.
+
+    v2 header features are read but not returned (caller doesn't need them for blending).
+    """
     with open(path, "rb") as f:
         magic = f.read(4)
         assert magic == MAGIC, f"Bad magic: {magic}"
         (version,) = struct.unpack("<I", f.read(4))
-        assert version == VERSION, f"Unknown version: {version}"
+        assert version in (1, 2), f"Unknown version: {version} (expected 1 or 2)"
         (n_records,) = struct.unpack("<Q", f.read(8))
         char_dim, embed_dim, stats_dim = struct.unpack("<HHH", f.read(6))
-        _padding = f.read(2)
+
+        if version >= 2:
+            (header_dim,) = struct.unpack("<H", f.read(2))
+        else:
+            _padding = f.read(2)
+            header_dim = 0
 
         assert char_dim == CHAR_DIM, f"char_dim mismatch: {char_dim}"
         assert embed_dim == EMBED_DIM, f"embed_dim mismatch: {embed_dim}"
@@ -357,6 +365,9 @@ def read_ftmb(path):
             char_feat = list(struct.unpack(f"<{CHAR_DIM}f", f.read(CHAR_DIM * 4)))
             embed_feat = list(struct.unpack(f"<{EMBED_DIM}f", f.read(EMBED_DIM * 4)))
             stats_feat = list(struct.unpack(f"<{STATS_DIM}f", f.read(STATS_DIM * 4)))
+            if header_dim > 0:
+                # Read and discard header features for now
+                f.read(header_dim * 4)
             records.append((label, char_feat, embed_feat, stats_feat))
 
         return records
