@@ -214,7 +214,11 @@ echo " Started: $(date)"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-for model_dir in "$FLAT_MODEL" "$HIER_MODEL"; do
+# Only eval models that were trained in this run
+MODELS_TO_EVAL=("$FLAT_MODEL")
+[[ "$FLAT_ONLY" == "false" ]] && MODELS_TO_EVAL+=("$HIER_MODEL")
+
+for model_dir in "${MODELS_TO_EVAL[@]}"; do
     model_name="$(basename "$model_dir")"
     if [[ -f "$model_dir/model.safetensors" ]]; then
         echo "── Evaluating $model_name ──"
@@ -251,7 +255,7 @@ echo ""
 
 # Print eval scores summary (reads JSON with DuckDB — works on macOS + Linux)
 echo "Results:"
-for model_dir in "$FLAT_MODEL" "$HIER_MODEL"; do
+for model_dir in "${MODELS_TO_EVAL[@]}"; do
     model_name="$(basename "$model_dir")"
     JSON_FILE="$model_dir/eval/profile_results.json"
     if [[ -f "$JSON_FILE" ]]; then
