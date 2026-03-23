@@ -213,7 +213,7 @@ datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,rfc_28
 datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,american_timestamp,american timestamp
 datetime_formats_extended,eval/datasets/csv/datetime_formats_extended.csv,european_timestamp,european timestamp
 api_users_json,eval/datasets/json/api_users.json,address.city,city
-api_users_json,eval/datasets/json/api_users.json,address.country,country
+api_users_json,eval/datasets/json/api_users.json,address.country,country code
 api_users_json,eval/datasets/json/api_users.json,address.postal_code,postal code
 api_users_json,eval/datasets/json/api_users.json,email,email
 api_users_json,eval/datasets/json/api_users.json,name,name
@@ -240,7 +240,7 @@ server_logs_json,eval/datasets/json/server_logs.ndjson,timestamp,iso timestamp m
 server_logs_json,eval/datasets/json/server_logs.ndjson,user_agent,user agent
 weather_stations_json,eval/datasets/json/weather_stations.json,humidity_pct,decimal number
 weather_stations_json,eval/datasets/json/weather_stations.json,location.city,city
-weather_stations_json,eval/datasets/json/weather_stations.json,location.country,country
+weather_stations_json,eval/datasets/json/weather_stations.json,location.country,country code
 weather_stations_json,eval/datasets/json/weather_stations.json,location.latitude,latitude
 weather_stations_json,eval/datasets/json/weather_stations.json,location.longitude,longitude
 weather_stations_json,eval/datasets/json/weather_stations.json,observation_date,iso date

@@ -19,6 +19,7 @@ first name,profile,identity.person.first_name,identity,direct,false
 last name,profile,identity.person.last_name,identity,direct,false
 hash,profile,technology.cryptographic.hash,technology,direct,false
 http status code,profile,representation.numeric.integer_number,representation,close,false
+http status code,profile,representation.identifier.numeric_code,representation,close,false
 iata,profile,geography.transportation.iata_code,geography,direct,false
 icao,profile,geography.transportation.icao_code,geography,direct,false
 hostname,profile,technology.internet.hostname,technology,direct,false
@@ -28,6 +29,7 @@ measurement unit,profile,representation.scientific.measurement_unit,representati
 month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
 port,profile,representation.numeric.integer_number,representation,close,false
+port,profile,representation.identifier.numeric_code,representation,close,false
 street number,profile,representation.numeric.integer_number,representation,close,false
 uuid,profile,representation.identifier.uuid,representation,direct,false
 user agent,profile,technology.internet.user_agent,technology,direct,false
@@ -355,3 +357,33 @@ cas number,profile_eval,representation.scientific.cas_number,representation,dire
 inchi,profile_eval,representation.scientific.inchi,representation,direct,false
 smiles,profile_eval,representation.scientific.smiles,representation,direct,false
 color hsl,profile_eval,representation.format.color_hsl,representation,direct,false
+birth date,sherlock,datetime.date.iso,datetime,close,false
+birth place,sherlock,geography.location.city,geography,close,false
+continent,sherlock,geography.location.continent,geography,direct,false
+day,sherlock,datetime.component.day_of_week,datetime,close,false
+director,sherlock,identity.person.full_name,identity,close,false
+file size,sherlock,representation.file.file_size,representation,direct,false
+owner,sherlock,identity.person.full_name,identity,close,false
+sales,sherlock,finance.currency.amount,finance,close,false
+symbol,sherlock,finance.currency.currency_symbol,finance,partial,false
+elevation,sherlock,representation.numeric.decimal_number,representation,partial,false
+grades,sherlock,representation.discrete.ordinal,representation,partial,false
+nationality,sherlock,geography.location.country,geography,partial,false
+organisation,sherlock,,identity,partial,true
+ranking,sherlock,representation.discrete.ordinal,representation,partial,false
+affiliate,sherlock,,,semantic_only,false
+affiliation,sherlock,,,semantic_only,false
+album,sherlock,,,semantic_only,false
+area,sherlock,,,semantic_only,false
+club,sherlock,,,semantic_only,false
+command,sherlock,,,semantic_only,false
+creator,sherlock,,identity,semantic_only,false
+credit,sherlock,,,semantic_only,false
+education,sherlock,,,semantic_only,false
+jockey,sherlock,,identity,semantic_only,false
+plays,sherlock,,,semantic_only,false
+religion,sherlock,,,semantic_only,false
+requirement,sherlock,,representation,semantic_only,false
+result,sherlock,,,semantic_only,false
+service,sherlock,,,semantic_only,false
+team name,sherlock,,,semantic_only,false

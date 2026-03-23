@@ -61,12 +61,15 @@ fn main() -> Result<()> {
 
     let predictions = load_csv(&args.profile_results)?;
     let ground_truth = load_csv(&args.ground_truth)?;
-    let schema_mapping = {
+    // Multi-map: gt_label → Vec<Row> to handle multiple candidates per label
+    // (e.g., "decimal number" maps to both decimal_number and integer_number).
+    // Previously used HashMap which silently dropped all but the last row.
+    let schema_mapping: HashMap<String, Vec<HashMap<String, String>>> = {
         let rows = load_csv(&args.schema_mapping)?;
-        let mut m = HashMap::new();
+        let mut m: HashMap<String, Vec<HashMap<String, String>>> = HashMap::new();
         for row in rows {
             if let Some(k) = row.get("gt_label") {
-                m.insert(k.clone(), row);
+                m.entry(k.clone()).or_default().push(row);
             }
         }
         m
@@ -74,10 +77,12 @@ fn main() -> Result<()> {
     let actionability = load_csv(&args.actionability_results)?;
     let taxonomy_stats = load_taxonomy_stats(&args.labels_dir)?;
 
+    let mapping_rows: usize = schema_mapping.values().map(|v| v.len()).sum();
     println!(
-        "Loaded {} predictions, {} ground truth, {} mappings, {} actionability results",
+        "Loaded {} predictions, {} ground truth, {} mappings ({} unique gt_labels), {} actionability results",
         predictions.len(),
         ground_truth.len(),
+        mapping_rows,
         schema_mapping.len(),
         actionability.len()
     );
@@ -106,29 +111,42 @@ fn main() -> Result<()> {
             Some(l) => l.clone(),
             None => continue,
         };
-        let mapping = match schema_mapping.get(&gt_label) {
-            Some(m) => m,
+        let candidates = match schema_mapping.get(&gt_label) {
+            Some(c) => c,
             None => continue,
         };
-        let mq = mapping
-            .get("match_quality")
-            .map(|s| s.as_str())
-            .unwrap_or("");
-        if mq != "direct" && mq != "close" {
+        // Filter to direct/close candidates only
+        let eligible: Vec<_> = candidates
+            .iter()
+            .filter(|m| {
+                let mq = m.get("match_quality").map(|s| s.as_str()).unwrap_or("");
+                mq == "direct" || mq == "close"
+            })
+            .collect();
+        if eligible.is_empty() {
             continue;
         }
 
         total += 1;
         datasets_seen.insert(dataset.clone());
         let predicted = pred.get("predicted_type").cloned().unwrap_or_default();
-        let expected_label = mapping.get("finetype_label").cloned().unwrap_or_default();
-        let expected_domain = mapping.get("finetype_domain").cloned().unwrap_or_default();
 
-        let lok = is_label_match(&predicted, &expected_label);
+        // Check all candidates — if ANY matches, it's correct.
+        // This mirrors eval_profile.sql's MAX(label_match) deduplication.
+        let lok = eligible.iter().any(|m| {
+            let ft = m.get("finetype_label").map(|s| s.as_str()).unwrap_or("");
+            is_label_match(&predicted, ft)
+        });
+        let dok = eligible.iter().any(|m| {
+            let ft = m.get("finetype_label").map(|s| s.as_str()).unwrap_or("");
+            let fd = m.get("finetype_domain").map(|s| s.as_str()).unwrap_or("");
+            is_domain_match(&predicted, ft, fd)
+        });
+
         if lok {
             label_correct += 1;
         }
-        if is_domain_match(&predicted, &expected_label, &expected_domain) {
+        if dok {
             domain_correct += 1;
         }
 
@@ -140,6 +158,15 @@ fn main() -> Result<()> {
         }
 
         if !lok {
+            // For the miss report, pick the best candidate (first match by label, else first)
+            let best = eligible
+                .iter()
+                .find(|m| {
+                    let ft = m.get("finetype_label").map(|s| s.as_str()).unwrap_or("");
+                    !ft.is_empty()
+                })
+                .unwrap_or(&eligible[0]);
+            let expected_label = best.get("finetype_label").cloned().unwrap_or_default();
             let conf: f64 = pred
                 .get("confidence")
                 .and_then(|s| s.parse().ok())
