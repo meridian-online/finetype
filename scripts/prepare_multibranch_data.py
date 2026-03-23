@@ -2,8 +2,14 @@
 """Prepare feature-vector training data for the multi-branch model.
 
 Reads distilled data (sherlock_distilled.csv.gz) and synthetic data
-(from finetype generate), blends them per-type, extracts 3 feature
-branches via `finetype extract-features`, and writes a binary .ftmb file.
+(from finetype generate), blends them per-type, extracts 4 feature
+branches via `finetype extract-features`, and writes a binary .ftmb v2 file.
+
+The 4 feature branches are:
+  1. char:   960-dim character distribution features
+  2. embed:  512-dim Model2Vec embedding aggregation over values
+  3. stats:   27-dim column-level statistics
+  4. header: 128-dim Model2Vec embedding of the column header
 
 Usage:
     python3 scripts/prepare_multibranch_data.py [OPTIONS]
@@ -11,11 +17,11 @@ Usage:
 Options:
     --distilled PATH        Distilled CSV (default: output/distillation-v3/sherlock_distilled.csv.gz)
     --finetype PATH         finetype binary (default: ./target/release/finetype)
-    --output PATH           Output binary file (default: output/multibranch-training/blend-30-70.ftmb)
+    --output PATH           Output binary file (default: output/multibranch-training/blend-50-50.ftmb)
     --label-remap PATH      Label remap JSON (default: data/label_remap.json)
     --samples-per-type N    Blend cap: max columns per type after blending (default: 1200)
     --synthetic-columns N   Synthetic columns to generate per type (default: 1200)
-    --ratio-distilled F     Distilled ratio 0.0-1.0 (default: 0.3)
+    --ratio-distilled F     Distilled ratio 0.0-1.0 (default: 0.5)
     --min-values N          Min values per column (default: 5)
     --seed N                Random seed (default: 42)
     --workers N             Parallel feature extraction workers (default: 4)
@@ -44,8 +50,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 CHAR_DIM = 960
 EMBED_DIM = 512
 STATS_DIM = 27
+HEADER_DIM = 128
 MAGIC = b"FTMB"
-VERSION = 1
+VERSION = 2
 
 # Column-level types that may cause negative transfer (same as prepare_spike_data.py)
 COLUMN_LEVEL_TYPES = {
@@ -53,6 +60,334 @@ COLUMN_LEVEL_TYPES = {
     "representation.discrete.ordinal",
     "representation.identifier.increment",
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Header variation mapping
+#
+# Realistic column name variations for synthetic data. Prevents the model from
+# cheating on perfect type-key headers. Each type maps to a list of plausible
+# column names an analyst might use. For types not in this mapping, we generate
+# variations programmatically from the type key's leaf name.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+HEADER_VARIATIONS = {
+    # ─── Identity domain ──────────────────────────────────────────
+    "identity.person.email": [
+        "email", "email_address", "e-mail", "contact_email", "Email",
+        "EMAIL_ADDR", "emailAddress", "user_email", "mail", "email_id",
+    ],
+    "identity.person.full_name": [
+        "name", "full_name", "fullName", "customer_name", "Name",
+        "FULL_NAME", "person_name", "contact_name", "display_name", "client_name",
+    ],
+    "identity.person.first_name": [
+        "first_name", "firstName", "fname", "given_name", "First Name",
+        "FIRST_NAME", "first", "givenName", "forename", "name_first",
+    ],
+    "identity.person.last_name": [
+        "last_name", "lastName", "lname", "surname", "Last Name",
+        "LAST_NAME", "family_name", "familyName", "last", "name_last",
+    ],
+    "identity.person.username": [
+        "username", "user_name", "userName", "login", "Username",
+        "USERNAME", "user_id", "screen_name", "handle", "account_name",
+    ],
+    "identity.person.gender": [
+        "gender", "sex", "Gender", "GENDER", "gender_code", "m_f",
+    ],
+    "identity.person.age": [
+        "age", "Age", "AGE", "person_age", "customer_age", "age_years",
+    ],
+    "identity.person.job_title": [
+        "job_title", "title", "position", "job", "Job Title",
+        "JOB_TITLE", "jobTitle", "role", "occupation", "designation",
+    ],
+    "identity.person.phone_number": [
+        "phone", "phone_number", "phoneNumber", "telephone", "Phone",
+        "PHONE", "tel", "mobile", "contact_phone", "phone_no",
+    ],
+    "identity.account.password": [
+        "password", "passwd", "pass", "Password", "PASSWORD", "pwd",
+        "secret", "user_password", "hashed_password", "pw",
+    ],
+    "identity.account.ssn": [
+        "ssn", "social_security", "SSN", "social_security_number",
+        "ss_number", "soc_sec", "ssn_number", "tax_id",
+    ],
+    "identity.identifier.uuid": [
+        "uuid", "id", "UUID", "guid", "unique_id", "identifier",
+        "record_id", "entity_id", "uid", "external_id",
+    ],
+    "identity.identifier.alphanumeric_id": [
+        "id", "code", "ref", "reference", "ID", "record_id",
+        "identifier", "ref_code", "external_ref", "item_id",
+    ],
+    # ─── Geography domain ─────────────────────────────────────────
+    "geography.location.city": [
+        "city", "City", "CITY", "city_name", "town", "municipality",
+        "cityName", "location_city", "metro", "place",
+    ],
+    "geography.location.state": [
+        "state", "State", "STATE", "state_name", "province",
+        "state_code", "region", "stateName", "state_province",
+    ],
+    "geography.location.country": [
+        "country", "Country", "COUNTRY", "country_name", "nation",
+        "country_code", "countryName", "country_of_origin", "nationality",
+    ],
+    "geography.location.region": [
+        "region", "Region", "REGION", "area", "district", "zone",
+        "territory", "geo_region", "location_region",
+    ],
+    "geography.address.street_address": [
+        "address", "street_address", "addr", "Address", "ADDRESS",
+        "street", "address_line_1", "mailing_address", "location",
+        "street_addr",
+    ],
+    "geography.address.full_address": [
+        "full_address", "address", "complete_address", "Full Address",
+        "FULL_ADDRESS", "mailing_address", "postal_address", "location",
+    ],
+    "geography.coordinate.latitude": [
+        "latitude", "lat", "Latitude", "LAT", "geo_lat", "y",
+        "lat_deg", "location_lat", "coord_lat",
+    ],
+    "geography.coordinate.longitude": [
+        "longitude", "lon", "lng", "Longitude", "LON", "geo_lon", "x",
+        "long", "location_lon", "coord_lon",
+    ],
+    "geography.postal.zip_code": [
+        "zip", "zip_code", "zipcode", "postal_code", "Zip Code",
+        "ZIP", "postcode", "postalCode", "zip_postal",
+    ],
+    "geography.coordinate.geohash": [
+        "geohash", "geo_hash", "Geohash", "GEOHASH", "location_hash",
+    ],
+    # ─── Datetime domain ──────────────────────────────────────────
+    "datetime.timestamp.iso_8601": [
+        "timestamp", "datetime", "created_at", "updated_at", "Timestamp",
+        "TIMESTAMP", "date_time", "event_time", "ts", "created",
+    ],
+    "datetime.date.iso_date": [
+        "date", "Date", "DATE", "event_date", "start_date", "end_date",
+        "birth_date", "created_date", "dateValue", "record_date",
+    ],
+    "datetime.time.iso_time": [
+        "time", "Time", "TIME", "event_time", "start_time", "end_time",
+        "clock_time", "timeValue", "scheduled_time",
+    ],
+    "datetime.date.us_date": [
+        "date", "Date", "DATE", "mm_dd_yyyy", "us_date", "event_date",
+        "start_date", "end_date", "date_us",
+    ],
+    "datetime.date.eu_date": [
+        "date", "Date", "DATE", "dd_mm_yyyy", "eu_date", "event_date",
+        "start_date", "end_date", "date_eu",
+    ],
+    "datetime.component.year": [
+        "year", "Year", "YEAR", "yr", "fiscal_year", "birth_year",
+        "start_year", "end_year", "year_value",
+    ],
+    "datetime.component.month_name": [
+        "month", "Month", "MONTH", "month_name", "mon", "calendar_month",
+    ],
+    "datetime.component.day_of_week": [
+        "day", "day_of_week", "weekday", "Day", "DAY", "dow",
+    ],
+    "datetime.duration.iso_duration": [
+        "duration", "Duration", "DURATION", "elapsed", "time_span",
+        "period", "interval",
+    ],
+    # ─── Finance domain ───────────────────────────────────────────
+    "finance.monetary.usd": [
+        "price", "amount", "cost", "Price", "PRICE", "total",
+        "revenue", "salary", "fee", "balance", "payment",
+    ],
+    "finance.monetary.eur": [
+        "price", "amount", "cost", "Price", "betrag", "preis",
+        "montant", "prix", "total", "payment_eur",
+    ],
+    "finance.monetary.gbp": [
+        "price", "amount", "cost", "Price", "total", "payment_gbp",
+        "fee", "salary", "balance",
+    ],
+    "finance.identifier.iban": [
+        "iban", "IBAN", "bank_account", "account_number", "iban_number",
+        "Iban", "account_iban",
+    ],
+    "finance.identifier.credit_card": [
+        "card_number", "credit_card", "cc_number", "card", "Card Number",
+        "CC", "card_no", "creditCard", "payment_card",
+    ],
+    "finance.identifier.cusip": [
+        "cusip", "CUSIP", "security_id", "cusip_number", "fund_cusip",
+    ],
+    "finance.identifier.isin": [
+        "isin", "ISIN", "security_id", "isin_code", "instrument_id",
+    ],
+    "finance.identifier.ticker": [
+        "ticker", "symbol", "stock_symbol", "Ticker", "TICKER",
+        "stock", "equity_symbol", "trading_symbol",
+    ],
+    # ─── Technology domain ────────────────────────────────────────
+    "technology.network.ipv4": [
+        "ip", "ip_address", "ipv4", "IP", "IP_ADDRESS", "ipAddress",
+        "source_ip", "dest_ip", "client_ip", "server_ip",
+    ],
+    "technology.network.ipv6": [
+        "ipv6", "ip_address", "IPv6", "IPV6", "ipv6_address",
+        "source_ipv6", "dest_ipv6",
+    ],
+    "technology.network.mac_address": [
+        "mac", "mac_address", "MAC", "MAC_ADDRESS", "macAddress",
+        "hardware_address", "nic_address", "physical_address",
+    ],
+    "technology.web.url": [
+        "url", "URL", "link", "website", "web_address", "href",
+        "page_url", "source_url", "endpoint",
+    ],
+    "technology.web.domain_name": [
+        "domain", "hostname", "domain_name", "Domain", "DOMAIN",
+        "host", "server_name", "site",
+    ],
+    "technology.web.user_agent": [
+        "user_agent", "userAgent", "User-Agent", "ua", "USER_AGENT",
+        "browser", "client_agent",
+    ],
+    "technology.web.mime_type": [
+        "mime_type", "content_type", "mimeType", "MIME", "media_type",
+        "Content-Type", "file_type",
+    ],
+    "technology.file.file_path": [
+        "path", "file_path", "filepath", "Path", "FILE_PATH",
+        "filePath", "full_path", "directory",
+    ],
+    "technology.file.file_extension": [
+        "extension", "ext", "file_ext", "Extension", "FILE_EXT",
+        "file_extension", "file_type",
+    ],
+    "technology.crypto.sha256": [
+        "hash", "sha256", "SHA256", "checksum", "digest", "file_hash",
+        "content_hash",
+    ],
+    "technology.crypto.md5": [
+        "md5", "MD5", "hash", "md5_hash", "checksum", "md5sum",
+        "file_md5",
+    ],
+    "technology.version.semver": [
+        "version", "Version", "VERSION", "ver", "release", "app_version",
+        "api_version", "semver",
+    ],
+    # ─── Representation domain ────────────────────────────────────
+    "representation.text.free_text": [
+        "description", "text", "comment", "notes", "Description",
+        "TEXT", "remarks", "body", "content", "message",
+    ],
+    "representation.text.sentence": [
+        "sentence", "text", "message", "comment", "Sentence",
+        "description", "note",
+    ],
+    "representation.text.entity_name": [
+        "name", "entity", "company", "organization", "Name",
+        "org_name", "entity_name", "business_name", "label",
+    ],
+    "representation.numeric.integer": [
+        "count", "quantity", "number", "amount", "Count",
+        "QUANTITY", "num", "total", "value", "size",
+    ],
+    "representation.numeric.decimal_number": [
+        "value", "amount", "score", "rate", "Value",
+        "AMOUNT", "decimal", "measurement", "reading",
+    ],
+    "representation.numeric.percentage": [
+        "percentage", "pct", "percent", "rate", "Percentage",
+        "PCT", "ratio", "share", "completion_rate",
+    ],
+    "representation.boolean.boolean": [
+        "active", "enabled", "is_active", "flag", "Active",
+        "ENABLED", "status", "boolean", "is_valid", "approved",
+    ],
+    "representation.encoding.json_string": [
+        "data", "json", "payload", "config", "Data",
+        "JSON", "metadata", "properties", "attributes",
+    ],
+    "representation.encoding.base64": [
+        "encoded", "base64", "data", "content", "Base64",
+        "BASE64", "encoded_data", "blob", "payload",
+    ],
+    "representation.color.hex_color": [
+        "color", "colour", "hex_color", "Color", "COLOR",
+        "bg_color", "text_color", "fill_color", "hex",
+    ],
+    # ─── Container domain ─────────────────────────────────────────
+    "container.tabular.csv_row": [
+        "row", "data", "record", "line", "csv_row", "Row",
+    ],
+    "container.tabular.tsv_row": [
+        "row", "data", "record", "line", "tsv_row", "Row",
+    ],
+    "container.markup.html_fragment": [
+        "html", "content", "body", "markup", "HTML",
+        "html_content", "snippet", "template",
+    ],
+}
+
+
+def _generate_fallback_header_variations(type_key):
+    """Generate header variations from the type key's leaf name.
+
+    Used for types not in the curated HEADER_VARIATIONS mapping.
+    Produces underscore, camelCase, space, and abbreviated forms.
+    """
+    # Extract leaf: "identity.person.email" -> "email"
+    leaf = type_key.rsplit(".", 1)[-1]
+
+    variations = [leaf]
+
+    # Underscore form is the leaf itself (e.g., "zip_code")
+    # Title case
+    variations.append(leaf.replace("_", " ").title().replace(" ", ""))
+
+    # UPPER_CASE
+    variations.append(leaf.upper())
+
+    # Space-separated title case
+    if "_" in leaf:
+        variations.append(leaf.replace("_", " ").title())
+        # CamelCase
+        parts = leaf.split("_")
+        variations.append(parts[0] + "".join(p.capitalize() for p in parts[1:]))
+        # First word only (abbreviation)
+        variations.append(parts[0])
+
+    # Capitalize first letter
+    variations.append(leaf.capitalize())
+
+    # Kebab-case
+    variations.append(leaf.replace("_", "-"))
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for v in variations:
+        if v not in seen:
+            seen.add(v)
+            unique.append(v)
+
+    return unique
+
+
+def get_header_for_type(type_key, rng):
+    """Return a random realistic header name for a given type key.
+
+    Uses curated variations when available, falls back to programmatic
+    generation from the leaf name.
+    """
+    variations = HEADER_VARIATIONS.get(type_key)
+    if not variations:
+        variations = _generate_fallback_header_variations(type_key)
+    return rng.choice(variations)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -97,12 +432,15 @@ def load_label_remap(remap_path):
 def load_distilled_columns(distilled_path, min_values, label_remap=None):
     """Load distilled data as columns (groups of values per type).
 
+    Each column is a (values, header) tuple where header is the original
+    column_name from the Sherlock corpus.
+
     Args:
         label_remap: dict mapping non-canonical labels to canonical equivalents.
 
     Returns:
-        columns_by_type: dict[str, list[list[str]]] — each type has a list of columns,
-                         each column being a list of string values.
+        columns_by_type: dict[str, list[tuple[list[str], str]]] — each type has
+                         a list of (values, header) tuples.
         stats: dict with counts for logging
     """
     columns_by_type = defaultdict(list)
@@ -151,10 +489,11 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
                 continue
 
             stats["qualifying_rows"] += 1
-            # Keep as a column (list of values)
+            # Keep as a column (list of values) with its original header
             clean_vals = [str(v).strip() for v in vals if str(v).strip()]
+            header = row.get("column_name", "").strip()
             if len(clean_vals) >= min_values:
-                columns_by_type[label].append(clean_vals)
+                columns_by_type[label].append((clean_vals, header))
                 stats["total_values"] += len(clean_vals)
 
     return dict(columns_by_type), stats
@@ -163,16 +502,22 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
 def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values):
     """Generate synthetic training data via finetype generate, grouped as columns.
 
+    Each column gets a realistic header variation (not the type key) to prevent
+    the model from cheating on perfect type-key headers.
+
     Args:
         synthetic_columns_per_type: target number of columns per type. Each column
             has ~100 values, so we generate synthetic_columns_per_type * 100 values
             per type via `finetype generate --samples`.
 
-    Returns: dict[str, list[list[str]]] — each type has a list of columns
+    Returns: dict[str, list[tuple[list[str], str]]] — each type has a list of
+             (values, header) tuples
     """
     # Generate enough values to produce the target number of columns
     # Each column is ~100 values, so we need N * 100 values per type
     values_per_type = synthetic_columns_per_type * 100
+
+    rng = random.Random(seed + 7)  # Offset seed for header variation
 
     with tempfile.NamedTemporaryFile(suffix=".ndjson", delete=False) as tmp:
         tmp_path = tmp.name
@@ -204,6 +549,7 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
                 values_by_type[rec["classification"]].append(rec["text"])
 
         # Convert to columns: chunk each type's values into column-sized groups
+        # Each column gets a random realistic header variation
         columns_by_type = {}
         for type_key, values in values_by_type.items():
             if len(values) < min_values:
@@ -214,7 +560,8 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
             for i in range(0, len(values), col_size):
                 chunk = values[i : i + col_size]
                 if len(chunk) >= min_values:
-                    columns.append(chunk)
+                    header = get_header_for_type(type_key, rng)
+                    columns.append((chunk, header))
             columns_by_type[type_key] = columns
 
         return columns_by_type
@@ -225,9 +572,11 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
 def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng):
     """Blend distilled and synthetic column data per-type with capping.
 
+    Each column is a (values, header) tuple.
+
     samples_per_type: target number of columns per type
-    ratio_distilled: float 0.0-1.0 (e.g. 0.3 means 30% distilled)
-    Returns: dict[str, list[list[str]]]
+    ratio_distilled: float 0.0-1.0 (e.g. 0.5 means 50% distilled)
+    Returns: dict[str, list[tuple[list[str], str]]]
     """
     all_types = set(distilled.keys()) | set(synthetic.keys())
     blended = {}
@@ -269,7 +618,8 @@ def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng):
 def extract_features(finetype_bin, values, header=None):
     """Call `finetype extract-features` to get feature vectors for a column.
 
-    Returns: dict with 'char', 'embed', 'stats' arrays, or None on failure.
+    Returns: dict with 'char', 'embed', 'stats', 'header_features' arrays,
+             or None on failure.
     """
     cmd = [finetype_bin, "extract-features", "--json"]
     if header:
@@ -292,23 +642,24 @@ def extract_features(finetype_bin, values, header=None):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Binary file I/O
+# Binary file I/O — FTMB v2
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def write_ftmb(path, records):
-    """Write records to a .ftmb binary file.
+    """Write records to a .ftmb v2 binary file.
 
-    records: list of (label: str, char_features: list[float], embed_features: list[float], stats_features: list[float])
+    records: list of (label, char_features, embed_features, stats_features, header_features)
 
-    Header (24 bytes):
+    Header (28 bytes):
         magic: b"FTMB" (4 bytes)
-        version: uint32 = 1
+        version: uint32 = 2
         n_records: uint64
         char_dim: uint16 = 960
         embed_dim: uint16 = 512
         stats_dim: uint16 = 27
-        padding: 2 bytes of zeros
+        header_dim: uint16 = 128
+        padding: 0 bytes (header_dim replaces old 2-byte padding)
 
     Each record:
         label_len: uint16
@@ -316,59 +667,58 @@ def write_ftmb(path, records):
         char_features: 960 x float32 (little-endian)
         embed_features: 512 x float32 (little-endian)
         stats_features: 27 x float32 (little-endian)
+        header_features: 128 x float32 (little-endian)
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
-        # Header
+        # Header (28 bytes)
         f.write(MAGIC)
         f.write(struct.pack("<I", VERSION))
         f.write(struct.pack("<Q", len(records)))
-        f.write(struct.pack("<HHH", CHAR_DIM, EMBED_DIM, STATS_DIM))
-        f.write(b"\x00\x00")  # padding
+        f.write(struct.pack("<HHHH", CHAR_DIM, EMBED_DIM, STATS_DIM, HEADER_DIM))
 
-        for label, char_feat, embed_feat, stats_feat in records:
+        for label, char_feat, embed_feat, stats_feat, header_feat in records:
             label_bytes = label.encode("utf-8")
             f.write(struct.pack("<H", len(label_bytes)))
             f.write(label_bytes)
             f.write(struct.pack(f"<{CHAR_DIM}f", *char_feat))
             f.write(struct.pack(f"<{EMBED_DIM}f", *embed_feat))
             f.write(struct.pack(f"<{STATS_DIM}f", *stats_feat))
+            f.write(struct.pack(f"<{HEADER_DIM}f", *header_feat))
 
 
 def read_ftmb(path):
-    """Read a .ftmb binary file (v1 or v2), yielding (label, char_feat, embed_feat, stats_feat) tuples.
+    """Read a .ftmb binary file (v1 or v2).
 
-    v2 header features are read but not returned (caller doesn't need them for blending).
+    v1: returns (label, char_feat, embed_feat, stats_feat) tuples
+    v2: returns (label, char_feat, embed_feat, stats_feat, header_feat) tuples
     """
     with open(path, "rb") as f:
         magic = f.read(4)
         assert magic == MAGIC, f"Bad magic: {magic}"
         (version,) = struct.unpack("<I", f.read(4))
-        assert version in (1, 2), f"Unknown version: {version} (expected 1 or 2)"
+        assert version in (1, 2), f"Unknown version: {version}"
         (n_records,) = struct.unpack("<Q", f.read(8))
         char_dim, embed_dim, stats_dim = struct.unpack("<HHH", f.read(6))
 
-        if version >= 2:
-            (header_dim,) = struct.unpack("<H", f.read(2))
-        else:
+        if version == 1:
             _padding = f.read(2)
             header_dim = 0
-
-        assert char_dim == CHAR_DIM, f"char_dim mismatch: {char_dim}"
-        assert embed_dim == EMBED_DIM, f"embed_dim mismatch: {embed_dim}"
-        assert stats_dim == STATS_DIM, f"stats_dim mismatch: {stats_dim}"
+        else:
+            (header_dim,) = struct.unpack("<H", f.read(2))
 
         records = []
         for _ in range(n_records):
             (label_len,) = struct.unpack("<H", f.read(2))
             label = f.read(label_len).decode("utf-8")
-            char_feat = list(struct.unpack(f"<{CHAR_DIM}f", f.read(CHAR_DIM * 4)))
-            embed_feat = list(struct.unpack(f"<{EMBED_DIM}f", f.read(EMBED_DIM * 4)))
-            stats_feat = list(struct.unpack(f"<{STATS_DIM}f", f.read(STATS_DIM * 4)))
+            char_feat = list(struct.unpack(f"<{char_dim}f", f.read(char_dim * 4)))
+            embed_feat = list(struct.unpack(f"<{embed_dim}f", f.read(embed_dim * 4)))
+            stats_feat = list(struct.unpack(f"<{stats_dim}f", f.read(stats_dim * 4)))
             if header_dim > 0:
-                # Read and discard header features for now
-                f.read(header_dim * 4)
-            records.append((label, char_feat, embed_feat, stats_feat))
+                header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
+                records.append((label, char_feat, embed_feat, stats_feat, header_feat))
+            else:
+                records.append((label, char_feat, embed_feat, stats_feat))
 
         return records
 
@@ -383,7 +733,7 @@ def run_preflight_check(finetype_bin, blended, num_types=10, cols_per_type=5):
 
     Returns True if preflight passes, False if any extraction fails.
     """
-    print(f"\nPreflight: extracting features for {num_types} types × {cols_per_type} cols...")
+    print(f"\nPreflight: extracting features for {num_types} types x {cols_per_type} cols...")
     sample_types = list(sorted(blended.keys()))[:num_types]
     total = 0
     errors = 0
@@ -391,12 +741,15 @@ def run_preflight_check(finetype_bin, blended, num_types=10, cols_per_type=5):
 
     for type_key in sample_types:
         cols = blended[type_key][:cols_per_type]
-        for col_values in cols:
-            features = extract_features(finetype_bin, col_values)
+        for col_values, header in cols:
+            features = extract_features(finetype_bin, col_values, header=header)
             total += 1
             if features is None:
                 errors += 1
                 print(f"  FAIL: {type_key} ({len(col_values)} values)", file=sys.stderr)
+            elif "header_features" not in features:
+                errors += 1
+                print(f"  FAIL: {type_key} missing header_features", file=sys.stderr)
 
     elapsed = time.time() - start
     if errors > 0:
@@ -414,11 +767,11 @@ def main():
     # Defaults
     distilled_path = "output/distillation-v3/sherlock_distilled.csv.gz"
     finetype_bin = "./target/release/finetype"
-    output_path = "output/multibranch-training/blend-30-70.ftmb"
+    output_path = "output/multibranch-training/blend-50-50.ftmb"
     label_remap_path = "data/label_remap.json"
     samples_per_type = 1200
     synthetic_columns_per_type = 1200
-    ratio_distilled = 0.3
+    ratio_distilled = 0.5
     min_values = 5
     seed = 42
     workers = 4
@@ -541,8 +894,10 @@ def main():
     if dry_run:
         print(f"\n[DRY RUN] Would extract features for {total_blended} columns")
         print(f"  Output: {output_path}")
-        print(f"  Record size: {2 + 30 + CHAR_DIM*4 + EMBED_DIM*4 + STATS_DIM*4} bytes (avg)")
-        est_size_mb = total_blended * (CHAR_DIM + EMBED_DIM + STATS_DIM) * 4 / (1024 * 1024)
+        print(f"  FTMB version: {VERSION} (with header branch)")
+        total_dim = CHAR_DIM + EMBED_DIM + STATS_DIM + HEADER_DIM
+        print(f"  Record size: {2 + 30 + total_dim*4} bytes (avg)")
+        est_size_mb = total_blended * total_dim * 4 / (1024 * 1024)
         print(f"  Estimated file size: ~{est_size_mb:.0f} MB")
         return
 
@@ -555,19 +910,19 @@ def main():
     # ─── Extract features ──────────────────────────────────────────
     print(f"\nExtracting features for {total_blended} columns (workers={workers})...")
 
-    # Build work items: (type_key, column_values)
+    # Build work items: (type_key, column_values, header)
     work_items = []
     for type_key in sorted(blended.keys()):
-        for col_values in blended[type_key]:
-            work_items.append((type_key, col_values))
+        for col_values, header in blended[type_key]:
+            work_items.append((type_key, col_values, header))
 
     records = []
     errors = 0
     start_time = time.time()
 
     def process_item(item):
-        type_key, col_values = item
-        features = extract_features(finetype_bin, col_values)
+        type_key, col_values, header = item
+        features = extract_features(finetype_bin, col_values, header=header)
         return type_key, features
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -582,6 +937,7 @@ def main():
             char_feat = features.get("char", [0.0] * CHAR_DIM)
             embed_feat = features.get("embed", [0.0] * EMBED_DIM)
             stats_feat = features.get("stats", [0.0] * STATS_DIM)
+            header_feat = features.get("header_features", [0.0] * HEADER_DIM)
 
             # Validate dimensions
             if len(char_feat) != CHAR_DIM:
@@ -596,8 +952,12 @@ def main():
                 print(f"  Warning: {type_key} stats dim {len(stats_feat)} != {STATS_DIM}", file=sys.stderr)
                 errors += 1
                 continue
+            if len(header_feat) != HEADER_DIM:
+                print(f"  Warning: {type_key} header dim {len(header_feat)} != {HEADER_DIM}", file=sys.stderr)
+                errors += 1
+                continue
 
-            records.append((type_key, char_feat, embed_feat, stats_feat))
+            records.append((type_key, char_feat, embed_feat, stats_feat, header_feat))
 
             # Progress
             done = i + 1
@@ -624,6 +984,7 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"Summary:")
+    print(f"  FTMB version:    {VERSION}")
     print(f"  Records written: {len(records)}")
     print(f"  Types covered:   {len(type_counts)}")
     print(f"  Extraction errors: {errors}")
@@ -634,6 +995,7 @@ def main():
     # Write manifest
     manifest_path = output_path.replace(".ftmb", ".manifest.json")
     manifest = {
+        "ftmb_version": VERSION,
         "seed": seed,
         "samples_per_type": samples_per_type,
         "ratio_distilled": ratio_distilled,
@@ -648,6 +1010,7 @@ def main():
             "char": CHAR_DIM,
             "embed": EMBED_DIM,
             "stats": STATS_DIM,
+            "header": HEADER_DIM,
         },
         "type_counts": dict(type_counts.most_common()),
     }
