@@ -51,12 +51,20 @@ pub struct MultiBranchConfig {
     pub embed_dim: usize,
     /// Input dimension for column statistics features.
     pub stats_dim: usize,
+    /// Input dimension for header embedding features (Model2Vec, 128-dim).
+    /// Defaults to 0 for backward compatibility with old configs.
+    #[serde(default)]
+    pub header_dim: usize,
     /// Hidden layer sizes for the character branch (2 layers).
     pub char_hidden: [usize; 2],
     /// Hidden layer sizes for the embedding branch (2 layers).
     pub embed_hidden: [usize; 2],
     /// Hidden layer sizes for the statistics branch (2 layers).
     pub stats_hidden: [usize; 2],
+    /// Hidden layer sizes for the header branch (2 layers).
+    /// Defaults to [128, 64] for new models, [0, 0] for old configs.
+    #[serde(default)]
+    pub header_hidden: [usize; 2],
     /// Hidden layer sizes for the merge trunk (2 layers).
     pub merge_hidden: [usize; 2],
     /// Number of output classes.
@@ -73,9 +81,11 @@ impl Default for MultiBranchConfig {
             char_dim: 960,
             embed_dim: 512,
             stats_dim: 27,
+            header_dim: 128,
             char_hidden: [300, 300],
             embed_hidden: [200, 200],
             stats_hidden: [128, 64],
+            header_hidden: [128, 64],
             merge_hidden: [500, 500],
             n_classes: 250,
             dropout: 0.35,
@@ -85,9 +95,19 @@ impl Default for MultiBranchConfig {
 }
 
 impl MultiBranchConfig {
+    /// Whether the header branch is enabled (header_dim > 0 with valid hidden dims).
+    pub fn has_header_branch(&self) -> bool {
+        self.header_dim > 0 && self.header_hidden[0] > 0 && self.header_hidden[1] > 0
+    }
+
     /// Compute the merged dimension (sum of final branch hidden sizes).
     pub fn merged_dim(&self) -> usize {
-        self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1]
+        let base = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
+        if self.has_header_branch() {
+            base + self.header_hidden[1]
+        } else {
+            base
+        }
     }
 
     /// Save config to JSON file.
@@ -164,6 +184,7 @@ pub struct MultiBranchModel {
     char_branch: BranchWeights,
     embed_branch: BranchWeights,
     stats_branch: BranchWeights,
+    header_branch: Option<BranchWeights>,
     merge_bn: BatchNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
@@ -177,8 +198,15 @@ pub struct MultiBranchModel {
 impl MultiBranchModel {
     /// Create a new multi-branch model with a flat classification head.
     pub fn new(config: &MultiBranchConfig, vb: VarBuilder) -> candle_core::Result<Self> {
-        let (char_branch, embed_branch, stats_branch, merge_bn, merge_linear1, merge_linear2) =
-            Self::build_trunk(config, &vb)?;
+        let (
+            char_branch,
+            embed_branch,
+            stats_branch,
+            header_branch,
+            merge_bn,
+            merge_linear1,
+            merge_linear2,
+        ) = Self::build_trunk(config, &vb)?;
 
         let head = linear(config.merge_hidden[1], config.n_classes, vb.pp("head"))?;
 
@@ -186,6 +214,7 @@ impl MultiBranchModel {
             char_branch,
             embed_branch,
             stats_branch,
+            header_branch,
             merge_bn,
             merge_linear1,
             merge_linear2,
@@ -203,8 +232,15 @@ impl MultiBranchModel {
         labels: &[String],
         vb: VarBuilder,
     ) -> candle_core::Result<Self> {
-        let (char_branch, embed_branch, stats_branch, merge_bn, merge_linear1, merge_linear2) =
-            Self::build_trunk(config, &vb)?;
+        let (
+            char_branch,
+            embed_branch,
+            stats_branch,
+            header_branch,
+            merge_bn,
+            merge_linear1,
+            merge_linear2,
+        ) = Self::build_trunk(config, &vb)?;
 
         let hier_head = HierarchicalHead::new(
             config.merge_hidden[1],
@@ -216,6 +252,7 @@ impl MultiBranchModel {
             char_branch,
             embed_branch,
             stats_branch,
+            header_branch,
             merge_bn,
             merge_linear1,
             merge_linear2,
@@ -226,6 +263,7 @@ impl MultiBranchModel {
     }
 
     /// Build the shared trunk (branches + merge layers). Used by both constructors.
+    #[allow(clippy::type_complexity)]
     fn build_trunk(
         config: &MultiBranchConfig,
         vb: &VarBuilder,
@@ -233,6 +271,7 @@ impl MultiBranchModel {
         BranchWeights,
         BranchWeights,
         BranchWeights,
+        Option<BranchWeights>,
         BatchNorm,
         Linear,
         Linear,
@@ -256,6 +295,17 @@ impl MultiBranchModel {
             vb.pp("stats"),
         )?;
 
+        let header_branch = if config.has_header_branch() {
+            Some(BranchWeights::new(
+                config.header_dim,
+                config.header_hidden,
+                config.dropout,
+                vb.pp("header"),
+            )?)
+        } else {
+            None
+        };
+
         let merged_dim = config.merged_dim();
         let merge_bn = batch_norm(merged_dim, BatchNormConfig::default(), vb.pp("merge_bn"))?;
         let merge_linear1 = linear(merged_dim, config.merge_hidden[0], vb.pp("merge_l1"))?;
@@ -269,6 +319,7 @@ impl MultiBranchModel {
             char_branch,
             embed_branch,
             stats_branch,
+            header_branch,
             merge_bn,
             merge_linear1,
             merge_linear2,
@@ -278,11 +329,13 @@ impl MultiBranchModel {
     /// Forward pass through the trunk only (branches → merge → hidden).
     ///
     /// Returns the hidden representation `[B, merge_hidden[1]]` before the classification head.
+    /// `header_feats` is optional — pass `None` for old 3-branch models.
     pub fn forward_trunk(
         &self,
         char_feats: &Tensor,
         embed_feats: &Tensor,
         stats_feats: &Tensor,
+        header_feats: Option<&Tensor>,
         train: bool,
     ) -> candle_core::Result<Tensor> {
         // Process each branch independently
@@ -291,7 +344,21 @@ impl MultiBranchModel {
         let stats_out = self.stats_branch.forward(stats_feats, train)?;
 
         // Concatenate branch outputs: [B, merged_dim]
-        let merged = Tensor::cat(&[char_out, embed_out, stats_out], 1)?;
+        let merged = if let Some(ref hb) = &self.header_branch {
+            let batch_size = char_out.dim(0)?;
+            let header_input = match header_feats {
+                Some(hf) => hf.clone(),
+                None => Tensor::zeros(
+                    (batch_size, self.config.header_dim),
+                    DType::F32,
+                    char_feats.device(),
+                )?,
+            };
+            let header_out = hb.forward(&header_input, train)?;
+            Tensor::cat(&[char_out, embed_out, stats_out, header_out], 1)?
+        } else {
+            Tensor::cat(&[char_out, embed_out, stats_out], 1)?
+        };
 
         // BatchNorm expects [B, C, ...] — for 2D input [B, C] we add a dummy spatial dim
         let merged_3d = merged.unsqueeze(2)?; // [B, C, 1]
@@ -326,9 +393,11 @@ impl MultiBranchModel {
         char_feats: &Tensor,
         embed_feats: &Tensor,
         stats_feats: &Tensor,
+        header_feats: Option<&Tensor>,
         train: bool,
     ) -> candle_core::Result<Tensor> {
-        let hidden = self.forward_trunk(char_feats, embed_feats, stats_feats, train)?;
+        let hidden =
+            self.forward_trunk(char_feats, embed_feats, stats_feats, header_feats, train)?;
 
         if let Some(ref head) = self.head {
             // Flat head: logits
@@ -351,9 +420,11 @@ impl MultiBranchModel {
         char_feats: &Tensor,
         embed_feats: &Tensor,
         stats_feats: &Tensor,
+        header_feats: Option<&Tensor>,
         train: bool,
     ) -> candle_core::Result<(Tensor, Vec<Tensor>, Vec<Vec<Option<Tensor>>>)> {
-        let hidden = self.forward_trunk(char_feats, embed_feats, stats_feats, train)?;
+        let hidden =
+            self.forward_trunk(char_feats, embed_feats, stats_feats, header_feats, train)?;
 
         match &self.hierarchical {
             Some(ref hier) => hier.forward_levels(&hidden),
@@ -384,13 +455,15 @@ impl MultiBranchModel {
 /// Magic bytes for the FTMB binary format.
 const FTMB_MAGIC: &[u8; 4] = b"FTMB";
 
-/// Current format version.
-const FTMB_VERSION: u32 = 1;
+/// Current format version (v2 adds header features).
+const FTMB_VERSION: u32 = 2;
 
-/// Header size in bytes (4 magic + 4 version + 8 n_records + 2+2+2 dims + 2 padding).
+/// Header size in bytes (same for v1 and v2: 24 bytes).
+/// v1: 4 magic + 4 version + 8 n_records + 2+2+2 dims + 2 padding = 24.
+/// v2: 4 magic + 4 version + 8 n_records + 2+2+2+2 dims = 24 (header_dim replaces padding).
 const FTMB_HEADER_SIZE: usize = 24;
 
-/// A single training record with label and three feature vectors.
+/// A single training record with label and feature vectors.
 #[derive(Debug, Clone)]
 pub struct TrainingRecord {
     /// Type label (e.g., "identity.person.email").
@@ -401,27 +474,30 @@ pub struct TrainingRecord {
     pub embed_features: Vec<f32>,
     /// Column statistics features.
     pub stats_features: Vec<f32>,
+    /// Header embedding features (Model2Vec, 128-dim). Empty for v1 data.
+    pub header_features: Vec<f32>,
 }
 
-/// Write training records to an FTMB binary file.
+/// Write training records to an FTMB v2 binary file.
 pub fn write_training_data(
     path: &Path,
     records: &[TrainingRecord],
     char_dim: u16,
     embed_dim: u16,
     stats_dim: u16,
+    header_dim: u16,
 ) -> Result<()> {
     let mut file = std::fs::File::create(path)
         .with_context(|| format!("Failed to create training data file: {}", path.display()))?;
 
-    // Write header (24 bytes)
+    // Write v2 header (24 bytes): magic + version + n_records + char_dim + embed_dim + stats_dim + header_dim
     file.write_all(FTMB_MAGIC)?;
     file.write_all(&FTMB_VERSION.to_le_bytes())?;
     file.write_all(&(records.len() as u64).to_le_bytes())?;
     file.write_all(&char_dim.to_le_bytes())?;
     file.write_all(&embed_dim.to_le_bytes())?;
     file.write_all(&stats_dim.to_le_bytes())?;
-    file.write_all(&[0u8; 2])?; // padding
+    file.write_all(&header_dim.to_le_bytes())?;
 
     // Write records
     for record in records {
@@ -458,6 +534,13 @@ pub fn write_training_data(
                 stats_dim
             );
         }
+        if record.header_features.len() != header_dim as usize {
+            bail!(
+                "header_features length {} != expected {}",
+                record.header_features.len(),
+                header_dim
+            );
+        }
 
         // Write features as raw f32 bytes (little-endian)
         for &v in &record.char_features {
@@ -469,6 +552,9 @@ pub fn write_training_data(
         for &v in &record.stats_features {
             file.write_all(&v.to_le_bytes())?;
         }
+        for &v in &record.header_features {
+            file.write_all(&v.to_le_bytes())?;
+        }
     }
 
     Ok(())
@@ -477,17 +563,21 @@ pub fn write_training_data(
 /// FTMB file header.
 #[derive(Debug)]
 pub struct FtmbHeader {
+    pub version: u32,
     pub n_records: u64,
     pub char_dim: u16,
     pub embed_dim: u16,
     pub stats_dim: u16,
+    /// Header embedding dimension. 0 for v1 files.
+    pub header_dim: u16,
 }
 
-/// Read the header from an FTMB binary file.
+/// Read the header from an FTMB binary file. Supports v1 and v2.
 pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     let mut file = std::fs::File::open(path)
         .with_context(|| format!("Failed to open training data file: {}", path.display()))?;
 
+    // Read the maximum header size (v1 and v2 are both 24 bytes)
     let mut header = [0u8; FTMB_HEADER_SIZE];
     file.read_exact(&mut header)
         .context("Failed to read FTMB header")?;
@@ -501,8 +591,8 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     }
 
     let version = u32::from_le_bytes(header[4..8].try_into().unwrap());
-    if version != FTMB_VERSION {
-        bail!("Unsupported FTMB version: {}", version);
+    if version != 1 && version != 2 {
+        bail!("Unsupported FTMB version: {} (expected 1 or 2)", version);
     }
 
     let n_records = u64::from_le_bytes(header[8..16].try_into().unwrap());
@@ -510,19 +600,31 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     let embed_dim = u16::from_le_bytes(header[18..20].try_into().unwrap());
     let stats_dim = u16::from_le_bytes(header[20..22].try_into().unwrap());
 
+    // v2: the 2 bytes at offset 22 are header_dim instead of padding
+    let header_dim = if version >= 2 {
+        u16::from_le_bytes(header[22..24].try_into().unwrap())
+    } else {
+        0
+    };
+
     Ok(FtmbHeader {
+        version,
         n_records,
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
     })
 }
 
-/// Read all training records from an FTMB binary file.
+/// Read all training records from an FTMB binary file. Supports v1 and v2.
+///
+/// v1 files are loaded with zero-vector header_features (graceful degradation).
 pub fn read_training_data(path: &Path) -> Result<(FtmbHeader, Vec<TrainingRecord>)> {
     let mut file = std::fs::File::open(path)
         .with_context(|| format!("Failed to open training data file: {}", path.display()))?;
 
+    // Both v1 and v2 headers are 24 bytes
     let mut header_buf = [0u8; FTMB_HEADER_SIZE];
     file.read_exact(&mut header_buf)
         .context("Failed to read FTMB header")?;
@@ -531,20 +633,27 @@ pub fn read_training_data(path: &Path) -> Result<(FtmbHeader, Vec<TrainingRecord
         bail!("Invalid FTMB magic");
     }
     let version = u32::from_le_bytes(header_buf[4..8].try_into().unwrap());
-    if version != FTMB_VERSION {
-        bail!("Unsupported FTMB version: {}", version);
+    if version != 1 && version != 2 {
+        bail!("Unsupported FTMB version: {} (expected 1 or 2)", version);
     }
 
     let n_records = u64::from_le_bytes(header_buf[8..16].try_into().unwrap());
     let char_dim = u16::from_le_bytes(header_buf[16..18].try_into().unwrap()) as usize;
     let embed_dim = u16::from_le_bytes(header_buf[18..20].try_into().unwrap()) as usize;
     let stats_dim = u16::from_le_bytes(header_buf[20..22].try_into().unwrap()) as usize;
+    let header_dim = if version >= 2 {
+        u16::from_le_bytes(header_buf[22..24].try_into().unwrap()) as usize
+    } else {
+        0
+    };
 
     let header = FtmbHeader {
+        version,
         n_records,
         char_dim: char_dim as u16,
         embed_dim: embed_dim as u16,
         stats_dim: stats_dim as u16,
+        header_dim: header_dim as u16,
     };
 
     let mut records = Vec::with_capacity(n_records as usize);
@@ -578,11 +687,24 @@ pub fn read_training_data(path: &Path) -> Result<(FtmbHeader, Vec<TrainingRecord
             stats_features.push(f32::from_le_bytes(f32_buf));
         }
 
+        // v2: read header features; v1: zero-vector
+        let header_features = if version >= 2 && header_dim > 0 {
+            let mut hf = Vec::with_capacity(header_dim);
+            for _ in 0..header_dim {
+                file.read_exact(&mut f32_buf)?;
+                hf.push(f32::from_le_bytes(f32_buf));
+            }
+            hf
+        } else {
+            vec![0.0f32; header_dim]
+        };
+
         records.push(TrainingRecord {
             label,
             char_features,
             embed_features,
             stats_features,
+            header_features,
         });
     }
 
@@ -637,6 +759,8 @@ pub struct MultiBranchDataset {
     pub embed_feats: Vec<f32>,
     /// Column statistics features, flat [N * stats_dim].
     pub stats_feats: Vec<f32>,
+    /// Header embedding features, flat [N * header_dim].
+    pub header_feats: Vec<f32>,
     /// Label indices [N].
     pub labels: Vec<u32>,
     /// Number of samples.
@@ -645,6 +769,7 @@ pub struct MultiBranchDataset {
     pub char_dim: usize,
     pub embed_dim: usize,
     pub stats_dim: usize,
+    pub header_dim: usize,
 }
 
 impl MultiBranchDataset {
@@ -655,11 +780,13 @@ impl MultiBranchDataset {
         char_dim: usize,
         embed_dim: usize,
         stats_dim: usize,
+        header_dim: usize,
     ) -> Result<Self> {
         let n = records.len();
         let mut char_feats = Vec::with_capacity(n * char_dim);
         let mut embed_feats_flat = Vec::with_capacity(n * embed_dim);
         let mut stats_feats = Vec::with_capacity(n * stats_dim);
+        let mut header_feats = Vec::with_capacity(n * header_dim);
         let mut labels = Vec::with_capacity(n);
 
         for record in records {
@@ -671,17 +798,29 @@ impl MultiBranchDataset {
             char_feats.extend_from_slice(&record.char_features);
             embed_feats_flat.extend_from_slice(&record.embed_features);
             stats_feats.extend_from_slice(&record.stats_features);
+            // Pad or truncate header features to expected dim
+            if record.header_features.len() >= header_dim {
+                header_feats.extend_from_slice(&record.header_features[..header_dim]);
+            } else {
+                header_feats.extend_from_slice(&record.header_features);
+                header_feats.extend(std::iter::repeat_n(
+                    0.0f32,
+                    header_dim - record.header_features.len(),
+                ));
+            }
         }
 
         Ok(Self {
             char_feats,
             embed_feats: embed_feats_flat,
             stats_feats,
+            header_feats,
             labels,
             n_samples: n,
             char_dim,
             embed_dim,
             stats_dim,
+            header_dim,
         })
     }
 
@@ -696,16 +835,20 @@ impl MultiBranchDataset {
     }
 
     /// Extract a batch of tensors for the given sample indices.
+    ///
+    /// Returns `(char, embed, stats, header, labels)`. When `header_dim == 0`,
+    /// the header tensor is a zero-width `[B, 0]` tensor.
     pub fn batch(
         &self,
         indices: &[usize],
         device: &Device,
-    ) -> candle_core::Result<(Tensor, Tensor, Tensor, Tensor)> {
+    ) -> candle_core::Result<(Tensor, Tensor, Tensor, Option<Tensor>, Tensor)> {
         let bs = indices.len();
 
         let mut char_batch = Vec::with_capacity(bs * self.char_dim);
         let mut embed_batch = Vec::with_capacity(bs * self.embed_dim);
         let mut stats_batch = Vec::with_capacity(bs * self.stats_dim);
+        let mut header_batch = Vec::with_capacity(bs * self.header_dim);
         let mut label_batch = Vec::with_capacity(bs);
 
         for &i in indices {
@@ -717,15 +860,26 @@ impl MultiBranchDataset {
             let stats_start = i * self.stats_dim;
             stats_batch
                 .extend_from_slice(&self.stats_feats[stats_start..stats_start + self.stats_dim]);
+            if self.header_dim > 0 {
+                let header_start = i * self.header_dim;
+                header_batch.extend_from_slice(
+                    &self.header_feats[header_start..header_start + self.header_dim],
+                );
+            }
             label_batch.push(self.labels[i]);
         }
 
         let char_t = Tensor::new(char_batch.as_slice(), device)?.reshape((bs, self.char_dim))?;
         let embed_t = Tensor::new(embed_batch.as_slice(), device)?.reshape((bs, self.embed_dim))?;
         let stats_t = Tensor::new(stats_batch.as_slice(), device)?.reshape((bs, self.stats_dim))?;
+        let header_t = if self.header_dim > 0 {
+            Some(Tensor::new(header_batch.as_slice(), device)?.reshape((bs, self.header_dim))?)
+        } else {
+            None
+        };
         let labels_t = Tensor::new(label_batch.as_slice(), device)?;
 
-        Ok((char_t, embed_t, stats_t, labels_t))
+        Ok((char_t, embed_t, stats_t, header_t, labels_t))
     }
 }
 
@@ -898,15 +1052,28 @@ pub fn train_multi_branch(
 
     let n_params = count_parameters(&varmap);
     tracing::info!("Model parameters: {}", n_params);
-    tracing::info!(
-        "Architecture: char [{} → {} → {}] | embed [{} → {} → {}] | stats [{} → {} → {}] | merge [{} → {} → {}] | head → {}",
-        model_config.char_dim, model_config.char_hidden[0], model_config.char_hidden[1],
-        model_config.embed_dim, model_config.embed_hidden[0], model_config.embed_hidden[1],
-        model_config.stats_dim, model_config.stats_hidden[0], model_config.stats_hidden[1],
-        model_config.char_hidden[1] + model_config.embed_hidden[1] + model_config.stats_hidden[1],
-        model_config.merge_hidden[0], model_config.merge_hidden[1],
-        model_config.n_classes,
-    );
+    if model_config.has_header_branch() {
+        tracing::info!(
+            "Architecture: char [{} → {} → {}] | embed [{} → {} → {}] | stats [{} → {} → {}] | header [{} → {} → {}] | merge [{} → {} → {}] | head → {}",
+            model_config.char_dim, model_config.char_hidden[0], model_config.char_hidden[1],
+            model_config.embed_dim, model_config.embed_hidden[0], model_config.embed_hidden[1],
+            model_config.stats_dim, model_config.stats_hidden[0], model_config.stats_hidden[1],
+            model_config.header_dim, model_config.header_hidden[0], model_config.header_hidden[1],
+            model_config.merged_dim(),
+            model_config.merge_hidden[0], model_config.merge_hidden[1],
+            model_config.n_classes,
+        );
+    } else {
+        tracing::info!(
+            "Architecture: char [{} → {} → {}] | embed [{} → {} → {}] | stats [{} → {} → {}] | merge [{} → {} → {}] | head → {}",
+            model_config.char_dim, model_config.char_hidden[0], model_config.char_hidden[1],
+            model_config.embed_dim, model_config.embed_hidden[0], model_config.embed_hidden[1],
+            model_config.stats_dim, model_config.stats_hidden[0], model_config.stats_hidden[1],
+            model_config.merged_dim(),
+            model_config.merge_hidden[0], model_config.merge_hidden[1],
+            model_config.n_classes,
+        );
+    }
 
     if is_hierarchical {
         let hier = model.hierarchical_head().unwrap();
@@ -950,7 +1117,7 @@ pub fn train_multi_branch(
         renderer.unwrap_or_else(|| Box::new(crate::tui::LogRenderer::new()));
 
     // Compute initial batches count for renderer (will be recomputed each epoch due to shuffling)
-    let initial_batch_count = (train_data.len() + config.batch_size - 1) / config.batch_size;
+    let initial_batch_count = train_data.len().div_ceil(config.batch_size);
     renderer.on_train_start(config.epochs, initial_batch_count);
 
     for epoch in 0..config.epochs {
@@ -970,14 +1137,15 @@ pub fn train_multi_branch(
         // Training loop
         let total_batches = batches.len();
         for (batch_num, batch_idx) in batches.iter().enumerate() {
-            let (char_t, embed_t, stats_t, labels_t) = train_data.batch(batch_idx, &device)?;
+            let (char_t, embed_t, stats_t, header_t, labels_t) =
+                train_data.batch(batch_idx, &device)?;
             let bs = batch_idx.len();
 
             let loss = if is_hierarchical {
                 let hier = model.hierarchical_head().unwrap();
                 let hierarchy = hier.hierarchy();
                 let (domain_logits, cat_logits, leaf_logits) =
-                    model.forward_levels(&char_t, &embed_t, &stats_t, true)?;
+                    model.forward_levels(&char_t, &embed_t, &stats_t, header_t.as_ref(), true)?;
                 compute_hierarchical_loss(
                     &domain_logits,
                     &cat_logits,
@@ -987,7 +1155,7 @@ pub fn train_multi_branch(
                     &device,
                 )?
             } else {
-                let logits = model.forward(&char_t, &embed_t, &stats_t, true)?;
+                let logits = model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), true)?;
                 candle_nn::loss::cross_entropy(&logits, &labels_t)?
             };
 
@@ -997,7 +1165,7 @@ pub fn train_multi_branch(
             train_loss_sum += loss_val as f64 * bs as f64;
 
             // Accuracy via forward (product probabilities for hier, logits for flat)
-            let output = model.forward(&char_t, &embed_t, &stats_t, false)?;
+            let output = model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), false)?;
             let acc = compute_accuracy(&output, &labels_t)?;
             train_correct_sum += acc as f64 * bs as f64;
             train_samples += bs;
@@ -1021,14 +1189,20 @@ pub fn train_multi_branch(
             let mut val_samples = 0usize;
 
             for batch_idx in &val_batches {
-                let (char_t, embed_t, stats_t, labels_t) = val_data.batch(batch_idx, &device)?;
+                let (char_t, embed_t, stats_t, header_t, labels_t) =
+                    val_data.batch(batch_idx, &device)?;
                 let bs = batch_idx.len();
 
                 let loss_val = if is_hierarchical {
                     let hier = model.hierarchical_head().unwrap();
                     let hierarchy = hier.hierarchy();
-                    let (domain_logits, cat_logits, leaf_logits) =
-                        model.forward_levels(&char_t, &embed_t, &stats_t, false)?;
+                    let (domain_logits, cat_logits, leaf_logits) = model.forward_levels(
+                        &char_t,
+                        &embed_t,
+                        &stats_t,
+                        header_t.as_ref(),
+                        false,
+                    )?;
                     let loss = compute_hierarchical_loss(
                         &domain_logits,
                         &cat_logits,
@@ -1039,14 +1213,16 @@ pub fn train_multi_branch(
                     )?;
                     loss.to_scalar::<f32>()?
                 } else {
-                    let logits = model.forward(&char_t, &embed_t, &stats_t, false)?;
+                    let logits =
+                        model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), false)?;
                     let loss = candle_nn::loss::cross_entropy(&logits, &labels_t)?;
                     loss.to_scalar::<f32>()?
                 };
 
                 val_loss_sum += loss_val as f64 * bs as f64;
 
-                let output = model.forward(&char_t, &embed_t, &stats_t, false)?;
+                let output =
+                    model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), false)?;
                 let acc = compute_accuracy(&output, &labels_t)?;
                 val_correct_sum += acc as f64 * bs as f64;
                 val_samples += bs;
@@ -1171,13 +1347,13 @@ mod tests {
 
         // Training mode
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, true)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, true)
             .unwrap();
         assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
 
         // Eval mode
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, false)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
             .unwrap();
         assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
     }
@@ -1214,7 +1390,7 @@ mod tests {
 
         // Forward + backward
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, true)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, true)
             .unwrap();
         let loss = candle_nn::loss::cross_entropy(&logits, &targets).unwrap();
 
@@ -1271,9 +1447,11 @@ mod tests {
             char_dim: 960,
             embed_dim: 512,
             stats_dim: 27,
+            header_dim: 128,
             char_hidden: [300, 300],
             embed_hidden: [200, 200],
             stats_hidden: [128, 64],
+            header_hidden: [128, 64],
             merge_hidden: [500, 500],
             n_classes: 250,
             dropout: 0.35,
@@ -1287,6 +1465,7 @@ mod tests {
         assert_eq!(config.char_dim, loaded.char_dim);
         assert_eq!(config.embed_dim, loaded.embed_dim);
         assert_eq!(config.stats_dim, loaded.stats_dim);
+        assert_eq!(config.header_dim, loaded.header_dim);
         assert_eq!(config.char_hidden, loaded.char_hidden);
         assert_eq!(config.embed_hidden, loaded.embed_hidden);
         assert_eq!(config.stats_hidden, loaded.stats_hidden);
@@ -1304,17 +1483,20 @@ mod tests {
                 char_features: (0..960).map(|j| (i * 960 + j) as f32 * 0.001).collect(),
                 embed_features: (0..512).map(|j| (i * 512 + j) as f32 * 0.002).collect(),
                 stats_features: (0..27).map(|j| (i * 27 + j) as f32 * 0.1).collect(),
+                header_features: (0..128).map(|j| (i * 128 + j) as f32 * 0.003).collect(),
             })
             .collect();
 
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        write_training_data(tmp.path(), &records, 960, 512, 27).unwrap();
+        write_training_data(tmp.path(), &records, 960, 512, 27, 128).unwrap();
 
         let (header, loaded) = read_training_data(tmp.path()).unwrap();
         assert_eq!(header.n_records, 10);
+        assert_eq!(header.version, 2);
         assert_eq!(header.char_dim, 960);
         assert_eq!(header.embed_dim, 512);
         assert_eq!(header.stats_dim, 27);
+        assert_eq!(header.header_dim, 128);
         assert_eq!(loaded.len(), 10);
 
         for (orig, read) in records.iter().zip(loaded.iter()) {
@@ -1322,6 +1504,7 @@ mod tests {
             assert_eq!(orig.char_features.len(), read.char_features.len());
             assert_eq!(orig.embed_features.len(), read.embed_features.len());
             assert_eq!(orig.stats_features.len(), read.stats_features.len());
+            assert_eq!(orig.header_features.len(), read.header_features.len());
 
             // Verify exact float roundtrip
             for (a, b) in orig.char_features.iter().zip(read.char_features.iter()) {
@@ -1333,6 +1516,112 @@ mod tests {
             for (a, b) in orig.stats_features.iter().zip(read.stats_features.iter()) {
                 assert_eq!(a.to_bits(), b.to_bits(), "stats feature mismatch");
             }
+            for (a, b) in orig.header_features.iter().zip(read.header_features.iter()) {
+                assert_eq!(a.to_bits(), b.to_bits(), "header feature mismatch");
+            }
+        }
+    }
+
+    #[test]
+    fn test_ftmb_v1_read_compat() {
+        // Write a v1-format file manually and verify read_training_data loads it
+        // with zero header_features (graceful degradation).
+        use std::io::Write;
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let mut file = std::fs::File::create(tmp.path()).unwrap();
+
+        let char_dim: u16 = 4;
+        let embed_dim: u16 = 3;
+        let stats_dim: u16 = 2;
+        let n_records: u64 = 2;
+
+        // Write v1 header (version=1, padding=0)
+        file.write_all(b"FTMB").unwrap();
+        file.write_all(&1u32.to_le_bytes()).unwrap(); // version 1
+        file.write_all(&n_records.to_le_bytes()).unwrap();
+        file.write_all(&char_dim.to_le_bytes()).unwrap();
+        file.write_all(&embed_dim.to_le_bytes()).unwrap();
+        file.write_all(&stats_dim.to_le_bytes()).unwrap();
+        file.write_all(&[0u8; 2]).unwrap(); // padding (v1)
+
+        // Write 2 records
+        for i in 0..2 {
+            let label = format!("type_{i}");
+            let label_bytes = label.as_bytes();
+            file.write_all(&(label_bytes.len() as u16).to_le_bytes())
+                .unwrap();
+            file.write_all(label_bytes).unwrap();
+
+            for j in 0..char_dim {
+                file.write_all(&((i * 10 + j) as f32).to_le_bytes())
+                    .unwrap();
+            }
+            for j in 0..embed_dim {
+                file.write_all(&((i * 10 + j) as f32 * 0.5).to_le_bytes())
+                    .unwrap();
+            }
+            for j in 0..stats_dim {
+                file.write_all(&((i * 10 + j) as f32 * 0.1).to_le_bytes())
+                    .unwrap();
+            }
+        }
+        drop(file);
+
+        let (header, records) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 1);
+        assert_eq!(header.n_records, 2);
+        assert_eq!(header.char_dim, 4);
+        assert_eq!(header.embed_dim, 3);
+        assert_eq!(header.stats_dim, 2);
+        assert_eq!(header.header_dim, 0);
+        assert_eq!(records.len(), 2);
+
+        // v1 records should have empty header_features (header_dim=0 -> zero-length vec)
+        for record in &records {
+            assert!(
+                record.header_features.is_empty(),
+                "v1 should have empty header_features"
+            );
+            assert_eq!(record.char_features.len(), 4);
+            assert_eq!(record.embed_features.len(), 3);
+            assert_eq!(record.stats_features.len(), 2);
+        }
+        assert_eq!(records[0].label, "type_0");
+        assert_eq!(records[1].label, "type_1");
+    }
+
+    #[test]
+    fn test_ftmb_v2_roundtrip_4_vectors() {
+        // Write v2 with 4 feature vectors, read back, assert all 4 match.
+        let records: Vec<TrainingRecord> = (0..3)
+            .map(|i| TrainingRecord {
+                label: format!("test.type.t_{i}"),
+                char_features: vec![i as f32 * 1.0; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+            })
+            .collect();
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data(tmp.path(), &records, 8, 6, 4, 5).unwrap();
+
+        let (header, loaded) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 2);
+        assert_eq!(header.n_records, 3);
+        assert_eq!(header.char_dim, 8);
+        assert_eq!(header.embed_dim, 6);
+        assert_eq!(header.stats_dim, 4);
+        assert_eq!(header.header_dim, 5);
+        assert_eq!(loaded.len(), 3);
+
+        for (orig, read) in records.iter().zip(loaded.iter()) {
+            assert_eq!(orig.label, read.label);
+            assert_eq!(orig.char_features, read.char_features);
+            assert_eq!(orig.embed_features, read.embed_features);
+            assert_eq!(orig.stats_features, read.stats_features);
+            assert_eq!(orig.header_features, read.header_features);
         }
     }
 
@@ -1344,6 +1633,7 @@ mod tests {
                 char_features: vec![i as f32; 960],
                 embed_features: vec![i as f32 * 2.0; 512],
                 stats_features: vec![i as f32 * 3.0; 27],
+                header_features: vec![i as f32 * 4.0; 128],
             })
             .collect();
 
@@ -1353,14 +1643,17 @@ mod tests {
         label_to_idx.insert("identity.person.type_2".to_string(), 2u32);
 
         let dataset =
-            MultiBranchDataset::from_records(&records, &label_to_idx, 960, 512, 27).unwrap();
+            MultiBranchDataset::from_records(&records, &label_to_idx, 960, 512, 27, 128).unwrap();
         assert_eq!(dataset.len(), 5);
 
         let device = Device::Cpu;
-        let (char_t, embed_t, stats_t, labels_t) = dataset.batch(&[0, 2, 4], &device).unwrap();
+        let (char_t, embed_t, stats_t, header_t, labels_t) =
+            dataset.batch(&[0, 2, 4], &device).unwrap();
         assert_eq!(char_t.dims(), &[3, 960]);
         assert_eq!(embed_t.dims(), &[3, 512]);
         assert_eq!(stats_t.dims(), &[3, 27]);
+        let header_t = header_t.expect("header tensor should be Some for header_dim=128");
+        assert_eq!(header_t.dims(), &[3, 128]);
         assert_eq!(labels_t.dims(), &[3]);
 
         let labels: Vec<u32> = labels_t.to_vec1().unwrap();
@@ -1393,6 +1686,9 @@ mod tests {
                 stats_features: (0..27)
                     .map(|j| if j % 3 == class_idx { 1.0 + bias } else { 0.1 })
                     .collect(),
+                header_features: (0..128)
+                    .map(|j| if j % 3 == class_idx { 0.5 + bias } else { 0.05 })
+                    .collect(),
             });
         }
 
@@ -1402,9 +1698,11 @@ mod tests {
         label_to_idx.insert("type_c".to_string(), 2u32);
 
         let train_data =
-            MultiBranchDataset::from_records(&records[..20], &label_to_idx, 960, 512, 27).unwrap();
+            MultiBranchDataset::from_records(&records[..20], &label_to_idx, 960, 512, 27, 128)
+                .unwrap();
         let val_data =
-            MultiBranchDataset::from_records(&records[20..], &label_to_idx, 960, 512, 27).unwrap();
+            MultiBranchDataset::from_records(&records[20..], &label_to_idx, 960, 512, 27, 128)
+                .unwrap();
 
         let tmp_dir = tempfile::tempdir().unwrap();
         let train_config = MultiBranchTrainConfig {
@@ -1443,7 +1741,15 @@ mod tests {
     #[test]
     fn test_merged_dim() {
         let config = MultiBranchConfig::default();
-        assert_eq!(config.merged_dim(), 300 + 200 + 64); // 564
+        assert_eq!(config.merged_dim(), 300 + 200 + 64 + 64); // 628 (with header branch)
+
+        // Old-style config without header branch
+        let old_config = MultiBranchConfig {
+            header_dim: 0,
+            header_hidden: [0, 0],
+            ..Default::default()
+        };
+        assert_eq!(old_config.merged_dim(), 300 + 200 + 64); // 564
     }
 
     // ── Hierarchical head tests ──────────────────────────────────────
@@ -1488,13 +1794,13 @@ mod tests {
 
         // forward() returns product probabilities [B, n_classes]
         let output = model
-            .forward(&char_feats, &embed_feats, &stats_feats, false)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
             .unwrap();
         assert_eq!(output.dims(), &[batch_size, labels.len()]);
 
         // forward_levels() returns per-level logits
         let (domain_logits, cat_logits, leaf_logits) = model
-            .forward_levels(&char_feats, &embed_feats, &stats_feats, false)
+            .forward_levels(&char_feats, &embed_feats, &stats_feats, None, false)
             .unwrap();
 
         // 4 domains: container, datetime, geography, identity
@@ -1542,7 +1848,7 @@ mod tests {
         let hier = model.hierarchical_head().unwrap();
         let hierarchy = hier.hierarchy();
         let (domain_logits, cat_logits, leaf_logits) = model
-            .forward_levels(&char_feats, &embed_feats, &stats_feats, true)
+            .forward_levels(&char_feats, &embed_feats, &stats_feats, None, true)
             .unwrap();
         let loss = compute_hierarchical_loss(
             &domain_logits,
@@ -1629,6 +1935,15 @@ mod tests {
                         }
                     })
                     .collect(),
+                header_features: (0..128)
+                    .map(|j| {
+                        if j % n_classes == class_idx {
+                            0.5 + bias
+                        } else {
+                            0.05
+                        }
+                    })
+                    .collect(),
             });
         }
 
@@ -1638,9 +1953,11 @@ mod tests {
         }
 
         let train_data =
-            MultiBranchDataset::from_records(&records[..20], &label_to_idx, 960, 512, 27).unwrap();
+            MultiBranchDataset::from_records(&records[..20], &label_to_idx, 960, 512, 27, 128)
+                .unwrap();
         let val_data =
-            MultiBranchDataset::from_records(&records[20..], &label_to_idx, 960, 512, 27).unwrap();
+            MultiBranchDataset::from_records(&records[20..], &label_to_idx, 960, 512, 27, 128)
+                .unwrap();
 
         let tmp_dir = tempfile::tempdir().unwrap();
         let train_config = MultiBranchTrainConfig {

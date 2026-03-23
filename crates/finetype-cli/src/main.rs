@@ -876,6 +876,7 @@ fn cmd_train_multi_branch(
     let char_dim = header.char_dim as usize;
     let embed_dim = header.embed_dim as usize;
     let stats_dim = header.stats_dim as usize;
+    let header_dim = header.header_dim as usize;
 
     let train_data = MultiBranchDataset::from_records(
         &train_records,
@@ -883,6 +884,7 @@ fn cmd_train_multi_branch(
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
     )?;
     let val_data = MultiBranchDataset::from_records(
         &val_records,
@@ -890,12 +892,15 @@ fn cmd_train_multi_branch(
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
     )?;
 
     let model_config = MultiBranchConfig {
         char_dim,
         embed_dim,
         stats_dim,
+        header_dim,
+        header_hidden: if header_dim > 0 { [128, 64] } else { [0, 0] },
         n_classes,
         dropout,
         head_type: head_type.clone(),
@@ -1005,13 +1010,16 @@ fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> 
 
     let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
+    // Load Model2Vec resources (shared across embed + header features)
+    let m2v = load_model2vec_resources();
+
     // 1. Character distribution (960-dim, deterministic, no model needed)
     let char_features = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
 
     // 2. Embedding aggregation (512-dim, requires Model2Vec)
-    let embed_features = match load_model2vec_resources() {
+    let embed_features = match &m2v {
         Some(m2v) => {
-            extract_embedding_aggregation(&value_refs, &m2v).unwrap_or([0.0f32; EMBED_AGG_DIM])
+            extract_embedding_aggregation(&value_refs, m2v).unwrap_or([0.0f32; EMBED_AGG_DIM])
         }
         None => {
             eprintln!("Warning: Model2Vec not available, embedding features will be zeros");
@@ -1022,11 +1030,32 @@ fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> 
     // 3. Column statistics (27-dim, deterministic)
     let stats_features = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
+    // 4. Header embedding (128-dim, requires Model2Vec + header string)
+    let header_features: Vec<f32> = match (&m2v, &header) {
+        (Some(m2v), Some(h)) if !h.is_empty() => {
+            let embed_dim = m2v.embed_dim().unwrap_or(128);
+            match m2v.encode_one(h) {
+                Some(tensor) => tensor.to_vec1::<f32>().unwrap_or(vec![0.0f32; embed_dim]),
+                None => vec![0.0f32; embed_dim],
+            }
+        }
+        (Some(m2v), _) => {
+            // No header provided — zero vector
+            let embed_dim = m2v.embed_dim().unwrap_or(128);
+            vec![0.0f32; embed_dim]
+        }
+        (None, _) => {
+            eprintln!("Warning: Model2Vec not available, header features will be zeros");
+            vec![0.0f32; 128]
+        }
+    };
+
     // Output as JSON
     let output = json!({
         "char": char_features.to_vec(),
         "embed": embed_features.to_vec(),
         "stats": stats_features.to_vec(),
+        "header_features": header_features,
         "header": header,
         "n_values": values.len(),
     });

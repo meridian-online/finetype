@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Read and inspect a .ftmb (FineType Multi-Branch) binary file.
 
+Supports both v1 (3 branches: char, embed, stats) and v2 (4 branches:
+char, embed, stats, header).
+
 Usage:
     python3 scripts/read_ftmb.py <file.ftmb> [--records N] [--type KEY] [--stats]
 
@@ -20,22 +23,39 @@ MAGIC = b"FTMB"
 
 
 def read_header(f):
-    """Read and validate the FTMB header. Returns (version, n_records, char_dim, embed_dim, stats_dim)."""
+    """Read and validate the FTMB header.
+
+    Returns: (version, n_records, char_dim, embed_dim, stats_dim, header_dim)
+    header_dim is 0 for v1 files.
+    """
     magic = f.read(4)
     if magic != MAGIC:
         print(f"ERROR: Bad magic bytes: {magic!r} (expected {MAGIC!r})", file=sys.stderr)
         sys.exit(1)
 
     (version,) = struct.unpack("<I", f.read(4))
+    if version not in (1, 2):
+        print(f"ERROR: Unknown version: {version}", file=sys.stderr)
+        sys.exit(1)
+
     (n_records,) = struct.unpack("<Q", f.read(8))
     char_dim, embed_dim, stats_dim = struct.unpack("<HHH", f.read(6))
-    _padding = f.read(2)
 
-    return version, n_records, char_dim, embed_dim, stats_dim
+    if version == 1:
+        _padding = f.read(2)
+        header_dim = 0
+    else:
+        (header_dim,) = struct.unpack("<H", f.read(2))
+
+    return version, n_records, char_dim, embed_dim, stats_dim, header_dim
 
 
-def read_record(f, char_dim, embed_dim, stats_dim):
-    """Read a single record. Returns (label, char_feat, embed_feat, stats_feat) or None at EOF."""
+def read_record(f, char_dim, embed_dim, stats_dim, header_dim):
+    """Read a single record.
+
+    Returns (label, char_feat, embed_feat, stats_feat[, header_feat]) or None at EOF.
+    For v1 files (header_dim=0), header_feat is omitted.
+    """
     label_len_bytes = f.read(2)
     if len(label_len_bytes) < 2:
         return None
@@ -44,6 +64,9 @@ def read_record(f, char_dim, embed_dim, stats_dim):
     char_feat = list(struct.unpack(f"<{char_dim}f", f.read(char_dim * 4)))
     embed_feat = list(struct.unpack(f"<{embed_dim}f", f.read(embed_dim * 4)))
     stats_feat = list(struct.unpack(f"<{stats_dim}f", f.read(stats_dim * 4)))
+    if header_dim > 0:
+        header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
+        return label, char_feat, embed_feat, stats_feat, header_feat
     return label, char_feat, embed_feat, stats_feat
 
 
@@ -94,7 +117,7 @@ def main():
             sys.exit(1)
 
     with open(path, "rb") as f:
-        version, n_records, char_dim, embed_dim, stats_dim = read_header(f)
+        version, n_records, char_dim, embed_dim, stats_dim, header_dim = read_header(f)
 
         print(f"FTMB File: {path}")
         print(f"  Version:    {version}")
@@ -102,23 +125,30 @@ def main():
         print(f"  Char dim:   {char_dim}")
         print(f"  Embed dim:  {embed_dim}")
         print(f"  Stats dim:  {stats_dim}")
+        if version >= 2:
+            print(f"  Header dim: {header_dim}")
         print()
 
         type_counts = Counter()
         shown = 0
         issues = 0
 
+        branch_names = [("char", char_dim), ("embed", embed_dim), ("stats", stats_dim)]
+        if header_dim > 0:
+            branch_names.append(("header", header_dim))
+
         for idx in range(n_records):
-            record = read_record(f, char_dim, embed_dim, stats_dim)
+            record = read_record(f, char_dim, embed_dim, stats_dim, header_dim)
             if record is None:
                 print(f"WARNING: EOF at record {idx} (expected {n_records})")
                 break
 
-            label, char_feat, embed_feat, stats_feat = record
+            label = record[0]
+            feats = record[1:]
             type_counts[label] += 1
 
             if verify:
-                for name, feat in [("char", char_feat), ("embed", embed_feat), ("stats", stats_feat)]:
+                for (name, _dim), feat in zip(branch_names, feats):
                     for v in feat:
                         if math.isnan(v) or math.isinf(v):
                             print(f"  ISSUE: record {idx} ({label}) has NaN/Inf in {name}")
@@ -130,9 +160,8 @@ def main():
 
             if shown < max_records:
                 print(f"Record {idx}: {label}")
-                print(f"  char:  {feat_summary(char_feat)}")
-                print(f"  embed: {feat_summary(embed_feat)}")
-                print(f"  stats: {feat_summary(stats_feat)}")
+                for (name, _dim), feat in zip(branch_names, feats):
+                    print(f"  {name:7s}: {feat_summary(feat)}")
                 shown += 1
 
         if show_stats:
