@@ -95,7 +95,7 @@ enum ClassificationHead {
     Flat(Linear),
     /// Hierarchical: 3-level tree softmax (domain → category → type)
     /// producing product probabilities.
-    Hierarchical(HierarchicalHead),
+    Hierarchical(Box<HierarchicalHead>),
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -138,9 +138,8 @@ impl MultiBranchClassifier {
         let dir = model_dir.as_ref();
 
         // Load config
-        let config_bytes = std::fs::read(dir.join("config.json")).map_err(|e| {
-            InferenceError::InvalidPath(format!("Failed to read config.json: {e}"))
-        })?;
+        let config_bytes = std::fs::read(dir.join("config.json"))
+            .map_err(|e| InferenceError::InvalidPath(format!("Failed to read config.json: {e}")))?;
         let config: MultiBranchConfig = serde_json::from_slice(&config_bytes).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
         })?;
@@ -172,9 +171,8 @@ impl MultiBranchClassifier {
         let vb = VarBuilder::from_tensors(tensors, DType::F32, &device);
 
         // Build branches + merge trunk
-        let char_branch =
-            BranchWeights::new(config.char_dim, config.char_hidden, vb.pp("char"))
-                .map_err(|e| InferenceError::InvalidPath(format!("char branch: {e}")))?;
+        let char_branch = BranchWeights::new(config.char_dim, config.char_hidden, vb.pp("char"))
+            .map_err(|e| InferenceError::InvalidPath(format!("char branch: {e}")))?;
         let embed_branch =
             BranchWeights::new(config.embed_dim, config.embed_hidden, vb.pp("embed"))
                 .map_err(|e| InferenceError::InvalidPath(format!("embed branch: {e}")))?;
@@ -183,12 +181,10 @@ impl MultiBranchClassifier {
                 .map_err(|e| InferenceError::InvalidPath(format!("stats branch: {e}")))?;
 
         let merged_dim = config.merged_dim();
-        let merge_bn =
-            batch_norm(merged_dim, BatchNormConfig::default(), vb.pp("merge_bn"))
-                .map_err(|e| InferenceError::InvalidPath(format!("merge_bn: {e}")))?;
-        let merge_linear1 =
-            linear(merged_dim, config.merge_hidden[0], vb.pp("merge_l1"))
-                .map_err(|e| InferenceError::InvalidPath(format!("merge_l1: {e}")))?;
+        let merge_bn = batch_norm(merged_dim, BatchNormConfig::default(), vb.pp("merge_bn"))
+            .map_err(|e| InferenceError::InvalidPath(format!("merge_bn: {e}")))?;
+        let merge_linear1 = linear(merged_dim, config.merge_hidden[0], vb.pp("merge_l1"))
+            .map_err(|e| InferenceError::InvalidPath(format!("merge_l1: {e}")))?;
         let merge_linear2 = linear(
             config.merge_hidden[0],
             config.merge_hidden[1],
@@ -204,11 +200,13 @@ impl MultiBranchClassifier {
                 ClassificationHead::Flat(flat_head)
             }
             HeadType::Hierarchical => {
-                let hier_head = HierarchicalHead::new(config.merge_hidden[1], &labels, vb.pp(HierarchicalHead::VARBUILDER_PREFIX))
-                    .map_err(|e| {
-                        InferenceError::InvalidPath(format!("hierarchical head: {e}"))
-                    })?;
-                ClassificationHead::Hierarchical(hier_head)
+                let hier_head = HierarchicalHead::new(
+                    config.merge_hidden[1],
+                    &labels,
+                    vb.pp(HierarchicalHead::VARBUILDER_PREFIX),
+                )
+                .map_err(|e| InferenceError::InvalidPath(format!("hierarchical head: {e}")))?;
+                ClassificationHead::Hierarchical(Box::new(hier_head))
             }
         };
 
@@ -257,10 +255,7 @@ impl MultiBranchClassifier {
     ///
     /// For flat heads: confidence is the softmax probability of the top prediction.
     /// For hierarchical heads: confidence is the product probability (domain × category × type).
-    pub fn classify_column(
-        &self,
-        values: &[String],
-    ) -> Result<(String, f32), InferenceError> {
+    pub fn classify_column(&self, values: &[String]) -> Result<(String, f32), InferenceError> {
         if values.is_empty() {
             return Ok(("unknown".to_string(), 0.0));
         }
@@ -268,13 +263,10 @@ impl MultiBranchClassifier {
         let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
         // Extract features
-        let char_feats =
-            extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats =
-            extract_embedding_aggregation(&value_refs, &self.model2vec)
-                .unwrap_or([0.0f32; EMBED_AGG_DIM]);
-        let stats_feats =
-            extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
+        let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
+        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
+            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         // Forward pass through trunk
         let device = Device::Cpu;
@@ -324,9 +316,11 @@ impl MultiBranchClassifier {
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap();
 
-        let label = self.labels.get(max_idx).cloned().unwrap_or_else(|| {
-            format!("unknown_idx_{max_idx}")
-        });
+        let label = self
+            .labels
+            .get(max_idx)
+            .cloned()
+            .unwrap_or_else(|| format!("unknown_idx_{max_idx}"));
 
         Ok((label, *max_prob))
     }
@@ -476,6 +470,8 @@ mod tests {
     #[test]
     fn test_is_multi_branch_dir_missing_files() {
         // Use a path that definitely doesn't contain model files
-        assert!(!MultiBranchClassifier::is_multi_branch_dir("/tmp/nonexistent-finetype-test"));
+        assert!(!MultiBranchClassifier::is_multi_branch_dir(
+            "/tmp/nonexistent-finetype-test"
+        ));
     }
 }

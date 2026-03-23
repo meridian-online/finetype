@@ -76,9 +76,7 @@ mod tui_impl {
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::{Color, Modifier, Style};
     use ratatui::text::{Line, Span};
-    use ratatui::widgets::{
-        Block, Borders, Cell, Gauge, Paragraph, Row, Sparkline, Table, Wrap,
-    };
+    use ratatui::widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Sparkline, Table, Wrap};
     use ratatui::Terminal;
 
     /// Messages sent from the training thread to the render thread.
@@ -290,8 +288,8 @@ mod tui_impl {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),  // Title bar
-                Constraint::Length(8),  // Sparkline charts
+                Constraint::Length(1), // Title bar
+                Constraint::Length(8), // Sparkline charts
                 Constraint::Min(5),    // Epoch table
                 Constraint::Length(4), // Progress + ETA
             ])
@@ -312,14 +310,13 @@ mod tui_impl {
         } else {
             format!("{}h {}m", elapsed / 3600, (elapsed % 3600) / 60)
         };
-        let status = if state.finished {
-            " [COMPLETE]"
-        } else {
-            ""
-        };
+        let status = if state.finished { " [COMPLETE]" } else { "" };
         let text = format!(" FineType Training — {title}{status}  [{elapsed_str}]");
-        let paragraph =
-            Paragraph::new(text).style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        let paragraph = Paragraph::new(text).style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
         f.render_widget(paragraph, area);
     }
 
@@ -444,10 +441,22 @@ mod tui_impl {
 
     fn draw_epoch_table(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
         let header_cells = [
-            "Epoch", "Train Loss", "Val Loss", "Train Acc", "Val Acc", "LR", "Time",
+            "Epoch",
+            "Train Loss",
+            "Val Loss",
+            "Train Acc",
+            "Val Acc",
+            "LR",
+            "Time",
         ]
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)));
+        .map(|h| {
+            Cell::from(*h).style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+        });
         let header = Row::new(header_cells).height(1);
 
         let rows: Vec<Row> = state

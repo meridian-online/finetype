@@ -206,7 +206,11 @@ impl MultiBranchModel {
         let (char_branch, embed_branch, stats_branch, merge_bn, merge_linear1, merge_linear2) =
             Self::build_trunk(config, &vb)?;
 
-        let hier_head = HierarchicalHead::new(config.merge_hidden[1], labels, vb.pp(HierarchicalHead::VARBUILDER_PREFIX))?;
+        let hier_head = HierarchicalHead::new(
+            config.merge_hidden[1],
+            labels,
+            vb.pp(HierarchicalHead::VARBUILDER_PREFIX),
+        )?;
 
         Ok(Self {
             char_branch,
@@ -225,8 +229,14 @@ impl MultiBranchModel {
     fn build_trunk(
         config: &MultiBranchConfig,
         vb: &VarBuilder,
-    ) -> candle_core::Result<(BranchWeights, BranchWeights, BranchWeights, BatchNorm, Linear, Linear)>
-    {
+    ) -> candle_core::Result<(
+        BranchWeights,
+        BranchWeights,
+        BranchWeights,
+        BatchNorm,
+        Linear,
+        Linear,
+    )> {
         let char_branch = BranchWeights::new(
             config.char_dim,
             config.char_hidden,
@@ -815,12 +825,10 @@ fn compute_hierarchical_loss(
                     .collect();
                 let idx_tensor = Tensor::new(indices, device)?;
                 let leaf_logits_subset = leaf_logits.index_select(&idx_tensor, 0)?;
-                let leaf_target_tensor =
-                    Tensor::new(leaf_targets_by_cat[d][c].clone(), device)?;
+                let leaf_target_tensor = Tensor::new(leaf_targets_by_cat[d][c].clone(), device)?;
                 let ll = candle_nn::loss::cross_entropy(&leaf_logits_subset, &leaf_target_tensor)?;
                 let n = leaf_targets_by_cat[d][c].len() as f32;
-                leaf_loss_sum =
-                    (leaf_loss_sum + ll.broadcast_mul(&Tensor::new(n, device)?))?;
+                leaf_loss_sum = (leaf_loss_sum + ll.broadcast_mul(&Tensor::new(n, device)?))?;
                 leaf_count += leaf_targets_by_cat[d][c].len();
             }
         }
@@ -881,9 +889,8 @@ pub fn train_multi_branch(
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
     let model = if is_hierarchical {
-        let labels = labels.ok_or_else(|| {
-            anyhow::anyhow!("Hierarchical head requires sorted labels list")
-        })?;
+        let labels = labels
+            .ok_or_else(|| anyhow::anyhow!("Hierarchical head requires sorted labels list"))?;
         MultiBranchModel::new_hierarchical(model_config, labels, vb)?
     } else {
         MultiBranchModel::new(model_config, vb)?

@@ -99,12 +99,16 @@ while IFS=, read -r dataset file_path column_name gt_label; do
 
     # Run finetype profile and parse JSON output
     # FINETYPE_MODEL_TYPE env var allows overriding the default model type (char-cnn)
-    MODEL_TYPE_FLAG=""
+    # FINETYPE_MODEL env var allows overriding the model directory
+    MODEL_FLAGS=""
     if [ -n "${FINETYPE_MODEL_TYPE:-}" ]; then
-        MODEL_TYPE_FLAG="--model-type $FINETYPE_MODEL_TYPE"
+        MODEL_FLAGS="$MODEL_FLAGS --model-type $FINETYPE_MODEL_TYPE"
+    fi
+    if [ -n "${FINETYPE_MODEL:-}" ]; then
+        MODEL_FLAGS="$MODEL_FLAGS --model $FINETYPE_MODEL"
     fi
     PROFILE_ERR=$(mktemp)
-    PROFILE_JSON=$("$FINETYPE" profile -f "$file_path" -o json $MODEL_TYPE_FLAG 2>"$PROFILE_ERR") || {
+    PROFILE_JSON=$("$FINETYPE" profile -f "$file_path" -o json $MODEL_FLAGS 2>"$PROFILE_ERR") || {
         ERR_MSG=$(grep -m1 'Error:' "$PROFILE_ERR" || tail -1 "$PROFILE_ERR")
         printf " \033[31mFAILED\033[0m"
         if [ -n "$ERR_MSG" ]; then printf " (%s)" "$ERR_MSG"; fi
