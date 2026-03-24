@@ -1619,6 +1619,7 @@ pub fn train_multi_branch(
     train_data: &MultiBranchDataset,
     val_data: &MultiBranchDataset,
     labels: Option<&[String]>,
+    frozen_ctx: Option<&FrozenSiblingContext>,
     renderer: Option<Box<dyn crate::tui::TrainingRenderer>>,
 ) -> Result<crate::training::TrainingSummary> {
     use crate::training::{
@@ -1632,6 +1633,11 @@ pub fn train_multi_branch(
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     let is_hierarchical = model_config.head_type == HeadType::Hierarchical;
+    let use_group_batching = frozen_ctx.is_some() && !train_data.table_groups.is_empty();
+
+    if frozen_ctx.is_some() {
+        tracing::info!("Sibling-context enrichment enabled (frozen attention)");
+    }
 
     tracing::info!(
         "Starting multi-branch training: {} train, {} val, {} epochs, batch_size={}, lr={}, head={}",
@@ -1731,19 +1737,56 @@ pub fn train_multi_branch(
         let lr = scheduler.lr(epoch);
         optimizer.set_learning_rate(lr);
 
-        // Shuffle into batches
-        let batches = shuffled_batches(train_data.len(), config.batch_size, &mut rng);
-
         let mut train_loss_sum = 0.0f64;
         let mut train_correct_sum = 0.0f64;
         let mut train_samples = 0usize;
 
+        // Build batches: group-based (with frozen enrichment) or flat (traditional)
+        let group_batches: Vec<Vec<usize>>;
+        let flat_batches: Vec<Vec<usize>>;
+        let total_batches;
+
+        if use_group_batching {
+            // Shuffle at table-group level, sample whole groups until batch is full
+            use rand::seq::SliceRandom;
+            let n_groups = train_data.table_groups.len();
+            let mut group_order: Vec<usize> = (0..n_groups).collect();
+            group_order.shuffle(&mut rng);
+
+            // Pack groups into batches (may overshoot batch_size per group)
+            let mut batches = Vec::new();
+            let mut current_batch = Vec::new();
+            let mut current_size = 0usize;
+            for &gi in &group_order {
+                let group_size = train_data.table_groups[gi].record_indices.len();
+                current_batch.push(gi);
+                current_size += group_size;
+                if current_size >= config.batch_size {
+                    batches.push(current_batch);
+                    current_batch = Vec::new();
+                    current_size = 0;
+                }
+            }
+            if !current_batch.is_empty() {
+                batches.push(current_batch);
+            }
+            group_batches = batches;
+            flat_batches = Vec::new();
+            total_batches = group_batches.len();
+        } else {
+            group_batches = Vec::new();
+            flat_batches = shuffled_batches(train_data.len(), config.batch_size, &mut rng);
+            total_batches = flat_batches.len();
+        }
+
         // Training loop
-        let total_batches = batches.len();
-        for (batch_num, batch_idx) in batches.iter().enumerate() {
-            let (char_t, embed_t, stats_t, header_t, labels_t) =
-                train_data.batch(batch_idx, &device)?;
-            let bs = batch_idx.len();
+        for batch_num in 0..total_batches {
+            let (char_t, embed_t, stats_t, header_t, labels_t) = if use_group_batching {
+                train_data.batch_groups(&group_batches[batch_num], frozen_ctx, &device)?
+            } else {
+                train_data.batch(&flat_batches[batch_num], &device)?
+            };
+            let bs = labels_t.dim(0)?;
 
             let loss = if is_hierarchical {
                 let hier = model.hierarchical_head().unwrap();
@@ -2320,8 +2363,16 @@ mod tests {
             min_lr: 1e-6,
         };
 
-        let summary =
-            train_multi_branch(&train_config, &config, &train_data, &val_data, None, None).unwrap();
+        let summary = train_multi_branch(
+            &train_config,
+            &config,
+            &train_data,
+            &val_data,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(summary.total_epochs, 5);
         assert_eq!(summary.epoch_metrics.len(), 5);
@@ -2581,6 +2632,7 @@ mod tests {
             &train_data,
             &val_data,
             Some(&labels),
+            None,
             None,
         )
         .unwrap();

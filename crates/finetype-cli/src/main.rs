@@ -831,24 +831,53 @@ fn cmd_train_multi_branch(
     let n_classes = taxonomy.len();
 
     eprintln!("Loading training data from {}...", data.display());
-    let (header, records, _table_groups) = read_training_data(&data)?;
+    let (header, records, table_groups) = read_training_data(&data)?;
     eprintln!(
-        "Loaded {} records ({} char, {} embed, {} stats dims)",
+        "Loaded {} records ({} char, {} embed, {} stats dims, {} table groups)",
         records.len(),
         header.char_dim,
         header.embed_dim,
         header.stats_dim,
+        table_groups.len(),
     );
 
-    // Filter records to only include labels present in taxonomy
-    let valid_records: Vec<_> = records
+    // Filter records to only include labels present in taxonomy.
+    // Build old→new index mapping for remapping table group indices.
+    let mut valid_records = Vec::new();
+    let mut old_to_new: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    for (old_idx, record) in records.into_iter().enumerate() {
+        if label_to_idx.contains_key(&record.label) {
+            let new_idx = valid_records.len();
+            old_to_new.insert(old_idx, new_idx);
+            valid_records.push(record);
+        }
+    }
+
+    // Remap table group indices, dropping records that were filtered out
+    let remapped_groups: Vec<_> = table_groups
         .into_iter()
-        .filter(|r| label_to_idx.contains_key(&r.label))
+        .filter_map(|g| {
+            let new_indices: Vec<usize> = g
+                .record_indices
+                .iter()
+                .filter_map(|old| old_to_new.get(old).copied())
+                .collect();
+            if new_indices.is_empty() {
+                None
+            } else {
+                Some(finetype_train::multi_branch::TableGroup {
+                    record_indices: new_indices,
+                    sibling_headers: g.sibling_headers,
+                })
+            }
+        })
         .collect();
+
     eprintln!(
-        "{} records match taxonomy ({} classes)",
+        "{} records match taxonomy ({} classes, {} groups retained)",
         valid_records.len(),
         n_classes,
+        remapped_groups.len(),
     );
 
     // Split into train/val
@@ -867,10 +896,53 @@ fn cmd_train_multi_branch(
         .map(|&i| valid_records[i].clone())
         .collect();
 
+    // Remap table groups for train/val splits — each group's record_indices
+    // need to be re-indexed into the split-local arrays
+    let train_idx_map: std::collections::HashMap<usize, usize> = train_indices
+        .iter()
+        .enumerate()
+        .map(|(new, &old)| (old, new))
+        .collect();
+    let val_idx_map: std::collections::HashMap<usize, usize> = val_indices
+        .iter()
+        .enumerate()
+        .map(|(new, &old)| (old, new))
+        .collect();
+
+    let mut train_groups = Vec::new();
+    let mut val_groups = Vec::new();
+    for group in &remapped_groups {
+        // Count how many records from this group land in train vs val
+        let train_remap: Vec<usize> = group
+            .record_indices
+            .iter()
+            .filter_map(|idx| train_idx_map.get(idx).copied())
+            .collect();
+        let val_remap: Vec<usize> = group
+            .record_indices
+            .iter()
+            .filter_map(|idx| val_idx_map.get(idx).copied())
+            .collect();
+        if !train_remap.is_empty() {
+            train_groups.push(finetype_train::multi_branch::TableGroup {
+                record_indices: train_remap,
+                sibling_headers: group.sibling_headers.clone(),
+            });
+        }
+        if !val_remap.is_empty() {
+            val_groups.push(finetype_train::multi_branch::TableGroup {
+                record_indices: val_remap,
+                sibling_headers: group.sibling_headers.clone(),
+            });
+        }
+    }
+
     eprintln!(
-        "Train: {} | Val: {}",
+        "Train: {} ({} groups) | Val: {} ({} groups)",
         train_records.len(),
-        val_records.len()
+        train_groups.len(),
+        val_records.len(),
+        val_groups.len(),
     );
 
     let char_dim = header.char_dim as usize;
@@ -878,21 +950,23 @@ fn cmd_train_multi_branch(
     let stats_dim = header.stats_dim as usize;
     let header_dim = header.header_dim as usize;
 
-    let train_data = MultiBranchDataset::from_records(
+    let train_data = MultiBranchDataset::from_records_with_groups(
         &train_records,
         &label_to_idx,
         char_dim,
         embed_dim,
         stats_dim,
         header_dim,
+        Some(train_groups),
     )?;
-    let val_data = MultiBranchDataset::from_records(
+    let val_data = MultiBranchDataset::from_records_with_groups(
         &val_records,
         &label_to_idx,
         char_dim,
         embed_dim,
         stats_dim,
         header_dim,
+        Some(val_groups),
     )?;
 
     let model_config = MultiBranchConfig {
@@ -945,12 +1019,34 @@ fn cmd_train_multi_branch(
         }
     };
 
+    // Load frozen sibling-context model if available
+    let sibling_ctx_dir = std::path::PathBuf::from("models/sibling-context");
+    let frozen_ctx = if sibling_ctx_dir.join("model.safetensors").exists() {
+        let device = finetype_train::get_device();
+        match finetype_train::multi_branch::FrozenSiblingContext::load(&sibling_ctx_dir, &device) {
+            Ok(ctx) => {
+                eprintln!(
+                    "Loaded frozen sibling-context attention ({}d)",
+                    ctx.embed_dim()
+                );
+                Some(ctx)
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to load sibling-context model: {e}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let summary = train_multi_branch(
         &train_config,
         &model_config,
         &train_data,
         &val_data,
         labels_opt,
+        frozen_ctx.as_ref(),
         renderer,
     )?;
 
@@ -1254,6 +1350,10 @@ fn cmd_infer(
             wire_sense(&mut column_classifier);
             wire_sibling_context(&mut column_classifier);
         }
+        // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+        if column_classifier.has_multi_branch() {
+            wire_model2vec_and_siblings(&mut column_classifier);
+        }
 
         let result = if let Some(ref hdr) = header {
             column_classifier.classify_column_with_header(&inputs, hdr)?
@@ -1539,6 +1639,10 @@ fn cmd_infer_batch(
     if !sharp_only && !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
+    }
+    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+    if column_classifier.has_multi_branch() {
+        wire_model2vec_and_siblings(&mut column_classifier);
     }
 
     let load_elapsed = t_start.elapsed();
@@ -1865,6 +1969,18 @@ fn wire_sense(cc: &mut finetype_model::ColumnClassifier) {
     let label_map = finetype_model::LabelCategoryMap::new();
     eprintln!("Loaded Sense classifier (broad category prediction)");
     cc.set_sense(sense, m2v, label_map);
+}
+
+/// Wire Model2Vec + sibling context for multi-branch classifiers.
+///
+/// When multi-branch is active, Sense is not used — but sibling-context attention
+/// still needs Model2Vec to encode headers. This wires both independently of Sense.
+fn wire_model2vec_and_siblings(cc: &mut finetype_model::ColumnClassifier) {
+    if let Some(m2v) = load_model2vec_resources() {
+        eprintln!("Loaded Model2Vec for multi-branch sibling context");
+        cc.set_model2vec(m2v);
+        wire_sibling_context(cc);
+    }
 }
 
 /// Load and wire the sibling-context attention module (NNFT-268).
@@ -2920,6 +3036,10 @@ fn cmd_load(
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
+    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+    if column_classifier.has_multi_branch() {
+        wire_model2vec_and_siblings(&mut column_classifier);
+    }
 
     eprintln!("Reading {:?}", file);
 
@@ -3606,6 +3726,10 @@ fn cmd_profile(
     if !sharp_only && !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
+    }
+    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+    if column_classifier.has_multi_branch() {
+        wire_model2vec_and_siblings(&mut column_classifier);
     }
 
     eprintln!("Reading {:?}", file);

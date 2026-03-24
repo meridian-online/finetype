@@ -544,6 +544,14 @@ impl ColumnClassifier {
         self.sibling_context.is_some()
     }
 
+    /// Attach Model2Vec resources without Sense.
+    ///
+    /// Used when multi-branch is active: sibling-context attention needs Model2Vec
+    /// to encode headers, but the Sense classifier is not required.
+    pub fn set_model2vec(&mut self, model2vec: Model2VecResources) {
+        self.model2vec = Some(model2vec);
+    }
+
     /// Create a column classifier using a multi-branch model.
     ///
     /// Multi-branch is fundamentally column-level (Vec<String> → features → label),
@@ -822,15 +830,15 @@ impl ColumnClassifier {
         &self,
         columns: &[(Vec<String>, String)], // (values, header) per column
     ) -> Result<Vec<ColumnResult>, InferenceError> {
-        // Fast path: no sibling context available → per-column classification
-        if !self.has_sibling_context() {
+        // Fast path: no sibling context or no Model2Vec → per-column classification
+        if !self.has_sibling_context() || self.model2vec.is_none() {
             return columns
                 .iter()
                 .map(|(values, header)| self.classify_column_with_header(values, header))
                 .collect();
         }
 
-        // Multi-branch without Sense still needs sibling context for the header branch
+        // Sense path requires Sense classifier; multi-branch path doesn't
         let needs_sense = !self.has_multi_branch();
         if needs_sense && !self.has_sense() {
             return columns
