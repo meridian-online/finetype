@@ -1619,7 +1619,7 @@ pub fn train_multi_branch(
     train_data: &MultiBranchDataset,
     val_data: &MultiBranchDataset,
     labels: Option<&[String]>,
-    frozen_ctx: Option<&FrozenSiblingContext>,
+    sibling_ctx_dir: Option<&Path>,
     renderer: Option<Box<dyn crate::tui::TrainingRenderer>>,
 ) -> Result<crate::training::TrainingSummary> {
     use crate::training::{
@@ -1632,10 +1632,31 @@ pub fn train_multi_branch(
     let device = crate::get_device();
     let mut rng = StdRng::seed_from_u64(config.seed);
 
-    let is_hierarchical = model_config.head_type == HeadType::Hierarchical;
-    let use_group_batching = frozen_ctx.is_some() && !train_data.table_groups.is_empty();
+    // Load frozen sibling-context on the SAME device as the training model.
+    // Loading externally creates a separate Metal device handle, causing
+    // "device mismatch" errors during matmul.
+    let frozen_ctx = match sibling_ctx_dir {
+        Some(dir) => match FrozenSiblingContext::load(dir, &device) {
+            Ok(ctx) => {
+                tracing::info!(
+                    "Loaded frozen sibling-context attention ({}d) on training device",
+                    ctx.embed_dim()
+                );
+                Some(ctx)
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load sibling-context model: {e}");
+                None
+            }
+        },
+        None => None,
+    };
+    let frozen_ref = frozen_ctx.as_ref();
 
-    if frozen_ctx.is_some() {
+    let is_hierarchical = model_config.head_type == HeadType::Hierarchical;
+    let use_group_batching = frozen_ref.is_some() && !train_data.table_groups.is_empty();
+
+    if frozen_ref.is_some() {
         tracing::info!("Sibling-context enrichment enabled (frozen attention)");
     }
 
@@ -1782,7 +1803,7 @@ pub fn train_multi_branch(
         // Training loop
         for batch_num in 0..total_batches {
             let (char_t, embed_t, stats_t, header_t, labels_t) = if use_group_batching {
-                train_data.batch_groups(&group_batches[batch_num], frozen_ctx, &device)?
+                train_data.batch_groups(&group_batches[batch_num], frozen_ref, &device)?
             } else {
                 train_data.batch(&flat_batches[batch_num], &device)?
             };
