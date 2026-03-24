@@ -544,6 +544,14 @@ impl ColumnClassifier {
         self.sibling_context.is_some()
     }
 
+    /// Attach Model2Vec resources without Sense.
+    ///
+    /// Used when multi-branch is active: sibling-context attention needs Model2Vec
+    /// to encode headers, but the Sense classifier is not required.
+    pub fn set_model2vec(&mut self, model2vec: Model2VecResources) {
+        self.model2vec = Some(model2vec);
+    }
+
     /// Create a column classifier using a multi-branch model.
     ///
     /// Multi-branch is fundamentally column-level (Vec<String> → features → label),
@@ -807,10 +815,14 @@ impl ColumnClassifier {
 
     /// Classify multiple columns with sibling context (NNFT-268).
     ///
-    /// When sibling-context attention is available and Sense is active:
+    /// When sibling-context attention is available:
     /// 1. Encode all column headers with Model2Vec → `[N_cols, 128]`
     /// 2. Run sibling-context attention → `[N_cols, 128]` (enriched)
-    /// 3. For each column: run Sense with enriched header → CharCNN → disambiguation
+    /// 3. For each column: run the active pipeline with enriched headers
+    ///
+    /// Supports both Sense→Sharpen and multi-branch pipelines:
+    /// - Sense→Sharpen: enriched header feeds into Sense classification
+    /// - Multi-branch: enriched header feeds into the 4th header branch MLP
     ///
     /// When sibling context is NOT available (no trained model), falls back to
     /// per-column `classify_column_with_header` — producing identical results.
@@ -818,8 +830,17 @@ impl ColumnClassifier {
         &self,
         columns: &[(Vec<String>, String)], // (values, header) per column
     ) -> Result<Vec<ColumnResult>, InferenceError> {
-        // Fast path: multi-branch or no sibling context → per-column classification
-        if self.has_multi_branch() || !self.has_sibling_context() || !self.has_sense() {
+        // Fast path: no sibling context or no Model2Vec → per-column classification
+        if !self.has_sibling_context() || self.model2vec.is_none() {
+            return columns
+                .iter()
+                .map(|(values, header)| self.classify_column_with_header(values, header))
+                .collect();
+        }
+
+        // Sense path requires Sense classifier; multi-branch path doesn't
+        let needs_sense = !self.has_multi_branch();
+        if needs_sense && !self.has_sense() {
             return columns
                 .iter()
                 .map(|(values, header)| self.classify_column_with_header(values, header))
@@ -836,13 +857,25 @@ impl ColumnClassifier {
         // Step 2: Run sibling-context attention → enriched [N_cols, D]
         let enriched = sibling_ctx.forward(&header_embs)?;
 
-        // Step 3: For each column, run Sense→Sharpen with enriched header
+        // Step 3: For each column, run the active pipeline with enriched header
         let mut results = Vec::with_capacity(columns.len());
-        for (i, (values, header)) in columns.iter().enumerate() {
-            let enriched_header = enriched.get(i)?; // [D]
-            let result =
-                self.classify_sense_sharpen_with_context(values, header, &enriched_header)?;
-            results.push(result);
+
+        if let Some(ref mb) = self.multi_branch {
+            // Multi-branch path: enriched header → header branch MLP
+            for (i, (values, _header)) in columns.iter().enumerate() {
+                let enriched_header = enriched.get(i)?; // [D]
+                let result =
+                    self.classify_multi_branch_with_enriched(mb, values, &enriched_header)?;
+                results.push(result);
+            }
+        } else {
+            // Sense→Sharpen path: enriched header → Sense classification
+            for (i, (values, header)) in columns.iter().enumerate() {
+                let enriched_header = enriched.get(i)?; // [D]
+                let result =
+                    self.classify_sense_sharpen_with_context(values, header, &enriched_header)?;
+                results.push(result);
+            }
         }
 
         Ok(results)
@@ -1953,6 +1986,61 @@ impl ColumnClassifier {
             vote_distribution: vec![(label, confidence)],
             disambiguation_applied: false,
             disambiguation_rule: Some("multi-branch".to_string()),
+            samples_used,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        })
+    }
+
+    /// Multi-branch classification with a pre-enriched header embedding.
+    ///
+    /// Like `classify_multi_branch()` but uses a sibling-context-enriched
+    /// header tensor instead of the raw header string. Called from
+    /// `classify_columns_with_context()` when both multi-branch and sibling
+    /// context are active.
+    fn classify_multi_branch_with_enriched(
+        &self,
+        mb: &MultiBranchClassifier,
+        values: &[String],
+        enriched_header: &candle_core::Tensor,
+    ) -> Result<ColumnResult, InferenceError> {
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Sample values (same strategy as classify_column)
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+
+        let samples_used = sample.len();
+
+        // Classify via multi-branch with enriched header (sibling context applied)
+        let (label, confidence) =
+            mb.classify_column_with_enriched_header(&sample, enriched_header)?;
+
+        Ok(ColumnResult {
+            label: label.clone(),
+            confidence,
+            vote_distribution: vec![(label, confidence)],
+            disambiguation_applied: false,
+            disambiguation_rule: Some("multi-branch-sibling".to_string()),
             samples_used,
             detected_locale: None,
             is_generic: false,

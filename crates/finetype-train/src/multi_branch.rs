@@ -455,13 +455,20 @@ impl MultiBranchModel {
 /// Magic bytes for the FTMB binary format.
 const FTMB_MAGIC: &[u8; 4] = b"FTMB";
 
-/// Current format version (v2 adds header features).
-const FTMB_VERSION: u32 = 2;
+/// Current format version for flat writes (v2 adds header features).
+const FTMB_VERSION_V2: u32 = 2;
 
-/// Header size in bytes (same for v1 and v2: 24 bytes).
+/// Format version for table-grouped writes (v3 adds sibling headers).
+const FTMB_VERSION_V3: u32 = 3;
+
+/// Header size in bytes for v1/v2 (24 bytes).
 /// v1: 4 magic + 4 version + 8 n_records + 2+2+2 dims + 2 padding = 24.
 /// v2: 4 magic + 4 version + 8 n_records + 2+2+2+2 dims = 24 (header_dim replaces padding).
-const FTMB_HEADER_SIZE: usize = 24;
+const FTMB_HEADER_SIZE_V2: usize = 24;
+
+/// Header size in bytes for v3 (28 bytes).
+/// v3: 4 magic + 4 version + 8 n_records + 2+2+2+2 dims + 2 n_groups + 2 reserved = 28.
+const FTMB_HEADER_SIZE_V3: usize = 28;
 
 /// A single training record with label and feature vectors.
 #[derive(Debug, Clone)]
@@ -478,6 +485,19 @@ pub struct TrainingRecord {
     pub header_features: Vec<f32>,
 }
 
+/// A group of training records from the same table, with sibling header names.
+///
+/// Used by FTMB v3 to enable frozen sibling-context attention during training.
+/// For v1/v2 data, records form a single group with empty sibling headers.
+#[derive(Debug, Clone)]
+pub struct TableGroup {
+    /// Indices into the flat record list for columns belonging to this table.
+    pub record_indices: Vec<usize>,
+    /// Header names for all columns in this table (used by sibling-context attention).
+    /// Order matches record_indices.
+    pub sibling_headers: Vec<String>,
+}
+
 /// Write training records to an FTMB v2 binary file.
 pub fn write_training_data(
     path: &Path,
@@ -492,7 +512,7 @@ pub fn write_training_data(
 
     // Write v2 header (24 bytes): magic + version + n_records + char_dim + embed_dim + stats_dim + header_dim
     file.write_all(FTMB_MAGIC)?;
-    file.write_all(&FTMB_VERSION.to_le_bytes())?;
+    file.write_all(&FTMB_VERSION_V2.to_le_bytes())?;
     file.write_all(&(records.len() as u64).to_le_bytes())?;
     file.write_all(&char_dim.to_le_bytes())?;
     file.write_all(&embed_dim.to_le_bytes())?;
@@ -570,16 +590,19 @@ pub struct FtmbHeader {
     pub stats_dim: u16,
     /// Header embedding dimension. 0 for v1 files.
     pub header_dim: u16,
+    /// Number of table groups. 0 for v1/v2 files.
+    pub n_groups: u16,
 }
 
-/// Read the header from an FTMB binary file. Supports v1 and v2.
+/// Read the header from an FTMB binary file. Supports v1, v2, and v3.
 pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     let mut file = std::fs::File::open(path)
         .with_context(|| format!("Failed to open training data file: {}", path.display()))?;
 
-    // Read the maximum header size (v1 and v2 are both 24 bytes)
-    let mut header = [0u8; FTMB_HEADER_SIZE];
-    file.read_exact(&mut header)
+    // Read the common prefix first (24 bytes covers v1/v2 fully)
+    let mut header = [0u8; FTMB_HEADER_SIZE_V3];
+    // Read at least the v2 header size to determine version
+    file.read_exact(&mut header[..FTMB_HEADER_SIZE_V2])
         .context("Failed to read FTMB header")?;
 
     if &header[0..4] != FTMB_MAGIC {
@@ -591,8 +614,11 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     }
 
     let version = u32::from_le_bytes(header[4..8].try_into().unwrap());
-    if version != 1 && version != 2 {
-        bail!("Unsupported FTMB version: {} (expected 1 or 2)", version);
+    if version != 1 && version != 2 && version != 3 {
+        bail!(
+            "Unsupported FTMB version: {} (expected 1, 2, or 3)",
+            version
+        );
     }
 
     let n_records = u64::from_le_bytes(header[8..16].try_into().unwrap());
@@ -600,9 +626,18 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     let embed_dim = u16::from_le_bytes(header[18..20].try_into().unwrap());
     let stats_dim = u16::from_le_bytes(header[20..22].try_into().unwrap());
 
-    // v2: the 2 bytes at offset 22 are header_dim instead of padding
+    // v2+: the 2 bytes at offset 22 are header_dim instead of padding
     let header_dim = if version >= 2 {
         u16::from_le_bytes(header[22..24].try_into().unwrap())
+    } else {
+        0
+    };
+
+    // v3: read the additional 4 bytes (n_groups + reserved)
+    let n_groups = if version >= 3 {
+        file.read_exact(&mut header[24..28])
+            .context("Failed to read v3 header extension")?;
+        u16::from_le_bytes(header[24..26].try_into().unwrap())
     } else {
         0
     };
@@ -614,27 +649,35 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
         embed_dim,
         stats_dim,
         header_dim,
+        n_groups,
     })
 }
 
-/// Read all training records from an FTMB binary file. Supports v1 and v2.
+/// Read all training records from an FTMB binary file. Supports v1, v2, and v3.
 ///
 /// v1 files are loaded with zero-vector header_features (graceful degradation).
-pub fn read_training_data(path: &Path) -> Result<(FtmbHeader, Vec<TrainingRecord>)> {
+/// v1/v2 files return a single table group containing all records with empty sibling headers.
+/// v3 files return proper table groups with sibling header metadata.
+pub fn read_training_data(
+    path: &Path,
+) -> Result<(FtmbHeader, Vec<TrainingRecord>, Vec<TableGroup>)> {
     let mut file = std::fs::File::open(path)
         .with_context(|| format!("Failed to open training data file: {}", path.display()))?;
 
-    // Both v1 and v2 headers are 24 bytes
-    let mut header_buf = [0u8; FTMB_HEADER_SIZE];
-    file.read_exact(&mut header_buf)
+    // Read common header prefix (24 bytes for v1/v2)
+    let mut header_buf = [0u8; FTMB_HEADER_SIZE_V3];
+    file.read_exact(&mut header_buf[..FTMB_HEADER_SIZE_V2])
         .context("Failed to read FTMB header")?;
 
     if &header_buf[0..4] != FTMB_MAGIC {
         bail!("Invalid FTMB magic");
     }
     let version = u32::from_le_bytes(header_buf[4..8].try_into().unwrap());
-    if version != 1 && version != 2 {
-        bail!("Unsupported FTMB version: {} (expected 1 or 2)", version);
+    if version != 1 && version != 2 && version != 3 {
+        bail!(
+            "Unsupported FTMB version: {} (expected 1, 2, or 3)",
+            version
+        );
     }
 
     let n_records = u64::from_le_bytes(header_buf[8..16].try_into().unwrap());
@@ -647,6 +690,15 @@ pub fn read_training_data(path: &Path) -> Result<(FtmbHeader, Vec<TrainingRecord
         0
     };
 
+    // v3: read additional 4 bytes
+    let n_groups = if version >= 3 {
+        file.read_exact(&mut header_buf[24..28])
+            .context("Failed to read v3 header extension")?;
+        u16::from_le_bytes(header_buf[24..26].try_into().unwrap()) as usize
+    } else {
+        0
+    };
+
     let header = FtmbHeader {
         version,
         n_records,
@@ -654,61 +706,462 @@ pub fn read_training_data(path: &Path) -> Result<(FtmbHeader, Vec<TrainingRecord
         embed_dim: embed_dim as u16,
         stats_dim: stats_dim as u16,
         header_dim: header_dim as u16,
+        n_groups: n_groups as u16,
     };
 
     let mut records = Vec::with_capacity(n_records as usize);
+    let mut table_groups = Vec::new();
     let mut label_len_buf = [0u8; 2];
     let mut f32_buf = [0u8; 4];
 
-    for _ in 0..n_records {
-        // Read label
-        file.read_exact(&mut label_len_buf)?;
-        let label_len = u16::from_le_bytes(label_len_buf) as usize;
-        let mut label_buf = vec![0u8; label_len];
-        file.read_exact(&mut label_buf)?;
-        let label = String::from_utf8(label_buf).context("Invalid UTF-8 in label")?;
+    if version >= 3 {
+        // v3: read table groups sequentially
+        let mut record_offset = 0usize;
+        for _ in 0..n_groups {
+            // Read group header: n_columns (u16) + n_sibling_headers (u16)
+            let mut group_header = [0u8; 4];
+            file.read_exact(&mut group_header)?;
+            let n_columns = u16::from_le_bytes(group_header[0..2].try_into().unwrap()) as usize;
+            let n_sibling_headers =
+                u16::from_le_bytes(group_header[2..4].try_into().unwrap()) as usize;
 
-        // Read features
-        let mut char_features = Vec::with_capacity(char_dim);
-        for _ in 0..char_dim {
-            file.read_exact(&mut f32_buf)?;
-            char_features.push(f32::from_le_bytes(f32_buf));
-        }
-
-        let mut embed_features = Vec::with_capacity(embed_dim);
-        for _ in 0..embed_dim {
-            file.read_exact(&mut f32_buf)?;
-            embed_features.push(f32::from_le_bytes(f32_buf));
-        }
-
-        let mut stats_features = Vec::with_capacity(stats_dim);
-        for _ in 0..stats_dim {
-            file.read_exact(&mut f32_buf)?;
-            stats_features.push(f32::from_le_bytes(f32_buf));
-        }
-
-        // v2: read header features; v1: zero-vector
-        let header_features = if version >= 2 && header_dim > 0 {
-            let mut hf = Vec::with_capacity(header_dim);
-            for _ in 0..header_dim {
-                file.read_exact(&mut f32_buf)?;
-                hf.push(f32::from_le_bytes(f32_buf));
+            // Read sibling headers
+            let mut sibling_headers = Vec::with_capacity(n_sibling_headers);
+            for _ in 0..n_sibling_headers {
+                file.read_exact(&mut label_len_buf)?;
+                let header_len = u16::from_le_bytes(label_len_buf) as usize;
+                let mut header_bytes = vec![0u8; header_len];
+                file.read_exact(&mut header_bytes)?;
+                sibling_headers
+                    .push(String::from_utf8(header_bytes).context("Invalid UTF-8 in header")?);
             }
-            hf
-        } else {
-            vec![0.0f32; header_dim]
-        };
 
-        records.push(TrainingRecord {
-            label,
-            char_features,
-            embed_features,
-            stats_features,
-            header_features,
-        });
+            let mut group_indices = Vec::with_capacity(n_columns);
+
+            // Read records for this group
+            for _ in 0..n_columns {
+                // Read label
+                file.read_exact(&mut label_len_buf)?;
+                let label_len = u16::from_le_bytes(label_len_buf) as usize;
+                let mut label_buf = vec![0u8; label_len];
+                file.read_exact(&mut label_buf)?;
+                let label = String::from_utf8(label_buf).context("Invalid UTF-8 in label")?;
+
+                // Read column_index (u16) — index into sibling_headers
+                let mut col_idx_buf = [0u8; 2];
+                file.read_exact(&mut col_idx_buf)?;
+                // column_index is stored for reference but we use positional order
+                let _column_index = u16::from_le_bytes(col_idx_buf);
+
+                // Read features
+                let mut char_features = Vec::with_capacity(char_dim);
+                for _ in 0..char_dim {
+                    file.read_exact(&mut f32_buf)?;
+                    char_features.push(f32::from_le_bytes(f32_buf));
+                }
+                let mut embed_features = Vec::with_capacity(embed_dim);
+                for _ in 0..embed_dim {
+                    file.read_exact(&mut f32_buf)?;
+                    embed_features.push(f32::from_le_bytes(f32_buf));
+                }
+                let mut stats_features = Vec::with_capacity(stats_dim);
+                for _ in 0..stats_dim {
+                    file.read_exact(&mut f32_buf)?;
+                    stats_features.push(f32::from_le_bytes(f32_buf));
+                }
+                let mut header_features = Vec::with_capacity(header_dim);
+                for _ in 0..header_dim {
+                    file.read_exact(&mut f32_buf)?;
+                    header_features.push(f32::from_le_bytes(f32_buf));
+                }
+
+                group_indices.push(record_offset);
+                records.push(TrainingRecord {
+                    label,
+                    char_features,
+                    embed_features,
+                    stats_features,
+                    header_features,
+                });
+                record_offset += 1;
+            }
+
+            table_groups.push(TableGroup {
+                record_indices: group_indices,
+                sibling_headers,
+            });
+        }
+    } else {
+        // v1/v2: read flat records
+        for _ in 0..n_records {
+            // Read label
+            file.read_exact(&mut label_len_buf)?;
+            let label_len = u16::from_le_bytes(label_len_buf) as usize;
+            let mut label_buf = vec![0u8; label_len];
+            file.read_exact(&mut label_buf)?;
+            let label = String::from_utf8(label_buf).context("Invalid UTF-8 in label")?;
+
+            // Read features
+            let mut char_features = Vec::with_capacity(char_dim);
+            for _ in 0..char_dim {
+                file.read_exact(&mut f32_buf)?;
+                char_features.push(f32::from_le_bytes(f32_buf));
+            }
+            let mut embed_features = Vec::with_capacity(embed_dim);
+            for _ in 0..embed_dim {
+                file.read_exact(&mut f32_buf)?;
+                embed_features.push(f32::from_le_bytes(f32_buf));
+            }
+            let mut stats_features = Vec::with_capacity(stats_dim);
+            for _ in 0..stats_dim {
+                file.read_exact(&mut f32_buf)?;
+                stats_features.push(f32::from_le_bytes(f32_buf));
+            }
+            // v2: read header features; v1: zero-vector
+            let header_features = if version >= 2 && header_dim > 0 {
+                let mut hf = Vec::with_capacity(header_dim);
+                for _ in 0..header_dim {
+                    file.read_exact(&mut f32_buf)?;
+                    hf.push(f32::from_le_bytes(f32_buf));
+                }
+                hf
+            } else {
+                vec![0.0f32; header_dim]
+            };
+
+            records.push(TrainingRecord {
+                label,
+                char_features,
+                embed_features,
+                stats_features,
+                header_features,
+            });
+        }
+
+        // v1/v2: single group with all records, empty sibling headers
+        if !records.is_empty() {
+            table_groups.push(TableGroup {
+                record_indices: (0..records.len()).collect(),
+                sibling_headers: Vec::new(),
+            });
+        }
     }
 
-    Ok((header, records))
+    Ok((header, records, table_groups))
+}
+
+/// Write training records to an FTMB v3 binary file with table group metadata.
+///
+/// Each table group contains records from the same source table, along with
+/// sibling header names that enable frozen sibling-context attention during training.
+pub fn write_training_data_v3(
+    path: &Path,
+    records: &[TrainingRecord],
+    table_groups: &[TableGroup],
+    char_dim: u16,
+    embed_dim: u16,
+    stats_dim: u16,
+    header_dim: u16,
+) -> Result<()> {
+    let mut file = std::fs::File::create(path)
+        .with_context(|| format!("Failed to create training data file: {}", path.display()))?;
+
+    // Count total records across all groups
+    let total_records: usize = table_groups.iter().map(|g| g.record_indices.len()).sum();
+    if total_records != records.len() {
+        bail!(
+            "Table groups reference {} records but {} were provided",
+            total_records,
+            records.len()
+        );
+    }
+
+    // Write v3 header (28 bytes)
+    file.write_all(FTMB_MAGIC)?;
+    file.write_all(&FTMB_VERSION_V3.to_le_bytes())?;
+    file.write_all(&(records.len() as u64).to_le_bytes())?;
+    file.write_all(&char_dim.to_le_bytes())?;
+    file.write_all(&embed_dim.to_le_bytes())?;
+    file.write_all(&stats_dim.to_le_bytes())?;
+    file.write_all(&header_dim.to_le_bytes())?;
+    file.write_all(&(table_groups.len() as u16).to_le_bytes())?;
+    file.write_all(&[0u8; 2])?; // reserved
+
+    // Write each table group
+    for group in table_groups {
+        // Group header: n_columns + n_sibling_headers
+        file.write_all(&(group.record_indices.len() as u16).to_le_bytes())?;
+        file.write_all(&(group.sibling_headers.len() as u16).to_le_bytes())?;
+
+        // Write sibling headers
+        for header_name in &group.sibling_headers {
+            let header_bytes = header_name.as_bytes();
+            if header_bytes.len() > u16::MAX as usize {
+                bail!(
+                    "Sibling header too long ({} bytes): {}",
+                    header_bytes.len(),
+                    header_name
+                );
+            }
+            file.write_all(&(header_bytes.len() as u16).to_le_bytes())?;
+            file.write_all(header_bytes)?;
+        }
+
+        // Write records for this group
+        for (col_idx, &record_idx) in group.record_indices.iter().enumerate() {
+            let record = &records[record_idx];
+
+            // Label
+            let label_bytes = record.label.as_bytes();
+            if label_bytes.len() > u16::MAX as usize {
+                bail!(
+                    "Label too long ({} bytes): {}",
+                    label_bytes.len(),
+                    record.label
+                );
+            }
+            file.write_all(&(label_bytes.len() as u16).to_le_bytes())?;
+            file.write_all(label_bytes)?;
+
+            // Column index into sibling_headers
+            file.write_all(&(col_idx as u16).to_le_bytes())?;
+
+            // Validate and write features
+            if record.char_features.len() != char_dim as usize {
+                bail!(
+                    "char_features length {} != expected {}",
+                    record.char_features.len(),
+                    char_dim
+                );
+            }
+            if record.embed_features.len() != embed_dim as usize {
+                bail!(
+                    "embed_features length {} != expected {}",
+                    record.embed_features.len(),
+                    embed_dim
+                );
+            }
+            if record.stats_features.len() != stats_dim as usize {
+                bail!(
+                    "stats_features length {} != expected {}",
+                    record.stats_features.len(),
+                    stats_dim
+                );
+            }
+            if record.header_features.len() != header_dim as usize {
+                bail!(
+                    "header_features length {} != expected {}",
+                    record.header_features.len(),
+                    header_dim
+                );
+            }
+
+            for &v in &record.char_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.embed_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.stats_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.header_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FrozenSiblingContext — constant tensor version for multi-branch training
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Frozen sibling-context attention for multi-branch training.
+///
+/// Loads weights as constant tensors (not Var-backed) so gradients pass through
+/// but don't update attention weights. This follows the `FrozenSense` pattern
+/// from `crates/finetype-train/src/sense.rs`.
+///
+/// Architecture: 2-layer pre-norm transformer, 4 heads, 128-dim (matching
+/// `SiblingContextAttention` from `finetype-model`).
+pub struct FrozenSiblingContext {
+    blocks: Vec<FrozenTransformerBlock>,
+    final_norm_weight: Tensor,
+    final_norm_bias: Tensor,
+    embed_dim: usize,
+}
+
+struct FrozenTransformerBlock {
+    // norm1
+    norm1_weight: Tensor,
+    norm1_bias: Tensor,
+    // attn
+    wq: Tensor,
+    bq: Tensor,
+    wk: Tensor,
+    bk: Tensor,
+    wv: Tensor,
+    bv: Tensor,
+    out_weight: Tensor,
+    out_bias: Tensor,
+    n_heads: usize,
+    head_dim: usize,
+    // norm2
+    norm2_weight: Tensor,
+    norm2_bias: Tensor,
+    // ffn
+    ffn_w1: Tensor,
+    ffn_b1: Tensor,
+    ffn_w2: Tensor,
+    ffn_b2: Tensor,
+}
+
+impl FrozenSiblingContext {
+    /// Load frozen sibling-context weights from a model directory.
+    ///
+    /// Expects `model.safetensors` and `config.json` in the directory.
+    /// All tensors are loaded as constants (not variables), allowing gradients
+    /// to flow through this model's forward pass to upstream trainable parameters.
+    pub fn load(model_dir: &Path, device: &Device) -> Result<Self> {
+        use finetype_model::sibling_context::SiblingContextConfig;
+
+        let config_bytes =
+            std::fs::read(model_dir.join("config.json")).context("Failed to read config.json")?;
+        let config: SiblingContextConfig =
+            serde_json::from_slice(&config_bytes).context("Failed to parse config.json")?;
+
+        let tensors = candle_core::safetensors::load(model_dir.join("model.safetensors"), device)?;
+
+        let get = |name: &str| -> Result<Tensor> {
+            tensors
+                .get(name)
+                .cloned()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Missing tensor '{}' in sibling-context model", name)
+                })
+                .and_then(|t| Ok(t.to_dtype(DType::F32)?))
+        };
+
+        let d = config.embed_dim;
+        let n_heads = config.n_heads;
+        let head_dim = d / n_heads;
+
+        let mut blocks = Vec::with_capacity(config.n_layers);
+        for i in 0..config.n_layers {
+            let p = format!("blocks.{}", i);
+            blocks.push(FrozenTransformerBlock {
+                norm1_weight: get(&format!("{p}.norm1.weight"))?,
+                norm1_bias: get(&format!("{p}.norm1.bias"))?,
+                wq: get(&format!("{p}.attn.wq"))?,
+                bq: get(&format!("{p}.attn.bq"))?,
+                wk: get(&format!("{p}.attn.wk"))?,
+                bk: get(&format!("{p}.attn.bk"))?,
+                wv: get(&format!("{p}.attn.wv"))?,
+                bv: get(&format!("{p}.attn.bv"))?,
+                out_weight: get(&format!("{p}.attn.out_weight"))?,
+                out_bias: get(&format!("{p}.attn.out_bias"))?,
+                n_heads,
+                head_dim,
+                norm2_weight: get(&format!("{p}.norm2.weight"))?,
+                norm2_bias: get(&format!("{p}.norm2.bias"))?,
+                ffn_w1: get(&format!("{p}.ffn.w1"))?,
+                ffn_b1: get(&format!("{p}.ffn.b1"))?,
+                ffn_w2: get(&format!("{p}.ffn.w2"))?,
+                ffn_b2: get(&format!("{p}.ffn.b2"))?,
+            });
+        }
+
+        Ok(Self {
+            blocks,
+            final_norm_weight: get("final_norm.weight")?,
+            final_norm_bias: get("final_norm.bias")?,
+            embed_dim: d,
+        })
+    }
+
+    /// Run frozen attention: `[N_cols, 128] -> [N_cols, 128]`.
+    ///
+    /// Gradients flow transparently through all operations to upstream
+    /// trainable parameters (e.g., multi-branch model weights).
+    pub fn forward(&self, header_embeds: &Tensor) -> Result<Tensor> {
+        let mut out = header_embeds.clone();
+        for block in &self.blocks {
+            out = block.forward(&out)?;
+        }
+        // Final layer norm
+        frozen_layer_norm(&out, &self.final_norm_weight, &self.final_norm_bias)
+    }
+
+    /// Get the embedding dimension.
+    pub fn embed_dim(&self) -> usize {
+        self.embed_dim
+    }
+}
+
+impl FrozenTransformerBlock {
+    fn forward(&self, x: &Tensor) -> Result<Tensor> {
+        // Pre-norm → self-attention → residual
+        let normed = frozen_layer_norm(x, &self.norm1_weight, &self.norm1_bias)?;
+        let attn_out = self.forward_attn(&normed)?;
+        let x = (x + &attn_out)?;
+
+        // Pre-norm → FFN → residual
+        let normed = frozen_layer_norm(&x, &self.norm2_weight, &self.norm2_bias)?;
+        let ffn_out = self.forward_ffn(&normed)?;
+        Ok((&x + &ffn_out)?)
+    }
+
+    fn forward_attn(&self, x: &Tensor) -> Result<Tensor> {
+        let n = x.dim(0)?;
+        let d = x.dim(1)?;
+        let h = self.n_heads;
+        let hd = self.head_dim;
+
+        let q = x.matmul(&self.wq.t()?)?.broadcast_add(&self.bq)?;
+        let k = x.matmul(&self.wk.t()?)?.broadcast_add(&self.bk)?;
+        let v = x.matmul(&self.wv.t()?)?.broadcast_add(&self.bv)?;
+
+        let q = q.reshape((n, h, hd))?.transpose(0, 1)?;
+        let k = k.reshape((n, h, hd))?.transpose(0, 1)?;
+        let v = v.reshape((n, h, hd))?.transpose(0, 1)?;
+
+        let scale = (hd as f64).sqrt();
+        let attn_weights = (q.matmul(&k.transpose(1, 2)?)? / scale)?;
+
+        let attn_max = attn_weights.max(2)?.unsqueeze(2)?;
+        let shifted = attn_weights.broadcast_sub(&attn_max)?;
+        let exp = shifted.exp()?;
+        let sum_exp = exp.sum(2)?.unsqueeze(2)?;
+        let attn_probs = exp.broadcast_div(&sum_exp)?;
+
+        let attn_out = attn_probs.matmul(&v)?;
+        let attn_out = attn_out.transpose(0, 1)?.reshape((n, d))?;
+
+        Ok(attn_out
+            .matmul(&self.out_weight.t()?)?
+            .broadcast_add(&self.out_bias)?)
+    }
+
+    fn forward_ffn(&self, x: &Tensor) -> Result<Tensor> {
+        let h = x.matmul(&self.ffn_w1.t()?)?.broadcast_add(&self.ffn_b1)?;
+        let h = h.gelu_erf()?;
+        Ok(h.matmul(&self.ffn_w2.t()?)?.broadcast_add(&self.ffn_b2)?)
+    }
+}
+
+/// Layer normalisation using constant tensors (for frozen models).
+fn frozen_layer_norm(x: &Tensor, weight: &Tensor, bias: &Tensor) -> Result<Tensor> {
+    let eps = 1e-5_f64;
+    let d = x.dim(1)?;
+    let mean = (x.sum(1)? / d as f64)?;
+    let mean = mean.unsqueeze(1)?;
+    let diff = x.broadcast_sub(&mean)?;
+    let var = ((&diff * &diff)?.sum(1)? / d as f64)?;
+    let std = (var + eps)?.sqrt()?.unsqueeze(1)?;
+    let normed = diff.broadcast_div(&std)?;
+    Ok(normed.broadcast_mul(weight)?.broadcast_add(bias)?)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -770,10 +1223,15 @@ pub struct MultiBranchDataset {
     pub embed_dim: usize,
     pub stats_dim: usize,
     pub header_dim: usize,
+    /// Table groups from v3 data. Empty for v1/v2 data (single group with all records).
+    pub table_groups: Vec<TableGroup>,
 }
 
 impl MultiBranchDataset {
-    /// Build a dataset from training records and a label-to-index mapping.
+    /// Build a dataset from training records, a label-to-index mapping, and optional table groups.
+    ///
+    /// When `table_groups` is `None`, a single group spanning all records is created
+    /// (backward compatible with v1/v2 data).
     pub fn from_records(
         records: &[TrainingRecord],
         label_to_idx: &std::collections::HashMap<String, u32>,
@@ -781,6 +1239,27 @@ impl MultiBranchDataset {
         embed_dim: usize,
         stats_dim: usize,
         header_dim: usize,
+    ) -> Result<Self> {
+        Self::from_records_with_groups(
+            records,
+            label_to_idx,
+            char_dim,
+            embed_dim,
+            stats_dim,
+            header_dim,
+            None,
+        )
+    }
+
+    /// Build a dataset from training records with explicit table group metadata.
+    pub fn from_records_with_groups(
+        records: &[TrainingRecord],
+        label_to_idx: &std::collections::HashMap<String, u32>,
+        char_dim: usize,
+        embed_dim: usize,
+        stats_dim: usize,
+        header_dim: usize,
+        table_groups: Option<Vec<TableGroup>>,
     ) -> Result<Self> {
         let n = records.len();
         let mut char_feats = Vec::with_capacity(n * char_dim);
@@ -810,6 +1289,18 @@ impl MultiBranchDataset {
             }
         }
 
+        // Use provided groups or create a single default group
+        let groups = table_groups.unwrap_or_else(|| {
+            if n > 0 {
+                vec![TableGroup {
+                    record_indices: (0..n).collect(),
+                    sibling_headers: Vec::new(),
+                }]
+            } else {
+                Vec::new()
+            }
+        });
+
         Ok(Self {
             char_feats,
             embed_feats: embed_feats_flat,
@@ -821,6 +1312,7 @@ impl MultiBranchDataset {
             embed_dim,
             stats_dim,
             header_dim,
+            table_groups: groups,
         })
     }
 
@@ -878,6 +1370,118 @@ impl MultiBranchDataset {
             None
         };
         let labels_t = Tensor::new(label_batch.as_slice(), device)?;
+
+        Ok((char_t, embed_t, stats_t, header_t, labels_t))
+    }
+
+    /// Extract a batch from whole table groups, optionally enriching headers via
+    /// frozen sibling-context attention.
+    ///
+    /// `group_indices` selects which table groups to include. All records from each
+    /// selected group are concatenated into a single batch. When `frozen_ctx` is
+    /// `Some`, header features for each group are passed through the frozen attention
+    /// module before being placed into the batch.
+    ///
+    /// For groups with empty sibling_headers (v1/v2 data), header features pass through
+    /// unchanged regardless of `frozen_ctx`.
+    pub fn batch_groups(
+        &self,
+        group_indices: &[usize],
+        frozen_ctx: Option<&FrozenSiblingContext>,
+        device: &Device,
+    ) -> Result<(Tensor, Tensor, Tensor, Option<Tensor>, Tensor)> {
+        // Collect all record indices from the selected groups
+        let mut all_indices = Vec::new();
+        // Track group boundaries for per-group header enrichment
+        let mut group_boundaries: Vec<(usize, usize, usize)> = Vec::new(); // (start, end, group_idx)
+
+        for &gi in group_indices {
+            let group = &self.table_groups[gi];
+            let start = all_indices.len();
+            all_indices.extend_from_slice(&group.record_indices);
+            let end = all_indices.len();
+            group_boundaries.push((start, end, gi));
+        }
+
+        let bs = all_indices.len();
+        if bs == 0 {
+            // Return empty tensors
+            let char_t = Tensor::zeros((0, self.char_dim), DType::F32, device)?;
+            let embed_t = Tensor::zeros((0, self.embed_dim), DType::F32, device)?;
+            let stats_t = Tensor::zeros((0, self.stats_dim), DType::F32, device)?;
+            let header_t = if self.header_dim > 0 {
+                Some(Tensor::zeros((0, self.header_dim), DType::F32, device)?)
+            } else {
+                None
+            };
+            let labels_t = Tensor::zeros(0, DType::U32, device)?;
+            return Ok((char_t, embed_t, stats_t, header_t, labels_t));
+        }
+
+        // Build base batch from flat indices
+        let mut char_batch = Vec::with_capacity(bs * self.char_dim);
+        let mut embed_batch = Vec::with_capacity(bs * self.embed_dim);
+        let mut stats_batch = Vec::with_capacity(bs * self.stats_dim);
+        let mut header_batch = Vec::with_capacity(bs * self.header_dim);
+        let mut label_batch = Vec::with_capacity(bs);
+
+        for &i in &all_indices {
+            let char_start = i * self.char_dim;
+            char_batch.extend_from_slice(&self.char_feats[char_start..char_start + self.char_dim]);
+            let embed_start = i * self.embed_dim;
+            embed_batch
+                .extend_from_slice(&self.embed_feats[embed_start..embed_start + self.embed_dim]);
+            let stats_start = i * self.stats_dim;
+            stats_batch
+                .extend_from_slice(&self.stats_feats[stats_start..stats_start + self.stats_dim]);
+            if self.header_dim > 0 {
+                let header_start = i * self.header_dim;
+                header_batch.extend_from_slice(
+                    &self.header_feats[header_start..header_start + self.header_dim],
+                );
+            }
+            label_batch.push(self.labels[i]);
+        }
+
+        let char_t = Tensor::new(char_batch.as_slice(), device)?.reshape((bs, self.char_dim))?;
+        let embed_t = Tensor::new(embed_batch.as_slice(), device)?.reshape((bs, self.embed_dim))?;
+        let stats_t = Tensor::new(stats_batch.as_slice(), device)?.reshape((bs, self.stats_dim))?;
+        let labels_t = Tensor::new(label_batch.as_slice(), device)?;
+
+        let header_t = if self.header_dim > 0 {
+            let mut header_t =
+                Tensor::new(header_batch.as_slice(), device)?.reshape((bs, self.header_dim))?;
+
+            // Enrich headers per-group via frozen sibling-context attention
+            if let Some(ctx) = frozen_ctx {
+                for &(start, end, gi) in &group_boundaries {
+                    let group = &self.table_groups[gi];
+                    let n_cols = end - start;
+                    // Only enrich groups with sibling headers (v3 data)
+                    if n_cols > 1 && !group.sibling_headers.is_empty() {
+                        // Extract this group's header features: [n_cols, header_dim]
+                        let group_headers = header_t.narrow(0, start, n_cols)?;
+                        // Run frozen attention
+                        let enriched = ctx.forward(&group_headers)?;
+                        // Splice enriched headers back into the batch tensor
+                        // We rebuild by concatenating: [0..start] + enriched + [end..bs]
+                        let mut parts: Vec<Tensor> = Vec::new();
+                        if start > 0 {
+                            parts.push(header_t.narrow(0, 0, start)?);
+                        }
+                        parts.push(enriched);
+                        if end < bs {
+                            parts.push(header_t.narrow(0, end, bs - end)?);
+                        }
+                        header_t = Tensor::cat(&parts, 0)?;
+                    }
+                }
+            }
+
+            Some(header_t)
+        } else {
+            None
+        };
 
         Ok((char_t, embed_t, stats_t, header_t, labels_t))
     }
@@ -1015,6 +1619,7 @@ pub fn train_multi_branch(
     train_data: &MultiBranchDataset,
     val_data: &MultiBranchDataset,
     labels: Option<&[String]>,
+    frozen_ctx: Option<&FrozenSiblingContext>,
     renderer: Option<Box<dyn crate::tui::TrainingRenderer>>,
 ) -> Result<crate::training::TrainingSummary> {
     use crate::training::{
@@ -1028,6 +1633,11 @@ pub fn train_multi_branch(
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     let is_hierarchical = model_config.head_type == HeadType::Hierarchical;
+    let use_group_batching = frozen_ctx.is_some() && !train_data.table_groups.is_empty();
+
+    if frozen_ctx.is_some() {
+        tracing::info!("Sibling-context enrichment enabled (frozen attention)");
+    }
 
     tracing::info!(
         "Starting multi-branch training: {} train, {} val, {} epochs, batch_size={}, lr={}, head={}",
@@ -1127,19 +1737,56 @@ pub fn train_multi_branch(
         let lr = scheduler.lr(epoch);
         optimizer.set_learning_rate(lr);
 
-        // Shuffle into batches
-        let batches = shuffled_batches(train_data.len(), config.batch_size, &mut rng);
-
         let mut train_loss_sum = 0.0f64;
         let mut train_correct_sum = 0.0f64;
         let mut train_samples = 0usize;
 
+        // Build batches: group-based (with frozen enrichment) or flat (traditional)
+        let group_batches: Vec<Vec<usize>>;
+        let flat_batches: Vec<Vec<usize>>;
+        let total_batches;
+
+        if use_group_batching {
+            // Shuffle at table-group level, sample whole groups until batch is full
+            use rand::seq::SliceRandom;
+            let n_groups = train_data.table_groups.len();
+            let mut group_order: Vec<usize> = (0..n_groups).collect();
+            group_order.shuffle(&mut rng);
+
+            // Pack groups into batches (may overshoot batch_size per group)
+            let mut batches = Vec::new();
+            let mut current_batch = Vec::new();
+            let mut current_size = 0usize;
+            for &gi in &group_order {
+                let group_size = train_data.table_groups[gi].record_indices.len();
+                current_batch.push(gi);
+                current_size += group_size;
+                if current_size >= config.batch_size {
+                    batches.push(current_batch);
+                    current_batch = Vec::new();
+                    current_size = 0;
+                }
+            }
+            if !current_batch.is_empty() {
+                batches.push(current_batch);
+            }
+            group_batches = batches;
+            flat_batches = Vec::new();
+            total_batches = group_batches.len();
+        } else {
+            group_batches = Vec::new();
+            flat_batches = shuffled_batches(train_data.len(), config.batch_size, &mut rng);
+            total_batches = flat_batches.len();
+        }
+
         // Training loop
-        let total_batches = batches.len();
-        for (batch_num, batch_idx) in batches.iter().enumerate() {
-            let (char_t, embed_t, stats_t, header_t, labels_t) =
-                train_data.batch(batch_idx, &device)?;
-            let bs = batch_idx.len();
+        for batch_num in 0..total_batches {
+            let (char_t, embed_t, stats_t, header_t, labels_t) = if use_group_batching {
+                train_data.batch_groups(&group_batches[batch_num], frozen_ctx, &device)?
+            } else {
+                train_data.batch(&flat_batches[batch_num], &device)?
+            };
+            let bs = labels_t.dim(0)?;
 
             let loss = if is_hierarchical {
                 let hier = model.hierarchical_head().unwrap();
@@ -1490,7 +2137,7 @@ mod tests {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         write_training_data(tmp.path(), &records, 960, 512, 27, 128).unwrap();
 
-        let (header, loaded) = read_training_data(tmp.path()).unwrap();
+        let (header, loaded, _groups) = read_training_data(tmp.path()).unwrap();
         assert_eq!(header.n_records, 10);
         assert_eq!(header.version, 2);
         assert_eq!(header.char_dim, 960);
@@ -1568,7 +2215,7 @@ mod tests {
         }
         drop(file);
 
-        let (header, records) = read_training_data(tmp.path()).unwrap();
+        let (header, records, _groups) = read_training_data(tmp.path()).unwrap();
         assert_eq!(header.version, 1);
         assert_eq!(header.n_records, 2);
         assert_eq!(header.char_dim, 4);
@@ -1607,7 +2254,7 @@ mod tests {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         write_training_data(tmp.path(), &records, 8, 6, 4, 5).unwrap();
 
-        let (header, loaded) = read_training_data(tmp.path()).unwrap();
+        let (header, loaded, _groups) = read_training_data(tmp.path()).unwrap();
         assert_eq!(header.version, 2);
         assert_eq!(header.n_records, 3);
         assert_eq!(header.char_dim, 8);
@@ -1716,8 +2363,16 @@ mod tests {
             min_lr: 1e-6,
         };
 
-        let summary =
-            train_multi_branch(&train_config, &config, &train_data, &val_data, None, None).unwrap();
+        let summary = train_multi_branch(
+            &train_config,
+            &config,
+            &train_data,
+            &val_data,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(summary.total_epochs, 5);
         assert_eq!(summary.epoch_metrics.len(), 5);
@@ -1978,6 +2633,7 @@ mod tests {
             &val_data,
             Some(&labels),
             None,
+            None,
         )
         .unwrap();
 
@@ -1996,5 +2652,270 @@ mod tests {
         // Model artifacts should exist
         assert!(tmp_dir.path().join("model.safetensors").exists());
         assert!(tmp_dir.path().join("config.json").exists());
+    }
+
+    // ── FTMB v3 tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_ftmb_v3_roundtrip() {
+        // Create records belonging to 2 table groups
+        let records: Vec<TrainingRecord> = (0..5)
+            .map(|i| TrainingRecord {
+                label: format!("test.type.t_{i}"),
+                char_features: vec![i as f32 * 1.0; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+            })
+            .collect();
+
+        let groups = vec![
+            TableGroup {
+                record_indices: vec![0, 1, 2],
+                sibling_headers: vec!["city".to_string(), "name".to_string(), "email".to_string()],
+            },
+            TableGroup {
+                record_indices: vec![3, 4],
+                sibling_headers: vec!["amount".to_string(), "currency".to_string()],
+            },
+        ];
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data_v3(tmp.path(), &records, &groups, 8, 6, 4, 5).unwrap();
+
+        let (header, loaded, loaded_groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 3);
+        assert_eq!(header.n_records, 5);
+        assert_eq!(header.n_groups, 2);
+        assert_eq!(header.char_dim, 8);
+        assert_eq!(header.embed_dim, 6);
+        assert_eq!(header.stats_dim, 4);
+        assert_eq!(header.header_dim, 5);
+        assert_eq!(loaded.len(), 5);
+        assert_eq!(loaded_groups.len(), 2);
+
+        // Verify group metadata
+        assert_eq!(loaded_groups[0].record_indices, vec![0, 1, 2]);
+        assert_eq!(loaded_groups[0].sibling_headers.len(), 3);
+        assert_eq!(loaded_groups[0].sibling_headers[0], "city");
+        assert_eq!(loaded_groups[0].sibling_headers[1], "name");
+        assert_eq!(loaded_groups[0].sibling_headers[2], "email");
+
+        assert_eq!(loaded_groups[1].record_indices, vec![3, 4]);
+        assert_eq!(loaded_groups[1].sibling_headers.len(), 2);
+        assert_eq!(loaded_groups[1].sibling_headers[0], "amount");
+        assert_eq!(loaded_groups[1].sibling_headers[1], "currency");
+
+        // Verify record data roundtrip
+        for (orig, read) in records.iter().zip(loaded.iter()) {
+            assert_eq!(orig.label, read.label);
+            assert_eq!(orig.char_features, read.char_features);
+            assert_eq!(orig.embed_features, read.embed_features);
+            assert_eq!(orig.stats_features, read.stats_features);
+            assert_eq!(orig.header_features, read.header_features);
+        }
+    }
+
+    #[test]
+    fn test_ftmb_v1_read_as_single_group() {
+        // Write a v1 file and verify it loads as single group with empty siblings
+        use std::io::Write;
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let mut file = std::fs::File::create(tmp.path()).unwrap();
+
+        let char_dim: u16 = 4;
+        let embed_dim: u16 = 3;
+        let stats_dim: u16 = 2;
+        let n_records: u64 = 2;
+
+        file.write_all(b"FTMB").unwrap();
+        file.write_all(&1u32.to_le_bytes()).unwrap();
+        file.write_all(&n_records.to_le_bytes()).unwrap();
+        file.write_all(&char_dim.to_le_bytes()).unwrap();
+        file.write_all(&embed_dim.to_le_bytes()).unwrap();
+        file.write_all(&stats_dim.to_le_bytes()).unwrap();
+        file.write_all(&[0u8; 2]).unwrap(); // padding
+
+        for i in 0..2 {
+            let label = format!("type_{i}");
+            let label_bytes = label.as_bytes();
+            file.write_all(&(label_bytes.len() as u16).to_le_bytes())
+                .unwrap();
+            file.write_all(label_bytes).unwrap();
+            for j in 0..char_dim {
+                file.write_all(&((i * 10 + j) as f32).to_le_bytes())
+                    .unwrap();
+            }
+            for j in 0..embed_dim {
+                file.write_all(&((i * 10 + j) as f32 * 0.5).to_le_bytes())
+                    .unwrap();
+            }
+            for j in 0..stats_dim {
+                file.write_all(&((i * 10 + j) as f32 * 0.1).to_le_bytes())
+                    .unwrap();
+            }
+        }
+        drop(file);
+
+        let (_header, records, groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(groups.len(), 1, "v1 should have single group");
+        assert_eq!(groups[0].record_indices, vec![0, 1]);
+        assert!(
+            groups[0].sibling_headers.is_empty(),
+            "v1 group should have empty sibling headers"
+        );
+    }
+
+    #[test]
+    fn test_ftmb_v2_read_as_single_group() {
+        // Write v2, read back, verify single group wrapper
+        let records: Vec<TrainingRecord> = (0..3)
+            .map(|i| TrainingRecord {
+                label: format!("test.type.t_{i}"),
+                char_features: vec![i as f32; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+            })
+            .collect();
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data(tmp.path(), &records, 8, 6, 4, 5).unwrap();
+
+        let (_header, loaded, groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(loaded.len(), 3);
+        assert_eq!(groups.len(), 1, "v2 should have single group");
+        assert_eq!(groups[0].record_indices, vec![0, 1, 2]);
+        assert!(
+            groups[0].sibling_headers.is_empty(),
+            "v2 group should have empty sibling headers"
+        );
+    }
+
+    #[test]
+    fn test_frozen_sibling_context_forward() {
+        // Create a real sibling-context model, save it, then load as frozen
+        use crate::sibling_context::SiblingContextTrainable;
+        use finetype_model::sibling_context::SiblingContextConfig;
+
+        let varmap = VarMap::new();
+        let config = SiblingContextConfig::default();
+        let device = Device::Cpu;
+        let trainable = SiblingContextTrainable::new(&varmap, &config, &device).unwrap();
+
+        // Save to temp dir
+        let tmp_dir = std::env::temp_dir().join("finetype_frozen_sibling_test");
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        std::fs::create_dir_all(&tmp_dir).unwrap();
+        varmap.save(tmp_dir.join("model.safetensors")).unwrap();
+        let config_json = serde_json::to_string_pretty(&config).unwrap();
+        std::fs::write(tmp_dir.join("config.json"), &config_json).unwrap();
+
+        // Load as frozen
+        let frozen = FrozenSiblingContext::load(&tmp_dir, &device).unwrap();
+        assert_eq!(frozen.embed_dim(), 128);
+
+        // Verify shape preservation for various column counts
+        for n_cols in [1, 5, 10, 20] {
+            let input = Tensor::randn(0.0f32, 1.0, (n_cols, 128), &device).unwrap();
+            let output = frozen.forward(&input).unwrap();
+            assert_eq!(
+                output.dims(),
+                &[n_cols, 128],
+                "Shape mismatch for N={}",
+                n_cols
+            );
+        }
+
+        // Verify output matches trainable model
+        let input = Tensor::randn(0.0f32, 1.0, (5, 128), &device).unwrap();
+        let out_trainable: Vec<f32> = trainable
+            .forward(&input)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
+        let out_frozen: Vec<f32> = frozen
+            .forward(&input)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
+
+        for (a, b) in out_trainable.iter().zip(out_frozen.iter()) {
+            assert!(
+                (a - b).abs() < 1e-5,
+                "Frozen output should match trainable: {} vs {}",
+                a,
+                b
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_dataset_batch_groups_without_enrichment() {
+        // Test batch_groups without frozen context (passthrough)
+        let records: Vec<TrainingRecord> = (0..6)
+            .map(|i| TrainingRecord {
+                label: format!("identity.person.type_{}", i % 3),
+                char_features: vec![i as f32; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+            })
+            .collect();
+
+        let mut label_to_idx = std::collections::HashMap::new();
+        label_to_idx.insert("identity.person.type_0".to_string(), 0u32);
+        label_to_idx.insert("identity.person.type_1".to_string(), 1u32);
+        label_to_idx.insert("identity.person.type_2".to_string(), 2u32);
+
+        let groups = vec![
+            TableGroup {
+                record_indices: vec![0, 1, 2],
+                sibling_headers: vec!["city".to_string(), "name".to_string(), "email".to_string()],
+            },
+            TableGroup {
+                record_indices: vec![3, 4, 5],
+                sibling_headers: vec![
+                    "amount".to_string(),
+                    "currency".to_string(),
+                    "date".to_string(),
+                ],
+            },
+        ];
+
+        let dataset = MultiBranchDataset::from_records_with_groups(
+            &records,
+            &label_to_idx,
+            8,
+            6,
+            4,
+            5,
+            Some(groups),
+        )
+        .unwrap();
+
+        // Batch first group only
+        let device = Device::Cpu;
+        let (char_t, embed_t, stats_t, header_t, labels_t) =
+            dataset.batch_groups(&[0], None, &device).unwrap();
+        assert_eq!(char_t.dims(), &[3, 8]);
+        assert_eq!(embed_t.dims(), &[3, 6]);
+        assert_eq!(stats_t.dims(), &[3, 4]);
+        let header_t = header_t.expect("header should be Some");
+        assert_eq!(header_t.dims(), &[3, 5]);
+        assert_eq!(labels_t.dims(), &[3]);
+
+        // Batch both groups
+        let (char_t, _, _, _, labels_t) = dataset.batch_groups(&[0, 1], None, &device).unwrap();
+        assert_eq!(char_t.dims(), &[6, 8]);
+        assert_eq!(labels_t.dims(), &[6]);
     }
 }
