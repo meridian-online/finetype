@@ -1123,12 +1123,16 @@ impl FrozenTransformerBlock {
         let k = x.matmul(&self.wk.t()?)?.broadcast_add(&self.bk)?;
         let v = x.matmul(&self.wv.t()?)?.broadcast_add(&self.bv)?;
 
-        let q = q.reshape((n, h, hd))?.transpose(0, 1)?;
-        let k = k.reshape((n, h, hd))?.transpose(0, 1)?;
-        let v = v.reshape((n, h, hd))?.transpose(0, 1)?;
+        // .contiguous() required after transpose — Metal's matmul kernel
+        // cannot operate on non-contiguous (strided) tensors. Without this,
+        // Metal sees the stride array as the shape and rejects the matmul.
+        let q = q.reshape((n, h, hd))?.transpose(0, 1)?.contiguous()?;
+        let k = k.reshape((n, h, hd))?.transpose(0, 1)?.contiguous()?;
+        let v = v.reshape((n, h, hd))?.transpose(0, 1)?.contiguous()?;
 
         let scale = (hd as f64).sqrt();
-        let attn_weights = (q.matmul(&k.transpose(1, 2)?)? / scale)?;
+        let attn_weights =
+            (q.matmul(&k.transpose(1, 2)?.contiguous()?)? / scale)?;
 
         let attn_max = attn_weights.max(2)?.unsqueeze(2)?;
         let shifted = attn_weights.broadcast_sub(&attn_max)?;
@@ -1137,7 +1141,7 @@ impl FrozenTransformerBlock {
         let attn_probs = exp.broadcast_div(&sum_exp)?;
 
         let attn_out = attn_probs.matmul(&v)?;
-        let attn_out = attn_out.transpose(0, 1)?.reshape((n, d))?;
+        let attn_out = attn_out.transpose(0, 1)?.contiguous()?.reshape((n, d))?;
 
         Ok(attn_out
             .matmul(&self.out_weight.t()?)?
