@@ -1,35 +1,41 @@
 #!/usr/bin/env bash
-# scripts/overnight_sherlock.sh — Overnight multi-branch training pipeline (v3)
+# scripts/overnight_sherlock.sh — Overnight multi-branch training pipeline (v4)
 #
 # Runs on M1 Pro with Metal acceleration. Expects:
 #   - Distilled data at output/distillation-v3/sherlock_distilled.csv.gz
 #   - Model2Vec at models/model2vec/
 #   - Label remap at data/label_remap.json
+#   - Sibling-context model at models/sibling-context/ (for enriched training)
 #
 # Pipeline:
-#   1. Prepare 300k+ column-level training data (.ftmb) — 50/50 distilled/synthetic
-#   2. Train flat multi-branch model (20 epochs)
-#   3. Train hierarchical multi-branch model (20 epochs)
-#   4. Train no-header ablation model (20 epochs, embed features zeroed)
-#   5. Evaluate all models against Tier 1 profile eval + ablation delta
+#   1. Prepare 300k+ FTMB v3 training data (table-grouped, 50/50 mix)
+#   2. Train flat model WITH frozen sibling-context enrichment (20 epochs)
+#   3. Train flat model WITHOUT sibling enrichment (same v3 data, ablation baseline)
+#   4. Evaluate both models against Tier 1 profile eval
+#   5. Ablation comparison: sibling-enriched vs raw headers (AC-7)
 #
 # Usage:
 #   ./scripts/overnight_sherlock.sh                  # Full pipeline
-#   ./scripts/overnight_sherlock.sh --flat-only       # Skip hierarchical + ablation
-#   ./scripts/overnight_sherlock.sh --skip-data        # Skip data prep (reuse existing .ftmb)
-#   ./scripts/overnight_sherlock.sh --skip-ablation    # Skip no-header ablation variant
+#   ./scripts/overnight_sherlock.sh --skip-data       # Skip data prep (reuse existing .ftmb)
+#   ./scripts/overnight_sherlock.sh --skip-ablation   # Skip ablation variant
 #
 # Output:
-#   output/multibranch-training/blend-50-50.ftmb      — Training data (50/50 mix)
-#   output/multibranch-training/blend-50-50-noheader.ftmb — Ablation data (headers zeroed)
-#   models/sherlock-v3-flat/                           — Flat model + eval
-#   models/sherlock-v3-hier/                           — Hierarchical model + eval
-#   models/sherlock-v3-noheader/                       — No-header ablation model + eval
-#   results/overnight-v3.log                           — Full log
+#   output/multibranch-training/blend-50-50-v3.ftmb  — Training data (FTMB v3, table-grouped)
+#   models/sherlock-v4-sibling/                       — Flat model with sibling enrichment
+#   models/sherlock-v4-baseline/                      — Flat model without sibling enrichment
+#   results/overnight-v4.log                          — Full log
 #
-# v2 config (preserved for reproducibility):
-#   --ratio-distilled 0.3, blend-30-70.ftmb, sherlock-v2-{flat,hier}/
-#   To reproduce v2: git checkout <v2-commit> -- scripts/overnight_sherlock.sh
+# Ablation design (AC-7):
+#   Both models train on identical FTMB v3 data with table groups.
+#   "sibling" model: FrozenSiblingContext loads from models/sibling-context/,
+#     enriching header embeddings via frozen attention per group.
+#   "baseline" model: sibling-context model is temporarily hidden,
+#     so FrozenSiblingContext doesn't load → flat batching with raw headers.
+#   Delta measures sibling signal contribution.
+#
+# v3 config (preserved for reproducibility):
+#   --format v2, blend-50-50.ftmb, sherlock-v3-{flat,hier,noheader}/
+#   To reproduce v3: git checkout <v3-commit> -- scripts/overnight_sherlock.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -38,15 +44,13 @@ cd "$PROJECT_DIR"
 
 LOG_DIR="results"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/overnight-v3.log"
+LOG_FILE="$LOG_DIR/overnight-v4.log"
 
-FLAT_ONLY=false
 SKIP_DATA=false
 SKIP_ABLATION=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --flat-only)      FLAT_ONLY=true; shift ;;
         --skip-data)      SKIP_DATA=true; shift ;;
         --skip-ablation)  SKIP_ABLATION=true; shift ;;
         --help|-h)
@@ -61,10 +65,10 @@ done
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "================================================================"
-echo " Multi-Branch Overnight Pipeline v3"
+echo " Multi-Branch Overnight Pipeline v4 (Sibling Context)"
 echo " Started: $(date)"
 echo " Host: $(hostname) — $(uname -m)"
-echo " Config: 50/50 distilled/synthetic, seed 42, batch 32, 20 epochs"
+echo " Config: FTMB v3, 50/50 distilled/synthetic, seed 42, 20 epochs"
 echo "================================================================"
 echo ""
 
@@ -84,6 +88,15 @@ if [[ ! -d models/model2vec ]]; then
     exit 1
 fi
 
+SIBLING_CTX_DIR="models/sibling-context"
+if [[ ! -f "$SIBLING_CTX_DIR/model.safetensors" ]]; then
+    echo "FAIL: Sibling-context model not found at $SIBLING_CTX_DIR/model.safetensors"
+    echo "  This is required for v4 pipeline. Train with:"
+    echo "    cargo run --release -- train-sibling-context"
+    exit 1
+fi
+echo "[Pre-flight] Sibling-context model found at $SIBLING_CTX_DIR/"
+
 if [[ ! -f data/label_remap.json ]]; then
     echo "WARN: Label remap not found at data/label_remap.json (proceeding without remap)"
 fi
@@ -99,21 +112,20 @@ cargo build --bin finetype --no-default-features --features metal --release 2>&1
 echo "[Pre-flight] Build OK"
 echo ""
 
-# --- Step 1: Prepare Training Data (50/50 mix) -----------------------
+# --- Step 1: Prepare Training Data (FTMB v3, table-grouped) ----------
 
-FTMB_FILE="output/multibranch-training/blend-50-50.ftmb"
-FTMB_NOHEADER="output/multibranch-training/blend-50-50-noheader.ftmb"
+FTMB_FILE="output/multibranch-training/blend-50-50-v3.ftmb"
 mkdir -p output/multibranch-training
 
 if [[ "$SKIP_DATA" == "true" ]] && [[ -f "$FTMB_FILE" ]]; then
     echo "================================================================"
-    echo " Step 1/5: Data prep — SKIPPED (--skip-data, reusing existing)"
+    echo " Step 1/4: Data prep — SKIPPED (--skip-data, reusing existing)"
     echo "================================================================"
     python3 scripts/read_ftmb.py "$FTMB_FILE" --stats --verify
     echo ""
 else
     echo "================================================================"
-    echo " Step 1/5: Prepare 300k+ Training Data (.ftmb) — 50/50 mix"
+    echo " Step 1/4: Prepare 300k+ Training Data (FTMB v3, table-grouped)"
     echo " Started: $(date)"
     echo "================================================================"
 
@@ -124,6 +136,7 @@ else
         --samples-per-type 1200 \
         --synthetic-columns 1200 \
         --ratio-distilled 0.5 \
+        --format v3 \
         --seed 42
 
     echo ""
@@ -136,6 +149,7 @@ else
         --samples-per-type 1200 \
         --synthetic-columns 1200 \
         --ratio-distilled 0.5 \
+        --format v3 \
         --seed 42 \
         --workers 8
 
@@ -148,76 +162,26 @@ else
 fi
 echo ""
 
-# --- Step 1b: Create no-header ablation data -------------------------
-# Zero out embed (header) features for AC-7 ablation comparison.
-# Reads the FTMB file and writes a copy with all embed_features set to 0.
+# --- Step 2: Train WITH Sibling-Context Enrichment --------------------
+#
+# FrozenSiblingContext loads from models/sibling-context/ automatically.
+# Training loop uses batch_groups() with frozen attention enrichment.
 
-if [[ "$FLAT_ONLY" == "false" ]] && [[ "$SKIP_ABLATION" == "false" ]]; then
-    if [[ "$SKIP_DATA" == "true" ]] && [[ -f "$FTMB_NOHEADER" ]]; then
-        echo "[Data] No-header ablation data exists, reusing"
-    else
-        echo "[Data] Creating no-header ablation FTMB (zeroing header features)..."
-        python3 -c "
-import struct, sys
-
-src, dst = sys.argv[1], sys.argv[2]
-
-with open(src, 'rb') as fin, open(dst, 'wb') as fout:
-    # Read and copy 24-byte header verbatim
-    header = fin.read(24)
-    fout.write(header)
-
-    version = struct.unpack_from('<I', header, 4)[0]
-    n_records = struct.unpack_from('<Q', header, 8)[0]
-    char_dim = struct.unpack_from('<H', header, 16)[0]
-    embed_dim = struct.unpack_from('<H', header, 18)[0]
-    stats_dim = struct.unpack_from('<H', header, 20)[0]
-    header_dim = struct.unpack_from('<H', header, 22)[0] if version >= 2 else 0
-
-    zero_header = b'\x00' * (header_dim * 4)
-
-    for i in range(n_records):
-        # Read and copy label (u16 length prefix in both v1 and v2)
-        (llen,) = struct.unpack('<H', fin.read(2))
-        fout.write(struct.pack('<H', llen))
-        label = fin.read(llen)
-        fout.write(label)
-
-        # Copy char, embed, stats features unchanged
-        fout.write(fin.read(char_dim * 4))
-        fout.write(fin.read(embed_dim * 4))
-        fout.write(fin.read(stats_dim * 4))
-
-        # Zero out header features (the ablation target)
-        if header_dim > 0:
-            fin.read(header_dim * 4)  # skip original
-            fout.write(zero_header)
-
-    print(f'Wrote {n_records} records to {dst} with zeroed header features (header_dim={header_dim})')
-" "$FTMB_FILE" "$FTMB_NOHEADER"
-
-        echo "[Data] Verifying no-header ablation data..."
-        python3 scripts/read_ftmb.py "$FTMB_NOHEADER" --stats --verify
-    fi
-    echo ""
-fi
-
-# --- Step 2: Train Flat Multi-Branch (M-6) ---------------------------
+SIBLING_MODEL="models/sherlock-v4-sibling"
 
 echo "================================================================"
-echo " Step 2/5: Train Flat Multi-Branch (20 epochs)"
+echo " Step 2/4: Train Flat Model WITH Sibling-Context Enrichment"
 echo " Started: $(date)"
+echo " Sibling context: $SIBLING_CTX_DIR/"
 echo "================================================================"
 
-FLAT_MODEL="models/sherlock-v3-flat"
-
-if [[ -f "$FLAT_MODEL/model.safetensors" ]]; then
-    echo "[Flat] Model already exists, skipping training"
+if [[ -f "$SIBLING_MODEL/model.safetensors" ]]; then
+    echo "[Sibling] Model already exists, skipping training"
 else
     cargo run --bin finetype --no-default-features --features metal --release -- \
         train-multi-branch \
         --data "$FTMB_FILE" \
-        --output "$FLAT_MODEL" \
+        --output "$SIBLING_MODEL" \
         --epochs 20 \
         --batch-size 32 \
         --lr 0.0001 \
@@ -231,64 +195,36 @@ else
 fi
 
 echo ""
-echo "Flat training complete: $(date)"
+echo "Sibling-enriched training complete: $(date)"
 echo ""
 
-# --- Step 3: Train Hierarchical Multi-Branch -------------------------
+# --- Step 3: Train WITHOUT Sibling-Context (Ablation Baseline) --------
+#
+# Same v3 data, same hyperparameters, but sibling-context model is
+# temporarily hidden so FrozenSiblingContext doesn't load. Training
+# falls back to flat batching with raw header features.
 
-HIER_MODEL="models/sherlock-v3-hier"
+BASELINE_MODEL="models/sherlock-v4-baseline"
 
-if [[ "$FLAT_ONLY" == "false" ]]; then
+if [[ "$SKIP_ABLATION" == "false" ]]; then
     echo "================================================================"
-    echo " Step 3/5: Train Hierarchical Multi-Branch (20 epochs)"
+    echo " Step 3/4: Train Flat Model WITHOUT Sibling-Context (Ablation)"
     echo " Started: $(date)"
+    echo " Purpose: AC-7 — baseline for sibling signal measurement"
     echo "================================================================"
 
-    if [[ -f "$HIER_MODEL/model.safetensors" ]]; then
-        echo "[Hier] Model already exists, skipping training"
+    if [[ -f "$BASELINE_MODEL/model.safetensors" ]]; then
+        echo "[Baseline] Model already exists, skipping training"
     else
+        # Temporarily hide sibling-context model so it doesn't load
+        SIBLING_HIDDEN="${SIBLING_CTX_DIR}.hidden"
+        mv "$SIBLING_CTX_DIR" "$SIBLING_HIDDEN"
+        trap 'mv "$SIBLING_HIDDEN" "$SIBLING_CTX_DIR" 2>/dev/null || true' EXIT
+
         cargo run --bin finetype --no-default-features --features metal --release -- \
             train-multi-branch \
             --data "$FTMB_FILE" \
-            --output "$HIER_MODEL" \
-            --epochs 20 \
-            --batch-size 32 \
-            --lr 0.0001 \
-            --weight-decay 0.0001 \
-            --dropout 0.35 \
-            --seed 42 \
-            --head hierarchical \
-            --patience 10 \
-            --no-tui \
-        2>&1
-    fi
-
-    echo ""
-    echo "Hierarchical training complete: $(date)"
-    echo ""
-else
-    echo "[Step 3/5] Hierarchical training — SKIPPED (--flat-only)"
-    echo ""
-fi
-
-# --- Step 4: Train No-Header Ablation (AC-7) -------------------------
-
-NOHEADER_MODEL="models/sherlock-v3-noheader"
-
-if [[ "$FLAT_ONLY" == "false" ]] && [[ "$SKIP_ABLATION" == "false" ]]; then
-    echo "================================================================"
-    echo " Step 4/5: Train No-Header Ablation (20 epochs, embed zeroed)"
-    echo " Started: $(date)"
-    echo " Purpose: AC-7 — measure header contribution to accuracy"
-    echo "================================================================"
-
-    if [[ -f "$NOHEADER_MODEL/model.safetensors" ]]; then
-        echo "[NoHeader] Model already exists, skipping training"
-    else
-        cargo run --bin finetype --no-default-features --features metal --release -- \
-            train-multi-branch \
-            --data "$FTMB_NOHEADER" \
-            --output "$NOHEADER_MODEL" \
+            --output "$BASELINE_MODEL" \
             --epochs 20 \
             --batch-size 32 \
             --lr 0.0001 \
@@ -299,28 +235,30 @@ if [[ "$FLAT_ONLY" == "false" ]] && [[ "$SKIP_ABLATION" == "false" ]]; then
             --patience 10 \
             --no-tui \
         2>&1
+
+        # Restore sibling-context model
+        mv "$SIBLING_HIDDEN" "$SIBLING_CTX_DIR"
+        trap - EXIT
     fi
 
     echo ""
-    echo "No-header ablation training complete: $(date)"
+    echo "Baseline training complete: $(date)"
     echo ""
 else
-    echo "[Step 4/5] No-header ablation — SKIPPED (--flat-only or --skip-ablation)"
+    echo "[Step 3/4] Ablation baseline — SKIPPED (--skip-ablation)"
     echo ""
 fi
 
-# --- Step 5: Evaluation -----------------------------------------------
+# --- Step 4: Evaluation -----------------------------------------------
 
 echo "================================================================"
-echo " Step 5/5: Evaluation"
+echo " Step 4/4: Evaluation"
 echo " Started: $(date)"
 echo "================================================================"
 echo ""
 
-# Build eval list: always include flat, conditionally add hier + noheader
-MODELS_TO_EVAL=("$FLAT_MODEL")
-[[ "$FLAT_ONLY" == "false" ]] && MODELS_TO_EVAL+=("$HIER_MODEL")
-[[ "$FLAT_ONLY" == "false" ]] && [[ "$SKIP_ABLATION" == "false" ]] && MODELS_TO_EVAL+=("$NOHEADER_MODEL")
+MODELS_TO_EVAL=("$SIBLING_MODEL")
+[[ "$SKIP_ABLATION" == "false" ]] && MODELS_TO_EVAL+=("$BASELINE_MODEL")
 
 for model_dir in "${MODELS_TO_EVAL[@]}"; do
     model_name="$(basename "$model_dir")"
@@ -344,45 +282,50 @@ done
 
 # --- Ablation Comparison (AC-7) ----------------------------------------
 
-if [[ "$FLAT_ONLY" == "false" ]] && [[ "$SKIP_ABLATION" == "false" ]]; then
-    FLAT_JSON="$FLAT_MODEL/eval/profile_results.json"
-    NOHEADER_JSON="$NOHEADER_MODEL/eval/profile_results.json"
+if [[ "$SKIP_ABLATION" == "false" ]]; then
+    SIBLING_JSON="$SIBLING_MODEL/eval/profile_results.json"
+    BASELINE_JSON="$BASELINE_MODEL/eval/profile_results.json"
 
-    if [[ -f "$FLAT_JSON" ]] && [[ -f "$NOHEADER_JSON" ]]; then
+    if [[ -f "$SIBLING_JSON" ]] && [[ -f "$BASELINE_JSON" ]]; then
         echo "================================================================"
-        echo " Header Ablation Comparison (AC-7)"
+        echo " Sibling-Context Ablation Comparison (AC-7)"
         echo "================================================================"
+        echo ""
+        echo " Both models trained on identical FTMB v3 data."
+        echo " Sibling: FrozenSiblingContext enriches headers via frozen attention."
+        echo " Baseline: raw Model2Vec headers, no sibling enrichment."
+        echo ""
         duckdb -c "
-            WITH flat AS (
+            WITH sibling AS (
                 SELECT label_correct, label_total, label_accuracy_pct,
                        domain_correct, domain_total, domain_accuracy_pct
-                FROM read_json_auto('$FLAT_JSON')
+                FROM read_json_auto('$SIBLING_JSON')
             ),
-            noheader AS (
+            baseline AS (
                 SELECT label_correct, label_total, label_accuracy_pct,
                        domain_correct, domain_total, domain_accuracy_pct
-                FROM read_json_auto('$NOHEADER_JSON')
+                FROM read_json_auto('$BASELINE_JSON')
             )
             SELECT
-                'With headers:    ' || flat.label_correct || '/' || flat.label_total
-                    || ' (' || flat.label_accuracy_pct || '% label), '
-                    || flat.domain_correct || '/' || flat.domain_total
-                    || ' (' || flat.domain_accuracy_pct || '% domain)' AS result
-            FROM flat
+                'With siblings:    ' || sibling.label_correct || '/' || sibling.label_total
+                    || ' (' || sibling.label_accuracy_pct || '% label), '
+                    || sibling.domain_correct || '/' || sibling.domain_total
+                    || ' (' || sibling.domain_accuracy_pct || '% domain)' AS result
+            FROM sibling
             UNION ALL
             SELECT
-                'Without headers: ' || noheader.label_correct || '/' || noheader.label_total
-                    || ' (' || noheader.label_accuracy_pct || '% label), '
-                    || noheader.domain_correct || '/' || noheader.domain_total
-                    || ' (' || noheader.domain_accuracy_pct || '% domain)'
-            FROM noheader
+                'Without siblings: ' || baseline.label_correct || '/' || baseline.label_total
+                    || ' (' || baseline.label_accuracy_pct || '% label), '
+                    || baseline.domain_correct || '/' || baseline.domain_total
+                    || ' (' || baseline.domain_accuracy_pct || '% domain)'
+            FROM baseline
             UNION ALL
             SELECT
-                'Delta:           ' || (flat.label_accuracy_pct - noheader.label_accuracy_pct)
+                'Delta:            ' || (sibling.label_accuracy_pct - baseline.label_accuracy_pct)
                     || ' pp label, '
-                    || (flat.domain_accuracy_pct - noheader.domain_accuracy_pct)
+                    || (sibling.domain_accuracy_pct - baseline.domain_accuracy_pct)
                     || ' pp domain'
-            FROM flat, noheader
+            FROM sibling, baseline
         " -noheader -csv 2>/dev/null || echo "  (failed to compute ablation delta)"
         echo ""
     fi
@@ -425,7 +368,7 @@ for model_dir in "${MODELS_TO_EVAL[@]}"; do
 done
 echo ""
 echo "Next steps:"
-echo "  1. Compare flat vs hier vs noheader accuracy"
-echo "  2. If header delta > 5pp: headers are load-bearing, keep header branch"
-echo "  3. If header delta < 2pp: headers add noise, consider removing"
+echo "  1. Compare sibling-enriched vs baseline accuracy"
+echo "  2. If delta > 0: sibling context improves accuracy, proceed to pipeline integration"
+echo "  3. If delta ≤ 0: see fallback plan in spec (retrain attention against multi-branch loss)"
 echo "  4. Review findings before merging"

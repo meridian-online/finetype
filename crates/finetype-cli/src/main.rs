@@ -1019,23 +1019,16 @@ fn cmd_train_multi_branch(
         }
     };
 
-    // Load frozen sibling-context model if available
+    // Pass sibling-context model path if available — loaded inside
+    // train_multi_branch on the same device as the training model to
+    // avoid Metal device handle mismatch.
     let sibling_ctx_dir = std::path::PathBuf::from("models/sibling-context");
-    let frozen_ctx = if sibling_ctx_dir.join("model.safetensors").exists() {
-        let device = finetype_train::get_device();
-        match finetype_train::multi_branch::FrozenSiblingContext::load(&sibling_ctx_dir, &device) {
-            Ok(ctx) => {
-                eprintln!(
-                    "Loaded frozen sibling-context attention ({}d)",
-                    ctx.embed_dim()
-                );
-                Some(ctx)
-            }
-            Err(e) => {
-                eprintln!("Warning: Failed to load sibling-context model: {e}");
-                None
-            }
-        }
+    let sibling_ctx_path = if sibling_ctx_dir.join("model.safetensors").exists() {
+        eprintln!(
+            "Sibling-context model found at {}",
+            sibling_ctx_dir.display()
+        );
+        Some(sibling_ctx_dir)
     } else {
         None
     };
@@ -1046,7 +1039,7 @@ fn cmd_train_multi_branch(
         &train_data,
         &val_data,
         labels_opt,
-        frozen_ctx.as_ref(),
+        sibling_ctx_path.as_deref(),
         renderer,
     )?;
 
