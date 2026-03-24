@@ -3,7 +3,12 @@
 
 Reads distilled data (sherlock_distilled.csv.gz) and synthetic data
 (from finetype generate), blends them per-type, extracts 4 feature
-branches via `finetype extract-features`, and writes a binary .ftmb v2 file.
+branches via `finetype extract-features`, and writes a binary .ftmb file.
+
+Supports two output formats:
+  - v2 (legacy): flat list of records, no table grouping
+  - v3 (default): records grouped by source table with sibling header metadata,
+    enabling sibling-context attention during training
 
 The 4 feature branches are:
   1. char:   960-dim character distribution features
@@ -25,6 +30,7 @@ Options:
     --min-values N          Min values per column (default: 5)
     --seed N                Random seed (default: 42)
     --workers N             Parallel feature extraction workers (default: 4)
+    --format v2|v3          Output format version (default: v3)
     --dry-run               Show counts without extracting features
     --skip-preflight        Skip preflight extraction check
     -h, --help              Show help
@@ -52,7 +58,8 @@ EMBED_DIM = 512
 STATS_DIM = 27
 HEADER_DIM = 128
 MAGIC = b"FTMB"
-VERSION = 2
+VERSION_V2 = 2
+VERSION_V3 = 3
 
 # Column-level types that may cause negative transfer (same as prepare_spike_data.py)
 COLUMN_LEVEL_TYPES = {
@@ -60,6 +67,129 @@ COLUMN_LEVEL_TYPES = {
     "representation.discrete.ordinal",
     "representation.identifier.increment",
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Table templates for synthetic table assembly (v3)
+#
+# Each template defines a realistic table archetype: a list of type keys that
+# commonly co-occur in real datasets. During assembly, 1-3 random types from
+# other domains are added as controlled noise, producing tables of 5-15 columns.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+TABLE_TEMPLATES = {
+    "person_record": [
+        "identity.person.email", "identity.person.full_name",
+        "identity.person.phone_number", "geography.location.city",
+        "geography.address.postal_code", "identity.person.height",
+        "identity.person.gender",
+    ],
+    "customer_profile": [
+        "identity.person.full_name", "identity.person.email",
+        "geography.address.street_name", "geography.location.city",
+        "geography.location.region", "geography.address.postal_code",
+        "geography.location.country", "identity.person.phone_number",
+    ],
+    "financial_txn": [
+        "finance.currency.amount", "finance.banking.iban",
+        "datetime.timestamp.iso_8601", "representation.text.entity_name",
+        "finance.currency.currency_code",
+    ],
+    "credit_card_txn": [
+        "finance.payment.credit_card_number", "finance.currency.amount",
+        "datetime.timestamp.iso_8601", "representation.text.entity_name",
+        "identity.person.full_name", "finance.currency.currency_code",
+    ],
+    "geo_dataset": [
+        "geography.coordinate.latitude", "geography.coordinate.longitude",
+        "geography.location.city", "geography.location.country",
+        "geography.location.region",
+    ],
+    "geo_places": [
+        "representation.text.entity_name", "geography.coordinate.latitude",
+        "geography.coordinate.longitude", "geography.address.full_address",
+        "geography.address.postal_code", "geography.location.region",
+    ],
+    "web_log": [
+        "technology.internet.ip_v4", "technology.internet.url",
+        "technology.internet.user_agent", "datetime.timestamp.iso_8601",
+    ],
+    "web_analytics": [
+        "technology.internet.url", "technology.internet.hostname",
+        "datetime.timestamp.iso_8601", "representation.numeric.integer_number",
+        "technology.internet.user_agent", "technology.internet.ip_v4",
+    ],
+    "product_catalog": [
+        "representation.identifier.alphanumeric_id",
+        "representation.text.entity_name", "finance.currency.amount",
+        "representation.text.sentence",
+    ],
+    "ecommerce_order": [
+        "representation.identifier.alphanumeric_id",
+        "identity.person.full_name", "identity.person.email",
+        "finance.currency.amount", "datetime.date.iso",
+        "representation.numeric.integer_number",
+    ],
+    "employee_hr": [
+        "identity.person.full_name", "identity.person.email",
+        "representation.text.entity_name", "identity.person.phone_number",
+        "datetime.date.iso", "finance.currency.amount",
+        "identity.person.gender",
+    ],
+    "network_inventory": [
+        "technology.internet.ip_v4", "technology.internet.ip_v6",
+        "technology.internet.mac_address", "technology.internet.hostname",
+        "representation.text.entity_name",
+    ],
+    "event_calendar": [
+        "representation.text.entity_name", "datetime.date.iso",
+        "datetime.time.iso", "representation.text.sentence",
+        "geography.location.city",
+    ],
+    "scientific_data": [
+        "representation.numeric.decimal_number",
+        "representation.numeric.decimal_number",
+        "representation.text.entity_name", "datetime.date.iso",
+        "representation.numeric.percentage",
+    ],
+    "user_accounts": [
+        "identity.person.username", "identity.person.email",
+        "identity.person.password", "datetime.timestamp.iso_8601",
+        "representation.identifier.uuid",
+    ],
+    "securities_data": [
+        "finance.securities.isin", "finance.securities.cusip",
+        "finance.currency.amount", "finance.rate.yield",
+        "datetime.date.iso", "representation.text.entity_name",
+    ],
+    "file_registry": [
+        "representation.file.extension", "representation.file.mime_type",
+        "technology.cryptographic.hash", "representation.numeric.integer_number",
+        "datetime.timestamp.iso_8601",
+    ],
+    "address_book": [
+        "identity.person.full_name", "geography.address.full_address",
+        "identity.person.phone_number", "identity.person.email",
+        "geography.location.city", "geography.location.country",
+    ],
+    "survey_results": [
+        "representation.numeric.integer_number",
+        "representation.numeric.percentage",
+        "representation.text.entity_name", "representation.boolean.terms",
+        "representation.text.sentence", "datetime.date.iso",
+    ],
+    "api_logs": [
+        "technology.internet.url", "technology.internet.ip_v4",
+        "datetime.timestamp.iso_8601", "container.object.json",
+        "representation.numeric.integer_number",
+        "representation.file.mime_type",
+    ],
+}
+
+# All unique types referenced in templates (for noise injection)
+_TEMPLATE_TYPES = set()
+for _types in TABLE_TEMPLATES.values():
+    _TEMPLATE_TYPES.update(_types)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -435,15 +565,23 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
     Each column is a (values, header) tuple where header is the original
     column_name from the Sherlock corpus.
 
+    Also returns a flat ordered list of (label, values, header) for all
+    qualifying rows, preserving CSV row order. This is used for proximity-
+    based table grouping in v3 format (adjacent rows in the Sherlock corpus
+    likely came from the same source table).
+
     Args:
         label_remap: dict mapping non-canonical labels to canonical equivalents.
 
     Returns:
         columns_by_type: dict[str, list[tuple[list[str], str]]] — each type has
                          a list of (values, header) tuples.
+        ordered_columns: list[tuple[str, list[str], str]] — all qualifying
+                         columns in CSV row order as (label, values, header).
         stats: dict with counts for logging
     """
     columns_by_type = defaultdict(list)
+    ordered_columns = []
     label_remap = label_remap or {}
     stats = {
         "total_rows": 0,
@@ -494,9 +632,10 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
             header = row.get("column_name", "").strip()
             if len(clean_vals) >= min_values:
                 columns_by_type[label].append((clean_vals, header))
+                ordered_columns.append((label, clean_vals, header))
                 stats["total_values"] += len(clean_vals)
 
-    return dict(columns_by_type), stats
+    return dict(columns_by_type), ordered_columns, stats
 
 
 def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values):
@@ -611,6 +750,137 @@ def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Table assembly (v3)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def assemble_synthetic_tables(synthetic_columns_by_type, rng, taxonomy_types,
+                              noise_min=1, noise_max=3):
+    """Assemble synthetic columns into table groups using TABLE_TEMPLATES.
+
+    Each assembled table:
+    1. Picks a template
+    2. For each type in template: picks one synthetic column (if available)
+    3. Adds 1-3 random columns from other domains (controlled noise)
+    4. Final table size: 5-15 columns
+
+    Returns: list of TableGroup, each being:
+        [(label, values, header), ...] — the columns in the table
+    """
+    # Build a pool of available synthetic columns per type (as a queue)
+    pool = {}
+    for type_key, cols in synthetic_columns_by_type.items():
+        pool[type_key] = list(cols)  # copy so we can pop
+
+    # All available types for noise injection (excluding column-level types)
+    noise_candidates = [t for t in taxonomy_types if t not in COLUMN_LEVEL_TYPES]
+
+    tables = []
+    template_names = list(TABLE_TEMPLATES.keys())
+
+    # Keep cycling through templates until we run low on synthetic columns
+    max_tables = sum(len(c) for c in pool.values()) // 3  # rough upper bound
+    table_count = 0
+
+    while table_count < max_tables:
+        template_name = template_names[table_count % len(template_names)]
+        template_types = TABLE_TEMPLATES[template_name]
+
+        table_columns = []
+        for type_key in template_types:
+            if type_key in pool and pool[type_key]:
+                values, header = pool[type_key].pop()
+                table_columns.append((type_key, values, header))
+
+        if len(table_columns) < 2:
+            # Not enough columns for this template, skip
+            table_count += 1
+            # Check if we've exhausted all pools
+            total_remaining = sum(len(c) for c in pool.values())
+            if total_remaining < 3:
+                break
+            continue
+
+        # Add 1-3 noise columns from random types
+        n_noise = rng.randint(noise_min, noise_max)
+        noise_types = rng.sample(noise_candidates,
+                                 min(n_noise * 3, len(noise_candidates)))
+        added_noise = 0
+        for nt in noise_types:
+            if added_noise >= n_noise:
+                break
+            if nt in pool and pool[nt]:
+                values, header = pool[nt].pop()
+                table_columns.append((nt, values, header))
+                added_noise += 1
+
+        # Enforce 5-15 column limit
+        if len(table_columns) > 15:
+            table_columns = table_columns[:15]
+
+        if len(table_columns) >= 2:
+            rng.shuffle(table_columns)
+            tables.append(table_columns)
+
+        table_count += 1
+
+    # Any remaining columns that didn't fit into templates: group into
+    # random tables of 5-10 columns
+    remaining = []
+    for type_key, cols in pool.items():
+        for values, header in cols:
+            remaining.append((type_key, values, header))
+    rng.shuffle(remaining)
+
+    i = 0
+    while i < len(remaining):
+        left = len(remaining) - i
+        if left < 2:
+            # Append remaining to last group
+            if tables and left > 0:
+                tables[-1].extend(remaining[i:])
+            break
+        group_size = rng.randint(min(5, left), min(10, left))
+        tables.append(remaining[i:i + group_size])
+        i += group_size
+
+    return tables
+
+
+def group_distilled_by_proximity(ordered_columns, rng, group_min=5, group_max=15):
+    """Group distilled columns by proximity in CSV row order.
+
+    Adjacent rows in the Sherlock corpus likely came from the same source
+    table, so we use proximity-based grouping as a fallback when source_file
+    is unavailable.
+
+    Strategy: walk through ordered_columns and cut groups at random sizes
+    between group_min and group_max. This preserves the adjacency signal
+    while producing variable-sized groups.
+
+    Returns: list of TableGroup, each being:
+        [(label, values, header), ...] — the columns in the table
+    """
+    if not ordered_columns:
+        return []
+
+    tables = []
+    i = 0
+    while i < len(ordered_columns):
+        group_size = rng.randint(group_min, group_max)
+        group = ordered_columns[i:i + group_size]
+        if len(group) >= 2:
+            tables.append(group)
+        else:
+            # Append single remaining column to last group if possible
+            if tables:
+                tables[-1].extend(group)
+        i += group_size
+
+    return tables
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Feature extraction
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -642,11 +912,11 @@ def extract_features(finetype_bin, values, header=None):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Binary file I/O — FTMB v2
+# Binary file I/O — FTMB v2 and v3
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def write_ftmb(path, records):
+def write_ftmb_v2(path, records):
     """Write records to a .ftmb v2 binary file.
 
     records: list of (label, char_features, embed_features, stats_features, header_features)
@@ -659,7 +929,6 @@ def write_ftmb(path, records):
         embed_dim: uint16 = 512
         stats_dim: uint16 = 27
         header_dim: uint16 = 128
-        padding: 0 bytes (header_dim replaces old 2-byte padding)
 
     Each record:
         label_len: uint16
@@ -673,7 +942,7 @@ def write_ftmb(path, records):
     with open(path, "wb") as f:
         # Header (28 bytes)
         f.write(MAGIC)
-        f.write(struct.pack("<I", VERSION))
+        f.write(struct.pack("<I", VERSION_V2))
         f.write(struct.pack("<Q", len(records)))
         f.write(struct.pack("<HHHH", CHAR_DIM, EMBED_DIM, STATS_DIM, HEADER_DIM))
 
@@ -687,17 +956,114 @@ def write_ftmb(path, records):
             f.write(struct.pack(f"<{HEADER_DIM}f", *header_feat))
 
 
-def read_ftmb(path):
-    """Read a .ftmb binary file (v1 or v2).
+def write_ftmb_v3(path, table_groups):
+    """Write table-grouped records to a .ftmb v3 binary file.
 
-    v1: returns (label, char_feat, embed_feat, stats_feat) tuples
-    v2: returns (label, char_feat, embed_feat, stats_feat, header_feat) tuples
+    table_groups: list of TableGroupRecord, each being:
+        {
+            "sibling_headers": [str, ...],  -- all headers in the table
+            "records": [
+                {
+                    "label": str,
+                    "column_index": int,  -- index into sibling_headers
+                    "char": [float, ...],
+                    "embed": [float, ...],
+                    "stats": [float, ...],
+                    "header": [float, ...],
+                },
+                ...
+            ]
+        }
+
+    File layout (28-byte header):
+        4B  magic "FTMB"
+        4B  version (3, LE u32)
+        8B  n_records (total, LE u64)
+        2B  char_dim (u16) = 960
+        2B  embed_dim (u16) = 512
+        2B  stats_dim (u16) = 27
+        2B  header_dim (u16) = 128
+        2B  n_groups (u16) = number of table groups
+        2B  reserved (0)
+
+    Per table group:
+        2B  n_columns (u16) — records in this group
+        2B  n_sibling_headers (u16) — number of sibling header strings
+        For each sibling header:
+            2B  header_len (u16)
+            *B  header_bytes (UTF-8)
+        For each record (n_columns times):
+            2B  label_len (u16)
+            *B  label_bytes
+            2B  column_index (u16) — index into this group's sibling_headers
+            char_dim*4B  char_features (f32 LE)
+            embed_dim*4B embed_features (f32 LE)
+            stats_dim*4B stats_features (f32 LE)
+            header_dim*4B header_features (f32 LE, raw Model2Vec)
+    """
+    n_records = sum(len(g["records"]) for g in table_groups)
+    n_groups = len(table_groups)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        # File header (28 bytes)
+        f.write(MAGIC)
+        f.write(struct.pack("<I", VERSION_V3))
+        f.write(struct.pack("<Q", n_records))
+        f.write(struct.pack("<HHHH", CHAR_DIM, EMBED_DIM, STATS_DIM, HEADER_DIM))
+        f.write(struct.pack("<HH", n_groups, 0))  # n_groups + reserved
+
+        # Table groups
+        for group in table_groups:
+            sibling_headers = group["sibling_headers"]
+            records = group["records"]
+
+            f.write(struct.pack("<HH", len(records), len(sibling_headers)))
+
+            # Write sibling header strings
+            for hdr in sibling_headers:
+                hdr_bytes = hdr.encode("utf-8")
+                f.write(struct.pack("<H", len(hdr_bytes)))
+                f.write(hdr_bytes)
+
+            # Write records
+            for rec in records:
+                label_bytes = rec["label"].encode("utf-8")
+                f.write(struct.pack("<H", len(label_bytes)))
+                f.write(label_bytes)
+                f.write(struct.pack("<H", rec["column_index"]))
+                f.write(struct.pack(f"<{CHAR_DIM}f", *rec["char"]))
+                f.write(struct.pack(f"<{EMBED_DIM}f", *rec["embed"]))
+                f.write(struct.pack(f"<{STATS_DIM}f", *rec["stats"]))
+                f.write(struct.pack(f"<{HEADER_DIM}f", *rec["header"]))
+
+
+def read_ftmb(path):
+    """Read a .ftmb binary file (v1, v2, or v3).
+
+    v1: returns list of (label, char_feat, embed_feat, stats_feat) tuples
+    v2: returns list of (label, char_feat, embed_feat, stats_feat, header_feat) tuples
+    v3: returns list of (label, char_feat, embed_feat, stats_feat, header_feat) tuples
+        (flattened from table groups — use read_ftmb_v3 for grouped data)
     """
     with open(path, "rb") as f:
         magic = f.read(4)
         assert magic == MAGIC, f"Bad magic: {magic}"
         (version,) = struct.unpack("<I", f.read(4))
-        assert version in (1, 2), f"Unknown version: {version}"
+        assert version in (1, 2, 3), f"Unknown version: {version}"
+
+        if version == 3:
+            # Read v3 grouped format, flatten to record list
+            groups = _read_ftmb_v3_groups(f)
+            records = []
+            for group in groups:
+                for rec in group["records"]:
+                    records.append((
+                        rec["label"], rec["char"], rec["embed"],
+                        rec["stats"], rec["header"],
+                    ))
+            return records
+
         (n_records,) = struct.unpack("<Q", f.read(8))
         char_dim, embed_dim, stats_dim = struct.unpack("<HHH", f.read(6))
 
@@ -721,6 +1087,51 @@ def read_ftmb(path):
                 records.append((label, char_feat, embed_feat, stats_feat))
 
         return records
+
+
+def _read_ftmb_v3_groups(f):
+    """Read v3 table groups from an open file (after magic+version already read).
+
+    Returns: list of group dicts, each with 'sibling_headers' and 'records'.
+    """
+    (n_records,) = struct.unpack("<Q", f.read(8))
+    char_dim, embed_dim, stats_dim, header_dim = struct.unpack("<HHHH", f.read(8))
+    n_groups, _reserved = struct.unpack("<HH", f.read(4))
+
+    groups = []
+    for _ in range(n_groups):
+        n_columns, n_sibling_headers = struct.unpack("<HH", f.read(4))
+
+        sibling_headers = []
+        for _ in range(n_sibling_headers):
+            (hdr_len,) = struct.unpack("<H", f.read(2))
+            hdr = f.read(hdr_len).decode("utf-8")
+            sibling_headers.append(hdr)
+
+        records = []
+        for _ in range(n_columns):
+            (label_len,) = struct.unpack("<H", f.read(2))
+            label = f.read(label_len).decode("utf-8")
+            (column_index,) = struct.unpack("<H", f.read(2))
+            char_feat = list(struct.unpack(f"<{char_dim}f", f.read(char_dim * 4)))
+            embed_feat = list(struct.unpack(f"<{embed_dim}f", f.read(embed_dim * 4)))
+            stats_feat = list(struct.unpack(f"<{stats_dim}f", f.read(stats_dim * 4)))
+            header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
+            records.append({
+                "label": label,
+                "column_index": column_index,
+                "char": char_feat,
+                "embed": embed_feat,
+                "stats": stats_feat,
+                "header": header_feat,
+            })
+
+        groups.append({
+            "sibling_headers": sibling_headers,
+            "records": records,
+        })
+
+    return groups
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -761,6 +1172,222 @@ def run_preflight_check(finetype_bin, blended, num_types=10, cols_per_type=5):
         return True
 
 
+def _extract_and_validate(finetype_bin, type_key, col_values, header):
+    """Extract features for a single column and validate dimensions.
+
+    Returns: (type_key, char, embed, stats, header_feat) or None on failure.
+    """
+    features = extract_features(finetype_bin, col_values, header=header)
+    if features is None:
+        return None
+
+    char_feat = features.get("char", [0.0] * CHAR_DIM)
+    embed_feat = features.get("embed", [0.0] * EMBED_DIM)
+    stats_feat = features.get("stats", [0.0] * STATS_DIM)
+    header_feat = features.get("header_features", [0.0] * HEADER_DIM)
+
+    # Validate dimensions
+    for name, feat, expected in [
+        ("char", char_feat, CHAR_DIM),
+        ("embed", embed_feat, EMBED_DIM),
+        ("stats", stats_feat, STATS_DIM),
+        ("header", header_feat, HEADER_DIM),
+    ]:
+        if len(feat) != expected:
+            print(f"  Warning: {type_key} {name} dim {len(feat)} != {expected}",
+                  file=sys.stderr)
+            return None
+
+    return type_key, char_feat, embed_feat, stats_feat, header_feat
+
+
+def _run_v2_pipeline(blended, finetype_bin, output_path, workers, start_time):
+    """Run v2 flat extraction and write pipeline.
+
+    Returns: (records, errors) tuple.
+    """
+    total_blended = sum(len(cols) for cols in blended.values())
+    print(f"\nExtracting features for {total_blended} columns (workers={workers})...")
+
+    work_items = []
+    for type_key in sorted(blended.keys()):
+        for col_values, header in blended[type_key]:
+            work_items.append((type_key, col_values, header))
+
+    records = []
+    errors = 0
+
+    def process_item(item):
+        type_key, col_values, header = item
+        return _extract_and_validate(finetype_bin, type_key, col_values, header)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(process_item, item): item for item in work_items}
+        for i, future in enumerate(as_completed(futures)):
+            result = future.result()
+
+            if result is None:
+                errors += 1
+                continue
+
+            records.append(result)
+
+            # Progress
+            done = i + 1
+            if done % 100 == 0 or done == len(work_items):
+                elapsed = time.time() - start_time
+                rate = done / elapsed if elapsed > 0 else 0
+                eta = (len(work_items) - done) / rate if rate > 0 else 0
+                print(
+                    f"  [{done}/{len(work_items)}] {rate:.1f} cols/sec, "
+                    f"ETA {eta/60:.1f}min, {errors} errors",
+                    file=sys.stderr,
+                )
+
+    print(f"\nWriting {len(records)} records to {output_path}...")
+    write_ftmb_v2(output_path, records)
+    return records, errors
+
+
+def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
+                     workers, ratio_distilled, samples_per_type,
+                     taxonomy_types, rng, start_time):
+    """Run v3 table-grouped extraction and write pipeline.
+
+    1. Assemble synthetic columns into table groups
+    2. Group distilled columns by proximity
+    3. Extract features per-table-group (preserving group structure)
+    4. Interleave synthetic and distilled groups
+    5. Write FTMB v3
+
+    Returns: (n_records, n_groups, errors) tuple.
+    """
+    # ─── Assemble synthetic tables ──────────────────────────────
+    print("\nAssembling synthetic columns into table groups...")
+    synthetic_tables = assemble_synthetic_tables(synthetic, rng, taxonomy_types)
+    syn_cols = sum(len(t) for t in synthetic_tables)
+    print(f"  {len(synthetic_tables)} synthetic tables ({syn_cols} columns)")
+
+    # ─── Group distilled columns by proximity ────────────────────
+    print("Grouping distilled columns by CSV proximity...")
+    # Note: source_file is empty for all Sherlock rows, so we use proximity-
+    # based grouping: adjacent rows in the CSV likely came from the same
+    # source table in the Sherlock corpus.
+    distilled_tables = group_distilled_by_proximity(ordered_distilled, rng)
+    dist_cols = sum(len(t) for t in distilled_tables)
+    print(f"  {len(distilled_tables)} distilled tables ({dist_cols} columns)")
+
+    # ─── Apply ratio cap ─────────────────────────────────────────
+    # Target: ratio_distilled of total groups should be distilled
+    total_target = min(
+        len(synthetic_tables) + len(distilled_tables),
+        int(samples_per_type * len(taxonomy_types) / 8),  # rough cap
+    )
+    target_dist = int(total_target * ratio_distilled)
+    target_syn = total_target - target_dist
+
+    if len(distilled_tables) > target_dist:
+        rng.shuffle(distilled_tables)
+        distilled_tables = distilled_tables[:target_dist]
+    if len(synthetic_tables) > target_syn:
+        rng.shuffle(synthetic_tables)
+        synthetic_tables = synthetic_tables[:target_syn]
+
+    all_tables = distilled_tables + synthetic_tables
+    rng.shuffle(all_tables)
+
+    total_columns = sum(len(t) for t in all_tables)
+    print(f"\n  Total: {len(all_tables)} table groups ({total_columns} columns)")
+
+    # ─── Extract features per table group ──────────────────────
+    print(f"\nExtracting features for {total_columns} columns in "
+          f"{len(all_tables)} groups (workers={workers})...")
+
+    # We extract features for all columns, then assemble into v3 groups.
+    # Build a flat list of (group_idx, col_idx, label, values, header) items
+    work_items = []
+    for g_idx, table in enumerate(all_tables):
+        for c_idx, (label, values, header) in enumerate(table):
+            work_items.append((g_idx, c_idx, label, values, header))
+
+    # Extract features in parallel
+    # Results keyed by (group_idx, col_idx) -> extracted features
+    results_map = {}
+    errors = 0
+
+    def process_item(item):
+        g_idx, c_idx, label, values, header = item
+        result = _extract_and_validate(finetype_bin, label, values, header)
+        return g_idx, c_idx, header, result
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(process_item, item): item for item in work_items}
+        for i, future in enumerate(as_completed(futures)):
+            g_idx, c_idx, header, result = future.result()
+
+            if result is None:
+                errors += 1
+            else:
+                results_map[(g_idx, c_idx)] = (header, result)
+
+            # Progress
+            done = i + 1
+            if done % 100 == 0 or done == len(work_items):
+                elapsed = time.time() - start_time
+                rate = done / elapsed if elapsed > 0 else 0
+                eta = (len(work_items) - done) / rate if rate > 0 else 0
+                print(
+                    f"  [{done}/{len(work_items)}] {rate:.1f} cols/sec, "
+                    f"ETA {eta/60:.1f}min, {errors} errors",
+                    file=sys.stderr,
+                )
+
+    # ─── Assemble v3 table groups ──────────────────────────────
+    print("\nAssembling v3 table groups...")
+    v3_groups = []
+    total_records = 0
+
+    for g_idx, table in enumerate(all_tables):
+        # Collect all successfully extracted columns for this group
+        group_columns = []
+        for c_idx in range(len(table)):
+            if (g_idx, c_idx) in results_map:
+                header, result = results_map[(g_idx, c_idx)]
+                label, char_f, embed_f, stats_f, header_f = result
+                group_columns.append((label, header, char_f, embed_f, stats_f, header_f))
+
+        if len(group_columns) < 2:
+            # Skip groups with fewer than 2 successful columns
+            continue
+
+        # Build sibling headers list (all headers in this group)
+        sibling_headers = [col[1] for col in group_columns]
+
+        # Build records with column_index pointing into sibling_headers
+        records = []
+        for col_idx, (label, header, char_f, embed_f, stats_f, header_f) in enumerate(group_columns):
+            records.append({
+                "label": label,
+                "column_index": col_idx,
+                "char": char_f,
+                "embed": embed_f,
+                "stats": stats_f,
+                "header": header_f,
+            })
+
+        v3_groups.append({
+            "sibling_headers": sibling_headers,
+            "records": records,
+        })
+        total_records += len(records)
+
+    # ─── Write v3 binary file ──────────────────────────────────
+    print(f"\nWriting {total_records} records in {len(v3_groups)} groups to {output_path}...")
+    write_ftmb_v3(output_path, v3_groups)
+
+    return total_records, len(v3_groups), errors
+
+
 def main():
     args = sys.argv[1:]
 
@@ -777,6 +1404,7 @@ def main():
     workers = 4
     dry_run = False
     skip_preflight = False
+    output_format = "v3"
 
     i = 0
     while i < len(args):
@@ -810,6 +1438,13 @@ def main():
         elif args[i] == "--workers":
             workers = int(args[i + 1])
             i += 2
+        elif args[i] == "--format":
+            output_format = args[i + 1]
+            if output_format not in ("v2", "v3"):
+                print(f"ERROR: --format must be 'v2' or 'v3', got '{output_format}'",
+                      file=sys.stderr)
+                sys.exit(1)
+            i += 2
         elif args[i] == "--dry-run":
             dry_run = True
             i += 1
@@ -823,7 +1458,10 @@ def main():
             print(f"Unknown argument: {args[i]}", file=sys.stderr)
             sys.exit(1)
 
+    version = VERSION_V3 if output_format == "v3" else VERSION_V2
     rng = random.Random(seed)
+
+    print(f"FTMB output format: {output_format}")
 
     # ─── Load taxonomy ─────────────────────────────────────────────
     print("Loading taxonomy...")
@@ -840,7 +1478,9 @@ def main():
 
     # ─── Load distilled data ───────────────────────────────────────
     print(f"\nLoading distilled data (min_values={min_values})...")
-    distilled, d_stats = load_distilled_columns(distilled_path, min_values, label_remap)
+    distilled, ordered_distilled, d_stats = load_distilled_columns(
+        distilled_path, min_values, label_remap
+    )
     print(f"  {d_stats['total_rows']} total rows")
     print(f"  {d_stats['qualifying_rows']} qualifying rows")
     print(f"  {d_stats['sparse_rows']} sparse rows (skipped)")
@@ -866,12 +1506,22 @@ def main():
             print(f"    {t} ({len(distilled[t])} columns)")
         for t in bad_distilled:
             del distilled[t]
+        # Also filter ordered_distilled
+        ordered_distilled = [
+            (label, vals, hdr) for label, vals, hdr in ordered_distilled
+            if label not in bad_distilled
+        ]
 
-    # ─── Blend ────────────────────────────────────────────────────
-    print(f"\nBlending data ({ratio_distilled:.0%} distilled, {1-ratio_distilled:.0%} synthetic)...")
-    blended = blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng)
-    total_blended = sum(len(cols) for cols in blended.values())
-    print(f"  {total_blended} columns across {len(blended)} types")
+    # ─── Blend (for v2) or assemble tables (for v3) ──────────────
+    if output_format == "v2":
+        print(f"\nBlending data ({ratio_distilled:.0%} distilled, {1-ratio_distilled:.0%} synthetic)...")
+        blended = blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng)
+        total_blended = sum(len(cols) for cols in blended.values())
+        print(f"  {total_blended} columns across {len(blended)} types")
+    else:
+        # For v3, we do blending implicitly via table assembly + ratio cap
+        blended = blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng)
+        total_blended = sum(len(cols) for cols in blended.values())
 
     # ─── Type coverage summary ─────────────────────────────────────
     distilled_types = set(distilled.keys())
@@ -894,7 +1544,9 @@ def main():
     if dry_run:
         print(f"\n[DRY RUN] Would extract features for {total_blended} columns")
         print(f"  Output: {output_path}")
-        print(f"  FTMB version: {VERSION} (with header branch)")
+        print(f"  FTMB version: {version}")
+        if output_format == "v3":
+            print(f"  Table grouping: synthetic (templates) + distilled (proximity)")
         total_dim = CHAR_DIM + EMBED_DIM + STATS_DIM + HEADER_DIM
         print(f"  Record size: {2 + 30 + total_dim*4} bytes (avg)")
         est_size_mb = total_blended * total_dim * 4 / (1024 * 1024)
@@ -907,95 +1559,52 @@ def main():
             print("\nAborting: preflight extraction failed.", file=sys.stderr)
             sys.exit(1)
 
-    # ─── Extract features ──────────────────────────────────────────
-    print(f"\nExtracting features for {total_blended} columns (workers={workers})...")
-
-    # Build work items: (type_key, column_values, header)
-    work_items = []
-    for type_key in sorted(blended.keys()):
-        for col_values, header in blended[type_key]:
-            work_items.append((type_key, col_values, header))
-
-    records = []
-    errors = 0
     start_time = time.time()
 
-    def process_item(item):
-        type_key, col_values, header = item
-        features = extract_features(finetype_bin, col_values, header=header)
-        return type_key, features
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(process_item, item): item for item in work_items}
-        for i, future in enumerate(as_completed(futures)):
-            type_key, features = future.result()
-
-            if features is None:
-                errors += 1
-                continue
-
-            char_feat = features.get("char", [0.0] * CHAR_DIM)
-            embed_feat = features.get("embed", [0.0] * EMBED_DIM)
-            stats_feat = features.get("stats", [0.0] * STATS_DIM)
-            header_feat = features.get("header_features", [0.0] * HEADER_DIM)
-
-            # Validate dimensions
-            if len(char_feat) != CHAR_DIM:
-                print(f"  Warning: {type_key} char dim {len(char_feat)} != {CHAR_DIM}", file=sys.stderr)
-                errors += 1
-                continue
-            if len(embed_feat) != EMBED_DIM:
-                print(f"  Warning: {type_key} embed dim {len(embed_feat)} != {EMBED_DIM}", file=sys.stderr)
-                errors += 1
-                continue
-            if len(stats_feat) != STATS_DIM:
-                print(f"  Warning: {type_key} stats dim {len(stats_feat)} != {STATS_DIM}", file=sys.stderr)
-                errors += 1
-                continue
-            if len(header_feat) != HEADER_DIM:
-                print(f"  Warning: {type_key} header dim {len(header_feat)} != {HEADER_DIM}", file=sys.stderr)
-                errors += 1
-                continue
-
-            records.append((type_key, char_feat, embed_feat, stats_feat, header_feat))
-
-            # Progress
-            done = i + 1
-            if done % 100 == 0 or done == len(work_items):
-                elapsed = time.time() - start_time
-                rate = done / elapsed if elapsed > 0 else 0
-                eta = (len(work_items) - done) / rate if rate > 0 else 0
-                print(
-                    f"  [{done}/{len(work_items)}] {rate:.1f} cols/sec, "
-                    f"ETA {eta/60:.1f}min, {errors} errors",
-                    file=sys.stderr,
-                )
-
-    # ─── Write binary file ─────────────────────────────────────────
-    print(f"\nWriting {len(records)} records to {output_path}...")
-    write_ftmb(output_path, records)
+    # ─── Run format-specific pipeline ─────────────────────────────
+    if output_format == "v2":
+        records, errors = _run_v2_pipeline(
+            blended, finetype_bin, output_path, workers, start_time
+        )
+        n_records = len(records)
+        n_groups = 0
+        type_counts = Counter(r[0] for r in records)
+    else:
+        n_records, n_groups, errors = _run_v3_pipeline(
+            synthetic, ordered_distilled, finetype_bin, output_path,
+            workers, ratio_distilled, samples_per_type,
+            taxonomy_types, rng, start_time,
+        )
+        type_counts = None  # v3 groups don't easily yield per-type counts
 
     file_size = os.path.getsize(output_path)
     print(f"  File size: {file_size / (1024*1024):.1f} MB")
 
     # ─── Summary ──────────────────────────────────────────────────
-    type_counts = Counter(r[0] for r in records)
     elapsed = time.time() - start_time
 
     print(f"\n{'='*60}")
     print(f"Summary:")
-    print(f"  FTMB version:    {VERSION}")
-    print(f"  Records written: {len(records)}")
-    print(f"  Types covered:   {len(type_counts)}")
+    print(f"  FTMB version:    {version}")
+    print(f"  Records written: {n_records}")
+    if n_groups > 0:
+        print(f"  Table groups:    {n_groups}")
+        print(f"  Avg group size:  {n_records / n_groups:.1f} columns")
+    if type_counts:
+        print(f"  Types covered:   {len(type_counts)}")
     print(f"  Extraction errors: {errors}")
     print(f"  Time: {elapsed:.1f}s ({elapsed/60:.1f}min)")
     print(f"  Output: {output_path}")
+    if output_format == "v3":
+        print(f"  Distilled grouping: proximity-based (source_file empty in Sherlock)")
+        print(f"  Synthetic grouping: domain-based table templates ({len(TABLE_TEMPLATES)} templates)")
     print(f"{'='*60}")
 
     # Write manifest
     manifest_path = output_path.replace(".ftmb", ".manifest.json")
     manifest = {
-        "ftmb_version": VERSION,
+        "ftmb_version": version,
+        "format": output_format,
         "seed": seed,
         "samples_per_type": samples_per_type,
         "ratio_distilled": ratio_distilled,
@@ -1003,8 +1612,7 @@ def main():
         "distilled_source": distilled_path,
         "taxonomy_types": len(taxonomy_types),
         "blended_types": len(blended_types),
-        "records_written": len(records),
-        "types_covered": len(type_counts),
+        "records_written": n_records,
         "errors": errors,
         "dimensions": {
             "char": CHAR_DIM,
@@ -1012,8 +1620,17 @@ def main():
             "stats": STATS_DIM,
             "header": HEADER_DIM,
         },
-        "type_counts": dict(type_counts.most_common()),
     }
+    if n_groups > 0:
+        manifest["table_groups"] = n_groups
+        manifest["avg_group_size"] = round(n_records / n_groups, 1)
+        manifest["distilled_grouping_strategy"] = "proximity"
+        manifest["synthetic_grouping_strategy"] = "table_templates"
+        manifest["n_table_templates"] = len(TABLE_TEMPLATES)
+    if type_counts:
+        manifest["types_covered"] = len(type_counts)
+        manifest["type_counts"] = dict(type_counts.most_common())
+
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
     print(f"Manifest: {manifest_path}")

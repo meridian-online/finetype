@@ -831,7 +831,7 @@ fn cmd_train_multi_branch(
     let n_classes = taxonomy.len();
 
     eprintln!("Loading training data from {}...", data.display());
-    let (header, records) = read_training_data(&data)?;
+    let (header, records, _table_groups) = read_training_data(&data)?;
     eprintln!(
         "Loaded {} records ({} char, {} embed, {} stats dims)",
         records.len(),

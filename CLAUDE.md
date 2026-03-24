@@ -45,9 +45,14 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's in progress
 
+- **Multi-branch v3 training** — sherlock-v3-flat (4 branches: char+embed+stats+header) achieves 140/190 (73.7%) raw, +12 over v2. Gap analysis: 15 decimal→date/IP errors, 8+ header-fixable, 7 entity confusion. Next: wire sibling-context into multi-branch training, numeric disambiguation.
 - **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema, validate commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range).
-- **Dead code cleanup** — `if false { // validate removed }` blocks in `cmd_profile` output formatting (harmless but noisy).
-- **Remaining accuracy gaps** — 2 misclassifications at 188/190: geohash→alphanumeric_id (1), region→city (1). Both genuinely ambiguous without cross-column context.
+
+### Architectural direction (settled — do not re-ask)
+
+- **Multi-branch as Sense replacement** (decision 0041): The multi-branch model serves as a better Sense classifier WITHIN the existing pipeline — not a replacement for the entire pipeline. Disambiguation rules and post-processing continue to operate on multi-branch output. Rules are progressively retired as the model improves.
+- **Remove regex header hints** (decision 0042): Regex-based `header_hint()` and hardcoded header rules are deprecated in favour of learned approaches — multi-branch header branch (Model2Vec), sibling-context attention, and Model2Vec semantic matching. No more regex rabbit holes.
+- **Strength through simplification** (decision 0038): Prefer retraining over adding disambiguation rules. Rules are a last resort when the model demonstrably cannot learn a pattern.
 
 ## Architecture
 
@@ -176,13 +181,11 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Schema-driven validation (m-14):** `finetype schema <file>` + `finetype validate` shipped and merged. Table-level JSON Schema generation, sidecar file output, MCP validate tool, DuckDB `finetype_validate()`. Decisions 0031–0033.
-
-**Remaining accuracy gaps:** 2 misclassifications at 188/190: geohash→alphanumeric_id (1), region→city (1). Both genuinely ambiguous without cross-column context.
+**Multi-branch v3 → pipeline integration (m-15):** Wire sibling-context attention into multi-branch training, integrate multi-branch as Sense replacement within existing pipeline, target ≥150/190 on profile eval. Decisions 0041–0042.
 
 ## Decision Register
 
-33 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
+42 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
 
 Browse: `ls decisions/` or use Ctrl+B (fzf + glow preview).
 

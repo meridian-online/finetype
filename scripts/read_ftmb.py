@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Read and inspect a .ftmb (FineType Multi-Branch) binary file.
 
-Supports both v1 (3 branches: char, embed, stats) and v2 (4 branches:
-char, embed, stats, header).
+Supports v1 (3 branches: char, embed, stats), v2 (4 branches:
+char, embed, stats, header), and v3 (table-grouped with sibling headers).
 
 Usage:
     python3 scripts/read_ftmb.py <file.ftmb> [--records N] [--type KEY] [--stats]
@@ -25,8 +25,8 @@ MAGIC = b"FTMB"
 def read_header(f):
     """Read and validate the FTMB header.
 
-    Returns: (version, n_records, char_dim, embed_dim, stats_dim, header_dim)
-    header_dim is 0 for v1 files.
+    Returns: (version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups)
+    header_dim is 0 for v1 files. n_groups is 0 for v1/v2 files.
     """
     magic = f.read(4)
     if magic != MAGIC:
@@ -34,7 +34,7 @@ def read_header(f):
         sys.exit(1)
 
     (version,) = struct.unpack("<I", f.read(4))
-    if version not in (1, 2):
+    if version not in (1, 2, 3):
         print(f"ERROR: Unknown version: {version}", file=sys.stderr)
         sys.exit(1)
 
@@ -44,14 +44,20 @@ def read_header(f):
     if version == 1:
         _padding = f.read(2)
         header_dim = 0
-    else:
+        n_groups = 0
+    elif version == 2:
         (header_dim,) = struct.unpack("<H", f.read(2))
+        n_groups = 0
+    else:
+        # v3: header_dim + n_groups + reserved
+        (header_dim,) = struct.unpack("<H", f.read(2))
+        n_groups, _reserved = struct.unpack("<HH", f.read(4))
 
-    return version, n_records, char_dim, embed_dim, stats_dim, header_dim
+    return version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups
 
 
 def read_record(f, char_dim, embed_dim, stats_dim, header_dim):
-    """Read a single record.
+    """Read a single v1/v2 record.
 
     Returns (label, char_feat, embed_feat, stats_feat[, header_feat]) or None at EOF.
     For v1 files (header_dim=0), header_feat is omitted.
@@ -68,6 +74,38 @@ def read_record(f, char_dim, embed_dim, stats_dim, header_dim):
         header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
         return label, char_feat, embed_feat, stats_feat, header_feat
     return label, char_feat, embed_feat, stats_feat
+
+
+def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim):
+    """Read a single v3 table group.
+
+    Returns: (sibling_headers, records) where records is a list of
+    (label, column_index, char_feat, embed_feat, stats_feat, header_feat).
+    Returns None at EOF.
+    """
+    data = f.read(4)
+    if len(data) < 4:
+        return None
+    n_columns, n_sibling_headers = struct.unpack("<HH", data)
+
+    sibling_headers = []
+    for _ in range(n_sibling_headers):
+        (hdr_len,) = struct.unpack("<H", f.read(2))
+        hdr = f.read(hdr_len).decode("utf-8")
+        sibling_headers.append(hdr)
+
+    records = []
+    for _ in range(n_columns):
+        (label_len,) = struct.unpack("<H", f.read(2))
+        label = f.read(label_len).decode("utf-8")
+        (column_index,) = struct.unpack("<H", f.read(2))
+        char_feat = list(struct.unpack(f"<{char_dim}f", f.read(char_dim * 4)))
+        embed_feat = list(struct.unpack(f"<{embed_dim}f", f.read(embed_dim * 4)))
+        stats_feat = list(struct.unpack(f"<{stats_dim}f", f.read(stats_dim * 4)))
+        header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
+        records.append((label, column_index, char_feat, embed_feat, stats_feat, header_feat))
+
+    return sibling_headers, records
 
 
 def feat_summary(feat):
@@ -117,7 +155,7 @@ def main():
             sys.exit(1)
 
     with open(path, "rb") as f:
-        version, n_records, char_dim, embed_dim, stats_dim, header_dim = read_header(f)
+        version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups = read_header(f)
 
         print(f"FTMB File: {path}")
         print(f"  Version:    {version}")
@@ -127,6 +165,8 @@ def main():
         print(f"  Stats dim:  {stats_dim}")
         if version >= 2:
             print(f"  Header dim: {header_dim}")
+        if version >= 3:
+            print(f"  Groups:     {n_groups}")
         print()
 
         type_counts = Counter()
@@ -137,32 +177,86 @@ def main():
         if header_dim > 0:
             branch_names.append(("header", header_dim))
 
-        for idx in range(n_records):
-            record = read_record(f, char_dim, embed_dim, stats_dim, header_dim)
-            if record is None:
-                print(f"WARNING: EOF at record {idx} (expected {n_records})")
-                break
+        if version >= 3:
+            # v3: read table groups
+            group_sizes = []
+            record_idx = 0
 
-            label = record[0]
-            feats = record[1:]
-            type_counts[label] += 1
+            for g_idx in range(n_groups):
+                result = read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim)
+                if result is None:
+                    print(f"WARNING: EOF at group {g_idx} (expected {n_groups})")
+                    break
 
-            if verify:
-                for (name, _dim), feat in zip(branch_names, feats):
-                    for v in feat:
-                        if math.isnan(v) or math.isinf(v):
-                            print(f"  ISSUE: record {idx} ({label}) has NaN/Inf in {name}")
-                            issues += 1
-                            break
+                sibling_headers, records = result
+                group_sizes.append(len(records))
 
-            if filter_type and label != filter_type:
-                continue
+                for label, column_index, char_feat, embed_feat, stats_feat, header_feat in records:
+                    type_counts[label] += 1
+                    feats = [char_feat, embed_feat, stats_feat, header_feat]
 
-            if shown < max_records:
-                print(f"Record {idx}: {label}")
-                for (name, _dim), feat in zip(branch_names, feats):
-                    print(f"  {name:7s}: {feat_summary(feat)}")
-                shown += 1
+                    if verify:
+                        for (name, _dim), feat in zip(branch_names, feats):
+                            for v in feat:
+                                if math.isnan(v) or math.isinf(v):
+                                    print(f"  ISSUE: record {record_idx} ({label}) has NaN/Inf in {name}")
+                                    issues += 1
+                                    break
+
+                    if filter_type and label != filter_type:
+                        record_idx += 1
+                        continue
+
+                    if shown < max_records:
+                        hdr_name = sibling_headers[column_index] if column_index < len(sibling_headers) else "?"
+                        print(f"Record {record_idx} [group {g_idx}, col_idx={column_index}, header=\"{hdr_name}\"]: {label}")
+                        siblings_str = ", ".join(f'"{h}"' for h in sibling_headers)
+                        print(f"  siblings: [{siblings_str}]")
+                        for (name, _dim), feat in zip(branch_names, feats):
+                            print(f"  {name:7s}: {feat_summary(feat)}")
+                        shown += 1
+
+                    record_idx += 1
+
+            # v3 group summary
+            if group_sizes:
+                avg_size = sum(group_sizes) / len(group_sizes)
+                min_size = min(group_sizes)
+                max_size = max(group_sizes)
+                print(f"\nGroup summary:")
+                print(f"  Groups:    {len(group_sizes)}")
+                print(f"  Avg size:  {avg_size:.1f} columns")
+                print(f"  Min size:  {min_size}")
+                print(f"  Max size:  {max_size}")
+
+        else:
+            # v1/v2: flat record list
+            for idx in range(n_records):
+                record = read_record(f, char_dim, embed_dim, stats_dim, header_dim)
+                if record is None:
+                    print(f"WARNING: EOF at record {idx} (expected {n_records})")
+                    break
+
+                label = record[0]
+                feats = record[1:]
+                type_counts[label] += 1
+
+                if verify:
+                    for (name, _dim), feat in zip(branch_names, feats):
+                        for v in feat:
+                            if math.isnan(v) or math.isinf(v):
+                                print(f"  ISSUE: record {idx} ({label}) has NaN/Inf in {name}")
+                                issues += 1
+                                break
+
+                if filter_type and label != filter_type:
+                    continue
+
+                if shown < max_records:
+                    print(f"Record {idx}: {label}")
+                    for (name, _dim), feat in zip(branch_names, feats):
+                        print(f"  {name:7s}: {feat_summary(feat)}")
+                    shown += 1
 
         if show_stats:
             print(f"\n{'='*60}")

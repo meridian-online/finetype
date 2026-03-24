@@ -390,6 +390,95 @@ impl MultiBranchClassifier {
         Ok((label, *max_prob))
     }
 
+    /// Classify a column using a pre-enriched header embedding.
+    ///
+    /// Like `classify_column()`, but accepts a pre-computed header tensor
+    /// (e.g., from sibling-context attention) instead of embedding the raw
+    /// header string via Model2Vec. Used when sibling context is available
+    /// to pass enriched header embeddings into the multi-branch model.
+    pub fn classify_column_with_enriched_header(
+        &self,
+        values: &[String],
+        enriched_header: &Tensor, // [D] — already enriched by sibling attention
+    ) -> Result<(String, f32), InferenceError> {
+        if values.is_empty() {
+            return Ok(("unknown".to_string(), 0.0));
+        }
+
+        let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
+
+        // Extract features (same as classify_column)
+        let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
+        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
+            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
+
+        let device = Device::Cpu;
+        let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
+        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+
+        // Use the pre-enriched header embedding (reshaped to [1, D])
+        let header_t = if self.header_branch.is_some() {
+            let header_embed = enriched_header
+                .to_vec1::<f32>()
+                .unwrap_or_else(|_| vec![0.0f32; self.config.header_dim]);
+            Some(
+                Tensor::from_slice(&header_embed, (1, self.config.header_dim), &device)
+                    .map_err(|e| InferenceError::InvalidPath(format!("header tensor: {e}")))?,
+            )
+        } else {
+            None
+        };
+
+        let hidden = self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref())?;
+
+        // Head-specific forward pass (same as classify_column)
+        let probs_vec = match &self.head {
+            ClassificationHead::Flat(head) => {
+                let logits = head
+                    .forward_t(&hidden, false)
+                    .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))?;
+                let probs = candle_nn::ops::softmax(&logits, 1)
+                    .map_err(|e| InferenceError::InvalidPath(format!("softmax: {e}")))?;
+                probs
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?
+            }
+            ClassificationHead::Hierarchical(hier_head) => {
+                let probs = hier_head
+                    .forward(&hidden, self.config.n_classes)
+                    .map_err(|e| {
+                        InferenceError::InvalidPath(format!("hierarchical forward: {e}"))
+                    })?;
+                probs
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?
+            }
+        };
+
+        let (max_idx, max_prob) = probs_vec
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap();
+
+        let label = self
+            .labels
+            .get(max_idx)
+            .cloned()
+            .unwrap_or_else(|| format!("unknown_idx_{max_idx}"));
+
+        Ok((label, *max_prob))
+    }
+
     /// Forward pass through the trunk (branches + merge), returning the hidden
     /// representation before the classification head.
     fn forward_trunk(
