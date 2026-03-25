@@ -2,23 +2,23 @@ use candle_core::Device;
 
 /// Auto-detect best available compute device.
 /// Tries CUDA first, then Metal, falls back to CPU.
-pub fn get_device() -> Device {
+///
+/// Returns `(device, device_name)` so the caller can log the device
+/// at the appropriate time (before TUI alternate screen entry).
+pub fn get_device() -> (Device, &'static str) {
     #[cfg(feature = "cuda")]
     {
         if let Ok(device) = Device::new_cuda(0) {
-            eprintln!("Using CUDA device");
-            return device;
+            return (device, "CUDA");
         }
     }
 
     #[cfg(feature = "metal")]
     {
         if let Ok(device) = Device::new_metal(0) {
-            eprintln!("Using Metal device");
-            return device;
+            return (device, "Metal");
         }
     }
 
-    eprintln!("Using CPU device");
-    Device::Cpu
+    (Device::Cpu, "CPU")
 }

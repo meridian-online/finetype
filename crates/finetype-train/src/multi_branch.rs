@@ -1672,7 +1672,8 @@ pub fn train_multi_branch(
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
-    let device = crate::get_device();
+    let (device, device_name) = crate::get_device();
+    eprintln!("Using {device_name} device");
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     // Load frozen sibling-context on the SAME device as the training model.

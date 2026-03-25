@@ -204,7 +204,8 @@ pub fn train_sibling_context(
     train_data: &SiblingDataset,
     val_data: &SiblingDataset,
 ) -> Result<TrainingSummary> {
-    let device = crate::get_device();
+    let (device, device_name) = crate::get_device();
+    eprintln!("Using {device_name} device");
 
     tracing::info!(
         "Starting sibling-context training: {} train tables ({} cols), {} val tables ({} cols), {} epochs, lr={}",
