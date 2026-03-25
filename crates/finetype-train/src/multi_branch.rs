@@ -19,7 +19,7 @@
 //! and column_stats.
 
 use anyhow::{bail, Context, Result};
-use candle_core::{DType, Device, Tensor};
+use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{
     batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder, VarMap,
 };
@@ -131,6 +131,7 @@ impl MultiBranchConfig {
 
 /// A single feature-processing branch: two linear layers with ReLU and dropout.
 struct BranchWeights {
+    input_norm: Option<candle_nn::LayerNorm>,
     linear1: Linear,
     linear2: Linear,
     dropout: f32,
@@ -143,18 +144,52 @@ impl BranchWeights {
         dropout: f32,
         vb: VarBuilder,
     ) -> candle_core::Result<Self> {
+        Self::new_inner(input_dim, hidden, dropout, false, vb)
+    }
+
+    /// Create a branch with LayerNorm on the input (stabilises raw embeddings).
+    fn new_with_input_norm(
+        input_dim: usize,
+        hidden: [usize; 2],
+        dropout: f32,
+        vb: VarBuilder,
+    ) -> candle_core::Result<Self> {
+        Self::new_inner(input_dim, hidden, dropout, true, vb)
+    }
+
+    fn new_inner(
+        input_dim: usize,
+        hidden: [usize; 2],
+        dropout: f32,
+        normalize_input: bool,
+        vb: VarBuilder,
+    ) -> candle_core::Result<Self> {
+        let input_norm = if normalize_input {
+            Some(candle_nn::layer_norm(
+                input_dim,
+                candle_nn::LayerNormConfig::default(),
+                vb.pp("input_ln"),
+            )?)
+        } else {
+            None
+        };
         let linear1 = linear(input_dim, hidden[0], vb.pp("l1"))?;
         let linear2 = linear(hidden[0], hidden[1], vb.pp("l2"))?;
         Ok(Self {
+            input_norm,
             linear1,
             linear2,
             dropout,
         })
     }
 
-    /// Forward pass: Linear → ReLU → Dropout → Linear → ReLU → Dropout.
+    /// Forward pass: [LayerNorm →] Linear → ReLU → Dropout → Linear → ReLU → Dropout.
     fn forward(&self, x: &Tensor, train: bool) -> candle_core::Result<Tensor> {
-        let h = self.linear1.forward_t(x, false)?;
+        let x = match &self.input_norm {
+            Some(ln) => ln.forward(x)?,
+            None => x.clone(),
+        };
+        let h = self.linear1.forward_t(&x, false)?;
         let h = h.relu()?;
         let h = if train {
             candle_nn::ops::dropout(&h, self.dropout)?
@@ -296,7 +331,11 @@ impl MultiBranchModel {
         )?;
 
         let header_branch = if config.has_header_branch() {
-            Some(BranchWeights::new(
+            // Input LayerNorm stabilises raw Model2Vec embeddings which can have
+            // large magnitudes. Without this, gradient explosion collapses training
+            // when sibling-context enrichment (which includes its own LayerNorm)
+            // is not active.
+            Some(BranchWeights::new_with_input_norm(
                 config.header_dim,
                 config.header_hidden,
                 config.dropout,

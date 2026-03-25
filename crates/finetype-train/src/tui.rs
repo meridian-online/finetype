@@ -193,6 +193,17 @@ mod tui_impl {
         }
 
         fn on_epoch_end(&mut self, metrics: &EpochMetrics) {
+            // Log to stderr so tee/redirect captures epoch progress alongside the TUI
+            eprintln!(
+                "Epoch {:>3}: train_loss={:.4} val_loss={:.4} train_acc={:.1}% val_acc={:.1}% lr={:.2e} ({:.1}s)",
+                metrics.epoch + 1,
+                metrics.train_loss,
+                metrics.val_loss,
+                metrics.train_accuracy * 100.0,
+                metrics.val_accuracy * 100.0,
+                metrics.learning_rate,
+                metrics.epoch_time_secs,
+            );
             if let Some(tx) = &self.tx {
                 let _ = tx.send(RenderMsg::EpochEnd(metrics.clone()));
             }

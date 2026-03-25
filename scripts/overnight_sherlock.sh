@@ -190,7 +190,7 @@ else
         --seed 42 \
         --head flat \
         --patience 10 \
-        --no-tui \
+        \
     2>&1
 fi
 
@@ -233,7 +233,7 @@ if [[ "$SKIP_ABLATION" == "false" ]]; then
             --seed 42 \
             --head flat \
             --patience 10 \
-            --no-tui \
+            \
         2>&1
 
         # Restore sibling-context model
