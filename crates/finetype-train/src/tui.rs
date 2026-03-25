@@ -87,7 +87,7 @@ mod tui_impl {
     use ratatui::backend::CrosstermBackend;
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::{Color, Modifier, Style};
-    use ratatui::text::Span;
+    use ratatui::text::{Line, Span};
     use ratatui::symbols::Marker;
     use ratatui::widgets::{
         Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table,
@@ -443,7 +443,11 @@ mod tui_impl {
             let x_max = (batch_points.len() as f64).max(1.0);
 
             let chart = Chart::new(datasets)
-                .block(Block::default().title(" Loss — batch (yellow) ").borders(Borders::ALL))
+                .block(Block::default().title(Line::from(vec![
+                    Span::raw(" Loss "),
+                    Span::styled("━", Style::default().fg(Color::Yellow)),
+                    Span::raw(" batch "),
+                ])).borders(Borders::ALL))
                 .x_axis(
                     Axis::default()
                         .bounds([0.0, x_max])
@@ -482,7 +486,13 @@ mod tui_impl {
             let x_max = (state.total_epochs as f64).max(1.0);
 
             let chart = Chart::new(datasets)
-                .block(Block::default().title(" Loss — train (yellow) · val (magenta) ").borders(Borders::ALL))
+                .block(Block::default().title(Line::from(vec![
+                    Span::raw(" Loss "),
+                    Span::styled("━", Style::default().fg(Color::Yellow)),
+                    Span::raw(" train  "),
+                    Span::styled("━", Style::default().fg(Color::Magenta)),
+                    Span::raw(" val "),
+                ])).borders(Borders::ALL))
                 .x_axis(
                     Axis::default()
                         .bounds([0.0, x_max])
@@ -555,7 +565,13 @@ mod tui_impl {
         let chart = Chart::new(datasets)
             .block(
                 Block::default()
-                    .title(" Accuracy — train (green) · val (blue) ")
+                    .title(Line::from(vec![
+                        Span::raw(" Accuracy "),
+                        Span::styled("━", Style::default().fg(Color::Green)),
+                        Span::raw(" train  "),
+                        Span::styled("━", Style::default().fg(Color::Blue)),
+                        Span::raw(" val "),
+                    ]))
                     .borders(Borders::ALL),
             )
             .x_axis(
