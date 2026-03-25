@@ -18,6 +18,7 @@
 #   ./scripts/overnight_v5.sh                    # Full pipeline
 #   ./scripts/overnight_v5.sh --skip-data        # Reuse existing .ftmb
 #   ./scripts/overnight_v5.sh --skip-scaled      # Skip scaled architecture
+#   ./scripts/overnight_v5.sh --tui              # Show training TUI (interactive)
 #   ./scripts/overnight_v5.sh --epochs 40        # Override epoch count
 #   ./scripts/overnight_v5.sh --samples 3000     # Override samples per type
 #
@@ -54,11 +55,13 @@ OVERSAMPLE_TYPES="geography.transportation.hs_code,representation.numeric.decima
 
 SKIP_DATA=false
 SKIP_SCALED=false
+USE_TUI=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --skip-data)      SKIP_DATA=true; shift ;;
         --skip-scaled)    SKIP_SCALED=true; shift ;;
+        --tui)            USE_TUI=true; shift ;;
         --epochs)         EPOCHS="$2"; shift 2 ;;
         --samples)        SAMPLES_PER_TYPE="$2"; shift 2 ;;
         --help|-h)
@@ -69,8 +72,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# TUI flag for training commands (--no-tui unless --tui was passed)
+TUI_FLAG="--no-tui"
+if $USE_TUI; then
+    TUI_FLAG=""
+fi
+
 mkdir -p "$OUTPUT_DIR" results
-exec > >(tee -a "$LOG_FILE") 2>&1
+if ! $USE_TUI; then
+    exec > >(tee -a "$LOG_FILE") 2>&1
+fi
 
 echo "================================================================"
 echo " Multi-Branch Overnight Pipeline v5 (Data Quality + Scale-Up)"
@@ -198,7 +209,7 @@ if ! stage_done "1.5-timing"; then
         --seed "$SEED" \
         --head flat \
         --patience 999 \
-        --no-tui \
+        $TUI_FLAG \
         2>&1
     PROBE_END=$(date +%s)
     PROBE_ELAPSED=$((PROBE_END - PROBE_START))
@@ -284,7 +295,7 @@ else
         --seed "$SEED" \
         --head flat \
         --patience "$PATIENCE" \
-        --no-tui \
+        $TUI_FLAG \
         2>&1
 
     echo ""
@@ -331,7 +342,7 @@ else
         --seed "$SEED" \
         --head flat \
         --patience "$PATIENCE" \
-        --no-tui \
+        $TUI_FLAG \
         --model-config "$SCALED_CONFIG" \
         2>&1
 
