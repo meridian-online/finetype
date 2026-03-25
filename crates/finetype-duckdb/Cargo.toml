@@ -9,10 +9,6 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
-[features]
-default = ["embed-models"]
-embed-models = []
-
 [dependencies]
 duckdb = { workspace = true }
 libduckdb-sys = { workspace = true }
@@ -20,3 +16,5 @@ finetype-core = { workspace = true }
 finetype-model = { workspace = true }
 serde_json = { workspace = true }
 jsonschema = { workspace = true }
+hf-hub = { workspace = true }
+tracing = { workspace = true }

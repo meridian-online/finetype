@@ -861,11 +861,11 @@ impl ColumnClassifier {
         let mut results = Vec::with_capacity(columns.len());
 
         if let Some(ref mb) = self.multi_branch {
-            // Multi-branch path: enriched header → header branch MLP
-            for (i, (values, _header)) in columns.iter().enumerate() {
+            // Multi-branch path: enriched header → header branch MLP + Sharpen
+            for (i, (values, header)) in columns.iter().enumerate() {
                 let enriched_header = enriched.get(i)?; // [D]
                 let result =
-                    self.classify_multi_branch_with_enriched(mb, values, &enriched_header)?;
+                    self.classify_multi_branch_with_enriched(mb, values, header, &enriched_header)?;
                 results.push(result);
             }
         } else {
@@ -1939,12 +1939,14 @@ impl ColumnClassifier {
         &self.config
     }
 
-    /// Multi-branch classification: extract column-level features and run
-    /// the MLP forward pass directly.
+    /// Multi-branch classification with Sharpen post-processing (AC-1).
+    ///
+    /// Pipeline: multi-branch forward pass → feature_sharpen (F1-F6) →
+    /// value_sharpen (R1-R19) → header hints → locale detection.
     ///
     /// Samples values (same as standard pipeline), then extracts 3-branch
     /// features (960 char + 512 embed + 27 stats), runs the forward pass,
-    /// and returns a ColumnResult matching the standard output format.
+    /// and applies the lightweight Sharpen layer before returning.
     fn classify_multi_branch(
         &self,
         mb: &MultiBranchClassifier,
@@ -1977,10 +1979,15 @@ impl ColumnClassifier {
 
         let samples_used = sample.len();
 
-        // Classify via multi-branch (feature extraction + forward pass)
+        // Step 1: Classify via multi-branch (feature extraction + forward pass)
         let (label, confidence) = mb.classify_column(&sample, header)?;
 
-        Ok(ColumnResult {
+        // Step 2: Compute deterministic ColumnFeatures (36-dim, no neural inference)
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+
+        let mut result = ColumnResult {
             label: label.clone(),
             confidence,
             vote_distribution: vec![(label, confidence)],
@@ -1989,20 +1996,59 @@ impl ColumnClassifier {
             samples_used,
             detected_locale: None,
             is_generic: false,
-            column_features: None,
-        })
+            column_features: Some(column_features.clone()),
+        };
+
+        // Step 3: Feature-based Sharpen rules (F1-F6)
+        // Runs before value rules: structural corrections (leading zeros,
+        // slash segments, digit ratios) set the baseline, then value rules
+        // refine based on actual content inspection.
+        feature_sharpen(&mut result, &column_features);
+
+        // Step 4: Value-based Sharpen rules (R1-R19)
+        if let Some((resolved_label, rule_name)) = value_sharpen(
+            &sample,
+            &result.label,
+            result.confidence,
+            self.taxonomy.as_ref(),
+        ) {
+            result.label = resolved_label;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(rule_name);
+        }
+
+        // Step 5: Header hints (Model2Vec semantic matching)
+        if !header.is_empty() {
+            self.apply_header_sharpen(&mut result, header, &sample);
+        }
+
+        // Step 6: Post-hoc locale detection
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) =
+                detect_locale_from_validation(&sample, &result.label, taxonomy)
+            {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
     }
 
-    /// Multi-branch classification with a pre-enriched header embedding.
+    /// Multi-branch classification with enriched header + Sharpen (AC-1).
     ///
     /// Like `classify_multi_branch()` but uses a sibling-context-enriched
     /// header tensor instead of the raw header string. Called from
     /// `classify_columns_with_context()` when both multi-branch and sibling
     /// context are active.
+    ///
+    /// Note: header hints require the raw header string, which is passed
+    /// separately from the enriched tensor.
     fn classify_multi_branch_with_enriched(
         &self,
         mb: &MultiBranchClassifier,
         values: &[String],
+        header: &str,
         enriched_header: &candle_core::Tensor,
     ) -> Result<ColumnResult, InferenceError> {
         if values.is_empty() {
@@ -2031,11 +2077,16 @@ impl ColumnClassifier {
 
         let samples_used = sample.len();
 
-        // Classify via multi-branch with enriched header (sibling context applied)
+        // Step 1: Classify via multi-branch with enriched header
         let (label, confidence) =
             mb.classify_column_with_enriched_header(&sample, enriched_header)?;
 
-        Ok(ColumnResult {
+        // Step 2: Compute deterministic ColumnFeatures
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+
+        let mut result = ColumnResult {
             label: label.clone(),
             confidence,
             vote_distribution: vec![(label, confidence)],
@@ -2044,8 +2095,275 @@ impl ColumnClassifier {
             samples_used,
             detected_locale: None,
             is_generic: false,
-            column_features: None,
-        })
+            column_features: Some(column_features.clone()),
+        };
+
+        // Step 3: Feature-based Sharpen rules (F1-F6)
+        // Runs before value rules: structural corrections (leading zeros,
+        // slash segments, digit ratios) set the baseline, then value rules
+        // refine based on actual content inspection.
+        feature_sharpen(&mut result, &column_features);
+
+        // Step 4: Value-based Sharpen rules (R1-R19)
+        if let Some((resolved_label, rule_name)) = value_sharpen(
+            &sample,
+            &result.label,
+            result.confidence,
+            self.taxonomy.as_ref(),
+        ) {
+            result.label = resolved_label;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(rule_name);
+        }
+
+        // Step 5: Header hints (Model2Vec semantic matching)
+        if !header.is_empty() {
+            self.apply_header_sharpen(&mut result, header, &sample);
+        }
+
+        // Step 6: Post-hoc locale detection
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) =
+                detect_locale_from_validation(&sample, &result.label, taxonomy)
+            {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    /// Header hint Sharpen for the multi-branch pipeline (AC-5).
+    ///
+    /// Applies header-based semantic matching to refine multi-branch predictions.
+    /// Simplified from the Sense→Sharpen header logic:
+    /// - No unmasked_votes (no CharCNN votes exist)
+    /// - No Sense entity demotion guard (no Sense)
+    /// - Financial model2vec guard preserved (prevents false financial overrides)
+    /// - Geography protection preserved (prevents person-name hints overriding locations)
+    /// - Same-domain/cross-domain overrides preserved
+    fn apply_header_sharpen(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
+        let label_before = result.label.clone();
+
+        // Get header hint: hardcoded first, then Model2Vec semantic
+        let hardcoded_hint = header_hint(header).map(|h| h.to_string());
+        let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
+            self.semantic_hint
+                .as_ref()
+                .and_then(|sh| sh.classify_header(header))
+                .map(|r| r.label.clone())
+        });
+        let hint_is_hardcoded = hardcoded_hint.is_some();
+
+        let hinted_type = match hinted_type.as_deref() {
+            Some(h) => h,
+            None => return,
+        };
+
+        // Already predicts the hinted type — boost confidence
+        if result.label == hinted_type {
+            result.confidence = (result.confidence + 0.1).min(1.0);
+            return;
+        }
+
+        // Measurement disambiguation: height/weight
+        const MEASUREMENT_TYPES: &[&str] =
+            &["identity.person.height", "identity.person.weight"];
+        const COORDINATE_TYPES: &[&str] = &[
+            "geography.coordinate.latitude",
+            "geography.coordinate.longitude",
+        ];
+        if MEASUREMENT_TYPES.contains(&hinted_type)
+            && MEASUREMENT_TYPES.contains(&result.label.as_str())
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.9;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_measurement:{}",
+                header.to_lowercase()
+            ));
+            return;
+        }
+
+        // Scientific measurement override (coordinates → decimal when header says measurement)
+        if hinted_type == "representation.numeric.decimal_number"
+            && COORDINATE_TYPES.contains(&result.label.as_str())
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.8;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_sci_measurement:{}",
+                header.to_lowercase()
+            ));
+            return;
+        }
+
+        // Check hint in vote distribution (single-entry for multi-branch)
+        let hint_in_votes = result
+            .vote_distribution
+            .iter()
+            .any(|(label, _)| label == hinted_type);
+
+        let is_generic = is_generic_prediction(
+            &result.label,
+            &result.disambiguation_rule,
+            self.taxonomy.as_ref(),
+        );
+
+        // Geography protection: person-name hints don't override location types
+        if PERSON_NAME_HINTS.contains(&hinted_type) {
+            if LOCATION_TYPES.contains(&result.label.as_str()) {
+                if hint_is_hardcoded {
+                    // Hardcoded person-name hint overrides location (NNFT-235)
+                    result.label = hinted_type.to_string();
+                    result.confidence = result.confidence.max(0.6);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_person_override:{}",
+                        header.to_lowercase()
+                    ));
+                }
+                // Model2Vec person-name hints do NOT override locations
+                // (no unmasked votes to check in multi-branch)
+                return;
+            }
+        }
+
+        // Same-domain geographic override
+        if LOCATION_TYPES.contains(&hinted_type)
+            && LOCATION_TYPES.contains(&result.label.as_str())
+            && result.label != hinted_type
+            && (hint_is_hardcoded || result.confidence <= 0.90)
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = result.confidence.max(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_geo_override:{}",
+                header.to_lowercase()
+            ));
+            return;
+        }
+
+        // Same-category hardcoded hint override (NNFT-194)
+        if hint_is_hardcoded
+            && result.label != hinted_type
+            && result.confidence <= 0.80
+        {
+            let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
+            let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
+            if !hint_category.is_empty()
+                && hint_category == pred_category
+                && hint_category.contains('.')
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.7);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_same_category:{}",
+                    header.to_lowercase()
+                ));
+                return;
+            }
+        }
+
+        // Cross-domain hardcoded hint override (NNFT-254)
+        if hint_is_hardcoded && result.label != hinted_type {
+            let hint_domain = hinted_type.split('.').next().unwrap_or("");
+            let pred_domain = result.label.split('.').next().unwrap_or("");
+            let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
+            let pred_base = result.label.rsplit('.').next().unwrap_or("");
+            if !hint_domain.is_empty()
+                && !pred_domain.is_empty()
+                && hint_domain != pred_domain
+                && hint_base != pred_base
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.5);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_cross_domain:{}",
+                    header.to_lowercase()
+                ));
+                return;
+            }
+        }
+
+        // General hint logic
+        if (result.confidence < 0.5 || is_generic) && hint_in_votes {
+            let hint_fraction = result
+                .vote_distribution
+                .iter()
+                .find(|(label, _)| label == hinted_type)
+                .map(|(_, frac)| *frac)
+                .unwrap_or(0.0);
+
+            result.label = hinted_type.to_string();
+            result.confidence = hint_fraction.max(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("header_hint:{}", header.to_lowercase()));
+        } else if is_generic && !hint_in_votes {
+            // Financial model2vec guard: block model2vec financial hints with no value evidence
+            let is_financial_hint = hinted_type.starts_with("finance.");
+            if is_financial_hint && !hint_is_hardcoded {
+                tracing::debug!(
+                    column = %header,
+                    blocked_hint = %hinted_type,
+                    current_label = %result.label,
+                    "Financial model2vec hint blocked (no vote evidence)"
+                );
+            } else {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.5;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_generic:{}",
+                    header.to_lowercase()
+                ));
+            }
+        } else if hint_is_hardcoded && !hint_in_votes {
+            // Hardcoded hint authority with domain-dependent threshold
+            let h_domain = hinted_type.split('.').next().unwrap_or("");
+            let p_domain = result.label.split('.').next().unwrap_or("");
+            let threshold = if h_domain != p_domain { 0.85 } else { 0.5 };
+            if result.confidence < threshold {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.5;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_hardcoded:{}",
+                    header.to_lowercase()
+                ));
+            }
+        } else if result.confidence < 0.3 && !hint_in_votes {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.4;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_fallback:{}",
+                header.to_lowercase()
+            ));
+        }
+
+        // Re-detect locale if label changed
+        if result.label != label_before {
+            if let Some(taxonomy) = self.taxonomy.as_ref() {
+                result.detected_locale = detect_locale_from_validation(
+                    sample,
+                    &result.label,
+                    taxonomy,
+                );
+            }
+        }
     }
 }
 
@@ -2088,6 +2406,456 @@ const CODE_ATTRACTORS: &[&str] = &[
     "finance.securities.cusip",
     "technology.internet.top_level_domain",
 ];
+
+/// Feature-based Sharpen rules for the multi-branch pipeline (AC-2).
+///
+/// Adapted from `feature_disambiguate()` with vote-dependent guards removed:
+/// - F2: fires on slash_segments threshold alone (no docker_ref in votes check)
+/// - F3: fires on feature thresholds alone (no hs_code in votes / vote fraction)
+/// - F6: uses fixed categorical fallback (no next-vote lookup)
+///
+/// All other rules (F1, F4, F5) are unchanged — they never depended on votes.
+fn feature_sharpen(
+    result: &mut ColumnResult,
+    column_features: &ColumnFeatures,
+) {
+    let label_before = result.label.clone();
+
+    // Rule F1: Leading-zero pre-filter — numeric_code vs postal_code.
+    // Unchanged from feature_disambiguate — no vote dependency.
+    let leading_zero_ratio = column_features.mean[feature_idx::HAS_LEADING_ZERO];
+    if leading_zero_ratio >= 0.3 {
+        let code_confusion_types = ["geography.address.postal_code", "identity.medical.cpt"];
+        if code_confusion_types.contains(&result.label.as_str()) {
+            let numeric_code_label = "representation.identifier.numeric_code";
+            result.label = numeric_code_label.to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "feature_leading_zero:{:.0}%",
+                leading_zero_ratio * 100.0
+            ));
+        }
+    }
+
+    // Rule F2: docker_ref vs hostname — slash segments signal container refs.
+    // ADAPTED: removed docker_in_votes guard. Multi-branch produces single-entry
+    // votes, so docker_ref would never appear as runner-up. Fire on feature
+    // threshold alone — high slash segments is a strong enough signal.
+    let slash_segments = column_features.mean[feature_idx::SEGMENT_COUNT_SLASH];
+    if result.label == "technology.internet.hostname" && slash_segments >= 1.5 {
+        result.label = "technology.container.docker_ref".to_string();
+        result.confidence = result.confidence.max(0.7);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("feature_slash_segments:{:.1}", slash_segments));
+    }
+
+    // Rule F3: hs_code vs decimal_number — HS codes are pure digits with dots.
+    // ADAPTED: removed hs_in_votes guard and hs_frac threshold. Multi-branch
+    // single-entry votes never contain hs_code as runner-up. Fire on feature
+    // thresholds alone — the combination of digit_ratio + dot_segments + negative
+    // prefix guard + dot variance guard is discriminative enough.
+    let digit_ratio = column_features.mean[feature_idx::DIGIT_RATIO];
+    let dot_segments = column_features.mean[feature_idx::SEGMENT_COUNT_DOT];
+    let is_float_fraction = column_features.mean[feature_idx::IS_FLOAT];
+    let has_neg_prefix = column_features.mean[feature_idx::HAS_NEGATIVE_PREFIX];
+    let dot_segment_variance = column_features.variance[feature_idx::SEGMENT_COUNT_DOT];
+    let f3_path_a = digit_ratio >= 0.75 && dot_segments >= 2.0;
+    let f3_path_b = digit_ratio >= 0.75 && is_float_fraction < 1.0 && dot_segments >= 1.5;
+    let f3_neg_guard = has_neg_prefix > 0.0;
+    let f3_dot_var_guard = dot_segment_variance > 0.5;
+    if result.label == "representation.numeric.decimal_number"
+        && (f3_path_a || f3_path_b)
+        && !f3_neg_guard
+        && !f3_dot_var_guard
+    {
+        result.label = "geography.trade.hs_code".to_string();
+        result.confidence = result.confidence.max(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_hs_code:digit_ratio={:.2},dots={:.1},float={:.2},neg={:.2},dot_var={:.2}",
+            digit_ratio, dot_segments, is_float_fraction, has_neg_prefix, dot_segment_variance
+        ));
+    }
+
+    // Rule F4: git_sha vs hash — length variance. Unchanged — no vote dependency.
+    let length_variance = column_features.variance[feature_idx::LENGTH];
+    let hex_ratio = column_features.mean[feature_idx::IS_HEX_STRING];
+    let mean_length = column_features.mean[feature_idx::LENGTH];
+    if result.label == "technology.cryptographic.hash"
+        && length_variance < 0.01
+        && hex_ratio >= 0.95
+        && (mean_length - 40.0).abs() < 1.0
+    {
+        result.label = "technology.development.git_sha".to_string();
+        result.confidence = result.confidence.max(0.8);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_git_sha:len_var={:.4},hex={:.2},len={:.0}",
+            length_variance, hex_ratio, mean_length
+        ));
+    }
+
+    // Rule F5: numeric_code without leading zeros → integer_number or decimal_number.
+    // Unchanged — no vote dependency.
+    let is_float_ratio = column_features.mean[feature_idx::IS_FLOAT];
+    if result.label == "representation.identifier.numeric_code" && leading_zero_ratio < 0.01 {
+        if is_float_ratio > 0.5 {
+            result.label = "representation.numeric.decimal_number".to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "feature_decimal_over_numeric_code:float={:.2},leading_zero={:.2}",
+                is_float_ratio, leading_zero_ratio
+            ));
+        } else {
+            result.label = "representation.numeric.integer_number".to_string();
+            result.confidence = result.confidence.max(0.7);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("feature_no_leading_zero:{:.2}", leading_zero_ratio));
+        }
+    }
+
+    // Rule F6: Short alphabetic codes misclassified as file.extension.
+    // ADAPTED: uses fixed categorical fallback instead of next-vote lookup.
+    // Multi-branch single-entry votes have no second-place candidate.
+    let feat_mean_length = column_features.mean[feature_idx::LENGTH];
+    let feat_dot_segments = column_features.mean[feature_idx::SEGMENT_COUNT_DOT];
+    let feat_alpha_ratio = column_features.mean[feature_idx::ALPHA_RATIO];
+    if result.label == "representation.file.extension"
+        && feat_mean_length <= 4.0
+        && feat_dot_segments < 1.1
+        && feat_alpha_ratio >= 0.8
+    {
+        result.label = "representation.discrete.categorical".to_string();
+        result.confidence = result.confidence.max(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_short_code_not_extension:len={:.1},dots={:.2},alpha={:.2}",
+            feat_mean_length, feat_dot_segments, feat_alpha_ratio
+        ));
+    }
+
+    // Trace point: Feature rule outcome
+    if result.label != label_before {
+        tracing::debug!(
+            rule = ?result.disambiguation_rule,
+            old_label = %label_before,
+            new_label = %result.label,
+            "Feature sharpen rule applied"
+        );
+    }
+}
+
+/// Value-based Sharpen rules for the multi-branch pipeline (AC-3).
+///
+/// Adapted from `disambiguate()` with label-based triggers instead of
+/// vote-based `contains_pair()`:
+/// - Rules that checked `contains_pair(top_labels, a, b)` now check if
+///   `result.label` matches either type
+/// - Rules that checked `top_labels.first()` now check `result.label`
+/// - R12 (numeric): triggers when result.label is any numeric-adjacent type
+/// - R15 (attractor demotion): uses `result.confidence` directly instead of
+///   `top_count / n_samples` (which gives 0.0 with multi-branch single-entry
+///   votes where `confidence as usize` truncates to 0)
+/// - `results: &[ClassificationResult]` parameter dropped (R12 never used it)
+///
+/// Returns Some((resolved_label, rule_name)) if a rule was applied.
+fn value_sharpen(
+    values: &[String],
+    result_label: &str,
+    result_confidence: f32,
+    taxonomy: Option<&Taxonomy>,
+) -> Option<(String, String)> {
+    // Rule 1: Date slash disambiguation (mdy_slash vs dmy_slash)
+    // ADAPTED: fire when result.label is either date type (not both in top-3)
+    if result_label == DATE_SLASH_PAIR.0 || result_label == DATE_SLASH_PAIR.1 {
+        if let Some(label) = disambiguate_slash_dates(values) {
+            return Some((label, "date_slash_disambiguation".to_string()));
+        }
+    }
+
+    // Rule 2: Short date disambiguation (short_mdy vs short_dmy)
+    if result_label == SHORT_DATE_PAIR.0 || result_label == SHORT_DATE_PAIR.1 {
+        if let Some(label) = disambiguate_short_dates(values) {
+            return Some((label, "short_date_disambiguation".to_string()));
+        }
+    }
+
+    // Rule 3: Coordinate disambiguation (latitude vs longitude)
+    // ADAPTED: fire when result.label is either coordinate type
+    if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
+        if let Some(label) = disambiguate_coordinates(values) {
+            return Some((label, "coordinate_disambiguation".to_string()));
+        }
+    }
+
+    // Rule 4: IPv4 address detection (dotted-quad pattern)
+    if let Some(label) = disambiguate_ipv4(values) {
+        return Some((label, "ipv4_detection".to_string()));
+    }
+
+    // Rule 5: Day-of-week name detection
+    if let Some(label) = disambiguate_day_of_week(values) {
+        return Some((label, "day_of_week_name_detection".to_string()));
+    }
+
+    // Rule 6: Month name detection
+    if let Some(label) = disambiguate_month_name(values) {
+        return Some((label, "month_name_detection".to_string()));
+    }
+
+    // Rule 7: Boolean sub-type normalization
+    // ADAPTED: check result.label for boolean types
+    let top_labels_single = [result_label];
+    if let Some((label, rule)) = disambiguate_boolean_subtype(values, &top_labels_single) {
+        return Some((label, rule));
+    }
+
+    // Rule 8: Gender detection
+    if let Some(label) = disambiguate_gender(values) {
+        return Some((label, "gender_detection".to_string()));
+    }
+
+    // Rule 9: Boolean override
+    if let Some((label, rule)) = disambiguate_boolean_override(values, &top_labels_single) {
+        return Some((label, rule));
+    }
+
+    // Rule 10: Small-integer ordinal detection
+    if let Some((label, rule)) = disambiguate_small_integer_ordinal(values, &top_labels_single) {
+        return Some((label, rule));
+    }
+
+    // Rule 11: Categorical detection
+    if let Some((label, rule)) = disambiguate_categorical(values, &top_labels_single) {
+        return Some((label, rule));
+    }
+
+    // Rule 12: Numeric type disambiguation
+    // ADAPTED: trigger when result.label is any numeric-adjacent type
+    let numeric_types = [
+        "representation.identifier.increment",
+        "representation.numeric.integer_number",
+        "representation.numeric.decimal_number",
+        "geography.address.postal_code",
+        "datetime.component.year",
+        "representation.identifier.numeric_code",
+    ];
+    if numeric_types.contains(&result_label) {
+        // Pass empty results — R12 never uses them (let _ = results)
+        if let Some((label, rule)) =
+            disambiguate_numeric(values, &[], &top_labels_single)
+        {
+            return Some((label, rule));
+        }
+    }
+
+    // Rule 13: SI number override
+    if result_label == "representation.numeric.si_number" {
+        if let Some((label, rule)) = disambiguate_si_number(values) {
+            return Some((label, rule));
+        }
+    }
+
+    // Rule 19: Percentage without '%' sign → decimal_number
+    if result_label == "representation.numeric.percentage" {
+        let has_pct_sign = values.iter().any(|v| v.contains('%'));
+        if !has_pct_sign {
+            return Some((
+                "representation.numeric.decimal_number".to_string(),
+                "percentage_no_sign".to_string(),
+            ));
+        }
+    }
+
+    // Rule 14: Duration override — ISO 8601 durations misclassified as SEDOL
+    if result_label == "finance.securities.sedol" {
+        if let Some((label, rule)) = disambiguate_duration_override(values) {
+            return Some((label, rule));
+        }
+    }
+
+    // Rule 17: UTC offset override
+    if let Some((label, rule)) = disambiguate_utc_offset_override(values) {
+        return Some((label, rule));
+    }
+
+    // Rule 15: Attractor type demotion
+    // ADAPTED: uses result.confidence directly instead of top_count / n_samples
+    // (which produces 0.0 with multi-branch because confidence as usize truncates to 0)
+    if let Some((label, rule)) = sharpen_attractor_demotion(
+        values,
+        result_label,
+        result_confidence,
+        taxonomy,
+    ) {
+        return Some((label, rule));
+    }
+
+    // Rule 16: Text length demotion
+    // ADAPTED: check result.label directly for full_address
+    if result_label == "geography.address.full_address" {
+        if let Some((label, rule)) = disambiguate_text_length_demotion(
+            values,
+            &[(result_label.to_string(), 1)], // Minimal vote entry for the function signature
+        ) {
+            return Some((label, rule));
+        }
+    }
+
+    None
+}
+
+/// Attractor demotion adapted for multi-branch pipeline (AC-3, R15).
+///
+/// Uses `result_confidence` directly as the majority fraction instead of
+/// computing `top_count as f32 / n_samples as f32` — which gives 0.0 with
+/// multi-branch single-entry votes where `confidence as usize` truncates to 0.
+///
+/// When no second-place vote exists (multi-branch single-entry), uses
+/// taxonomy-based category demotion for the fallback.
+fn sharpen_attractor_demotion(
+    values: &[String],
+    result_label: &str,
+    result_confidence: f32,
+    taxonomy: Option<&Taxonomy>,
+) -> Option<(String, String)> {
+    let is_numeric = NUMERIC_ATTRACTORS.contains(&result_label);
+    let is_text = TEXT_ATTRACTORS.contains(&result_label);
+    let is_code = CODE_ATTRACTORS.contains(&result_label);
+
+    if !is_numeric && !is_text && !is_code {
+        return None;
+    }
+
+    // Signal 1: Validation failure (strongest signal)
+    let mut locale_confirmed = false;
+    let mut validation_confirmed = false;
+    let mut has_locale_validators = false;
+    if let Some(taxonomy) = taxonomy {
+        let has_pattern = taxonomy
+            .get(result_label)
+            .and_then(|d| d.validation.as_ref())
+            .and_then(|v| v.pattern.as_ref())
+            .is_some();
+
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+
+        if non_empty.len() >= 3 {
+            if let Some(locale_validators) = taxonomy.get_locale_validators(result_label) {
+                has_locale_validators = true;
+                let mut best_pass_rate: f32 = 0.0;
+                for compiled in locale_validators.values() {
+                    let pass_count = non_empty.iter().filter(|v| compiled.is_valid(v)).count();
+                    let pass_rate = pass_count as f32 / non_empty.len() as f32;
+                    if pass_rate > best_pass_rate {
+                        best_pass_rate = pass_rate;
+                    }
+                }
+                if best_pass_rate > 0.5 {
+                    locale_confirmed = true;
+                }
+            }
+
+            if !locale_confirmed {
+                let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
+                    non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+                } else if let Some(def) = taxonomy.get(result_label) {
+                    if let Some(validation) = &def.validation {
+                        non_empty
+                            .iter()
+                            .filter(|v| {
+                                finetype_core::validate_value(v, validation)
+                                    .map(|r| !r.is_valid)
+                                    .unwrap_or(false)
+                            })
+                            .count()
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+
+                let fail_rate = fail_count as f32 / non_empty.len() as f32;
+                if fail_rate > 0.5 {
+                    let fallback =
+                        sharpen_select_fallback(is_numeric, is_text, is_code, values);
+                    return Some((
+                        fallback,
+                        format!("attractor_demotion_validation:{}", result_label),
+                    ));
+                }
+                if has_pattern && fail_rate <= 0.3 {
+                    validation_confirmed = true;
+                }
+            }
+        }
+    }
+
+    // Signal 2: Confidence threshold
+    // ADAPTED: use result_confidence directly instead of top_count / n_samples
+    let confirmed = locale_confirmed || (!has_locale_validators && validation_confirmed);
+    if !confirmed && result_confidence < 0.85 {
+        let fallback = sharpen_select_fallback(is_numeric, is_text, is_code, values);
+        return Some((
+            fallback,
+            format!("attractor_demotion_confidence:{}", result_label),
+        ));
+    }
+
+    // Signal 3: Cardinality mismatch (text attractors only)
+    if is_text && !locale_confirmed {
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        let mut unique: Vec<&str> = non_empty.clone();
+        unique.sort();
+        unique.dedup();
+        if (1..=20).contains(&unique.len()) {
+            return Some((
+                "representation.discrete.categorical".to_string(),
+                format!("attractor_demotion_cardinality:{}", result_label),
+            ));
+        }
+    }
+
+    None
+}
+
+/// Select fallback for Sharpen attractor demotion (no votes available).
+///
+/// Without a vote distribution, uses taxonomy-based category demotion.
+fn sharpen_select_fallback(
+    is_numeric: bool,
+    is_text: bool,
+    is_code: bool,
+    values: &[String],
+) -> String {
+    if is_numeric {
+        let has_decimal = values.iter().any(|v| v.contains('.'));
+        if has_decimal {
+            "representation.numeric.decimal_number".to_string()
+        } else {
+            "representation.numeric.integer_number".to_string()
+        }
+    } else if is_text {
+        "representation.discrete.categorical".to_string()
+    } else if is_code {
+        "representation.alphanumeric.alphanumeric_id".to_string()
+    } else {
+        "representation.text.word".to_string()
+    }
+}
 
 /// Feature-based disambiguation: use aggregated column features to resolve
 /// known confusion pairs that the CharCNN model cannot distinguish (NNFT-250).
@@ -8388,5 +9156,361 @@ datetime.component.day_of_week:
             "should fallback to categorical when no second vote exists"
         );
         assert!(result.disambiguation_applied);
+    }
+
+    // ── Sharpen-specific tests (AC-2, AC-3) ──────────────────────────────
+    //
+    // These tests exercise the multi-branch Sharpen functions directly,
+    // using single-entry vote distributions that simulate multi-branch output.
+
+    // AC-2: feature_sharpen — F2 fires on hostname without docker_ref in votes
+    #[test]
+    fn test_sharpen_f2_hostname_high_slash_segments_no_docker_vote() {
+        // Multi-branch predicts "hostname" but column has high slash segments
+        // (e.g., "docker.io/library/nginx:latest"). With multi-branch single-entry
+        // votes, docker_ref never appears as runner-up — F2 must fire on feature
+        // threshold alone.
+        let mut result = ColumnResult {
+            label: "technology.internet.hostname".to_string(),
+            confidence: 0.85,
+            vote_distribution: vec![(
+                "technology.internet.hostname".to_string(),
+                0.85,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::SEGMENT_COUNT_SLASH] = 2.0; // ≥ 1.5 threshold
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "technology.container.docker_ref",
+            "F2 should fire on hostname with high slash segments even without docker_ref in votes"
+        );
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_slash_segments"));
+    }
+
+    #[test]
+    fn test_sharpen_f2_hostname_low_slash_segments_stays() {
+        // hostname with low slash segments should NOT trigger F2
+        let mut result = ColumnResult {
+            label: "technology.internet.hostname".to_string(),
+            confidence: 0.85,
+            vote_distribution: vec![(
+                "technology.internet.hostname".to_string(),
+                0.85,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::SEGMENT_COUNT_SLASH] = 0.5; // below 1.5
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "technology.internet.hostname",
+            "F2 should NOT fire when slash segments are below threshold"
+        );
+        assert!(!result.disambiguation_applied);
+    }
+
+    // AC-2: feature_sharpen — F3 fires on decimal_number without hs_code in votes
+    #[test]
+    fn test_sharpen_f3_decimal_to_hs_code_no_hs_vote() {
+        // Multi-branch predicts "decimal_number" but column has HS code features
+        // (high digit ratio + dot segments). F3 should fire without hs_code in votes.
+        let mut result = ColumnResult {
+            label: "representation.numeric.decimal_number".to_string(),
+            confidence: 0.80,
+            vote_distribution: vec![(
+                "representation.numeric.decimal_number".to_string(),
+                0.80,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::DIGIT_RATIO] = 0.85;          // ≥ 0.75
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 2.5;     // ≥ 2.0 (path A)
+        cf.mean[feature_idx::IS_FLOAT] = 0.3;              // < 1.0
+        cf.mean[feature_idx::HAS_NEGATIVE_PREFIX] = 0.0;   // no negative prefix
+        cf.variance[feature_idx::SEGMENT_COUNT_DOT] = 0.1;  // ≤ 0.5
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "geography.trade.hs_code",
+            "F3 should fire on decimal_number with HS code features even without hs_code in votes"
+        );
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_hs_code"));
+    }
+
+    // AC-2: feature_sharpen — F5 demotes numeric_code (single-entry votes)
+    #[test]
+    fn test_sharpen_f5_numeric_code_demoted_single_vote() {
+        // Same as existing F5 test but using feature_sharpen (not feature_disambiguate)
+        let mut result = ColumnResult {
+            label: "representation.identifier.numeric_code".to_string(),
+            confidence: 0.90,
+            vote_distribution: vec![(
+                "representation.identifier.numeric_code".to_string(),
+                0.90,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.0; // no leading zeros
+        cf.mean[feature_idx::IS_FLOAT] = 0.0;
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "representation.numeric.integer_number",
+            "F5 should demote numeric_code without leading zeros via feature_sharpen"
+        );
+        assert!(result.disambiguation_applied);
+    }
+
+    // AC-2: feature_sharpen — F6 falls back to categorical with empty votes
+    #[test]
+    fn test_sharpen_f6_extension_to_categorical_empty_votes() {
+        // Multi-branch predicts "file.extension" with single-entry votes
+        // and short alphabetic values — F6 should fallback to categorical
+        let mut result = ColumnResult {
+            label: "representation.file.extension".to_string(),
+            confidence: 0.75,
+            vote_distribution: vec![(
+                "representation.file.extension".to_string(),
+                0.75,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::LENGTH] = 2.5;            // ≤ 4.0
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 0.0; // < 1.1
+        cf.mean[feature_idx::ALPHA_RATIO] = 0.95;      // ≥ 0.8
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "representation.discrete.categorical",
+            "F6 should fallback to categorical with single-entry votes"
+        );
+        assert!(result.disambiguation_applied);
+    }
+
+    // AC-3: value_sharpen — R5 day-of-week with single-entry votes
+    #[test]
+    fn test_sharpen_r5_day_of_week_single_vote() {
+        let values: Vec<String> = vec![
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "representation.discrete.categorical", 0.80, None);
+
+        assert!(result.is_some(), "R5 should fire for day-of-week values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.component.day_of_week");
+        assert_eq!(rule, "day_of_week_name_detection");
+    }
+
+    // AC-3: value_sharpen — R8 gender with single-entry votes
+    #[test]
+    fn test_sharpen_r8_gender_single_vote() {
+        let values: Vec<String> = vec!["Male", "Female", "Male", "Female", "Male"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = value_sharpen(&values, "representation.discrete.categorical", 0.80, None);
+
+        assert!(result.is_some(), "R8 should fire for gender values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "identity.person.gender");
+        assert_eq!(rule, "gender_detection");
+    }
+
+    // AC-3: value_sharpen — R11 categorical with single-entry votes
+    #[test]
+    fn test_sharpen_r11_categorical_single_vote() {
+        let values: Vec<String> = vec!["red", "blue", "green", "red", "blue"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        // Low cardinality values with a text-like label should trigger categorical
+        let result = value_sharpen(&values, "identity.person.first_name", 0.70, None);
+
+        assert!(result.is_some(), "R11 should fire for low-cardinality categorical values");
+        let (label, _rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+    }
+
+    // AC-3: value_sharpen — R12 numeric disambiguation with single-entry votes
+    #[test]
+    fn test_sharpen_r12_numeric_single_vote() {
+        // Year-like values predicted as integer_number
+        let values: Vec<String> = vec!["2020", "2021", "2022", "2023", "2024"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result =
+            value_sharpen(&values, "representation.numeric.integer_number", 0.80, None);
+
+        assert!(result.is_some(), "R12 should fire for year-like values");
+        let (label, _rule) = result.unwrap();
+        assert_eq!(label, "datetime.component.year");
+    }
+
+    // AC-3: value_sharpen — R17 UTC offset with single-entry votes
+    #[test]
+    fn test_sharpen_r17_utc_offset_single_vote() {
+        let values: Vec<String> = vec!["+05:30", "-08:00", "+00:00", "+09:00", "-05:00"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result =
+            value_sharpen(&values, "representation.numeric.decimal_number", 0.70, None);
+
+        assert!(result.is_some(), "R17 should fire for UTC offset values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.offset.utc");
+        assert_eq!(rule, "utc_offset_override_time");
+    }
+
+    // AC-3: sharpen_attractor_demotion — confidence threshold
+    #[test]
+    fn test_sharpen_attractor_high_confidence_no_demotion() {
+        // postal_code with high confidence (0.95) should NOT be demoted
+        let values: Vec<String> = vec!["10001", "90210", "60601", "30301", "94102"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "geography.address.postal_code",
+            0.95, // high confidence
+            None, // no taxonomy for validation
+        );
+
+        assert!(
+            result.is_none(),
+            "High confidence (0.95) should NOT trigger attractor demotion"
+        );
+    }
+
+    #[test]
+    fn test_sharpen_attractor_low_confidence_demotes() {
+        // postal_code with low confidence (0.30) should be demoted
+        let values: Vec<String> = vec!["42", "100", "7", "256", "1024"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "geography.address.postal_code",
+            0.30, // low confidence — below 0.85 threshold
+            None, // no taxonomy for validation
+        );
+
+        assert!(
+            result.is_some(),
+            "Low confidence (0.30) should trigger attractor demotion"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert!(
+            rule.starts_with("attractor_demotion_confidence"),
+            "Rule should be confidence-based demotion, got: {}",
+            rule
+        );
+    }
+
+    #[test]
+    fn test_sharpen_attractor_text_low_confidence_demotes_to_categorical() {
+        // first_name with low confidence and low cardinality → categorical
+        let values: Vec<String> = vec!["alpha", "beta", "gamma", "alpha", "beta"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "identity.person.first_name",
+            0.40, // low confidence
+            None,
+        );
+
+        assert!(result.is_some(), "Low confidence text attractor should demote");
+        let (label, _rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+    }
+
+    #[test]
+    fn test_sharpen_attractor_non_attractor_type_ignored() {
+        // A type that's not in any attractor list should never trigger demotion
+        let values: Vec<String> = vec!["hello@example.com"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "identity.person.email",
+            0.30, // even with low confidence
+            None,
+        );
+
+        assert!(
+            result.is_none(),
+            "Non-attractor type should never trigger demotion"
+        );
     }
 }

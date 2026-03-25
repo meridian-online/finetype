@@ -20,44 +20,15 @@
 //! FROM values_table GROUP BY col_name;
 //! ```
 
-use crate::get_classifier;
+use crate::get_column_classifier;
 use crate::type_mapping;
 
 use duckdb::core::{DataChunkHandle, Inserter};
 use duckdb::vtab::arrow::WritableVector;
 use std::error::Error;
 use std::ffi::CString;
-use std::sync::OnceLock;
 
-use finetype_model::inference::InferenceError;
-use finetype_model::{ClassificationResult, ColumnClassifier, ColumnResult, ValueClassifier};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// GLOBAL COLUMN CLASSIFIER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Thin delegate that implements ValueClassifier by forwarding to the global CharClassifier.
-struct GlobalClassifierDelegate;
-
-impl ValueClassifier for GlobalClassifierDelegate {
-    fn classify(&self, text: &str) -> std::result::Result<ClassificationResult, InferenceError> {
-        get_classifier().classify(text)
-    }
-
-    fn classify_batch(
-        &self,
-        texts: &[String],
-    ) -> std::result::Result<Vec<ClassificationResult>, InferenceError> {
-        get_classifier().classify_batch(texts)
-    }
-}
-
-static COLUMN_CLASSIFIER: OnceLock<ColumnClassifier> = OnceLock::new();
-
-fn get_column_classifier() -> &'static ColumnClassifier {
-    COLUMN_CLASSIFIER
-        .get_or_init(|| ColumnClassifier::with_defaults(Box::new(GlobalClassifierDelegate)))
-}
+use finetype_model::ColumnResult;
 
 /// Run column classification on a slice of strings.
 ///

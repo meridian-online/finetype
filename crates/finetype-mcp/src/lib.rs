@@ -14,7 +14,7 @@
 //! ```ignore
 //! // From CLI: finetype mcp
 //! // Or programmatically:
-//! let server = FineTypeServer::new(classifier, taxonomy, semantic);
+//! let server = FineTypeServer::new(column_classifier, taxonomy);
 //! server.serve_stdio().await?;
 //! ```
 
@@ -23,9 +23,7 @@ pub mod tools;
 
 use anyhow::Result;
 use finetype_core::Taxonomy;
-use finetype_model::{
-    CharClassifier, ColumnClassifier, ColumnConfig, SemanticHintClassifier, ValueClassifier,
-};
+use finetype_model::ColumnClassifier;
 use rmcp::{
     handler::server::router::tool::ToolRouter, handler::server::wrapper::Parameters, model::*,
     service::RequestContext, tool, tool_handler, tool_router, RoleServer, ServerHandler,
@@ -168,42 +166,17 @@ impl ServerHandler for FineTypeServer {
 }
 
 impl FineTypeServer {
-    /// Create a new server with loaded models.
+    /// Create a new server with a fully-configured column classifier.
     ///
-    /// All models are loaded once at startup and shared across requests.
-    pub fn new(
-        char_classifier: CharClassifier,
-        taxonomy: Taxonomy,
-        semantic: Option<SemanticHintClassifier>,
-    ) -> Self {
-        let config = ColumnConfig {
-            sample_size: 100,
-            ..Default::default()
-        };
-
-        let mut column_classifier = if let Some(semantic) = semantic {
-            ColumnClassifier::with_semantic_hint(
-                Box::new(char_classifier) as Box<dyn ValueClassifier>,
-                config,
-                semantic,
-            )
-        } else {
-            ColumnClassifier::new(
-                Box::new(char_classifier) as Box<dyn ValueClassifier>,
-                config,
-            )
-        };
-
-        // Set taxonomy for validation-based disambiguation
-        let mut tax = taxonomy;
-        tax.compile_validators();
-        tax.compile_locale_validators();
-        column_classifier.set_taxonomy(tax.clone());
-
+    /// The caller is responsible for building the `ColumnClassifier` with all
+    /// desired models wired up (multi-branch, sibling context, semantic hints,
+    /// taxonomy, etc.). The taxonomy is extracted from the classifier's state
+    /// and also stored separately for resource/tool access.
+    pub fn new(column_classifier: ColumnClassifier, taxonomy: Taxonomy) -> Self {
         Self {
             tool_router: Self::tool_router(),
             classifier: Arc::new(RwLock::new(column_classifier)),
-            tax: Arc::new(tax),
+            tax: Arc::new(taxonomy),
         }
     }
 

@@ -4,7 +4,7 @@
 # Supports both flat models (single dir) and tiered models (multiple subdirs).
 set -euo pipefail
 
-REPO="https://huggingface.co/meridian-online/finetype-char-cnn/resolve/main"
+REPO="https://huggingface.co/meridian-online/finetype-model/resolve/main"
 # readlink works on Linux/macOS; fall back to cat for Windows where
 # git may check out symlinks as plain text files.
 MODEL_DIR=$(readlink models/default 2>/dev/null || cat models/default)
@@ -28,10 +28,10 @@ if curl -sfI "${MANIFEST_URL}" > /dev/null 2>&1; then
     curl -sfL "${REPO}/${MODEL_DIR}/${file}" -o "models/${MODEL_DIR}/${file}"
   done < "models/${MODEL_DIR}/manifest.txt"
 else
-  # Flat model: download 3 fixed files
+  # Multi-branch flat model: download 3 fixed files
   echo "  Flat model — downloading model files..."
   cd "models/${MODEL_DIR}"
-  for file in model.safetensors labels.json config.yaml; do
+  for file in model.safetensors label_map.json config.json; do
     echo "  Downloading ${file}..."
     curl -sfLO "${REPO}/${MODEL_DIR}/${file}"
   done
@@ -40,6 +40,30 @@ fi
 
 echo "Model files:"
 find "models/${MODEL_DIR}" -type f | sort
+
+# ── Sibling-context model (optional) ──────────────────────────────────────
+# Download the sibling-context attention model for cross-column enrichment.
+# The build gracefully degrades if these are absent.
+echo ""
+echo "Downloading sibling-context model..."
+mkdir -p models/sibling-context
+SC_OK=true
+for file in model.safetensors config.json; do
+  echo "  Downloading sibling-context/${file}..."
+  if ! curl -sfL "${REPO}/sibling-context/${file}" -o "models/sibling-context/${file}"; then
+    echo "  WARNING: Failed to download sibling-context/${file} — sibling context will be disabled"
+    SC_OK=false
+    break
+  fi
+done
+
+if [ "${SC_OK}" = true ]; then
+  echo "Sibling-context files:"
+  find models/sibling-context -type f | sort
+else
+  echo "Sibling-context download failed — continuing without cross-column enrichment"
+  rm -rf models/sibling-context
+fi
 
 # ── Model2Vec semantic hint classifier (optional) ──────────────────────────
 # Download the Model2Vec artifacts for the semantic column name classifier.
@@ -87,28 +111,4 @@ if [ "${EC_OK}" = true ]; then
 else
   echo "Entity classifier download failed — continuing without entity demotion"
   rm -rf models/entity-classifier
-fi
-
-# ── Sense classifier (optional) ──────────────────────────────────────────
-# Download the Sense broad-category classifier for Sense→Sharpen pipeline.
-# The build gracefully degrades if these are absent (HAS_SENSE_CLASSIFIER=false).
-echo ""
-echo "Downloading Sense classifier model..."
-mkdir -p models/sense
-SENSE_OK=true
-for file in model.safetensors config.json; do
-  echo "  Downloading sense/${file}..."
-  if ! curl -sfL "${REPO}/sense/${file}" -o "models/sense/${file}"; then
-    echo "  WARNING: Failed to download sense/${file} — Sense pipeline will be disabled"
-    SENSE_OK=false
-    break
-  fi
-done
-
-if [ "${SENSE_OK}" = true ]; then
-  echo "Sense classifier files:"
-  find models/sense -type f | sort
-else
-  echo "Sense classifier download failed — continuing with legacy pipeline"
-  rm -rf models/sense
 fi

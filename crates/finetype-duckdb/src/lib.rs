@@ -16,51 +16,85 @@ use duckdb::vtab::arrow::WritableVector;
 use duckdb::{duckdb_entrypoint_c_api, Result};
 use std::error::Error;
 use std::ffi::CString;
+use std::path::PathBuf;
+use std::sync::OnceLock;
 
+use finetype_model::{ColumnClassifier, ColumnConfig, MultiBranchClassifier};
+
+mod column_fn;
+mod normalize;
 mod type_mapping;
+mod unpack;
 mod validate;
 
-#[cfg(feature = "embed-models")]
-mod column_fn;
-#[cfg(feature = "embed-models")]
-mod normalize;
-#[cfg(feature = "embed-models")]
-mod unpack;
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// EMBEDDED MODELS
+// RUNTIME MODEL LOADING
 // ═══════════════════════════════════════════════════════════════════════════════
-
-#[cfg(feature = "embed-models")]
-mod embedded {
-    include!(concat!(env!("OUT_DIR"), "/embedded_models.rs"));
-}
 
 /// Extension name and version.
 const EXTENSION_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// GLOBAL CLASSIFIER (lazy-initialized on first use)
-// ═══════════════════════════════════════════════════════════════════════════════
+/// HuggingFace repository for the default FineType multi-branch model.
+const HF_REPO: &str = "meridian-online/finetype-model";
 
-#[cfg(feature = "embed-models")]
-use std::sync::OnceLock;
+/// Files required for the multi-branch model.
+const MODEL_FILES: &[&str] = &["model.safetensors", "label_map.json", "config.json"];
 
-/// Global flat classifier, initialized on first finetype() call.
-/// Uses the single-pass CharCNN model (91.97% accuracy, ~100x faster than tiered).
-#[cfg(feature = "embed-models")]
-static CLASSIFIER: OnceLock<finetype_model::CharClassifier> = OnceLock::new();
+/// Global column classifier backed by multi-branch model.
+/// Initialized on first finetype() call, loaded at runtime from
+/// HuggingFace Hub or a local directory.
+static COLUMN_CLASSIFIER: OnceLock<ColumnClassifier> = OnceLock::new();
 
-/// Initialize or get the global classifier from embedded flat model.
-#[cfg(feature = "embed-models")]
-fn get_classifier() -> &'static finetype_model::CharClassifier {
-    CLASSIFIER.get_or_init(|| {
-        finetype_model::CharClassifier::from_bytes(
-            embedded::FLAT_WEIGHTS,
-            embedded::FLAT_LABELS,
-            embedded::FLAT_CONFIG,
+/// Resolve the model directory: check `FINETYPE_MODEL_DIR` env var first,
+/// then fall back to downloading from HuggingFace Hub.
+fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
+    // 1. Check env var for local path override
+    if let Ok(dir) = std::env::var("FINETYPE_MODEL_DIR") {
+        let path = PathBuf::from(&dir);
+        if path.join("model.safetensors").exists() {
+            tracing::info!("Loading FineType model from local path: {}", dir);
+            return Ok(path);
+        }
+        return Err(format!(
+            "FINETYPE_MODEL_DIR={} does not contain model.safetensors",
+            dir
         )
-        .expect("Failed to load embedded flat model")
+        .into());
+    }
+
+    // 2. Download from HuggingFace Hub (cached after first download)
+    tracing::info!(
+        "Downloading FineType model from HuggingFace Hub: {}",
+        HF_REPO
+    );
+    let repo = hf_hub::Repo::new(HF_REPO.to_string(), hf_hub::RepoType::Model);
+    let api = hf_hub::api::sync::Api::new()?;
+    let api = api.repo(repo);
+
+    // Download all required files — hf_hub caches them automatically
+    let mut model_dir = None;
+    for filename in MODEL_FILES {
+        let path = api.get(filename)?;
+        if model_dir.is_none() {
+            // All files from the same repo land in the same cache directory
+            model_dir = path.parent().map(|p| p.to_path_buf());
+        }
+    }
+
+    model_dir.ok_or_else(|| "Failed to determine model cache directory".into())
+}
+
+/// Initialize or get the global column classifier backed by multi-branch model.
+fn get_column_classifier() -> &'static ColumnClassifier {
+    COLUMN_CLASSIFIER.get_or_init(|| {
+        let model_dir = resolve_model_dir().expect("Failed to resolve FineType model directory");
+        let mb = MultiBranchClassifier::load(&model_dir)
+            .expect("Failed to load multi-branch model from resolved directory");
+        let config = ColumnConfig {
+            sample_size: 100,
+            ..Default::default()
+        };
+        ColumnClassifier::with_multi_branch(mb, config)
     })
 }
 
@@ -163,10 +197,8 @@ impl VScalar for FineTypeVersion {
 /// The `list()` overload gives explicit control over the sample — useful with
 /// GROUP BY to classify each group independently, or when you want the full
 /// column rather than a chunk-sized sample.
-#[cfg(feature = "embed-models")]
 struct FineType;
 
-#[cfg(feature = "embed-models")]
 impl VScalar for FineType {
     type State = ();
 
@@ -256,10 +288,8 @@ impl VScalar for FineType {
 ///
 /// In scalar mode, the DuckDB processing chunk (~2048 rows) is used as the
 /// column sample. The `list()` overload gives explicit control over the sample.
-#[cfg(feature = "embed-models")]
 struct FineTypeDetail;
 
-#[cfg(feature = "embed-models")]
 impl VScalar for FineTypeDetail {
     type State = ();
 
@@ -346,10 +376,8 @@ impl VScalar for FineTypeDetail {
 /// - `finetype_cast('Yes')` → `'true'` (boolean normalization)
 /// - `finetype_cast('550E8400-...')` → `'550e8400-...'` (UUID lowercase)
 /// - `finetype_cast('1,234')` → `'1234'` (strip formatting)
-#[cfg(feature = "embed-models")]
 struct FineTypeCast;
 
-#[cfg(feature = "embed-models")]
 impl VScalar for FineTypeCast {
     type State = ();
 
@@ -358,7 +386,7 @@ impl VScalar for FineTypeCast {
         input: &mut DataChunkHandle,
         output: &mut dyn WritableVector,
     ) -> Result<(), Box<dyn Error>> {
-        let classifier = get_classifier();
+        let col_classifier = get_column_classifier();
         let len = input.len();
         let mut output_vec = output.flat_vector();
 
@@ -368,7 +396,8 @@ impl VScalar for FineTypeCast {
                     output_vec.set_null(i);
                     continue;
                 }
-                match classifier.classify(&text) {
+                // Classify single value via column classifier (1-element column)
+                match col_classifier.classify_column(&[text.clone()]) {
                     Ok(result) => {
                         if let Some(normalized) = normalize::normalize(&text, &result.label) {
                             let cstr = CString::new(normalized)?;
@@ -409,10 +438,8 @@ impl VScalar for FineTypeCast {
 /// - `duckdb_type`: recommended DuckDB type
 ///
 /// Returns NULL for non-JSON input.
-#[cfg(feature = "embed-models")]
 struct FineTypeUnpack;
 
-#[cfg(feature = "embed-models")]
 impl VScalar for FineTypeUnpack {
     type State = ();
 
@@ -421,7 +448,7 @@ impl VScalar for FineTypeUnpack {
         input: &mut DataChunkHandle,
         output: &mut dyn WritableVector,
     ) -> Result<(), Box<dyn Error>> {
-        let classifier = get_classifier();
+        let col_classifier = get_column_classifier();
         let len = input.len();
         let mut output_vec = output.flat_vector();
 
@@ -431,7 +458,7 @@ impl VScalar for FineTypeUnpack {
                     output_vec.set_null(i);
                     continue;
                 }
-                match unpack::unpack_json(&text, classifier) {
+                match unpack::unpack_json_column(&text, col_classifier) {
                     Some(annotated) => {
                         let cstr = CString::new(annotated)?;
                         output_vec.insert(i, cstr);
@@ -527,20 +554,17 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     con.register_scalar_function::<FineTypeValidate>("finetype_validate")
         .expect("Failed to register finetype_validate");
 
-    #[cfg(feature = "embed-models")]
-    {
-        con.register_scalar_function::<FineType>("finetype")
-            .expect("Failed to register finetype");
+    con.register_scalar_function::<FineType>("finetype")
+        .expect("Failed to register finetype");
 
-        con.register_scalar_function::<FineTypeDetail>("finetype_detail")
-            .expect("Failed to register finetype_detail");
+    con.register_scalar_function::<FineTypeDetail>("finetype_detail")
+        .expect("Failed to register finetype_detail");
 
-        con.register_scalar_function::<FineTypeCast>("finetype_cast")
-            .expect("Failed to register finetype_cast");
+    con.register_scalar_function::<FineTypeCast>("finetype_cast")
+        .expect("Failed to register finetype_cast");
 
-        con.register_scalar_function::<FineTypeUnpack>("finetype_unpack")
-            .expect("Failed to register finetype_unpack");
-    }
+    con.register_scalar_function::<FineTypeUnpack>("finetype_unpack")
+        .expect("Failed to register finetype_unpack");
 
     Ok(())
 }

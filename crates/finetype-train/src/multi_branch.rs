@@ -19,7 +19,7 @@
 //! and column_stats.
 
 use anyhow::{bail, Context, Result};
-use candle_core::{DType, Device, Tensor};
+use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{
     batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder, VarMap,
 };
@@ -131,6 +131,7 @@ impl MultiBranchConfig {
 
 /// A single feature-processing branch: two linear layers with ReLU and dropout.
 struct BranchWeights {
+    input_norm: Option<candle_nn::LayerNorm>,
     linear1: Linear,
     linear2: Linear,
     dropout: f32,
@@ -143,18 +144,52 @@ impl BranchWeights {
         dropout: f32,
         vb: VarBuilder,
     ) -> candle_core::Result<Self> {
+        Self::new_inner(input_dim, hidden, dropout, false, vb)
+    }
+
+    /// Create a branch with LayerNorm on the input (stabilises raw embeddings).
+    fn new_with_input_norm(
+        input_dim: usize,
+        hidden: [usize; 2],
+        dropout: f32,
+        vb: VarBuilder,
+    ) -> candle_core::Result<Self> {
+        Self::new_inner(input_dim, hidden, dropout, true, vb)
+    }
+
+    fn new_inner(
+        input_dim: usize,
+        hidden: [usize; 2],
+        dropout: f32,
+        normalize_input: bool,
+        vb: VarBuilder,
+    ) -> candle_core::Result<Self> {
+        let input_norm = if normalize_input {
+            Some(candle_nn::layer_norm(
+                input_dim,
+                candle_nn::LayerNormConfig::default(),
+                vb.pp("input_ln"),
+            )?)
+        } else {
+            None
+        };
         let linear1 = linear(input_dim, hidden[0], vb.pp("l1"))?;
         let linear2 = linear(hidden[0], hidden[1], vb.pp("l2"))?;
         Ok(Self {
+            input_norm,
             linear1,
             linear2,
             dropout,
         })
     }
 
-    /// Forward pass: Linear → ReLU → Dropout → Linear → ReLU → Dropout.
+    /// Forward pass: [LayerNorm →] Linear → ReLU → Dropout → Linear → ReLU → Dropout.
     fn forward(&self, x: &Tensor, train: bool) -> candle_core::Result<Tensor> {
-        let h = self.linear1.forward_t(x, false)?;
+        let x = match &self.input_norm {
+            Some(ln) => ln.forward(x)?,
+            None => x.clone(),
+        };
+        let h = self.linear1.forward_t(&x, false)?;
         let h = h.relu()?;
         let h = if train {
             candle_nn::ops::dropout(&h, self.dropout)?
@@ -296,7 +331,11 @@ impl MultiBranchModel {
         )?;
 
         let header_branch = if config.has_header_branch() {
-            Some(BranchWeights::new(
+            // Input LayerNorm stabilises raw Model2Vec embeddings which can have
+            // large magnitudes. Without this, gradient explosion collapses training
+            // when sibling-context enrichment (which includes its own LayerNorm)
+            // is not active.
+            Some(BranchWeights::new_with_input_norm(
                 config.header_dim,
                 config.header_hidden,
                 config.dropout,
@@ -1123,12 +1162,16 @@ impl FrozenTransformerBlock {
         let k = x.matmul(&self.wk.t()?)?.broadcast_add(&self.bk)?;
         let v = x.matmul(&self.wv.t()?)?.broadcast_add(&self.bv)?;
 
-        let q = q.reshape((n, h, hd))?.transpose(0, 1)?;
-        let k = k.reshape((n, h, hd))?.transpose(0, 1)?;
-        let v = v.reshape((n, h, hd))?.transpose(0, 1)?;
+        // .contiguous() required after transpose — Metal's matmul kernel
+        // cannot operate on non-contiguous (strided) tensors. Without this,
+        // Metal sees the stride array as the shape and rejects the matmul.
+        let q = q.reshape((n, h, hd))?.transpose(0, 1)?.contiguous()?;
+        let k = k.reshape((n, h, hd))?.transpose(0, 1)?.contiguous()?;
+        let v = v.reshape((n, h, hd))?.transpose(0, 1)?.contiguous()?;
 
         let scale = (hd as f64).sqrt();
-        let attn_weights = (q.matmul(&k.transpose(1, 2)?)? / scale)?;
+        let attn_weights =
+            (q.matmul(&k.transpose(1, 2)?.contiguous()?)? / scale)?;
 
         let attn_max = attn_weights.max(2)?.unsqueeze(2)?;
         let shifted = attn_weights.broadcast_sub(&attn_max)?;
@@ -1137,7 +1180,7 @@ impl FrozenTransformerBlock {
         let attn_probs = exp.broadcast_div(&sum_exp)?;
 
         let attn_out = attn_probs.matmul(&v)?;
-        let attn_out = attn_out.transpose(0, 1)?.reshape((n, d))?;
+        let attn_out = attn_out.transpose(0, 1)?.contiguous()?.reshape((n, d))?;
 
         Ok(attn_out
             .matmul(&self.out_weight.t()?)?
@@ -1838,7 +1881,7 @@ pub fn train_multi_branch(
             train_correct_sum += acc as f64 * bs as f64;
             train_samples += bs;
 
-            renderer.on_batch_end(epoch, batch_num + 1, total_batches);
+            renderer.on_batch_end(epoch, batch_num + 1, total_batches, loss_val);
         }
 
         let train_loss = (train_loss_sum / train_samples as f64) as f32;
