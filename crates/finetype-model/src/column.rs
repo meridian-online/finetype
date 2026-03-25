@@ -9157,4 +9157,360 @@ datetime.component.day_of_week:
         );
         assert!(result.disambiguation_applied);
     }
+
+    // ── Sharpen-specific tests (AC-2, AC-3) ──────────────────────────────
+    //
+    // These tests exercise the multi-branch Sharpen functions directly,
+    // using single-entry vote distributions that simulate multi-branch output.
+
+    // AC-2: feature_sharpen — F2 fires on hostname without docker_ref in votes
+    #[test]
+    fn test_sharpen_f2_hostname_high_slash_segments_no_docker_vote() {
+        // Multi-branch predicts "hostname" but column has high slash segments
+        // (e.g., "docker.io/library/nginx:latest"). With multi-branch single-entry
+        // votes, docker_ref never appears as runner-up — F2 must fire on feature
+        // threshold alone.
+        let mut result = ColumnResult {
+            label: "technology.internet.hostname".to_string(),
+            confidence: 0.85,
+            vote_distribution: vec![(
+                "technology.internet.hostname".to_string(),
+                0.85,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::SEGMENT_COUNT_SLASH] = 2.0; // ≥ 1.5 threshold
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "technology.container.docker_ref",
+            "F2 should fire on hostname with high slash segments even without docker_ref in votes"
+        );
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_slash_segments"));
+    }
+
+    #[test]
+    fn test_sharpen_f2_hostname_low_slash_segments_stays() {
+        // hostname with low slash segments should NOT trigger F2
+        let mut result = ColumnResult {
+            label: "technology.internet.hostname".to_string(),
+            confidence: 0.85,
+            vote_distribution: vec![(
+                "technology.internet.hostname".to_string(),
+                0.85,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::SEGMENT_COUNT_SLASH] = 0.5; // below 1.5
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "technology.internet.hostname",
+            "F2 should NOT fire when slash segments are below threshold"
+        );
+        assert!(!result.disambiguation_applied);
+    }
+
+    // AC-2: feature_sharpen — F3 fires on decimal_number without hs_code in votes
+    #[test]
+    fn test_sharpen_f3_decimal_to_hs_code_no_hs_vote() {
+        // Multi-branch predicts "decimal_number" but column has HS code features
+        // (high digit ratio + dot segments). F3 should fire without hs_code in votes.
+        let mut result = ColumnResult {
+            label: "representation.numeric.decimal_number".to_string(),
+            confidence: 0.80,
+            vote_distribution: vec![(
+                "representation.numeric.decimal_number".to_string(),
+                0.80,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::DIGIT_RATIO] = 0.85;          // ≥ 0.75
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 2.5;     // ≥ 2.0 (path A)
+        cf.mean[feature_idx::IS_FLOAT] = 0.3;              // < 1.0
+        cf.mean[feature_idx::HAS_NEGATIVE_PREFIX] = 0.0;   // no negative prefix
+        cf.variance[feature_idx::SEGMENT_COUNT_DOT] = 0.1;  // ≤ 0.5
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "geography.trade.hs_code",
+            "F3 should fire on decimal_number with HS code features even without hs_code in votes"
+        );
+        assert!(result.disambiguation_applied);
+        assert!(result
+            .disambiguation_rule
+            .as_ref()
+            .unwrap()
+            .starts_with("feature_hs_code"));
+    }
+
+    // AC-2: feature_sharpen — F5 demotes numeric_code (single-entry votes)
+    #[test]
+    fn test_sharpen_f5_numeric_code_demoted_single_vote() {
+        // Same as existing F5 test but using feature_sharpen (not feature_disambiguate)
+        let mut result = ColumnResult {
+            label: "representation.identifier.numeric_code".to_string(),
+            confidence: 0.90,
+            vote_distribution: vec![(
+                "representation.identifier.numeric_code".to_string(),
+                0.90,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::HAS_LEADING_ZERO] = 0.0; // no leading zeros
+        cf.mean[feature_idx::IS_FLOAT] = 0.0;
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "representation.numeric.integer_number",
+            "F5 should demote numeric_code without leading zeros via feature_sharpen"
+        );
+        assert!(result.disambiguation_applied);
+    }
+
+    // AC-2: feature_sharpen — F6 falls back to categorical with empty votes
+    #[test]
+    fn test_sharpen_f6_extension_to_categorical_empty_votes() {
+        // Multi-branch predicts "file.extension" with single-entry votes
+        // and short alphabetic values — F6 should fallback to categorical
+        let mut result = ColumnResult {
+            label: "representation.file.extension".to_string(),
+            confidence: 0.75,
+            vote_distribution: vec![(
+                "representation.file.extension".to_string(),
+                0.75,
+            )],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 50,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        };
+
+        let mut cf = ColumnFeatures::empty();
+        cf.mean[feature_idx::LENGTH] = 2.5;            // ≤ 4.0
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 0.0; // < 1.1
+        cf.mean[feature_idx::ALPHA_RATIO] = 0.95;      // ≥ 0.8
+
+        feature_sharpen(&mut result, &cf);
+
+        assert_eq!(
+            result.label, "representation.discrete.categorical",
+            "F6 should fallback to categorical with single-entry votes"
+        );
+        assert!(result.disambiguation_applied);
+    }
+
+    // AC-3: value_sharpen — R5 day-of-week with single-entry votes
+    #[test]
+    fn test_sharpen_r5_day_of_week_single_vote() {
+        let values: Vec<String> = vec![
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "representation.discrete.categorical", 0.80, None);
+
+        assert!(result.is_some(), "R5 should fire for day-of-week values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.component.day_of_week");
+        assert_eq!(rule, "day_of_week_name_detection");
+    }
+
+    // AC-3: value_sharpen — R8 gender with single-entry votes
+    #[test]
+    fn test_sharpen_r8_gender_single_vote() {
+        let values: Vec<String> = vec!["Male", "Female", "Male", "Female", "Male"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = value_sharpen(&values, "representation.discrete.categorical", 0.80, None);
+
+        assert!(result.is_some(), "R8 should fire for gender values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "identity.person.gender");
+        assert_eq!(rule, "gender_detection");
+    }
+
+    // AC-3: value_sharpen — R11 categorical with single-entry votes
+    #[test]
+    fn test_sharpen_r11_categorical_single_vote() {
+        let values: Vec<String> = vec!["red", "blue", "green", "red", "blue"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        // Low cardinality values with a text-like label should trigger categorical
+        let result = value_sharpen(&values, "identity.person.first_name", 0.70, None);
+
+        assert!(result.is_some(), "R11 should fire for low-cardinality categorical values");
+        let (label, _rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+    }
+
+    // AC-3: value_sharpen — R12 numeric disambiguation with single-entry votes
+    #[test]
+    fn test_sharpen_r12_numeric_single_vote() {
+        // Year-like values predicted as integer_number
+        let values: Vec<String> = vec!["2020", "2021", "2022", "2023", "2024"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result =
+            value_sharpen(&values, "representation.numeric.integer_number", 0.80, None);
+
+        assert!(result.is_some(), "R12 should fire for year-like values");
+        let (label, _rule) = result.unwrap();
+        assert_eq!(label, "datetime.component.year");
+    }
+
+    // AC-3: value_sharpen — R17 UTC offset with single-entry votes
+    #[test]
+    fn test_sharpen_r17_utc_offset_single_vote() {
+        let values: Vec<String> = vec!["+05:30", "-08:00", "+00:00", "+09:00", "-05:00"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result =
+            value_sharpen(&values, "representation.numeric.decimal_number", 0.70, None);
+
+        assert!(result.is_some(), "R17 should fire for UTC offset values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.offset.utc");
+        assert_eq!(rule, "utc_offset_override_time");
+    }
+
+    // AC-3: sharpen_attractor_demotion — confidence threshold
+    #[test]
+    fn test_sharpen_attractor_high_confidence_no_demotion() {
+        // postal_code with high confidence (0.95) should NOT be demoted
+        let values: Vec<String> = vec!["10001", "90210", "60601", "30301", "94102"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "geography.address.postal_code",
+            0.95, // high confidence
+            None, // no taxonomy for validation
+        );
+
+        assert!(
+            result.is_none(),
+            "High confidence (0.95) should NOT trigger attractor demotion"
+        );
+    }
+
+    #[test]
+    fn test_sharpen_attractor_low_confidence_demotes() {
+        // postal_code with low confidence (0.30) should be demoted
+        let values: Vec<String> = vec!["42", "100", "7", "256", "1024"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "geography.address.postal_code",
+            0.30, // low confidence — below 0.85 threshold
+            None, // no taxonomy for validation
+        );
+
+        assert!(
+            result.is_some(),
+            "Low confidence (0.30) should trigger attractor demotion"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.integer_number");
+        assert!(
+            rule.starts_with("attractor_demotion_confidence"),
+            "Rule should be confidence-based demotion, got: {}",
+            rule
+        );
+    }
+
+    #[test]
+    fn test_sharpen_attractor_text_low_confidence_demotes_to_categorical() {
+        // first_name with low confidence and low cardinality → categorical
+        let values: Vec<String> = vec!["alpha", "beta", "gamma", "alpha", "beta"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "identity.person.first_name",
+            0.40, // low confidence
+            None,
+        );
+
+        assert!(result.is_some(), "Low confidence text attractor should demote");
+        let (label, _rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+    }
+
+    #[test]
+    fn test_sharpen_attractor_non_attractor_type_ignored() {
+        // A type that's not in any attractor list should never trigger demotion
+        let values: Vec<String> = vec!["hello@example.com"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = sharpen_attractor_demotion(
+            &values,
+            "identity.person.email",
+            0.30, // even with low confidence
+            None,
+        );
+
+        assert!(
+            result.is_none(),
+            "Non-attractor type should never trigger demotion"
+        );
+    }
 }
