@@ -99,7 +99,7 @@ SELECT finetype_cast(value) FROM my_table;
 SELECT finetype_unpack(json_col) FROM my_table;
 ```
 
-The extension embeds model weights at compile time — no external files needed.
+On first use, the extension downloads model weights from HuggingFace and caches them locally. Set `FINETYPE_MODEL_DIR` to use a local model path instead.
 
 ### MCP Server
 
@@ -112,6 +112,7 @@ FineType exposes type inference to AI agents via the [Model Context Protocol](ht
 | `ddl` | Generate CREATE TABLE DDL from file profiling |
 | `taxonomy` | Search/filter type taxonomy by domain/category/query |
 | `schema` | Export JSON Schema contract for type(s), supports globs |
+| `validate` | Schema-driven CSV validation — valid/invalid counts + error details |
 | `generate` | Generate synthetic sample data for a type |
 
 **Resources:** `finetype://taxonomy`, `finetype://taxonomy/{domain}`, `finetype://taxonomy/{domain}.{category}.{type}`
@@ -152,10 +153,10 @@ See [`labels/`](labels/) for the complete taxonomy definitions.
 
 | Model | Profile Eval | Actionability | Classes |
 |-------|----------|---------|---------|
-| **Sense→Sharpen** (default) | **97.7% label** (170/174) | **99.9%** | **250** |
-| Tiered v2 (`--sharp-only`) | Legacy fallback | — | 164 |
+| **Multi-branch→Sharpen** (default) | **81.6% label** (155/190) | **99.9%** | **250** |
+| Sense→Sharpen (legacy) | 98.9% label (188/190) | 99.9% | 250 |
 
-**Profile eval:** 30 real-world datasets, 174 format-detectable columns. **Actionability:** 232,321/232,541 values transformed successfully across 120 types.
+**Profile eval:** 29 real-world datasets, 190 format-detectable columns. **Actionability:** 232,321/232,541 values transformed successfully across 120 types.
 
 | Metric | Value |
 |--------|-------|

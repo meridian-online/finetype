@@ -31,26 +31,26 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.12
 **Taxonomy:** 250 definitions across 7 domains (container: 12, datetime: 84, finance: 31, geography: 25, identity: 34, representation: 36, technology: 28) — all generators pass, 100% alignment
-**Default model:** Sense→Sharpen pipeline (CLI) with char-cnn-v14-250 flat (250 classes, 10 epochs, 372k samples), tiered-v2 fallback via `--sharp-only`. Hierarchical head available: char-cnn-v15-250 (7→43→250 tree softmax, 84.2% type / 90.9% domain / 96.5% category training accuracy).
-**Features:** 36-dim deterministic feature extractor (NNFT-248/266/270), column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6). Financial header hints (NNFT-270).
+**Default model:** Multi-branch→Sharpen pipeline with sherlock-v4-sibling (4-branch: char+embed+stats+header). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: 155/190 (81.6% label). Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
+**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 19 value-based disambiguation rules (R1–R19), Model2Vec semantic header hints.
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check)
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent work
 
-- **Schema-driven validate command** — Standalone quality gate: `finetype schema data.csv` generates table-level JSON Schema, `finetype validate data.csv schema.json` enforces it with predictable sidecar output (`.valid.csv`, `.invalid.csv`, `.errors.jsonl`). Old repair-based validate removed. MCP `validate` tool + DuckDB `finetype_validate()` function. Decisions 0031–0033.
-- **Sibling-context attention** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention on 509 real-world CSVs. Enriches per-column headers with cross-column context before Sense classification. Profile: 188/190 (98.9% label, 96.3% domain). Entry point: `classify_columns_with_context()`.
-- **Hierarchical classification head** (NNFT-267, m-13) — Tree softmax (7 domains → 43 categories → 250 types). char-cnn-v15-250: 84.2% type accuracy. Matches flat baseline on profile eval. `--hierarchical` flag.
+- **Multi-branch pipeline integration** (m-15) — Replaced Sense+CharCNN with multi-branch (sherlock-v4-sibling) as the default inference pipeline. Lightweight Sharpen layer (feature_sharpen F1–F6, value_sharpen R1–R19, Model2Vec header hints) wired into multi-branch output. Profile eval: 155/190 (81.6%), +34 over raw 121/190 baseline. MCP server receives fully-configured ColumnClassifier. DuckDB extension uses runtime hf_hub download. Decisions 0041–0042. Spec: `specs/2026-03-25-multi-branch-pipeline-integration/`.
+- **Sibling-context attention** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention on 509 real-world CSVs. Enriches per-column headers with cross-column context. Entry point: `classify_columns_with_context()`.
+- **Schema-driven validate command** — Standalone quality gate: `finetype schema data.csv` generates table-level JSON Schema, `finetype validate data.csv schema.json` enforces it with predictable sidecar output. MCP `validate` tool + DuckDB `finetype_validate()`. Decisions 0031–0033.
 
 ### What's in progress
 
-- **Multi-branch v3 training** — sherlock-v3-flat (4 branches: char+embed+stats+header) achieves 140/190 (73.7%) raw, +12 over v2. Gap analysis: 15 decimal→date/IP errors, 8+ header-fixable, 7 entity confusion. Next: wire sibling-context into multi-branch training, numeric disambiguation.
 - **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema, validate commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range).
+- **Multi-branch accuracy gap closure** — 155/190 with Sharpen, targeting ≥170/190 via model improvements (retraining > new rules per decision 0038). Key gaps: numeric_code false positives (F5), entity confusion, date format ambiguity.
 
 ### Architectural direction (settled — do not re-ask)
 
-- **Multi-branch as Sense replacement** (decision 0041): The multi-branch model serves as a better Sense classifier WITHIN the existing pipeline — not a replacement for the entire pipeline. Disambiguation rules and post-processing continue to operate on multi-branch output. Rules are progressively retired as the model improves.
+- **Multi-branch as Sense replacement** (decision 0041): The multi-branch model (sherlock-v4-sibling) is the default classifier. It replaces both Sense and CharCNN — single forward pass per column. The Sharpen layer (feature_sharpen, value_sharpen, header hints) post-processes multi-branch output. Rules are progressively retired as the model improves.
 - **Remove regex header hints** (decision 0042): Regex-based `header_hint()` and hardcoded header rules are deprecated in favour of learned approaches — multi-branch header branch (Model2Vec), sibling-context attention, and Model2Vec semantic matching. No more regex rabbit holes.
 - **Strength through simplification** (decision 0038): Prefer retraining over adding disambiguation rules. Rules are a last resort when the model demonstrably cannot learn a pattern.
 
@@ -82,7 +82,7 @@ finetype/
 ```
 finetype-core  (no internal deps — taxonomy, generators, validation)
     |
-finetype-model (depends on core — CharCNN, tiered inference, column mode)
+finetype-model (depends on core — multi-branch, CharCNN, column classification, Sharpen rules)
     |
     +--- finetype-cli   (depends on core + model + mcp — CLI binary)
     +--- finetype-mcp   (depends on core + model — MCP server library)
@@ -93,18 +93,19 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
 
 ### Inference pipeline
 
-**Value-level:** Single string → type label via `CharClassifier` (flat, 250 classes) or `TieredClassifier` (34 CharCNN models). Both implement `ValueClassifier` trait.
-
-**Column-level (Sense→Sharpen, default):** Vector of strings + header → single column type:
+**Column-level (Multi-branch→Sharpen, default):** Vector of strings + header → single column type:
 1. Optional sibling-context attention enriches headers with cross-column context
-2. Sample 100 values, encode header with Model2Vec, extract 36-dim deterministic features
-3. Sense classify → broad category (temporal/numeric/geographic/entity/format/text)
-4. CharCNN batch inference on all values → masked vote aggregation (filtered by Sense category)
-5. Disambiguation: vote-based rules, feature-based rules (F1–F5), entity demotion
-6. Header hints (hardcoded + Model2Vec semantic) with geography protection
-7. Post-hoc locale detection via `validation_by_locale` patterns
+2. Sample 100 values, extract 4-branch features (960 char + 512 embed + 36 stats + header)
+3. Multi-branch forward pass → type label + confidence (single pass per column)
+4. Sharpen post-processing (no neural inference):
+   - `feature_sharpen()`: F1–F6 rules on label + 36-dim ColumnFeatures
+   - `value_sharpen()`: R1–R19 rules on label + values + confidence
+   - `apply_header_sharpen()`: Model2Vec semantic header matching
+5. Post-hoc locale detection via `validation_by_locale` patterns
 
-Key implementation files: `column.rs` (disambiguation + pipeline), `sense.rs` (Sense classifier), `semantic.rs` (header hints), `sibling_context.rs` (attention). Legacy fallback path exists when Sense model is absent.
+**Value-level (legacy):** Single string → type label via `CharClassifier` (flat, 250 classes) or `TieredClassifier` (34 CharCNN models). Both implement `ValueClassifier` trait. Not used in the default pipeline.
+
+Key implementation files: `column.rs` (Sharpen rules + pipeline), `semantic.rs` (header hints), `sibling_context.rs` (attention). Legacy Sense→CharCNN path exists but multi-branch is the default for CLI, MCP, and DuckDB.
 
 ### Tiered model architecture
 
@@ -133,7 +134,7 @@ Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB t
 | `finetype_validate(value, schema_json)` | Schema-driven validation (returns 'valid' or error message) |
 | `finetype_version()` | Version string |
 
-Uses flat CharCNN with chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
+Uses multi-branch model downloaded at runtime via hf_hub (cached after first download). `FINETYPE_MODEL_DIR` env var overrides with local path. Chunk-aware column classification (~2048-row chunks). `finetype_validate` uses cached schema parsing for performance.
 
 ### MCP server
 
@@ -172,7 +173,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — 98.9% label (188/190), 96.3% domain on 29 datasets (314 manifest entries, 250-type taxonomy).
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen default: 155/190 (81.6% label, 90.5% domain). Legacy Sense→Sharpen: 188/190 (98.9% label). 29 datasets, 314 manifest entries, 250-type taxonomy.
 **Actionability eval** — 99.9% transform success rate (232k values, 283 columns, 120 types).
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
@@ -181,7 +182,7 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Multi-branch v3 → pipeline integration (m-15):** Wire sibling-context attention into multi-branch training, integrate multi-branch as Sense replacement within existing pipeline, target ≥150/190 on profile eval. Decisions 0041–0042.
+**Multi-branch accuracy gap closure (m-16):** Close the 155/190 → 170+/190 gap through model improvements (retraining > new rules, decision 0038). Key targets: numeric false positives, entity confusion, date format ambiguity. Publish multi-branch artifacts to HuggingFace for DuckDB extension runtime download. Previous: m-15 pipeline integration shipped at 155/190.
 
 ## Decision Register
 
