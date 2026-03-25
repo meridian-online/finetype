@@ -19,6 +19,8 @@ use std::ffi::CString;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+use finetype_model::{ColumnClassifier, ColumnConfig, MultiBranchClassifier};
+
 mod column_fn;
 mod normalize;
 mod type_mapping;
@@ -32,15 +34,16 @@ mod validate;
 /// Extension name and version.
 const EXTENSION_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// HuggingFace repository for the default FineType model.
+/// HuggingFace repository for the default FineType multi-branch model.
 const HF_REPO: &str = "meridian-online/finetype-model";
 
-/// Files required for the CharCNN flat model.
-const MODEL_FILES: &[&str] = &["model.safetensors", "labels.json", "config.yaml"];
+/// Files required for the multi-branch model.
+const MODEL_FILES: &[&str] = &["model.safetensors", "label_map.json", "config.json"];
 
-/// Global flat classifier, initialized on first finetype() call.
-/// Loaded at runtime from HuggingFace Hub or a local directory.
-static CLASSIFIER: OnceLock<finetype_model::CharClassifier> = OnceLock::new();
+/// Global column classifier backed by multi-branch model.
+/// Initialized on first finetype() call, loaded at runtime from
+/// HuggingFace Hub or a local directory.
+static COLUMN_CLASSIFIER: OnceLock<ColumnClassifier> = OnceLock::new();
 
 /// Resolve the model directory: check `FINETYPE_MODEL_DIR` env var first,
 /// then fall back to downloading from HuggingFace Hub.
@@ -81,12 +84,17 @@ fn resolve_model_dir() -> std::result::Result<PathBuf, Box<dyn Error>> {
     model_dir.ok_or_else(|| "Failed to determine model cache directory".into())
 }
 
-/// Initialize or get the global classifier from runtime-loaded model.
-fn get_classifier() -> &'static finetype_model::CharClassifier {
-    CLASSIFIER.get_or_init(|| {
+/// Initialize or get the global column classifier backed by multi-branch model.
+fn get_column_classifier() -> &'static ColumnClassifier {
+    COLUMN_CLASSIFIER.get_or_init(|| {
         let model_dir = resolve_model_dir().expect("Failed to resolve FineType model directory");
-        finetype_model::CharClassifier::load(&model_dir)
-            .expect("Failed to load CharCNN model from resolved directory")
+        let mb = MultiBranchClassifier::load(&model_dir)
+            .expect("Failed to load multi-branch model from resolved directory");
+        let config = ColumnConfig {
+            sample_size: 100,
+            ..Default::default()
+        };
+        ColumnClassifier::with_multi_branch(mb, config)
     })
 }
 
@@ -378,7 +386,7 @@ impl VScalar for FineTypeCast {
         input: &mut DataChunkHandle,
         output: &mut dyn WritableVector,
     ) -> Result<(), Box<dyn Error>> {
-        let classifier = get_classifier();
+        let col_classifier = get_column_classifier();
         let len = input.len();
         let mut output_vec = output.flat_vector();
 
@@ -388,7 +396,8 @@ impl VScalar for FineTypeCast {
                     output_vec.set_null(i);
                     continue;
                 }
-                match classifier.classify(&text) {
+                // Classify single value via column classifier (1-element column)
+                match col_classifier.classify_column(&[text.clone()]) {
                     Ok(result) => {
                         if let Some(normalized) = normalize::normalize(&text, &result.label) {
                             let cstr = CString::new(normalized)?;
@@ -439,7 +448,7 @@ impl VScalar for FineTypeUnpack {
         input: &mut DataChunkHandle,
         output: &mut dyn WritableVector,
     ) -> Result<(), Box<dyn Error>> {
-        let classifier = get_classifier();
+        let col_classifier = get_column_classifier();
         let len = input.len();
         let mut output_vec = output.flat_vector();
 
@@ -449,7 +458,7 @@ impl VScalar for FineTypeUnpack {
                     output_vec.set_null(i);
                     continue;
                 }
-                match unpack::unpack_json(&text, classifier) {
+                match unpack::unpack_json_column(&text, col_classifier) {
                     Some(annotated) => {
                         let cstr = CString::new(annotated)?;
                         output_vec.insert(i, cstr);

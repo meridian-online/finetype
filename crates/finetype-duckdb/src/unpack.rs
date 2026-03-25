@@ -4,10 +4,11 @@
 //! with per-field type information.
 
 use crate::type_mapping;
-use finetype_model::CharClassifier;
+use finetype_model::ColumnClassifier;
 use serde_json::{Map, Value};
 
-/// Unpack a JSON string: classify each scalar field and return annotated JSON.
+/// Unpack a JSON string using column classifier: classify each scalar field
+/// and return annotated JSON.
 ///
 /// For each scalar value (strings, numbers, booleans), the output includes:
 /// - `value`: the original value
@@ -17,28 +18,31 @@ use serde_json::{Map, Value};
 ///
 /// Nested objects are recursively unpacked. Arrays have each element annotated.
 /// Non-JSON input returns None.
-pub fn unpack_json(input: &str, classifier: &CharClassifier) -> Option<String> {
+pub fn unpack_json_column(input: &str, classifier: &ColumnClassifier) -> Option<String> {
     let parsed: Value = serde_json::from_str(input.trim()).ok()?;
-    let annotated = annotate_value(&parsed, classifier);
+    let annotated = annotate_value_column(&parsed, classifier);
     serde_json::to_string(&annotated).ok()
 }
 
-/// Recursively annotate a JSON value with type information.
-fn annotate_value(value: &Value, classifier: &CharClassifier) -> Value {
+/// Recursively annotate a JSON value with type information using column classifier.
+fn annotate_value_column(value: &Value, classifier: &ColumnClassifier) -> Value {
     match value {
         Value::Object(map) => {
             let mut result = Map::new();
             for (key, val) in map {
-                result.insert(key.clone(), annotate_value(val, classifier));
+                result.insert(key.clone(), annotate_value_column(val, classifier));
             }
             Value::Object(result)
         }
         Value::Array(arr) => {
-            let annotated: Vec<Value> = arr.iter().map(|v| annotate_value(v, classifier)).collect();
+            let annotated: Vec<Value> = arr
+                .iter()
+                .map(|v| annotate_value_column(v, classifier))
+                .collect();
             Value::Array(annotated)
         }
-        Value::String(s) => classify_and_annotate(s, classifier),
-        Value::Number(n) => classify_and_annotate(&n.to_string(), classifier),
+        Value::String(s) => classify_and_annotate_column(s, classifier),
+        Value::Number(n) => classify_and_annotate_column(&n.to_string(), classifier),
         Value::Bool(b) => {
             let mut anno = Map::new();
             anno.insert("value".to_string(), Value::Bool(*b));
@@ -67,8 +71,9 @@ fn annotate_value(value: &Value, classifier: &CharClassifier) -> Value {
     }
 }
 
-/// Classify a string value and return an annotation object.
-fn classify_and_annotate(value: &str, classifier: &CharClassifier) -> Value {
+/// Classify a string value via column classifier (1-element column) and return
+/// an annotation object.
+fn classify_and_annotate_column(value: &str, classifier: &ColumnClassifier) -> Value {
     let mut anno = Map::new();
     anno.insert("value".to_string(), Value::String(value.to_string()));
 
@@ -82,7 +87,7 @@ fn classify_and_annotate(value: &str, classifier: &CharClassifier) -> Value {
         return Value::Object(anno);
     }
 
-    match classifier.classify(value) {
+    match classifier.classify_column(&[value.to_string()]) {
         Ok(result) => {
             let duckdb_type = type_mapping::to_duckdb_type(&result.label);
             anno.insert("type".to_string(), Value::String(result.label));
@@ -110,7 +115,7 @@ fn classify_and_annotate(value: &str, classifier: &CharClassifier) -> Value {
 
 #[cfg(test)]
 mod tests {
-    // Note: Integration tests require the CharClassifier which needs model weights.
+    // Note: Integration tests require a model which needs model weights.
     // These tests validate the JSON structure rather than classification accuracy.
 
     use super::*;
