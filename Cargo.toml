@@ -11,7 +11,7 @@ members = [
     "crates/finetype-train",
     "crates/finetype-build-tools",
 ]
-# DuckDB extension requires model files for embed-models feature (default).
+# DuckDB extension downloads models at runtime from HuggingFace Hub.
 # Build it explicitly with: cargo build -p finetype_duckdb
 default-members = [
     "crates/finetype-core",
@@ -73,6 +73,9 @@ indexmap = "2.0"
 
 # Testing
 tempfile = "3"
+
+# HuggingFace Hub (runtime model download)
+hf-hub = "0.4"
 
 # DuckDB extension
 duckdb = { version = "=1.4.4", features = ["loadable-extension", "vscalar"] }

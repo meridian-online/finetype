@@ -58,9 +58,9 @@ enum Commands {
         #[arg(short, long)]
         value: bool,
 
-        /// Model type: char-cnn (166 types, default) or tiered (legacy 34-model cascade).
-        /// Sense→Sharpen pipeline masks char-cnn output, making tiered routing redundant.
-        #[arg(long, default_value = "char-cnn")]
+        /// Model type: multi-branch (default), char-cnn, or tiered (legacy).
+        /// Multi-branch uses a single column-level forward pass + Sharpen post-processing.
+        #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
         /// Inference mode: row (per-value) or column (distribution-based disambiguation)
@@ -145,7 +145,7 @@ enum Commands {
         device: String,
 
         /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
         /// Random seed for deterministic training reproducibility
@@ -247,7 +247,7 @@ enum Commands {
         no_header_hint: bool,
 
         /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
         /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
@@ -342,7 +342,7 @@ enum Commands {
         no_header_hint: bool,
 
         /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
         /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
@@ -465,7 +465,7 @@ enum Commands {
         taxonomy: PathBuf,
 
         /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "char-cnn")]
+        #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
         /// Number of top confusions to show
@@ -759,23 +759,70 @@ fn main() -> Result<()> {
 }
 
 fn cmd_mcp() -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig};
+
     eprintln!("Starting FineType MCP server...");
 
-    // Load models
+    let config = ColumnConfig {
+        sample_size: 100,
+        ..Default::default()
+    };
+
+    // Build column classifier — prefer multi-branch, fall back to CharCNN
     let model_path = PathBuf::from("models/default");
-    let char_classifier = load_char_classifier(&model_path)?;
+    let mut column_classifier =
+        if let Ok(mb) = finetype_model::MultiBranchClassifier::load(&model_path) {
+            eprintln!(
+                "Loaded multi-branch classifier ({} classes)",
+                mb.n_classes()
+            );
+            let mut cc = ColumnClassifier::with_multi_branch(mb, config);
+            wire_model2vec_and_siblings(&mut cc);
+            cc
+        } else {
+            eprintln!("No multi-branch model found, falling back to CharCNN");
+            let char_classifier = load_char_classifier(&model_path)?;
+            if let Some(semantic) = load_semantic_hint() {
+                eprintln!("Loaded semantic hint classifier (Model2Vec)");
+                let entity = load_entity_classifier(&semantic);
+                let mut cc = ColumnClassifier::with_semantic_hint(
+                    Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
+                    config,
+                    semantic,
+                );
+                if let Some(entity) = entity {
+                    eprintln!("Loaded entity classifier (full_name demotion gate)");
+                    cc.set_entity_classifier(entity);
+                }
+                wire_sense(&mut cc);
+                wire_sibling_context(&mut cc);
+                cc
+            } else {
+                let mut cc = ColumnClassifier::new(
+                    Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
+                    config,
+                );
+                wire_sense(&mut cc);
+                wire_sibling_context(&mut cc);
+                cc
+            }
+        };
 
-    // Load taxonomy
+    // Load taxonomy for validation-based disambiguation
     let taxonomy_path = PathBuf::from("labels");
-    let taxonomy = load_taxonomy(&taxonomy_path)?;
+    let mut taxonomy = load_taxonomy(&taxonomy_path)?;
+    taxonomy.compile_validators();
+    taxonomy.compile_locale_validators();
+    eprintln!(
+        "Loaded taxonomy ({} types, {} validators cached, {} with locale validators)",
+        taxonomy.labels().len(),
+        taxonomy.validator_count(),
+        taxonomy.locale_validator_count()
+    );
+    column_classifier.set_taxonomy(taxonomy.clone());
 
-    // Load semantic hint classifier (optional)
-    let semantic = load_semantic_hint();
-
-    // Create MCP server
-    let server = finetype_mcp::FineTypeServer::new(char_classifier, taxonomy, semantic);
-
-    // TODO: Add Sense + Entity wiring once MCP server supports it
+    // Create MCP server with fully-configured classifier
+    let server = finetype_mcp::FineTypeServer::new(column_classifier, taxonomy);
 
     eprintln!("FineType MCP server ready (stdio transport)");
 
