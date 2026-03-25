@@ -185,7 +185,16 @@ pub fn shuffled_batches(
     use rand::seq::SliceRandom;
     let mut indices: Vec<usize> = (0..n_samples).collect();
     indices.shuffle(rng);
-    indices.chunks(batch_size).map(|c| c.to_vec()).collect()
+    let mut batches: Vec<Vec<usize>> = indices.chunks(batch_size).map(|c| c.to_vec()).collect();
+    // Drop trailing batch of size 1 — Candle's BatchNorm uses Bessel's correction
+    // (N / (N-1)) which divides by zero for N=1, producing NaN in running_var.
+    // Once NaN enters, all subsequent eval-mode forward passes are corrupted.
+    if let Some(last) = batches.last() {
+        if last.len() < 2 {
+            batches.pop();
+        }
+    }
+    batches
 }
 
 // ── Tensor Conversion Helpers ────────────────────────────────────────────────
@@ -316,13 +325,32 @@ mod tests {
     fn test_shuffled_batches() {
         let mut rng = rand::thread_rng();
         let batches = shuffled_batches(10, 3, &mut rng);
-        assert_eq!(batches.len(), 4); // ceil(10/3)
-        assert_eq!(batches[0].len(), 3);
-        assert_eq!(batches[3].len(), 1); // remainder
+        // 10/3 = 3 full batches + remainder of 1, but remainder of 1 is dropped
+        // (BatchNorm Bessel correction divides by N-1 = 0 for N=1 → NaN)
+        assert_eq!(batches.len(), 3);
+        assert!(batches.iter().all(|b| b.len() == 3));
 
-        // All indices present exactly once
-        let mut all: Vec<usize> = batches.iter().flatten().copied().collect();
-        all.sort();
-        assert_eq!(all, (0..10).collect::<Vec<_>>());
+        // 9 of 10 indices present (last 1 dropped)
+        let all: Vec<usize> = batches.iter().flatten().copied().collect();
+        assert_eq!(all.len(), 9);
+    }
+
+    #[test]
+    fn test_shuffled_batches_no_drop_when_even() {
+        let mut rng = rand::thread_rng();
+        let batches = shuffled_batches(9, 3, &mut rng);
+        assert_eq!(batches.len(), 3);
+        assert!(batches.iter().all(|b| b.len() == 3));
+        let all: Vec<usize> = batches.iter().flatten().copied().collect();
+        assert_eq!(all.len(), 9);
+    }
+
+    #[test]
+    fn test_shuffled_batches_keeps_remainder_of_two() {
+        let mut rng = rand::thread_rng();
+        let batches = shuffled_batches(11, 3, &mut rng);
+        // 11/3 = 3 full batches + remainder of 2 (kept, since 2 >= 2)
+        assert_eq!(batches.len(), 4);
+        assert_eq!(batches[3].len(), 2);
     }
 }
