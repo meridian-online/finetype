@@ -1999,7 +1999,13 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
-        // Step 3: Value-based Sharpen rules (R1-R19)
+        // Step 3: Feature-based Sharpen rules (F1-F6)
+        // Runs before value rules: structural corrections (leading zeros,
+        // slash segments, digit ratios) set the baseline, then value rules
+        // refine based on actual content inspection.
+        feature_sharpen(&mut result, &column_features);
+
+        // Step 4: Value-based Sharpen rules (R1-R19)
         if let Some((resolved_label, rule_name)) = value_sharpen(
             &sample,
             &result.label,
@@ -2010,9 +2016,6 @@ impl ColumnClassifier {
             result.disambiguation_applied = true;
             result.disambiguation_rule = Some(rule_name);
         }
-
-        // Step 4: Feature-based Sharpen rules (F1-F6)
-        feature_sharpen(&mut result, &column_features);
 
         // Step 5: Header hints (Model2Vec semantic matching)
         if !header.is_empty() {
@@ -2095,7 +2098,13 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
-        // Step 3: Value-based Sharpen rules (R1-R19)
+        // Step 3: Feature-based Sharpen rules (F1-F6)
+        // Runs before value rules: structural corrections (leading zeros,
+        // slash segments, digit ratios) set the baseline, then value rules
+        // refine based on actual content inspection.
+        feature_sharpen(&mut result, &column_features);
+
+        // Step 4: Value-based Sharpen rules (R1-R19)
         if let Some((resolved_label, rule_name)) = value_sharpen(
             &sample,
             &result.label,
@@ -2106,9 +2115,6 @@ impl ColumnClassifier {
             result.disambiguation_applied = true;
             result.disambiguation_rule = Some(rule_name);
         }
-
-        // Step 4: Feature-based Sharpen rules (F1-F6)
-        feature_sharpen(&mut result, &column_features);
 
         // Step 5: Header hints (Model2Vec semantic matching)
         if !header.is_empty() {
