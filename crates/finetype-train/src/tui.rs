@@ -16,7 +16,13 @@ pub trait TrainingRenderer: Send {
     fn on_train_start(&mut self, total_epochs: usize, batches_per_epoch: usize);
 
     /// Called after each training batch completes.
-    fn on_batch_end(&mut self, epoch: usize, batch: usize, total_batches: usize);
+    fn on_batch_end(
+        &mut self,
+        epoch: usize,
+        batch: usize,
+        total_batches: usize,
+        batch_loss: f32,
+    );
 
     /// Called after each epoch completes with full metrics.
     fn on_epoch_end(&mut self, metrics: &EpochMetrics);
@@ -47,7 +53,13 @@ impl TrainingRenderer for LogRenderer {
         // Training start is already logged by train_multi_branch before renderer calls.
     }
 
-    fn on_batch_end(&mut self, _epoch: usize, _batch: usize, _total_batches: usize) {
+    fn on_batch_end(
+        &mut self,
+        _epoch: usize,
+        _batch: usize,
+        _total_batches: usize,
+        _batch_loss: f32,
+    ) {
         // Batch-level logging is too noisy for the log renderer.
     }
 
@@ -75,8 +87,11 @@ mod tui_impl {
     use ratatui::backend::CrosstermBackend;
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::{Color, Modifier, Style};
-    use ratatui::text::{Line, Span};
-    use ratatui::widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Sparkline, Table, Wrap};
+    use ratatui::text::Span;
+    use ratatui::symbols::Marker;
+    use ratatui::widgets::{
+        Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table, Wrap,
+    };
     use ratatui::Terminal;
 
     /// Messages sent from the training thread to the render thread.
@@ -89,6 +104,7 @@ mod tui_impl {
             epoch: usize,
             batch: usize,
             total_batches: usize,
+            batch_loss: f32,
         },
         EpochEnd(EpochMetrics),
         TrainEnd,
@@ -104,6 +120,8 @@ mod tui_impl {
         current_batch: usize,
         current_total_batches: usize,
         epoch_history: Vec<EpochMetrics>,
+        /// Batch-level loss history for the current epoch (cleared on epoch boundary).
+        batch_loss_history: Vec<f64>,
         train_start: Instant,
         finished: bool,
     }
@@ -117,6 +135,7 @@ mod tui_impl {
                 current_batch: 0,
                 current_total_batches: 0,
                 epoch_history: Vec::new(),
+                batch_loss_history: Vec::new(),
                 train_start: Instant::now(),
                 finished: false,
             }
@@ -182,12 +201,19 @@ mod tui_impl {
             }
         }
 
-        fn on_batch_end(&mut self, epoch: usize, batch: usize, total_batches: usize) {
+        fn on_batch_end(
+            &mut self,
+            epoch: usize,
+            batch: usize,
+            total_batches: usize,
+            batch_loss: f32,
+        ) {
             if let Some(tx) = &self.tx {
                 let _ = tx.send(RenderMsg::BatchEnd {
                     epoch,
                     batch,
                     total_batches,
+                    batch_loss,
                 });
             }
         }
@@ -231,6 +257,15 @@ mod tui_impl {
 
     /// Main render loop running in background thread.
     fn render_loop(rx: mpsc::Receiver<RenderMsg>, title: &str) -> io::Result<()> {
+        // Panic hook guard — restore terminal if training thread panics.
+        // Covers training-thread panics only; render-thread panics are handled
+        // by the error path in the thread::spawn closure.
+        let original_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+            original_hook(info);
+        }));
+
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
 
@@ -258,12 +293,15 @@ mod tui_impl {
                         epoch,
                         batch,
                         total_batches,
+                        batch_loss,
                     }) => {
                         state.current_epoch = epoch;
                         state.current_batch = batch;
                         state.current_total_batches = total_batches;
+                        state.batch_loss_history.push(batch_loss as f64);
                     }
                     Ok(RenderMsg::EpochEnd(metrics)) => {
+                        state.batch_loss_history.clear();
                         state.epoch_history.push(metrics);
                     }
                     Ok(RenderMsg::TrainEnd) => {
@@ -272,12 +310,15 @@ mod tui_impl {
                     Ok(RenderMsg::Shutdown) => {
                         // Leave alternate screen and print summary
                         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                        // Remove our panic hook (alternate screen is gone, hook is no longer needed)
+                        let _ = std::panic::take_hook();
                         print_final_summary(&state);
                         return Ok(());
                     }
                     Err(mpsc::TryRecvError::Empty) => break,
                     Err(mpsc::TryRecvError::Disconnected) => {
                         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                        let _ = std::panic::take_hook();
                         print_final_summary(&state);
                         return Ok(());
                     }
@@ -295,12 +336,12 @@ mod tui_impl {
     fn draw_frame(f: &mut ratatui::Frame, state: &RenderState, title: &str) {
         let area = f.area();
 
-        // Vertical layout: title(1) | charts(8) | table(flex) | progress(3)
+        // Vertical layout: title(1) | charts(12) | table(flex) | progress(3)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // Title bar
-                Constraint::Length(8), // Sparkline charts
+                Constraint::Length(1),  // Title bar
+                Constraint::Length(12), // Line charts with axes
                 Constraint::Min(5),    // Epoch table
                 Constraint::Length(4), // Progress + ETA
             ])
@@ -343,111 +384,206 @@ mod tui_impl {
     }
 
     fn draw_loss_chart(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
-        let block = Block::default().title(" Loss ").borders(Borders::ALL);
-        let inner = block.inner(area);
-        f.render_widget(block, area);
-
-        if state.epoch_history.is_empty() {
-            let msg = Paragraph::new("  Waiting for first epoch...");
+        if state.batch_loss_history.is_empty() && state.epoch_history.is_empty() {
+            let block = Block::default().title(" Loss ").borders(Borders::ALL);
+            let inner = block.inner(area);
+            f.render_widget(block, area);
+            let msg = Paragraph::new("  Waiting for first batch...");
             f.render_widget(msg, inner);
             return;
         }
 
-        // Split inner vertically: train sparkline | val sparkline | legend
-        let chart_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Min(1),
-            ])
-            .split(inner);
+        // Build dataset from batch-level or epoch-level data
+        let batch_points: Vec<(f64, f64)>;
+        let epoch_train_points: Vec<(f64, f64)>;
+        let epoch_val_points: Vec<(f64, f64)>;
 
-        // Scale losses to u64 for sparkline (multiply by 1000)
-        let train_data: Vec<u64> = state
+        let has_batch_data = !state.batch_loss_history.is_empty();
+
+        if has_batch_data {
+            batch_points = state
+                .batch_loss_history
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v))
+                .collect();
+        } else {
+            batch_points = Vec::new();
+        }
+
+        epoch_train_points = state
             .epoch_history
             .iter()
-            .map(|m| (m.train_loss * 1000.0).min(65535.0) as u64)
+            .map(|m| (m.epoch as f64, m.train_loss as f64))
             .collect();
-        let val_data: Vec<u64> = state
+        epoch_val_points = state
             .epoch_history
             .iter()
-            .map(|m| (m.val_loss * 1000.0).min(65535.0) as u64)
+            .map(|m| (m.epoch as f64, m.val_loss as f64))
             .collect();
 
-        let train_spark = Sparkline::default()
-            .data(&train_data)
-            .style(Style::default().fg(Color::Yellow));
-        f.render_widget(train_spark, chart_chunks[0]);
+        // Compute Y bounds across all visible data
+        let all_y: Vec<f64> = if has_batch_data {
+            batch_points.iter().map(|p| p.1).collect()
+        } else {
+            epoch_train_points
+                .iter()
+                .chain(epoch_val_points.iter())
+                .map(|p| p.1)
+                .collect()
+        };
+        let y_min = all_y.iter().cloned().fold(f64::INFINITY, f64::min);
+        let y_max = all_y.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let y_margin = (y_max - y_min).max(0.01) * 0.1;
 
-        let val_spark = Sparkline::default()
-            .data(&val_data)
-            .style(Style::default().fg(Color::Magenta));
-        f.render_widget(val_spark, chart_chunks[1]);
+        let mut datasets = Vec::new();
 
-        // Legend with latest values
-        let last = state.epoch_history.last().unwrap();
-        let legend = Line::from(vec![
-            Span::styled("▄ train ", Style::default().fg(Color::Yellow)),
-            Span::raw(format!("{:.4}  ", last.train_loss)),
-            Span::styled("▄ val ", Style::default().fg(Color::Magenta)),
-            Span::raw(format!("{:.4}", last.val_loss)),
-        ]);
-        let legend_widget = Paragraph::new(legend);
-        f.render_widget(legend_widget, chart_chunks[2]);
+        if has_batch_data {
+            // Intra-epoch: show batch loss as primary series
+            datasets.push(
+                Dataset::default()
+                    .name("batch")
+                    .marker(Marker::Braille)
+                    .graph_type(ratatui::widgets::GraphType::Line)
+                    .style(Style::default().fg(Color::Yellow))
+                    .data(&batch_points),
+            );
+            let x_max = (batch_points.len() as f64).max(1.0);
+
+            let chart = Chart::new(datasets)
+                .block(Block::default().title(" Loss (batch) ").borders(Borders::ALL))
+                .x_axis(
+                    Axis::default()
+                        .bounds([0.0, x_max])
+                        .labels(vec![
+                            Span::raw("0"),
+                            Span::raw(format!("{}", batch_points.len())),
+                        ]),
+                )
+                .y_axis(
+                    Axis::default()
+                        .bounds([y_min - y_margin, y_max + y_margin])
+                        .labels(vec![
+                            Span::raw(format!("{:.3}", y_min)),
+                            Span::raw(format!("{:.3}", y_max)),
+                        ]),
+                );
+            f.render_widget(chart, area);
+        } else {
+            // Between epochs: show epoch-level train + val
+            datasets.push(
+                Dataset::default()
+                    .name("train")
+                    .marker(Marker::Braille)
+                    .graph_type(ratatui::widgets::GraphType::Line)
+                    .style(Style::default().fg(Color::Yellow))
+                    .data(&epoch_train_points),
+            );
+            datasets.push(
+                Dataset::default()
+                    .name("val")
+                    .marker(Marker::Braille)
+                    .graph_type(ratatui::widgets::GraphType::Line)
+                    .style(Style::default().fg(Color::Magenta))
+                    .data(&epoch_val_points),
+            );
+            let x_max = (state.total_epochs as f64).max(1.0);
+
+            let chart = Chart::new(datasets)
+                .block(Block::default().title(" Loss (epoch) ").borders(Borders::ALL))
+                .x_axis(
+                    Axis::default()
+                        .bounds([0.0, x_max])
+                        .labels(vec![
+                            Span::raw("0"),
+                            Span::raw(format!("{}", state.total_epochs)),
+                        ]),
+                )
+                .y_axis(
+                    Axis::default()
+                        .bounds([y_min - y_margin, y_max + y_margin])
+                        .labels(vec![
+                            Span::raw(format!("{:.3}", y_min)),
+                            Span::raw(format!("{:.3}", y_max)),
+                        ]),
+                );
+            f.render_widget(chart, area);
+        }
     }
 
     fn draw_accuracy_chart(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
-        let block = Block::default().title(" Accuracy ").borders(Borders::ALL);
-        let inner = block.inner(area);
-        f.render_widget(block, area);
-
         if state.epoch_history.is_empty() {
+            let block = Block::default().title(" Accuracy ").borders(Borders::ALL);
+            let inner = block.inner(area);
+            f.render_widget(block, area);
             let msg = Paragraph::new("  Waiting for first epoch...");
             f.render_widget(msg, inner);
             return;
         }
 
-        let chart_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Min(1),
-            ])
-            .split(inner);
-
-        // Scale accuracy to u64 (multiply by 1000, range 0-1000)
-        let train_data: Vec<u64> = state
+        let train_points: Vec<(f64, f64)> = state
             .epoch_history
             .iter()
-            .map(|m| (m.train_accuracy * 1000.0) as u64)
+            .map(|m| (m.epoch as f64, m.train_accuracy as f64 * 100.0))
             .collect();
-        let val_data: Vec<u64> = state
+        let val_points: Vec<(f64, f64)> = state
             .epoch_history
             .iter()
-            .map(|m| (m.val_accuracy * 1000.0) as u64)
+            .map(|m| (m.epoch as f64, m.val_accuracy as f64 * 100.0))
             .collect();
 
-        let train_spark = Sparkline::default()
-            .data(&train_data)
-            .style(Style::default().fg(Color::Green));
-        f.render_widget(train_spark, chart_chunks[0]);
+        let all_y: Vec<f64> = train_points
+            .iter()
+            .chain(val_points.iter())
+            .map(|p| p.1)
+            .collect();
+        let y_min = all_y.iter().cloned().fold(f64::INFINITY, f64::min);
+        let y_max = all_y.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let y_margin = (y_max - y_min).max(1.0) * 0.1;
+        let y_floor = (y_min - y_margin).max(0.0);
+        let y_ceil = (y_max + y_margin).min(100.0);
 
-        let val_spark = Sparkline::default()
-            .data(&val_data)
-            .style(Style::default().fg(Color::Blue));
-        f.render_widget(val_spark, chart_chunks[1]);
+        let x_max = (state.total_epochs as f64).max(1.0);
 
-        let last = state.epoch_history.last().unwrap();
-        let legend = Line::from(vec![
-            Span::styled("▄ train ", Style::default().fg(Color::Green)),
-            Span::raw(format!("{:.1}%  ", last.train_accuracy * 100.0)),
-            Span::styled("▄ val ", Style::default().fg(Color::Blue)),
-            Span::raw(format!("{:.1}%", last.val_accuracy * 100.0)),
-        ]);
-        let legend_widget = Paragraph::new(legend);
-        f.render_widget(legend_widget, chart_chunks[2]);
+        let datasets = vec![
+            Dataset::default()
+                .name("train")
+                .marker(Marker::Braille)
+                .graph_type(ratatui::widgets::GraphType::Line)
+                .style(Style::default().fg(Color::Green))
+                .data(&train_points),
+            Dataset::default()
+                .name("val")
+                .marker(Marker::Braille)
+                .graph_type(ratatui::widgets::GraphType::Line)
+                .style(Style::default().fg(Color::Blue))
+                .data(&val_points),
+        ];
+
+        let chart = Chart::new(datasets)
+            .block(
+                Block::default()
+                    .title(" Accuracy (%) ")
+                    .borders(Borders::ALL),
+            )
+            .x_axis(
+                Axis::default()
+                    .title("epoch")
+                    .bounds([0.0, x_max])
+                    .labels(vec![
+                        Span::raw("0"),
+                        Span::raw(format!("{}", state.total_epochs)),
+                    ]),
+            )
+            .y_axis(
+                Axis::default()
+                    .bounds([y_floor, y_ceil])
+                    .labels(vec![
+                        Span::raw(format!("{:.0}%", y_floor)),
+                        Span::raw(format!("{:.0}%", y_ceil)),
+                    ]),
+            );
+        f.render_widget(chart, area);
     }
 
     fn draw_epoch_table(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
@@ -604,7 +740,79 @@ mod tui_impl {
         println!("Total time: {:.1}s", total_time);
         println!();
     }
+
+    /// Render a single static frame of the TUI dashboard with synthetic data.
+    ///
+    /// Used for visual verification that the TUI layout, text, and charts render
+    /// correctly before committing to an overnight training run.
+    pub fn run_tui_demo() -> io::Result<()> {
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen)?;
+
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
+        terminal.clear()?;
+
+        // Build realistic synthetic state mimicking a mid-training run
+        let mut state = RenderState::new();
+        state.total_epochs = 20;
+        state.current_epoch = 7;
+        state.current_batch = 3200;
+        state.current_total_batches = 5145;
+        state.batches_per_epoch = 5145;
+
+        // Realistic epoch history: loss decreasing, accuracy increasing
+        let epoch_data: Vec<(f32, f32, f32, f32, f64, f32)> = vec![
+            (3.72, 1.21, 0.405, 0.701, 1e-4, 123.5),
+            (1.43, 0.62, 0.787, 0.825, 9.94e-5, 122.5),
+            (0.89, 0.47, 0.847, 0.852, 9.76e-5, 121.8),
+            (0.68, 0.43, 0.867, 0.865, 9.46e-5, 121.8),
+            (0.57, 0.38, 0.877, 0.875, 9.05e-5, 122.4),
+            (0.50, 0.36, 0.886, 0.880, 8.55e-5, 123.6),
+            (0.46, 0.34, 0.892, 0.883, 7.96e-5, 121.9),
+        ];
+        for (i, (tl, vl, ta, va, lr, t)) in epoch_data.iter().enumerate() {
+            state.epoch_history.push(EpochMetrics {
+                epoch: i,
+                train_loss: *tl,
+                val_loss: *vl,
+                train_accuracy: *ta,
+                val_accuracy: *va,
+                learning_rate: *lr,
+                epoch_time_secs: *t,
+            });
+        }
+
+        // Synthetic batch losses for current (in-progress) epoch 7
+        // Simulate ~50 batches of a gradually decreasing loss
+        let mut batch_losses = Vec::with_capacity(50);
+        let mut loss = 0.42;
+        for i in 0..50 {
+            // Add some noise around a decreasing trend
+            let noise = ((i as f64 * 1.7).sin() * 0.03) + ((i as f64 * 0.3).cos() * 0.02);
+            batch_losses.push(loss + noise);
+            loss -= 0.001;
+        }
+        state.batch_loss_history = batch_losses;
+
+        let title = "sherlock-v4-sibling (demo)";
+
+        // Draw one frame
+        terminal.draw(|f| draw_frame(f, &state, title))?;
+
+        // Wait for user to see it, then exit
+        eprintln!("\n  TUI Demo — press Enter to exit...");
+        let mut buf = String::new();
+        let _ = io::stdin().read_line(&mut buf);
+
+        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+        println!("TUI demo complete. All panels rendered.");
+        Ok(())
+    }
 }
 
 #[cfg(feature = "tui")]
 pub use tui_impl::TuiRenderer;
+
+#[cfg(feature = "tui")]
+pub use tui_impl::run_tui_demo;

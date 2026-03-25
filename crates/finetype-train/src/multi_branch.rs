@@ -1881,7 +1881,7 @@ pub fn train_multi_branch(
             train_correct_sum += acc as f64 * bs as f64;
             train_samples += bs;
 
-            renderer.on_batch_end(epoch, batch_num + 1, total_batches);
+            renderer.on_batch_end(epoch, batch_num + 1, total_batches, loss_val);
         }
 
         let train_loss = (train_loss_sum / train_samples as f64) as f32;

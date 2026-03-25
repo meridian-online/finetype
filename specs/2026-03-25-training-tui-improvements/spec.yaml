@@ -1,0 +1,121 @@
+goal: >
+  Ship a standalone TUI demo mode for visual verification, batch-level loss charts
+  to eliminate the dead-screen problem during epochs, and a panic hook guard
+  for terminal safety during overnight training runs.
+
+constraints:
+  - "Demo mode is a standalone Rust binary (example or bin), not a flag on finetype train"
+  - "Demo renders a single static frame with realistic data — no animation loop"
+  - "Batch-level loss replaces both epoch-level loss sparklines (train+val) with a single batch-loss sparkline; val loss appears in legend and epoch table only"
+  - "Preserve display-only mode (no enable_raw_mode) for unattended overnight safety"
+  - "TrainingRenderer trait changes must be backward-compatible with LogRenderer"
+  - "Panic hook covers training-thread panics only (render-thread panics handled by existing error path)"
+  - "Changes in tui.rs, multi_branch.rs (on_batch_end call site only), plus the new demo binary"
+  - "Demo binary accesses TUI internals via a pub fn run_tui_demo() exported from tui_impl"
+  - "Visual verification only — demo binary is not CI-verified (no TTY in CI)"
+
+acceptance_criteria:
+  - id: AC-1
+    description: >
+      Standalone demo binary renders one frame of the TUI to the alternate screen
+      with realistic data in all four panels (title, charts, epoch table, progress bar),
+      then exits cleanly to the normal screen. Entry point: pub fn run_tui_demo()
+      exported from tui_impl, called by the demo binary.
+    verification: >
+      Run the demo binary. Visual inspection confirms: title bar shows model name
+      and elapsed time, loss chart has sparkline data with legend values, accuracy
+      chart has sparkline data with legend values, epoch table has 5+ rows with
+      plausible metrics, progress bar shows epoch/batch counts and ETA. Text is
+      readable (no truncation or overlap).
+
+  - id: AC-2
+    description: >
+      TrainingRenderer::on_batch_end signature extended with batch_loss: f32.
+      RenderMsg::BatchEnd includes batch_loss field. RenderState accumulates
+      batch losses into batch_loss_history: Vec<f64> for the current epoch.
+      Vec is cleared in the RenderMsg::EpochEnd handler (render thread side).
+      multi_branch.rs call site passes loss_val through on_batch_end.
+    verification: >
+      Code review: on_batch_end signature includes loss value. RenderState has
+      batch_loss_history field. Vec is cleared when EpochEnd message is received
+      in the render thread. multi_branch.rs passes loss_val at the call site.
+
+  - id: AC-3
+    description: >
+      Loss chart displays a single batch-level loss sparkline replacing the
+      previous two epoch-level sparklines (train + val). During epoch 0, the
+      chart shows live batch losses instead of "Waiting for first epoch...".
+      Val loss appears in the legend (from epoch_history) and epoch table only.
+    verification: >
+      Demo binary populates batch_loss_history with ~50 synthetic batch losses.
+      Visual inspection confirms the loss sparkline shows batch-granularity data
+      as a single series. Legend shows latest epoch-level train/val loss from
+      epoch_history.
+
+  - id: AC-4
+    description: >
+      Panic hook guard installed in render_loop for training-thread panics:
+      saves original panic hook, installs wrapper that calls LeaveAlternateScreen,
+      restores original on clean exit. Scope: training-thread panics only —
+      render-thread panics are handled by the existing error path in the
+      thread::spawn closure.
+    verification: >
+      Code review: render_loop calls std::panic::take_hook before EnterAlternateScreen
+      and set_hook with LeaveAlternateScreen wrapper. Clean exit path restores
+      original hook. Approximately 10-15 lines of code.
+
+  - id: AC-5
+    description: >
+      Existing overnight training pipeline works unmodified — LogRenderer compiles,
+      TuiRenderer still accepts all TrainingRenderer trait calls, no regressions.
+    verification: >
+      cargo test -p finetype-train passes. cargo build -p finetype-cli --features tui
+      succeeds. LogRenderer implements updated trait (batch_loss default to no-op).
+
+ontology_schema:
+  name: "TuiDemoState"
+  description: "Synthetic state constructed by run_tui_demo() to populate RenderState directly"
+  fields:
+    - name: "model_title"
+      type: "string"
+      description: "Model name shown in title bar"
+    - name: "total_epochs"
+      type: "number"
+      description: "Total epochs configured"
+    - name: "epoch_history"
+      type: "array"
+      description: "Vec of EpochMetrics with realistic training curves"
+    - name: "batch_loss_history"
+      type: "array"
+      description: "Vec of f64 batch losses for current-epoch sparkline (lives in RenderState)"
+    - name: "current_epoch"
+      type: "number"
+      description: "Current epoch index"
+    - name: "current_batch"
+      type: "number"
+      description: "Current batch index within epoch"
+
+evaluation_principles:
+  - principle: "Visual correctness — all panels render with readable text, no truncation"
+    weight: 0.35
+  - principle: "Liveness — batch-level chart shows progress during epochs, not frozen"
+    weight: 0.30
+  - principle: "Safety — panic hook restores terminal, display-only mode preserved"
+    weight: 0.20
+  - principle: "Backward compatibility — existing pipeline unaffected"
+    weight: 0.15
+
+exit_conditions:
+  - "Demo binary renders a correct single frame (AC-1)"
+  - "Batch-level loss visible in demo sparkline (AC-3)"
+  - "cargo test and cargo build pass (AC-5)"
+  - "Visual inspection confirms text readability on progress bar and all panels"
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-03-25T13:00:00Z"
+  ambiguity_score: 0.09
+  interview_ref: "specs/2026-03-25-training-tui-improvements/interview.md"
+  analysis_ref: "specs/2026-03-25-training-tui-improvements/analysis.md"
+  review_ref: "specs/2026-03-25-training-tui-improvements/review-spec-2026-03-25.md"
+  risk_tier: "STANDARD"
