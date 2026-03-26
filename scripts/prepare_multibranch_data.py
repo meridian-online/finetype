@@ -287,14 +287,10 @@ HEADER_VARIATIONS = {
         "region", "Region", "REGION", "area", "district", "zone",
         "territory", "geo_region", "location_region",
     ],
-    "geography.address.street_address": [
-        "address", "street_address", "addr", "Address", "ADDRESS",
-        "street", "address_line_1", "mailing_address", "location",
-        "street_addr",
-    ],
     "geography.address.full_address": [
         "full_address", "address", "complete_address", "Full Address",
         "FULL_ADDRESS", "mailing_address", "postal_address", "location",
+        "street_address", "addr", "street", "address_line_1", "street_addr",
     ],
     "geography.coordinate.latitude": [
         "latitude", "lat", "Latitude", "LAT", "geo_lat", "y",
@@ -316,7 +312,7 @@ HEADER_VARIATIONS = {
         "timestamp", "datetime", "created_at", "updated_at", "Timestamp",
         "TIMESTAMP", "date_time", "event_time", "ts", "created",
     ],
-    "datetime.date.iso_date": [
+    "datetime.date.iso": [
         "date", "Date", "DATE", "event_date", "start_date", "end_date",
         "birth_date", "created_date", "dateValue", "record_date",
     ],

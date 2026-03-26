@@ -183,9 +183,9 @@ const BOOLEAN_LABELS: &[&str] = &[
     "representation.boolean.binary",   // NNFT-075: 0/1
     "representation.boolean.initials", // NNFT-075: T/F, Y/N
     "representation.boolean.terms",    // NNFT-075: true/false, yes/no, on/off
-    "technology.development.boolean",  // legacy (pre-NNFT-075 model)
-    "representation.logical.boolean",  // legacy interim label
-    "technology.data.boolean",         // legacy
+    // Legacy labels removed in v6 cleanup: technology.development.boolean,
+    // technology.data.boolean, representation.logical.boolean — none exist in
+    // the current 250-type taxonomy or label_map.json.
 ];
 
 /// Geography location types used by both geography protection (header hints)
@@ -1784,7 +1784,7 @@ impl ColumnClassifier {
                         //   "epoch" → unix_seconds vs NPI (medical ID)
                         //   "cabin" → alphanumeric_id vs ICD10 (medical code)
                         // Does NOT fire when the base type name matches (e.g.,
-                        // representation.identifier.uuid vs technology.identifier.uuid)
+                        // representation.identifier.uuid vs representation.identifier.uuid)
                         // or when only the domain prefix differs for the same concept.
                         if !geo_handled && hint_is_hardcoded && result.label != hinted_type {
                             let hint_domain = hinted_type.split('.').next().unwrap_or("");
@@ -2416,7 +2416,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
     // threshold alone — high slash segments is a strong enough signal.
     let slash_segments = column_features.mean[feature_idx::SEGMENT_COUNT_SLASH];
     if result.label == "technology.internet.hostname" && slash_segments >= 1.5 {
-        result.label = "technology.container.docker_ref".to_string();
+        result.label = "technology.development.docker_ref".to_string();
         result.confidence = result.confidence.max(0.7);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("feature_slash_segments:{:.1}", slash_segments));
@@ -2441,7 +2441,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        result.label = "geography.trade.hs_code".to_string();
+        result.label = "geography.transportation.hs_code".to_string();
         result.confidence = result.confidence.max(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!(
@@ -2875,9 +2875,9 @@ fn feature_disambiguate(
         // Multiple slash segments → likely docker refs
         let docker_in_votes = votes
             .iter()
-            .any(|(l, _)| l == "technology.container.docker_ref");
+            .any(|(l, _)| l == "technology.development.docker_ref");
         if docker_in_votes {
-            result.label = "technology.container.docker_ref".to_string();
+            result.label = "technology.development.docker_ref".to_string();
             result.confidence = result.confidence.max(0.7);
             result.disambiguation_applied = true;
             result.disambiguation_rule =
@@ -2918,16 +2918,16 @@ fn feature_disambiguate(
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
+        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.transportation.hs_code");
         if hs_in_votes {
             let hs_votes = votes
                 .iter()
-                .find(|(l, _)| l == "geography.trade.hs_code")
+                .find(|(l, _)| l == "geography.transportation.hs_code")
                 .map(|(_, c)| *c)
                 .unwrap_or(0);
             let hs_frac = hs_votes as f32 / n_samples as f32;
             if hs_frac >= 0.10 {
-                result.label = "geography.trade.hs_code".to_string();
+                result.label = "geography.transportation.hs_code".to_string();
                 result.confidence = hs_frac.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!(
@@ -3764,7 +3764,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("technology.internet.ip_v4");
         }
         "uuid" | "guid" => {
-            return Some("technology.identifier.uuid");
+            return Some("representation.identifier.uuid");
         }
         "gender" | "sex" => {
             return Some("identity.person.gender");
@@ -3840,7 +3840,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("geography.location.state");
         }
         "currency" | "currency code" => {
-            return Some("identity.financial.currency_code");
+            return Some("finance.currency.currency_code");
         }
         // "id" | "identifier" — REMOVED (decision 0034). ID columns are genuinely
         // ambiguous (numeric, UUID, alphanumeric). Let the model decide from values.
@@ -3890,10 +3890,8 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "ean" | "barcode" | "gtin" | "upc" => {
             return Some("identity.commerce.ean");
         }
-        // Operating system
-        "os" | "operating system" | "platform" => {
-            return Some("technology.development.os");
-        }
+        // "os" | "operating system" | "platform" — REMOVED (v6 cleanup).
+        // technology.development.os does not exist in taxonomy. Let the model decide.
         // Occupation / job title — collapsed to categorical (NNFT-162)
         "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role" | "position" => {
             return Some("representation.discrete.categorical");
@@ -3957,19 +3955,17 @@ fn header_hint(header: &str) -> Option<&'static str> {
         }
     }
     if h.contains("address") && !h.contains("email") && !h.contains("ip") && !h.contains("mac") {
-        // "street address" or "street_address" → street_address
-        // "full address" → full_address
-        // Bare "address" → full_address (NNFT-235: more commonly means full address)
-        if h.contains("street") {
-            return Some("geography.address.street_address");
-        }
+        // "street address", "full address", or bare "address" → full_address
+        // (v6 cleanup: geography.address.street_address doesn't exist in taxonomy;
+        //  "street address" columns typically contain full addresses like "123 Main St")
         return Some("geography.address.full_address");
     }
     if h.contains("street") {
-        return Some("geography.address.street_address");
+        // Bare "street" header without "address" — still likely a full address column
+        return Some("geography.address.full_address");
     }
     if h.contains("born") || h.contains("birth") || h.contains("dob") {
-        return Some("datetime.date.iso_date");
+        return Some("datetime.date.iso");
     }
     // Specific timestamp formats — must precede the generic date/timestamp catch-all.
     // Note: underscores are already replaced with spaces by header normalization.
@@ -4003,7 +3999,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("identity.person.height");
     }
     if h.contains("password") || h.contains("passwd") {
-        return Some("identity.credential.password");
+        return Some("identity.person.password");
     }
     if h.contains("url") || h.contains("uri") || h.contains("link") || h.contains("href") {
         return Some("technology.internet.url");
@@ -5541,7 +5537,7 @@ mod tests {
             .map(String::from)
             .collect();
         let top_labels = vec![
-            "representation.logical.boolean",
+            "representation.boolean.binary",
             "representation.numeric.integer_number",
         ];
 
@@ -5559,7 +5555,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.logical.boolean"];
+        let top_labels = vec!["representation.boolean.binary"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         // Should return None — this IS a boolean column (only 2 unique, spread=1)
@@ -5573,7 +5569,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.logical.boolean", "representation.text.word"];
+        let top_labels = vec!["representation.boolean.binary", "representation.text.word"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(result.is_some());
@@ -5589,7 +5585,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.logical.boolean"];
+        let top_labels = vec!["representation.boolean.binary"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         // Should return None — T/F is a valid boolean encoding
@@ -5661,7 +5657,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["geography.transport.iata_code"];
+        let top_labels = vec!["geography.transportation.iata_code"];
 
         let result = disambiguate_categorical(&values, &top_labels);
         assert!(result.is_none());
@@ -5764,7 +5760,7 @@ mod tests {
         assert_eq!(header_hint("URL"), Some("technology.internet.url"));
         assert_eq!(header_hint("website"), Some("technology.internet.url"));
         assert_eq!(header_hint("ip_address"), Some("technology.internet.ip_v4"));
-        assert_eq!(header_hint("uuid"), Some("technology.identifier.uuid"));
+        assert_eq!(header_hint("uuid"), Some("representation.identifier.uuid"));
         // "port" header hint removed in NNFT-242
     }
 
@@ -5776,8 +5772,8 @@ mod tests {
             Some("datetime.timestamp.iso_8601")
         );
         assert_eq!(header_hint("year"), Some("datetime.component.year"));
-        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso_date"));
-        assert_eq!(header_hint("dob"), Some("datetime.date.iso_date"));
+        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso"));
+        assert_eq!(header_hint("dob"), Some("datetime.date.iso"));
         // Specific timestamp formats take priority over generic catch-all
         assert_eq!(
             header_hint("rfc_2822_timestamp"),
@@ -5947,21 +5943,21 @@ mod tests {
 
     #[test]
     fn test_boolean_override_with_current_model_label() {
-        // The actual model outputs "technology.development.boolean", not the
-        // previously-checked labels. Verify the override fires for this label.
+        // Model predicts representation.boolean.binary but values span 0-8 →
+        // override to integer_number (v6: updated from stale technology.development.boolean)
         let values: Vec<String> = vec!["0", "1", "2", "3", "0", "1", "4", "0", "5", "8"]
             .into_iter()
             .map(String::from)
             .collect();
         let top_labels = vec![
-            "technology.development.boolean",
+            "representation.boolean.binary",
             "representation.numeric.integer_number",
         ];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(
             result.is_some(),
-            "Boolean override must trigger for technology.development.boolean"
+            "Boolean override must trigger for representation.boolean.binary with wide spread"
         );
         let (label, rule) = result.unwrap();
         assert_eq!(label, "representation.numeric.integer_number");
@@ -5970,12 +5966,12 @@ mod tests {
 
     #[test]
     fn test_boolean_override_preserves_real_boolean_current_label() {
-        // Actual {0,1} boolean column with current model label should NOT override
+        // Actual {0,1} boolean column should NOT override
         let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1", "0", "1"]
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["technology.development.boolean"];
+        let top_labels = vec!["representation.boolean.binary"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(
@@ -8957,7 +8953,7 @@ datetime.component.day_of_week:
             confidence: 0.80,
             vote_distribution: vec![
                 ("representation.numeric.decimal_number".to_string(), 0.70),
-                ("geography.trade.hs_code".to_string(), 0.20),
+                ("geography.transportation.hs_code".to_string(), 0.20),
             ],
             disambiguation_applied: false,
             disambiguation_rule: None,
@@ -8974,12 +8970,12 @@ datetime.component.day_of_week:
 
         let votes = vec![
             ("representation.numeric.decimal_number".to_string(), 70),
-            ("geography.trade.hs_code".to_string(), 20),
+            ("geography.transportation.hs_code".to_string(), 20),
         ];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
-        assert_eq!(result.label, "geography.trade.hs_code");
+        assert_eq!(result.label, "geography.transportation.hs_code");
         assert!(result.disambiguation_applied);
         assert!(result
             .disambiguation_rule
@@ -9153,7 +9149,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "technology.container.docker_ref",
+            result.label, "technology.development.docker_ref",
             "F2 should fire on hostname with high slash segments even without docker_ref in votes"
         );
         assert!(result.disambiguation_applied);
@@ -9218,7 +9214,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "geography.trade.hs_code",
+            result.label, "geography.transportation.hs_code",
             "F3 should fire on decimal_number with HS code features even without hs_code in votes"
         );
         assert!(result.disambiguation_applied);

@@ -442,7 +442,6 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         | "technology.cryptographic.token_hex"
         | "technology.cryptographic.token_urlsafe"
         | "technology.development.calver"
-        | "technology.development.os"
         | "technology.development.programming_language"
         | "technology.development.software_license"
         | "technology.development.stage"
@@ -1299,10 +1298,7 @@ mod tests {
             finetype_to_broad_category("representation.text.sentence"),
             Some(5)
         );
-        assert_eq!(
-            finetype_to_broad_category("technology.development.os"),
-            Some(5)
-        );
+        // technology.development.os removed (v6 cleanup — not in taxonomy)
     }
 
     #[test]

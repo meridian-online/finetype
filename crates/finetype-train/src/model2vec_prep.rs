@@ -369,10 +369,8 @@ fn build_header_hint_entries() -> Vec<(String, String)> {
         ("barcode", "identity.commerce.ean"),
         ("gtin", "identity.commerce.ean"),
         ("upc", "identity.commerce.ean"),
-        // OS
-        ("os", "technology.development.os"),
-        ("operating system", "technology.development.os"),
-        ("platform", "technology.development.os"),
+        // "os" / "operating system" / "platform" — removed (v6 cleanup).
+        // technology.development.os doesn't exist in taxonomy.
         // Categorical
         ("embarked", "representation.discrete.categorical"),
         ("boarded", "representation.discrete.categorical"),

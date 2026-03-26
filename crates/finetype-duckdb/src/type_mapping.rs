@@ -94,7 +94,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "technology.development.calver"
         | "technology.development.programming_language"
         | "technology.development.software_license"
-        | "technology.development.os"
         | "technology.development.stage" => "VARCHAR",
 
         // ── technology.hardware ────────────────────────────────────────

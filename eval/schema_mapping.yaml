@@ -400,12 +400,11 @@ mappings:
     finetype_label: geography.address.full_address
     finetype_labels:
       - geography.address.full_address
-      - geography.address.street_address
       - geography.coordinate.coordinates
     finetype_domain: geography
     match_quality: close
     expand: false
-    notes: Full address strings; FineType detects as full_address, street_address, or coordinates
+    notes: Full address strings; FineType detects as full_address or coordinates
 
   - gt_label: county
     source: dbpedia
@@ -519,7 +518,6 @@ mappings:
     finetype_label: null
     finetype_labels:
       - datetime.date.iso
-      - datetime.date.iso_date
       - datetime.date.mdy_slash
       - datetime.date.dmy_slash
       - datetime.date.dmy_dot
@@ -1922,11 +1920,11 @@ mappings:
 
   - gt_label: operating system
     source: dbpedia
-    finetype_label: technology.development.os
+    finetype_label: null
     finetype_domain: technology
-    match_quality: close
+    match_quality: semantic_only
     expand: false
-    notes: OS names; FineType has os type
+    notes: OS names; technology.development.os removed from taxonomy (v6 cleanup)
 
   - gt_label: software source code
     source: dbpedia
