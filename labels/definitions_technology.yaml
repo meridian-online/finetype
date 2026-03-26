@@ -550,7 +550,7 @@ technology.development.calver:
     day: "CAST(REGEXP_EXTRACT({col}, '^[0-9]{4}\\.[0-9]{2}\\.([0-9]{2})') AS SMALLINT)"
   validation:
     type: string
-    pattern: "^[0-9]{4}\\.[0-9]{2}(?:\\.[0-9]{2})?(?:\\..*)?$"
+    pattern: "^[0-9]{4}\\.[0-9]{1,2}(?:\\.[0-9]{1,2})?(?:\\..*)?$"
   tier: [VARCHAR, development]
   release_priority: 3
   aliases: null

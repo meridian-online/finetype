@@ -1134,16 +1134,16 @@ geography.transportation.hs_code:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}\\.?\\d{2}(\\.?\\d{2}){0,2}$"
+    pattern: "^\\d{4}\\.\\d{2}(\\.\\d{2}){1,2}$"
   tier: [VARCHAR, transportation]
   release_priority: 3
   aliases: [harmonized_system, tariff_code]
   samples:
-    - "8471.30"
     - "6110.20.20"
     - "0901.11.00.10"
-    - "8517.12"
+    - "8517.12.00"
     - "3004.90.92"
+    - "8471.30.01"
   references: null
   notes: >
     HS is maintained by the World Customs Organization. First 6 digits

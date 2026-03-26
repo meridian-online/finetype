@@ -1248,13 +1248,27 @@ impl Generator {
                 Ok(format!("{}{}.{}.{}{}", prefix, major, minor, patch, pre))
             }
             ("development", "calver") => {
-                let y = self.rng.gen_range(2020..2026);
+                // CalVer always starts with 4-digit year (≥2000), distinguishing from
+                // semver which starts with small integers. Month is 01-12 (zero-padded).
+                // C-07: widened year range and added micro-version patterns.
+                let y = self.rng.gen_range(2018..2027);
                 let m = self.rng.gen_range(1..13);
-                if self.rng.gen_bool(0.5) {
+                let r = self.rng.gen::<f64>();
+                if r < 0.35 {
+                    // YYYY.MM (e.g., 2024.02)
+                    Ok(format!("{}.{:02}", y, m))
+                } else if r < 0.70 {
+                    // YYYY.MM.DD (e.g., 2024.02.09)
                     let d = self.rng.gen_range(1..29);
                     Ok(format!("{}.{:02}.{:02}", y, m, d))
+                } else if r < 0.85 {
+                    // YYYY.MM.micro (e.g., 2024.01.15.1) — Ubuntu-style
+                    let d = self.rng.gen_range(1..29);
+                    let micro = self.rng.gen_range(1..10);
+                    Ok(format!("{}.{:02}.{:02}.{}", y, m, d, micro))
                 } else {
-                    Ok(format!("{}.{:02}", y, m))
+                    // YYYY.0M (non-zero-padded month, e.g., 2024.1) — pip/twine style
+                    Ok(format!("{}.{}", y, m))
                 }
             }
             // technology.development.boolean — REMOVED in NNFT-075
@@ -2450,16 +2464,13 @@ impl Generator {
                 let sub_heading = self.rng.gen_range(0u32..100);
                 let heading = chapter * 100 + sub_heading;
                 let b = self.rng.gen_range(0u32..100); // HS 6-digit subheading suffix
-                let r = self.rng.gen::<f64>();
-                if r < 0.10 {
-                    // ≤10%: 2-level XXXX.XX — minimised; still present for format variety
-                    Ok(format!("{:04}.{:02}", heading, b))
-                } else if r < 0.80 {
-                    // 70%: 3-level XXXX.XX.XX (standard HS 8-digit national tariff)
+                // 2-level XXXX.XX removed (C-01): collides with decimal. Only 3+ levels.
+                if self.rng.gen_bool(0.75) {
+                    // 75%: 3-level XXXX.XX.XX (standard HS 8-digit national tariff)
                     let c = self.rng.gen_range(0u32..100);
                     Ok(format!("{:04}.{:02}.{:02}", heading, b, c))
                 } else {
-                    // 20%: 4-level XXXX.XX.XX.XX (10-digit statistical suffix)
+                    // 25%: 4-level XXXX.XX.XX.XX (10-digit statistical suffix)
                     let c = self.rng.gen_range(0u32..100);
                     let d = self.rng.gen_range(0u32..100);
                     Ok(format!("{:04}.{:02}.{:02}.{:02}", heading, b, c, d))
