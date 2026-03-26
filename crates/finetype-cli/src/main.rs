@@ -1023,34 +1023,45 @@ fn cmd_train_multi_branch(
         Some(val_groups),
     )?;
 
-    let model_config = if let Some(config_path) = &model_config {
-        // Load architecture from JSON config file
-        let config_str = std::fs::read_to_string(config_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read model config {}: {}", config_path.display(), e))?;
-        let mut cfg: MultiBranchConfig = serde_json::from_str(&config_str)
-            .map_err(|e| anyhow::anyhow!("Failed to parse model config {}: {}", config_path.display(), e))?;
-        // Override n_classes and dropout from CLI args (these are training params, not architecture)
-        cfg.n_classes = n_classes;
-        cfg.dropout = dropout;
-        cfg.head_type = head_type.clone();
-        eprintln!(
+    let model_config =
+        if let Some(config_path) = &model_config {
+            // Load architecture from JSON config file
+            let config_str = std::fs::read_to_string(config_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to read model config {}: {}",
+                    config_path.display(),
+                    e
+                )
+            })?;
+            let mut cfg: MultiBranchConfig = serde_json::from_str(&config_str).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to parse model config {}: {}",
+                    config_path.display(),
+                    e
+                )
+            })?;
+            // Override n_classes and dropout from CLI args (these are training params, not architecture)
+            cfg.n_classes = n_classes;
+            cfg.dropout = dropout;
+            cfg.head_type = head_type.clone();
+            eprintln!(
             "Loaded model config from {}: char_hidden={:?}, embed_hidden={:?}, merge_hidden={:?}",
             config_path.display(), cfg.char_hidden, cfg.embed_hidden, cfg.merge_hidden,
         );
-        cfg
-    } else {
-        MultiBranchConfig {
-            char_dim,
-            embed_dim,
-            stats_dim,
-            header_dim,
-            header_hidden: if header_dim > 0 { [128, 64] } else { [0, 0] },
-            n_classes,
-            dropout,
-            head_type: head_type.clone(),
-            ..Default::default()
-        }
-    };
+            cfg
+        } else {
+            MultiBranchConfig {
+                char_dim,
+                embed_dim,
+                stats_dim,
+                header_dim,
+                header_hidden: if header_dim > 0 { [128, 64] } else { [0, 0] },
+                n_classes,
+                dropout,
+                head_type: head_type.clone(),
+                ..Default::default()
+            }
+        };
 
     let train_config = MultiBranchTrainConfig {
         output_dir: output.clone(),
