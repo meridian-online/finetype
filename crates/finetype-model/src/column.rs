@@ -2441,7 +2441,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        result.label = "geography.trade.hs_code".to_string();
+        result.label = "geography.transportation.hs_code".to_string();
         result.confidence = result.confidence.max(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!(
@@ -2621,6 +2621,25 @@ fn value_sharpen(
                 "representation.numeric.decimal_number".to_string(),
                 "percentage_no_sign".to_string(),
             ));
+        }
+    }
+
+    // Rule 20: HS code validation gate — demote to decimal_number when values
+    // don't match HS code format. The model over-predicts hs_code on plain decimal
+    // columns (pe_ratio, sepal_length, humidity_pct, earthquake measurements).
+    // HS codes are structured digit groups: 4 digits + optional dot-separated 2-digit
+    // groups (e.g., "8471.30", "8471.30.00"). Plain decimals like "3.14" or "0.887" fail.
+    if result_label == "geography.transportation.hs_code" {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let match_count = non_empty.iter().filter(|v| is_hs_code_format(v)).count();
+            let match_rate = match_count as f32 / non_empty.len() as f32;
+            if match_rate < 0.5 {
+                return Some((
+                    "representation.numeric.decimal_number".to_string(),
+                    format!("hs_code_validation_gate:match_rate={:.2}", match_rate),
+                ));
+            }
         }
     }
 
@@ -2902,16 +2921,16 @@ fn feature_disambiguate(
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
+        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.transportation.hs_code");
         if hs_in_votes {
             let hs_votes = votes
                 .iter()
-                .find(|(l, _)| l == "geography.trade.hs_code")
+                .find(|(l, _)| l == "geography.transportation.hs_code")
                 .map(|(_, c)| *c)
                 .unwrap_or(0);
             let hs_frac = hs_votes as f32 / n_samples as f32;
             if hs_frac >= 0.10 {
-                result.label = "geography.trade.hs_code".to_string();
+                result.label = "geography.transportation.hs_code".to_string();
                 result.confidence = hs_frac.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!(
@@ -4203,6 +4222,36 @@ fn disambiguate_coordinates(values: &[String]) -> Option<String> {
 
 /// Detect IPv4 addresses via dotted-quad pattern.
 ///
+/// Check whether a value matches HS code format: 4+ digits optionally separated
+/// into 2-digit groups by dots. Valid: "8471.30", "847130", "8471.30.00".
+/// Invalid: "3.14", "0.887", "-12.5" (plain decimals).
+fn is_hs_code_format(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() {
+        return false;
+    }
+    // HS codes are never negative
+    if s.starts_with('-') || s.starts_with('+') {
+        return false;
+    }
+    // Split on dots and check structure
+    let parts: Vec<&str> = s.split('.').collect();
+    match parts.len() {
+        // No dots: must be 4-10 pure digits (e.g., "847130")
+        1 => {
+            let len = parts[0].len();
+            len >= 4 && len <= 10 && parts[0].chars().all(|c| c.is_ascii_digit())
+        }
+        // Dotted: first group 4 digits, subsequent groups exactly 2 digits
+        2..=4 => {
+            parts[0].len() == 4
+                && parts[0].chars().all(|c| c.is_ascii_digit())
+                && parts[1..].iter().all(|p| p.len() == 2 && p.chars().all(|c| c.is_ascii_digit()))
+        }
+        _ => false,
+    }
+}
+
 /// Rule: If ≥80% of non-empty values match `\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`
 /// with each octet in 0..255, classify as ip_v4.
 ///
@@ -8815,7 +8864,7 @@ datetime.component.day_of_week:
             confidence: 0.80,
             vote_distribution: vec![
                 ("representation.numeric.decimal_number".to_string(), 0.70),
-                ("geography.trade.hs_code".to_string(), 0.20),
+                ("geography.transportation.hs_code".to_string(), 0.20),
             ],
             disambiguation_applied: false,
             disambiguation_rule: None,
@@ -8832,12 +8881,12 @@ datetime.component.day_of_week:
 
         let votes = vec![
             ("representation.numeric.decimal_number".to_string(), 70),
-            ("geography.trade.hs_code".to_string(), 20),
+            ("geography.transportation.hs_code".to_string(), 20),
         ];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
-        assert_eq!(result.label, "geography.trade.hs_code");
+        assert_eq!(result.label, "geography.transportation.hs_code");
         assert!(result.disambiguation_applied);
         assert!(result
             .disambiguation_rule
@@ -9076,7 +9125,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "geography.trade.hs_code",
+            result.label, "geography.transportation.hs_code",
             "F3 should fire on decimal_number with HS code features even without hs_code in votes"
         );
         assert!(result.disambiguation_applied);
@@ -9085,6 +9134,62 @@ datetime.component.day_of_week:
             .as_ref()
             .unwrap()
             .starts_with("feature_hs_code"));
+    }
+
+    // R20: HS code validation gate — demotes hs_code when values are plain decimals
+    #[test]
+    fn test_r20_hs_code_gate_demotes_plain_decimals() {
+        // Model predicts hs_code but values are plain decimals (pe_ratio, sepal_length, etc.)
+        let values: Vec<String> = vec![
+            "3.14", "0.887", "-12.5", "100.0", "0.003", "45.67", "1.23", "99.9",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "geography.transportation.hs_code", 0.95, None);
+        assert!(result.is_some(), "R20 should fire on plain decimals");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.decimal_number");
+        assert!(rule.starts_with("hs_code_validation_gate"));
+    }
+
+    #[test]
+    fn test_r20_hs_code_gate_keeps_real_hs_codes() {
+        // Real HS codes should NOT be demoted
+        let values: Vec<String> = vec![
+            "8471.30", "8471.30.00", "6204.62", "8517.12", "0901.21", "2204.10",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "geography.transportation.hs_code", 0.95, None);
+        assert!(result.is_none(), "R20 should NOT fire on real HS codes");
+    }
+
+    #[test]
+    fn test_is_hs_code_format() {
+        // Valid HS codes
+        assert!(is_hs_code_format("8471.30"));
+        assert!(is_hs_code_format("8471.30.00"));
+        assert!(is_hs_code_format("0901.21.00.10"));
+        assert!(is_hs_code_format("847130")); // undotted 6-digit
+        assert!(is_hs_code_format("84713000")); // undotted 8-digit
+
+        // Invalid — plain decimals
+        assert!(!is_hs_code_format("3.14"));
+        assert!(!is_hs_code_format("0.887"));
+        assert!(!is_hs_code_format("-12.5"));
+        assert!(!is_hs_code_format("100.0"));
+        assert!(!is_hs_code_format("45.67"));
+
+        // Invalid — too short
+        assert!(!is_hs_code_format("123"));
+        assert!(!is_hs_code_format("12.34"));
+
+        // Invalid — negative
+        assert!(!is_hs_code_format("-8471.30"));
     }
 
     // AC-2: feature_sharpen — F5 demotes numeric_code (single-entry votes)

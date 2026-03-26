@@ -171,6 +171,22 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 | `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`, `--enum-threshold N`) |
 | `finetype mcp` | Start MCP server over stdio (8 tools: profile, infer, ddl, taxonomy, schema, validate, generate) |
 
+### Training infrastructure
+
+**Crate:** `finetype-train` — pure Rust ML training on Candle. Metal auto-detected on macOS.
+
+**`TrainingRenderer` trait** (`crates/finetype-train/src/tui.rs`): Display-only interface for training progress. Two implementations:
+- **`TuiRenderer`** — ratatui alternate-screen dashboard (live loss/accuracy charts, epoch table, progress bar). Feature-gated behind `tui` (default on). No `enable_raw_mode()` — safe for unattended overnight runs.
+- **`LogRenderer`** — `tracing::info!` fallback. Used when TUI init fails or `--no-tui` is passed.
+
+**`results.json`** is the canonical source of training metrics — written by the training loop to the model output directory (e.g., `models/sherlock-v7/results.json`). Contains a JSON array of `EpochMetrics`:
+```json
+[{"epoch": 0, "train_loss": 1.23, "val_loss": 1.10, "train_accuracy": 0.45, "val_accuracy": 0.52, "learning_rate": 0.0001, "epoch_time_secs": 95.2}, ...]
+```
+**Do not parse log files for training metrics.** Read `results.json` directly — overnight scripts, comparison queries, and post-hoc analysis should all use this structured output.
+
+**`TrainingSummary`** is returned by `train_multi_branch()`: `best_epoch`, `best_val_accuracy`, `total_epochs`, `total_time_secs`, `epoch_metrics: Vec<EpochMetrics>`.
+
 ### Evaluation infrastructure
 
 **Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen default: 155/190 (81.6% label, 90.5% domain). Legacy Sense→Sharpen: 188/190 (98.9% label). 29 datasets, 314 manifest entries, 239-type taxonomy.
@@ -227,6 +243,9 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | MCP server + tools | `crates/finetype-mcp/src/` |
 | DuckDB extension | `crates/finetype-duckdb/src/` |
 | Training crate | `crates/finetype-train/src/` |
+| Training TUI + renderer trait | `crates/finetype-train/src/tui.rs` |
+| Multi-branch training loop | `crates/finetype-train/src/multi_branch.rs` |
+| Training metrics (per model) | `models/<name>/results.json` |
 | Eval binaries | `crates/finetype-eval/src/bin/` |
 | Golden integration tests | `crates/finetype-cli/tests/cli_golden.rs` |
 | Eval config + schema mapping | `eval/config.env`, `eval/schema_mapping.yaml` |

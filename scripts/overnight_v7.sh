@@ -219,6 +219,43 @@ echo ""
 echo "Training complete: $(date)"
 echo ""
 
+# --- Training Summary (from results.json, not log parsing) -------------
+
+RESULTS_JSON="$MODEL_DIR/results.json"
+if [[ -f "$RESULTS_JSON" ]]; then
+    echo "================================================================"
+    echo " Training Summary (from $RESULTS_JSON)"
+    echo "================================================================"
+    echo ""
+    duckdb -c "
+        WITH metrics AS (
+            SELECT unnest(from_json_strict(
+                content::JSON, '[{\"epoch\":0,\"train_loss\":0.0,\"val_loss\":0.0,\"train_accuracy\":0.0,\"val_accuracy\":0.0,\"learning_rate\":0.0,\"epoch_time_secs\":0.0}]'
+            )) AS m
+            FROM read_text('$RESULTS_JSON')
+        ),
+        flat AS (
+            SELECT m.epoch, m.train_loss, m.val_loss,
+                   m.train_accuracy, m.val_accuracy,
+                   m.learning_rate, m.epoch_time_secs
+            FROM metrics
+        ),
+        best AS (
+            SELECT * FROM flat ORDER BY val_accuracy DESC LIMIT 1
+        )
+        SELECT
+            (SELECT count(*) FROM flat) AS total_epochs,
+            ROUND(best.val_accuracy * 100, 1) AS best_val_acc_pct,
+            best.epoch + 1 AS best_epoch,
+            ROUND(best.val_loss, 4) AS best_val_loss,
+            ROUND(best.train_loss, 4) AS best_train_loss,
+            printf('%.2e', best.learning_rate) AS lr_at_best,
+            ROUND((SELECT sum(epoch_time_secs) FROM flat) / 60, 1) AS total_train_min
+        FROM best;
+    " 2>/dev/null || echo "(summary query failed — check results.json structure)"
+    echo ""
+fi
+
 # --- Step 3: Evaluation -----------------------------------------------
 
 echo "================================================================"
