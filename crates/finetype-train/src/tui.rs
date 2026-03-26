@@ -274,6 +274,8 @@ mod tui_impl {
                         state.total_epochs = total_epochs;
                         state.batches_per_epoch = batches_per_epoch;
                         state.train_start = Instant::now();
+                        // Force full repaint to flush stale "Waiting..." frames
+                        let _ = terminal.clear();
                     }
                     Ok(RenderMsg::BatchEnd {
                         epoch,
@@ -287,6 +289,11 @@ mod tui_impl {
                         state.batch_loss_history.push(batch_loss as f64);
                     }
                     Ok(RenderMsg::EpochEnd(metrics)) => {
+                        // Force full repaint on epoch boundary — the chart
+                        // switches from batch-level to epoch-level view, and
+                        // stale braille characters from the batch chart can
+                        // persist with delta rendering alone.
+                        let _ = terminal.clear();
                         state.batch_loss_history.clear();
                         state.epoch_history.push(metrics);
                     }
@@ -322,12 +329,14 @@ mod tui_impl {
     fn draw_frame(f: &mut ratatui::Frame, state: &RenderState, title: &str) {
         let area = f.area();
 
-        // Vertical layout: title(1) | charts(12) | table(flex) | progress(3)
+        // Vertical layout: title(1) | charts(12) | gap(1) | table(flex) | progress(3)
+        // The 1-line gap prevents chart x-axis labels bleeding into the table title.
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),  // Title bar
                 Constraint::Length(12), // Line charts with axes
+                Constraint::Length(1),  // Spacer (prevents axis/title overlap)
                 Constraint::Min(5),     // Epoch table
                 Constraint::Length(3),  // Status + progress bar + ETA
             ])
@@ -335,8 +344,9 @@ mod tui_impl {
 
         draw_title(f, chunks[0], title, state);
         draw_charts(f, chunks[1], state);
-        draw_epoch_table(f, chunks[2], state);
-        draw_progress(f, chunks[3], state);
+        // chunks[2] is the spacer — intentionally empty
+        draw_epoch_table(f, chunks[3], state);
+        draw_progress(f, chunks[4], state);
     }
 
     fn draw_title(f: &mut ratatui::Frame, area: Rect, title: &str, state: &RenderState) {
@@ -651,20 +661,26 @@ mod tui_impl {
         } else {
             0
         };
-        let batch_info = if state.current_total_batches > 0 {
-            let batch_pct =
-                ((state.current_batch as f64 / state.current_total_batches as f64) * 100.0) as u16;
-            format!(
-                "  │  Batch {}/{} [{}%]",
-                state.current_batch, state.current_total_batches, batch_pct,
-            )
+        let status_text = if state.total_epochs == 0 {
+            // Pre-TrainStart: no epoch info yet
+            " Initialising...".to_string()
         } else {
-            String::new()
+            let batch_info = if state.current_total_batches > 0 {
+                let batch_pct = ((state.current_batch as f64
+                    / state.current_total_batches as f64)
+                    * 100.0) as u16;
+                format!(
+                    "  │  Batch {}/{} [{}%]",
+                    state.current_batch, state.current_total_batches, batch_pct,
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                " Epoch {}/{}  [{}%]{}",
+                completed_epochs, state.total_epochs, epoch_pct, batch_info,
+            )
         };
-        let status_text = format!(
-            " Epoch {}/{}  [{}%]{}",
-            completed_epochs, state.total_epochs, epoch_pct, batch_info,
-        );
         let status = Paragraph::new(status_text).style(
             Style::default()
                 .fg(Color::White)
@@ -672,11 +688,13 @@ mod tui_impl {
         );
         f.render_widget(status, chunks[0]);
 
-        // ── Line 2: Progress bar (epoch-level only, no label) ──
+        // ── Line 2: Progress bar (epoch-level) ──
+        // Use a space label instead of empty string to prevent gauge
+        // character bleed into the ETA line below.
         let gauge = Gauge::default()
             .gauge_style(Style::default().fg(Color::Green))
             .percent(epoch_pct)
-            .label("");
+            .label(Span::raw(" "));
         f.render_widget(gauge, chunks[1]);
 
         // ── Line 3: ETA ──
