@@ -45,7 +45,7 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/overnight-v7.log"
 
 SKIP_DATA=false
-EPOCHS=20
+EPOCHS=30
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -67,7 +67,7 @@ echo " Multi-Branch Overnight Pipeline v7 (Taxonomy Collapse)"
 echo " Started: $(date)"
 echo " Host: $(hostname) — $(uname -m)"
 echo " Config: FTMB v3, 50/50 distilled/synthetic, seed 42"
-echo "         $EPOCHS epochs, 35% augmentation rate"
+echo "         $EPOCHS epochs (up from 20), 35% augmentation rate"
 echo " Spec: specs/2026-03-26-overnight-v6-data-quality/"
 echo "================================================================"
 echo ""
