@@ -120,6 +120,12 @@ fi
 # Verify taxonomy/generator alignment (239 types post-collapse)
 echo "[Pre-flight] Checking taxonomy alignment (expect 239 types)..."
 cargo run --bin finetype --no-default-features --features metal --release -- check 2>&1 | tail -3
+
+# Verify eval mapping ↔ taxonomy alignment
+echo ""
+echo "[Pre-flight] Validating eval mapping against taxonomy..."
+cargo run -p finetype-eval --bin eval-mapping --release -- --validate 2>&1
+echo ""
 echo ""
 
 echo "[Pre-flight] Building with Metal..."

@@ -327,7 +327,7 @@ mappings:
       - geography.location.country
       - geography.location.city
       - geography.location.region
-      - geography.location.state
+      - geography.location.region
     finetype_domain: null
     match_quality: close
     expand: false
@@ -419,7 +419,7 @@ mappings:
     finetype_label: geography.location.region
     finetype_labels:
       - geography.location.region
-      - geography.location.state
+      - geography.location.region
       - geography.location.continent
     finetype_domain: geography
     match_quality: close
@@ -460,7 +460,7 @@ mappings:
 
   - gt_label: sentence
     source: dbpedia
-    finetype_label: representation.text.sentence
+    finetype_label: representation.text.plain_text
     finetype_domain: representation
     match_quality: close
     expand: false
@@ -655,7 +655,7 @@ mappings:
       - representation.numeric.integer_number
       - representation.numeric.decimal_number
       - representation.identifier.increment
-      - finance.currency.amount_minor_int
+      - representation.numeric.integer_number
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -776,7 +776,7 @@ mappings:
     finetype_labels:
       - representation.text.entity_name
       - representation.text.plain_text
-      - representation.text.sentence
+      - representation.text.plain_text
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -787,7 +787,7 @@ mappings:
     finetype_label: null
     finetype_labels:
       - representation.text.plain_text
-      - representation.text.sentence
+      - representation.text.plain_text
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -2093,7 +2093,7 @@ mappings:
     expand: false
   - gt_label: geojson
     source: profile_eval
-    finetype_label: geography.format.geojson
+    finetype_label: container.object.json
     finetype_domain: geography
     match_quality: direct
     expand: false
@@ -2190,7 +2190,7 @@ mappings:
     expand: false
   - gt_label: git sha
     source: profile_eval
-    finetype_label: technology.development.git_sha
+    finetype_label: technology.cryptographic.hash
     finetype_domain: technology
     match_quality: direct
     expand: false

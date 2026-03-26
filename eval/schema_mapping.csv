@@ -39,7 +39,7 @@ name,both,representation.text.entity_name,,close,false
 name,both,geography.location.country,,close,false
 name,both,geography.location.city,,close,false
 name,both,geography.location.region,,close,false
-name,both,geography.location.state,,close,false
+name,both,geography.location.region,,close,false
 entity name,profile,representation.text.entity_name,representation,direct,false
 author,both,identity.person.full_name,,close,false
 author,both,representation.text.entity_name,,close,false
@@ -53,13 +53,13 @@ address,dbpedia,geography.address.full_address,geography,close,false
 address,dbpedia,geography.coordinate.coordinates,geography,close,false
 county,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
-region,dbpedia,geography.location.state,geography,close,false
+region,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.continent,geography,close,false
 location,both,geography.location.city,geography,close,false
 age,dbpedia,representation.numeric.integer_number,representation,close,false
 height,both,identity.person.height,identity,close,false
 weight,dbpedia,identity.person.weight,identity,close,false
-sentence,dbpedia,representation.text.sentence,representation,close,false
+sentence,dbpedia,representation.text.plain_text,representation,close,false
 occupation,profile,representation.discrete.categorical,representation,close,false
 timestamp,profile,datetime.timestamp.iso_8601,datetime,partial,false
 timestamp,profile,datetime.timestamp.iso_8601_milliseconds,datetime,partial,false
@@ -110,7 +110,7 @@ code,both,container.key_value.query_string,,partial,false
 number,dbpedia,representation.numeric.integer_number,representation,partial,false
 number,dbpedia,representation.numeric.decimal_number,representation,partial,false
 number,dbpedia,representation.identifier.increment,representation,partial,false
-number,dbpedia,finance.currency.amount_minor_int,representation,partial,false
+number,dbpedia,representation.numeric.integer_number,representation,partial,false
 file format,schema,representation.file.mime_type,representation,partial,false
 content type,schema,representation.file.mime_type,representation,partial,false
 color,schema,representation.format.color_hex,representation,partial,false
@@ -128,9 +128,9 @@ telephone,schema,identity.person.phone_number,identity,direct,false
 telephone,schema,identity.person.phone_e164,identity,direct,false
 title,both,representation.text.entity_name,representation,partial,false
 title,both,representation.text.plain_text,representation,partial,false
-title,both,representation.text.sentence,representation,partial,false
+title,both,representation.text.plain_text,representation,partial,false
 description,both,representation.text.plain_text,representation,partial,false
-description,both,representation.text.sentence,representation,partial,false
+description,both,representation.text.plain_text,representation,partial,false
 abstract,both,,representation,semantic_only,false
 comment,both,,representation,semantic_only,false
 note,dbpedia,,representation,semantic_only,false
@@ -311,7 +311,7 @@ alphanumeric id,profile,representation.identifier.alphanumeric_id,representation
 http method,profile,technology.internet.http_method,technology,direct,false
 currency code,profile,finance.currency.currency_code,finance,direct,false
 wkt,profile_eval,geography.format.wkt,geography,direct,false
-geojson,profile_eval,geography.format.geojson,geography,direct,false
+geojson,profile_eval,container.object.json,geography,direct,false
 h3,profile_eval,geography.index.h3,geography,direct,false
 geohash,profile_eval,geography.coordinate.geohash,geography,direct,false
 plus code,profile_eval,geography.coordinate.plus_code,geography,direct,false
@@ -327,7 +327,7 @@ aws arn,profile_eval,technology.cloud.aws_arn,technology,direct,false
 s3 uri,profile_eval,technology.cloud.s3_uri,technology,direct,false
 jwt,profile_eval,technology.cryptographic.jwt,technology,direct,false
 docker ref,profile_eval,technology.development.docker_ref,technology,direct,false
-git sha,profile_eval,technology.development.git_sha,technology,direct,false
+git sha,profile_eval,technology.cryptographic.hash,technology,direct,false
 git sha,profile_eval,technology.cryptographic.hash,technology,close,false
 cidr,profile_eval,technology.internet.cidr,technology,direct,false
 urn,profile_eval,technology.internet.urn,technology,direct,false
