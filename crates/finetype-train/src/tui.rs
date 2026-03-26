@@ -16,13 +16,7 @@ pub trait TrainingRenderer: Send {
     fn on_train_start(&mut self, total_epochs: usize, batches_per_epoch: usize);
 
     /// Called after each training batch completes.
-    fn on_batch_end(
-        &mut self,
-        epoch: usize,
-        batch: usize,
-        total_batches: usize,
-        batch_loss: f32,
-    );
+    fn on_batch_end(&mut self, epoch: usize, batch: usize, total_batches: usize, batch_loss: f32);
 
     /// Called after each epoch completes with full metrics.
     fn on_epoch_end(&mut self, metrics: &EpochMetrics);
@@ -87,8 +81,8 @@ mod tui_impl {
     use ratatui::backend::CrosstermBackend;
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::{Color, Modifier, Style};
-    use ratatui::text::{Line, Span};
     use ratatui::symbols::Marker;
+    use ratatui::text::{Line, Span};
     use ratatui::widgets::{
         Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table,
     };
@@ -334,8 +328,8 @@ mod tui_impl {
             .constraints([
                 Constraint::Length(1),  // Title bar
                 Constraint::Length(12), // Line charts with axes
-                Constraint::Min(5),    // Epoch table
-                Constraint::Length(3), // Status + progress bar + ETA
+                Constraint::Min(5),     // Epoch table
+                Constraint::Length(3),  // Status + progress bar + ETA
             ])
             .split(area);
 
@@ -386,29 +380,25 @@ mod tui_impl {
         }
 
         // Build dataset from batch-level or epoch-level data
-        let batch_points: Vec<(f64, f64)>;
-        let epoch_train_points: Vec<(f64, f64)>;
-        let epoch_val_points: Vec<(f64, f64)>;
-
         let has_batch_data = !state.batch_loss_history.is_empty();
 
-        if has_batch_data {
-            batch_points = state
+        let batch_points: Vec<(f64, f64)> = if has_batch_data {
+            state
                 .batch_loss_history
                 .iter()
                 .enumerate()
                 .map(|(i, &v)| (i as f64, v))
-                .collect();
+                .collect()
         } else {
-            batch_points = Vec::new();
-        }
+            Vec::new()
+        };
 
-        epoch_train_points = state
+        let epoch_train_points: Vec<(f64, f64)> = state
             .epoch_history
             .iter()
             .map(|m| (m.epoch as f64, m.train_loss as f64))
             .collect();
-        epoch_val_points = state
+        let epoch_val_points: Vec<(f64, f64)> = state
             .epoch_history
             .iter()
             .map(|m| (m.epoch as f64, m.val_loss as f64))
@@ -443,19 +433,19 @@ mod tui_impl {
             let x_max = (batch_points.len() as f64).max(1.0);
 
             let chart = Chart::new(datasets)
-                .block(Block::default().title(Line::from(vec![
-                    Span::raw(" Loss "),
-                    Span::styled("━", Style::default().fg(Color::Yellow)),
-                    Span::raw(" batch "),
-                ])).borders(Borders::ALL))
-                .x_axis(
-                    Axis::default()
-                        .bounds([0.0, x_max])
-                        .labels(vec![
-                            Span::raw("0"),
-                            Span::raw(format!("{}", batch_points.len())),
-                        ]),
+                .block(
+                    Block::default()
+                        .title(Line::from(vec![
+                            Span::raw(" Loss "),
+                            Span::styled("━", Style::default().fg(Color::Yellow)),
+                            Span::raw(" batch "),
+                        ]))
+                        .borders(Borders::ALL),
                 )
+                .x_axis(Axis::default().bounds([0.0, x_max]).labels(vec![
+                    Span::raw("0"),
+                    Span::raw(format!("{}", batch_points.len())),
+                ]))
                 .y_axis(
                     Axis::default()
                         .bounds([y_min - y_margin, y_max + y_margin])
@@ -486,21 +476,21 @@ mod tui_impl {
             let x_max = (state.total_epochs as f64).max(1.0);
 
             let chart = Chart::new(datasets)
-                .block(Block::default().title(Line::from(vec![
-                    Span::raw(" Loss "),
-                    Span::styled("━", Style::default().fg(Color::Yellow)),
-                    Span::raw(" train  "),
-                    Span::styled("━", Style::default().fg(Color::Magenta)),
-                    Span::raw(" val "),
-                ])).borders(Borders::ALL))
-                .x_axis(
-                    Axis::default()
-                        .bounds([0.0, x_max])
-                        .labels(vec![
-                            Span::raw("0"),
-                            Span::raw(format!("{}", state.total_epochs)),
-                        ]),
+                .block(
+                    Block::default()
+                        .title(Line::from(vec![
+                            Span::raw(" Loss "),
+                            Span::styled("━", Style::default().fg(Color::Yellow)),
+                            Span::raw(" train  "),
+                            Span::styled("━", Style::default().fg(Color::Magenta)),
+                            Span::raw(" val "),
+                        ]))
+                        .borders(Borders::ALL),
                 )
+                .x_axis(Axis::default().bounds([0.0, x_max]).labels(vec![
+                    Span::raw("0"),
+                    Span::raw(format!("{}", state.total_epochs)),
+                ]))
                 .y_axis(
                     Axis::default()
                         .bounds([y_min - y_margin, y_max + y_margin])
@@ -583,14 +573,10 @@ mod tui_impl {
                         Span::raw(format!("{}", state.total_epochs)),
                     ]),
             )
-            .y_axis(
-                Axis::default()
-                    .bounds([y_floor, y_ceil])
-                    .labels(vec![
-                        Span::raw(format!("{:.0}%", y_floor)),
-                        Span::raw(format!("{:.0}%", y_ceil)),
-                    ]),
-            );
+            .y_axis(Axis::default().bounds([y_floor, y_ceil]).labels(vec![
+                Span::raw(format!("{:.0}%", y_floor)),
+                Span::raw(format!("{:.0}%", y_ceil)),
+            ]));
         f.render_widget(chart, area);
     }
 
@@ -666,7 +652,8 @@ mod tui_impl {
             0
         };
         let batch_info = if state.current_total_batches > 0 {
-            let batch_pct = ((state.current_batch as f64 / state.current_total_batches as f64) * 100.0) as u16;
+            let batch_pct =
+                ((state.current_batch as f64 / state.current_total_batches as f64) * 100.0) as u16;
             format!(
                 "  │  Batch {}/{} [{}%]",
                 state.current_batch, state.current_total_batches, batch_pct,
@@ -696,9 +683,17 @@ mod tui_impl {
         let eta_text = if state.finished {
             let elapsed = state.train_start.elapsed().as_secs();
             if elapsed < 3600 {
-                format!(" ✓ Training complete in {}m {}s", elapsed / 60, elapsed % 60)
+                format!(
+                    " ✓ Training complete in {}m {}s",
+                    elapsed / 60,
+                    elapsed % 60
+                )
             } else {
-                format!(" ✓ Training complete in {}h {}m", elapsed / 3600, (elapsed % 3600) / 60)
+                format!(
+                    " ✓ Training complete in {}h {}m",
+                    elapsed / 3600,
+                    (elapsed % 3600) / 60
+                )
             }
         } else {
             format!(" ETA: {}", state.eta_string())

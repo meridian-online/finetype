@@ -2329,9 +2329,11 @@ impl Generator {
                 let lat = if self.rng.gen_bool(0.3) {
                     // Cluster around major city latitudes for realistic distribution
                     let city_lats: [f64; 12] = [
-                        -33.87, -23.55, -34.60, -41.29, // Sydney, São Paulo, Buenos Aires, Wellington
-                        51.51, 48.85, 52.52, 59.91,     // London, Paris, Berlin, Oslo
-                        35.69, 1.35, 37.77, 19.43,      // Tokyo, Singapore, San Francisco, Mexico City
+                        -33.87, -23.55, -34.60,
+                        -41.29, // Sydney, São Paulo, Buenos Aires, Wellington
+                        51.51, 48.85, 52.52, 59.91, // London, Paris, Berlin, Oslo
+                        35.69, 1.35, 37.77,
+                        19.43, // Tokyo, Singapore, San Francisco, Mexico City
                     ];
                     let base = city_lats[self.rng.gen_range(0..city_lats.len())];
                     let jitter: f64 = (self.rng.gen::<f64>() - 0.5) * 4.0;
@@ -2347,9 +2349,11 @@ impl Generator {
                 let lon = if self.rng.gen_bool(0.3) {
                     // Cluster around major city longitudes for realistic distribution
                     let city_lons: [f64; 12] = [
-                        151.21, -46.63, -58.38, 174.76,  // Sydney, São Paulo, Buenos Aires, Wellington
-                        -0.13, 2.35, 13.40, 10.75,       // London, Paris, Berlin, Oslo
-                        139.69, 103.82, -122.42, -99.13,  // Tokyo, Singapore, San Francisco, Mexico City
+                        151.21, -46.63, -58.38,
+                        174.76, // Sydney, São Paulo, Buenos Aires, Wellington
+                        -0.13, 2.35, 13.40, 10.75, // London, Paris, Berlin, Oslo
+                        139.69, 103.82, -122.42,
+                        -99.13, // Tokyo, Singapore, San Francisco, Mexico City
                     ];
                     let base = city_lons[self.rng.gen_range(0..city_lons.len())];
                     let jitter: f64 = (self.rng.gen::<f64>() - 0.5) * 4.0;
