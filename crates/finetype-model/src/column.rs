@@ -2539,6 +2539,33 @@ fn value_sharpen(
         }
     }
 
+    // Rule 21: Coordinate plausibility gate — demote to decimal_number when values
+    // exceed all coordinate ranges. The model over-predicts latitude/longitude on
+    // plain numeric columns (earthquake depth, error measurements). Real coordinates
+    // must be within [-180, 180]; if >20% of values exceed that, they're not coords.
+    // Must fire BEFORE Rule 3 (coordinate disambiguation) to filter non-coordinates.
+    if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let mut parseable = 0usize;
+            let mut out_of_range = 0usize;
+            for v in &non_empty {
+                if let Ok(val) = v.parse::<f64>() {
+                    parseable += 1;
+                    if val.abs() > 180.0 {
+                        out_of_range += 1;
+                    }
+                }
+            }
+            if parseable >= 3 && (out_of_range as f32 / parseable as f32) > 0.1 {
+                return Some((
+                    "representation.numeric.decimal_number".to_string(),
+                    format!("coordinate_plausibility_gate:out_of_range={}/{}", out_of_range, parseable),
+                ));
+            }
+        }
+    }
+
     // Rule 3: Coordinate disambiguation (latitude vs longitude)
     // ADAPTED: fire when result.label is either coordinate type
     if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
@@ -2638,6 +2665,75 @@ fn value_sharpen(
                 return Some((
                     "representation.numeric.decimal_number".to_string(),
                     format!("hs_code_validation_gate:match_rate={:.2}", match_rate),
+                ));
+            }
+        }
+    }
+
+    // Rule 22: UPC digit-count gate — correct UPC predictions when value lengths
+    // don't match 12-digit UPC format. The model confuses similar digit-string
+    // identifiers: EAN (13 digits), NPI (10 digits) get predicted as UPC.
+    if result_label == "identity.commerce.upc" {
+        let digit_only: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty() && v.chars().all(|c| c.is_ascii_digit()))
+            .collect();
+        if digit_only.len() >= 3 {
+            // Count values by digit length
+            let twelve = digit_only.iter().filter(|v| v.len() == 12).count();
+            let thirteen = digit_only.iter().filter(|v| v.len() == 13).count();
+            let eight = digit_only.iter().filter(|v| v.len() == 8).count();
+            let total = digit_only.len();
+            let twelve_rate = twelve as f32 / total as f32;
+
+            if twelve_rate < 0.5 {
+                // Not UPC — check if EAN (13 or 8 digits)
+                let ean_rate = (thirteen + eight) as f32 / total as f32;
+                if ean_rate > 0.5 {
+                    return Some((
+                        "identity.commerce.ean".to_string(),
+                        format!("upc_digit_count_gate:ean_rate={:.2}", ean_rate),
+                    ));
+                }
+                // Otherwise demote to numeric_code (generic identifier)
+                return Some((
+                    "representation.identifier.numeric_code".to_string(),
+                    format!("upc_digit_count_gate:twelve_rate={:.2}", twelve_rate),
+                ));
+            }
+        }
+    }
+
+    // Rule 23: ISIN format gate — correct ISRC predictions when values match
+    // ISIN format (2-letter country code + 9 alphanumeric + 1 check digit).
+    // ISRC format is different: CC-XXX-YY-NNNNN with dashes.
+    if result_label == "identity.commerce.isrc" {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let isin_count = non_empty.iter().filter(|v| is_isin_format(v)).count();
+            let isin_rate = isin_count as f32 / non_empty.len() as f32;
+            if isin_rate > 0.5 {
+                return Some((
+                    "finance.securities.isin".to_string(),
+                    format!("isin_format_gate:match_rate={:.2}", isin_rate),
+                ));
+            }
+        }
+    }
+
+    // Rule 24: ISSN/EIN dash-position gate — correct EIN predictions when values
+    // match ISSN format (DDDD-DDDD, dash at position 4) rather than EIN (DD-DDDDDDD,
+    // dash at position 2).
+    if result_label == "identity.government.ein" {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let issn_count = non_empty.iter().filter(|v| is_issn_format(v)).count();
+            let issn_rate = issn_count as f32 / non_empty.len() as f32;
+            if issn_rate > 0.5 {
+                return Some((
+                    "identity.commerce.issn".to_string(),
+                    format!("issn_format_gate:match_rate={:.2}", issn_rate),
                 ));
             }
         }
@@ -4250,6 +4346,53 @@ fn is_hs_code_format(s: &str) -> bool {
         }
         _ => false,
     }
+}
+
+/// Check whether a value matches ISIN format: 2-letter country code followed by
+/// 9 alphanumeric characters and 1 check digit. Total 12 characters.
+/// Valid: "US0378331005", "GB0002634946", "DE0007164600".
+/// Invalid: "US-Z03-98-12345" (ISRC format with dashes).
+///
+/// Key distinction from ISRC (also 12-char, 2-letter prefix): ISIN positions 2-4
+/// are the start of the NSIN and are typically all digits (e.g., US**037**8331005).
+/// ISRC positions 2-4 are the registrant code and typically contain letters
+/// (e.g., SE**3YX**3859059). Requiring all-digit positions 2-4 avoids false matches
+/// on ISRC values.
+fn is_isin_format(s: &str) -> bool {
+    let s = s.trim();
+    if s.len() != 12 {
+        return false;
+    }
+    let bytes = s.as_bytes();
+    // First 2 chars: uppercase letters (country code)
+    if !bytes[0].is_ascii_uppercase() || !bytes[1].is_ascii_uppercase() {
+        return false;
+    }
+    // Positions 2-4: must be all digits (distinguishes from ISRC registrant codes)
+    if !bytes[2..5].iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    // Remaining positions 5-10: alphanumeric
+    if !bytes[5..11].iter().all(|b| b.is_ascii_alphanumeric()) {
+        return false;
+    }
+    // Last char: digit (check digit)
+    bytes[11].is_ascii_digit()
+}
+
+/// Check whether a value matches ISSN format: DDDD-DDD[DX] (4 digits, dash,
+/// 3 digits, 1 digit or 'X'). Total 9 characters with dash at position 4.
+/// Valid: "1781-2253", "8371-5342", "0317-839X".
+/// Distinguishes from EIN format: DD-DDDDDDD (2 digits, dash, 7 digits).
+fn is_issn_format(s: &str) -> bool {
+    let s = s.trim();
+    let bytes = s.as_bytes();
+    // Exactly 9 chars with dash at position 4
+    bytes.len() == 9
+        && bytes[4] == b'-'
+        && bytes[..4].iter().all(|b| b.is_ascii_digit())
+        && bytes[5..8].iter().all(|b| b.is_ascii_digit())
+        && (bytes[8].is_ascii_digit() || bytes[8] == b'X')
 }
 
 /// Rule: If ≥80% of non-empty values match `\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`
@@ -9190,6 +9333,150 @@ datetime.component.day_of_week:
 
         // Invalid — negative
         assert!(!is_hs_code_format("-8471.30"));
+    }
+
+    // ── R21: Coordinate plausibility gate tests ─────────────────────────
+    #[test]
+    fn test_r21_coordinate_gate_demotes_out_of_range() {
+        // Earthquake depth values — many exceed 180, not coordinates
+        let values: Vec<String> = vec![
+            "127.013", "573.817", "201.998", "10.0", "224.419",
+            "177.684", "97.335", "671.0", "450.2", "300.1",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "geography.coordinate.longitude", 0.94, None);
+        assert!(result.is_some(), "R21 should fire for out-of-range values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.decimal_number");
+        assert!(rule.contains("coordinate_plausibility_gate"));
+    }
+
+    #[test]
+    fn test_r21_coordinate_gate_keeps_real_coordinates() {
+        // Real longitude values — all within [-180, 180]
+        let values: Vec<String> = vec![
+            "-122.4194", "139.6917", "2.3522", "-73.9857", "151.2093",
+            "-43.1729", "28.9784", "-3.7038", "103.8198", "-46.6333",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "geography.coordinate.longitude", 0.95, None);
+        // Should NOT fire — these are valid longitude values
+        assert!(
+            result.is_none() || result.as_ref().unwrap().1.contains("coordinate_disambiguation"),
+            "R21 should not fire for valid coordinates"
+        );
+    }
+
+    // ── R22: UPC digit-count gate tests ───────────────────────────────
+    #[test]
+    fn test_r22_upc_gate_corrects_to_ean() {
+        // EAN-13 values (13 digits) misclassified as UPC (12 digits)
+        let values: Vec<String> = vec![
+            "1794213764625", "4293423898067", "6324920385397",
+            "3683935437077", "5078019484874", "8706648142321",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.upc", 0.999, None);
+        assert!(result.is_some(), "R22 should fire for 13-digit values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "identity.commerce.ean");
+        assert!(rule.contains("upc_digit_count_gate"));
+    }
+
+    #[test]
+    fn test_r22_upc_gate_demotes_wrong_length() {
+        // 10-digit values (e.g., NPI) misclassified as UPC
+        let values: Vec<String> = vec![
+            "1966662179", "6579926978", "2527909147",
+            "9953906342", "2157414996", "6989529491",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.upc", 0.94, None);
+        assert!(result.is_some(), "R22 should fire for non-12-digit values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.identifier.numeric_code");
+        assert!(rule.contains("upc_digit_count_gate"));
+    }
+
+    #[test]
+    fn test_r22_upc_gate_keeps_real_upc() {
+        // Real UPC values (12 digits)
+        let values: Vec<String> = vec![
+            "012345678905", "036000291452", "070330507227",
+            "042100005264", "040000000068", "041570056103",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.upc", 0.99, None);
+        // Should NOT fire — these are valid UPC values
+        assert!(
+            result.is_none() || !result.as_ref().unwrap().1.contains("upc_digit_count_gate"),
+            "R22 should not fire for valid 12-digit UPC"
+        );
+    }
+
+    // ── R23: ISIN format gate tests ───────────────────────────────────
+    #[test]
+    fn test_r23_isin_gate_corrects_isrc() {
+        // ISIN values misclassified as ISRC
+        let values: Vec<String> = vec![
+            "US0378331005", "GB0002634946", "DE0007164600",
+            "JP3435000009", "FR0000120271", "CA0585861085",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.isrc", 0.97, None);
+        assert!(result.is_some(), "R23 should fire for ISIN-format values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "finance.securities.isin");
+        assert!(rule.contains("isin_format_gate"));
+    }
+
+    // ── R24: ISSN/EIN dash-position gate tests ────────────────────────
+    #[test]
+    fn test_r24_issn_gate_corrects_ein() {
+        // ISSN values misclassified as EIN
+        let values: Vec<String> = vec![
+            "1781-2253", "8371-5342", "6910-7471",
+            "2908-3721", "8987-7548", "4149-8688",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.government.ein", 0.91, None);
+        assert!(result.is_some(), "R24 should fire for ISSN-format values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "identity.commerce.issn");
+        assert!(rule.contains("issn_format_gate"));
+    }
+
+    #[test]
+    fn test_is_isin_format() {
+        assert!(is_isin_format("US0378331005"));
+        assert!(is_isin_format("GB0002634946"));
+        assert!(is_isin_format("AU000000BHP4"));
+        assert!(is_isin_format("NL0011540547"));
+
+        // Invalid — ISRC values (letters in positions 2-4 = registrant code)
+        assert!(!is_isin_format("SE3YX3859059")); // ISRC: positions 2-4 = "3YX"
+        assert!(!is_isin_format("NLEK47515013")); // ISRC: positions 2-4 = "EK4"
+        assert!(!is_isin_format("CAHRM7311593")); // ISRC: positions 2-4 = "HRM"
+        // Invalid — other formats
+        assert!(!is_isin_format("US-Z03-98-12345")); // ISRC with dashes
+        assert!(!is_isin_format("1234567890AB")); // starts with digits
+        assert!(!is_isin_format("USABC")); // too short
+        assert!(!is_isin_format("us0378331005")); // lowercase
+    }
+
+    #[test]
+    fn test_is_issn_format() {
+        assert!(is_issn_format("1781-2253"));
+        assert!(is_issn_format("0317-839X")); // X check digit
+        assert!(is_issn_format("0000-0000"));
+
+        // Invalid — EIN format (dash at position 2)
+        assert!(!is_issn_format("12-3456789"));
+        // Invalid — too short/long
+        assert!(!is_issn_format("1234-567"));
+        assert!(!is_issn_format("12345-6789"));
+        // Invalid — no dash
+        assert!(!is_issn_format("12345678"));
     }
 
     // AC-2: feature_sharpen — F5 demotes numeric_code (single-entry votes)
