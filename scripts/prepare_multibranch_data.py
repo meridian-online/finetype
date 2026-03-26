@@ -287,14 +287,10 @@ HEADER_VARIATIONS = {
         "region", "Region", "REGION", "area", "district", "zone",
         "territory", "geo_region", "location_region",
     ],
-    "geography.address.street_address": [
-        "address", "street_address", "addr", "Address", "ADDRESS",
-        "street", "address_line_1", "mailing_address", "location",
-        "street_addr",
-    ],
     "geography.address.full_address": [
         "full_address", "address", "complete_address", "Full Address",
         "FULL_ADDRESS", "mailing_address", "postal_address", "location",
+        "street_address", "addr", "street", "address_line_1", "street_addr",
     ],
     "geography.coordinate.latitude": [
         "latitude", "lat", "Latitude", "LAT", "geo_lat", "y",
@@ -316,7 +312,7 @@ HEADER_VARIATIONS = {
         "timestamp", "datetime", "created_at", "updated_at", "Timestamp",
         "TIMESTAMP", "date_time", "event_time", "ts", "created",
     ],
-    "datetime.date.iso_date": [
+    "datetime.date.iso": [
         "date", "Date", "DATE", "event_date", "start_date", "end_date",
         "birth_date", "created_date", "dateValue", "record_date",
     ],
@@ -564,18 +560,15 @@ def augment_column(values, rng):
     Returns (augmented_values, augmentation_type) or (values, None) if no augmentation.
     The augmentation_type is a string describing what was applied.
     """
+    # AC-5: Removed no_aug slots. The outer augmentation_rate gate in
+    # augment_columns() controls what fraction of columns are augmented.
+    # This function now always applies an augmentation when called.
     aug_type = rng.choice([
-        "whitespace", "whitespace",   # 10% weight (2 of 20 slots)
-        "encoding", "encoding",       # 5% weight (skipped for non-text — effectively lower)
-        "null_mix", "null_mix",       # 10% weight
-        "case_variation",             # 5% weight
-        "no_aug", "no_aug", "no_aug", "no_aug", "no_aug",
-        "no_aug", "no_aug", "no_aug", "no_aug", "no_aug",
-        "no_aug", "no_aug", "no_aug",
+        "whitespace", "whitespace", "whitespace",  # ~43% weight
+        "encoding",                                 # ~14% weight
+        "null_mix", "null_mix",                     # ~29% weight
+        "case_variation",                           # ~14% weight
     ])
-
-    if aug_type == "no_aug":
-        return values, None
 
     augmented = list(values)
 
@@ -848,7 +841,8 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
     return dict(columns_by_type), ordered_columns, stats
 
 
-def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values):
+def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values,
+                                oversample_types=None, oversample_multiplier=3):
     """Generate synthetic training data via finetype generate, grouped as columns.
 
     Each column gets a realistic header variation (not the type key) to prevent
@@ -858,13 +852,24 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
         synthetic_columns_per_type: target number of columns per type. Each column
             has ~100 values, so we generate synthetic_columns_per_type * 100 values
             per type via `finetype generate --samples`.
+        oversample_types: set of type keys needing extra synthetic data (AC-6)
+        oversample_multiplier: how much extra to generate for oversampled types
 
     Returns: dict[str, list[tuple[list[str], str]]] — each type has a list of
              (values, header) tuples
     """
+    oversample_types = oversample_types or set()
+    # AC-6: If oversampled types exist, generate enough to fill the larger pool.
+    # We scale up the base generation for ALL types by the oversample multiplier,
+    # since finetype generate produces a flat N-per-type and we can't target
+    # individual types. The excess for non-oversampled types is harmlessly capped
+    # during blending.
+    effective_columns = synthetic_columns_per_type
+    if oversample_types:
+        effective_columns = synthetic_columns_per_type * oversample_multiplier
     # Generate enough values to produce the target number of columns
     # Each column is ~100 values, so we need N * 100 values per type
-    values_per_type = synthetic_columns_per_type * 100
+    values_per_type = effective_columns * 100
 
     rng = random.Random(seed + 7)  # Offset seed for header variation
 
@@ -1794,8 +1799,12 @@ def main():
                   # eval dataset name matching against the distilled corpus index.
 
     # ─── Generate synthetic data ───────────────────────────────────
-    print(f"\nGenerating synthetic data ({synthetic_columns_per_type} columns/type, {synthetic_columns_per_type * 100} values/type)...")
-    synthetic = generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values)
+    effective_synth = synthetic_columns_per_type * (oversample_multiplier if oversample_types else 1)
+    print(f"\nGenerating synthetic data ({synthetic_columns_per_type} columns/type, {effective_synth} for oversampled, {effective_synth * 100} values/type)...")
+    synthetic = generate_synthetic_columns(
+        finetype_bin, synthetic_columns_per_type, seed, min_values,
+        oversample_types=oversample_types, oversample_multiplier=oversample_multiplier,
+    )
     total_s_cols = sum(len(cols) for cols in synthetic.values())
     print(f"  {total_s_cols} columns across {len(synthetic)} types")
 

@@ -544,9 +544,15 @@ impl Generator {
                 Ok(format!("{} {}", dt.format("%b"), dt.year()))
             }
             ("date", "month_year_slash") => {
-                // 01/2024
+                // 01/2024 or 01/24 (MM/YYYY or MM/YY)
                 let dt = self.random_datetime();
-                Ok(format!("{:02}/{}", dt.month(), dt.year()))
+                if self.rng.gen_bool(0.3) {
+                    // MM/YY format (credit card expiration style)
+                    Ok(format!("{:02}/{:02}", dt.month(), dt.year() % 100))
+                } else {
+                    // MM/YYYY format
+                    Ok(format!("{:02}/{}", dt.month(), dt.year()))
+                }
             }
 
             // Weekday variant (1)
@@ -966,16 +972,6 @@ impl Generator {
                 let len = lengths[self.rng.gen_range(0..3)];
                 Ok(self.gen_hex_string(len))
             }
-            ("cryptographic", "token_hex") => {
-                // Generate hex tokens at lengths that DON'T match standard hash sizes
-                // Avoid: 32 (MD5), 40 (SHA1), 64 (SHA256), 128 (SHA512)
-                let hash_lengths = [32, 40, 64];
-                let mut len = self.rng.gen_range(16..48);
-                while hash_lengths.contains(&len) {
-                    len = self.rng.gen_range(16..48);
-                }
-                Ok(self.gen_hex_string(len))
-            }
             ("cryptographic", "token_urlsafe") => {
                 // Base64url alphabet: A-Z, a-z, 0-9, -, _
                 // Must include - and _ to distinguish from base58 (bitcoin_address)
@@ -1293,7 +1289,7 @@ impl Generator {
                     Ok(format!("{}{}/{}:{}", registry, org, image, tag))
                 }
             }
-            ("development", "git_sha") => Ok(self.gen_hex_string(40)),
+
 
             // ── identifier (3 types) ──────────────────────────────────
             ("identifier", "ulid") => {
@@ -1617,11 +1613,6 @@ impl Generator {
                 let codes = ["M", "F", "X"];
                 Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
             }
-            ("person", "gender_symbol") => {
-                // Unicode gender symbols only — NOT emoji codepoints
-                let symbols = ["♂", "♀", "⚧", "⚪"];
-                Ok(symbols[self.rng.gen_range(0..symbols.len())].to_string())
-            }
             ("person", "nationality") => {
                 let nationalities = locale_data::nationalities(self.current_locale());
                 Ok(nationalities[self.rng.gen_range(0..nationalities.len())].to_string())
@@ -1700,11 +1691,7 @@ impl Generator {
                 let check = self.luhn_check_digit(&partial);
                 Ok(format!("{}{}", partial, check))
             }
-            ("payment", "credit_card_expiration_date") => {
-                let month = self.rng.gen_range(1..13);
-                let year = self.rng.gen_range(25..32);
-                Ok(format!("{:02}/{:02}", month, year))
-            }
+            // credit_card_expiration_date collapsed into datetime.date.month_year_slash
             // cvv removed in NNFT-177 (taxonomy revision v0.5.1)
             // credit_card_network removed in NNFT-233 (low precision, enum-only)
             ("payment", "bitcoin_address") => {
@@ -1736,41 +1723,7 @@ impl Generator {
                 }
             }
             ("payment", "ethereum_address") => Ok(format!("0x{}", self.gen_hex_string(40))),
-            ("payment", "paypal_email") => {
-                // PayPal-distinctive patterns: paypal.com domains, business patterns, pp- prefixes
-                let first = self.random_first_name().to_lowercase();
-                let last = self.random_last_name().to_lowercase();
-                match self.rng.gen_range(0u8..5) {
-                    0 => {
-                        // PayPal business email
-                        Ok(format!("{}@paypal.com", first))
-                    }
-                    1 => {
-                        // PayPal-style pp- prefix
-                        Ok(format!("pp-{}.{}@paypal.com", first, last))
-                    }
-                    2 => {
-                        // PayPal merchant pattern
-                        let word = self.random_word();
-                        Ok(format!("{}-payments@paypal.com", word))
-                    }
-                    3 => {
-                        // PayPal service address
-                        let services = ["service", "payments", "billing", "merchant", "seller"];
-                        let svc = services[self.rng.gen_range(0..services.len())];
-                        Ok(format!("{}.{}@{}.paypal.com", first, last, svc))
-                    }
-                    _ => {
-                        // PayPal-linked email with paypal subdomain
-                        Ok(format!(
-                            "paypal-{}{}@{}.com",
-                            first,
-                            self.rng.gen_range(1..999),
-                            self.random_word()
-                        ))
-                    }
-                }
-            }
+            // paypal_email collapsed into identity.person.email
 
             // ── payment: finance identifiers (7 types) ──────────────────
             ("payment", "isin") => {
@@ -2276,37 +2229,6 @@ impl Generator {
                     Ok("POINT EMPTY".to_string())
                 }
             }
-            ("format", "geojson") => {
-                let r = self.rng.gen::<f64>();
-                if r < 0.5 {
-                    let x = self.rng.gen_range(-180.0f64..180.0);
-                    let y = self.rng.gen_range(-90.0f64..90.0);
-                    Ok(format!(
-                        "{{\"type\": \"Point\", \"coordinates\": [{:.4}, {:.4}]}}",
-                        x, y
-                    ))
-                } else if r < 0.75 {
-                    let pts: Vec<String> = (0..self.rng.gen_range(2..4))
-                        .map(|_| {
-                            let x = self.rng.gen_range(-180.0f64..180.0);
-                            let y = self.rng.gen_range(-90.0f64..90.0);
-                            format!("[{:.2}, {:.2}]", x, y)
-                        })
-                        .collect();
-                    Ok(format!(
-                        "{{\"type\": \"LineString\", \"coordinates\": [{}]}}",
-                        pts.join(", ")
-                    ))
-                } else {
-                    let x = self.rng.gen_range(-180.0f64..180.0);
-                    let y = self.rng.gen_range(-90.0f64..90.0);
-                    Ok(format!(
-                        "{{\"type\": \"Feature\", \"geometry\": {{\"type\": \"Point\", \"coordinates\": [{:.4}, {:.4}]}}, \"properties\": {{}}}}",
-                        x, y
-                    ))
-                }
-            }
-
             // ── index (1 type) ───────────────────────────────────────────
             ("index", "h3") => {
                 // H3 index: 15 hex characters. Use realistic prefixes.
@@ -2630,23 +2552,8 @@ impl Generator {
                     .collect();
                 Ok(words.join(" "))
             }
-            ("text", "sentence") => {
-                let mut words: Vec<String> = (0..self.rng.gen_range(5..15))
-                    .map(|_| self.random_word())
-                    .collect();
-                // Capitalize first word
-                if let Some(first) = words.first_mut() {
-                    let mut chars = first.chars();
-                    if let Some(c) = chars.next() {
-                        *first = c.to_uppercase().collect::<String>() + chars.as_str();
-                    }
-                }
-                let ending = [".", "!", "?"][self.rng.gen_range(0..3)];
-                Ok(format!("{}{}", words.join(" "), ending))
-            }
             ("text", "word") => Ok(self.random_word()),
             ("text", "entity_name") => self.gen_entity_name(),
-            ("text", "paragraph") => self.gen_paragraph(),
             ("text", "emoji") => {
                 let emojis = [
                     "\u{1f600}",
@@ -2932,14 +2839,6 @@ impl Generator {
                 ];
                 Ok(units[self.rng.gen_range(0..units.len())].to_string())
             }
-            ("scientific", "metric_prefix") => {
-                let prefixes = [
-                    "yotta", "zetta", "exa", "peta", "tera", "giga", "mega", "kilo", "hecto",
-                    "deca", "deci", "centi", "milli", "micro", "nano", "pico", "femto", "atto",
-                ];
-                Ok(prefixes[self.rng.gen_range(0..prefixes.len())].to_string())
-            }
-
             // ── discrete (2 types) ────────────────────────────────────────
             ("discrete", "categorical") => {
                 // Generate values that look like typical categorical column entries.
@@ -3338,23 +3237,6 @@ impl Generator {
                     .collect();
                 Ok(pairs.join("&"))
             }
-            ("key_value", "form_data") => {
-                let fields = [
-                    ("username", self.random_first_name().to_lowercase()),
-                    ("email", format!("{}@example.com", self.random_word())),
-                    (
-                        "password",
-                        format!("pass{}", self.rng.gen_range(1000..9999)),
-                    ),
-                ];
-                let count = self.rng.gen_range(2..=3);
-                let pairs: Vec<String> = fields[..count]
-                    .iter()
-                    .map(|(k, v)| format!("{}={}", k, v))
-                    .collect();
-                Ok(pairs.join("&"))
-            }
-
             _ => Err(GeneratorError::NotImplemented(format!(
                 "container.{}.{}",
                 category, type_name
@@ -3555,10 +3437,6 @@ impl Generator {
 
             // ── payment (moved from identity.payment) ────────────────────
             ("payment", "credit_card_number") => self.gen_identity("payment", "credit_card_number"),
-            ("payment", "credit_card_expiration_date") => {
-                self.gen_identity("payment", "credit_card_expiration_date")
-            }
-            ("payment", "paypal_email") => self.gen_identity("payment", "paypal_email"),
 
             // ── securities (moved from identity.payment) ─────────────────
             ("securities", "cusip") => self.gen_identity("payment", "cusip"),
@@ -3717,11 +3595,6 @@ impl Generator {
                 } else {
                     Ok(format!("{} {}.{:02}", code, formatted, cents))
                 }
-            }
-            ("currency", "amount_minor_int") => {
-                // 12345 — amount in smallest currency unit (cents)
-                let amount = self.rng.gen_range(1i64..10_000_000);
-                Ok(amount.to_string())
             }
             ("currency", "amount_crypto") => {
                 // 0.00123456 BTC — high decimal precision
@@ -6411,7 +6284,6 @@ test.test.test:
             "finance.currency.amount_apostrophe",
             "finance.currency.amount_nodecimal",
             "finance.currency.amount_code_prefix",
-            "finance.currency.amount_minor_int",
             "finance.currency.amount_crypto",
             "finance.currency.amount_multisym",
             "finance.currency.amount_neg_trailing",
@@ -6420,7 +6292,7 @@ test.test.test:
             "finance.rate.yield",
         ];
 
-        assert_eq!(new_types.len(), 53, "Should have exactly 53 new types");
+        assert_eq!(new_types.len(), 52, "Should have exactly 52 new types");
 
         for type_key in &new_types {
             let result = gen.generate_value(type_key);

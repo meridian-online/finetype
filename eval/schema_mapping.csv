@@ -39,7 +39,7 @@ name,both,representation.text.entity_name,,close,false
 name,both,geography.location.country,,close,false
 name,both,geography.location.city,,close,false
 name,both,geography.location.region,,close,false
-name,both,geography.location.state,,close,false
+name,both,geography.location.region,,close,false
 entity name,profile,representation.text.entity_name,representation,direct,false
 author,both,identity.person.full_name,,close,false
 author,both,representation.text.entity_name,,close,false
@@ -50,17 +50,16 @@ publisher,dbpedia,representation.text.entity_name,,close,false
 producer,both,identity.person.full_name,identity,close,false
 manufacturer,both,representation.text.word,representation,close,false
 address,dbpedia,geography.address.full_address,geography,close,false
-address,dbpedia,geography.address.street_address,geography,close,false
 address,dbpedia,geography.coordinate.coordinates,geography,close,false
 county,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
-region,dbpedia,geography.location.state,geography,close,false
+region,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.continent,geography,close,false
 location,both,geography.location.city,geography,close,false
 age,dbpedia,representation.numeric.integer_number,representation,close,false
 height,both,identity.person.height,identity,close,false
 weight,dbpedia,identity.person.weight,identity,close,false
-sentence,dbpedia,representation.text.sentence,representation,close,false
+sentence,dbpedia,representation.text.plain_text,representation,close,false
 occupation,profile,representation.discrete.categorical,representation,close,false
 timestamp,profile,datetime.timestamp.iso_8601,datetime,partial,false
 timestamp,profile,datetime.timestamp.iso_8601_milliseconds,datetime,partial,false
@@ -73,7 +72,6 @@ sql timestamp,profile,datetime.timestamp.sql_standard,datetime,direct,false
 time 24h,profile,datetime.time.hm_24h,datetime,partial,false
 time 24h,profile,datetime.time.hms_24h,datetime,partial,false
 date,dbpedia,datetime.date.iso,datetime,partial,false
-date,dbpedia,datetime.date.iso_date,datetime,partial,false
 date,dbpedia,datetime.date.mdy_slash,datetime,partial,false
 date,dbpedia,datetime.date.dmy_slash,datetime,partial,false
 date,dbpedia,datetime.date.dmy_dot,datetime,partial,false
@@ -112,7 +110,7 @@ code,both,container.key_value.query_string,,partial,false
 number,dbpedia,representation.numeric.integer_number,representation,partial,false
 number,dbpedia,representation.numeric.decimal_number,representation,partial,false
 number,dbpedia,representation.identifier.increment,representation,partial,false
-number,dbpedia,finance.currency.amount_minor_int,representation,partial,false
+number,dbpedia,representation.numeric.integer_number,representation,partial,false
 file format,schema,representation.file.mime_type,representation,partial,false
 content type,schema,representation.file.mime_type,representation,partial,false
 color,schema,representation.format.color_hex,representation,partial,false
@@ -130,9 +128,9 @@ telephone,schema,identity.person.phone_number,identity,direct,false
 telephone,schema,identity.person.phone_e164,identity,direct,false
 title,both,representation.text.entity_name,representation,partial,false
 title,both,representation.text.plain_text,representation,partial,false
-title,both,representation.text.sentence,representation,partial,false
+title,both,representation.text.plain_text,representation,partial,false
 description,both,representation.text.plain_text,representation,partial,false
-description,both,representation.text.sentence,representation,partial,false
+description,both,representation.text.plain_text,representation,partial,false
 abstract,both,,representation,semantic_only,false
 comment,both,,representation,semantic_only,false
 note,dbpedia,,representation,semantic_only,false
@@ -292,7 +290,7 @@ genre,dbpedia,,representation,semantic_only,false
 day of week,dbpedia,datetime.component.day_of_week,datetime,direct,false
 record label,dbpedia,,representation,semantic_only,false
 article,dbpedia,,representation,semantic_only,false
-operating system,dbpedia,technology.development.os,technology,close,false
+operating system,dbpedia,,technology,semantic_only,false
 software source code,dbpedia,,technology,semantic_only,false
 time of day,dbpedia,,datetime,partial,false
 published on,dbpedia,,datetime,partial,false
@@ -313,7 +311,7 @@ alphanumeric id,profile,representation.identifier.alphanumeric_id,representation
 http method,profile,technology.internet.http_method,technology,direct,false
 currency code,profile,finance.currency.currency_code,finance,direct,false
 wkt,profile_eval,geography.format.wkt,geography,direct,false
-geojson,profile_eval,geography.format.geojson,geography,direct,false
+geojson,profile_eval,container.object.json,geography,direct,false
 h3,profile_eval,geography.index.h3,geography,direct,false
 geohash,profile_eval,geography.coordinate.geohash,geography,direct,false
 plus code,profile_eval,geography.coordinate.plus_code,geography,direct,false
@@ -329,7 +327,7 @@ aws arn,profile_eval,technology.cloud.aws_arn,technology,direct,false
 s3 uri,profile_eval,technology.cloud.s3_uri,technology,direct,false
 jwt,profile_eval,technology.cryptographic.jwt,technology,direct,false
 docker ref,profile_eval,technology.development.docker_ref,technology,direct,false
-git sha,profile_eval,technology.development.git_sha,technology,direct,false
+git sha,profile_eval,technology.cryptographic.hash,technology,direct,false
 git sha,profile_eval,technology.cryptographic.hash,technology,close,false
 cidr,profile_eval,technology.internet.cidr,technology,direct,false
 urn,profile_eval,technology.internet.urn,technology,direct,false
@@ -356,6 +354,31 @@ cas number,profile_eval,representation.scientific.cas_number,representation,dire
 inchi,profile_eval,representation.scientific.inchi,representation,direct,false
 smiles,profile_eval,representation.scientific.smiles,representation,direct,false
 color hsl,profile_eval,representation.format.color_hsl,representation,direct,false
+compact ymd,profile_eval,datetime.date.compact_ymd,datetime,direct,false
+rfc 3339,profile_eval,datetime.timestamp.rfc_3339,datetime,direct,false
+dmy dash,profile_eval,datetime.date.dmy_dash,datetime,direct,false
+ymd dot,profile_eval,datetime.date.ymd_dot,datetime,direct,false
+quarter,profile_eval,datetime.period.quarter,datetime,direct,false
+fiscal year,profile_eval,datetime.period.fiscal_year,datetime,direct,false
+iso 8601 offset,profile_eval,datetime.timestamp.iso_8601_offset,datetime,direct,false
+iso week,profile_eval,datetime.date.iso_week,datetime,direct,false
+clf timestamp,profile_eval,datetime.timestamp.clf,datetime,direct,false
+syslog bsd,profile_eval,datetime.timestamp.syslog_bsd,datetime,direct,false
+mdy dash,profile_eval,datetime.date.mdy_dash,datetime,direct,false
+compact dmy,profile_eval,datetime.date.compact_dmy,datetime,direct,false
+currency symbol,profile_eval,finance.currency.currency_symbol,finance,direct,false
+bitcoin address,profile_eval,finance.crypto.bitcoin_address,finance,direct,false
+isin,profile_eval,finance.securities.isin,finance,direct,false
+cusip,profile_eval,finance.securities.cusip,finance,direct,false
+lei,profile_eval,finance.securities.lei,finance,direct,false
+scientific notation,profile_eval,representation.numeric.scientific_notation,representation,direct,false
+decimal number comma,profile_eval,representation.numeric.decimal_number_comma,representation,direct,false
+file size,profile_eval,representation.file.file_size,representation,direct,false
+integer number,profile_eval,representation.numeric.integer_number,representation,direct,false
+ip_v6,profile_eval,technology.internet.ip_v6,technology,direct,false
+calver,profile_eval,technology.development.calver,technology,direct,false
+ip_v4 with port,profile_eval,technology.internet.ip_v4_with_port,technology,direct,false
+username,profile_eval,identity.person.username,identity,direct,false
 birth date,sherlock,datetime.date.iso,datetime,close,false
 birth place,sherlock,geography.location.city,geography,close,false
 continent,sherlock,geography.location.continent,geography,direct,false

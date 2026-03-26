@@ -268,35 +268,6 @@ representation.text.plain_text:
     with low release priority. Distinguishing from other text types (sentence,
     word, etc.) requires statistical analysis.
 
-representation.text.sentence:
-  title: "Sentence"
-  description: >
-    Grammatically complete sentence (one or more words, ending with punctuation).
-  designation: broad_characters
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    word_count: "CAST(REGEXP_COUNT({col}, '\\s+') + 1 AS SMALLINT)"
-  validation:
-    type: string
-    minLength: 3
-    maxLength: 1000
-    pattern: "^[A-Z].*[.!?]$"
-  tier: [VARCHAR, text]
-  release_priority: 3
-  aliases: null
-  samples:
-    - "This is a complete sentence."
-    - "Is this a question?"
-    - "What an exclamation!"
-  references: null
-  notes: >
-    v1 migration: Was text.sentence. Pattern expects capital letter start
-    and ending punctuation. Locale-specific.
-
 representation.text.word:
   title: "Single Word"
   description: >
@@ -488,40 +459,6 @@ representation.text.entity_name:
     venues). CharCNN can learn to distinguish entity_name from full_name via
     business suffixes, numbers, and mixed-case patterns. broad_words designation
     means column-level disambiguation can override with header hints.
-
-representation.text.paragraph:
-  title: "Paragraph"
-  description: >
-    Multi-sentence free-form text (descriptions, reviews, recipes, articles).
-    Distinguished from sentence by containing multiple sentences (period
-    followed by space or newline and another capital letter).
-  designation: broad_characters
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose:
-    word_count: "CAST(REGEXP_COUNT({col}, '\\s+') + 1 AS SMALLINT)"
-    sentence_count: "CAST(REGEXP_COUNT({col}, '[.!?]\\s') + 1 AS SMALLINT)"
-  validation:
-    type: string
-    minLength: 50
-    maxLength: 65536
-  tier: [VARCHAR, text]
-  release_priority: 3
-  aliases: [description, review, article, body_text]
-  samples:
-    - "This product works great. I would recommend it to anyone looking for quality."
-    - "First, preheat the oven to 350F. Then mix the dry ingredients together. Add the wet ingredients slowly."
-    - "The hotel was located in the city center. Rooms were clean and spacious. Staff was very friendly and helpful."
-  references: null
-  notes: >
-    NNFT-137. Addresses full_address overcall for long text. NNFT-134 found
-    text >100 chars median incorrectly classified as addresses. Rule 16
-    demotes full_address to sentence, but paragraph is the more accurate
-    classification for multi-sentence text. broad_characters designation makes
-    it yield to header hints like sentence and plain_text do.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: file
@@ -935,58 +872,6 @@ representation.scientific.smiles:
     reflects that single values like "O" or "CC" are indistinguishable from
     plain text — column-level disambiguation (header hints) is essential.
     Common molecules: O=water, CCO=ethanol, c1ccccc1=benzene, CC(=O)O=acetic acid.
-
-representation.scientific.metric_prefix:
-  title: "Metric Prefix"
-  description: >
-    SI metric prefix (kilo, mega, giga, milli, micro, nano, etc.).
-    May include unit or stand alone.
-  designation: broad_words
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "LOWER(CAST({col} AS VARCHAR))"
-  transform_ext: null
-  decompose:
-    prefix: "REGEXP_EXTRACT({col}, '^([a-z]+)')"
-    multiplier: "CASE WHEN {col} LIKE 'kilo%' THEN 1000 WHEN {col} LIKE 'mega%' THEN 1000000 WHEN {col} LIKE 'giga%' THEN 1000000000 WHEN {col} LIKE 'milli%' THEN 0.001 WHEN {col} LIKE 'micro%' THEN 0.000001 WHEN {col} LIKE 'nano%' THEN 0.000000001 ELSE NULL END"
-  validation:
-    type: string
-    enum:
-      - yotta
-      - zetta
-      - exa
-      - peta
-      - tera
-      - giga
-      - mega
-      - kilo
-      - hecto
-      - deca
-      - deci
-      - centi
-      - milli
-      - micro
-      - nano
-      - pico
-      - femto
-      - atto
-      - zepto
-      - yocto
-  tier: [VARCHAR, scientific]
-  release_priority: 3
-  aliases: [si_prefix]
-  samples:
-    - "kilo"
-    - "mega"
-    - "milli"
-    - "micro"
-    - "nano"
-  references: null
-  notes: >
-    v1 migration: Was science.metric_prefix marked broad_words.
-    SI metric prefixes: 10^24 (yotta) to 10^-24 (yocto).
-    Decompose extracts prefix and multiplier.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: discrete

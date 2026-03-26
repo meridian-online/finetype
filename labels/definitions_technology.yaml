@@ -335,37 +335,6 @@ technology.cryptographic.hash:
     32→MD5, 40→SHA1, 64→SHA256, 128→SHA512. No cryptographic validation (can't
     verify true hash without known input).
 
-technology.cryptographic.token_hex:
-  title: "Hexadecimal Token"
-  description: >
-    Random token as hex string (e.g., secure session tokens).
-    Distinguished from cryptographic hashes by variable length that does NOT
-    match standard hash lengths (32=MD5, 40=SHA1, 64=SHA256, 128=SHA512).
-    Tokens are typically 16-48 hex chars at non-standard lengths.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[0-9a-f]{16,48}$"
-  tier: [VARCHAR, cryptographic]
-  release_priority: 3
-  aliases: [hex_token]
-  samples:
-    - "a1b2c3d4e5f67890ab"
-    - "1234567890abcdef1234"
-    - "deadbeefcafebabe00ff11"
-  references: null
-  notes: >
-    v1 migration: Was cryptographic.token_hex. Typically 16-48 hex characters
-    (8-24 bytes). Used for session IDs, API tokens, etc. Distinguished from
-    hashes by avoiding standard hash lengths: 32 (MD5), 40 (SHA1), 64 (SHA256),
-    128 (SHA512). Generator produces lengths that exclude these values.
-
 technology.cryptographic.token_urlsafe:
   title: "URL-Safe Base64 Token"
   description: >
@@ -595,34 +564,6 @@ technology.development.docker_ref:
   notes: >
     New in NNFT-244.02. OCI image reference format. Includes optional registry,
     repository path, tag, and digest components.
-
-technology.development.git_sha:
-  title: "Git Commit SHA"
-  description: >
-    Full 40-character hexadecimal SHA-1 hash identifying a git commit.
-    Used in version control systems, CI/CD pipelines, and deployment tracking.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[0-9a-f]{40}$"
-  tier: [VARCHAR, development]
-  release_priority: 4
-  aliases: [commit_hash, git_hash]
-  samples:
-    - "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
-    - "5d41402abc4b2a76b9719d911017c59200000000"
-    - "da39a3ee5e6b4b0d3255bfef95601890afd80709"
-  references: null
-  notes: >
-    New in NNFT-244.02. Distinguished from cryptographic.hash by being exactly
-    40 hex chars (SHA-1 length). Disambiguation relies on header hints
-    (commit, sha, revision) since hash also matches 40-char SHA-1.
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: identifier

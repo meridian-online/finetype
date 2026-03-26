@@ -237,8 +237,8 @@ MANIFEST ?= eval/datasets/manifest.csv
 
 eval-mapping:
 	@echo "═══ Generating schema_mapping.csv from YAML ═══"
-	$(EVAL_RUN) eval-mapping --
-	@echo "✓ eval/schema_mapping.csv generated"
+	$(EVAL_RUN) eval-mapping -- --validate
+	@echo "✓ eval/schema_mapping.csv generated and validated"
 
 eval-profile: eval-mapping
 	@echo "═══ Running profile evaluation ═══"

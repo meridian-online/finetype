@@ -47,7 +47,7 @@ impl ValueClassifier for NoopClassifier {
 /// feature vectors (NNFT-250, expanded in NNFT-266).
 ///
 /// Used by disambiguation rules for column-level decisions. Variance is the
-/// critical new signal: zero length-variance distinguishes git_sha from hash,
+/// critical new signal: zero length-variance distinguishes structured codes,
 /// and dot-segment variance distinguishes structured codes from free-form text.
 /// Aggregated column-level features: per-feature mean, variance, min, max
 /// across all sampled values. Used by disambiguation rules and the spike
@@ -775,7 +775,7 @@ impl ColumnClassifier {
         // Step 5b: Feature-based disambiguation (NNFT-250, extended to legacy path).
         // Compute aggregated column features and apply feature disambiguation rules
         // (F1–F6). Previously only ran in Sense→Sharpen path; now also in legacy
-        // to fix git_sha/hash (F4) and decimal/numeric_code (F5) when Sense is absent.
+        // to fix decimal/numeric_code (F5) when Sense is absent.
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
             sample.iter().map(|v| extract_features(v)).collect();
         let column_features = aggregate_features(&per_value_features);
@@ -2441,7 +2441,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        result.label = "geography.trade.hs_code".to_string();
+        result.label = "geography.transportation.hs_code".to_string();
         result.confidence = result.confidence.max(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!(
@@ -2450,23 +2450,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         ));
     }
 
-    // Rule F4: git_sha vs hash — length variance. Unchanged — no vote dependency.
-    let length_variance = column_features.variance[feature_idx::LENGTH];
-    let hex_ratio = column_features.mean[feature_idx::IS_HEX_STRING];
-    let mean_length = column_features.mean[feature_idx::LENGTH];
-    if result.label == "technology.cryptographic.hash"
-        && length_variance < 0.01
-        && hex_ratio >= 0.95
-        && (mean_length - 40.0).abs() < 1.0
-    {
-        result.label = "technology.development.git_sha".to_string();
-        result.confidence = result.confidence.max(0.8);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!(
-            "feature_git_sha:len_var={:.4},hex={:.2},len={:.0}",
-            length_variance, hex_ratio, mean_length
-        ));
-    }
+    // Rule F4: git_sha collapsed into technology.cryptographic.hash — rule removed.
 
     // Rule F5: numeric_code without leading zeros → integer_number or decimal_number.
     // Unchanged — no vote dependency.
@@ -2555,6 +2539,33 @@ fn value_sharpen(
         }
     }
 
+    // Rule 21: Coordinate plausibility gate — demote to decimal_number when values
+    // exceed all coordinate ranges. The model over-predicts latitude/longitude on
+    // plain numeric columns (earthquake depth, error measurements). Real coordinates
+    // must be within [-180, 180]; if >20% of values exceed that, they're not coords.
+    // Must fire BEFORE Rule 3 (coordinate disambiguation) to filter non-coordinates.
+    if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let mut parseable = 0usize;
+            let mut out_of_range = 0usize;
+            for v in &non_empty {
+                if let Ok(val) = v.parse::<f64>() {
+                    parseable += 1;
+                    if val.abs() > 180.0 {
+                        out_of_range += 1;
+                    }
+                }
+            }
+            if parseable >= 3 && (out_of_range as f32 / parseable as f32) > 0.1 {
+                return Some((
+                    "representation.numeric.decimal_number".to_string(),
+                    format!("coordinate_plausibility_gate:out_of_range={}/{}", out_of_range, parseable),
+                ));
+            }
+        }
+    }
+
     // Rule 3: Coordinate disambiguation (latitude vs longitude)
     // ADAPTED: fire when result.label is either coordinate type
     if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
@@ -2637,6 +2648,94 @@ fn value_sharpen(
                 "representation.numeric.decimal_number".to_string(),
                 "percentage_no_sign".to_string(),
             ));
+        }
+    }
+
+    // Rule 20: HS code validation gate — demote to decimal_number when values
+    // don't match HS code format. The model over-predicts hs_code on plain decimal
+    // columns (pe_ratio, sepal_length, humidity_pct, earthquake measurements).
+    // HS codes are structured digit groups: 4 digits + optional dot-separated 2-digit
+    // groups (e.g., "8471.30", "8471.30.00"). Plain decimals like "3.14" or "0.887" fail.
+    if result_label == "geography.transportation.hs_code" {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let match_count = non_empty.iter().filter(|v| is_hs_code_format(v)).count();
+            let match_rate = match_count as f32 / non_empty.len() as f32;
+            if match_rate < 0.5 {
+                return Some((
+                    "representation.numeric.decimal_number".to_string(),
+                    format!("hs_code_validation_gate:match_rate={:.2}", match_rate),
+                ));
+            }
+        }
+    }
+
+    // Rule 22: UPC digit-count gate — correct UPC predictions when value lengths
+    // don't match 12-digit UPC format. The model confuses similar digit-string
+    // identifiers: EAN (13 digits), NPI (10 digits) get predicted as UPC.
+    if result_label == "identity.commerce.upc" {
+        let digit_only: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty() && v.chars().all(|c| c.is_ascii_digit()))
+            .collect();
+        if digit_only.len() >= 3 {
+            // Count values by digit length
+            let twelve = digit_only.iter().filter(|v| v.len() == 12).count();
+            let thirteen = digit_only.iter().filter(|v| v.len() == 13).count();
+            let eight = digit_only.iter().filter(|v| v.len() == 8).count();
+            let total = digit_only.len();
+            let twelve_rate = twelve as f32 / total as f32;
+
+            if twelve_rate < 0.5 {
+                // Not UPC — check if EAN (13 or 8 digits)
+                let ean_rate = (thirteen + eight) as f32 / total as f32;
+                if ean_rate > 0.5 {
+                    return Some((
+                        "identity.commerce.ean".to_string(),
+                        format!("upc_digit_count_gate:ean_rate={:.2}", ean_rate),
+                    ));
+                }
+                // Otherwise demote to numeric_code (generic identifier)
+                return Some((
+                    "representation.identifier.numeric_code".to_string(),
+                    format!("upc_digit_count_gate:twelve_rate={:.2}", twelve_rate),
+                ));
+            }
+        }
+    }
+
+    // Rule 23: ISIN format gate — correct ISRC predictions when values match
+    // ISIN format (2-letter country code + 9 alphanumeric + 1 check digit).
+    // ISRC format is different: CC-XXX-YY-NNNNN with dashes.
+    if result_label == "identity.commerce.isrc" {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let isin_count = non_empty.iter().filter(|v| is_isin_format(v)).count();
+            let isin_rate = isin_count as f32 / non_empty.len() as f32;
+            if isin_rate > 0.5 {
+                return Some((
+                    "finance.securities.isin".to_string(),
+                    format!("isin_format_gate:match_rate={:.2}", isin_rate),
+                ));
+            }
+        }
+    }
+
+    // Rule 24: ISSN/EIN dash-position gate — correct EIN predictions when values
+    // match ISSN format (DDDD-DDDD, dash at position 4) rather than EIN (DD-DDDDDDD,
+    // dash at position 2).
+    if result_label == "identity.government.ein" {
+        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        if non_empty.len() >= 3 {
+            let issn_count = non_empty.iter().filter(|v| is_issn_format(v)).count();
+            let issn_rate = issn_count as f32 / non_empty.len() as f32;
+            if issn_rate > 0.5 {
+                return Some((
+                    "identity.commerce.issn".to_string(),
+                    format!("issn_format_gate:match_rate={:.2}", issn_rate),
+                ));
+            }
         }
     }
 
@@ -2829,7 +2928,7 @@ fn sharpen_select_fallback(
 /// a feature signal is strong enough to override the current prediction.
 ///
 /// NNFT-266: expanded to use variance/min/max statistics and float-parseability
-/// for git_sha/hash and hs_code/decimal_number disambiguation.
+/// for hs_code/decimal_number disambiguation.
 fn feature_disambiguate(
     result: &mut ColumnResult,
     column_features: &ColumnFeatures,
@@ -2918,16 +3017,16 @@ fn feature_disambiguate(
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
+        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.transportation.hs_code");
         if hs_in_votes {
             let hs_votes = votes
                 .iter()
-                .find(|(l, _)| l == "geography.trade.hs_code")
+                .find(|(l, _)| l == "geography.transportation.hs_code")
                 .map(|(_, c)| *c)
                 .unwrap_or(0);
             let hs_frac = hs_votes as f32 / n_samples as f32;
             if hs_frac >= 0.10 {
-                result.label = "geography.trade.hs_code".to_string();
+                result.label = "geography.transportation.hs_code".to_string();
                 result.confidence = hs_frac.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!(
@@ -2938,38 +3037,7 @@ fn feature_disambiguate(
         }
     }
 
-    // Rule F4: git_sha vs hash — length variance distinguishes uniform-length
-    // git SHAs from mixed-length hashes (NNFT-266).
-    //
-    // Git SHAs are always exactly 40 hex characters → zero length variance.
-    // General hash columns contain MD5 (32), SHA1 (40), SHA256 (64) → high
-    // length variance (822.6 per Spike A). Near-zero length variance combined
-    // with high hex ratio is a perfect separator.
-    //
-    // The CharCNN model doesn't produce git_sha votes (all 40-char hex strings
-    // score as hash), so we cannot require git_sha in the vote distribution.
-    // Instead we use a length check: mean length ~40 (SHA-1) is the definitive
-    // git SHA fingerprint. This is safe because:
-    //   - MD5 = 32 chars, SHA-256 = 64 chars — neither is 40
-    //   - RIPEMD-160 = 40 chars but exceedingly rare in tabular data
-    //   - The combination of hash prediction + zero variance + len=40 + all hex
-    //     is effectively unique to git SHAs
-    let length_variance = column_features.variance[feature_idx::LENGTH];
-    let hex_ratio = column_features.mean[feature_idx::IS_HEX_STRING];
-    let mean_length = column_features.mean[feature_idx::LENGTH];
-    if result.label == "technology.cryptographic.hash"
-        && length_variance < 0.01
-        && hex_ratio >= 0.95
-        && (mean_length - 40.0).abs() < 1.0
-    {
-        result.label = "technology.development.git_sha".to_string();
-        result.confidence = result.confidence.max(0.8);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!(
-            "feature_git_sha:len_var={:.4},hex={:.2},len={:.0}",
-            length_variance, hex_ratio, mean_length
-        ));
-    }
+    // Rule F4: git_sha collapsed into technology.cryptographic.hash — rule removed.
 
     // Rule F5: numeric_code without leading zeros → integer_number or decimal_number
     // (NNFT-272, extended for decimal disambiguation).
@@ -3215,7 +3283,7 @@ fn disambiguate(
     // Rule 16: Text length demotion — full_address predictions where
     // the median value length exceeds 100 characters are almost certainly
     // free-form text (descriptions, paragraphs, recipe steps) rather than
-    // street addresses. Demote to representation.text.sentence.
+    // street addresses. Demote to representation.text.plain_text.
     // Threshold 100 gives 0% false demotion rate on SOTAB evaluation data.
     if let Some((label, rule)) = disambiguate_text_length_demotion(values, votes) {
         return Some((label, rule));
@@ -3792,7 +3860,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         | "duration hours" | "duration hrs" | "duration ms" | "elapsed" | "elapsed time" => {
             return Some("representation.numeric.integer_number");
         }
-        // Attendance / headcount — large integers confused with amount_minor_int (NNFT-254)
+        // Attendance / headcount — large integers (NNFT-254)
         "attendance" | "headcount" | "participants" | "crowd size" | "capacity" => {
             return Some("representation.numeric.integer_number");
         }
@@ -4250,6 +4318,83 @@ fn disambiguate_coordinates(values: &[String]) -> Option<String> {
 
 /// Detect IPv4 addresses via dotted-quad pattern.
 ///
+/// Check whether a value matches HS code format: 4+ digits optionally separated
+/// into 2-digit groups by dots. Valid: "8471.30", "847130", "8471.30.00".
+/// Invalid: "3.14", "0.887", "-12.5" (plain decimals).
+fn is_hs_code_format(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() {
+        return false;
+    }
+    // HS codes are never negative
+    if s.starts_with('-') || s.starts_with('+') {
+        return false;
+    }
+    // Split on dots and check structure
+    let parts: Vec<&str> = s.split('.').collect();
+    match parts.len() {
+        // No dots: must be 4-10 pure digits (e.g., "847130")
+        1 => {
+            let len = parts[0].len();
+            len >= 4 && len <= 10 && parts[0].chars().all(|c| c.is_ascii_digit())
+        }
+        // Dotted: first group 4 digits, subsequent groups exactly 2 digits
+        2..=4 => {
+            parts[0].len() == 4
+                && parts[0].chars().all(|c| c.is_ascii_digit())
+                && parts[1..].iter().all(|p| p.len() == 2 && p.chars().all(|c| c.is_ascii_digit()))
+        }
+        _ => false,
+    }
+}
+
+/// Check whether a value matches ISIN format: 2-letter country code followed by
+/// 9 alphanumeric characters and 1 check digit. Total 12 characters.
+/// Valid: "US0378331005", "GB0002634946", "DE0007164600".
+/// Invalid: "US-Z03-98-12345" (ISRC format with dashes).
+///
+/// Key distinction from ISRC (also 12-char, 2-letter prefix): ISIN positions 2-4
+/// are the start of the NSIN and are typically all digits (e.g., US**037**8331005).
+/// ISRC positions 2-4 are the registrant code and typically contain letters
+/// (e.g., SE**3YX**3859059). Requiring all-digit positions 2-4 avoids false matches
+/// on ISRC values.
+fn is_isin_format(s: &str) -> bool {
+    let s = s.trim();
+    if s.len() != 12 {
+        return false;
+    }
+    let bytes = s.as_bytes();
+    // First 2 chars: uppercase letters (country code)
+    if !bytes[0].is_ascii_uppercase() || !bytes[1].is_ascii_uppercase() {
+        return false;
+    }
+    // Positions 2-4: must be all digits (distinguishes from ISRC registrant codes)
+    if !bytes[2..5].iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    // Remaining positions 5-10: alphanumeric
+    if !bytes[5..11].iter().all(|b| b.is_ascii_alphanumeric()) {
+        return false;
+    }
+    // Last char: digit (check digit)
+    bytes[11].is_ascii_digit()
+}
+
+/// Check whether a value matches ISSN format: DDDD-DDD[DX] (4 digits, dash,
+/// 3 digits, 1 digit or 'X'). Total 9 characters with dash at position 4.
+/// Valid: "1781-2253", "8371-5342", "0317-839X".
+/// Distinguishes from EIN format: DD-DDDDDDD (2 digits, dash, 7 digits).
+fn is_issn_format(s: &str) -> bool {
+    let s = s.trim();
+    let bytes = s.as_bytes();
+    // Exactly 9 chars with dash at position 4
+    bytes.len() == 9
+        && bytes[4] == b'-'
+        && bytes[..4].iter().all(|b| b.is_ascii_digit())
+        && bytes[5..8].iter().all(|b| b.is_ascii_digit())
+        && (bytes[8].is_ascii_digit() || bytes[8] == b'X')
+}
+
 /// Rule: If ≥80% of non-empty values match `\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`
 /// with each octet in 0..255, classify as ip_v4.
 ///
@@ -4580,7 +4725,7 @@ fn disambiguate_utc_offset_override(values: &[String]) -> Option<(String, String
 /// overcall has a median of 53+ chars.
 ///
 /// Rule: If the top vote is full_address and the median non-empty value
-/// length exceeds 100 characters, demote to representation.text.sentence.
+/// length exceeds 100 characters, demote to representation.text.plain_text.
 /// Threshold 100 gives 0% false demotion rate on evaluation data.
 fn disambiguate_text_length_demotion(
     values: &[String],
@@ -4608,7 +4753,7 @@ fn disambiguate_text_length_demotion(
 
     if median > 100 {
         Some((
-            "representation.text.sentence".to_string(),
+            "representation.text.plain_text".to_string(),
             "text_length_demotion_full_address".to_string(),
         ))
     } else {
@@ -7610,7 +7755,7 @@ identity.person.phone_number:
         let result = disambiguate_text_length_demotion(&values, &votes);
         assert!(result.is_some(), "Should demote long text overcall");
         let (label, rule) = result.unwrap();
-        assert_eq!(label, "representation.text.sentence");
+        assert_eq!(label, "representation.text.plain_text");
         assert_eq!(rule, "text_length_demotion_full_address");
     }
 
@@ -8676,8 +8821,8 @@ datetime.component.day_of_week:
     }
 
     #[test]
-    fn test_git_sha_uniform_length_zero_variance() {
-        // Git SHAs: all exactly 40 hex chars → zero length variance
+    fn test_uniform_length_hex_zero_variance() {
+        // Uniform-length hex strings: all exactly 40 chars → zero length variance
         let shas = [
             "a".repeat(40),
             "b1c2d3e4f5a6b7c8d9e0a1b2c3d4e5f6a7b8c9d0".to_string(),
@@ -8690,13 +8835,13 @@ datetime.component.day_of_week:
         // Length variance should be exactly 0 (all same length)
         assert!(
             cf.variance[feature_idx::LENGTH] < 0.01,
-            "git SHA length variance should be ~0, got {}",
+            "uniform hex length variance should be ~0, got {}",
             cf.variance[feature_idx::LENGTH]
         );
         // All should be hex
         assert!(
             cf.mean[feature_idx::IS_HEX_STRING] >= 0.95,
-            "git SHAs should all be hex, got {}",
+            "uniform hex strings should all be hex, got {}",
             cf.mean[feature_idx::IS_HEX_STRING]
         );
     }
@@ -8727,102 +8872,7 @@ datetime.component.day_of_week:
         );
     }
 
-    #[test]
-    fn test_rule_f4_git_sha_override() {
-        // Simulate: hash wins the vote, but features show zero length variance,
-        // all hex, and mean length = 40 (SHA-1 fingerprint)
-        let mut result = ColumnResult {
-            label: "technology.cryptographic.hash".to_string(),
-            confidence: 0.99,
-            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
-            disambiguation_applied: false,
-            disambiguation_rule: None,
-            samples_used: 100,
-            detected_locale: None,
-            is_generic: false,
-            column_features: None,
-        };
-
-        // Build column features with zero length variance, high hex, len=40
-        let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
-        cf.mean[feature_idx::LENGTH] = 40.0;
-        cf.variance[feature_idx::LENGTH] = 0.0;
-
-        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
-
-        feature_disambiguate(&mut result, &cf, &votes, 100);
-
-        assert_eq!(result.label, "technology.development.git_sha");
-        assert!(result.disambiguation_applied);
-        assert!(result
-            .disambiguation_rule
-            .as_ref()
-            .unwrap()
-            .starts_with("feature_git_sha"));
-    }
-
-    #[test]
-    fn test_rule_f4_no_override_when_variance_high() {
-        // Hash column with mixed lengths — should NOT override to git_sha
-        let mut result = ColumnResult {
-            label: "technology.cryptographic.hash".to_string(),
-            confidence: 0.99,
-            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
-            disambiguation_applied: false,
-            disambiguation_rule: None,
-            samples_used: 100,
-            detected_locale: None,
-            is_generic: false,
-            column_features: None,
-        };
-
-        let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
-        cf.mean[feature_idx::LENGTH] = 45.3;
-        cf.variance[feature_idx::LENGTH] = 177.56; // high variance = mixed hash lengths
-
-        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
-
-        feature_disambiguate(&mut result, &cf, &votes, 100);
-
-        assert_eq!(
-            result.label, "technology.cryptographic.hash",
-            "should NOT override when length variance is high"
-        );
-        assert!(!result.disambiguation_applied);
-    }
-
-    #[test]
-    fn test_rule_f4_no_override_when_length_not_40() {
-        // Uniform-length hex but NOT length 40 (e.g., MD5 at 32) — should NOT override
-        let mut result = ColumnResult {
-            label: "technology.cryptographic.hash".to_string(),
-            confidence: 0.99,
-            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
-            disambiguation_applied: false,
-            disambiguation_rule: None,
-            samples_used: 100,
-            detected_locale: None,
-            is_generic: false,
-            column_features: None,
-        };
-
-        let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
-        cf.mean[feature_idx::LENGTH] = 32.0; // MD5 length
-        cf.variance[feature_idx::LENGTH] = 0.0; // zero variance
-
-        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
-
-        feature_disambiguate(&mut result, &cf, &votes, 100);
-
-        assert_eq!(
-            result.label, "technology.cryptographic.hash",
-            "should NOT override for non-40-char uniform hex"
-        );
-        assert!(!result.disambiguation_applied);
-    }
+    // Rule F4 tests removed — git_sha collapsed into technology.cryptographic.hash.
 
     #[test]
     fn test_rule_f5_numeric_code_demoted_without_leading_zeros() {
@@ -8957,7 +9007,7 @@ datetime.component.day_of_week:
             confidence: 0.80,
             vote_distribution: vec![
                 ("representation.numeric.decimal_number".to_string(), 0.70),
-                ("geography.trade.hs_code".to_string(), 0.20),
+                ("geography.transportation.hs_code".to_string(), 0.20),
             ],
             disambiguation_applied: false,
             disambiguation_rule: None,
@@ -8974,12 +9024,12 @@ datetime.component.day_of_week:
 
         let votes = vec![
             ("representation.numeric.decimal_number".to_string(), 70),
-            ("geography.trade.hs_code".to_string(), 20),
+            ("geography.transportation.hs_code".to_string(), 20),
         ];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
-        assert_eq!(result.label, "geography.trade.hs_code");
+        assert_eq!(result.label, "geography.transportation.hs_code");
         assert!(result.disambiguation_applied);
         assert!(result
             .disambiguation_rule
@@ -9218,7 +9268,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "geography.trade.hs_code",
+            result.label, "geography.transportation.hs_code",
             "F3 should fire on decimal_number with HS code features even without hs_code in votes"
         );
         assert!(result.disambiguation_applied);
@@ -9227,6 +9277,206 @@ datetime.component.day_of_week:
             .as_ref()
             .unwrap()
             .starts_with("feature_hs_code"));
+    }
+
+    // R20: HS code validation gate — demotes hs_code when values are plain decimals
+    #[test]
+    fn test_r20_hs_code_gate_demotes_plain_decimals() {
+        // Model predicts hs_code but values are plain decimals (pe_ratio, sepal_length, etc.)
+        let values: Vec<String> = vec![
+            "3.14", "0.887", "-12.5", "100.0", "0.003", "45.67", "1.23", "99.9",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "geography.transportation.hs_code", 0.95, None);
+        assert!(result.is_some(), "R20 should fire on plain decimals");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.decimal_number");
+        assert!(rule.starts_with("hs_code_validation_gate"));
+    }
+
+    #[test]
+    fn test_r20_hs_code_gate_keeps_real_hs_codes() {
+        // Real HS codes should NOT be demoted
+        let values: Vec<String> = vec![
+            "8471.30", "8471.30.00", "6204.62", "8517.12", "0901.21", "2204.10",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "geography.transportation.hs_code", 0.95, None);
+        assert!(result.is_none(), "R20 should NOT fire on real HS codes");
+    }
+
+    #[test]
+    fn test_is_hs_code_format() {
+        // Valid HS codes
+        assert!(is_hs_code_format("8471.30"));
+        assert!(is_hs_code_format("8471.30.00"));
+        assert!(is_hs_code_format("0901.21.00.10"));
+        assert!(is_hs_code_format("847130")); // undotted 6-digit
+        assert!(is_hs_code_format("84713000")); // undotted 8-digit
+
+        // Invalid — plain decimals
+        assert!(!is_hs_code_format("3.14"));
+        assert!(!is_hs_code_format("0.887"));
+        assert!(!is_hs_code_format("-12.5"));
+        assert!(!is_hs_code_format("100.0"));
+        assert!(!is_hs_code_format("45.67"));
+
+        // Invalid — too short
+        assert!(!is_hs_code_format("123"));
+        assert!(!is_hs_code_format("12.34"));
+
+        // Invalid — negative
+        assert!(!is_hs_code_format("-8471.30"));
+    }
+
+    // ── R21: Coordinate plausibility gate tests ─────────────────────────
+    #[test]
+    fn test_r21_coordinate_gate_demotes_out_of_range() {
+        // Earthquake depth values — many exceed 180, not coordinates
+        let values: Vec<String> = vec![
+            "127.013", "573.817", "201.998", "10.0", "224.419",
+            "177.684", "97.335", "671.0", "450.2", "300.1",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "geography.coordinate.longitude", 0.94, None);
+        assert!(result.is_some(), "R21 should fire for out-of-range values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.numeric.decimal_number");
+        assert!(rule.contains("coordinate_plausibility_gate"));
+    }
+
+    #[test]
+    fn test_r21_coordinate_gate_keeps_real_coordinates() {
+        // Real longitude values — all within [-180, 180]
+        let values: Vec<String> = vec![
+            "-122.4194", "139.6917", "2.3522", "-73.9857", "151.2093",
+            "-43.1729", "28.9784", "-3.7038", "103.8198", "-46.6333",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "geography.coordinate.longitude", 0.95, None);
+        // Should NOT fire — these are valid longitude values
+        assert!(
+            result.is_none() || result.as_ref().unwrap().1.contains("coordinate_disambiguation"),
+            "R21 should not fire for valid coordinates"
+        );
+    }
+
+    // ── R22: UPC digit-count gate tests ───────────────────────────────
+    #[test]
+    fn test_r22_upc_gate_corrects_to_ean() {
+        // EAN-13 values (13 digits) misclassified as UPC (12 digits)
+        let values: Vec<String> = vec![
+            "1794213764625", "4293423898067", "6324920385397",
+            "3683935437077", "5078019484874", "8706648142321",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.upc", 0.999, None);
+        assert!(result.is_some(), "R22 should fire for 13-digit values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "identity.commerce.ean");
+        assert!(rule.contains("upc_digit_count_gate"));
+    }
+
+    #[test]
+    fn test_r22_upc_gate_demotes_wrong_length() {
+        // 10-digit values (e.g., NPI) misclassified as UPC
+        let values: Vec<String> = vec![
+            "1966662179", "6579926978", "2527909147",
+            "9953906342", "2157414996", "6989529491",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.upc", 0.94, None);
+        assert!(result.is_some(), "R22 should fire for non-12-digit values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.identifier.numeric_code");
+        assert!(rule.contains("upc_digit_count_gate"));
+    }
+
+    #[test]
+    fn test_r22_upc_gate_keeps_real_upc() {
+        // Real UPC values (12 digits)
+        let values: Vec<String> = vec![
+            "012345678905", "036000291452", "070330507227",
+            "042100005264", "040000000068", "041570056103",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.upc", 0.99, None);
+        // Should NOT fire — these are valid UPC values
+        assert!(
+            result.is_none() || !result.as_ref().unwrap().1.contains("upc_digit_count_gate"),
+            "R22 should not fire for valid 12-digit UPC"
+        );
+    }
+
+    // ── R23: ISIN format gate tests ───────────────────────────────────
+    #[test]
+    fn test_r23_isin_gate_corrects_isrc() {
+        // ISIN values misclassified as ISRC
+        let values: Vec<String> = vec![
+            "US0378331005", "GB0002634946", "DE0007164600",
+            "JP3435000009", "FR0000120271", "CA0585861085",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.commerce.isrc", 0.97, None);
+        assert!(result.is_some(), "R23 should fire for ISIN-format values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "finance.securities.isin");
+        assert!(rule.contains("isin_format_gate"));
+    }
+
+    // ── R24: ISSN/EIN dash-position gate tests ────────────────────────
+    #[test]
+    fn test_r24_issn_gate_corrects_ein() {
+        // ISSN values misclassified as EIN
+        let values: Vec<String> = vec![
+            "1781-2253", "8371-5342", "6910-7471",
+            "2908-3721", "8987-7548", "4149-8688",
+        ].into_iter().map(String::from).collect();
+
+        let result = value_sharpen(&values, "identity.government.ein", 0.91, None);
+        assert!(result.is_some(), "R24 should fire for ISSN-format values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "identity.commerce.issn");
+        assert!(rule.contains("issn_format_gate"));
+    }
+
+    #[test]
+    fn test_is_isin_format() {
+        assert!(is_isin_format("US0378331005"));
+        assert!(is_isin_format("GB0002634946"));
+        assert!(is_isin_format("AU000000BHP4"));
+        assert!(is_isin_format("NL0011540547"));
+
+        // Invalid — ISRC values (letters in positions 2-4 = registrant code)
+        assert!(!is_isin_format("SE3YX3859059")); // ISRC: positions 2-4 = "3YX"
+        assert!(!is_isin_format("NLEK47515013")); // ISRC: positions 2-4 = "EK4"
+        assert!(!is_isin_format("CAHRM7311593")); // ISRC: positions 2-4 = "HRM"
+        // Invalid — other formats
+        assert!(!is_isin_format("US-Z03-98-12345")); // ISRC with dashes
+        assert!(!is_isin_format("1234567890AB")); // starts with digits
+        assert!(!is_isin_format("USABC")); // too short
+        assert!(!is_isin_format("us0378331005")); // lowercase
+    }
+
+    #[test]
+    fn test_is_issn_format() {
+        assert!(is_issn_format("1781-2253"));
+        assert!(is_issn_format("0317-839X")); // X check digit
+        assert!(is_issn_format("0000-0000"));
+
+        // Invalid — EIN format (dash at position 2)
+        assert!(!is_issn_format("12-3456789"));
+        // Invalid — too short/long
+        assert!(!is_issn_format("1234-567"));
+        assert!(!is_issn_format("12345-6789"));
+        // Invalid — no dash
+        assert!(!is_issn_format("12345678"));
     }
 
     // AC-2: feature_sharpen — F5 demotes numeric_code (single-entry votes)

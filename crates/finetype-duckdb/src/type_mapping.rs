@@ -85,7 +85,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
 
         // ── technology.cryptographic ───────────────────────────────────
         "technology.cryptographic.hash"
-        | "technology.cryptographic.token_hex"
         | "technology.cryptographic.token_urlsafe" => "VARCHAR",
 
         // ── technology.development ─────────────────────────────────────
@@ -137,7 +136,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "identity.person.password"
         | "identity.person.gender"
         | "identity.person.gender_code"
-        | "identity.person.gender_symbol"
         | "identity.person.nationality"
         | "identity.person.occupation"
         | "identity.person.blood_type" => "VARCHAR",
@@ -151,8 +149,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "finance.banking.iban"
         | "finance.payment.credit_card_number"
         | "finance.payment.credit_card_network"
-        | "finance.payment.credit_card_expiration_date"
-        | "finance.payment.paypal_email"
         | "finance.securities.cusip"
         | "finance.securities.isin"
         | "finance.securities.sedol"
@@ -170,7 +166,6 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
 
         // ── representation.text ────────────────────────────────────────
         "representation.text.word"
-        | "representation.text.sentence"
         | "representation.text.plain_text"
         | "representation.text.emoji"
         | "representation.text.color_hex"
@@ -184,8 +179,7 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         "representation.scientific.dna_sequence"
         | "representation.scientific.rna_sequence"
         | "representation.scientific.protein_sequence"
-        | "representation.scientific.measurement_unit"
-        | "representation.scientific.metric_prefix" => "VARCHAR",
+        | "representation.scientific.measurement_unit" => "VARCHAR",
 
         // ── representation.boolean ───────────────────────────────────
         "representation.boolean.binary"
@@ -214,7 +208,7 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         | "container.array.whitespace_separated" => "VARCHAR",
 
         // ── container.key_value ────────────────────────────────────────
-        "container.key_value.query_string" | "container.key_value.form_data" => "VARCHAR",
+        "container.key_value.query_string" => "VARCHAR",
 
         // ── Fallback ───────────────────────────────────────────────────
         _ => "VARCHAR",

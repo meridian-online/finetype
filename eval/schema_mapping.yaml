@@ -327,7 +327,7 @@ mappings:
       - geography.location.country
       - geography.location.city
       - geography.location.region
-      - geography.location.state
+      - geography.location.region
     finetype_domain: null
     match_quality: close
     expand: false
@@ -400,12 +400,11 @@ mappings:
     finetype_label: geography.address.full_address
     finetype_labels:
       - geography.address.full_address
-      - geography.address.street_address
       - geography.coordinate.coordinates
     finetype_domain: geography
     match_quality: close
     expand: false
-    notes: Full address strings; FineType detects as full_address, street_address, or coordinates
+    notes: Full address strings; FineType detects as full_address or coordinates
 
   - gt_label: county
     source: dbpedia
@@ -420,7 +419,7 @@ mappings:
     finetype_label: geography.location.region
     finetype_labels:
       - geography.location.region
-      - geography.location.state
+      - geography.location.region
       - geography.location.continent
     finetype_domain: geography
     match_quality: close
@@ -461,7 +460,7 @@ mappings:
 
   - gt_label: sentence
     source: dbpedia
-    finetype_label: representation.text.sentence
+    finetype_label: representation.text.plain_text
     finetype_domain: representation
     match_quality: close
     expand: false
@@ -519,7 +518,6 @@ mappings:
     finetype_label: null
     finetype_labels:
       - datetime.date.iso
-      - datetime.date.iso_date
       - datetime.date.mdy_slash
       - datetime.date.dmy_slash
       - datetime.date.dmy_dot
@@ -657,7 +655,7 @@ mappings:
       - representation.numeric.integer_number
       - representation.numeric.decimal_number
       - representation.identifier.increment
-      - finance.currency.amount_minor_int
+      - representation.numeric.integer_number
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -778,7 +776,7 @@ mappings:
     finetype_labels:
       - representation.text.entity_name
       - representation.text.plain_text
-      - representation.text.sentence
+      - representation.text.plain_text
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -789,7 +787,7 @@ mappings:
     finetype_label: null
     finetype_labels:
       - representation.text.plain_text
-      - representation.text.sentence
+      - representation.text.plain_text
     finetype_domain: representation
     match_quality: partial
     expand: false
@@ -1922,11 +1920,11 @@ mappings:
 
   - gt_label: operating system
     source: dbpedia
-    finetype_label: technology.development.os
+    finetype_label: null
     finetype_domain: technology
-    match_quality: close
+    match_quality: semantic_only
     expand: false
-    notes: OS names; FineType has os type
+    notes: OS names; technology.development.os removed from taxonomy (v6 cleanup)
 
   - gt_label: software source code
     source: dbpedia
@@ -2095,7 +2093,7 @@ mappings:
     expand: false
   - gt_label: geojson
     source: profile_eval
-    finetype_label: geography.format.geojson
+    finetype_label: container.object.json
     finetype_domain: geography
     match_quality: direct
     expand: false
@@ -2192,7 +2190,7 @@ mappings:
     expand: false
   - gt_label: git sha
     source: profile_eval
-    finetype_label: technology.development.git_sha
+    finetype_label: technology.cryptographic.hash
     finetype_domain: technology
     match_quality: direct
     expand: false
@@ -2353,6 +2351,162 @@ mappings:
     source: profile_eval
     finetype_label: representation.format.color_hsl
     finetype_domain: representation
+    match_quality: direct
+    expand: false
+
+  # ─── Coverage datasets (datetime, finance, representation, technology) ───
+  # Datetime coverage
+  - gt_label: compact ymd
+    source: profile_eval
+    finetype_label: datetime.date.compact_ymd
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: rfc 3339
+    source: profile_eval
+    finetype_label: datetime.timestamp.rfc_3339
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: dmy dash
+    source: profile_eval
+    finetype_label: datetime.date.dmy_dash
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: ymd dot
+    source: profile_eval
+    finetype_label: datetime.date.ymd_dot
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: quarter
+    source: profile_eval
+    finetype_label: datetime.period.quarter
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: fiscal year
+    source: profile_eval
+    finetype_label: datetime.period.fiscal_year
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: iso 8601 offset
+    source: profile_eval
+    finetype_label: datetime.timestamp.iso_8601_offset
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: iso week
+    source: profile_eval
+    finetype_label: datetime.date.iso_week
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: clf timestamp
+    source: profile_eval
+    finetype_label: datetime.timestamp.clf
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: syslog bsd
+    source: profile_eval
+    finetype_label: datetime.timestamp.syslog_bsd
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: mdy dash
+    source: profile_eval
+    finetype_label: datetime.date.mdy_dash
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: compact dmy
+    source: profile_eval
+    finetype_label: datetime.date.compact_dmy
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  # Finance coverage
+  - gt_label: currency symbol
+    source: profile_eval
+    finetype_label: finance.currency.currency_symbol
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: bitcoin address
+    source: profile_eval
+    finetype_label: finance.crypto.bitcoin_address
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: isin
+    source: profile_eval
+    finetype_label: finance.securities.isin
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: cusip
+    source: profile_eval
+    finetype_label: finance.securities.cusip
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: lei
+    source: profile_eval
+    finetype_label: finance.securities.lei
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  # Representation coverage
+  - gt_label: scientific notation
+    source: profile_eval
+    finetype_label: representation.numeric.scientific_notation
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: decimal number comma
+    source: profile_eval
+    finetype_label: representation.numeric.decimal_number_comma
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: file size
+    source: profile_eval
+    finetype_label: representation.file.file_size
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: integer number
+    source: profile_eval
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  # Technology coverage
+  - gt_label: ip_v6
+    source: profile_eval
+    finetype_label: technology.internet.ip_v6
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: calver
+    source: profile_eval
+    finetype_label: technology.development.calver
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: ip_v4 with port
+    source: profile_eval
+    finetype_label: technology.internet.ip_v4_with_port
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: username
+    source: profile_eval
+    finetype_label: identity.person.username
+    finetype_domain: identity
     match_quality: direct
     expand: false
 

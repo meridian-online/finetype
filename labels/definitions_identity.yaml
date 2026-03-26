@@ -636,31 +636,6 @@ identity.person.gender_code:
     v1 migration: Was person.gender_code marked broad_words. Single character
     or code. Transform uppercases. Common: M (male), F (female), X (other/not specified).
 
-identity.person.gender_symbol:
-  title: "Gender Symbol"
-  description: >
-    Unicode symbol representing gender (♂, ♀, ⚧, etc.).
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    pattern: "^[♂♀⚧⚪]$"
-  tier: [VARCHAR, person]
-  release_priority: 3
-  aliases: null
-  samples:
-    - "♂"
-    - "♀"
-    - "⚧"
-  references: null
-  notes: >
-    v1 migration: Was person.gender_symbol. Single Unicode symbol.
-
 # identity.person.nationality: REMOVED in Phase 0 (NNFT-162)
 # Collapsed into representation.discrete.categorical. Short enumerated list.
 

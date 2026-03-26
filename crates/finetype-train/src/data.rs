@@ -348,7 +348,6 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         | "identity.person.full_name"
         | "identity.person.gender"
         | "identity.person.gender_code"
-        | "identity.person.gender_symbol"
         | "identity.person.last_name"
         | "identity.person.username"
         | "representation.text.entity_name" => return Some(0), // entity
@@ -380,9 +379,7 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         | "finance.banking.swift_bic"
         | "finance.crypto.bitcoin_address"
         | "finance.crypto.ethereum_address"
-        | "finance.payment.credit_card_expiration_date"
         | "finance.payment.credit_card_number"
-        | "finance.payment.paypal_email"
         | "finance.securities.cusip"
         | "finance.securities.isin"
         | "finance.securities.lei"
@@ -432,14 +429,10 @@ pub fn finetype_to_broad_category(ft_label: &str) -> Option<usize> {
         | "representation.file.extension"
         | "representation.file.mime_type"
         | "representation.scientific.measurement_unit"
-        | "representation.scientific.metric_prefix"
         | "representation.text.emoji"
-        | "representation.text.paragraph"
         | "representation.text.plain_text"
-        | "representation.text.sentence"
         | "representation.text.word"
         | "technology.cryptographic.hash"
-        | "technology.cryptographic.token_hex"
         | "technology.cryptographic.token_urlsafe"
         | "technology.development.calver"
         | "technology.development.os"
@@ -473,7 +466,6 @@ pub fn finetype_to_entity_subtype(ft_label: &str) -> Option<usize> {
         | "identity.person.username"
         | "identity.person.gender"
         | "identity.person.gender_code"
-        | "identity.person.gender_symbol"
         | "identity.person.blood_type" => Some(0), // person
         "representation.text.entity_name" => Some(2), // organization (conservative default)
         _ => None,
@@ -1296,7 +1288,7 @@ mod tests {
         assert_eq!(finetype_to_broad_category("container.object.json"), Some(1));
         // Text
         assert_eq!(
-            finetype_to_broad_category("representation.text.sentence"),
+            finetype_to_broad_category("representation.text.plain_text"),
             Some(5)
         );
         assert_eq!(

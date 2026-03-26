@@ -114,7 +114,6 @@ const NUMERIC_LABELS: &[&str] = &[
     "finance.currency.amount_comma_suffix",
     "finance.currency.amount_crypto",
     "finance.currency.amount_lakh",
-    "finance.currency.amount_minor_int",
     "finance.currency.amount_multisym",
     "finance.currency.amount_neg_trailing",
     "finance.currency.amount_nodecimal",
@@ -145,7 +144,6 @@ const GEOGRAPHIC_LABELS: &[&str] = &[
     "geography.coordinate.longitude",
     "geography.coordinate.mgrs",
     "geography.coordinate.plus_code",
-    "geography.format.geojson",
     "geography.format.wkt",
     "geography.index.h3",
     "geography.location.city",
@@ -166,7 +164,6 @@ const ENTITY_LABELS: &[&str] = &[
     "identity.person.full_name",
     "identity.person.gender",
     "identity.person.gender_code",
-    "identity.person.gender_symbol",
     "identity.person.last_name",
     "identity.person.username",
     "representation.text.entity_name",
@@ -178,7 +175,6 @@ const FORMAT_LABELS: &[&str] = &[
     "container.array.pipe_separated",
     "container.array.semicolon_separated",
     "container.array.whitespace_separated",
-    "container.key_value.form_data",
     "container.key_value.query_string",
     "container.object.csv",
     "container.object.html",
@@ -193,9 +189,7 @@ const FORMAT_LABELS: &[&str] = &[
     "finance.banking.swift_bic",
     "finance.crypto.bitcoin_address",
     "finance.crypto.ethereum_address",
-    "finance.payment.credit_card_expiration_date",
     "finance.payment.credit_card_number",
-    "finance.payment.paypal_email",
     "finance.securities.cusip",
     "finance.securities.figi",
     "finance.securities.isin",
@@ -256,7 +250,6 @@ const FORMAT_LABELS: &[&str] = &[
     "technology.cryptographic.jwt",
     // technology.development (structured references)
     "technology.development.docker_ref",
-    "technology.development.git_sha",
     // technology.identifier (structured IDs with embedded metadata)
     "technology.identifier.snowflake_id",
     "technology.identifier.tsid",
@@ -291,17 +284,13 @@ const TEXT_LABELS: &[&str] = &[
     "representation.file.mime_type",
     // representation.scientific (categorical — limited value sets)
     "representation.scientific.measurement_unit",
-    "representation.scientific.metric_prefix",
     "representation.scientific.smiles",
     // representation.text.* (free text)
     "representation.text.emoji",
-    "representation.text.paragraph",
     "representation.text.plain_text",
-    "representation.text.sentence",
     "representation.text.word",
     // technology.cryptographic.* (random/opaque strings; uuid moved to representation.identifier)
     "technology.cryptographic.hash",
-    "technology.cryptographic.token_hex",
     "technology.cryptographic.token_urlsafe",
     // technology.development.* (version strings)
     "technology.development.calver",
@@ -450,23 +439,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_250() {
+    fn test_total_is_239() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 250, "Map should contain exactly 250 types");
+        assert_eq!(map.len(), 239, "Map should contain exactly 239 types");
     }
 
     #[test]
     fn test_category_counts() {
         assert_eq!(TEMPORAL_LABELS.len(), 84, "temporal should have 84 types");
-        assert_eq!(NUMERIC_LABELS.len(), 24, "numeric should have 24 types");
+        assert_eq!(NUMERIC_LABELS.len(), 23, "numeric should have 23 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
-            25,
-            "geographic should have 25 types"
+            24,
+            "geographic should have 24 types"
         );
-        assert_eq!(ENTITY_LABELS.len(), 9, "entity should have 9 types");
-        assert_eq!(FORMAT_LABELS.len(), 83, "format should have 83 types");
-        assert_eq!(TEXT_LABELS.len(), 25, "text should have 25 types");
+        assert_eq!(ENTITY_LABELS.len(), 8, "entity should have 8 types");
+        assert_eq!(FORMAT_LABELS.len(), 79, "format should have 79 types");
+        assert_eq!(TEXT_LABELS.len(), 21, "text should have 21 types");
     }
 
     #[test]
@@ -512,7 +501,7 @@ mod tests {
             Some(BroadCategory::Format)
         );
         assert_eq!(
-            map.category_for("representation.text.sentence"),
+            map.category_for("representation.text.plain_text"),
             Some(BroadCategory::Text)
         );
         assert_eq!(map.category_for("nonexistent.type"), None);
@@ -560,27 +549,27 @@ mod tests {
         let geographic = map.eligible_labels(BroadCategory::Geographic);
         assert_eq!(
             geographic.len(),
-            25,
-            "geographic eligible should be 25 (no incoming overlaps)"
+            24,
+            "geographic eligible should be 24 (no incoming overlaps)"
         );
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);
-        // 26 primary + 3 incoming (coordinates, latitude, longitude)
-        assert_eq!(numeric.len(), 27, "numeric eligible should be 24+3=27");
+        // 23 primary + 3 incoming (coordinates, latitude, longitude)
+        assert_eq!(numeric.len(), 26, "numeric eligible should be 23+3=26");
 
         let entity = map.eligible_labels(BroadCategory::Entity);
-        // 9 primary + 4 incoming (email, email_display, phone_e164, phone_number)
-        assert_eq!(entity.len(), 13, "entity eligible should be 9+4=13");
+        // 8 primary + 4 incoming (email, email_display, phone_e164, phone_number)
+        assert_eq!(entity.len(), 12, "entity eligible should be 8+4=12");
 
         let format = map.eligible_labels(BroadCategory::Format);
-        // 83 primary + 2 incoming (postal_code, calling_code)
-        assert_eq!(format.len(), 85, "format eligible should be 83+2=85");
+        // 79 primary + 2 incoming (postal_code, calling_code)
+        assert_eq!(format.len(), 81, "format eligible should be 79+2=81");
 
         let text = map.eligible_labels(BroadCategory::Text);
         assert_eq!(
             text.len(),
-            25,
-            "text eligible should be 25 (no incoming overlaps)"
+            21,
+            "text eligible should be 21 (no incoming overlaps)"
         );
     }
 

@@ -734,45 +734,11 @@ fn post_process(result: &mut ClassificationResult, text: &str) {
         }
     }
 
-    // Rule 2: hash vs token_hex
-    //
-    // Cryptographic hashes have fixed lengths: 32 (MD5), 40 (SHA-1), 64 (SHA-256), 128 (SHA-512).
-    // Hex tokens have variable non-standard lengths. The model confuses these (58x token_hex→hash).
-    // A simple length check on the trimmed hex string resolves this definitively.
-    if result.label == "technology.cryptographic.hash"
-        || result.label == "technology.cryptographic.token_hex"
-    {
-        let trimmed = text.trim();
-        let is_hex = !trimmed.is_empty()
-            && trimmed
-                .bytes()
-                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase());
-        if is_hex {
-            let len = trimmed.len();
-            if len == 32 || len == 40 || len == 64 || len == 128 {
-                result.label = "technology.cryptographic.hash".to_string();
-            } else {
-                result.label = "technology.cryptographic.token_hex".to_string();
-            }
-        }
-    }
+    // Rule 2: token_hex collapsed into hash — all hex strings are now hash.
+    // (token_hex removed from taxonomy)
 
-    // Rule 3: emoji vs gender_symbol
-    //
-    // Gender symbols are a specific set: ♂ (U+2642), ♀ (U+2640), ⚧ (U+26A7), ⚪ (U+26AA).
-    // The model confuses emojis as gender symbols (96x). A character identity check resolves this.
-    if result.label == "identity.person.gender_symbol"
-        || result.label == "representation.text.emoji"
-    {
-        let trimmed = text.trim();
-        let is_gender_symbol = trimmed.chars().count() == 1
-            && matches!(trimmed.chars().next(), Some('♂' | '♀' | '⚧' | '⚪'));
-        if is_gender_symbol {
-            result.label = "identity.person.gender_symbol".to_string();
-        } else if !trimmed.is_empty() {
-            result.label = "representation.text.emoji".to_string();
-        }
-    }
+    // Rule 3: gender_symbol removed from taxonomy — resolve to emoji.
+    // (gender_symbol collapsed; emoji is the catch-all for symbol values)
 
     // Rule 4: ISSN vs postal_code
     //
@@ -1028,114 +994,8 @@ mod post_process_tests {
         assert_eq!(result.label, "datetime.timestamp.rfc_3339");
     }
 
-    // ── Rule 2: hash vs token_hex ────────────────────────────────────────────
-
-    #[test]
-    fn test_hash_md5_length_32() {
-        let mut result = make_result("technology.cryptographic.token_hex");
-        post_process(&mut result, "5d41402abc4b2a76b9719d911017c592");
-        assert_eq!(result.label, "technology.cryptographic.hash");
-    }
-
-    #[test]
-    fn test_hash_sha1_length_40() {
-        let mut result = make_result("technology.cryptographic.token_hex");
-        post_process(&mut result, "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
-        assert_eq!(result.label, "technology.cryptographic.hash");
-    }
-
-    #[test]
-    fn test_hash_sha256_length_64() {
-        let mut result = make_result("technology.cryptographic.token_hex");
-        post_process(
-            &mut result,
-            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-        );
-        assert_eq!(result.label, "technology.cryptographic.hash");
-    }
-
-    #[test]
-    fn test_token_hex_non_standard_length() {
-        let mut result = make_result("technology.cryptographic.hash");
-        post_process(&mut result, "a417b553b18d13027c23e8016c3466b81e70832254");
-        // 42 chars — not a standard hash length, should become token_hex
-        assert_eq!(result.label, "technology.cryptographic.token_hex");
-    }
-
-    #[test]
-    fn test_correct_hash_unchanged() {
-        let mut result = make_result("technology.cryptographic.hash");
-        post_process(&mut result, "5d41402abc4b2a76b9719d911017c592");
-        assert_eq!(result.label, "technology.cryptographic.hash");
-    }
-
-    #[test]
-    fn test_correct_token_hex_unchanged() {
-        let mut result = make_result("technology.cryptographic.token_hex");
-        post_process(&mut result, "deadbeefcafebabe00ff11");
-        // 22 chars — non-standard, stays as token_hex
-        assert_eq!(result.label, "technology.cryptographic.token_hex");
-    }
-
-    #[test]
-    fn test_hash_with_uppercase_not_reclassified() {
-        // Uppercase hex isn't lowercase-only, so rule doesn't fire
-        let mut result = make_result("technology.cryptographic.hash");
-        post_process(&mut result, "5D41402ABC4B2A76B9719D911017C592");
-        // Label unchanged — uppercase hex doesn't match our hex check
-        assert_eq!(result.label, "technology.cryptographic.hash");
-    }
-
-    // ── Rule 3: emoji vs gender_symbol ───────────────────────────────────────
-
-    #[test]
-    fn test_gender_symbol_male() {
-        let mut result = make_result("representation.text.emoji");
-        post_process(&mut result, "♂");
-        assert_eq!(result.label, "identity.person.gender_symbol");
-    }
-
-    #[test]
-    fn test_gender_symbol_female() {
-        let mut result = make_result("representation.text.emoji");
-        post_process(&mut result, "♀");
-        assert_eq!(result.label, "identity.person.gender_symbol");
-    }
-
-    #[test]
-    fn test_gender_symbol_transgender() {
-        let mut result = make_result("representation.text.emoji");
-        post_process(&mut result, "⚧");
-        assert_eq!(result.label, "identity.person.gender_symbol");
-    }
-
-    #[test]
-    fn test_emoji_not_gender_symbol() {
-        let mut result = make_result("identity.person.gender_symbol");
-        post_process(&mut result, "🎉");
-        assert_eq!(result.label, "representation.text.emoji");
-    }
-
-    #[test]
-    fn test_emoji_rocket_not_gender_symbol() {
-        let mut result = make_result("identity.person.gender_symbol");
-        post_process(&mut result, "🚀");
-        assert_eq!(result.label, "representation.text.emoji");
-    }
-
-    #[test]
-    fn test_correct_emoji_unchanged() {
-        let mut result = make_result("representation.text.emoji");
-        post_process(&mut result, "😀");
-        assert_eq!(result.label, "representation.text.emoji");
-    }
-
-    #[test]
-    fn test_correct_gender_symbol_unchanged() {
-        let mut result = make_result("identity.person.gender_symbol");
-        post_process(&mut result, "♂");
-        assert_eq!(result.label, "identity.person.gender_symbol");
-    }
+    // Rule 2 tests removed — token_hex collapsed into hash.
+    // Rule 3 tests removed — gender_symbol removed from taxonomy.
 
     // ── Rule 4: ISSN vs postal_code ──────────────────────────────────────────
 
@@ -1259,13 +1119,6 @@ mod post_process_tests {
         let mut result = make_result("identity.person.email");
         post_process(&mut result, "alice@gmail.com");
         assert_eq!(result.label, "identity.person.email");
-    }
-
-    #[test]
-    fn test_paypal_email_not_overridden() {
-        let mut result = make_result("finance.payment.paypal_email");
-        post_process(&mut result, "user@paypal.com");
-        assert_eq!(result.label, "finance.payment.paypal_email");
     }
 
     #[test]
