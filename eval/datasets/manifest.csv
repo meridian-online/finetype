@@ -313,3 +313,28 @@ earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,magNst,number
 earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,status,status
 earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,locationSource,category
 earthquakes_2024,eval/datasets/csv/earthquakes_2024.csv,magSource,category
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,compact_ymd,compact ymd
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,rfc_3339,rfc 3339
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,dmy_dash,dmy dash
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,ymd_dot,ymd dot
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,quarter,quarter
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,fiscal_year,fiscal year
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,iso_8601_offset,iso 8601 offset
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,iso_week,iso week
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,clf_timestamp,clf timestamp
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,syslog_bsd,syslog bsd
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,mdy_dash,mdy dash
+datetime_coverage,eval/datasets/csv/datetime_coverage.csv,compact_dmy,compact dmy
+finance_coverage,eval/datasets/csv/finance_coverage.csv,currency_symbol,currency symbol
+finance_coverage,eval/datasets/csv/finance_coverage.csv,bitcoin_address,bitcoin address
+finance_coverage,eval/datasets/csv/finance_coverage.csv,isin,isin
+finance_coverage,eval/datasets/csv/finance_coverage.csv,cusip,cusip
+finance_coverage,eval/datasets/csv/finance_coverage.csv,lei,lei
+representation_coverage,eval/datasets/csv/representation_coverage.csv,scientific_notation,scientific notation
+representation_coverage,eval/datasets/csv/representation_coverage.csv,decimal_number_comma,decimal number comma
+representation_coverage,eval/datasets/csv/representation_coverage.csv,file_size,file size
+representation_coverage,eval/datasets/csv/representation_coverage.csv,integer_number,integer number
+technology_coverage,eval/datasets/csv/technology_coverage.csv,ip_v6,ip_v6
+technology_coverage,eval/datasets/csv/technology_coverage.csv,calver,calver
+technology_coverage,eval/datasets/csv/technology_coverage.csv,ip_v4_with_port,ip_v4 with port
+technology_coverage,eval/datasets/csv/technology_coverage.csv,username,username
