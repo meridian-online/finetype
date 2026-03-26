@@ -30,7 +30,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ## Current State
 
 **Version:** 0.6.12
-**Taxonomy:** 250 definitions across 7 domains (container: 12, datetime: 84, finance: 31, geography: 25, identity: 34, representation: 36, technology: 28) — all generators pass, 100% alignment
+**Taxonomy:** 239 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 24, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
 **Default model:** Multi-branch→Sharpen pipeline with sherlock-v4-sibling (4-branch: char+embed+stats+header). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: 155/190 (81.6% label). Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
 **Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 19 value-based disambiguation rules (R1–R19), Model2Vec semantic header hints.
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
@@ -103,7 +103,7 @@ finetype-eval  (standalone — eval binaries, depends on csv/parquet/duckdb/arro
    - `apply_header_sharpen()`: Model2Vec semantic header matching
 5. Post-hoc locale detection via `validation_by_locale` patterns
 
-**Value-level (legacy):** Single string → type label via `CharClassifier` (flat, 250 classes) or `TieredClassifier` (34 CharCNN models). Both implement `ValueClassifier` trait. Not used in the default pipeline.
+**Value-level (legacy):** Single string → type label via `CharClassifier` (flat, 239 classes) or `TieredClassifier` (34 CharCNN models). Both implement `ValueClassifier` trait. Not used in the default pipeline.
 
 Key implementation files: `column.rs` (Sharpen rules + pipeline), `semantic.rs` (header hints), `sibling_context.rs` (attention). Legacy Sense→CharCNN path exists but multi-branch is the default for CLI, MCP, and DuckDB.
 
@@ -173,7 +173,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen default: 155/190 (81.6% label, 90.5% domain). Legacy Sense→Sharpen: 188/190 (98.9% label). 29 datasets, 314 manifest entries, 250-type taxonomy.
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen default: 155/190 (81.6% label, 90.5% domain). Legacy Sense→Sharpen: 188/190 (98.9% label). 29 datasets, 314 manifest entries, 239-type taxonomy.
 **Actionability eval** — 99.9% transform success rate (232k values, 283 columns, 120 types).
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.

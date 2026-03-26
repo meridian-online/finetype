@@ -415,33 +415,6 @@ container.key_value.query_string:
     Values are typically URL-encoded. Recursive inference parses
     key-value pairs and types each value independently.
 
-container.key_value.form_data:
-  title: "Form Data"
-  description: >
-    HTML form data in application/x-www-form-urlencoded format.
-    Similar to query string: key1=value1&key2=value2.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: VARCHAR
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: "RECURSIVE_PARSE_FORM_DATA({col})"
-  validation:
-    type: string
-    pattern: "^[^=&]+=([^&]*)(&[^=&]+=[^&]*)*$"
-  tier: [VARCHAR, key_value]
-  release_priority: 3
-  aliases: null
-  samples:
-    - "username=john&password=secret"
-    - "email=user@example.com&subscribe=yes"
-  references: null
-  notes: >
-    v1 migration: New for v2. Form data is identical format to query string.
-    Distinction is semantic (form submission vs URL parameters).
-    Release priority 2 (slightly higher than query_string in modern contexts).
-
 # ═════════════════════════════════════════════════════════════════════
 # Tiering Notes:
 # ─────────────────────────────────────────────────────────────────────

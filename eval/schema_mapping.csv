@@ -50,7 +50,6 @@ publisher,dbpedia,representation.text.entity_name,,close,false
 producer,both,identity.person.full_name,identity,close,false
 manufacturer,both,representation.text.word,representation,close,false
 address,dbpedia,geography.address.full_address,geography,close,false
-address,dbpedia,geography.address.full_address,geography,close,false
 address,dbpedia,geography.coordinate.coordinates,geography,close,false
 county,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
@@ -72,7 +71,6 @@ timestamp,profile,datetime.timestamp.dmy_hm,datetime,partial,false
 sql timestamp,profile,datetime.timestamp.sql_standard,datetime,direct,false
 time 24h,profile,datetime.time.hm_24h,datetime,partial,false
 time 24h,profile,datetime.time.hms_24h,datetime,partial,false
-date,dbpedia,datetime.date.iso,datetime,partial,false
 date,dbpedia,datetime.date.iso,datetime,partial,false
 date,dbpedia,datetime.date.mdy_slash,datetime,partial,false
 date,dbpedia,datetime.date.dmy_slash,datetime,partial,false
@@ -356,6 +354,31 @@ cas number,profile_eval,representation.scientific.cas_number,representation,dire
 inchi,profile_eval,representation.scientific.inchi,representation,direct,false
 smiles,profile_eval,representation.scientific.smiles,representation,direct,false
 color hsl,profile_eval,representation.format.color_hsl,representation,direct,false
+compact ymd,profile_eval,datetime.date.compact_ymd,datetime,direct,false
+rfc 3339,profile_eval,datetime.timestamp.rfc_3339,datetime,direct,false
+dmy dash,profile_eval,datetime.date.dmy_dash,datetime,direct,false
+ymd dot,profile_eval,datetime.date.ymd_dot,datetime,direct,false
+quarter,profile_eval,datetime.period.quarter,datetime,direct,false
+fiscal year,profile_eval,datetime.period.fiscal_year,datetime,direct,false
+iso 8601 offset,profile_eval,datetime.timestamp.iso_8601_offset,datetime,direct,false
+iso week,profile_eval,datetime.date.iso_week,datetime,direct,false
+clf timestamp,profile_eval,datetime.timestamp.clf,datetime,direct,false
+syslog bsd,profile_eval,datetime.timestamp.syslog_bsd,datetime,direct,false
+mdy dash,profile_eval,datetime.date.mdy_dash,datetime,direct,false
+compact dmy,profile_eval,datetime.date.compact_dmy,datetime,direct,false
+currency symbol,profile_eval,finance.currency.currency_symbol,finance,direct,false
+bitcoin address,profile_eval,finance.crypto.bitcoin_address,finance,direct,false
+isin,profile_eval,finance.securities.isin,finance,direct,false
+cusip,profile_eval,finance.securities.cusip,finance,direct,false
+lei,profile_eval,finance.securities.lei,finance,direct,false
+scientific notation,profile_eval,representation.numeric.scientific_notation,representation,direct,false
+decimal number comma,profile_eval,representation.numeric.decimal_number_comma,representation,direct,false
+file size,profile_eval,representation.file.file_size,representation,direct,false
+integer number,profile_eval,representation.numeric.integer_number,representation,direct,false
+ip_v6,profile_eval,technology.internet.ip_v6,technology,direct,false
+calver,profile_eval,technology.development.calver,technology,direct,false
+ip_v4 with port,profile_eval,technology.internet.ip_v4_with_port,technology,direct,false
+username,profile_eval,identity.person.username,identity,direct,false
 birth date,sherlock,datetime.date.iso,datetime,close,false
 birth place,sherlock,geography.location.city,geography,close,false
 continent,sherlock,geography.location.continent,geography,direct,false
@@ -386,27 +409,3 @@ requirement,sherlock,,representation,semantic_only,false
 result,sherlock,,,semantic_only,false
 service,sherlock,,,semantic_only,false
 team name,sherlock,,,semantic_only,false
-scientific notation,profile_eval,representation.numeric.scientific_notation,representation,direct,false
-decimal number comma,profile_eval,representation.numeric.decimal_number_comma,representation,direct,false
-compact ymd,profile_eval,datetime.date.compact_ymd,datetime,direct,false
-rfc 3339,profile_eval,datetime.timestamp.rfc_3339,datetime,direct,false
-dmy dash,profile_eval,datetime.date.dmy_dash,datetime,direct,false
-ymd dot,profile_eval,datetime.date.ymd_dot,datetime,direct,false
-quarter,profile_eval,datetime.period.quarter,datetime,direct,false
-fiscal year,profile_eval,datetime.period.fiscal_year,datetime,direct,false
-currency symbol,profile_eval,finance.currency.currency_symbol,finance,direct,false
-bitcoin address,profile_eval,finance.crypto.bitcoin_address,finance,direct,false
-isin,profile_eval,finance.securities.isin,finance,direct,false
-cusip,profile_eval,finance.securities.cusip,finance,direct,false
-ip_v6,profile_eval,technology.internet.ip_v6,technology,direct,false
-calver,profile_eval,technology.development.calver,technology,direct,false
-username,profile_eval,identity.person.username,identity,direct,false
-iso 8601 offset,profile_eval,datetime.timestamp.iso_8601_offset,datetime,direct,false
-iso week,profile_eval,datetime.date.iso_week,datetime,direct,false
-clf timestamp,profile_eval,datetime.timestamp.clf,datetime,direct,false
-syslog bsd,profile_eval,datetime.timestamp.syslog_bsd,datetime,direct,false
-mdy dash,profile_eval,datetime.date.mdy_dash,datetime,direct,false
-compact dmy,profile_eval,datetime.date.compact_dmy,datetime,direct,false
-integer number,profile_eval,representation.numeric.integer_number,representation,direct,false
-lei,profile_eval,finance.securities.lei,finance,direct,false
-ip_v4 with port,profile_eval,technology.internet.ip_v4_with_port,technology,direct,false

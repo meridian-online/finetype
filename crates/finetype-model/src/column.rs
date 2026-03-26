@@ -47,7 +47,7 @@ impl ValueClassifier for NoopClassifier {
 /// feature vectors (NNFT-250, expanded in NNFT-266).
 ///
 /// Used by disambiguation rules for column-level decisions. Variance is the
-/// critical new signal: zero length-variance distinguishes git_sha from hash,
+/// critical new signal: zero length-variance distinguishes structured codes,
 /// and dot-segment variance distinguishes structured codes from free-form text.
 /// Aggregated column-level features: per-feature mean, variance, min, max
 /// across all sampled values. Used by disambiguation rules and the spike
@@ -183,9 +183,9 @@ const BOOLEAN_LABELS: &[&str] = &[
     "representation.boolean.binary",   // NNFT-075: 0/1
     "representation.boolean.initials", // NNFT-075: T/F, Y/N
     "representation.boolean.terms",    // NNFT-075: true/false, yes/no, on/off
-    // Legacy labels removed in v6 cleanup: technology.development.boolean,
-    // technology.data.boolean, representation.logical.boolean — none exist in
-    // the current 250-type taxonomy or label_map.json.
+    "technology.development.boolean",  // legacy (pre-NNFT-075 model)
+    "representation.logical.boolean",  // legacy interim label
+    "technology.data.boolean",         // legacy
 ];
 
 /// Geography location types used by both geography protection (header hints)
@@ -775,7 +775,7 @@ impl ColumnClassifier {
         // Step 5b: Feature-based disambiguation (NNFT-250, extended to legacy path).
         // Compute aggregated column features and apply feature disambiguation rules
         // (F1–F6). Previously only ran in Sense→Sharpen path; now also in legacy
-        // to fix git_sha/hash (F4) and decimal/numeric_code (F5) when Sense is absent.
+        // to fix decimal/numeric_code (F5) when Sense is absent.
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
             sample.iter().map(|v| extract_features(v)).collect();
         let column_features = aggregate_features(&per_value_features);
@@ -1784,7 +1784,7 @@ impl ColumnClassifier {
                         //   "epoch" → unix_seconds vs NPI (medical ID)
                         //   "cabin" → alphanumeric_id vs ICD10 (medical code)
                         // Does NOT fire when the base type name matches (e.g.,
-                        // representation.identifier.uuid vs representation.identifier.uuid)
+                        // representation.identifier.uuid vs technology.identifier.uuid)
                         // or when only the domain prefix differs for the same concept.
                         if !geo_handled && hint_is_hardcoded && result.label != hinted_type {
                             let hint_domain = hinted_type.split('.').next().unwrap_or("");
@@ -2416,7 +2416,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
     // threshold alone — high slash segments is a strong enough signal.
     let slash_segments = column_features.mean[feature_idx::SEGMENT_COUNT_SLASH];
     if result.label == "technology.internet.hostname" && slash_segments >= 1.5 {
-        result.label = "technology.development.docker_ref".to_string();
+        result.label = "technology.container.docker_ref".to_string();
         result.confidence = result.confidence.max(0.7);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("feature_slash_segments:{:.1}", slash_segments));
@@ -2441,7 +2441,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        result.label = "geography.transportation.hs_code".to_string();
+        result.label = "geography.trade.hs_code".to_string();
         result.confidence = result.confidence.max(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!(
@@ -2450,23 +2450,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         ));
     }
 
-    // Rule F4: git_sha vs hash — length variance. Unchanged — no vote dependency.
-    let length_variance = column_features.variance[feature_idx::LENGTH];
-    let hex_ratio = column_features.mean[feature_idx::IS_HEX_STRING];
-    let mean_length = column_features.mean[feature_idx::LENGTH];
-    if result.label == "technology.cryptographic.hash"
-        && length_variance < 0.01
-        && hex_ratio >= 0.95
-        && (mean_length - 40.0).abs() < 1.0
-    {
-        result.label = "technology.development.git_sha".to_string();
-        result.confidence = result.confidence.max(0.8);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!(
-            "feature_git_sha:len_var={:.4},hex={:.2},len={:.0}",
-            length_variance, hex_ratio, mean_length
-        ));
-    }
+    // Rule F4: git_sha collapsed into technology.cryptographic.hash — rule removed.
 
     // Rule F5: numeric_code without leading zeros → integer_number or decimal_number.
     // Unchanged — no vote dependency.
@@ -2829,7 +2813,7 @@ fn sharpen_select_fallback(
 /// a feature signal is strong enough to override the current prediction.
 ///
 /// NNFT-266: expanded to use variance/min/max statistics and float-parseability
-/// for git_sha/hash and hs_code/decimal_number disambiguation.
+/// for hs_code/decimal_number disambiguation.
 fn feature_disambiguate(
     result: &mut ColumnResult,
     column_features: &ColumnFeatures,
@@ -2875,9 +2859,9 @@ fn feature_disambiguate(
         // Multiple slash segments → likely docker refs
         let docker_in_votes = votes
             .iter()
-            .any(|(l, _)| l == "technology.development.docker_ref");
+            .any(|(l, _)| l == "technology.container.docker_ref");
         if docker_in_votes {
-            result.label = "technology.development.docker_ref".to_string();
+            result.label = "technology.container.docker_ref".to_string();
             result.confidence = result.confidence.max(0.7);
             result.disambiguation_applied = true;
             result.disambiguation_rule =
@@ -2918,16 +2902,16 @@ fn feature_disambiguate(
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.transportation.hs_code");
+        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.trade.hs_code");
         if hs_in_votes {
             let hs_votes = votes
                 .iter()
-                .find(|(l, _)| l == "geography.transportation.hs_code")
+                .find(|(l, _)| l == "geography.trade.hs_code")
                 .map(|(_, c)| *c)
                 .unwrap_or(0);
             let hs_frac = hs_votes as f32 / n_samples as f32;
             if hs_frac >= 0.10 {
-                result.label = "geography.transportation.hs_code".to_string();
+                result.label = "geography.trade.hs_code".to_string();
                 result.confidence = hs_frac.max(0.6);
                 result.disambiguation_applied = true;
                 result.disambiguation_rule = Some(format!(
@@ -2938,38 +2922,7 @@ fn feature_disambiguate(
         }
     }
 
-    // Rule F4: git_sha vs hash — length variance distinguishes uniform-length
-    // git SHAs from mixed-length hashes (NNFT-266).
-    //
-    // Git SHAs are always exactly 40 hex characters → zero length variance.
-    // General hash columns contain MD5 (32), SHA1 (40), SHA256 (64) → high
-    // length variance (822.6 per Spike A). Near-zero length variance combined
-    // with high hex ratio is a perfect separator.
-    //
-    // The CharCNN model doesn't produce git_sha votes (all 40-char hex strings
-    // score as hash), so we cannot require git_sha in the vote distribution.
-    // Instead we use a length check: mean length ~40 (SHA-1) is the definitive
-    // git SHA fingerprint. This is safe because:
-    //   - MD5 = 32 chars, SHA-256 = 64 chars — neither is 40
-    //   - RIPEMD-160 = 40 chars but exceedingly rare in tabular data
-    //   - The combination of hash prediction + zero variance + len=40 + all hex
-    //     is effectively unique to git SHAs
-    let length_variance = column_features.variance[feature_idx::LENGTH];
-    let hex_ratio = column_features.mean[feature_idx::IS_HEX_STRING];
-    let mean_length = column_features.mean[feature_idx::LENGTH];
-    if result.label == "technology.cryptographic.hash"
-        && length_variance < 0.01
-        && hex_ratio >= 0.95
-        && (mean_length - 40.0).abs() < 1.0
-    {
-        result.label = "technology.development.git_sha".to_string();
-        result.confidence = result.confidence.max(0.8);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!(
-            "feature_git_sha:len_var={:.4},hex={:.2},len={:.0}",
-            length_variance, hex_ratio, mean_length
-        ));
-    }
+    // Rule F4: git_sha collapsed into technology.cryptographic.hash — rule removed.
 
     // Rule F5: numeric_code without leading zeros → integer_number or decimal_number
     // (NNFT-272, extended for decimal disambiguation).
@@ -3215,7 +3168,7 @@ fn disambiguate(
     // Rule 16: Text length demotion — full_address predictions where
     // the median value length exceeds 100 characters are almost certainly
     // free-form text (descriptions, paragraphs, recipe steps) rather than
-    // street addresses. Demote to representation.text.sentence.
+    // street addresses. Demote to representation.text.plain_text.
     // Threshold 100 gives 0% false demotion rate on SOTAB evaluation data.
     if let Some((label, rule)) = disambiguate_text_length_demotion(values, votes) {
         return Some((label, rule));
@@ -3764,7 +3717,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("technology.internet.ip_v4");
         }
         "uuid" | "guid" => {
-            return Some("representation.identifier.uuid");
+            return Some("technology.identifier.uuid");
         }
         "gender" | "sex" => {
             return Some("identity.person.gender");
@@ -3792,7 +3745,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         | "duration hours" | "duration hrs" | "duration ms" | "elapsed" | "elapsed time" => {
             return Some("representation.numeric.integer_number");
         }
-        // Attendance / headcount — large integers confused with amount_minor_int (NNFT-254)
+        // Attendance / headcount — large integers (NNFT-254)
         "attendance" | "headcount" | "participants" | "crowd size" | "capacity" => {
             return Some("representation.numeric.integer_number");
         }
@@ -3840,7 +3793,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("geography.location.state");
         }
         "currency" | "currency code" => {
-            return Some("finance.currency.currency_code");
+            return Some("identity.financial.currency_code");
         }
         // "id" | "identifier" — REMOVED (decision 0034). ID columns are genuinely
         // ambiguous (numeric, UUID, alphanumeric). Let the model decide from values.
@@ -3890,8 +3843,10 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "ean" | "barcode" | "gtin" | "upc" => {
             return Some("identity.commerce.ean");
         }
-        // "os" | "operating system" | "platform" — REMOVED (v6 cleanup).
-        // technology.development.os does not exist in taxonomy. Let the model decide.
+        // Operating system
+        "os" | "operating system" | "platform" => {
+            return Some("technology.development.os");
+        }
         // Occupation / job title — collapsed to categorical (NNFT-162)
         "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role" | "position" => {
             return Some("representation.discrete.categorical");
@@ -3955,17 +3910,19 @@ fn header_hint(header: &str) -> Option<&'static str> {
         }
     }
     if h.contains("address") && !h.contains("email") && !h.contains("ip") && !h.contains("mac") {
-        // "street address", "full address", or bare "address" → full_address
-        // (v6 cleanup: geography.address.street_address doesn't exist in taxonomy;
-        //  "street address" columns typically contain full addresses like "123 Main St")
+        // "street address" or "street_address" → street_address
+        // "full address" → full_address
+        // Bare "address" → full_address (NNFT-235: more commonly means full address)
+        if h.contains("street") {
+            return Some("geography.address.street_address");
+        }
         return Some("geography.address.full_address");
     }
     if h.contains("street") {
-        // Bare "street" header without "address" — still likely a full address column
-        return Some("geography.address.full_address");
+        return Some("geography.address.street_address");
     }
     if h.contains("born") || h.contains("birth") || h.contains("dob") {
-        return Some("datetime.date.iso");
+        return Some("datetime.date.iso_date");
     }
     // Specific timestamp formats — must precede the generic date/timestamp catch-all.
     // Note: underscores are already replaced with spaces by header normalization.
@@ -3999,7 +3956,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("identity.person.height");
     }
     if h.contains("password") || h.contains("passwd") {
-        return Some("identity.person.password");
+        return Some("identity.credential.password");
     }
     if h.contains("url") || h.contains("uri") || h.contains("link") || h.contains("href") {
         return Some("technology.internet.url");
@@ -4576,7 +4533,7 @@ fn disambiguate_utc_offset_override(values: &[String]) -> Option<(String, String
 /// overcall has a median of 53+ chars.
 ///
 /// Rule: If the top vote is full_address and the median non-empty value
-/// length exceeds 100 characters, demote to representation.text.sentence.
+/// length exceeds 100 characters, demote to representation.text.plain_text.
 /// Threshold 100 gives 0% false demotion rate on evaluation data.
 fn disambiguate_text_length_demotion(
     values: &[String],
@@ -4604,7 +4561,7 @@ fn disambiguate_text_length_demotion(
 
     if median > 100 {
         Some((
-            "representation.text.sentence".to_string(),
+            "representation.text.plain_text".to_string(),
             "text_length_demotion_full_address".to_string(),
         ))
     } else {
@@ -5537,7 +5494,7 @@ mod tests {
             .map(String::from)
             .collect();
         let top_labels = vec![
-            "representation.boolean.binary",
+            "representation.logical.boolean",
             "representation.numeric.integer_number",
         ];
 
@@ -5555,7 +5512,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.boolean.binary"];
+        let top_labels = vec!["representation.logical.boolean"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         // Should return None — this IS a boolean column (only 2 unique, spread=1)
@@ -5569,7 +5526,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.boolean.binary", "representation.text.word"];
+        let top_labels = vec!["representation.logical.boolean", "representation.text.word"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(result.is_some());
@@ -5585,7 +5542,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.boolean.binary"];
+        let top_labels = vec!["representation.logical.boolean"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         // Should return None — T/F is a valid boolean encoding
@@ -5657,7 +5614,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["geography.transportation.iata_code"];
+        let top_labels = vec!["geography.transport.iata_code"];
 
         let result = disambiguate_categorical(&values, &top_labels);
         assert!(result.is_none());
@@ -5760,7 +5717,7 @@ mod tests {
         assert_eq!(header_hint("URL"), Some("technology.internet.url"));
         assert_eq!(header_hint("website"), Some("technology.internet.url"));
         assert_eq!(header_hint("ip_address"), Some("technology.internet.ip_v4"));
-        assert_eq!(header_hint("uuid"), Some("representation.identifier.uuid"));
+        assert_eq!(header_hint("uuid"), Some("technology.identifier.uuid"));
         // "port" header hint removed in NNFT-242
     }
 
@@ -5772,8 +5729,8 @@ mod tests {
             Some("datetime.timestamp.iso_8601")
         );
         assert_eq!(header_hint("year"), Some("datetime.component.year"));
-        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso"));
-        assert_eq!(header_hint("dob"), Some("datetime.date.iso"));
+        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso_date"));
+        assert_eq!(header_hint("dob"), Some("datetime.date.iso_date"));
         // Specific timestamp formats take priority over generic catch-all
         assert_eq!(
             header_hint("rfc_2822_timestamp"),
@@ -5943,21 +5900,21 @@ mod tests {
 
     #[test]
     fn test_boolean_override_with_current_model_label() {
-        // Model predicts representation.boolean.binary but values span 0-8 →
-        // override to integer_number (v6: updated from stale technology.development.boolean)
+        // The actual model outputs "technology.development.boolean", not the
+        // previously-checked labels. Verify the override fires for this label.
         let values: Vec<String> = vec!["0", "1", "2", "3", "0", "1", "4", "0", "5", "8"]
             .into_iter()
             .map(String::from)
             .collect();
         let top_labels = vec![
-            "representation.boolean.binary",
+            "technology.development.boolean",
             "representation.numeric.integer_number",
         ];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(
             result.is_some(),
-            "Boolean override must trigger for representation.boolean.binary with wide spread"
+            "Boolean override must trigger for technology.development.boolean"
         );
         let (label, rule) = result.unwrap();
         assert_eq!(label, "representation.numeric.integer_number");
@@ -5966,12 +5923,12 @@ mod tests {
 
     #[test]
     fn test_boolean_override_preserves_real_boolean_current_label() {
-        // Actual {0,1} boolean column should NOT override
+        // Actual {0,1} boolean column with current model label should NOT override
         let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1", "0", "1"]
             .into_iter()
             .map(String::from)
             .collect();
-        let top_labels = vec!["representation.boolean.binary"];
+        let top_labels = vec!["technology.development.boolean"];
 
         let result = disambiguate_boolean_override(&values, &top_labels);
         assert!(
@@ -7606,7 +7563,7 @@ identity.person.phone_number:
         let result = disambiguate_text_length_demotion(&values, &votes);
         assert!(result.is_some(), "Should demote long text overcall");
         let (label, rule) = result.unwrap();
-        assert_eq!(label, "representation.text.sentence");
+        assert_eq!(label, "representation.text.plain_text");
         assert_eq!(rule, "text_length_demotion_full_address");
     }
 
@@ -8672,8 +8629,8 @@ datetime.component.day_of_week:
     }
 
     #[test]
-    fn test_git_sha_uniform_length_zero_variance() {
-        // Git SHAs: all exactly 40 hex chars → zero length variance
+    fn test_uniform_length_hex_zero_variance() {
+        // Uniform-length hex strings: all exactly 40 chars → zero length variance
         let shas = [
             "a".repeat(40),
             "b1c2d3e4f5a6b7c8d9e0a1b2c3d4e5f6a7b8c9d0".to_string(),
@@ -8686,13 +8643,13 @@ datetime.component.day_of_week:
         // Length variance should be exactly 0 (all same length)
         assert!(
             cf.variance[feature_idx::LENGTH] < 0.01,
-            "git SHA length variance should be ~0, got {}",
+            "uniform hex length variance should be ~0, got {}",
             cf.variance[feature_idx::LENGTH]
         );
         // All should be hex
         assert!(
             cf.mean[feature_idx::IS_HEX_STRING] >= 0.95,
-            "git SHAs should all be hex, got {}",
+            "uniform hex strings should all be hex, got {}",
             cf.mean[feature_idx::IS_HEX_STRING]
         );
     }
@@ -8723,102 +8680,7 @@ datetime.component.day_of_week:
         );
     }
 
-    #[test]
-    fn test_rule_f4_git_sha_override() {
-        // Simulate: hash wins the vote, but features show zero length variance,
-        // all hex, and mean length = 40 (SHA-1 fingerprint)
-        let mut result = ColumnResult {
-            label: "technology.cryptographic.hash".to_string(),
-            confidence: 0.99,
-            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
-            disambiguation_applied: false,
-            disambiguation_rule: None,
-            samples_used: 100,
-            detected_locale: None,
-            is_generic: false,
-            column_features: None,
-        };
-
-        // Build column features with zero length variance, high hex, len=40
-        let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
-        cf.mean[feature_idx::LENGTH] = 40.0;
-        cf.variance[feature_idx::LENGTH] = 0.0;
-
-        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
-
-        feature_disambiguate(&mut result, &cf, &votes, 100);
-
-        assert_eq!(result.label, "technology.development.git_sha");
-        assert!(result.disambiguation_applied);
-        assert!(result
-            .disambiguation_rule
-            .as_ref()
-            .unwrap()
-            .starts_with("feature_git_sha"));
-    }
-
-    #[test]
-    fn test_rule_f4_no_override_when_variance_high() {
-        // Hash column with mixed lengths — should NOT override to git_sha
-        let mut result = ColumnResult {
-            label: "technology.cryptographic.hash".to_string(),
-            confidence: 0.99,
-            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
-            disambiguation_applied: false,
-            disambiguation_rule: None,
-            samples_used: 100,
-            detected_locale: None,
-            is_generic: false,
-            column_features: None,
-        };
-
-        let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
-        cf.mean[feature_idx::LENGTH] = 45.3;
-        cf.variance[feature_idx::LENGTH] = 177.56; // high variance = mixed hash lengths
-
-        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
-
-        feature_disambiguate(&mut result, &cf, &votes, 100);
-
-        assert_eq!(
-            result.label, "technology.cryptographic.hash",
-            "should NOT override when length variance is high"
-        );
-        assert!(!result.disambiguation_applied);
-    }
-
-    #[test]
-    fn test_rule_f4_no_override_when_length_not_40() {
-        // Uniform-length hex but NOT length 40 (e.g., MD5 at 32) — should NOT override
-        let mut result = ColumnResult {
-            label: "technology.cryptographic.hash".to_string(),
-            confidence: 0.99,
-            vote_distribution: vec![("technology.cryptographic.hash".to_string(), 1.0)],
-            disambiguation_applied: false,
-            disambiguation_rule: None,
-            samples_used: 100,
-            detected_locale: None,
-            is_generic: false,
-            column_features: None,
-        };
-
-        let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::IS_HEX_STRING] = 1.0;
-        cf.mean[feature_idx::LENGTH] = 32.0; // MD5 length
-        cf.variance[feature_idx::LENGTH] = 0.0; // zero variance
-
-        let votes = vec![("technology.cryptographic.hash".to_string(), 100)];
-
-        feature_disambiguate(&mut result, &cf, &votes, 100);
-
-        assert_eq!(
-            result.label, "technology.cryptographic.hash",
-            "should NOT override for non-40-char uniform hex"
-        );
-        assert!(!result.disambiguation_applied);
-    }
+    // Rule F4 tests removed — git_sha collapsed into technology.cryptographic.hash.
 
     #[test]
     fn test_rule_f5_numeric_code_demoted_without_leading_zeros() {
@@ -8953,7 +8815,7 @@ datetime.component.day_of_week:
             confidence: 0.80,
             vote_distribution: vec![
                 ("representation.numeric.decimal_number".to_string(), 0.70),
-                ("geography.transportation.hs_code".to_string(), 0.20),
+                ("geography.trade.hs_code".to_string(), 0.20),
             ],
             disambiguation_applied: false,
             disambiguation_rule: None,
@@ -8970,12 +8832,12 @@ datetime.component.day_of_week:
 
         let votes = vec![
             ("representation.numeric.decimal_number".to_string(), 70),
-            ("geography.transportation.hs_code".to_string(), 20),
+            ("geography.trade.hs_code".to_string(), 20),
         ];
 
         feature_disambiguate(&mut result, &cf, &votes, 100);
 
-        assert_eq!(result.label, "geography.transportation.hs_code");
+        assert_eq!(result.label, "geography.trade.hs_code");
         assert!(result.disambiguation_applied);
         assert!(result
             .disambiguation_rule
@@ -9149,7 +9011,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "technology.development.docker_ref",
+            result.label, "technology.container.docker_ref",
             "F2 should fire on hostname with high slash segments even without docker_ref in votes"
         );
         assert!(result.disambiguation_applied);
@@ -9214,7 +9076,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "geography.transportation.hs_code",
+            result.label, "geography.trade.hs_code",
             "F3 should fire on decimal_number with HS code features even without hs_code in votes"
         );
         assert!(result.disambiguation_applied);

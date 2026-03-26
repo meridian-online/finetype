@@ -2551,31 +2551,36 @@ datetime.date.month_year_slash:
   title: Month/Year (slash-separated)
   description: >
     Numeric Month/Year with slash separator. No day component.
-    Billing data, credit card contexts, expiration-like formats.
+    Accepts both MM/YYYY and MM/YY formats. Common in billing data,
+    credit card expiration dates, and financial periodization.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
   format_string: "%m/%Y"
-  transform: "strptime('01/' || {col}, '%d/%m/%Y')::DATE"
+  transform: "CASE WHEN LENGTH({col}) = 5 THEN strptime('01/' || SUBSTRING({col}, 1, 2) || '/20' || SUBSTRING({col}, 4, 2), '%d/%m/%Y')::DATE ELSE strptime('01/' || {col}, '%d/%m/%Y')::DATE END"
   transform_ext: null
   decompose:
     month: "CAST(SUBSTRING({col}, 1, 2) AS INT)"
-    year: "CAST(SUBSTRING({col}, 4, 4) AS INT)"
+    year: "CASE WHEN LENGTH({col}) = 5 THEN 2000 + CAST(SUBSTRING({col}, 4, 2) AS INT) ELSE CAST(SUBSTRING({col}, 4, 4) AS INT) END"
   validation:
     type: string
-    pattern: "^(0[1-9]|1[0-2])/\\d{4}$"
-    minLength: 7
+    pattern: "^(0[1-9]|1[0-2])/(\\d{2}|\\d{4})$"
+    minLength: 5
     maxLength: 7
   tier: [VARCHAR, date]
   release_priority: 4
-  aliases: []
+  aliases: [card_expiry]
   samples:
     - "01/2024"
     - "12/2023"
     - "06/2000"
+    - "12/25"
+    - "03/26"
   references: null
   notes: >
     New in format coverage expansion. Billing data, financial periodization.
+    Widened to accept MM/YY format (credit card expiration dates) after
+    collapsing finance.payment.credit_card_expiration_date into this type.
 
 datetime.date.weekday_dmy_full:
   title: Weekday DMY Full (formal)

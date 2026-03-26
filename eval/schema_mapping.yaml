@@ -2354,6 +2354,162 @@ mappings:
     match_quality: direct
     expand: false
 
+  # ─── Coverage datasets (datetime, finance, representation, technology) ───
+  # Datetime coverage
+  - gt_label: compact ymd
+    source: profile_eval
+    finetype_label: datetime.date.compact_ymd
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: rfc 3339
+    source: profile_eval
+    finetype_label: datetime.timestamp.rfc_3339
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: dmy dash
+    source: profile_eval
+    finetype_label: datetime.date.dmy_dash
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: ymd dot
+    source: profile_eval
+    finetype_label: datetime.date.ymd_dot
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: quarter
+    source: profile_eval
+    finetype_label: datetime.period.quarter
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: fiscal year
+    source: profile_eval
+    finetype_label: datetime.period.fiscal_year
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: iso 8601 offset
+    source: profile_eval
+    finetype_label: datetime.timestamp.iso_8601_offset
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: iso week
+    source: profile_eval
+    finetype_label: datetime.date.iso_week
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: clf timestamp
+    source: profile_eval
+    finetype_label: datetime.timestamp.clf
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: syslog bsd
+    source: profile_eval
+    finetype_label: datetime.timestamp.syslog_bsd
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: mdy dash
+    source: profile_eval
+    finetype_label: datetime.date.mdy_dash
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: compact dmy
+    source: profile_eval
+    finetype_label: datetime.date.compact_dmy
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  # Finance coverage
+  - gt_label: currency symbol
+    source: profile_eval
+    finetype_label: finance.currency.currency_symbol
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: bitcoin address
+    source: profile_eval
+    finetype_label: finance.crypto.bitcoin_address
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: isin
+    source: profile_eval
+    finetype_label: finance.securities.isin
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: cusip
+    source: profile_eval
+    finetype_label: finance.securities.cusip
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: lei
+    source: profile_eval
+    finetype_label: finance.securities.lei
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  # Representation coverage
+  - gt_label: scientific notation
+    source: profile_eval
+    finetype_label: representation.numeric.scientific_notation
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: decimal number comma
+    source: profile_eval
+    finetype_label: representation.numeric.decimal_number_comma
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: file size
+    source: profile_eval
+    finetype_label: representation.file.file_size
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  - gt_label: integer number
+    source: profile_eval
+    finetype_label: representation.numeric.integer_number
+    finetype_domain: representation
+    match_quality: direct
+    expand: false
+  # Technology coverage
+  - gt_label: ip_v6
+    source: profile_eval
+    finetype_label: technology.internet.ip_v6
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: calver
+    source: profile_eval
+    finetype_label: technology.development.calver
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: ip_v4 with port
+    source: profile_eval
+    finetype_label: technology.internet.ip_v4_with_port
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
+  - gt_label: username
+    source: profile_eval
+    finetype_label: identity.person.username
+    finetype_domain: identity
+    match_quality: direct
+    expand: false
+
   # ═══════════════════════════════════════════════════════════════════════════
   # SHERLOCK/VIZNET — 30 types not already covered by Schema.org/DBpedia
   # ═══════════════════════════════════════════════════════════════════════════

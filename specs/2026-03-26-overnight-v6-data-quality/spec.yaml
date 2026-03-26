@@ -193,6 +193,58 @@ acceptance_criteria:
       AC-5, AC-6. Model saved as sherlock-v6-current. Script header documents
       what changed from v5.
 
+  - id: AC-8b
+    title: "Taxonomy collapses for analyst clarity"
+    description: >
+      Hugh reviewed the collision audit and identified types that don't spark joy for analysts.
+      Remove 11 types (250 → 239) across 10 collapses:
+
+      **Direct collapses (no structural difference):**
+        - paypal_email → identity.person.email (identical validation)
+        - form_data → container.key_value.query_string (identical validation)
+        - geojson → container.object.json (JSON is JSON)
+        - amount_minor_int → representation.numeric.integer_number (header-only signal, causes
+          more harm than good — exactly the case where numeric_code over-classification hurts)
+        - credit_card_expiration_date → datetime.date.month_year_slash (widen to accept MM/YY)
+
+      **Hash consolidation (structurally indistinguishable):**
+        - token_hex → technology.cryptographic.hash (random hex = hash output)
+        - git_sha → technology.cryptographic.hash (40-char hex like SHA-1, content-based)
+        - TSID stays separate (13-char Crockford Base32, time-sortable — different structure)
+
+      **Text consolidation (length-only distinction, no analyst value):**
+        - sentence + paragraph → representation.text.plain_text
+        - word stays (structurally distinct — no spaces)
+        - entity_name stays (meaningful category — orgs/products)
+
+      **Niche removal:**
+        - metric_prefix → representation.discrete.categorical (standalone SI prefixes too rare)
+        - gender_symbol → removed (♂/♀/⚧ as column values vanishingly rare)
+
+      **Hugh's domain notes from collision review:**
+        - IATA, currency_code, http_method: finite code lists → record as Sharpen allowlists
+        - numeric_code: existing F1/F5 rules already handle well (leading zeros → numeric_code,
+          no leading zeros → integer). No change needed.
+        - Hashes: hash/token_hex/git_sha structurally indistinguishable; TSID is different
+        - EAN vs credit_card: add Luhn check at Sharpen stage (luhn crate already in deps)
+        - Percentage vs yield: apply +/- sign rule at Sharpen stage
+        - CPT: alphanumeric per docs, but purely numeric CPT codes inherently collide with
+          postal_code/numeric_code — no taxonomy change, just awareness
+
+      **Post-retrain Sharpen rules (deterministic, don't affect training):**
+        - S1: IATA allowlist (~9,000 airport codes)
+        - S2: Currency code allowlist (ISO 4217, ~180 codes)
+        - S3: HTTP method allowlist (GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS)
+        - S4: Credit card vs EAN — Luhn check
+        - S5: Percentage vs yield — +/- sign prefix check
+        - S6: Coordinate range check — lat must be ±90, long ±180 (5 eval misses)
+        - S7: dmy_short_dot false positive check — basic date range validation (2 eval misses)
+    verification: >
+      cargo run -- check passes with 239 types. cargo test passes.
+      All removed types have no remaining references in taxonomy, generators,
+      Sharpen rules, label_category_map, type_mapping, or training data mappings.
+      month_year_slash validation widened to accept MM/YY.
+
   - id: AC-9
     title: "Post-Sharpen accuracy on expanded eval"
     description: >
@@ -277,7 +329,7 @@ exit_conditions:
   - "STOP if model regresses below 155/190 on legacy eval — escalate to distilled data expansion"
 
 metadata:
-  version: "2.1"
+  version: "2.2"
   timestamp: "2026-03-26T14:00:00Z"
   ambiguity_score: 0.13
   interview_ref: "specs/2026-03-26-overnight-v6-data-quality/interview.md"
