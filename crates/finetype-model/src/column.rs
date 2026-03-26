@@ -2024,9 +2024,7 @@ impl ColumnClassifier {
 
         // Step 6: Post-hoc locale detection
         if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) =
-                detect_locale_from_validation(&sample, &result.label, taxonomy)
-            {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
                 result.detected_locale = Some(locale);
             }
         }
@@ -2123,9 +2121,7 @@ impl ColumnClassifier {
 
         // Step 6: Post-hoc locale detection
         if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) =
-                detect_locale_from_validation(&sample, &result.label, taxonomy)
-            {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
                 result.detected_locale = Some(locale);
             }
         }
@@ -2143,12 +2139,7 @@ impl ColumnClassifier {
     /// - Financial model2vec guard preserved (prevents false financial overrides)
     /// - Geography protection preserved (prevents person-name hints overriding locations)
     /// - Same-domain/cross-domain overrides preserved
-    fn apply_header_sharpen(
-        &self,
-        result: &mut ColumnResult,
-        header: &str,
-        sample: &[String],
-    ) {
+    fn apply_header_sharpen(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
         let label_before = result.label.clone();
 
         // Get header hint: hardcoded first, then Model2Vec semantic
@@ -2173,8 +2164,7 @@ impl ColumnClassifier {
         }
 
         // Measurement disambiguation: height/weight
-        const MEASUREMENT_TYPES: &[&str] =
-            &["identity.person.height", "identity.person.weight"];
+        const MEASUREMENT_TYPES: &[&str] = &["identity.person.height", "identity.person.weight"];
         const COORDINATE_TYPES: &[&str] = &[
             "geography.coordinate.latitude",
             "geography.coordinate.longitude",
@@ -2185,10 +2175,8 @@ impl ColumnClassifier {
             result.label = hinted_type.to_string();
             result.confidence = 0.9;
             result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(format!(
-                "header_hint_measurement:{}",
-                header.to_lowercase()
-            ));
+            result.disambiguation_rule =
+                Some(format!("header_hint_measurement:{}", header.to_lowercase()));
             return;
         }
 
@@ -2219,22 +2207,22 @@ impl ColumnClassifier {
         );
 
         // Geography protection: person-name hints don't override location types
-        if PERSON_NAME_HINTS.contains(&hinted_type) {
-            if LOCATION_TYPES.contains(&result.label.as_str()) {
-                if hint_is_hardcoded {
-                    // Hardcoded person-name hint overrides location (NNFT-235)
-                    result.label = hinted_type.to_string();
-                    result.confidence = result.confidence.max(0.6);
-                    result.disambiguation_applied = true;
-                    result.disambiguation_rule = Some(format!(
-                        "header_hint_person_override:{}",
-                        header.to_lowercase()
-                    ));
-                }
-                // Model2Vec person-name hints do NOT override locations
-                // (no unmasked votes to check in multi-branch)
-                return;
+        if PERSON_NAME_HINTS.contains(&hinted_type)
+            && LOCATION_TYPES.contains(&result.label.as_str())
+        {
+            if hint_is_hardcoded {
+                // Hardcoded person-name hint overrides location (NNFT-235)
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_person_override:{}",
+                    header.to_lowercase()
+                ));
             }
+            // Model2Vec person-name hints do NOT override locations
+            // (no unmasked votes to check in multi-branch)
+            return;
         }
 
         // Same-domain geographic override
@@ -2254,10 +2242,7 @@ impl ColumnClassifier {
         }
 
         // Same-category hardcoded hint override (NNFT-194)
-        if hint_is_hardcoded
-            && result.label != hinted_type
-            && result.confidence <= 0.80
-        {
+        if hint_is_hardcoded && result.label != hinted_type && result.confidence <= 0.80 {
             let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
             let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
             if !hint_category.is_empty()
@@ -2309,8 +2294,7 @@ impl ColumnClassifier {
             result.label = hinted_type.to_string();
             result.confidence = hint_fraction.max(0.6);
             result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("header_hint:{}", header.to_lowercase()));
+            result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
         } else if is_generic && !hint_in_votes {
             // Financial model2vec guard: block model2vec financial hints with no value evidence
             let is_financial_hint = hinted_type.starts_with("finance.");
@@ -2325,10 +2309,8 @@ impl ColumnClassifier {
                 result.label = hinted_type.to_string();
                 result.confidence = 0.5;
                 result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(format!(
-                    "header_hint_generic:{}",
-                    header.to_lowercase()
-                ));
+                result.disambiguation_rule =
+                    Some(format!("header_hint_generic:{}", header.to_lowercase()));
             }
         } else if hint_is_hardcoded && !hint_in_votes {
             // Hardcoded hint authority with domain-dependent threshold
@@ -2339,29 +2321,22 @@ impl ColumnClassifier {
                 result.label = hinted_type.to_string();
                 result.confidence = 0.5;
                 result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(format!(
-                    "header_hint_hardcoded:{}",
-                    header.to_lowercase()
-                ));
+                result.disambiguation_rule =
+                    Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
             }
         } else if result.confidence < 0.3 && !hint_in_votes {
             result.label = hinted_type.to_string();
             result.confidence = 0.4;
             result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(format!(
-                "header_hint_fallback:{}",
-                header.to_lowercase()
-            ));
+            result.disambiguation_rule =
+                Some(format!("header_hint_fallback:{}", header.to_lowercase()));
         }
 
         // Re-detect locale if label changed
         if result.label != label_before {
             if let Some(taxonomy) = self.taxonomy.as_ref() {
-                result.detected_locale = detect_locale_from_validation(
-                    sample,
-                    &result.label,
-                    taxonomy,
-                );
+                result.detected_locale =
+                    detect_locale_from_validation(sample, &result.label, taxonomy);
             }
         }
     }
@@ -2415,10 +2390,7 @@ const CODE_ATTRACTORS: &[&str] = &[
 /// - F6: uses fixed categorical fallback (no next-vote lookup)
 ///
 /// All other rules (F1, F4, F5) are unchanged — they never depended on votes.
-fn feature_sharpen(
-    result: &mut ColumnResult,
-    column_features: &ColumnFeatures,
-) {
+fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) {
     let label_before = result.label.clone();
 
     // Rule F1: Leading-zero pre-filter — numeric_code vs postal_code.
@@ -2447,8 +2419,7 @@ fn feature_sharpen(
         result.label = "technology.container.docker_ref".to_string();
         result.confidence = result.confidence.max(0.7);
         result.disambiguation_applied = true;
-        result.disambiguation_rule =
-            Some(format!("feature_slash_segments:{:.1}", slash_segments));
+        result.disambiguation_rule = Some(format!("feature_slash_segments:{:.1}", slash_segments));
     }
 
     // Rule F3: hs_code vs decimal_number — HS codes are pure digits with dots.
@@ -2646,9 +2617,7 @@ fn value_sharpen(
     ];
     if numeric_types.contains(&result_label) {
         // Pass empty results — R12 never uses them (let _ = results)
-        if let Some((label, rule)) =
-            disambiguate_numeric(values, &[], &top_labels_single)
-        {
+        if let Some((label, rule)) = disambiguate_numeric(values, &[], &top_labels_single) {
             return Some((label, rule));
         }
     }
@@ -2686,12 +2655,9 @@ fn value_sharpen(
     // Rule 15: Attractor type demotion
     // ADAPTED: uses result.confidence directly instead of top_count / n_samples
     // (which produces 0.0 with multi-branch because confidence as usize truncates to 0)
-    if let Some((label, rule)) = sharpen_attractor_demotion(
-        values,
-        result_label,
-        result_confidence,
-        taxonomy,
-    ) {
+    if let Some((label, rule)) =
+        sharpen_attractor_demotion(values, result_label, result_confidence, taxonomy)
+    {
         return Some((label, rule));
     }
 
@@ -2786,8 +2752,7 @@ fn sharpen_attractor_demotion(
 
                 let fail_rate = fail_count as f32 / non_empty.len() as f32;
                 if fail_rate > 0.5 {
-                    let fallback =
-                        sharpen_select_fallback(is_numeric, is_text, is_code, values);
+                    let fallback = sharpen_select_fallback(is_numeric, is_text, is_code, values);
                     return Some((
                         fallback,
                         format!("attractor_demotion_validation:{}", result_label),
@@ -9173,10 +9138,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "technology.internet.hostname".to_string(),
             confidence: 0.85,
-            vote_distribution: vec![(
-                "technology.internet.hostname".to_string(),
-                0.85,
-            )],
+            vote_distribution: vec![("technology.internet.hostname".to_string(), 0.85)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 50,
@@ -9208,10 +9170,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "technology.internet.hostname".to_string(),
             confidence: 0.85,
-            vote_distribution: vec![(
-                "technology.internet.hostname".to_string(),
-                0.85,
-            )],
+            vote_distribution: vec![("technology.internet.hostname".to_string(), 0.85)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 50,
@@ -9240,10 +9199,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "representation.numeric.decimal_number".to_string(),
             confidence: 0.80,
-            vote_distribution: vec![(
-                "representation.numeric.decimal_number".to_string(),
-                0.80,
-            )],
+            vote_distribution: vec![("representation.numeric.decimal_number".to_string(), 0.80)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 50,
@@ -9253,11 +9209,11 @@ datetime.component.day_of_week:
         };
 
         let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::DIGIT_RATIO] = 0.85;          // ≥ 0.75
-        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 2.5;     // ≥ 2.0 (path A)
-        cf.mean[feature_idx::IS_FLOAT] = 0.3;              // < 1.0
-        cf.mean[feature_idx::HAS_NEGATIVE_PREFIX] = 0.0;   // no negative prefix
-        cf.variance[feature_idx::SEGMENT_COUNT_DOT] = 0.1;  // ≤ 0.5
+        cf.mean[feature_idx::DIGIT_RATIO] = 0.85; // ≥ 0.75
+        cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 2.5; // ≥ 2.0 (path A)
+        cf.mean[feature_idx::IS_FLOAT] = 0.3; // < 1.0
+        cf.mean[feature_idx::HAS_NEGATIVE_PREFIX] = 0.0; // no negative prefix
+        cf.variance[feature_idx::SEGMENT_COUNT_DOT] = 0.1; // ≤ 0.5
 
         feature_sharpen(&mut result, &cf);
 
@@ -9280,10 +9236,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "representation.identifier.numeric_code".to_string(),
             confidence: 0.90,
-            vote_distribution: vec![(
-                "representation.identifier.numeric_code".to_string(),
-                0.90,
-            )],
+            vote_distribution: vec![("representation.identifier.numeric_code".to_string(), 0.90)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 50,
@@ -9313,10 +9266,7 @@ datetime.component.day_of_week:
         let mut result = ColumnResult {
             label: "representation.file.extension".to_string(),
             confidence: 0.75,
-            vote_distribution: vec![(
-                "representation.file.extension".to_string(),
-                0.75,
-            )],
+            vote_distribution: vec![("representation.file.extension".to_string(), 0.75)],
             disambiguation_applied: false,
             disambiguation_rule: None,
             samples_used: 50,
@@ -9326,9 +9276,9 @@ datetime.component.day_of_week:
         };
 
         let mut cf = ColumnFeatures::empty();
-        cf.mean[feature_idx::LENGTH] = 2.5;            // ≤ 4.0
+        cf.mean[feature_idx::LENGTH] = 2.5; // ≤ 4.0
         cf.mean[feature_idx::SEGMENT_COUNT_DOT] = 0.0; // < 1.1
-        cf.mean[feature_idx::ALPHA_RATIO] = 0.95;      // ≥ 0.8
+        cf.mean[feature_idx::ALPHA_RATIO] = 0.95; // ≥ 0.8
 
         feature_sharpen(&mut result, &cf);
 
@@ -9342,12 +9292,10 @@ datetime.component.day_of_week:
     // AC-3: value_sharpen — R5 day-of-week with single-entry votes
     #[test]
     fn test_sharpen_r5_day_of_week_single_vote() {
-        let values: Vec<String> = vec![
-            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
+        let values: Vec<String> = vec!["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+            .into_iter()
+            .map(String::from)
+            .collect();
 
         let result = value_sharpen(&values, "representation.discrete.categorical", 0.80, None);
 
@@ -9384,7 +9332,10 @@ datetime.component.day_of_week:
         // Low cardinality values with a text-like label should trigger categorical
         let result = value_sharpen(&values, "identity.person.first_name", 0.70, None);
 
-        assert!(result.is_some(), "R11 should fire for low-cardinality categorical values");
+        assert!(
+            result.is_some(),
+            "R11 should fire for low-cardinality categorical values"
+        );
         let (label, _rule) = result.unwrap();
         assert_eq!(label, "representation.discrete.categorical");
     }
@@ -9398,8 +9349,7 @@ datetime.component.day_of_week:
             .map(String::from)
             .collect();
 
-        let result =
-            value_sharpen(&values, "representation.numeric.integer_number", 0.80, None);
+        let result = value_sharpen(&values, "representation.numeric.integer_number", 0.80, None);
 
         assert!(result.is_some(), "R12 should fire for year-like values");
         let (label, _rule) = result.unwrap();
@@ -9414,8 +9364,7 @@ datetime.component.day_of_week:
             .map(String::from)
             .collect();
 
-        let result =
-            value_sharpen(&values, "representation.numeric.decimal_number", 0.70, None);
+        let result = value_sharpen(&values, "representation.numeric.decimal_number", 0.70, None);
 
         assert!(result.is_some(), "R17 should fire for UTC offset values");
         let (label, rule) = result.unwrap();
@@ -9488,7 +9437,10 @@ datetime.component.day_of_week:
             None,
         );
 
-        assert!(result.is_some(), "Low confidence text attractor should demote");
+        assert!(
+            result.is_some(),
+            "Low confidence text attractor should demote"
+        );
         let (label, _rule) = result.unwrap();
         assert_eq!(label, "representation.discrete.categorical");
     }

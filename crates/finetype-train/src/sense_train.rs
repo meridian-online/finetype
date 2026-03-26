@@ -264,7 +264,8 @@ pub fn train_sense(
     train_data: &SenseDataset,
     val_data: &SenseDataset,
 ) -> Result<TrainingSummary> {
-    let device = crate::get_device();
+    let (device, device_name) = crate::get_device();
+    eprintln!("Using {device_name} device");
     let mut rng = StdRng::seed_from_u64(config.seed);
 
     tracing::info!(

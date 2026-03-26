@@ -761,7 +761,8 @@ pub fn train_entity(
     val_features: &[Vec<f32>],
     val_labels: &[usize],
 ) -> Result<(TrainingSummary, VarMap)> {
-    let device = crate::get_device();
+    let (device, device_name) = crate::get_device();
+    eprintln!("Using {device_name} device");
     let varmap = VarMap::new();
     let mut model = EntityClassifierTrainable::new(&varmap, &device)?;
 

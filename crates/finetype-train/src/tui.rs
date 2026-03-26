@@ -16,13 +16,7 @@ pub trait TrainingRenderer: Send {
     fn on_train_start(&mut self, total_epochs: usize, batches_per_epoch: usize);
 
     /// Called after each training batch completes.
-    fn on_batch_end(
-        &mut self,
-        epoch: usize,
-        batch: usize,
-        total_batches: usize,
-        batch_loss: f32,
-    );
+    fn on_batch_end(&mut self, epoch: usize, batch: usize, total_batches: usize, batch_loss: f32);
 
     /// Called after each epoch completes with full metrics.
     fn on_epoch_end(&mut self, metrics: &EpochMetrics);
@@ -87,10 +81,10 @@ mod tui_impl {
     use ratatui::backend::CrosstermBackend;
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::style::{Color, Modifier, Style};
-    use ratatui::text::Span;
     use ratatui::symbols::Marker;
+    use ratatui::text::{Line, Span};
     use ratatui::widgets::{
-        Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table, Wrap,
+        Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table,
     };
     use ratatui::Terminal;
 
@@ -219,17 +213,9 @@ mod tui_impl {
         }
 
         fn on_epoch_end(&mut self, metrics: &EpochMetrics) {
-            // Log to stderr so tee/redirect captures epoch progress alongside the TUI
-            eprintln!(
-                "Epoch {:>3}: train_loss={:.4} val_loss={:.4} train_acc={:.1}% val_acc={:.1}% lr={:.2e} ({:.1}s)",
-                metrics.epoch + 1,
-                metrics.train_loss,
-                metrics.val_loss,
-                metrics.train_accuracy * 100.0,
-                metrics.val_accuracy * 100.0,
-                metrics.learning_rate,
-                metrics.epoch_time_secs,
-            );
+            // Don't eprintln! here — it bleeds into the alternate screen and
+            // concatenates with the title bar. The TUI table shows all epoch data.
+            // After training ends, print_final_summary writes to stdout.
             if let Some(tx) = &self.tx {
                 let _ = tx.send(RenderMsg::EpochEnd(metrics.clone()));
             }
@@ -342,8 +328,8 @@ mod tui_impl {
             .constraints([
                 Constraint::Length(1),  // Title bar
                 Constraint::Length(12), // Line charts with axes
-                Constraint::Min(5),    // Epoch table
-                Constraint::Length(4), // Progress + ETA
+                Constraint::Min(5),     // Epoch table
+                Constraint::Length(3),  // Status + progress bar + ETA
             ])
             .split(area);
 
@@ -394,29 +380,25 @@ mod tui_impl {
         }
 
         // Build dataset from batch-level or epoch-level data
-        let batch_points: Vec<(f64, f64)>;
-        let epoch_train_points: Vec<(f64, f64)>;
-        let epoch_val_points: Vec<(f64, f64)>;
-
         let has_batch_data = !state.batch_loss_history.is_empty();
 
-        if has_batch_data {
-            batch_points = state
+        let batch_points: Vec<(f64, f64)> = if has_batch_data {
+            state
                 .batch_loss_history
                 .iter()
                 .enumerate()
                 .map(|(i, &v)| (i as f64, v))
-                .collect();
+                .collect()
         } else {
-            batch_points = Vec::new();
-        }
+            Vec::new()
+        };
 
-        epoch_train_points = state
+        let epoch_train_points: Vec<(f64, f64)> = state
             .epoch_history
             .iter()
             .map(|m| (m.epoch as f64, m.train_loss as f64))
             .collect();
-        epoch_val_points = state
+        let epoch_val_points: Vec<(f64, f64)> = state
             .epoch_history
             .iter()
             .map(|m| (m.epoch as f64, m.val_loss as f64))
@@ -451,15 +433,19 @@ mod tui_impl {
             let x_max = (batch_points.len() as f64).max(1.0);
 
             let chart = Chart::new(datasets)
-                .block(Block::default().title(" Loss (batch) ").borders(Borders::ALL))
-                .x_axis(
-                    Axis::default()
-                        .bounds([0.0, x_max])
-                        .labels(vec![
-                            Span::raw("0"),
-                            Span::raw(format!("{}", batch_points.len())),
-                        ]),
+                .block(
+                    Block::default()
+                        .title(Line::from(vec![
+                            Span::raw(" Loss "),
+                            Span::styled("━", Style::default().fg(Color::Yellow)),
+                            Span::raw(" batch "),
+                        ]))
+                        .borders(Borders::ALL),
                 )
+                .x_axis(Axis::default().bounds([0.0, x_max]).labels(vec![
+                    Span::raw("0"),
+                    Span::raw(format!("{}", batch_points.len())),
+                ]))
                 .y_axis(
                     Axis::default()
                         .bounds([y_min - y_margin, y_max + y_margin])
@@ -490,15 +476,21 @@ mod tui_impl {
             let x_max = (state.total_epochs as f64).max(1.0);
 
             let chart = Chart::new(datasets)
-                .block(Block::default().title(" Loss (epoch) ").borders(Borders::ALL))
-                .x_axis(
-                    Axis::default()
-                        .bounds([0.0, x_max])
-                        .labels(vec![
-                            Span::raw("0"),
-                            Span::raw(format!("{}", state.total_epochs)),
-                        ]),
+                .block(
+                    Block::default()
+                        .title(Line::from(vec![
+                            Span::raw(" Loss "),
+                            Span::styled("━", Style::default().fg(Color::Yellow)),
+                            Span::raw(" train  "),
+                            Span::styled("━", Style::default().fg(Color::Magenta)),
+                            Span::raw(" val "),
+                        ]))
+                        .borders(Borders::ALL),
                 )
+                .x_axis(Axis::default().bounds([0.0, x_max]).labels(vec![
+                    Span::raw("0"),
+                    Span::raw(format!("{}", state.total_epochs)),
+                ]))
                 .y_axis(
                     Axis::default()
                         .bounds([y_min - y_margin, y_max + y_margin])
@@ -563,7 +555,13 @@ mod tui_impl {
         let chart = Chart::new(datasets)
             .block(
                 Block::default()
-                    .title(" Accuracy (%) ")
+                    .title(Line::from(vec![
+                        Span::raw(" Accuracy "),
+                        Span::styled("━", Style::default().fg(Color::Green)),
+                        Span::raw(" train  "),
+                        Span::styled("━", Style::default().fg(Color::Blue)),
+                        Span::raw(" val "),
+                    ]))
                     .borders(Borders::ALL),
             )
             .x_axis(
@@ -575,14 +573,10 @@ mod tui_impl {
                         Span::raw(format!("{}", state.total_epochs)),
                     ]),
             )
-            .y_axis(
-                Axis::default()
-                    .bounds([y_floor, y_ceil])
-                    .labels(vec![
-                        Span::raw(format!("{:.0}%", y_floor)),
-                        Span::raw(format!("{:.0}%", y_ceil)),
-                    ]),
-            );
+            .y_axis(Axis::default().bounds([y_floor, y_ceil]).labels(vec![
+                Span::raw(format!("{:.0}%", y_floor)),
+                Span::raw(format!("{:.0}%", y_ceil)),
+            ]));
         f.render_widget(chart, area);
     }
 
@@ -641,56 +635,71 @@ mod tui_impl {
     }
 
     fn draw_progress(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
-        let block = Block::default().borders(Borders::ALL);
-        let inner = block.inner(area);
-        f.render_widget(block, area);
-
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(inner);
+            .constraints([
+                Constraint::Length(1), // Status text line
+                Constraint::Length(1), // Progress bar
+                Constraint::Length(1), // ETA line
+            ])
+            .split(area);
 
-        // Epoch progress gauge
+        // ── Line 1: Epoch and batch counters ──
         let completed_epochs = state.epoch_history.len();
         let epoch_pct = if state.total_epochs > 0 {
             ((completed_epochs as f64 / state.total_epochs as f64) * 100.0) as u16
         } else {
             0
         };
-
-        // Batch progress within current epoch
-        let batch_pct = if state.current_total_batches > 0 {
-            ((state.current_batch as f64 / state.current_total_batches as f64) * 100.0) as u16
+        let batch_info = if state.current_total_batches > 0 {
+            let batch_pct =
+                ((state.current_batch as f64 / state.current_total_batches as f64) * 100.0) as u16;
+            format!(
+                "  │  Batch {}/{} [{}%]",
+                state.current_batch, state.current_total_batches, batch_pct,
+            )
         } else {
-            0
+            String::new()
         };
-
-        let epoch_label = format!(
-            "Epoch {}/{} [{}%]    Batch {}/{} [{}%]",
-            completed_epochs,
-            state.total_epochs,
-            epoch_pct,
-            state.current_batch,
-            state.current_total_batches,
-            batch_pct,
+        let status_text = format!(
+            " Epoch {}/{}  [{}%]{}",
+            completed_epochs, state.total_epochs, epoch_pct, batch_info,
         );
-        let epoch_gauge = Gauge::default()
+        let status = Paragraph::new(status_text).style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        );
+        f.render_widget(status, chunks[0]);
+
+        // ── Line 2: Progress bar (epoch-level only, no label) ──
+        let gauge = Gauge::default()
             .gauge_style(Style::default().fg(Color::Green))
             .percent(epoch_pct)
-            .label(epoch_label);
-        f.render_widget(epoch_gauge, chunks[0]);
+            .label("");
+        f.render_widget(gauge, chunks[1]);
 
-        // ETA line
+        // ── Line 3: ETA ──
         let eta_text = if state.finished {
-            let elapsed = state.train_start.elapsed().as_secs_f32();
-            format!("  Training complete in {:.1}s", elapsed)
+            let elapsed = state.train_start.elapsed().as_secs();
+            if elapsed < 3600 {
+                format!(
+                    " ✓ Training complete in {}m {}s",
+                    elapsed / 60,
+                    elapsed % 60
+                )
+            } else {
+                format!(
+                    " ✓ Training complete in {}h {}m",
+                    elapsed / 3600,
+                    (elapsed % 3600) / 60
+                )
+            }
         } else {
-            format!("  ETA: {}", state.eta_string())
+            format!(" ETA: {}", state.eta_string())
         };
-        let eta_paragraph = Paragraph::new(eta_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .wrap(Wrap { trim: true });
-        f.render_widget(eta_paragraph, chunks[1]);
+        let eta = Paragraph::new(eta_text).style(Style::default().fg(Color::DarkGray));
+        f.render_widget(eta, chunks[2]);
     }
 
     /// Print a final summary to stdout after leaving the alternate screen.

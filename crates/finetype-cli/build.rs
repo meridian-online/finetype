@@ -356,7 +356,8 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
     // at runtime from disk or HuggingFace, so we generate empty stubs for the embedded
     // model constants — the CLI uses MultiBranchClassifier::load() instead.
     let is_tiered = model_dir.join("tier_graph.json").exists();
-    let is_multi_branch = model_dir.join("label_map.json").exists() && model_dir.join("config.json").exists();
+    let is_multi_branch =
+        model_dir.join("label_map.json").exists() && model_dir.join("config.json").exists();
 
     if is_tiered {
         generate_tiered_embeds(&model_dir, &mut code);

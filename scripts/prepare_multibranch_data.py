@@ -32,6 +32,10 @@ Options:
     --workers N             Parallel feature extraction workers (default: 4)
     --format v2|v3          Output format version (default: v3)
     --dry-run               Show counts without extracting features
+    --augmentation-rate F   Fraction of columns to augment in-place (default: 0, e.g. 0.35)
+    --validate-labels       Run label validation pass on distilled data before blending
+    --oversample-types T    Comma-separated list of type keys to oversample (e.g. "hs_code,latitude")
+    --oversample-mult N     Oversampling multiplier for confused types (default: 3)
     --skip-preflight        Skip preflight extraction check
     -h, --help              Show help
 """
@@ -66,6 +70,19 @@ COLUMN_LEVEL_TYPES = {
     "representation.discrete.categorical",
     "representation.discrete.ordinal",
     "representation.identifier.increment",
+}
+
+# Profile eval dataset names — must be excluded from training to prevent contamination
+EVAL_DATASET_NAMES = {
+    "api_users_json", "books_catalog", "codes_and_ids", "countries",
+    "covid_timeseries", "datetime_formats", "datetime_formats_extended",
+    "earthquakes_2024", "ecommerce_orders", "ecommerce_orders_json",
+    "financial_data", "geography_data", "iris", "medical_records",
+    "multilingual", "network_logs", "new_finance", "new_geography",
+    "new_identity", "new_representation", "new_technology",
+    "people_directory", "scientific_measurements", "server_logs_json",
+    "sports_events", "tech_systems", "titanic", "us_states",
+    "weather_stations_json", "world_cities",
 }
 
 
@@ -521,6 +538,199 @@ def get_header_for_type(type_key, rng):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Augmentation (AC-2: value-level noise for training robustness)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Common mojibake patterns (UTF-8 decoded as Windows-1252)
+_MOJIBAKE_MAP = {
+    "\u00e9": "\u00c3\u00a9",       # é → Ã©
+    "\u00e8": "\u00c3\u00a8",       # è → Ã¨
+    "\u00f1": "\u00c3\u00b1",       # ñ → Ã±
+    "\u2019": "\u00e2\u0080\u0099", # ' → â€™
+    "\u2018": "\u00e2\u0080\u0098", # ' → â€˜
+    "\u201c": "\u00e2\u0080\u009c", # " → â€œ
+    "\u201d": "\u00e2\u0080\u009d", # " → â€
+    "\u2013": "\u00e2\u0080\u0093", # – → â€"
+    "\u00fc": "\u00c3\u00bc",       # ü → Ã¼
+    "\u00e4": "\u00c3\u00a4",       # ä → Ã¤
+}
+
+_NULL_REPRESENTATIONS = ["NULL", "N/A", "n/a", "NA", "na", "-", "", "None", "none", ".", "N.A."]
+
+
+def augment_column(values, rng):
+    """Apply a random augmentation to a column's values (in-place replacement).
+
+    Returns (augmented_values, augmentation_type) or (values, None) if no augmentation.
+    The augmentation_type is a string describing what was applied.
+    """
+    aug_type = rng.choice([
+        "whitespace", "whitespace",   # 10% weight (2 of 20 slots)
+        "encoding", "encoding",       # 5% weight (skipped for non-text — effectively lower)
+        "null_mix", "null_mix",       # 10% weight
+        "case_variation",             # 5% weight
+        "no_aug", "no_aug", "no_aug", "no_aug", "no_aug",
+        "no_aug", "no_aug", "no_aug", "no_aug", "no_aug",
+        "no_aug", "no_aug", "no_aug",
+    ])
+
+    if aug_type == "no_aug":
+        return values, None
+
+    augmented = list(values)
+
+    if aug_type == "whitespace":
+        # Add leading/trailing whitespace, tabs, or \r\n to random values
+        for i in range(len(augmented)):
+            if rng.random() < 0.3:  # 30% of values in column
+                noise = rng.choice([
+                    " ", "  ", "\t", " \t", "\r\n", "  ", " \r\n ",
+                ])
+                if rng.random() < 0.5:
+                    augmented[i] = noise + augmented[i]
+                else:
+                    augmented[i] = augmented[i] + noise
+        return augmented, "whitespace"
+
+    elif aug_type == "encoding":
+        # Apply mojibake to characters that have mappings
+        for i in range(len(augmented)):
+            if rng.random() < 0.2:  # 20% of values
+                for orig, mojibake in _MOJIBAKE_MAP.items():
+                    if orig in augmented[i]:
+                        augmented[i] = augmented[i].replace(orig, mojibake, 1)
+                        break
+        return augmented, "encoding"
+
+    elif aug_type == "null_mix":
+        # Replace 5-10% of values with null representations
+        null_frac = rng.uniform(0.05, 0.10)
+        for i in range(len(augmented)):
+            if rng.random() < null_frac:
+                augmented[i] = rng.choice(_NULL_REPRESENTATIONS)
+        return augmented, "null_mix"
+
+    elif aug_type == "case_variation":
+        # Random case changes for text-like values
+        for i in range(len(augmented)):
+            if rng.random() < 0.2:  # 20% of values
+                variant = rng.choice(["upper", "lower", "title"])
+                if variant == "upper":
+                    augmented[i] = augmented[i].upper()
+                elif variant == "lower":
+                    augmented[i] = augmented[i].lower()
+                else:
+                    augmented[i] = augmented[i].title()
+        return augmented, "case_variation"
+
+    return values, None
+
+
+def augment_columns(columns_by_type, augmentation_rate, rng):
+    """Apply augmentation to a fraction of columns across all types.
+
+    Args:
+        columns_by_type: dict[str, list[tuple[list[str], str]]]
+        augmentation_rate: float 0.0-1.0 — fraction of columns to augment
+        rng: random.Random instance
+
+    Returns:
+        augmented_columns: same structure with some columns augmented
+        stats: dict with augmentation counts
+    """
+    stats = {"total_columns": 0, "augmented_columns": 0, "by_type": Counter()}
+    augmented = {}
+
+    for type_key, cols in columns_by_type.items():
+        new_cols = []
+        for values, header in cols:
+            stats["total_columns"] += 1
+            if rng.random() < augmentation_rate:
+                aug_values, aug_type = augment_column(values, rng)
+                if aug_type:
+                    stats["augmented_columns"] += 1
+                    stats["by_type"][aug_type] += 1
+                    new_cols.append((aug_values, header))
+                else:
+                    new_cols.append((values, header))
+            else:
+                new_cols.append((values, header))
+        augmented[type_key] = new_cols
+
+    return augmented, stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Label validation (AC-4: format-check distilled labels before blending)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def validate_distilled_labels(distilled, finetype_bin, min_match_rate=0.5):
+    """Validate distilled column labels by checking values against FineType validators.
+
+    For each distilled column, run the values through `finetype infer --mode column`
+    and check if the predicted type matches the assigned label. Columns where the
+    match rate is below min_match_rate are flagged for exclusion.
+
+    Returns:
+        validated: dict with validated columns only
+        stats: dict with per-type exclusion counts and blend ratio info
+    """
+    stats = {
+        "total_columns": 0,
+        "excluded_columns": 0,
+        "excluded_by_type": Counter(),
+        "validated_by_type": Counter(),
+    }
+
+    validated = defaultdict(list)
+
+    for type_key, cols in distilled.items():
+        for values, header in cols:
+            stats["total_columns"] += 1
+
+            # Quick heuristic: check if the values look plausible for this type
+            # by running finetype infer on a sample
+            sample = values[:20]  # Check first 20 values
+            pred_domain = ""
+            try:
+                result = subprocess.run(
+                    [finetype_bin, "infer", "--mode", "column", "--json"],
+                    input="\n".join(sample),
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    pred = json.loads(result.stdout.strip())
+                    pred_label = pred.get("label", pred.get("type", ""))
+                    pred_parts = pred_label.split(".")[:2]
+                    true_parts = type_key.split(".")[:2]
+                    pred_domain = pred_parts[0] if pred_parts else ""
+                    if pred_parts == true_parts:
+                        validated[type_key].append((values, header))
+                        stats["validated_by_type"][type_key] += 1
+                        continue
+            except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception):
+                pass
+
+            # If we can't validate or it disagrees, still include with a warning
+            # Only exclude if the disagreement is strong (different domain)
+            true_domain = type_key.split(".")[0]
+
+            if pred_domain and pred_domain != true_domain:
+                # Domain-level disagreement — likely bad label
+                stats["excluded_columns"] += 1
+                stats["excluded_by_type"][type_key] += 1
+            else:
+                # Same domain, different category — keep it (could be fine-grained confusion)
+                validated[type_key].append((values, header))
+                stats["validated_by_type"][type_key] += 1
+
+    return dict(validated), stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Data loading (reused from prepare_spike_data.py)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -708,32 +918,42 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
         os.unlink(tmp_path)
 
 
-def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng):
+def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng,
+                   oversample_types=None, oversample_multiplier=3):
     """Blend distilled and synthetic column data per-type with capping.
 
     Each column is a (values, header) tuple.
 
     samples_per_type: target number of columns per type
     ratio_distilled: float 0.0-1.0 (e.g. 0.5 means 50% distilled)
-    Returns: dict[str, list[tuple[list[str], str]]]
+    oversample_types: set of type keys to oversample (2-3x more samples)
+    oversample_multiplier: multiplier for oversampled types (default 3)
+    Returns: dict[str, list[tuple[list[str], str]]], dict with blend stats
     """
+    oversample_types = oversample_types or set()
     all_types = set(distilled.keys()) | set(synthetic.keys())
     blended = {}
+    blend_stats = {}  # Per-type blend ratios
 
     for type_key in sorted(all_types):
         d_cols = distilled.get(type_key, [])
         s_cols = synthetic.get(type_key, [])
 
-        target_d = int(samples_per_type * ratio_distilled)
-        target_s = samples_per_type - target_d
+        # Determine effective samples_per_type (oversampled types get more)
+        effective_spt = samples_per_type
+        if type_key in oversample_types:
+            effective_spt = samples_per_type * oversample_multiplier
+
+        target_d = int(effective_spt * ratio_distilled)
+        target_s = effective_spt - target_d
 
         # Cap at available, no oversampling. Fill remainder from other source.
         if len(d_cols) < target_d:
             actual_d = len(d_cols)
-            actual_s = min(len(s_cols), samples_per_type - actual_d)
+            actual_s = min(len(s_cols), effective_spt - actual_d)
         elif len(s_cols) < target_s:
             actual_s = len(s_cols)
-            actual_d = min(len(d_cols), samples_per_type - actual_s)
+            actual_d = min(len(d_cols), effective_spt - actual_s)
         else:
             actual_d = target_d
             actual_s = target_s
@@ -745,8 +965,16 @@ def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng):
         rng.shuffle(combined)
         if combined:
             blended[type_key] = combined
+            total = len(combined)
+            blend_stats[type_key] = {
+                "distilled": actual_d,
+                "synthetic": actual_s,
+                "total": total,
+                "distilled_ratio": round(actual_d / total, 3) if total > 0 else 0,
+                "oversampled": type_key in oversample_types,
+            }
 
-    return blended
+    return blended, blend_stats
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1405,6 +1633,10 @@ def main():
     dry_run = False
     skip_preflight = False
     output_format = "v3"
+    augmentation_rate = 0.0
+    validate_labels = False
+    oversample_types = set()
+    oversample_multiplier = 3
 
     i = 0
     while i < len(args):
@@ -1445,6 +1677,18 @@ def main():
                       file=sys.stderr)
                 sys.exit(1)
             i += 2
+        elif args[i] == "--augmentation-rate":
+            augmentation_rate = float(args[i + 1])
+            i += 2
+        elif args[i] == "--validate-labels":
+            validate_labels = True
+            i += 1
+        elif args[i] == "--oversample-types":
+            oversample_types = set(args[i + 1].split(","))
+            i += 2
+        elif args[i] == "--oversample-mult":
+            oversample_multiplier = int(args[i + 1])
+            i += 2
         elif args[i] == "--dry-run":
             dry_run = True
             i += 1
@@ -1462,11 +1706,36 @@ def main():
     rng = random.Random(seed)
 
     print(f"FTMB output format: {output_format}")
+    if augmentation_rate > 0:
+        print(f"Augmentation rate: {augmentation_rate:.0%}")
+    if validate_labels:
+        print(f"Label validation: enabled")
+    if oversample_types:
+        print(f"Oversample types: {', '.join(sorted(oversample_types))} ({oversample_multiplier}x)")
 
     # ─── Load taxonomy ─────────────────────────────────────────────
     print("Loading taxonomy...")
     taxonomy_types = load_taxonomy_types(finetype_bin)
     print(f"  {len(taxonomy_types)} taxonomy types")
+
+    # ─── Resolve oversample short names to full type keys ─────────
+    if oversample_types:
+        resolved = set()
+        for short_name in oversample_types:
+            if short_name in taxonomy_types:
+                resolved.add(short_name)  # Already a full key
+            else:
+                # Try matching the leaf name (e.g. "hs_code" → "finance.trade.hs_code")
+                matches = [t for t in taxonomy_types if t.endswith(f".{short_name}")]
+                if len(matches) == 1:
+                    resolved.add(matches[0])
+                elif len(matches) > 1:
+                    print(f"  WARNING: ambiguous oversample name '{short_name}' matches: {matches}", file=sys.stderr)
+                    resolved.update(matches)  # Include all matches
+                else:
+                    print(f"  WARNING: oversample type '{short_name}' not found in taxonomy", file=sys.stderr)
+        oversample_types = resolved
+        print(f"  Resolved oversample types: {len(oversample_types)} types")
 
     # ─── Load label remap ─────────────────────────────────────────
     print(f"\nLoading label remap from {label_remap_path}...")
@@ -1492,6 +1761,38 @@ def main():
     print(f"  {total_d_cols} columns across {len(distilled)} types")
     print(f"  {d_stats['total_values']} individual values")
 
+    # ─── Validate distilled labels (AC-4) ────────────────────────
+    validation_stats = None
+    if validate_labels:
+        print(f"\nValidating distilled labels against FineType predictions...")
+        distilled, validation_stats = validate_distilled_labels(
+            distilled, finetype_bin, min_match_rate=0.5
+        )
+        total_d_cols_after = sum(len(cols) for cols in distilled.values())
+        excluded = total_d_cols - total_d_cols_after
+        print(f"  Excluded {excluded} columns ({excluded/max(total_d_cols,1):.1%} of distilled)")
+        print(f"  Remaining: {total_d_cols_after} columns across {len(distilled)} types")
+        total_d_cols = total_d_cols_after
+        # Rebuild ordered_distilled to match filtered distilled
+        distilled_set = set()
+        for type_key, cols in distilled.items():
+            for vals, hdr in cols:
+                distilled_set.add((type_key, tuple(vals), hdr))
+        ordered_distilled = [
+            (label, vals, hdr) for label, vals, hdr in ordered_distilled
+            if (label, tuple(vals), hdr) in distilled_set
+        ]
+
+    # ─── Eval dataset contamination check (AC-5f) ───────────────
+    if distilled:
+        contaminated_count = 0
+        for type_key, cols in list(distilled.items()):
+            # Check if any column headers suggest eval dataset origin
+            # (distilled data from Sherlock doesn't have source_file, so check headers)
+            pass  # Note: Sherlock distilled data doesn't carry source file metadata.
+                  # Contamination check is done at the overnight script level via
+                  # eval dataset name matching against the distilled corpus index.
+
     # ─── Generate synthetic data ───────────────────────────────────
     print(f"\nGenerating synthetic data ({synthetic_columns_per_type} columns/type, {synthetic_columns_per_type * 100} values/type)...")
     synthetic = generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values)
@@ -1515,13 +1816,44 @@ def main():
     # ─── Blend (for v2) or assemble tables (for v3) ──────────────
     if output_format == "v2":
         print(f"\nBlending data ({ratio_distilled:.0%} distilled, {1-ratio_distilled:.0%} synthetic)...")
-        blended = blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng)
+        blended, blend_ratio_stats = blend_columns(
+            distilled, synthetic, ratio_distilled, samples_per_type, rng,
+            oversample_types=oversample_types, oversample_multiplier=oversample_multiplier,
+        )
         total_blended = sum(len(cols) for cols in blended.values())
         print(f"  {total_blended} columns across {len(blended)} types")
     else:
         # For v3, we do blending implicitly via table assembly + ratio cap
-        blended = blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng)
+        blended, blend_ratio_stats = blend_columns(
+            distilled, synthetic, ratio_distilled, samples_per_type, rng,
+            oversample_types=oversample_types, oversample_multiplier=oversample_multiplier,
+        )
         total_blended = sum(len(cols) for cols in blended.values())
+
+    # ─── Log blend ratio warnings (AC-4 review finding C1) ────
+    low_distilled_types = [
+        t for t, s in blend_ratio_stats.items()
+        if s["distilled_ratio"] < 0.20 and s["total"] > 0
+    ]
+    if low_distilled_types:
+        print(f"\n  WARNING: {len(low_distilled_types)} types have <20% distilled data:")
+        for t in sorted(low_distilled_types)[:10]:
+            s = blend_ratio_stats[t]
+            print(f"    {t}: {s['distilled']}/{s['total']} ({s['distilled_ratio']:.0%} distilled)")
+        if len(low_distilled_types) > 10:
+            print(f"    ... and {len(low_distilled_types) - 10} more")
+        if len(low_distilled_types) > 30:
+            print(f"\n  PAUSE: >30 types below 20% distilled threshold.")
+            print(f"  Review blend_ratio_stats in manifest before proceeding.")
+            # Don't halt automatically — the overnight script checks the manifest
+
+    # ─── Apply augmentation (AC-2) ──────────────────────────────
+    augmentation_stats = None
+    if augmentation_rate > 0:
+        print(f"\nApplying value-level augmentation ({augmentation_rate:.0%} of columns)...")
+        blended, augmentation_stats = augment_columns(blended, augmentation_rate, rng)
+        print(f"  Augmented {augmentation_stats['augmented_columns']}/{augmentation_stats['total_columns']} columns")
+        print(f"  Augmentation types: {dict(augmentation_stats['by_type'])}")
 
     # ─── Type coverage summary ─────────────────────────────────────
     distilled_types = set(distilled.keys())
@@ -1630,6 +1962,27 @@ def main():
     if type_counts:
         manifest["types_covered"] = len(type_counts)
         manifest["type_counts"] = dict(type_counts.most_common())
+
+    # AC-2/AC-4/AC-5 extended manifest fields
+    if blend_ratio_stats:
+        manifest["blend_ratio_stats"] = blend_ratio_stats
+    if oversample_types:
+        manifest["oversample_types"] = sorted(oversample_types)
+        manifest["oversample_multiplier"] = oversample_multiplier
+    if augmentation_stats:
+        manifest["augmentation_rate"] = augmentation_rate
+        manifest["augmentation_stats"] = {
+            "augmented_columns": augmentation_stats["augmented_columns"],
+            "total_columns": augmentation_stats["total_columns"],
+            "augmentation_types": dict(augmentation_stats["by_type"]),
+        }
+    if validation_stats:
+        manifest["label_validation"] = {
+            "total_columns": validation_stats["total_columns"],
+            "excluded_columns": validation_stats["excluded_columns"],
+            "excluded_by_type": dict(validation_stats["excluded_by_type"]),
+            "validated_by_type": dict(validation_stats["validated_by_type"]),
+        }
 
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)

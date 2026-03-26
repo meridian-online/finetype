@@ -1233,10 +1233,12 @@ impl Generator {
             }
             // ── development ────────────────────────────────────
             ("development", "version") => {
-                let major = self.rng.gen_range(0..20);
-                let minor = self.rng.gen_range(0..50);
-                let patch = self.rng.gen_range(0..100);
-                let prefix = if self.rng.gen_bool(0.3) { "v" } else { "" };
+                // Always ≥3-part (M.N.P) to avoid collision with decimal_number (2-part)
+                let major = self.rng.gen_range(0..20u32);
+                let minor = self.rng.gen_range(0..50u32);
+                let patch = self.rng.gen_range(0..100u32);
+                // v-prefix at ≥40% rate (was 30%)
+                let prefix = if self.rng.gen_bool(0.45) { "v" } else { "" };
                 let pre = if self.rng.gen_bool(0.2) {
                     let tags = ["-alpha", "-beta", "-rc.1", "-dev"];
                     tags[self.rng.gen_range(0..tags.len())]
@@ -2067,14 +2069,17 @@ impl Generator {
                 }
             },
             ("government", "ssn") => {
+                // Area number: 001–899, excluding 000 (never issued) and 666 (reserved)
                 let area = loop {
-                    let a = self.rng.gen_range(1..899u32);
+                    let a = self.rng.gen_range(1..=899u32);
                     if a != 666 {
                         break a;
                     }
                 };
-                let group = self.rng.gen_range(1..100u32);
-                let serial = self.rng.gen_range(1..10000u32);
+                // Group number: 01–99 (00 never issued)
+                let group = self.rng.gen_range(1..=99u32);
+                // Serial number: 0001–9999 (0000 never issued)
+                let serial = self.rng.gen_range(1..=9999u32);
                 Ok(format!("{:03}-{:02}-{:04}", area, group, serial))
             }
             ("government", "ein") => {
@@ -2319,12 +2324,44 @@ impl Generator {
 
             // ── coordinate (7 types) ─────────────────────────────────────
             ("coordinate", "latitude") => {
-                let lat = (self.rng.gen::<f64>() - 0.5) * 180.0;
-                Ok(format!("{:.4}", lat))
+                // Vary precision 2–8 decimal places to distinguish from fixed-precision decimals
+                let precision = self.rng.gen_range(2..=8usize);
+                let lat = if self.rng.gen_bool(0.3) {
+                    // Cluster around major city latitudes for realistic distribution
+                    let city_lats: [f64; 12] = [
+                        -33.87, -23.55, -34.60,
+                        -41.29, // Sydney, São Paulo, Buenos Aires, Wellington
+                        51.51, 48.85, 52.52, 59.91, // London, Paris, Berlin, Oslo
+                        35.69, 1.35, 37.77,
+                        19.43, // Tokyo, Singapore, San Francisco, Mexico City
+                    ];
+                    let base = city_lats[self.rng.gen_range(0..city_lats.len())];
+                    let jitter: f64 = (self.rng.gen::<f64>() - 0.5) * 4.0;
+                    (base + jitter).clamp(-90.0, 90.0)
+                } else {
+                    (self.rng.gen::<f64>() - 0.5) * 180.0
+                };
+                Ok(format!("{:.prec$}", lat, prec = precision))
             }
             ("coordinate", "longitude") => {
-                let lon = (self.rng.gen::<f64>() - 0.5) * 360.0;
-                Ok(format!("{:.4}", lon))
+                // Vary precision 2–8 decimal places; range -180 to 180
+                let precision = self.rng.gen_range(2..=8usize);
+                let lon = if self.rng.gen_bool(0.3) {
+                    // Cluster around major city longitudes for realistic distribution
+                    let city_lons: [f64; 12] = [
+                        151.21, -46.63, -58.38,
+                        174.76, // Sydney, São Paulo, Buenos Aires, Wellington
+                        -0.13, 2.35, 13.40, 10.75, // London, Paris, Berlin, Oslo
+                        139.69, 103.82, -122.42,
+                        -99.13, // Tokyo, Singapore, San Francisco, Mexico City
+                    ];
+                    let base = city_lons[self.rng.gen_range(0..city_lons.len())];
+                    let jitter: f64 = (self.rng.gen::<f64>() - 0.5) * 4.0;
+                    (base + jitter).clamp(-180.0, 180.0)
+                } else {
+                    (self.rng.gen::<f64>() - 0.5) * 360.0
+                };
+                Ok(format!("{:.prec$}", lon, prec = precision))
             }
             ("coordinate", "coordinates") => {
                 let lat = (self.rng.gen::<f64>() - 0.5) * 180.0;
@@ -2407,25 +2444,25 @@ impl Generator {
                 Ok(format!("{}{}{}", owner, cat, serial))
             }
             ("transportation", "hs_code") => {
+                // HS chapter: 01–97 (valid WCO chapters; 98-99 are country-specific)
+                // Heading = chapter (2 digits) * 100 + sub-heading (2 digits)
+                let chapter = self.rng.gen_range(1u32..=97);
+                let sub_heading = self.rng.gen_range(0u32..100);
+                let heading = chapter * 100 + sub_heading;
+                let b = self.rng.gen_range(0u32..100); // HS 6-digit subheading suffix
                 let r = self.rng.gen::<f64>();
-                if r < 0.4 {
-                    // 6-digit with dot: XXXX.XX
-                    let a = self.rng.gen_range(0..10000u32);
-                    let b = self.rng.gen_range(0..100u32);
-                    Ok(format!("{:04}.{:02}", a, b))
-                } else if r < 0.7 {
-                    // 8-digit with dots: XXXX.XX.XX
-                    let a = self.rng.gen_range(0..10000u32);
-                    let b = self.rng.gen_range(0..100u32);
-                    let c = self.rng.gen_range(0..100u32);
-                    Ok(format!("{:04}.{:02}.{:02}", a, b, c))
+                if r < 0.10 {
+                    // ≤10%: 2-level XXXX.XX — minimised; still present for format variety
+                    Ok(format!("{:04}.{:02}", heading, b))
+                } else if r < 0.80 {
+                    // 70%: 3-level XXXX.XX.XX (standard HS 8-digit national tariff)
+                    let c = self.rng.gen_range(0u32..100);
+                    Ok(format!("{:04}.{:02}.{:02}", heading, b, c))
                 } else {
-                    // 10-digit with dots: XXXX.XX.XX.XX
-                    let a = self.rng.gen_range(0..10000u32);
-                    let b = self.rng.gen_range(0..100u32);
-                    let c = self.rng.gen_range(0..100u32);
-                    let d = self.rng.gen_range(0..100u32);
-                    Ok(format!("{:04}.{:02}.{:02}.{:02}", a, b, c, d))
+                    // 20%: 4-level XXXX.XX.XX.XX (10-digit statistical suffix)
+                    let c = self.rng.gen_range(0u32..100);
+                    let d = self.rng.gen_range(0u32..100);
+                    Ok(format!("{:04}.{:02}.{:02}.{:02}", heading, b, c, d))
                 }
             }
             ("transportation", "unlocode") => {
