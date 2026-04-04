@@ -106,6 +106,8 @@ progress_bar() {
 }
 
 INSTANCE_ID="$$"  # PID as unique instance identifier
+STOP_REQUESTED=false
+trap 'log "Stop requested — finishing current session..."; STOP_REQUESTED=true' INT TERM
 START_TIME=$(date +%s)
 # Capture starting done count for ETA
 cd "$REPO_DIR"
@@ -116,6 +118,7 @@ log "Distillation overnight runner starting"
 log "Waves per session: $WAVES_PER_SESSION"
 log "Pause between sessions: ${PAUSE_BETWEEN_SESSIONS}s"
 log "Max sessions: $MAX_SESSIONS"
+log "Press Ctrl+C once to finish current session then stop. Twice to hard-kill."
 progress_bar
 
 for ((session=1; session<=MAX_SESSIONS; session++)); do
@@ -140,7 +143,9 @@ for ((session=1; session<=MAX_SESSIONS; session++)); do
     # prevent data issues, and duplicates are rare (only if two sessions
     # call `next` before either writes a .done marker).
     log "Launching Claude Code session..."
-    claude -p "$SESSION_PROMPT" \
+    # Run claude in its own process group (setsid) so Ctrl+C doesn't kill it.
+    # The parent trap sets STOP_REQUESTED; we wait for the session to finish naturally.
+    setsid claude -p "$SESSION_PROMPT" \
         --model haiku \
         --dangerously-skip-permissions \
         --verbose 2>&1 | tee "/tmp/distill_${INSTANCE_ID}_session_${session}.log" || {
@@ -148,6 +153,12 @@ for ((session=1; session<=MAX_SESSIONS; session++)); do
     }
 
     progress_bar
+
+    if $STOP_REQUESTED; then
+        log "Graceful stop after session $session."
+        break
+    fi
+
     log "Pausing ${PAUSE_BETWEEN_SESSIONS}s..."
     sleep "$PAUSE_BETWEEN_SESSIONS"
 done
