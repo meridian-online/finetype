@@ -252,54 +252,15 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | CI workflow | `.github/workflows/ci.yml` |
 | Training/eval/package scripts | `scripts/train.sh`, `scripts/eval.sh`, `scripts/package.sh` |
 
-## Workflow
+## Workflow (orbit)
 
-**Spec-driven:** interview → decision → spec → implement via PR → evaluate. No backlog, no task tracking.
-**Specs** live in `specs/`. **Decisions** live in `decisions/`. **Code changes** ship via PRs.
+This project uses the orbit workflow: Card → Interview → Spec → Review → Ship.
 
-<!-- ooo:START -->
-<!-- ooo:VERSION:0.14.0 -->
-# Ouroboros — Specification-First AI Development
+- `/orb:card` — capture a feature need with expected behaviours
+- `/orb:discovery` — explore a vague idea through Socratic Q&A
+- `/orb:design` — refine a feature card into technical decisions
+- `/orb:spec` — crystallise interview into a structured specification
+- `/orb:review-spec` — stress-test the spec before implementation
+- `/orb:review-pr` — verify the PR against the spec's acceptance criteria
 
-> Before telling AI what to build, define what should be built.
-> As Socrates asked 2,500 years ago — "What do you truly know?"
-> Ouroboros turns that question into an evolutionary AI workflow engine.
-
-Most AI coding fails at the input, not the output. Ouroboros fixes this by
-**exposing hidden assumptions before any code is written**.
-
-1. **Socratic Clarity** — Question until ambiguity ≤ 0.2
-2. **Ontological Precision** — Solve the root problem, not symptoms
-3. **Evolutionary Loops** — Each evaluation cycle feeds back into better specs
-
-```
-Interview → Seed → Execute → Evaluate
-    ↑                           ↓
-    └─── Evolutionary Loop ─────┘
-```
-
-## ooo Commands
-
-Each command loads its agent/MCP on-demand. Details in each skill file.
-
-| Command | Loads |
-|---------|-------|
-| `ooo` | — |
-| `ooo interview` | `ouroboros:socratic-interviewer` |
-| `ooo seed` | `ouroboros:seed-architect` |
-| `ooo run` | MCP required |
-| `ooo evolve` | MCP: `evolve_step` |
-| `ooo evaluate` | `ouroboros:evaluator` |
-| `ooo unstuck` | `ouroboros:{persona}` |
-| `ooo status` | MCP: `session_status` |
-| `ooo setup` | — |
-| `ooo help` | — |
-
-## Agents
-
-Loaded on-demand — not preloaded.
-
-**Core**: socratic-interviewer, ontologist, seed-architect, evaluator,
-wonder, reflect, advocate, contrarian, judge
-**Support**: hacker, simplifier, researcher, architect
-<!-- ooo:END -->
+Artifacts live in `cards/`, `specs/`, and `decisions/`.
