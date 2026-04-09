@@ -7,7 +7,7 @@ scenarios:
   - name: "Browse taxonomy by domain"
     given: "the FineType CLI"
     when: "I run finetype taxonomy --domain datetime"
-    then: "all 84 datetime types are listed with their categories and descriptions"
+    then: "all datetime types are listed with their categories and descriptions"
     source_lines: "README.md: finetype taxonomy --domain datetime — Show taxonomy (filter by domain, category)"
 
   - name: "Transformation contract guarantee"
