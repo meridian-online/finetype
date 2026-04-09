@@ -1,0 +1,32 @@
+feature: "Agent-ready skills"
+as_a: "developer using AI coding agents"
+i_want: "my agent to know the complete FineType pipeline — when to investigate, what to do with invalid rows, how to interpret schemas — without configuring an MCP server"
+so_that: "agents complete the full profile → schema → validate → load workflow instead of stopping after the first command"
+
+scenarios:
+  - name: "Pipeline skill guides full workflow"
+    given: "an AI agent with the /finetype-pipeline skill installed"
+    when: "the agent is asked to load a CSV into DuckDB"
+    then: "the skill guides it through all steps: profile, schema, validate, load — not just profile and stop"
+    source_lines: "agent-ready.mdx: Agents using skills complete full pipeline, not just profile"
+
+  - name: "CLI reference as agent knowledge"
+    given: "an AI agent with the /finetype-cli skill installed"
+    when: "the agent needs to look up a flag or output format"
+    then: "the complete CLI reference is available as inline context — every command, flag, and output format"
+    source_lines: "agent-ready.mdx: /finetype-cli: Complete CLI reference with flags and options"
+
+  - name: "Zero setup required"
+    given: "an AI coding agent with CLI access"
+    when: "skills are installed as markdown files"
+    then: "no MCP server, no API keys, no configuration — just markdown that teaches the agent what to do"
+    source_lines: "agent-ready.mdx: Zero setup required: No MCP server, no API keys, just markdown files"
+
+maturity: "emerging"
+goal: "Two skills shipped (/finetype-pipeline, /finetype-cli) — agents complete full pipeline, not just profile"
+
+specs: []
+
+references:
+  - "web: docs/projects/finetype/agent-ready.mdx"
+  - "CLAUDE.md"

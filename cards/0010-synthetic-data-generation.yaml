@@ -1,0 +1,33 @@
+feature: "Synthetic data generation"
+as_a: "data analyst or developer"
+i_want: "to generate realistic sample values for any type in the taxonomy"
+so_that: "I can create test fixtures, validate pipelines, and explore type definitions with concrete examples"
+
+scenarios:
+  - name: "Generate samples for a type"
+    given: "a known type key"
+    when: "I run finetype generate --type technology.internet.ip_v4 --samples 10"
+    then: "10 realistic IPv4 addresses are generated that conform to the type's validation pattern"
+    source_lines: "CLAUDE.md: finetype generate — Generate synthetic training data"
+
+  - name: "Locale-specific generation"
+    given: "a locale-specific type key"
+    when: "I generate samples for geography.address.postal_code.EN_CA"
+    then: "generated values conform to the Canadian postal code format (ANA NAN)"
+    source_lines: "LOCALE_GUIDE.md: finetype generate --type geography.address.postal_code.CA --samples 100 > ca_postal_codes.txt"
+
+  - name: "Generator-taxonomy alignment"
+    given: "the full taxonomy"
+    when: "I run finetype check"
+    then: "every type with a generator produces values that pass its own validation pattern — 100% alignment"
+    source_lines: "CLAUDE.md: Taxonomy: 239 definitions across 7 domains — all generators pass, 100% alignment"
+
+maturity: "established"
+goal: "100% generator-taxonomy alignment across all types with locale-specific generation"
+
+specs: []
+
+references:
+  - "CLAUDE.md"
+  - "README.md"
+  - "docs/LOCALE_GUIDE.md"

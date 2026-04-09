@@ -1,0 +1,42 @@
+feature: "Type taxonomy with transformation contracts"
+as_a: "data analyst"
+i_want: "a browsable, searchable taxonomy of semantic types where each type is a contract that guarantees a DuckDB cast will succeed"
+so_that: "I can trust that a type prediction is actionable — not just a label but a transformation I can safely apply"
+
+scenarios:
+  - name: "Browse taxonomy by domain"
+    given: "the FineType CLI"
+    when: "I run finetype taxonomy --domain datetime"
+    then: "all datetime types are listed with their categories and descriptions"
+    source_lines: "README.md: finetype taxonomy --domain datetime — Show taxonomy (filter by domain, category)"
+
+  - name: "Transformation contract guarantee"
+    given: "a type definition like datetime.date.mdy_slash"
+    when: "FineType predicts this type for a value"
+    then: "the transform expression strptime(col, '%m/%d/%Y')::DATE is guaranteed to succeed (99.9% actionability across 120 tested types)"
+    source_lines: "README.md: Each type is a transformation contract — if FineType predicts datetime.date.mdy_slash, that guarantees strptime(value, '%m/%d/%Y')::DATE will succeed"
+
+  - name: "Full taxonomy export"
+    given: "the CLI"
+    when: "I run finetype taxonomy --full --output json"
+    then: "all types with their broad_type, format_string, transform, validation, and tier fields are exported as structured JSON"
+    source_lines: "CLAUDE.md: finetype taxonomy — Print taxonomy summary (--full --output json for all fields)"
+
+  - name: "Seven-domain label structure"
+    given: "a classified value"
+    when: "I read the label"
+    then: "it follows domain.category.type format (e.g. technology.internet.ip_v4) across 7 domains: container, datetime, finance, geography, identity, representation, technology"
+    source_lines: "README.md: FineType recognizes 250 types across 7 domains: datetime (84), representation (36), technology (28), identity (34), finance (31), geography (25), container (12)"
+
+maturity: "established"
+goal: "239 types across 7 domains, 100% generator alignment, 99.9% actionability on tested types"
+
+specs:
+  - "specs/2026-03-02-taxonomy-revision/"
+  - "specs/2026-03-26-overnight-v6-data-quality/"
+
+references:
+  - "README.md"
+  - "CLAUDE.md"
+  - "docs/TAXONOMY_COMPARISON.md"
+  - "labels/"

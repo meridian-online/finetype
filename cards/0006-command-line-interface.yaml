@@ -1,0 +1,39 @@
+feature: "Command-line interface"
+as_a: "data analyst"
+i_want: "a single CLI binary with a consistent set of commands for type detection, profiling, loading, validation, and taxonomy exploration"
+so_that: "I can work with data types from my terminal using predictable patterns that compose into pipelines"
+
+scenarios:
+  - name: "Consistent input patterns"
+    given: "any FineType command that accepts data"
+    when: "I use -f for file input or -i for inline values"
+    then: "every command follows the same input convention — no per-command flag memorisation"
+    source_lines: "README.md: finetype infer -i '192.168.1.1'; finetype profile -f data.csv; finetype load -f data.csv"
+
+  - name: "Flexible output formats"
+    given: "a command that produces structured output"
+    when: "I pass -o plain|json|csv|markdown|arrow"
+    then: "results render in the requested format for human reading or downstream tooling"
+    source_lines: "CLAUDE.md: finetype profile <file> (-o plain|json|csv|markdown|arrow)"
+
+  - name: "Pipeline-friendly design"
+    given: "a Unix pipeline"
+    when: "I run finetype load -f data.csv | duckdb"
+    then: "SQL output goes to stdout, composing cleanly with duckdb, jq, or any pipe target"
+    source_lines: "README.md: finetype load -f data.csv | duckdb"
+
+  - name: "Command repertoire"
+    given: "the finetype binary"
+    when: "I explore available commands"
+    then: "9 commands cover the full workflow: infer, profile, load, schema, validate, taxonomy, generate, check, mcp"
+    source_lines: "CLAUDE.md: CLI commands table listing infer, profile, check, generate, taxonomy, schema, validate, load, mcp"
+
+maturity: "established"
+goal: "9 commands with consistent input/output patterns composing into Unix pipelines"
+
+specs: []
+
+references:
+  - "README.md"
+  - "CLAUDE.md"
+  - "crates/finetype-cli/src/main.rs"
