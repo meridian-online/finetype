@@ -1,0 +1,41 @@
+feature: "Locale-aware format detection"
+as_a: "data analyst working with international data"
+i_want: "FineType to detect which region a value belongs to using locale-specific validation"
+so_that: "I know a phone number is French, a postal code is Canadian, and a month name is German — not just that they're phone/postal/month"
+
+scenarios:
+  - name: "Phone number locale detection"
+    given: "a phone number in international format"
+    when: "I classify '+33 1 42 68 53 00'"
+    then: "FineType returns identity.person.phone_number.FR (46 locales supported)"
+    source_lines: "LOCALE_GUIDE.md: $ finetype infer -i '+33 1 42 68 53 00' → identity.person.phone_number.FR"
+
+  - name: "Postal code locale detection"
+    given: "a postal code value"
+    when: "I classify 'M5V 3A8'"
+    then: "FineType returns geography.address.postal_code.EN_CA (65 locales supported)"
+    source_lines: "LOCALE_GUIDE.md: $ finetype infer -i 'M5V 3A8' → geography.address.postal_code.EN_CA"
+
+  - name: "Non-English month name recognition"
+    given: "a month name in a non-English language"
+    when: "I classify 'janvier'"
+    then: "FineType returns datetime.component.month_name.FR (27 locales supported)"
+    source_lines: "LOCALE_GUIDE.md: $ finetype infer -i 'janvier' → datetime.component.month_name.FR"
+
+  - name: "Post-hoc validation architecture"
+    given: "a column classified as a locale-specific type"
+    when: "locale detection runs"
+    then: "locale is determined by running precise validation_by_locale patterns after type classification — not by the neural model"
+    source_lines: "LOCALE_DETECTION_ARCHITECTURE.md: This leads to a clean architectural separation: CharCNN → Type Classification, Validation Patterns → Locale Detection"
+
+maturity: "established"
+goal: "65+ locale postal codes, 46+ phone numbers, 27 month/day names via post-hoc validation patterns"
+
+specs:
+  - "specs/2026-02-24-locale-aware-inference/"
+  - "specs/2026-03-11-cldr-retraining/"
+
+references:
+  - "docs/LOCALE_GUIDE.md"
+  - "docs/LOCALE_DETECTION_ARCHITECTURE.md"
+  - "README.md"

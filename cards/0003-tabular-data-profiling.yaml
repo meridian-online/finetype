@@ -1,0 +1,39 @@
+feature: "Tabular data profiling"
+as_a: "data analyst"
+i_want: "to profile a CSV or Parquet file and get the detected semantic type for every column in one command"
+so_that: "I can understand the structure of an unfamiliar dataset without manually inspecting each column"
+
+scenarios:
+  - name: "Profile a CSV file"
+    given: "a CSV file with multiple columns of unknown types"
+    when: "I run finetype profile -f data.csv"
+    then: "FineType outputs a table showing each column's detected type, confidence, and locale"
+    source_lines: "README.md: finetype profile -f data.csv — Profile a CSV file — detect all column types"
+
+  - name: "Multiple output formats"
+    given: "a profiled dataset"
+    when: "I specify an output format with -o plain|json|csv|markdown|arrow"
+    then: "profile results are rendered in the requested format for downstream consumption"
+    source_lines: "CLAUDE.md: finetype profile <file> — Profile all columns in CSV/Parquet (-o plain|json|csv|markdown|arrow)"
+
+  - name: "Null detection"
+    given: "a CSV file with missing or null values in some columns"
+    when: "I profile the file"
+    then: "null values are detected and excluded from type inference so they don't corrupt the classification"
+    source_lines: "ARCHITECTURE.md: CSV/Parquet parsing with null detection, then column-mode inference on each column"
+
+  - name: "Enum detection"
+    given: "a column with a small number of distinct values"
+    when: "I profile with --enum-threshold N"
+    then: "columns with fewer than N distinct values are flagged as categorical/enum candidates"
+    source_lines: "CLAUDE.md: finetype profile <file> (--enum-threshold N, --verbose)"
+
+maturity: "established"
+goal: "CSV and Parquet profiling with 5 output formats, null detection, and enum threshold"
+
+specs: []
+
+references:
+  - "README.md"
+  - "docs/ARCHITECTURE.md"
+  - "CLAUDE.md"

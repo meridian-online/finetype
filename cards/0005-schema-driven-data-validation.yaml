@@ -1,0 +1,41 @@
+feature: "Schema-driven data validation"
+as_a: "data analyst"
+i_want: "to validate loaded data against a type schema directly inside DuckDB, using SQL I already know"
+so_that: "validation is part of my query workflow — not a separate CLI step that produces CSV files I then have to re-import"
+
+scenarios:
+  - name: "Generate table-level schema from profiling"
+    given: "a CSV file"
+    when: "I run finetype schema data.csv"
+    then: "FineType profiles the file and emits a JSON Schema describing every column's expected type and validation pattern"
+    source_lines: "CLAUDE.md: finetype schema data.csv generates table-level JSON Schema"
+
+  - name: "Validate inside DuckDB"
+    given: "data loaded into a DuckDB table and a JSON Schema"
+    when: "I run SELECT finetype_validate(col, schema_json) FROM my_table"
+    then: "each row returns 'valid' or an error message, queryable and filterable with standard SQL"
+    source_lines: "CLAUDE.md: finetype_validate(value, schema_json) — Schema-driven validation (returns 'valid' or error message)"
+
+  - name: "Separate valid from invalid with SQL"
+    given: "a validated table"
+    when: "I filter with WHERE finetype_validate(col, schema) = 'valid'"
+    then: "I get clean rows in-query — and can COPY TO csv if I choose to export, on my terms"
+    source_lines: "user-requested during edit"
+
+  - name: "Type-level schema export"
+    given: "a known type key or glob pattern"
+    when: "I run finetype schema 'datetime.date.*'"
+    then: "FineType exports JSON Schema fragments for matching types, composable into custom validation schemas"
+    source_lines: "README.md: finetype schema 'datetime.date.*' --pretty — Export JSON Schema for a type (supports glob patterns)"
+
+maturity: "emerging"
+goal: "Move validation into DuckDB-native workflow — analysts validate with SQL, not CLI sidecar files"
+
+specs:
+  - "specs/2026-03-12-validate-command/"
+
+references:
+  - "README.md"
+  - "CLAUDE.md"
+  - "decisions/0031-table-level-schema-via-finetype-schema.md"
+  - "decisions/0032-replace-validate-with-schema-driven-quality-gate.md"
