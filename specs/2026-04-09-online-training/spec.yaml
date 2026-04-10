@@ -1,0 +1,463 @@
+goal: >
+  Establish an autonomous experiment loop (autoresearch) that runs overnight on
+  RunPod GPUs, exploring model architecture, hyperparameters, and data strategies
+  to close the 155/190 → 170+/190 profile eval accuracy gap for FineType's
+  multi-branch semantic type classifier. Research in PyTorch; port winning
+  architecture to Candle for release.
+
+constraints:
+  - "$40 RunPod budget for first training session"
+  - "RTX 4090 Community Cloud (~$0.40/hr, 24 GB VRAM)"
+  - "10 min fixed training time budget per experiment (calibrate in experiment 0)"
+  - "PyTorch for research; Candle port is a separate follow-up"
+  - "Single-file train.py is the only file the agent modifies"
+  - "Fixed prepare.py for data loading, feature extraction, and eval harness"
+  - "Human-edited program.md for agent instructions"
+  - "Training data from HuggingFace: sherlock-annotated + finetype-synthetic"
+  - "Feature extraction via finetype binary (downloaded from GitHub releases to pod), not reimplemented in Python"
+  - "No multi-GPU, no distributed training"
+  - "Model budget: 10-50 MB final artefact"
+  - "Beelink Mini PC orchestrates (always-on, already running Claude Code)"
+  - "Persistent RunPod pod with SSH — port determined once at creation, stored in config"
+  - "Multi-branch architecture (decision 0041) is the starting point"
+  - "Prefer retraining over new rules (decision 0038)"
+  - "Context-lean agent pattern: redirect all output to files, grep for metrics only, accept manual restarts"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 1: Data preparation (one-time setup)
+# ──────────────────────────────────────────────────────────────────────────────
+
+acceptance_criteria:
+
+  # --- Synthetic data generation and upload ---
+
+  - id: ac-01
+    ac_type: code
+    description: >
+      Generate synthetic training data using finetype generate (NDJSON output
+      with {text, classification} per value). Run for all 239 taxonomy types
+      with configurable samples-per-type (default 5000). prepare.py on the pod
+      assembles value-level NDJSON into column-level training records by
+      sampling N values per type to form synthetic columns.
+    verification: >
+      Run finetype generate --samples 5000 --output synthetic.ndjson. Verify
+      NDJSON output contains all 239 labels. Upload to HuggingFace. On the pod,
+      prepare.py loads the NDJSON, groups values into columns (e.g. 100 values
+      per column), and produces column-level records ready for feature extraction.
+
+  - id: ac-02
+    ac_type: gate
+    description: >
+      Synthetic dataset is uploaded to HuggingFace as
+      meridian-online/finetype-synthetic and is publicly accessible.
+    verification: >
+      huggingface-cli download meridian-online/finetype-synthetic succeeds from
+      a clean environment.
+
+  # --- Feature extraction via finetype binary ---
+
+  - id: ac-03
+    ac_type: code
+    description: >
+      prepare.py extracts features by calling the finetype binary (downloaded
+      from GitHub releases: finetype-v0.6.12-x86_64-unknown-linux-gnu.tar.gz)
+      as a subprocess, matching the existing prepare_multibranch_data.py
+      pattern. Produces FTMB v3 feature vectors: char distribution (960-dim),
+      embedding aggregation (512-dim), column statistics (27-dim), header
+      embedding (128-dim). Total: 1627-dim per column sample. The finetype
+      binary is downloaded once to the network volume on first pod setup.
+    verification: >
+      On the pod, prepare.py calls finetype to extract features for a known
+      column. Output dimensions match FTMB v3 spec exactly (960+512+27+128).
+      Feature values are within 1e-4 of the Candle pipeline reference output.
+
+  # --- Data loading from HuggingFace ---
+
+  - id: ac-04
+    ac_type: code
+    description: >
+      prepare.py downloads and caches both datasets from HuggingFace
+      (sherlock-annotated + finetype-synthetic), merges them into a single
+      training set with configurable synthetic mix ratio, and produces
+      train/val/test splits (80/10/10). Cached data reused across pod restarts
+      via network volume. Label-to-index mapping is documented and consistent
+      with the actual training class count (verify against Candle config).
+    verification: >
+      Run prepare.py on a fresh pod. Verify datasets download, merge respects
+      mix ratio, splits are reproducible (seeded), second run skips download,
+      and label count matches the documented class count.
+
+  - id: ac-05
+    ac_type: code
+    description: >
+      prepare.py provides an evaluate_accuracy() function that computes
+      val_accuracy (top-1) and val_loss on the held-out validation split. This
+      is the fast-gate metric for the experiment loop.
+    verification: >
+      Train a baseline model, call evaluate_accuracy(). Returns val_accuracy
+      as a float (0-1) and val_loss. Results are deterministic for same model
+      and data.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Phase 2: Research codebase (the autoresearch files)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  # --- train.py: PyTorch multi-branch model ---
+
+  - id: ac-06
+    ac_type: code
+    description: >
+      train.py implements the multi-branch architecture in PyTorch matching the
+      Candle version: char branch (960 → 300 → 300), embed branch (512 → 200
+      → 200), stats branch (27 → 128 → 64), header branch (128 → 128 → 64),
+      merge trunk (concat → BatchNorm → 500 → 500), flat head (→ N classes,
+      matching the label-to-index mapping from prepare.py). ReLU activations,
+      configurable dropout.
+    verification: >
+      Instantiate model, verify parameter count matches Candle MultiBranchConfig
+      within 1%. Forward pass on random input produces (batch, N) logits.
+      Backward pass completes without error. N matches prepare.py label count.
+
+  - id: ac-07
+    ac_type: code
+    description: >
+      train.py trains for a fixed 10-minute wall-clock time budget (excluding
+      startup and compilation overhead). Training stops when the time budget
+      is reached, regardless of epoch count. Experiment 0 (baseline) includes
+      a calibration note: if a 30-min run produces >5% better val_accuracy,
+      the time budget should be increased.
+    verification: >
+      Run train.py on a 4090. Training section takes 10 min ± 30s. Total
+      script time (including startup + eval) under 13 min.
+
+  - id: ac-08
+    ac_type: code
+    description: >
+      train.py prints a machine-readable summary block at the end of training
+      matching the autoresearch format, with at minimum: val_accuracy,
+      val_loss, training_seconds, total_seconds, peak_vram_mb, num_epochs,
+      num_params_M.
+    verification: >
+      grep "^val_accuracy:" run.log returns a valid float. All summary fields
+      parseable. Fields match actual training behavior.
+
+  # --- program.md: agent instructions ---
+
+  - id: ac-09
+    ac_type: doc
+    description: >
+      program.md provides staged search instructions for the autoresearch agent:
+      Phase 1 (experiments 1-15): known gaps (data mix, augmentation, LR,
+      dropout). Phase 2 (16-30): architecture (branch dims, merge strategy,
+      loss functions). Phase 3 (31+): radical (attention, contrastive, novel).
+      Includes FineType-specific context: taxonomy structure, known accuracy
+      gaps (numeric_code FP, entity confusion, date ambiguity), evidence from
+      prior training runs. Specifies context-lean practices: redirect all
+      training output to run.log, read only via grep, never cat full logs.
+      Describes how to reconstruct state from results.tsv + git log if the
+      session restarts.
+    verification: >
+      program.md exists, contains all three phases with clear instructions,
+      references FineType-specific failure modes, includes context management
+      rules, and follows the autoresearch program.md conventions (setup,
+      experimentation, output format, logging, experiment loop sections).
+
+  # --- Profile eval confirmation (on pod, using eval CSVs from repo) ---
+
+  - id: ac-10
+    ac_type: code
+    description: >
+      prepare.py provides a profile_eval() function that loads the 29 eval
+      datasets from eval/datasets/csv/ (git-tracked, available on the pod via
+      the repo clone) and manifest (eval/datasets/manifest.csv), runs PyTorch
+      model inference on each column (extracting features via the finetype
+      binary), and computes label accuracy and domain accuracy against ground
+      truth. This is the confirmation-tier metric, run only on kept models.
+    verification: >
+      Run profile_eval() with the baseline model. Returns X/190 label accuracy
+      and X/190 domain accuracy. Results comparable to the Candle-based
+      profile_eval.sh (within ±5 due to minor feature extraction differences).
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Phase 3: Infrastructure (RunPod automation)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  # --- Pod provisioning ---
+
+  - id: ac-11
+    ac_type: code
+    description: >
+      A launch script (scripts/runpod_launch.sh) provisions a RunPod Community
+      Cloud pod with an RTX 4090, a CUDA-compatible PyTorch base image, and an
+      attached network volume for cached datasets and checkpoints. Selects
+      region based on 4090 availability. Creates the network volume if it
+      doesn't exist (in the same region as the pod). The pod includes a
+      self-destruct timer: a background process launched at pod start that
+      terminates the pod after a configurable maximum runtime (default: 10
+      hours). This is a hardware-level failsafe independent of the agent,
+      SSH, or budget guard. Implemented via the Docker command field:
+      bash -c "nohup sh -c 'sleep 36000 && runpodctl stop pod $RUNPOD_POD_ID' &"
+    verification: >
+      Run the launch script. Pod is created with correct GPU, image, and
+      volume. runpodctl pod list shows the pod in RUNNING state. Verify
+      the self-destruct process is running via ssh pod 'ps aux | grep sleep'.
+
+  - id: ac-12
+    ac_type: code
+    description: >
+      SSH access configured at pod creation: the Beelink's public key is
+      pre-registered via runpodctl ssh add-key (one-time setup). After pod
+      creation, the launch script parses SSH host and port from
+      runpodctl ssh info <pod-id> and writes them to a local config file
+      (e.g. .runpod_ssh.env with POD_HOST and POD_PORT). All subsequent
+      SSH/rsync commands source this file. StrictHostKeyChecking=no for
+      RunPod's proxy hosts.
+    verification: >
+      After launch, ssh -p $POD_PORT root@$POD_HOST 'nvidia-smi' returns 4090
+      info without prompting for credentials. rsync works with
+      -e "ssh -p $POD_PORT -o StrictHostKeyChecking=no".
+
+  - id: ac-13
+    ac_type: code
+    description: >
+      Initial pod setup: the launch script clones the finetype repo on the pod
+      (for eval datasets and manifest), downloads the finetype binary from
+      GitHub releases to the network volume, and syncs the autoresearch files
+      (train.py, prepare.py, program.md, pyproject.toml) from the Beelink.
+      Subsequent experiment syncs only push changed files (train.py) via rsync.
+    verification: >
+      After launch, the pod has: finetype binary at /workspace/bin/finetype,
+      eval datasets at /workspace/finetype/eval/datasets/csv/, and autoresearch
+      files at /workspace/research/. Modify train.py on Beelink, re-sync —
+      only train.py transferred.
+
+  - id: ac-14
+    ac_type: code
+    description: >
+      Results sync from pod to Beelink via rsync: pulls run.log and any saved
+      model checkpoints after each experiment. The agent reads metrics via
+      grep on the local run.log copy.
+    verification: >
+      After a training run, run.log appears locally on the Beelink. grep
+      "^val_accuracy:" run.log returns the expected metric.
+
+  - id: ac-15
+    ac_type: code
+    description: >
+      Pod teardown: a shutdown script (scripts/runpod_stop.sh) syncs final
+      results back, then terminates the pod via runpodctl pod stop. Network
+      volume is preserved for future sessions.
+    verification: >
+      Run shutdown. Pod transitions to EXITED/TERMINATED. Network volume still
+      exists with cached datasets, finetype binary, and results. Re-launching
+      creates a new pod attached to the same volume.
+
+  - id: ac-16
+    ac_type: code
+    description: >
+      Budget guard: a local file (budget.json) on the Beelink tracks
+      cumulative GPU spend across pod lifetimes. Updated after each experiment
+      by recording elapsed time * hourly rate (parsed from runpodctl pod get).
+      The experiment loop halts if spend approaches the $40 cap (configurable
+      threshold, default: $35 to leave headroom). Budget persists across
+      preemption events.
+    verification: >
+      Set budget to $0.50 for testing. After sufficient GPU time, the loop
+      halts with a budget warning. budget.json shows correct cumulative spend.
+
+  - id: ac-17
+    ac_type: code
+    description: >
+      Preemption handling: if SSH to the pod fails, the orchestration checks
+      pod status via runpodctl pod get. If the pod is TERMINATED/EXITED
+      (preempted), it logs the crashed experiment in results.tsv with status
+      "crash", waits with configurable backoff, provisions a new pod (attached
+      to the same network volume), and resumes the experiment loop from the
+      last completed experiment. Lost mid-experiment training time is accepted
+      (~$0.07 per preemption).
+    verification: >
+      Simulate preemption by terminating the pod mid-experiment via runpodctl.
+      The orchestration detects the failure, logs a crash, provisions a new
+      pod, and resumes. results.tsv shows the gap followed by continued
+      experiments.
+
+  # --- Zombie pod protection ---
+
+  - id: ac-23
+    ac_type: code
+    description: >
+      Beelink watchdog cron: a cron job on the Beelink runs every 30 minutes,
+      calls runpodctl pod list, and checks for any pod running longer than
+      a configurable maximum (default: 10 hours). If a zombie pod is detected,
+      the watchdog terminates it via runpodctl pod stop and logs a warning.
+      This is independent of the agent session — protects against agent crash,
+      SSH failure, and budget guard failure. Installed by the launch script,
+      removed by the shutdown script.
+    verification: >
+      After launch, crontab -l shows the watchdog entry. Create a test pod,
+      set max runtime to 5 minutes. After 5 minutes, the watchdog terminates
+      the pod and logs the action.
+
+  - id: ac-24
+    ac_type: gate
+    description: >
+      Four-layer zombie pod protection is verified end-to-end before any
+      overnight run: (1) pod self-destruct timer baked into pod startup
+      (ac-11), (2) agent-side budget guard halts loop at $35 (ac-16),
+      (3) Beelink watchdog cron kills pods exceeding max runtime (ac-23),
+      (4) RunPod account spend limit set to $80. At least two layers must
+      be operational before starting an overnight session.
+    verification: >
+      Pre-flight checklist: verify self-destruct timer is in pod command,
+      budget.json exists with correct cap, crontab has watchdog entry,
+      runpodctl user shows spendLimit >= 40. Document verification in the
+      session log before starting the experiment loop.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Phase 4: Experiment loop (the autoresearch core)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  - id: ac-18
+    ac_type: code
+    description: >
+      The experiment loop runs autonomously on the Beelink, driven by a Claude
+      Code agent reading program.md. The agent: edits train.py locally →
+      commits to the experiment branch → syncs to pod via rsync → runs training
+      via ssh (uv run train.py > run.log 2>&1) → syncs run.log back → parses
+      val_accuracy via grep → keeps or discards → logs to results.tsv → repeats.
+      All training output redirected to files; agent reads only via grep/tail.
+    verification: >
+      Start the loop. It completes at least 3 experiments without human
+      intervention. Each experiment logged in results.tsv with correct metrics.
+
+  - id: ac-19
+    ac_type: code
+    description: >
+      results.tsv tracks all experiments with tab-separated columns: commit,
+      val_accuracy, val_loss, peak_vram_mb, status (keep/discard/crash),
+      description. Commit is the short git hash of the train.py change.
+      results.tsv is NOT committed to git (untracked), matching autoresearch
+      convention.
+    verification: >
+      After 5+ experiments, results.tsv has correct header, one row per
+      experiment, all fields populated, statuses reflect keep/discard logic.
+
+  - id: ac-20
+    ac_type: code
+    description: >
+      Keep/discard logic: agent commits train.py before syncing to the pod
+      (matching autoresearch pattern). If val_accuracy improves over the
+      current best, the commit stays (kept). If val_accuracy is equal or
+      worse, git reset --hard HEAD~1 reverts. Kept models trigger
+      profile_eval() on the pod as a confirmation check. Profile eval
+      result logged in results.tsv.
+    verification: >
+      Run 5+ experiments. At least one is kept and at least one is discarded.
+      Git log on the experiment branch shows only kept experiments. Profile
+      eval ran for kept experiments with results in results.tsv.
+
+  - id: ac-21
+    ac_type: gate
+    description: >
+      The baseline experiment (first run with unmodified train.py) establishes
+      the starting val_accuracy and profile_eval score. Logged as the first
+      row in results.tsv with status "keep" and description "baseline".
+      Includes a calibration step: run baseline for 10 min and 30 min,
+      compare val_accuracy to validate the time budget.
+    verification: >
+      First row of results.tsv is the baseline. Calibration results documented
+      in the experiment log. If 30-min run is >5% better, time budget is
+      adjusted before continuing.
+
+  - id: ac-22
+    ac_type: gate
+    description: >
+      An overnight autoresearch session (8 hours) produces at least 30
+      experiments logged in results.tsv, with at least one model that improves
+      over the baseline val_accuracy.
+    verification: >
+      results.tsv has 30+ rows. At least one non-baseline row has status
+      "keep". Best val_accuracy > baseline val_accuracy.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ontology
+# ──────────────────────────────────────────────────────────────────────────────
+
+ontology_schema:
+  name: "Experiment"
+  description: >
+    A single autoresearch experiment: one modification to train.py, one
+    training run, one evaluation, one keep/discard decision.
+  fields:
+    - name: "commit"
+      type: "string"
+      description: "Short git hash (7 chars) of the train.py modification"
+    - name: "val_accuracy"
+      type: "float"
+      description: "Top-1 validation accuracy (0-1) from evaluate_accuracy()"
+    - name: "val_loss"
+      type: "float"
+      description: "Cross-entropy validation loss"
+    - name: "peak_vram_mb"
+      type: "float"
+      description: "Peak GPU VRAM usage in MB during training"
+    - name: "status"
+      type: "enum(keep, discard, crash)"
+      description: "Outcome: keep if val_accuracy improved, discard if not, crash if run failed"
+    - name: "description"
+      type: "string"
+      description: "Short text description of what the experiment tried"
+    - name: "profile_eval"
+      type: "int | null"
+      description: "X/190 label accuracy from confirmation-tier profile eval (null for discards)"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Evaluation principles
+# ──────────────────────────────────────────────────────────────────────────────
+
+evaluation_principles:
+  - principle: "Accuracy improvement over baseline"
+    weight: 0.4
+  - principle: "Experiment throughput (experiments per hour)"
+    weight: 0.2
+  - principle: "Cost efficiency (accuracy gain per dollar spent)"
+    weight: 0.2
+  - principle: "Reproducibility (deterministic with seed)"
+    weight: 0.1
+  - principle: "Simplicity (fewer changes for same gain preferred)"
+    weight: 0.1
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Exit conditions
+# ──────────────────────────────────────────────────────────────────────────────
+
+exit_conditions:
+  - "Budget guard triggers ($35 spent of $40 cap)"
+  - "8 hours of wall-clock experiment time elapsed"
+  - "Model reaches 170+/190 on profile eval confirmation"
+  - "15 consecutive experiments without improvement (search exhausted)"
+  - "Human interrupts (Ctrl-C → graceful shutdown)"
+  - "Agent context exhaustion (state recoverable from results.tsv + git log)"
+  - "Pod self-destruct timer fires (10h hard limit, independent of agent)"
+  - "Beelink watchdog cron kills zombie pod (30-min check interval)"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Metadata
+# ──────────────────────────────────────────────────────────────────────────────
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-04-09T14:00:00Z"
+  ambiguity_score: 0.08
+  interview_ref: "specs/2026-04-09-online-training/interview.md"
+  card_ref: "cards/0002-semantic-type-detection.yaml"
+  brief_ref: "specs/2026-04-09-online-training/brief.md"
+  review_ref: "specs/2026-04-09-online-training/review-spec-2026-04-09.md"
+  decisions:
+    - "0038: Supersede heuristic fixes with retraining"
+    - "0041: Multi-branch as Sense replacement"
+    - "0042: Remove regex header hints"
+  related_specs:
+    - "specs/2026-03-25-multi-branch-pipeline-integration/"
+    - "specs/2026-03-26-overnight-v6-data-quality/"
+    - "specs/2026-03-21-sherlock-architecture/"
