@@ -43,11 +43,31 @@
 
 **Exit condition triggered:** score < baseline → revert and investigate.
 
-## v9 Experiment (in progress): Isolating Architecture vs Hyperparameters
+## v9 Results (GELU+LN, lr=0.0001, wd=0.0001) — HYPOTHESIS REJECTED
 
-**Hypothesis:** Regression caused by 10x LR (1e-4 → 1e-3), not GELU+LN architecture.
-**Config:** Same GELU+LN architecture, but lr=0.0001, wd=0.0001 (original values).
-**Script:** `scripts/overnight_v9_conservative.sh`
+| Model | Label | Domain | Actionability | Val Acc | Best Epoch |
+|-------|-------|--------|---------------|---------|------------|
+| v4-sibling (baseline) | 179/214 (83.6%) | 197/214 (92.1%) | 96.9% | — | — |
+| v6-gelu (v8, lr=1e-3) | 167/214 (78.0%) | 187/214 (87.4%) | 94.5% | 84.63% | 27 |
+| v6-gelu-cons (v9, lr=1e-4) | 166/214 (77.6%) | 191/214 (89.3%) | 97.0% | 85.93% | 29 |
+
+**Hypothesis rejected:** Conservative LR scored 166/214 — same regression as v8 (167/214).
+LR is not the cause. The GELU+LN architecture itself regresses profile eval by ~13 labels.
+
+Paradox: v9 has *better* val_accuracy (85.9% vs 84.6%) but *worse* profile eval.
+This confirms val_accuracy and profile eval measure different things — profile eval includes
+Sharpen post-processing, which the GELU+LN output distribution doesn't interact well with.
+
+v8↔v9 diff: 40 both wrong, v9 fixed 7, v9 broke 8. Nearly identical failure modes.
+Both share: decimal→dmy_short_dot, person→email_display, phone→ssn patterns.
+
+### Root Cause Analysis
+
+The GELU+LN architecture shifts the model's output distribution in ways that Sharpen
+rules don't compensate for. Sharpen was tuned against v4-sibling (ReLU+BatchNorm) outputs.
+Two paths forward:
+1. Retune Sharpen rules for GELU+LN output distribution
+2. Abandon GELU+LN, focus on other accuracy improvements (data quality, training data mix)
 
 ## Test Results
 
