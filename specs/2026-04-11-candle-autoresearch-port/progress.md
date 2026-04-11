@@ -25,9 +25,9 @@
 - [x] ac-09: Training config defaults (weight_decay=0.01, lr=0.001) — updated in MultiBranchTrainConfig::default()
 - [x] ac-10: Tests for both old-style and new-style configs — 5 new tests added, 22 training + 5 inference all pass
 - [x] ac-11: Train new model on Mac with Metal — v8 completed, 30 epochs, best val_accuracy 84.6% at epoch 27
-- [ ] ac-12: Profile eval >=160/190 — v8 FAILED: 167/214 (78.0%) vs baseline 179/214 (83.6%), -12 regression
-- [ ] ac-13: No actionability regression — v8: 94.5% vs baseline 96.9%, minor regression
-- [ ] ac-14: Publish to HuggingFace — blocked by ac-12
+- [ ] ac-12: Profile eval >=160/190 — GELU+LN does not meet threshold. Best: v10 188/227 (82.8%) vs baseline 193/227 (85.0%). Experiment closed.
+- [x] ac-13: No actionability regression — v10: 97.0% vs baseline 96.9%. PASS.
+- [ ] ac-14: Publish to HuggingFace — not applicable; GELU+LN not adopted
 
 ## v8 Results (GELU+LN, lr=0.001, wd=0.01) — REGRESSION
 
@@ -81,6 +81,35 @@ header. `FrozenSiblingContext` is architecture-agnostic. No code changes needed.
 **v10 plan:** Retrain GELU+LN on fresh FTMB with real headers and sibling enrichment.
 Script: `scripts/overnight_v10_gelu_headers.sh` — includes header feature validation
 that hard-fails if Model2Vec isn't producing non-zero embeddings.
+
+## v10 Results (GELU+LN, real headers, fair comparison) — CLOSED
+
+First fair apples-to-apples comparison: both models trained on FTMB v3 with real
+Model2Vec header features and frozen sibling-context enrichment during training.
+
+| Model | Label | Domain | Actionability |
+|-------|-------|--------|---------------|
+| v4-sibling (ReLU+BN) | 193/227 (85.0%) | 206/227 (90.7%) | 96.9% |
+| v10-gelu (GELU+LN) | 188/227 (82.8%) | 203/227 (89.4%) | 97.0% |
+| **Delta** | **-5 (-2.2%)** | **-3 (-1.3%)** | **+0.1%** |
+
+### Decomposing the gap across experiments
+
+| Experiment | vs baseline | Header data | What it isolated |
+|------------|-------------|-------------|------------------|
+| v8 (lr=1e-3) | -8 labels | zeros | Architecture + LR + headers confounded |
+| v9 (lr=1e-4) | -8 labels | zeros | Ruled out LR; architecture + headers confounded |
+| v10 (lr=1e-4, real headers) | **-5 labels** | real | **Isolated architecture effect** |
+
+3 of the original 8-label gap was the dead header branch. The remaining **5 labels
+are a genuine GELU+LN regression** at this model scale and training data mix.
+
+### Conclusion
+
+GELU+LN does not improve profile eval accuracy over ReLU+BN for the multi-branch
+architecture at production scale. The experiment is closed. v4-sibling remains the
+default model. Future accuracy work should focus on training data quality and mix
+(decision 0038: retraining > new rules).
 
 ## Test Results
 
