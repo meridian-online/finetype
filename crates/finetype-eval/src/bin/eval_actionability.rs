@@ -20,7 +20,7 @@ fn read_expr(file_path: &str) -> String {
     let escaped = file_path.replace('\'', "''");
     if Path::new(file_path)
         .extension()
-        .is_some_and(|ext| ext == "json" || ext == "jsonl")
+        .is_some_and(|ext| ext == "json" || ext == "jsonl" || ext == "ndjson")
     {
         format!("read_json_auto('{escaped}')")
     } else {
