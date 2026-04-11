@@ -84,9 +84,13 @@ if [[ ! -f "$DISTILLED_FILE" ]]; then
     # The dataset has: sherlock_index, split, sample_values, blind_label,
     # blind_confidence, finetype_label, finetype_confidence, agreement,
     # final_label, reasoning, ground_truth_label
-    python3 -c "
+
+    # Prefer uv for dependency-free execution, fall back to pip
+    if command -v uv >/dev/null 2>&1; then
+        echo "[Pre-flight] Using uv to run download (auto-installs datasets)..."
+        uv run --with datasets python3 -c "
 from datasets import load_dataset
-import csv, gzip, io
+import csv, gzip
 
 print('Downloading $HF_DATASET from HuggingFace...')
 ds = load_dataset('$HF_DATASET', split='train')
@@ -101,9 +105,29 @@ with gzip.open('$DISTILLED_FILE', 'wt', newline='') as f:
 
 print(f'Saved {len(ds)} rows to $DISTILLED_FILE')
 " 2>&1
+    else
+        echo "[Pre-flight] uv not found, trying python3 directly..."
+        python3 -c "
+from datasets import load_dataset
+import csv, gzip
+
+print('Downloading $HF_DATASET from HuggingFace...')
+ds = load_dataset('$HF_DATASET', split='train')
+print(f'Downloaded {len(ds)} rows')
+
+print('Writing to $DISTILLED_FILE...')
+with gzip.open('$DISTILLED_FILE', 'wt', newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=ds.column_names)
+    writer.writeheader()
+    for row in ds:
+        writer.writerow(row)
+
+print(f'Saved {len(ds)} rows to $DISTILLED_FILE')
+" 2>&1
+    fi
 
     if [[ ! -f "$DISTILLED_FILE" ]]; then
-        echo "FAIL: Download failed. Install datasets: pip3 install datasets"
+        echo "FAIL: Download failed. Install uv (https://docs.astral.sh/uv/) or run: pip3 install datasets"
         exit 1
     fi
     echo "[Pre-flight] Download complete: $(ls -lh "$DISTILLED_FILE" | awk '{print $5}')"
