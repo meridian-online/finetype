@@ -61,13 +61,26 @@ Sharpen post-processing, which the GELU+LN output distribution doesn't interact 
 v8↔v9 diff: 40 both wrong, v9 fixed 7, v9 broke 8. Nearly identical failure modes.
 Both share: decimal→dmy_short_dot, person→email_display, phone→ssn patterns.
 
-### Root Cause Analysis
+### Root Cause Analysis — REVISED (v8/v9 comparison was invalid)
 
-The GELU+LN architecture shifts the model's output distribution in ways that Sharpen
-rules don't compensate for. Sharpen was tuned against v4-sibling (ReLU+BatchNorm) outputs.
-Two paths forward:
-1. Retune Sharpen rules for GELU+LN output distribution
-2. Abandon GELU+LN, focus on other accuracy improvements (data quality, training data mix)
+**Finding:** v8/v9 trained on `v7-blend-50-50.ftmb` which has ALL-ZERO header features
+and empty sibling strings. The header branch learned nothing — effectively a 3-branch model.
+v4-sibling trained on v3 data with real Model2Vec headers + frozen sibling-context enrichment
+(true 4-branch model). The 8-label gap may be explained by missing header signal, not GELU+LN.
+
+Evidence from v8 training log:
+```
+Record 0 [group 0, col_idx=0, header=""]: representation.text.entity_name
+  siblings: ["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  header : dim=128, nonzero=0, range=[0.0000, 0.0000], mean=0.0000
+```
+
+**Architecture audit:** GELU+LN properly propagates activation to all 4 branches including
+header. `FrozenSiblingContext` is architecture-agnostic. No code changes needed.
+
+**v10 plan:** Retrain GELU+LN on fresh FTMB with real headers and sibling enrichment.
+Script: `scripts/overnight_v10_gelu_headers.sh` — includes header feature validation
+that hard-fails if Model2Vec isn't producing non-zero embeddings.
 
 ## Test Results
 

@@ -87,3 +87,19 @@ Re-run this audit after each eval set expansion. Key metrics to track:
 - Ratio of DEBATABLE+AMBIGUOUS to total misclassifications (should stay < 25%)
 - Any GT label appearing in misclassifications across 3+ models → suspect GT label
 - New datasets should be validated against at least 2 model variants before being trusted
+
+## Corrected Eval Results (with ground truth fixes applied)
+
+Eval set expanded from 214 → 227 columns (JSON fixtures added). Ground truth fixes
+(accepted alternatives, interchangeability rules) resolved many debatable failures.
+
+| Model | Label (old) | Label (corrected) | Domain (corrected) | Actionability |
+|-------|-------------|--------------------|---------------------|---------------|
+| v4-sibling (baseline) | 179/214 (83.6%) | 193/227 (85.0%) | 206/227 (90.7%) | 96.9% |
+| v6-gelu-conservative | ~167/214 (78.0%) | 185/227 (81.5%) | 201/227 (88.5%) | 97.0% |
+| **Delta** | **-12** | **-8** | **-5** | **+0.1%** |
+
+Gap narrowed from 12 → 8 labels. However, **this comparison is still invalid** — see
+progress.md root cause analysis. v6-gelu-conservative trained on data with all-zero headers
+(effectively 3-branch), while v4-sibling trained with real Model2Vec headers + sibling-context
+(true 4-branch). The v10 retraining will produce the first fair comparison.
