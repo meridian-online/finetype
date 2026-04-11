@@ -2470,7 +2470,7 @@ mappings:
     finetype_label: finance.currency.currency_symbol
     finetype_labels:
       - finance.currency.currency_symbol
-      - finance.currency.iso_4217
+      - finance.currency.currency_code
     finetype_domain: finance
     match_quality: direct
     expand: false
