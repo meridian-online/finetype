@@ -73,9 +73,40 @@ PIPELINE_START=$(date +%s)
 
 echo "[Pre-flight] Checking prerequisites..."
 
-if [[ ! -f output/distillation-v3/sherlock_distilled.csv.gz ]]; then
-    echo "FAIL: Distilled data not found at output/distillation-v3/sherlock_distilled.csv.gz"
-    exit 1
+DISTILLED_FILE="output/distillation-v3/sherlock_distilled.csv.gz"
+HF_DATASET="meridian-online/sherlock-annotated"
+
+if [[ ! -f "$DISTILLED_FILE" ]]; then
+    echo "[Pre-flight] Distilled data not found locally. Downloading from HuggingFace..."
+    mkdir -p output/distillation-v3
+
+    # Download from HuggingFace and convert Parquet → CSV.gz
+    # The dataset has: sherlock_index, split, sample_values, blind_label,
+    # blind_confidence, finetype_label, finetype_confidence, agreement,
+    # final_label, reasoning, ground_truth_label
+    python3 -c "
+from datasets import load_dataset
+import csv, gzip, io
+
+print('Downloading $HF_DATASET from HuggingFace...')
+ds = load_dataset('$HF_DATASET', split='train')
+print(f'Downloaded {len(ds)} rows')
+
+print('Writing to $DISTILLED_FILE...')
+with gzip.open('$DISTILLED_FILE', 'wt', newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=ds.column_names)
+    writer.writeheader()
+    for row in ds:
+        writer.writerow(row)
+
+print(f'Saved {len(ds)} rows to $DISTILLED_FILE')
+" 2>&1
+
+    if [[ ! -f "$DISTILLED_FILE" ]]; then
+        echo "FAIL: Download failed. Install datasets: pip3 install datasets"
+        exit 1
+    fi
+    echo "[Pre-flight] Download complete: $(ls -lh "$DISTILLED_FILE" | awk '{print $5}')"
 fi
 
 if [[ ! -d models/model2vec ]]; then
