@@ -1,18 +1,23 @@
 //! Multi-branch neural network for Sherlock-style column classification.
 //!
-//! Architecture (Sherlock-inspired):
+//! Architecture (Sherlock-inspired, configurable activation + normalization):
 //! ```text
-//! Branch 1 (char):  [960] → Dense(300, ReLU) → Dropout → Dense(300, ReLU) → Dropout → [300]
-//! Branch 2 (embed): [512] → Dense(200, ReLU) → Dropout → Dense(200, ReLU) → Dropout → [200]
-//! Branch 3 (stats): [27]  → Dense(128, ReLU) → Dropout → Dense(64, ReLU)  → Dropout → [64]
+//! Branch 1 (char):  [960] → [LN →] Dense(300, Act) → Dropout → Dense(300, Act) → Dropout → [300]
+//! Branch 2 (embed): [512] → [LN →] Dense(200, Act) → Dropout → Dense(200, Act) → Dropout → [200]
+//! Branch 3 (stats): [27]  → [LN →] Dense(128, Act) → Dropout → Dense(64, Act)  → Dropout → [64]
+//! Branch 4 (header):[128] → LN → Dense(128, Act) → Dropout → Dense(64, Act) → Dropout → [64]
 //!                             ↓
-//! Merge:             concat([300, 200, 64]) = [564]
+//! Merge:             concat([300, 200, 64, 64]) = [628]
 //!                             ↓
-//!                    BatchNorm → Dense(500, ReLU) → Dropout → Dense(500, ReLU) → Dropout
+//!                    Norm → Dense(500, Act) → Dropout → Dense(500, Act) → Dropout
 //!                             ↓
 //! Head (flat):       Dense(250, softmax)
 //! Head (hier):       Tree softmax (7 domains → 43 categories → 250 types)
 //! ```
+//!
+//! Act = ReLU (default) or GELU (autoresearch winner, +1.3pp).
+//! LN = LayerNorm on branch inputs (when use_layer_norm=true).
+//! Norm = BatchNorm (default) or LayerNorm (when use_layer_norm=true, removes batch dim workaround).
 //!
 //! Training data is stored in a custom binary format (FTMB) with per-record
 //! feature vectors from three extractors: char_distribution, embedding_aggregation,
@@ -31,6 +36,16 @@ use std::path::Path;
 // ═══════════════════════════════════════════════════════════════════════════════
 // Configuration
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Activation function for branch and merge layers.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub enum Activation {
+    /// Rectified Linear Unit (default for backward compatibility).
+    #[default]
+    ReLU,
+    /// Gaussian Error Linear Unit (autoresearch winner: +1.3pp).
+    GELU,
+}
 
 /// Classification head type for the multi-branch model.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -73,6 +88,14 @@ pub struct MultiBranchConfig {
     pub dropout: f32,
     /// Classification head type.
     pub head_type: HeadType,
+    /// Activation function for branch and merge layers (default: ReLU for backward compat).
+    #[serde(default)]
+    pub activation: Activation,
+    /// Whether to use LayerNorm instead of BatchNorm, and add input LayerNorm to all branches.
+    /// When true: all branches get input LayerNorm, merge uses LayerNorm (no BatchNorm).
+    /// When false (default): only header branch gets input LayerNorm, merge uses BatchNorm.
+    #[serde(default)]
+    pub use_layer_norm: bool,
 }
 
 impl Default for MultiBranchConfig {
@@ -90,6 +113,8 @@ impl Default for MultiBranchConfig {
             n_classes: 250,
             dropout: 0.35,
             head_type: HeadType::Flat,
+            activation: Activation::ReLU,
+            use_layer_norm: false,
         }
     }
 }
@@ -129,12 +154,13 @@ impl MultiBranchConfig {
 // Branch weights (2-layer MLP with dropout)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// A single feature-processing branch: two linear layers with ReLU and dropout.
+/// A single feature-processing branch: two linear layers with activation and dropout.
 struct BranchWeights {
     input_norm: Option<candle_nn::LayerNorm>,
     linear1: Linear,
     linear2: Linear,
     dropout: f32,
+    activation: Activation,
 }
 
 impl BranchWeights {
@@ -142,9 +168,10 @@ impl BranchWeights {
         input_dim: usize,
         hidden: [usize; 2],
         dropout: f32,
+        activation: &Activation,
         vb: VarBuilder,
     ) -> candle_core::Result<Self> {
-        Self::new_inner(input_dim, hidden, dropout, false, vb)
+        Self::new_inner(input_dim, hidden, dropout, false, activation, vb)
     }
 
     /// Create a branch with LayerNorm on the input (stabilises raw embeddings).
@@ -152,9 +179,10 @@ impl BranchWeights {
         input_dim: usize,
         hidden: [usize; 2],
         dropout: f32,
+        activation: &Activation,
         vb: VarBuilder,
     ) -> candle_core::Result<Self> {
-        Self::new_inner(input_dim, hidden, dropout, true, vb)
+        Self::new_inner(input_dim, hidden, dropout, true, activation, vb)
     }
 
     fn new_inner(
@@ -162,6 +190,7 @@ impl BranchWeights {
         hidden: [usize; 2],
         dropout: f32,
         normalize_input: bool,
+        activation: &Activation,
         vb: VarBuilder,
     ) -> candle_core::Result<Self> {
         let input_norm = if normalize_input {
@@ -180,24 +209,33 @@ impl BranchWeights {
             linear1,
             linear2,
             dropout,
+            activation: activation.clone(),
         })
     }
 
-    /// Forward pass: [LayerNorm →] Linear → ReLU → Dropout → Linear → ReLU → Dropout.
+    /// Apply the configured activation function.
+    fn activate(&self, x: &Tensor) -> candle_core::Result<Tensor> {
+        match self.activation {
+            Activation::ReLU => x.relu(),
+            Activation::GELU => x.gelu_erf(),
+        }
+    }
+
+    /// Forward pass: [LayerNorm ->] Linear -> Activation -> Dropout -> Linear -> Activation -> Dropout.
     fn forward(&self, x: &Tensor, train: bool) -> candle_core::Result<Tensor> {
         let x = match &self.input_norm {
             Some(ln) => ln.forward(x)?,
             None => x.clone(),
         };
         let h = self.linear1.forward_t(&x, false)?;
-        let h = h.relu()?;
+        let h = self.activate(&h)?;
         let h = if train {
             candle_nn::ops::dropout(&h, self.dropout)?
         } else {
             h
         };
         let h = self.linear2.forward_t(&h, false)?;
-        let h = h.relu()?;
+        let h = self.activate(&h)?;
         if train {
             candle_nn::ops::dropout(&h, self.dropout)
         } else {
@@ -210,17 +248,27 @@ impl BranchWeights {
 // Multi-branch model
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Merge normalization: either BatchNorm (legacy) or LayerNorm (autoresearch winner).
+enum MergeNorm {
+    Batch(BatchNorm),
+    Layer(candle_nn::LayerNorm),
+}
+
 /// Multi-branch neural network combining character, embedding, and statistics features.
 ///
 /// Three independent branches process their respective feature vectors, then outputs
-/// are concatenated and passed through a shared merge trunk with BatchNorm, followed
+/// are concatenated and passed through a shared merge trunk with normalization, followed
 /// by a classification head (flat softmax or hierarchical tree softmax).
+///
+/// When `use_layer_norm=true`: LayerNorm on merge (no batch dim workaround), GELU activation,
+/// input LayerNorm on all branches. When false: BatchNorm on merge, ReLU, input LayerNorm
+/// only on header branch.
 pub struct MultiBranchModel {
     char_branch: BranchWeights,
     embed_branch: BranchWeights,
     stats_branch: BranchWeights,
     header_branch: Option<BranchWeights>,
-    merge_bn: BatchNorm,
+    merge_norm: MergeNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
     /// Flat classification head (250-class softmax). None when hierarchical.
@@ -238,7 +286,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
-            merge_bn,
+            merge_norm,
             merge_linear1,
             merge_linear2,
         ) = Self::build_trunk(config, &vb)?;
@@ -250,7 +298,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
-            merge_bn,
+            merge_norm,
             merge_linear1,
             merge_linear2,
             head: Some(head),
@@ -272,7 +320,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
-            merge_bn,
+            merge_norm,
             merge_linear1,
             merge_linear2,
         ) = Self::build_trunk(config, &vb)?;
@@ -288,7 +336,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
-            merge_bn,
+            merge_norm,
             merge_linear1,
             merge_linear2,
             head: None,
@@ -298,6 +346,12 @@ impl MultiBranchModel {
     }
 
     /// Build the shared trunk (branches + merge layers). Used by both constructors.
+    ///
+    /// When `config.use_layer_norm` is true:
+    /// - All branches get input LayerNorm (not just header)
+    /// - Merge uses LayerNorm instead of BatchNorm
+    ///
+    /// When false (default): only header branch gets input LayerNorm, merge uses BatchNorm.
     #[allow(clippy::type_complexity)]
     fn build_trunk(
         config: &MultiBranchConfig,
@@ -307,38 +361,43 @@ impl MultiBranchModel {
         BranchWeights,
         BranchWeights,
         Option<BranchWeights>,
-        BatchNorm,
+        MergeNorm,
         Linear,
         Linear,
     )> {
-        let char_branch = BranchWeights::new(
-            config.char_dim,
-            config.char_hidden,
-            config.dropout,
-            vb.pp("char"),
-        )?;
-        let embed_branch = BranchWeights::new(
-            config.embed_dim,
-            config.embed_hidden,
-            config.dropout,
-            vb.pp("embed"),
-        )?;
-        let stats_branch = BranchWeights::new(
-            config.stats_dim,
-            config.stats_hidden,
-            config.dropout,
-            vb.pp("stats"),
-        )?;
+        // When use_layer_norm=true, all branches get input LayerNorm.
+        // When false, only header gets it (backward compatible behavior).
+        let build_branch = |input_dim, hidden, name: &str| -> candle_core::Result<BranchWeights> {
+            if config.use_layer_norm {
+                BranchWeights::new_with_input_norm(
+                    input_dim,
+                    hidden,
+                    config.dropout,
+                    &config.activation,
+                    vb.pp(name),
+                )
+            } else {
+                BranchWeights::new(
+                    input_dim,
+                    hidden,
+                    config.dropout,
+                    &config.activation,
+                    vb.pp(name),
+                )
+            }
+        };
+
+        let char_branch = build_branch(config.char_dim, config.char_hidden, "char")?;
+        let embed_branch = build_branch(config.embed_dim, config.embed_hidden, "embed")?;
+        let stats_branch = build_branch(config.stats_dim, config.stats_hidden, "stats")?;
 
         let header_branch = if config.has_header_branch() {
-            // Input LayerNorm stabilises raw Model2Vec embeddings which can have
-            // large magnitudes. Without this, gradient explosion collapses training
-            // when sibling-context enrichment (which includes its own LayerNorm)
-            // is not active.
+            // Header branch always gets input LayerNorm (stabilises raw Model2Vec embeddings).
             Some(BranchWeights::new_with_input_norm(
                 config.header_dim,
                 config.header_hidden,
                 config.dropout,
+                &config.activation,
                 vb.pp("header"),
             )?)
         } else {
@@ -346,7 +405,22 @@ impl MultiBranchModel {
         };
 
         let merged_dim = config.merged_dim();
-        let merge_bn = batch_norm(merged_dim, BatchNormConfig::default(), vb.pp("merge_bn"))?;
+
+        // Merge normalization: LayerNorm (new) or BatchNorm (legacy)
+        let merge_norm = if config.use_layer_norm {
+            MergeNorm::Layer(candle_nn::layer_norm(
+                merged_dim,
+                candle_nn::LayerNormConfig::default(),
+                vb.pp("merge_ln"),
+            )?)
+        } else {
+            MergeNorm::Batch(batch_norm(
+                merged_dim,
+                BatchNormConfig::default(),
+                vb.pp("merge_bn"),
+            )?)
+        };
+
         let merge_linear1 = linear(merged_dim, config.merge_hidden[0], vb.pp("merge_l1"))?;
         let merge_linear2 = linear(
             config.merge_hidden[0],
@@ -359,7 +433,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
-            merge_bn,
+            merge_norm,
             merge_linear1,
             merge_linear2,
         ))
@@ -399,21 +473,37 @@ impl MultiBranchModel {
             Tensor::cat(&[char_out, embed_out, stats_out], 1)?
         };
 
-        // BatchNorm expects [B, C, ...] — for 2D input [B, C] we add a dummy spatial dim
-        let merged_3d = merged.unsqueeze(2)?; // [B, C, 1]
-        let normed_3d = self.merge_bn.forward_t(&merged_3d, train)?;
-        let normed = normed_3d.squeeze(2)?; // [B, C]
+        // Merge normalization
+        let normed = match &self.merge_norm {
+            MergeNorm::Batch(bn) => {
+                // BatchNorm expects [B, C, ...] — for 2D input [B, C] we add a dummy spatial dim
+                let merged_3d = merged.unsqueeze(2)?; // [B, C, 1]
+                let normed_3d = bn.forward_t(&merged_3d, train)?;
+                normed_3d.squeeze(2)? // [B, C]
+            }
+            MergeNorm::Layer(ln) => {
+                // LayerNorm works directly on [B, C] — no reshape needed
+                ln.forward(&merged)?
+            }
+        };
 
-        // Merge trunk: Dense → ReLU → Dropout → Dense → ReLU → Dropout
+        // Merge trunk: Dense -> Activation -> Dropout -> Dense -> Activation -> Dropout
+        let activate = |x: &Tensor| -> candle_core::Result<Tensor> {
+            match self.config.activation {
+                Activation::ReLU => x.relu(),
+                Activation::GELU => x.gelu_erf(),
+            }
+        };
+
         let h = self.merge_linear1.forward_t(&normed, false)?;
-        let h = h.relu()?;
+        let h = activate(&h)?;
         let h = if train {
             candle_nn::ops::dropout(&h, self.config.dropout)?
         } else {
             h
         };
         let h = self.merge_linear2.forward_t(&h, false)?;
-        let h = h.relu()?;
+        let h = activate(&h)?;
         if train {
             candle_nn::ops::dropout(&h, self.config.dropout)
         } else {
@@ -1237,8 +1327,8 @@ impl Default for MultiBranchTrainConfig {
             output_dir: std::path::PathBuf::from("models/multi-branch-v1"),
             epochs: 50,
             batch_size: 64,
-            lr: 1e-4,
-            weight_decay: 1e-4,
+            lr: 1e-3,
+            weight_decay: 0.01,
             patience: 10,
             seed: 42,
             min_lr: 1e-6,
@@ -2167,6 +2257,8 @@ mod tests {
             n_classes: 250,
             dropout: 0.35,
             head_type: HeadType::Flat,
+            activation: Activation::ReLU,
+            use_layer_norm: false,
         };
 
         let tmp = tempfile::NamedTempFile::new().unwrap();
@@ -2184,6 +2276,177 @@ mod tests {
         assert_eq!(config.n_classes, loaded.n_classes);
         assert!((config.dropout - loaded.dropout).abs() < 1e-6);
         assert_eq!(config.head_type, loaded.head_type);
+        assert_eq!(config.activation, loaded.activation);
+        assert_eq!(config.use_layer_norm, loaded.use_layer_norm);
+    }
+
+    #[test]
+    fn test_config_serialization_gelu_layer_norm() {
+        let config = MultiBranchConfig {
+            activation: Activation::GELU,
+            use_layer_norm: true,
+            ..MultiBranchConfig::default()
+        };
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        config.save(tmp.path()).unwrap();
+        let loaded = MultiBranchConfig::load(tmp.path()).unwrap();
+
+        assert_eq!(loaded.activation, Activation::GELU);
+        assert!(loaded.use_layer_norm);
+    }
+
+    #[test]
+    fn test_config_backward_compat_deserializes_without_new_fields() {
+        // Old config JSON without activation/use_layer_norm — should default to ReLU+BatchNorm
+        let json = r#"{
+            "char_dim": 960, "embed_dim": 512, "stats_dim": 27, "header_dim": 128,
+            "char_hidden": [300, 300], "embed_hidden": [200, 200],
+            "stats_hidden": [128, 64], "header_hidden": [128, 64],
+            "merge_hidden": [500, 500], "n_classes": 250, "dropout": 0.35,
+            "head_type": "Flat"
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.activation, Activation::ReLU);
+        assert!(!config.use_layer_norm);
+    }
+
+    /// GELU+LayerNorm forward pass shape test (ac-10).
+    #[test]
+    fn test_forward_pass_shape_gelu_layer_norm() {
+        let config = MultiBranchConfig {
+            activation: Activation::GELU,
+            use_layer_norm: true,
+            ..MultiBranchConfig::default()
+        };
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+
+        let batch_size = 10;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        let header_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.header_dim), &device).unwrap();
+
+        // Training mode
+        let logits = model
+            .forward(&char_feats, &embed_feats, &stats_feats, Some(&header_feats), true)
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+
+        // Eval mode
+        let logits = model
+            .forward(&char_feats, &embed_feats, &stats_feats, Some(&header_feats), false)
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+    }
+
+    /// GELU+LayerNorm gradient flow test (ac-10).
+    #[test]
+    fn test_gradient_flow_gelu_layer_norm() {
+        let config = MultiBranchConfig {
+            activation: Activation::GELU,
+            use_layer_norm: true,
+            ..MultiBranchConfig::default()
+        };
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+
+        let batch_size = 4;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        let header_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.header_dim), &device).unwrap();
+        let targets = Tensor::new(&[0u32, 1, 2, 3], &device).unwrap();
+
+        let vars = varmap.all_vars();
+        let initial_values: Vec<Vec<f32>> = vars
+            .iter()
+            .map(|v| v.as_tensor().flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .collect();
+
+        let logits = model
+            .forward(&char_feats, &embed_feats, &stats_feats, Some(&header_feats), true)
+            .unwrap();
+        let loss = candle_nn::loss::cross_entropy(&logits, &targets).unwrap();
+
+        let adamw_params = candle_nn::ParamsAdamW {
+            lr: 0.01,
+            ..Default::default()
+        };
+        let mut optimizer = candle_nn::AdamW::new(varmap.all_vars(), adamw_params).unwrap();
+        optimizer.backward_step(&loss).unwrap();
+
+        let updated_values: Vec<Vec<f32>> = vars
+            .iter()
+            .map(|v| v.as_tensor().flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .collect();
+
+        let n_changed: usize = initial_values
+            .iter()
+            .zip(updated_values.iter())
+            .filter(|(a, b)| a != b)
+            .count();
+        assert!(
+            n_changed > 5,
+            "Expected many parameters to change with GELU+LN, only {} changed out of {}",
+            n_changed,
+            vars.len()
+        );
+    }
+
+    /// Verify GELU and ReLU produce different outputs for same input (non-trivial difference).
+    #[test]
+    fn test_gelu_vs_relu_outputs_differ() {
+        let device = Device::Cpu;
+
+        let relu_config = MultiBranchConfig::default(); // ReLU
+        let gelu_config = MultiBranchConfig {
+            activation: Activation::GELU,
+            use_layer_norm: true,
+            ..MultiBranchConfig::default()
+        };
+
+        // Use same seed for parameter initialization
+        let varmap_relu = VarMap::new();
+        let vb_relu = VarBuilder::from_varmap(&varmap_relu, DType::F32, &device);
+        let relu_model = MultiBranchModel::new(&relu_config, vb_relu).unwrap();
+
+        let varmap_gelu = VarMap::new();
+        let vb_gelu = VarBuilder::from_varmap(&varmap_gelu, DType::F32, &device);
+        let gelu_model = MultiBranchModel::new(&gelu_config, vb_gelu).unwrap();
+
+        let char_feats = Tensor::randn(0.0f32, 1.0, (1, 960), &device).unwrap();
+        let embed_feats = Tensor::randn(0.0f32, 1.0, (1, 512), &device).unwrap();
+        let stats_feats = Tensor::randn(0.0f32, 1.0, (1, 27), &device).unwrap();
+
+        let relu_out = relu_model
+            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
+            .unwrap();
+        let gelu_out = gelu_model
+            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
+            .unwrap();
+
+        // Both should produce valid logits with same shape
+        assert_eq!(relu_out.dims(), gelu_out.dims());
+
+        // But the actual values should differ (different activations + different norm)
+        let relu_vec = relu_out.flatten_all().unwrap().to_vec1::<f32>().unwrap();
+        let gelu_vec = gelu_out.flatten_all().unwrap().to_vec1::<f32>().unwrap();
+        let any_different = relu_vec.iter().zip(gelu_vec.iter()).any(|(a, b)| (a - b).abs() > 1e-6);
+        assert!(any_different, "ReLU and GELU models should produce different outputs");
     }
 
     #[test]

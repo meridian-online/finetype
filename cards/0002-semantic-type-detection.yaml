@@ -32,9 +32,11 @@ maturity: "established"
 goal: "Close 155/190 → 170+/190 profile eval accuracy via data quality improvements and model retraining"
 
 specs:
+  - "specs/2026-03-21-sherlock-architecture/"
   - "specs/2026-03-25-multi-branch-pipeline-integration/"
   - "specs/2026-03-26-overnight-v6-data-quality/"
-  - "specs/2026-03-21-sherlock-architecture/"
+  - "specs/2026-04-09-online-training/"
+  - "specs/2026-04-11-candle-autoresearch-port/"
 
 references:
   - "README.md"
