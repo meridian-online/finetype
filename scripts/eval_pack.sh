@@ -57,6 +57,15 @@ mkdir -p results
 
 PACK_FILE="results/eval-pack-${MODEL_NAME}.tar.gz"
 
+# Copy fresh eval results from eval/eval_output/ into the model directory.
+# eval.sh writes to eval/eval_output/ but doesn't copy to the model dir.
+EVAL_OUTPUT="eval/eval_output"
+if [[ -d "$EVAL_OUTPUT" ]] && [[ -f "$EVAL_OUTPUT/profile_results.json" ]]; then
+    mkdir -p "$MODEL_DIR/eval"
+    cp -r "$EVAL_OUTPUT"/* "$MODEL_DIR/eval/" 2>/dev/null || true
+    echo "[Eval Pack] Copied fresh results from $EVAL_OUTPUT → $MODEL_DIR/eval/"
+fi
+
 # Build file list — only include files that exist
 FILES=()
 
