@@ -8,7 +8,7 @@
 - [x] Two primary files: finetype-train + finetype-model multi_branch.rs
 - [x] Backward compatible via #[serde(default)]
 - [x] Header branch retained
-- [ ] Mac Metal training
+- [x] Mac Metal training — v8 completed 30 epochs in 1h08m on M1 Pro
 - [ ] Profile eval >=160/190 to publish
 - [ ] No regression in actionability eval
 - [x] Training config: GELU, use_layer_norm=true, weight_decay=0.01, lr=0.001
@@ -24,10 +24,30 @@
 - [x] ac-08: Conditional merge LayerNorm/BatchNorm (inference) — MergeNorm enum, LayerNorm when use_layer_norm=true
 - [x] ac-09: Training config defaults (weight_decay=0.01, lr=0.001) — updated in MultiBranchTrainConfig::default()
 - [x] ac-10: Tests for both old-style and new-style configs — 5 new tests added, 22 training + 5 inference all pass
-- [ ] ac-11: Train new model on Mac with Metal
-- [ ] ac-12: Profile eval >=160/190
-- [ ] ac-13: No actionability regression
-- [ ] ac-14: Publish to HuggingFace
+- [x] ac-11: Train new model on Mac with Metal — v8 completed, 30 epochs, best val_accuracy 84.6% at epoch 27
+- [ ] ac-12: Profile eval >=160/190 — v8 FAILED: 167/214 (78.0%) vs baseline 179/214 (83.6%), -12 regression
+- [ ] ac-13: No actionability regression — v8: 94.5% vs baseline 96.9%, minor regression
+- [ ] ac-14: Publish to HuggingFace — blocked by ac-12
+
+## v8 Results (GELU+LN, lr=0.001, wd=0.01) — REGRESSION
+
+| Model | Label | Domain | Actionability |
+|-------|-------|--------|---------------|
+| v4-sibling (baseline) | 179/214 (83.6%) | 197/214 (92.1%) | 96.9% |
+| v6-gelu (v8) | 167/214 (78.0%) | 187/214 (87.4%) | 94.5% |
+| **Delta** | **-12 (-5.6%)** | **-10 (-4.7%)** | **-2.4%** |
+
+19 regressions, 7 fixes, 28 both wrong. Primary failure modes:
+- decimal_number → dmy_short_dot/ip_v4/icd10 (7 regressions)
+- person names → email_display (3 regressions)
+
+**Exit condition triggered:** score < baseline → revert and investigate.
+
+## v9 Experiment (in progress): Isolating Architecture vs Hyperparameters
+
+**Hypothesis:** Regression caused by 10x LR (1e-4 → 1e-3), not GELU+LN architecture.
+**Config:** Same GELU+LN architecture, but lr=0.0001, wd=0.0001 (original values).
+**Script:** `scripts/overnight_v9_conservative.sh`
 
 ## Test Results
 
