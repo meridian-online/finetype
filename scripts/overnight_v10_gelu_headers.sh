@@ -267,15 +267,26 @@ echo "================================================================"
 echo " Step 1.5/4: Validate FTMB header features"
 echo "================================================================"
 
-# Use read_ftmb.py to dump first N records and check header features
+# Parse the FTMB v3 binary and spot-check header features in the first 5 groups.
+# FTMB v3 header layout (28 bytes):
+#   [0..4]   Magic "FTMB"
+#   [4..8]   Version: u32 LE
+#   [8..16]  n_records: u64 LE
+#   [16..18] char_dim: u16
+#   [18..20] embed_dim: u16
+#   [20..22] stats_dim: u16
+#   [22..24] header_dim: u16
+#   [24..26] n_groups: u16  (v3+)
+#   [26..28] reserved: u16  (v3+)
 HEADER_VALIDATION=$(python3 -c "
 import struct, sys
 
 path = '$FTMB_FILE'
 with open(path, 'rb') as f:
     magic = f.read(4)
-    version = struct.unpack('<H', f.read(2))[0]
-    n_records = struct.unpack('<I', f.read(4))[0]
+    assert magic == b'FTMB', f'Bad magic: {magic}'
+    version = struct.unpack('<I', f.read(4))[0]
+    n_records = struct.unpack('<Q', f.read(8))[0]
     char_dim = struct.unpack('<H', f.read(2))[0]
     embed_dim = struct.unpack('<H', f.read(2))[0]
     stats_dim = struct.unpack('<H', f.read(2))[0]
@@ -285,7 +296,8 @@ with open(path, 'rb') as f:
         print(f'FAIL: FTMB version {version} does not support table groups')
         sys.exit(1)
 
-    n_groups = struct.unpack('<I', f.read(4))[0]
+    n_groups = struct.unpack('<H', f.read(2))[0]
+    _reserved = struct.unpack('<H', f.read(2))[0]
 
     # Check first 5 groups
     headers_checked = 0
@@ -296,11 +308,9 @@ with open(path, 'rb') as f:
         n_columns = struct.unpack('<H', f.read(2))[0]
         n_sibling_headers = struct.unpack('<H', f.read(2))[0]
 
-        sibling_names = []
         for _ in range(n_sibling_headers):
             name_len = struct.unpack('<H', f.read(2))[0]
             name = f.read(name_len).decode('utf-8')
-            sibling_names.append(name)
             if name.strip():
                 headers_with_name += 1
 
@@ -308,9 +318,9 @@ with open(path, 'rb') as f:
             label_len = struct.unpack('<H', f.read(2))[0]
             label = f.read(label_len).decode('utf-8')
             col_idx = struct.unpack('<H', f.read(2))[0]
-            char_feat = struct.unpack(f'<{char_dim}f', f.read(char_dim * 4))
-            embed_feat = struct.unpack(f'<{embed_dim}f', f.read(embed_dim * 4))
-            stats_feat = struct.unpack(f'<{stats_dim}f', f.read(stats_dim * 4))
+            f.read(char_dim * 4)   # skip char features
+            f.read(embed_dim * 4)  # skip embed features
+            f.read(stats_dim * 4)  # skip stats features
             header_feat = struct.unpack(f'<{header_dim}f', f.read(header_dim * 4))
 
             headers_checked += 1
