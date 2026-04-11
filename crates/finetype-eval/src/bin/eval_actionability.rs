@@ -14,14 +14,15 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// Build a DuckDB read expression appropriate for the file type.
-/// JSON files use `read_json_auto(..., all_varchar=true)`, everything else uses `read_csv(...)`.
+/// JSON files use `read_json_auto(...)`, everything else uses `read_csv(..., all_varchar=true)`.
+/// Note: `read_json_auto` does not support `all_varchar` — DuckDB auto-detects JSON types.
 fn read_expr(file_path: &str) -> String {
     let escaped = file_path.replace('\'', "''");
     if Path::new(file_path)
         .extension()
         .is_some_and(|ext| ext == "json" || ext == "jsonl")
     {
-        format!("read_json_auto('{escaped}', all_varchar=true)")
+        format!("read_json_auto('{escaped}')")
     } else {
         format!("read_csv('{escaped}', auto_detect=true, all_varchar=true)")
     }
