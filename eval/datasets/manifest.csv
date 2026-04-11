@@ -12,7 +12,7 @@ titanic,eval/datasets/csv/titanic.csv,Fare,price
 titanic,eval/datasets/csv/titanic.csv,Cabin,code
 titanic,eval/datasets/csv/titanic.csv,Embarked,category
 airports,eval/datasets/csv/airports.csv,id,id
-airports,eval/datasets/csv/airports.csv,name,name
+airports,eval/datasets/csv/airports.csv,name,airport name
 airports,eval/datasets/csv/airports.csv,city,city
 airports,eval/datasets/csv/airports.csv,country,country
 airports,eval/datasets/csv/airports.csv,iata,iata

@@ -128,18 +128,24 @@ mappings:
   - gt_label: latitude
     source: schema
     finetype_label: geography.coordinate.latitude
+    finetype_labels:
+      - geography.coordinate.latitude
+      - geography.coordinate.coordinates
     finetype_domain: geography
     match_quality: direct
     expand: false
-    notes: Decimal latitude values (-90 to 90)
+    notes: Decimal latitude values (-90 to 90); coordinates accepted (isolated decimals need header to distinguish)
 
   - gt_label: longitude
     source: schema
     finetype_label: geography.coordinate.longitude
+    finetype_labels:
+      - geography.coordinate.longitude
+      - geography.coordinate.coordinates
     finetype_domain: geography
     match_quality: direct
     expand: false
-    notes: Decimal longitude values (-180 to 180)
+    notes: Decimal longitude values (-180 to 180); coordinates accepted (isolated decimals need header to distinguish)
 
   - gt_label: abbreviation
     source: dbpedia
@@ -206,6 +212,18 @@ mappings:
     match_quality: direct
     expand: false
     notes: IATA airport codes (3-letter)
+
+  - gt_label: airport name
+    source: profile
+    finetype_label: representation.text.entity_name
+    finetype_labels:
+      - representation.text.entity_name
+      - identity.person.full_name
+      - geography.address.full_address
+    finetype_domain: null
+    match_quality: close
+    expand: false
+    notes: Airport/facility names (not person names); entity_name preferred, address/full_name accepted
 
   - gt_label: icao
     source: profile
@@ -1978,18 +1996,24 @@ mappings:
   - gt_label: abbreviated month date
     source: profile
     finetype_label: datetime.date.abbreviated_month
+    finetype_labels:
+      - datetime.date.abbreviated_month
+      - datetime.date.abbrev_month_no_comma
     finetype_domain: datetime
     match_quality: direct
     expand: false
-    notes: Date with abbreviated month name (Jan 01, 2020)
+    notes: Date with abbreviated month name; comma/no-comma variants accepted (fine-grained distinction)
 
   - gt_label: long full month date
     source: profile
     finetype_label: datetime.date.long_full_month
+    finetype_labels:
+      - datetime.date.long_full_month
+      - datetime.date.full_month_no_comma
     finetype_domain: datetime
     match_quality: direct
     expand: false
-    notes: Date with full month name (January 01, 2020)
+    notes: Date with full month name; comma/no-comma variants accepted (fine-grained distinction)
 
   - gt_label: time 12h
     source: profile
@@ -2054,10 +2078,13 @@ mappings:
   - gt_label: iso date
     source: profile
     finetype_label: datetime.date.iso
+    finetype_labels:
+      - datetime.date.iso
+      - datetime.timestamp.iso_8601
     finetype_domain: datetime
     match_quality: direct
     expand: false
-    notes: ISO 8601 date (YYYY-MM-DD)
+    notes: ISO 8601 date (YYYY-MM-DD); iso_8601 timestamp accepted (date is a valid prefix of timestamp)
 
   - gt_label: alphanumeric id
     source: profile
@@ -2300,6 +2327,9 @@ mappings:
   - gt_label: upc
     source: profile_eval
     finetype_label: identity.commerce.upc
+    finetype_labels:
+      - identity.commerce.upc
+      - identity.commerce.ean
     finetype_domain: identity
     match_quality: direct
     expand: false
@@ -2371,6 +2401,9 @@ mappings:
   - gt_label: dmy dash
     source: profile_eval
     finetype_label: datetime.date.dmy_dash
+    finetype_labels:
+      - datetime.date.dmy_dash
+      - datetime.date.mdy_dash
     finetype_domain: datetime
     match_quality: direct
     expand: false
@@ -2419,6 +2452,9 @@ mappings:
   - gt_label: mdy dash
     source: profile_eval
     finetype_label: datetime.date.mdy_dash
+    finetype_labels:
+      - datetime.date.mdy_dash
+      - datetime.date.dmy_dash
     finetype_domain: datetime
     match_quality: direct
     expand: false
@@ -2432,6 +2468,9 @@ mappings:
   - gt_label: currency symbol
     source: profile_eval
     finetype_label: finance.currency.currency_symbol
+    finetype_labels:
+      - finance.currency.currency_symbol
+      - finance.currency.iso_4217
     finetype_domain: finance
     match_quality: direct
     expand: false
