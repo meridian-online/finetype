@@ -4088,7 +4088,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
         }
         return Some("datetime.epoch.unix_seconds");
     }
-    if h.contains("date") || h.contains("timestamp") || h.contains("datetime") {
+    if (h.contains("date") || h.contains("timestamp") || h.contains("datetime"))
+        && !h.contains("month")
+    {
+        // Guard: headers containing "month" (e.g. "abbreviated_month_date",
+        // "long_full_month_date") are specific date formats, not generic iso_8601.
+        // Let the model decide those from values.
         return Some("datetime.timestamp.iso_8601");
     }
     if h.contains("year") {
