@@ -30,6 +30,7 @@
 #   models/sherlock-v11/                                    — Trained model
 #   results/overnight-v11-retraining.log                    — Full log
 #   results/eval-pack-sherlock-v11.tar.gz                   — Eval pack
+#   results/v11-transfer-bundle.tar.gz                      — All results for Beelink transfer
 #
 # Spec: specs/2026-04-12-accuracy-gap-retraining/spec.yaml
 set -euo pipefail
@@ -626,6 +627,45 @@ if [[ -f "$V11_REPORT" ]]; then
 fi
 echo ""
 
+# --- Transfer bundle ──────────────────────────────────────────────────
+# Single archive with everything needed for analysis on the Beelink.
+
+TRANSFER_BUNDLE="results/v11-transfer-bundle.tar.gz"
+BUNDLE_FILES=()
+
+# Eval packs (v11 + v4-sibling comparison)
+for pack in results/eval-pack-sherlock-v11.tar.gz results/eval-pack-sherlock-v4-sibling.tar.gz; do
+    [[ -f "$pack" ]] && BUNDLE_FILES+=("$pack")
+done
+
+# Training log
+[[ -f "$LOG_FILE" ]] && BUNDLE_FILES+=("$LOG_FILE")
+
+# Model weights (needed for HuggingFace publish if gates pass)
+for f in "$MODEL_DIR/model.safetensors" "$MODEL_DIR/config.json" "$MODEL_DIR/label_map.json" "$MODEL_DIR/results.json"; do
+    [[ -f "$f" ]] && BUNDLE_FILES+=("$f")
+done
+
+# Progress file for session continuity
+PROGRESS="specs/2026-04-12-accuracy-gap-retraining/progress.md"
+[[ -f "$PROGRESS" ]] && BUNDLE_FILES+=("$PROGRESS")
+
+if [[ ${#BUNDLE_FILES[@]} -gt 0 ]]; then
+    tar czf "$TRANSFER_BUNDLE" "${BUNDLE_FILES[@]}"
+    BUNDLE_SIZE="$(ls -lh "$TRANSFER_BUNDLE" | awk '{print $5}')"
+    echo "[Transfer] Created: $TRANSFER_BUNDLE ($BUNDLE_SIZE, ${#BUNDLE_FILES[@]} files)"
+    echo ""
+    echo "Contents:"
+    tar tzf "$TRANSFER_BUNDLE" | sed 's/^/  /'
+    echo ""
+    echo "To unpack on Beelink:"
+    echo "  scp mac:~/github/meridian-online/finetype/$TRANSFER_BUNDLE ."
+    echo "  cd ~/github/meridian-online/finetype && tar xzf v11-transfer-bundle.tar.gz"
+else
+    echo "WARN: No files to bundle for transfer"
+fi
+echo ""
+
 # --- Summary ──────────────────────────────────────────────────────────
 
 PIPELINE_END=$(date +%s)
@@ -642,11 +682,15 @@ echo " Config: $MODEL_CONFIG (ReLU+BN, production-scale)"
 echo " Hyperparameters: lr=0.0001, weight_decay=0.0001"
 echo " Data: 70/30 distillation:synthetic"
 echo " Log: $LOG_FILE"
-echo " Eval pack: results/eval-pack-$(basename "$MODEL_DIR").tar.gz"
+echo " Transfer: $TRANSFER_BUNDLE"
 echo ""
 echo " What changed from v4-sibling:"
 echo "   - Data mix: 50/50 → 70/30 distillation-heavy"
 echo "   - Epoch cap: 30 → $EPOCHS"
 echo "   - Config: v5-scaled dimensions (same as v8-v10)"
 echo "   - Architecture: UNCHANGED (ReLU+BN, flat head)"
+echo ""
+echo " To transfer results to the Beelink:"
+echo "   scp mac:~/github/meridian-online/finetype/$TRANSFER_BUNDLE ."
+echo "   tar xzf v11-transfer-bundle.tar.gz"
 echo "================================================================"
