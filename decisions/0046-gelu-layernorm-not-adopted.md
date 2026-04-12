@@ -3,7 +3,7 @@ status: accepted
 date-created: 2026-04-12
 date-modified: 2026-04-12
 ---
-# 0045. GELU+LayerNorm architecture not adopted for multi-branch model
+# 0046. GELU+LayerNorm architecture not adopted for multi-branch model
 
 ## Context and Problem Statement
 
