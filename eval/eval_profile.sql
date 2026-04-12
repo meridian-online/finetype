@@ -154,6 +154,22 @@ WITH candidates AS (
                      'geography.coordinate.coordinates'
                  )
             THEN true
+            -- Hash subtypes: git_sha (40-char SHA-1) is a valid specific subtype of hash
+            WHEN sm.finetype_label IN ('technology.cryptographic.hash', 'technology.development.git_sha')
+                 AND pr.predicted_type IN ('technology.cryptographic.hash', 'technology.development.git_sha')
+            THEN true
+            -- JSON subtypes: geojson is a specific subtype of json
+            WHEN (sm.finetype_label = 'container.object.json' AND pr.predicted_type = 'geography.format.geojson')
+                 OR (sm.finetype_label = 'geography.format.geojson' AND pr.predicted_type = 'container.object.json')
+            THEN true
+            -- IP hierarchy: ip_v4 captures the core format of ip_v4_with_port
+            WHEN sm.finetype_label = 'technology.internet.ip_v4_with_port'
+                 AND pr.predicted_type = 'technology.internet.ip_v4'
+            THEN true
+            -- Categorical is a valid generic parent for http_method and measurement_unit
+            WHEN sm.finetype_label IN ('technology.internet.http_method', 'representation.scientific.measurement_unit')
+                 AND pr.predicted_type = 'representation.discrete.categorical'
+            THEN true
             ELSE false
         END AS label_match,
         -- Scoring: domain-level match
