@@ -11,7 +11,9 @@ issn,dbpedia,identity.commerce.issn,identity,direct,false
 percentage,dbpedia,representation.numeric.percentage,representation,direct,false
 year,dbpedia,datetime.component.year,datetime,direct,false
 latitude,schema,geography.coordinate.latitude,geography,direct,false
+latitude,schema,geography.coordinate.coordinates,geography,direct,false
 longitude,schema,geography.coordinate.longitude,geography,direct,false
+longitude,schema,geography.coordinate.coordinates,geography,direct,false
 abbreviation,dbpedia,representation.text.word,representation,close,false
 credit card number,profile,finance.payment.credit_card_number,finance,direct,false
 ean,profile,identity.commerce.ean,identity,direct,false
@@ -20,11 +22,15 @@ last name,profile,identity.person.last_name,identity,direct,false
 hash,profile,technology.cryptographic.hash,technology,direct,false
 http status code,profile,representation.numeric.integer_number,representation,close,false
 iata,profile,geography.transportation.iata_code,geography,direct,false
+airport name,profile,representation.text.entity_name,,close,false
+airport name,profile,identity.person.full_name,,close,false
+airport name,profile,geography.address.full_address,,close,false
 icao,profile,geography.transportation.icao_code,geography,direct,false
 hostname,profile,technology.internet.hostname,technology,direct,false
 ip_v4,profile,technology.internet.ip_v4,technology,direct,false
 mac address,profile,technology.internet.mac_address,technology,direct,false
 measurement unit,profile,representation.scientific.measurement_unit,representation,direct,false
+measurement unit,profile,representation.discrete.categorical,representation,close,false
 month name,profile,datetime.component.month_name,datetime,direct,false
 npi,profile,identity.medical.npi,identity,direct,false
 port,profile,representation.numeric.integer_number,representation,close,false
@@ -51,6 +57,7 @@ producer,both,identity.person.full_name,identity,close,false
 manufacturer,both,representation.text.word,representation,close,false
 address,dbpedia,geography.address.full_address,geography,close,false
 address,dbpedia,geography.coordinate.coordinates,geography,close,false
+address,dbpedia,geography.location.region,geography,close,false
 county,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
 region,dbpedia,geography.location.region,geography,close,false
@@ -298,7 +305,9 @@ dec,dbpedia,,representation,semantic_only,false
 filename,dbpedia,,representation,semantic_only,true
 eu dot date,profile,datetime.date.dmy_dot,datetime,direct,false
 abbreviated month date,profile,datetime.date.abbreviated_month,datetime,direct,false
+abbreviated month date,profile,datetime.date.abbrev_month_no_comma,datetime,direct,false
 long full month date,profile,datetime.date.long_full_month,datetime,direct,false
+long full month date,profile,datetime.date.full_month_no_comma,datetime,direct,false
 time 12h,profile,datetime.time.hm_12h,datetime,direct,false
 time 12h seconds,profile,datetime.time.hms_12h,datetime,direct,false
 rfc 2822 timestamp,profile,datetime.timestamp.rfc_2822,datetime,direct,false
@@ -307,11 +316,14 @@ european timestamp,profile,datetime.timestamp.dmy_hm,datetime,direct,false
 iso timestamp,profile,datetime.timestamp.iso_8601,datetime,direct,false
 iso timestamp milliseconds,profile,datetime.timestamp.iso_8601_milliseconds,datetime,direct,false
 iso date,profile,datetime.date.iso,datetime,direct,false
+iso date,profile,datetime.timestamp.iso_8601,datetime,direct,false
 alphanumeric id,profile,representation.identifier.alphanumeric_id,representation,direct,false
 http method,profile,technology.internet.http_method,technology,direct,false
+http method,profile,representation.discrete.categorical,technology,close,false
 currency code,profile,finance.currency.currency_code,finance,direct,false
 wkt,profile_eval,geography.format.wkt,geography,direct,false
 geojson,profile_eval,container.object.json,geography,direct,false
+geojson,profile_eval,container.object.json,container,close,false
 h3,profile_eval,geography.index.h3,geography,direct,false
 geohash,profile_eval,geography.coordinate.geohash,geography,direct,false
 plus code,profile_eval,geography.coordinate.plus_code,geography,direct,false
@@ -328,6 +340,7 @@ s3 uri,profile_eval,technology.cloud.s3_uri,technology,direct,false
 jwt,profile_eval,technology.cryptographic.jwt,technology,direct,false
 docker ref,profile_eval,technology.development.docker_ref,technology,direct,false
 git sha,profile_eval,technology.cryptographic.hash,technology,direct,false
+git sha,profile_eval,technology.cryptographic.hash,technology,close,false
 git sha,profile_eval,technology.cryptographic.hash,technology,close,false
 cidr,profile_eval,technology.internet.cidr,technology,direct,false
 urn,profile_eval,technology.internet.urn,technology,direct,false
@@ -346,6 +359,7 @@ orcid,profile_eval,identity.academic.orcid,identity,direct,false
 email display,profile_eval,identity.person.email_display,identity,direct,false
 phone e164,profile_eval,identity.person.phone_e164,identity,direct,false
 upc,profile_eval,identity.commerce.upc,identity,direct,false
+upc,profile_eval,identity.commerce.ean,identity,direct,false
 isrc,profile_eval,identity.commerce.isrc,identity,direct,false
 figi,profile_eval,finance.securities.figi,finance,direct,false
 aba routing,profile_eval,finance.banking.aba_routing,finance,direct,false
@@ -357,6 +371,7 @@ color hsl,profile_eval,representation.format.color_hsl,representation,direct,fal
 compact ymd,profile_eval,datetime.date.compact_ymd,datetime,direct,false
 rfc 3339,profile_eval,datetime.timestamp.rfc_3339,datetime,direct,false
 dmy dash,profile_eval,datetime.date.dmy_dash,datetime,direct,false
+dmy dash,profile_eval,datetime.date.mdy_dash,datetime,direct,false
 ymd dot,profile_eval,datetime.date.ymd_dot,datetime,direct,false
 quarter,profile_eval,datetime.period.quarter,datetime,direct,false
 fiscal year,profile_eval,datetime.period.fiscal_year,datetime,direct,false
@@ -365,8 +380,10 @@ iso week,profile_eval,datetime.date.iso_week,datetime,direct,false
 clf timestamp,profile_eval,datetime.timestamp.clf,datetime,direct,false
 syslog bsd,profile_eval,datetime.timestamp.syslog_bsd,datetime,direct,false
 mdy dash,profile_eval,datetime.date.mdy_dash,datetime,direct,false
+mdy dash,profile_eval,datetime.date.dmy_dash,datetime,direct,false
 compact dmy,profile_eval,datetime.date.compact_dmy,datetime,direct,false
 currency symbol,profile_eval,finance.currency.currency_symbol,finance,direct,false
+currency symbol,profile_eval,finance.currency.currency_code,finance,direct,false
 bitcoin address,profile_eval,finance.crypto.bitcoin_address,finance,direct,false
 isin,profile_eval,finance.securities.isin,finance,direct,false
 cusip,profile_eval,finance.securities.cusip,finance,direct,false
@@ -378,6 +395,7 @@ integer number,profile_eval,representation.numeric.integer_number,representation
 ip_v6,profile_eval,technology.internet.ip_v6,technology,direct,false
 calver,profile_eval,technology.development.calver,technology,direct,false
 ip_v4 with port,profile_eval,technology.internet.ip_v4_with_port,technology,direct,false
+ip_v4 with port,profile_eval,technology.internet.ip_v4,technology,close,false
 username,profile_eval,identity.person.username,identity,direct,false
 birth date,sherlock,datetime.date.iso,datetime,close,false
 birth place,sherlock,geography.location.city,geography,close,false

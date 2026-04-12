@@ -38,6 +38,7 @@ specs:
   - "specs/2026-04-09-online-training/"
   - "specs/2026-04-11-candle-autoresearch-port/"
   - "specs/2026-04-12-accuracy-gap-retraining/"
+  - "specs/2026-04-12-sharpen-header-bugfixes/"
 
 references:
   - "README.md"

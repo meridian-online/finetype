@@ -1,0 +1,155 @@
+goal: >
+  Fix header hint bugs and threshold logic in Sharpen that block correct
+  overrides, then re-evaluate v11 to exceed 205/227 profile eval target.
+  Three categories: (1) header_hint() returning wrong types, (2) threshold
+  logic in apply_header_sharpen() too permissive for same-domain predictions,
+  (3) two high-impact new header hints for unambiguous column names.
+
+context: >
+  sherlock-v11 scores 203/227 (89.4%) — 2 short of the 205/227 target.
+  Investigation of all 24 misclassifications found 18 are Sharpen-fixable.
+  Two distinct threshold bugs in apply_header_sharpen() block correct hints:
+  (A) The same-category path (line ~2245) has threshold 0.80, so ssn@1.00
+  blocks a hardcoded "phone" hint for phone_number even though both are
+  identity.person.* types. (B) The hardcoded authority path (line ~2319)
+  uses threshold 0.5 for same-domain, so compact_ym@0.83 blocks a "year"
+  hint and docker_ref@0.60 blocks a "url" hint.
+  The v11 model weights are frozen — only Sharpen post-processing changes.
+  Note: Adding hardcoded hints is a stopgap that runs counter to decision
+  0042 (deprecate hardcoded hints in favour of learned approaches). These
+  hints should be absorbed by retraining in the next model iteration.
+
+constraints:
+  - "v11 model weights frozen — no retraining, only Sharpen changes"
+  - "Only fix bugs in existing hints/thresholds, plus add <=2 new header hints"
+  - "No changes to feature_sharpen (F1-F6) or value_sharpen (R1-R19+)"
+  - "All changes in crates/finetype-model/src/column.rs (header_hint and apply_header_sharpen)"
+  - "No actionability regression (>=99.8%, current v11 level)"
+  - "Every fix must have a unit test"
+  - "New hints must be unambiguous — exclude column names with multiple valid meanings"
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: >
+      Fix header_hint() to exclude "bitcoin" from address keyword match.
+      "bitcoin_address" currently matches h.contains("address") and returns
+      full_address, overriding the correct bitcoin_address prediction.
+    verification: >
+      Unit test: header_hint("bitcoin_address") returns None.
+      header_hint("street_address") still returns full_address.
+    fixes: ["#17 finance_coverage.bitcoin_address"]
+
+  - id: ac-02
+    ac_type: code
+    description: >
+      Fix header_hint() to return ip_v6 when header contains "v6" or "ipv6",
+      before the ip_v4 substring catch-all (line ~4000) fires. Currently
+      "ip_v6" normalizes to "ip v6" which matches h.starts_with("ip ") and
+      returns ip_v4.
+    verification: >
+      Unit test: header_hint("ip_v6") returns technology.internet.ip_v6.
+      header_hint("source_ip") still returns ip_v4.
+      header_hint("server_ipv6") returns ip_v6.
+    fixes: ["#21 technology_coverage.ip_v6"]
+
+  - id: ac-03
+    ac_type: code
+    description: >
+      Fix two threshold paths in apply_header_sharpen() for hardcoded hints:
+
+      (A) Same-category path (line ~2245): Remove the confidence threshold
+      entirely for hardcoded same-category overrides. When hint_is_hardcoded
+      and hint shares the same domain.category prefix as the prediction
+      (e.g. both identity.person.*), always override. Rationale: a hardcoded
+      hint is definitive — "phone" means phone_number, not ssn.
+
+      (B) Hardcoded authority path (line ~2319): Raise the same-domain
+      threshold from 0.5 to 0.90. When hint_is_hardcoded and hint shares
+      the same domain but different category, override when confidence < 0.90
+      (was < 0.5). This unblocks year@0.83 and url@0.60 while still
+      respecting genuinely high-confidence (>=0.90) same-domain predictions.
+
+      Code path trace for each fix:
+        phone→ssn@1.00: same-category path (identity.person == identity.person)
+          → (A) removes threshold → OVERRIDE ✓
+        year→compact_ym@0.83: different category (datetime.component ≠ datetime.date),
+          same domain → hardcoded authority path → (B) 0.83 < 0.90 → OVERRIDE ✓
+        url→docker_ref@0.60: different category (technology.internet ≠ technology.development),
+          same domain → hardcoded authority path → (B) 0.60 < 0.90 → OVERRIDE ✓
+    verification: >
+      Unit tests for all three scenarios with exact confidence values.
+      Regression test: a hardcoded same-domain hint does NOT override when
+      the model is very confident (>= 0.90) in a different-category prediction.
+    fixes:
+      - "#1/#4 ecommerce_orders.phone + people_directory.phone (via path A)"
+      - "#13 datetime_formats.year (via path B)"
+      - "#19 ecommerce_orders.tracking_url (via path B)"
+
+  - id: ac-04
+    ac_type: code
+    description: >
+      Add 2 hardcoded header hints for unambiguous column names:
+      "icao" → geography.transportation.icao_code,
+      "author" | "authors" → identity.person.full_name.
+      These are stopgaps per decision 0042 — to be absorbed by retraining.
+      "method", "port", and "status_code" are excluded: "method" is ambiguous
+      (payment method, HTTP method, scientific method), "port" was previously
+      removed in NNFT-242, and "status_code" is better served by R12 expansion
+      or retraining.
+    verification: >
+      Unit tests: header_hint("icao") returns geography.transportation.icao_code.
+      header_hint("author") returns identity.person.full_name.
+      header_hint("authors") returns identity.person.full_name.
+    fixes:
+      - "#2 airports.icao"
+      - "#5 books_catalog.author"
+
+  - id: ac-05
+    ac_type: gate
+    description: >
+      Re-evaluate v11 with Sharpen fixes. Profile eval >= 205/227.
+      Expected: ac-01 fixes 1, ac-02 fixes 1, ac-03 fixes 4, ac-04 fixes 2
+      = +8 → 211/227 if all land. Conservative estimate with interactions: +5.
+    verification: >
+      Run eval with FINETYPE_MODEL_DIR=models/sherlock-v11, compare
+      against 203/227 baseline. Report exact score and delta.
+
+  - id: ac-06
+    ac_type: gate
+    description: >
+      No actionability regression — actionability >= 99.8%.
+    verification: >
+      Actionability eval output shows >= 99.8%.
+
+  - id: ac-07
+    ac_type: code
+    description: >
+      All existing header_hint and Sharpen tests pass (no regressions).
+    verification: >
+      cargo test -p finetype-model passes with zero failures.
+
+deliverables:
+  - path: "crates/finetype-model/src/column.rs"
+    description: "header_hint() bugfixes, threshold fix, 2 new hints"
+
+evaluation_principles:
+  - principle: "Precision — fixes must not introduce false overrides"
+    weight: 0.4
+  - principle: "Minimal scope — only identified bugs + 2 unambiguous hints"
+    weight: 0.3
+  - principle: "Test coverage — every change has a unit test"
+    weight: 0.3
+
+exit_conditions:
+  - "Profile eval >= 205/227 with v11 model"
+  - "All cargo test -p finetype-model tests pass"
+  - "Actionability >= 99.8%"
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-04-12T21:00:00Z"
+  ambiguity_score: 0.05
+  parent_spec: "specs/2026-04-12-accuracy-gap-retraining/spec.yaml"
+  card: "cards/0002-semantic-type-detection.yaml"
+  review_ref: "specs/2026-04-12-sharpen-header-bugfixes/review-spec-2026-04-12.md"
