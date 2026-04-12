@@ -22,6 +22,7 @@ models/**/labels.json
 
 # Generated training data
 *.ndjson
+!eval/datasets/**/*.ndjson
 data/*
 !data/cldr/
 !data/label_remap.json

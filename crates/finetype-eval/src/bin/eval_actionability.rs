@@ -11,7 +11,54 @@ use clap::Parser;
 use finetype_eval::csv_utils::load_csv;
 use finetype_eval::taxonomy::{load_format_strings, load_transforms};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+fn is_json_file(file_path: &str) -> bool {
+    Path::new(file_path)
+        .extension()
+        .is_some_and(|ext| ext == "json" || ext == "jsonl" || ext == "ndjson")
+}
+
+/// Build a DuckDB read expression appropriate for the file type.
+/// JSON files use `read_json_auto(...)`, CSV uses `read_csv(..., all_varchar=true)`.
+fn read_expr(file_path: &str) -> String {
+    let escaped = file_path.replace('\'', "''");
+    if is_json_file(file_path) {
+        format!("read_json_auto('{escaped}')")
+    } else {
+        format!("read_csv('{escaped}', auto_detect=true, all_varchar=true)")
+    }
+}
+
+/// Build a SQL column reference for use in queries.
+///
+/// For JSON files:
+///   - Nested paths like `location.city` become struct access: `"location"."city"`
+///   - Values are cast to VARCHAR since JSON auto-detects types but our queries
+///     use string operations (TRIM, TRY_STRPTIME).
+///
+/// For CSV files (loaded with all_varchar=true):
+///   - Simple quoted identifier: `"column_name"`
+fn col_ref(column_name: &str, file_path: &str) -> String {
+    if is_json_file(file_path) && column_name.contains('.') {
+        // Nested JSON: location.city → CAST("location"."city" AS VARCHAR)
+        let parts: Vec<&str> = column_name.split('.').collect();
+        let nested = parts
+            .iter()
+            .map(|p| format!(r#""{}""#, p.replace('"', "\"\"")))
+            .collect::<Vec<_>>()
+            .join(".");
+        format!("CAST({nested} AS VARCHAR)")
+    } else if is_json_file(file_path) {
+        // Top-level JSON field: cast to VARCHAR for TRIM/STRPTIME compatibility
+        let escaped = column_name.replace('"', "\"\"");
+        format!(r#"CAST("{escaped}" AS VARCHAR)"#)
+    } else {
+        // CSV with all_varchar=true: already a string
+        let escaped = column_name.replace('"', "\"\"");
+        format!(r#""{escaped}""#)
+    }
+}
 
 #[derive(Parser)]
 #[command(
@@ -119,17 +166,17 @@ fn main() -> Result<()> {
             continue;
         }
 
-        let col_escaped = column_name.replace('"', "\"\"");
-        let file_escaped = file_path.replace('\'', "''");
+        let col = col_ref(&column_name, &file_path);
+        let source = read_expr(&file_path);
 
         let mut best: Option<ActionResult> = None;
         for fmt in &fmts {
             let fmt_escaped = fmt.replace('\'', "''");
             let query = format!(
-                r#"SELECT count(*), count(TRY_STRPTIME("{col}", '{fmt}')), count(*) - count(TRY_STRPTIME("{col}", '{fmt}')) FROM read_csv('{file}', auto_detect=true, all_varchar=true) WHERE "{col}" IS NOT NULL AND TRIM("{col}") != ''"#,
-                col = col_escaped,
+                r#"SELECT count(*), count(TRY_STRPTIME({col}, '{fmt}')), count(*) - count(TRY_STRPTIME({col}, '{fmt}')) FROM {source} WHERE {col} IS NOT NULL AND TRIM({col}) != ''"#,
+                col = col,
                 fmt = fmt_escaped,
-                file = file_escaped,
+                source = source,
             );
 
             match conn.query_row(&query, [], |row| {
@@ -209,19 +256,18 @@ fn main() -> Result<()> {
             continue;
         }
 
-        let col_escaped = column_name.replace('"', "\"\"");
-        let file_escaped = file_path.replace('\'', "''");
+        let col = col_ref(&column_name, &file_path);
+        let source = read_expr(&file_path);
 
         // Substitute {col} with the actual column reference and replace CAST→TRY_CAST
-        let col_ref = format!(r#""{col}""#, col = col_escaped);
-        let transform_sql = transform.replace("{col}", &col_ref);
+        let transform_sql = transform.replace("{col}", &col);
         let try_transform_sql = transform_sql.replace("CAST(", "TRY_CAST(");
 
         let query = format!(
-            r#"SELECT count(*), count({expr}), count(*) - count({expr}) FROM read_csv('{file}', auto_detect=true, all_varchar=true) WHERE "{col}" IS NOT NULL AND TRIM("{col}") != ''"#,
+            r#"SELECT count(*), count({expr}), count(*) - count({expr}) FROM {source} WHERE {col} IS NOT NULL AND TRIM({col}) != ''"#,
             expr = try_transform_sql,
-            file = file_escaped,
-            col = col_escaped,
+            source = source,
+            col = col,
         );
 
         match conn.query_row(&query, [], |row| {

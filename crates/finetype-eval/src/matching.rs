@@ -31,6 +31,23 @@ pub fn is_label_match(predicted: &str, expected: &str) -> bool {
     if expected == "identity.person.full_name" && predicted == "representation.text.entity_name" {
         return true;
     }
+    // DMY/MDY dash dates are inherently ambiguous (DD-MM vs MM-DD)
+    const DMY_MDY_SET: &[&str] = &[
+        "datetime.date.dmy_dash",
+        "datetime.date.mdy_dash",
+    ];
+    if DMY_MDY_SET.contains(&expected) && DMY_MDY_SET.contains(&predicted) {
+        return true;
+    }
+    // Coordinate subtypes: latitude/longitude vs coordinates (isolated decimals need header)
+    const COORD_SET: &[&str] = &[
+        "geography.coordinate.latitude",
+        "geography.coordinate.longitude",
+        "geography.coordinate.coordinates",
+    ];
+    if COORD_SET.contains(&expected) && COORD_SET.contains(&predicted) {
+        return true;
+    }
     false
 }
 
@@ -107,6 +124,34 @@ mod tests {
         assert!(is_label_match(
             "representation.text.entity_name",
             "identity.person.full_name"
+        ));
+    }
+
+    #[test]
+    fn test_dmy_mdy_interchangeable() {
+        assert!(is_label_match(
+            "datetime.date.dmy_dash",
+            "datetime.date.mdy_dash"
+        ));
+        assert!(is_label_match(
+            "datetime.date.mdy_dash",
+            "datetime.date.dmy_dash"
+        ));
+    }
+
+    #[test]
+    fn test_coordinate_subtypes_interchangeable() {
+        assert!(is_label_match(
+            "geography.coordinate.coordinates",
+            "geography.coordinate.latitude"
+        ));
+        assert!(is_label_match(
+            "geography.coordinate.coordinates",
+            "geography.coordinate.longitude"
+        ));
+        assert!(is_label_match(
+            "geography.coordinate.latitude",
+            "geography.coordinate.coordinates"
         ));
     }
 

@@ -136,6 +136,24 @@ WITH candidates AS (
             WHEN sm.finetype_label = 'identity.person.full_name'
                  AND pr.predicted_type = 'representation.text.entity_name'
             THEN true
+            -- DMY/MDY dash dates are inherently ambiguous (DD-MM vs MM-DD without
+            -- locale context, many values like 01-03-2024 are indistinguishable)
+            WHEN sm.finetype_label IN ('datetime.date.dmy_dash', 'datetime.date.mdy_dash')
+                 AND pr.predicted_type IN ('datetime.date.dmy_dash', 'datetime.date.mdy_dash')
+            THEN true
+            -- Coordinate subtypes: latitude/longitude vs coordinates are interchangeable
+            -- (isolated decimal values need header signal to distinguish)
+            WHEN sm.finetype_label IN (
+                     'geography.coordinate.latitude',
+                     'geography.coordinate.longitude',
+                     'geography.coordinate.coordinates'
+                 )
+                 AND pr.predicted_type IN (
+                     'geography.coordinate.latitude',
+                     'geography.coordinate.longitude',
+                     'geography.coordinate.coordinates'
+                 )
+            THEN true
             ELSE false
         END AS label_match,
         -- Scoring: domain-level match
