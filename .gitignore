@@ -57,3 +57,20 @@ homebrew-tap/
 
 # Model directories (large binary artifacts)
 models/tiered-v2/
+
+# RunPod (credentials, ephemeral config)
+.runpod_ssh.env
+.runpod_config.env
+budget.json
+
+# Research (ephemeral outputs)
+research/run.log
+research/results.tsv
+research/__pycache__/
+research/.venv/
+
+# Training result logs (ephemeral)
+results/
+
+# Claude Code worktrees
+.claude/worktrees/
