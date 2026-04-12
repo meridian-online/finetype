@@ -31,22 +31,24 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.12
 **Taxonomy:** 239 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 24, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
-**Default model:** Multi-branch→Sharpen pipeline with sherlock-v4-sibling (4-branch: char+embed+stats+header). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: 155/190 (81.6% label). Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
-**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 19 value-based disambiguation rules (R1–R19), Model2Vec semantic header hints.
+**Default model:** Multi-branch→Sharpen pipeline with sherlock-v11 (4-branch: char+embed+stats+header). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **201/227 (88.5% label, 91.2% domain)** on 35 datasets. Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
+**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 19 value-based disambiguation rules (R1–R19), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
-**CI status:** All checks pass (fmt, clippy, test, taxonomy check)
+**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 374 model tests, zero warnings.
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent work
 
-- **Multi-branch pipeline integration** (m-15) — Replaced Sense+CharCNN with multi-branch (sherlock-v4-sibling) as the default inference pipeline. Lightweight Sharpen layer (feature_sharpen F1–F6, value_sharpen R1–R19, Model2Vec header hints) wired into multi-branch output. Profile eval: 155/190 (81.6%), +34 over raw 121/190 baseline. MCP server receives fully-configured ColumnClassifier. DuckDB extension uses runtime hf_hub download. Decisions 0041–0042. Spec: `specs/2026-03-25-multi-branch-pipeline-integration/`.
-- **Sibling-context attention** (NNFT-268, m-13) — 2-layer pre-norm transformer self-attention on 509 real-world CSVs. Enriches per-column headers with cross-column context. Entry point: `classify_columns_with_context()`.
-- **Schema-driven validate command** — Standalone quality gate: `finetype schema data.csv` generates table-level JSON Schema, `finetype validate data.csv schema.json` enforces it with predictable sidecar output. MCP `validate` tool + DuckDB `finetype_validate()`. Decisions 0031–0033.
+- **v11 retraining + accuracy gap closure** — Retrained multi-branch model (sherlock-v11) with 70/30 distillation-heavy mix. Expanded eval from 190 to 227 columns across 35 datasets. Audited 34 misclassifications, fixed 6 ground-truth labels, 3 broken transforms, and phantom label matches. Specs: `specs/2026-04-12-accuracy-gap-retraining/`, `specs/2026-04-12-sharpen-header-bugfixes/`.
+- **Sharpen header bugfixes** — Fixed address keyword capturing bitcoin addresses, ipv6 routing before ip_v4 catch-all, same-category unconditional override, same-domain threshold raised to 0.95, added icao/author hints, guarded date keyword from month-specific formats. Three confirmed eval fixes (phone→ssn, abbreviated_month_date, long_full_month_date). Profile eval 199→201/227 across three iterations. **Finding: hint/threshold tuning has reached its ceiling at 201/227. Remaining 26 misclassifications are model-level (decision 0038).**
+- **Candle autoresearch port** — Ported overnight training findings to pure Rust Candle crate. GELU+LayerNorm infrastructure added but not adopted for v11 (decision 0046). Spec: `specs/2026-04-11-candle-autoresearch-port/`.
+- **Multi-branch pipeline integration** (m-15) — Replaced Sense+CharCNN with multi-branch as the default inference pipeline. Sharpen layer (feature_sharpen F1–F6, value_sharpen R1–R19, header hints) post-processes multi-branch output. Decisions 0041–0042.
 
-### What's in progress
+### What's next
 
-- **Golden test expansion** (NNFT-258) — Rust integration tests covering profile, load, taxonomy, schema, validate commands. Both small fixtures and real CSV datasets. Structured field matching (label, domain, confidence range).
-- **Multi-branch accuracy gap closure** — 155/190 with Sharpen, targeting ≥170/190 via model improvements (retraining > new rules per decision 0038). Key gaps: numeric_code false positives (F5), entity confusion, date format ambiguity.
+- **Retraining for remaining 26 misclassifications** — The top 8 are at ≥0.86 confidence (model-level confusion: decimal_number↔version/latitude, country↔country_code, user_agent misrouting). No rule or hint can reach these. Next model version must address them via training data improvements.
+- **Publish v11 to HuggingFace** — Required for DuckDB extension runtime download.
+- **Actionability format_string gaps** — Expanded eval set exposed empty format_strings on iso_8601, iso, dmy_short_dot (96.7% overall vs 99.9% on old eval set). These are taxonomy definition gaps, not model issues.
 
 ### Architectural direction (settled — do not re-ask)
 
@@ -189,8 +191,8 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen default: 155/190 (81.6% label, 90.5% domain). Legacy Sense→Sharpen: 188/190 (98.9% label). 29 datasets, 314 manifest entries, 239-type taxonomy.
-**Actionability eval** — 99.9% transform success rate (232k values, 283 columns, 120 types).
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v11: **201/227 (88.5% label, 91.2% domain)**. 35 datasets, 227 columns, 239-type taxonomy. Run on Mac with `FINETYPE_MODEL_DIR=models/sherlock-v11`.
+**Actionability eval** — 96.7% transform success rate (494k/511k values). Below old baseline (99.9%) due to expanded eval set exposing format_string gaps.
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 
@@ -198,11 +200,11 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Multi-branch accuracy gap closure (m-16):** Close the 155/190 → 170+/190 gap through model improvements (retraining > new rules, decision 0038). Key targets: numeric false positives, entity confusion, date format ambiguity. Publish multi-branch artifacts to HuggingFace for DuckDB extension runtime download. Previous: m-15 pipeline integration shipped at 155/190.
+**Multi-branch accuracy gap closure (m-16):** Current: 201/227 (88.5%) with v11+Sharpen. Sharpen tuning (hints, thresholds) has reached its ceiling — remaining 26 misclassifications require retraining (decision 0038). Key model-level gaps: decimal_number↔version/latitude false positives, country↔country_code confusion, user_agent misrouting, date format ambiguity (iso vs mdy/dmy variants). Next steps: publish v11 to HuggingFace, retrain for remaining gaps, fix actionability format_string coverage.
 
 ## Decision Register
 
-42 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
+46 architectural decisions in `decisions/` (MADR format). Key decisions — do not revisit without good reason.
 
 Browse: `ls decisions/` or use Ctrl+B (fzf + glow preview).
 
@@ -250,6 +252,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Golden integration tests | `crates/finetype-cli/tests/cli_golden.rs` |
 | Eval config + schema mapping | `eval/config.env`, `eval/schema_mapping.yaml` |
 | CI workflow | `.github/workflows/ci.yml` |
+| Overnight retraining script | `scripts/overnight_v11_retraining.sh` |
 | Training/eval/package scripts | `scripts/train.sh`, `scripts/eval.sh`, `scripts/package.sh` |
 
 ## Workflow (orbit)
