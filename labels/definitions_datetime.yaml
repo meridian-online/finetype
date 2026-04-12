@@ -1191,7 +1191,16 @@ datetime.duration.iso_8601:
   locales: [UNIVERSAL]
   broad_type: INTERVAL
   format_string: null
-  transform: "{col}::INTERVAL"
+  transform: >
+    CAST(
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)Y', 1), '') || ' years ', '') ||
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, 'P[^T]*?(\d+)M', 1), '') || ' months ', '') ||
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)W', 1), '') || ' weeks ', '') ||
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)D', 1), '') || ' days ', '') ||
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+)H', 1), '') || ' hours ', '') ||
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, 'T.*?(\d+)M', 1), '') || ' minutes ', '') ||
+      COALESCE(NULLIF(REGEXP_EXTRACT({col}, '(\d+(?:\.\d+)?)S', 1), '') || ' seconds', '0 seconds')
+    AS INTERVAL)
   transform_ext: null
   decompose: null
   validation:

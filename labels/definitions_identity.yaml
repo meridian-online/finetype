@@ -680,9 +680,9 @@ identity.person.height:
   format_string: null
   transform: >
     CASE
-      WHEN UPPER({col}) LIKE '%FT%' OR {col} LIKE '%\\''%' THEN
+      WHEN UPPER({col}) LIKE '%FT%' OR {col} LIKE '%''%' THEN
         (CAST(REGEXP_EXTRACT({col}, '^([0-9]+)') AS DOUBLE) * 30.48) +
-        (CAST(COALESCE(REGEXP_EXTRACT({col}, '\\'([0-9]+)'), '0') AS DOUBLE) * 2.54)
+        (CAST(COALESCE(NULLIF(REGEXP_EXTRACT({col}, '''([0-9]+)', 1), ''), '0') AS DOUBLE) * 2.54)
       WHEN UPPER({col}) LIKE '%IN%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 2.54
       ELSE CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
     END
