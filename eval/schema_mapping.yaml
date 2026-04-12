@@ -2141,11 +2141,11 @@ mappings:
     expand: false
   - gt_label: geojson
     source: profile_eval
-    finetype_label: geography.format.geojson
-    finetype_domain: geography
-    match_quality: direct
+    finetype_label: container.object.json
+    finetype_domain: container
+    match_quality: close
     expand: false
-    notes: GeoJSON is a subtype of JSON — more specific prediction is valid
+    notes: GeoJSON is a subtype of JSON — geojson prediction accepted via interchangeability rule
   - gt_label: h3
     source: profile_eval
     finetype_label: geography.index.h3
@@ -2251,11 +2251,11 @@ mappings:
     expand: false
   - gt_label: git sha
     source: profile_eval
-    finetype_label: technology.development.git_sha
+    finetype_label: technology.cryptographic.hash
     finetype_domain: technology
-    match_quality: direct
+    match_quality: close
     expand: false
-    notes: 40-char hex is SHA-1 — git_sha is a valid specific subtype of hash
+    notes: 40-char hex is SHA-1 — git_sha prediction accepted via interchangeability rule
   - gt_label: cidr
     source: profile_eval
     finetype_label: technology.internet.cidr
