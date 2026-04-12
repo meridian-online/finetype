@@ -473,18 +473,11 @@ if [[ -f "$RESULTS_JSON" ]] && command -v duckdb >/dev/null 2>&1; then
     echo " Training Summary (from $RESULTS_JSON)"
     echo "================================================================"
     echo ""
+    RESULTS_COLS="columns={epoch: 'INTEGER', train_loss: 'FLOAT', val_loss: 'FLOAT', train_accuracy: 'FLOAT', val_accuracy: 'FLOAT', learning_rate: 'DOUBLE', epoch_time_secs: 'FLOAT'}"
+
     duckdb -c "
-        WITH metrics AS (
-            SELECT unnest(from_json_strict(
-                content::JSON, '[{\"epoch\":0,\"train_loss\":0.0,\"val_loss\":0.0,\"train_accuracy\":0.0,\"val_accuracy\":0.0,\"learning_rate\":0.0,\"epoch_time_secs\":0.0}]'
-            )) AS m
-            FROM read_text('$RESULTS_JSON')
-        ),
-        flat AS (
-            SELECT m.epoch, m.train_loss, m.val_loss,
-                   m.train_accuracy, m.val_accuracy,
-                   m.learning_rate, m.epoch_time_secs
-            FROM metrics
+        WITH flat AS (
+            SELECT * FROM read_json('$RESULTS_JSON', format='array', $RESULTS_COLS)
         ),
         best AS (
             SELECT * FROM flat ORDER BY val_accuracy DESC LIMIT 1
@@ -502,13 +495,8 @@ if [[ -f "$RESULTS_JSON" ]] && command -v duckdb >/dev/null 2>&1; then
 
     # --- Val accuracy gate check (ac-07) ---
     BEST_VAL=$(duckdb -csv -noheader -c "
-        WITH metrics AS (
-            SELECT unnest(from_json_strict(
-                content::JSON, '[{\"val_accuracy\":0.0}]'
-            )) AS m
-            FROM read_text('$RESULTS_JSON')
-        )
-        SELECT ROUND(MAX(m.val_accuracy) * 100, 1) FROM metrics;
+        SELECT ROUND(MAX(val_accuracy) * 100, 1)
+        FROM read_json('$RESULTS_JSON', format='array', $RESULTS_COLS);
     " 2>/dev/null || echo "0")
 
     echo ""
