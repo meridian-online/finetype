@@ -4146,6 +4146,7 @@ impl Generator {
     /// Produces 2-6 sentences joined by spaces. Each sentence starts with a
     /// capital letter and ends with punctuation. Total length is typically
     /// 80-500 characters, well above the 50-char minLength validation.
+    #[allow(dead_code)]
     fn gen_paragraph(&mut self) -> Result<String, GeneratorError> {
         let sentence_count = self.rng.gen_range(2..7);
         let mut sentences = Vec::with_capacity(sentence_count);

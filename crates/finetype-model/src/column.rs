@@ -134,6 +134,7 @@ pub fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
 mod feature_idx {
     pub const IS_FLOAT: usize = 2;
     pub const HAS_LEADING_ZERO: usize = 3;
+    #[allow(dead_code)]
     pub const IS_HEX_STRING: usize = 7;
     pub const LENGTH: usize = 10;
     pub const DIGIT_RATIO: usize = 17;
@@ -2317,12 +2318,13 @@ impl ColumnClassifier {
             }
         } else if hint_is_hardcoded && !hint_in_votes {
             // Hardcoded hint authority with domain-dependent threshold
-            // Same-domain: 0.90 (was 0.50) — unblocks year@0.83 overriding compact_ym
-            // and url@0.60 overriding docker_ref, while still respecting >=0.90 predictions.
+            // Same-domain: 0.95 (was 0.90, originally 0.50) — unblocks phone@0.915
+            // overriding ssn, year@0.83 overriding compact_ym, url@0.60 overriding
+            // docker_ref. Only predictions >=0.95 resist a hardcoded same-domain hint.
             // Cross-domain: 0.85 (unchanged).
             let h_domain = hinted_type.split('.').next().unwrap_or("");
             let p_domain = result.label.split('.').next().unwrap_or("");
-            let threshold = if h_domain != p_domain { 0.85 } else { 0.90 };
+            let threshold = if h_domain != p_domain { 0.85 } else { 0.95 };
             if result.confidence < threshold {
                 result.label = hinted_type.to_string();
                 result.confidence = 0.5;
@@ -8897,6 +8899,49 @@ datetime.component.day_of_week:
     }
 
     #[test]
+    fn debug_icao_sharpen_override() {
+        // Full apply_header_sharpen test: icao hint should override unlocode
+        let mock = crate::inference::MockClassifier::new("geography.transportation.unlocode");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("geography.transportation.unlocode", 0.919);
+        let sample: Vec<String> = vec!["EGLL".into(), "KJFK".into(), "LFPG".into()];
+
+        // Verify header_hint works
+        let hint = header_hint("icao");
+        assert_eq!(hint, Some("geography.transportation.icao_code"));
+
+        cc.apply_header_sharpen(&mut result, "icao", &sample);
+
+        eprintln!("result.label = {}", result.label);
+        eprintln!("result.rule = {:?}", result.disambiguation_rule);
+        assert_eq!(
+            result.label, "geography.transportation.icao_code",
+            "icao hint must override unlocode@0.919 via same-category path"
+        );
+    }
+
+    #[test]
+    fn debug_ipv6_sharpen_override() {
+        // Full apply_header_sharpen test: ip_v6 hint should override ip_v4
+        let mock = crate::inference::MockClassifier::new("technology.internet.ip_v4");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("technology.internet.ip_v4", 0.70);
+        let sample: Vec<String> = vec!["2001:db8::1".into(); 5];
+
+        let hint = header_hint("ip_v6");
+        assert_eq!(hint, Some("technology.internet.ip_v6"));
+
+        cc.apply_header_sharpen(&mut result, "ip_v6", &sample);
+
+        eprintln!("result.label = {}", result.label);
+        eprintln!("result.rule = {:?}", result.disambiguation_rule);
+        assert_eq!(
+            result.label, "technology.internet.ip_v6",
+            "ip_v6 hint must override ip_v4@0.70 via same-category path"
+        );
+    }
+
+    #[test]
     fn ac04_author_header_hint() {
         assert_eq!(
             header_hint("author"),
@@ -8957,9 +9002,9 @@ datetime.component.day_of_week:
     }
 
     #[test]
-    fn ac03b_same_domain_hardcoded_override_below_090() {
+    fn ac03b_same_domain_hardcoded_override_below_095() {
         // Path B: hardcoded "year" hint overrides compact_ym@0.83 because
-        // both are datetime.* (same domain) and 0.83 < 0.90.
+        // both are datetime.* (same domain) and 0.83 < 0.95.
         let mock = crate::inference::MockClassifier::new("datetime.date.compact_ym");
         let cc = ColumnClassifier::with_defaults(Box::new(mock));
         let mut result = make_result("datetime.date.compact_ym", 0.83);
@@ -8977,7 +9022,7 @@ datetime.component.day_of_week:
     #[test]
     fn ac03b_same_domain_hardcoded_override_url_over_docker_ref() {
         // Path B: hardcoded "url" hint overrides docker_ref@0.60 because
-        // both are technology.* (same domain) and 0.60 < 0.90.
+        // both are technology.* (same domain) and 0.60 < 0.95.
         let mock = crate::inference::MockClassifier::new("technology.development.docker_ref");
         let cc = ColumnClassifier::with_defaults(Box::new(mock));
         let mut result = make_result("technology.development.docker_ref", 0.60);
@@ -8993,23 +9038,24 @@ datetime.component.day_of_week:
     }
 
     #[test]
-    fn ac03b_same_domain_hardcoded_does_not_override_at_090() {
+    fn ac03b_same_domain_hardcoded_does_not_override_at_095() {
         // Regression: a hardcoded same-domain hint does NOT override when
-        // confidence >= 0.90 — the model is very confident.
-        let mock = crate::inference::MockClassifier::new("datetime.date.compact_ym");
+        // confidence >= 0.95 — the model is very confident.
+        // Uses phone→ssn (identity.person vs identity.government, same domain).
+        let mock = crate::inference::MockClassifier::new("identity.government.ssn");
         let cc = ColumnClassifier::with_defaults(Box::new(mock));
-        let mut result = make_result("datetime.date.compact_ym", 0.92);
-        let sample: Vec<String> = vec!["202401".into(); 5];
+        let mut result = make_result("identity.government.ssn", 0.96);
+        let sample: Vec<String> = vec!["123-45-6789".into(); 5];
 
-        cc.apply_header_sharpen(&mut result, "year", &sample);
+        cc.apply_header_sharpen(&mut result, "phone", &sample);
 
         assert_eq!(
-            result.label, "datetime.date.compact_ym",
-            "hardcoded hint must NOT override at confidence >= 0.90"
+            result.label, "identity.government.ssn",
+            "hardcoded hint must NOT override at confidence >= 0.95"
         );
         assert!(
             !result.disambiguation_applied,
-            "disambiguation should not be applied at >= 0.90"
+            "disambiguation should not be applied at >= 0.95"
         );
     }
 

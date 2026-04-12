@@ -23,6 +23,7 @@ pub struct ColumnSample {
 /// Training dataset: collection of column samples
 pub struct SenseDataset {
     samples: Vec<ColumnSample>,
+    #[allow(dead_code)]
     device: candle_core::Device,
 }
 
