@@ -52,6 +52,7 @@ pub struct TrainingMetrics {
 }
 
 /// Cross-entropy loss for classification
+#[allow(dead_code)]
 fn cross_entropy_loss(logits: &Tensor, targets: &Tensor) -> Result<Tensor> {
     // Simplified cross-entropy: assumes logits are unnormalized
     // In practice, would use a proper cross-entropy implementation

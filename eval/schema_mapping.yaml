@@ -264,6 +264,13 @@ mappings:
     match_quality: direct
     expand: false
     notes: Scientific measurement units (kg, m, s, etc.)
+  - gt_label: measurement unit
+    source: profile
+    finetype_label: representation.discrete.categorical
+    finetype_domain: representation
+    match_quality: close
+    expand: false
+    notes: Short measurement unit strings are categorical — generic parent is acceptable
 
   - gt_label: month name
     source: profile
@@ -419,10 +426,11 @@ mappings:
     finetype_labels:
       - geography.address.full_address
       - geography.coordinate.coordinates
+      - geography.location.region
     finetype_domain: geography
     match_quality: close
     expand: false
-    notes: Full address strings; FineType detects as full_address or coordinates
+    notes: Full address strings; FineType detects as full_address, coordinates, or region (location descriptions)
 
   - gt_label: county
     source: dbpedia
@@ -2101,6 +2109,13 @@ mappings:
     match_quality: direct
     expand: false
     notes: HTTP request methods (GET, POST, PUT, DELETE)
+  - gt_label: http method
+    source: profile
+    finetype_label: representation.discrete.categorical
+    finetype_domain: technology
+    match_quality: close
+    expand: false
+    notes: HTTP methods are categorical by nature — generic parent type is acceptable
 
   - gt_label: currency code
     source: profile
@@ -2124,6 +2139,13 @@ mappings:
     finetype_domain: geography
     match_quality: direct
     expand: false
+  - gt_label: geojson
+    source: profile_eval
+    finetype_label: container.object.json
+    finetype_domain: container
+    match_quality: close
+    expand: false
+    notes: GeoJSON is a subtype of JSON — geojson prediction accepted via interchangeability rule
   - gt_label: h3
     source: profile_eval
     finetype_label: geography.index.h3
@@ -2227,6 +2249,13 @@ mappings:
     finetype_domain: technology
     match_quality: close
     expand: false
+  - gt_label: git sha
+    source: profile_eval
+    finetype_label: technology.cryptographic.hash
+    finetype_domain: technology
+    match_quality: close
+    expand: false
+    notes: 40-char hex is SHA-1 — git_sha prediction accepted via interchangeability rule
   - gt_label: cidr
     source: profile_eval
     finetype_label: technology.internet.cidr
@@ -2542,6 +2571,13 @@ mappings:
     finetype_domain: technology
     match_quality: direct
     expand: false
+  - gt_label: ip_v4 with port
+    source: profile_eval
+    finetype_label: technology.internet.ip_v4
+    finetype_domain: technology
+    match_quality: close
+    expand: false
+    notes: ip_v4 captures the core format — port suffix is a specialization
   - gt_label: username
     source: profile_eval
     finetype_label: identity.person.username

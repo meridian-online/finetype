@@ -1,0 +1,163 @@
+goal: >
+  Close the profile eval accuracy gap from 193/227 (85.0%) to 205/227 (~90%)
+  by retraining the ReLU+BN multi-branch model on a distillation-heavy (70/30)
+  data mix with real Model2Vec headers and sibling-context enrichment. Publish
+  the new model to HuggingFace as the default if the threshold is met.
+
+constraints:
+  - "Mac Metal training only — no cloud GPU (RunPod zombie protection not yet fixed)"
+  - "ReLU+BN architecture — GELU+LN rejected per decision 0046"
+  - "Production-scale config: use sherlock-v5-scaled-config.json as base (5 branch groups: char [450,450], embed [300,300], stats [192,96], header [192,96], merge [750,750])"
+  - "70/30 distillation:synthetic data mix — real-world data dominates"
+  - "Sibling-context enrichment during FTMB prep (frozen weights from existing model)"
+  - "v10-style header validation — hard-fail if Model2Vec produces zero features"
+  - "No actionability regression (currently 96.9%)"
+  - "Backward compatible — old model configs load unchanged via serde defaults"
+  - "Hyperparameters: lr=1e-4, weight_decay=1e-4 (v4-sibling-proven defaults for ReLU+BN). Autoresearch values (1e-3/0.01) were validated on GELU+LN only — do not use without explicit testing."
+  - "n_classes=239 (current taxonomy count). Config padding to 250 is historical — align with actual taxonomy."
+  - "Epoch cap: 40 epochs with patience=10"
+  - "Sharpen rules (F1-F6, R1-R19), Model2Vec model, and sibling-context model frozen during this spec — only the multi-branch model changes"
+
+acceptance_criteria:
+  # Phase 1: Eval ground truth audit
+  - id: ac-01
+    ac_type: doc
+    description: >
+      Quick audit of 34 remaining misclassifications. Classify each as
+      WRONG (model error), DEBATABLE (ground truth questionable), or
+      AMBIGUOUS (can't distinguish without external context). Document in
+      eval-audit-v2.md.
+    verification: "Audit document exists with verdict for all 34 cases"
+
+  - id: ac-02
+    ac_type: code
+    description: >
+      Fix any DEBATABLE labels found in ac-01 — add accepted alternatives
+      to schema_mapping.yaml and/or interchangeability rules to matching.rs
+      and eval_profile.sql. Recalibrate baseline after fixes.
+    verification: "make eval-report reflects corrected ground truth. Baseline number updated in ac-08 if changed."
+
+  # Phase 2: Data preparation
+  - id: ac-03
+    ac_type: gate
+    description: >
+      Prepare a fresh FTMB file with 70/30 distillation:synthetic mix.
+      Distillation source: Sherlock annotated (102k annotations from HuggingFace).
+      Synthetic source: finetype-synthetic (5k/type, 239 types).
+      Report per-type distilled coverage: at least 150/239 types must have
+      >= 1 distilled example.
+    verification: "FTMB file exists. Per-type coverage report shows >=150 types with distilled data."
+
+  - id: ac-04
+    ac_type: gate
+    description: >
+      FTMB includes real Model2Vec header features for all records.
+      Spot-check: first 5 groups must have non-zero header features
+      (>=10/128 nonzero dims).
+    verification: "Binary FTMB validation script confirms non-zero headers."
+
+  - id: ac-05
+    ac_type: gate
+    description: >
+      FTMB includes sibling-context enriched headers using frozen weights
+      from the existing sibling-context model. FrozenSiblingContext applied
+      during FTMB preparation.
+    verification: "FTMB prep log shows sibling-context enrichment applied. Header feature variance across groups is non-zero (not all identical)."
+
+  # Phase 3: Training
+  - id: ac-06
+    ac_type: gate
+    description: >
+      Train ReLU+BN multi-branch model on Mac Metal using the 70/30 FTMB.
+      Config: sherlock-v5-scaled-config.json base, n_classes=239,
+      lr=1e-4, weight_decay=1e-4, patience=10, max 40 epochs.
+    verification: "Training completes. results.json written with epoch metrics."
+
+  - id: ac-07
+    ac_type: gate
+    description: >
+      Best val_accuracy >= 88% (within 2 points of v4-sibling's 90%).
+      If val_accuracy < 84%, abort and investigate FTMB data quality.
+    verification: "results.json best_val_accuracy field."
+
+  # Phase 4: Evaluation
+  - id: ac-08
+    ac_type: gate
+    description: >
+      Profile eval label accuracy >= 205/227 (~90%) on the corrected
+      227-column eval set (or recalibrated target if ac-02 shifts baseline).
+    verification: "make eval-report. Compare against baseline from ac-02."
+
+  - id: ac-09
+    ac_type: gate
+    description: >
+      No actionability regression. Actionability eval >= 96.5%
+      (current baseline: 96.9%).
+    verification: "make eval-report actionability section."
+
+  - id: ac-10
+    ac_type: doc
+    description: >
+      Misclassification delta analysis: compare new model failures against
+      v4-sibling failures. Document which clusters improved, which
+      regressed, and net change.
+    verification: "Delta analysis in progress.md with per-cluster breakdown."
+
+  # Phase 5: Publish
+  - id: ac-11
+    ac_type: gate
+    description: >
+      If ac-08 and ac-09 both pass, publish the new model to HuggingFace
+      (meridian-online/finetype-multi-branch) as the new default.
+      Rollback plan: v4-sibling remains as a tagged release. If post-publish
+      regressions are found, re-publish v4-sibling as default.
+    verification: "HuggingFace model card updated. v4-sibling tagged as fallback. DuckDB extension downloads new model."
+
+  - id: ac-12
+    ac_type: config
+    description: >
+      Update CLAUDE.md default model reference and profile eval baseline
+      numbers to reflect the new model.
+    verification: "CLAUDE.md mentions new model name and updated eval scores."
+
+evaluation_principles:
+  - principle: "Profile eval label accuracy"
+    weight: 0.5
+  - principle: "No actionability regression"
+    weight: 0.3
+  - principle: "Data quality over architecture changes"
+    weight: 0.2
+
+exit_conditions:
+  - "ac-08 met (>=205/227) AND ac-09 met (no actionability regression) → publish and ship"
+  - "200 <= score < 205 → keep model locally, analyse remaining failures for next iteration"
+  - "score < baseline (regression) → revert, investigate data prep pipeline"
+  - "val_accuracy < 84% during training → abort, investigate FTMB data quality"
+  - "val_accuracy plateaus 84-88% → training completes but flag as underperforming; compare profile eval before deciding"
+
+deliverables:
+  - path: "specs/2026-04-12-accuracy-gap-retraining/eval-audit-v2.md"
+    description: "Ground truth audit of 34 remaining misclassifications"
+  - path: "eval/schema_mapping.yaml"
+    description: "Updated with any new accepted alternatives from audit"
+  - path: "crates/finetype-eval/src/matching.rs"
+    description: "Updated with any new interchangeability rules from audit"
+  - path: "eval/eval_profile.sql"
+    description: "Updated with any new SQL interchangeability rules from audit"
+  - path: "scripts/overnight_v11_retraining.sh"
+    description: "Training script with 70/30 FTMB prep + header/sibling validation"
+  - path: "models/sherlock-v11/config.json"
+    description: "Model config based on sherlock-v5-scaled with n_classes=239"
+  - path: "models/sherlock-v11/"
+    description: "Trained model directory with config.json, weights, results.json"
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-04-12T15:00:00Z"
+  ambiguity_score: 0.08
+  interview_ref: "specs/2026-04-12-accuracy-gap-retraining/interview.md"
+  card_ref: "cards/0002-semantic-type-detection.yaml"
+  review_ref: "specs/2026-04-12-accuracy-gap-retraining/review-spec-2026-04-12.md"
+  related_decisions:
+    - "decisions/0038-strength-through-simplification.md"
+    - "decisions/0046-gelu-layernorm-not-adopted.md"

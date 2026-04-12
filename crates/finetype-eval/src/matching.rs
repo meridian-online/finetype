@@ -48,6 +48,33 @@ pub fn is_label_match(predicted: &str, expected: &str) -> bool {
     if COORD_SET.contains(&expected) && COORD_SET.contains(&predicted) {
         return true;
     }
+    // Hash subtypes: git_sha (40-char SHA-1) is a valid specific subtype of hash
+    const HASH_SET: &[&str] = &[
+        "technology.cryptographic.hash",
+        "technology.development.git_sha",
+    ];
+    if HASH_SET.contains(&expected) && HASH_SET.contains(&predicted) {
+        return true;
+    }
+    // JSON subtypes: geojson is a specific subtype of json
+    if (expected == "container.object.json" && predicted == "geography.format.geojson")
+        || (expected == "geography.format.geojson" && predicted == "container.object.json")
+    {
+        return true;
+    }
+    // IP hierarchy: ip_v4 captures the core format of ip_v4_with_port
+    if expected == "technology.internet.ip_v4_with_port"
+        && predicted == "technology.internet.ip_v4"
+    {
+        return true;
+    }
+    // Categorical is a valid generic parent for http_method and measurement_unit
+    if (expected == "technology.internet.http_method"
+        || expected == "representation.scientific.measurement_unit")
+        && predicted == "representation.discrete.categorical"
+    {
+        return true;
+    }
     false
 }
 
@@ -152,6 +179,59 @@ mod tests {
         assert!(is_label_match(
             "geography.coordinate.latitude",
             "geography.coordinate.coordinates"
+        ));
+    }
+
+    #[test]
+    fn test_hash_git_sha_interchangeable() {
+        assert!(is_label_match(
+            "technology.development.git_sha",
+            "technology.cryptographic.hash"
+        ));
+        assert!(is_label_match(
+            "technology.cryptographic.hash",
+            "technology.development.git_sha"
+        ));
+    }
+
+    #[test]
+    fn test_json_geojson_interchangeable() {
+        assert!(is_label_match(
+            "geography.format.geojson",
+            "container.object.json"
+        ));
+        assert!(is_label_match(
+            "container.object.json",
+            "geography.format.geojson"
+        ));
+    }
+
+    #[test]
+    fn test_ip_v4_satisfies_ip_v4_with_port() {
+        assert!(is_label_match(
+            "technology.internet.ip_v4",
+            "technology.internet.ip_v4_with_port"
+        ));
+        // But not the reverse — ip_v4_with_port doesn't satisfy plain ip_v4
+        assert!(!is_label_match(
+            "technology.internet.ip_v4_with_port",
+            "technology.internet.ip_v4"
+        ));
+    }
+
+    #[test]
+    fn test_categorical_satisfies_http_method() {
+        assert!(is_label_match(
+            "representation.discrete.categorical",
+            "technology.internet.http_method"
+        ));
+    }
+
+    #[test]
+    fn test_categorical_satisfies_measurement_unit() {
+        assert!(is_label_match(
+            "representation.discrete.categorical",
+            "representation.scientific.measurement_unit"
         ));
     }
 

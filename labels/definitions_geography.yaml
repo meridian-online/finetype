@@ -848,8 +848,8 @@ geography.coordinate.coordinates:
   locales: [UNIVERSAL]
   broad_type: POINT
   format_string: null
-  transform: "ST_Point({col}::DOUBLE, CAST(REGEXP_EXTRACT({col}, ',([^,]+)') AS DOUBLE))"
-  transform_ext: "ST_GeogPoint(CAST(REGEXP_EXTRACT({col}, '^([^,]+)') AS DOUBLE), CAST(REGEXP_EXTRACT({col}, ',([^,]+)') AS DOUBLE))"
+  transform: "STRUCT_PACK(lat := CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), lon := CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
+  transform_ext: "ST_Point(CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
   decompose:
     latitude: "CAST(REGEXP_EXTRACT({col}, '^([^,]+)') AS DOUBLE)"
     longitude: "CAST(REGEXP_EXTRACT({col}, ',([^,]+)') AS DOUBLE)"

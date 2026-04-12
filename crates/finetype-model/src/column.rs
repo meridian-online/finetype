@@ -134,6 +134,7 @@ pub fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
 mod feature_idx {
     pub const IS_FLOAT: usize = 2;
     pub const HAS_LEADING_ZERO: usize = 3;
+    #[allow(dead_code)]
     pub const IS_HEX_STRING: usize = 7;
     pub const LENGTH: usize = 10;
     pub const DIGIT_RATIO: usize = 17;
@@ -2242,7 +2243,10 @@ impl ColumnClassifier {
         }
 
         // Same-category hardcoded hint override (NNFT-194)
-        if hint_is_hardcoded && result.label != hinted_type && result.confidence <= 0.80 {
+        // Hardcoded hints are definitive for same-category overrides — no confidence
+        // threshold. E.g. "phone" → phone_number overrides ssn@1.00 because both
+        // are identity.person.* and the header is unambiguous.
+        if hint_is_hardcoded && result.label != hinted_type {
             let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
             let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
             if !hint_category.is_empty()
@@ -2314,9 +2318,13 @@ impl ColumnClassifier {
             }
         } else if hint_is_hardcoded && !hint_in_votes {
             // Hardcoded hint authority with domain-dependent threshold
+            // Same-domain: 0.95 (was 0.90, originally 0.50) — unblocks phone@0.915
+            // overriding ssn, year@0.83 overriding compact_ym, url@0.60 overriding
+            // docker_ref. Only predictions >=0.95 resist a hardcoded same-domain hint.
+            // Cross-domain: 0.85 (unchanged).
             let h_domain = hinted_type.split('.').next().unwrap_or("");
             let p_domain = result.label.split('.').next().unwrap_or("");
-            let threshold = if h_domain != p_domain { 0.85 } else { 0.5 };
+            let threshold = if h_domain != p_domain { 0.85 } else { 0.95 };
             if result.confidence < threshold {
                 result.label = hinted_type.to_string();
                 result.confidence = 0.5;
@@ -3951,6 +3959,14 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "issn" => {
             return Some("identity.commerce.issn");
         }
+        // ICAO airport code — unambiguous (stopgap per decision 0042)
+        "icao" | "icao code" => {
+            return Some("geography.transportation.icao_code");
+        }
+        // Author — unambiguous person name (stopgap per decision 0042)
+        "author" | "authors" | "author name" => {
+            return Some("identity.person.full_name");
+        }
         // Medical identifiers
         "npi" | "npi number" => {
             return Some("identity.medical.npi");
@@ -3995,6 +4011,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax") {
         return Some("identity.person.phone_number");
     }
+    // IPv6 — check before the generic ip_v4 catch-all so "ip_v6", "server_ipv6",
+    // "ipv6_address" all route correctly. Exact "ip" / "ip address" etc. handled
+    // above in the exact-match arm (→ ip_v4).
+    if h.contains("v6") || h.contains("ipv6") {
+        return Some("technology.internet.ip_v6");
+    }
     // IP address — match " ip" suffix, "ip " prefix, or " ip " infix
     // (underscores already replaced with spaces, exact "ip" handled above)
     if h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip ") {
@@ -4024,7 +4046,15 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("identity.person.full_name");
         }
     }
-    if h.contains("address") && !h.contains("email") && !h.contains("ip") && !h.contains("mac") {
+    if h.contains("address")
+        && !h.contains("email")
+        && !h.contains("ip")
+        && !h.contains("mac")
+        && !h.contains("bitcoin")
+        && !h.contains("btc")
+        && !h.contains("crypto")
+        && !h.contains("wallet")
+    {
         // "street address" or "street_address" → street_address
         // "full address" → full_address
         // Bare "address" → full_address (NNFT-235: more commonly means full address)
@@ -4058,7 +4088,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
         }
         return Some("datetime.epoch.unix_seconds");
     }
-    if h.contains("date") || h.contains("timestamp") || h.contains("datetime") {
+    if (h.contains("date") || h.contains("timestamp") || h.contains("datetime"))
+        && !h.contains("month")
+    {
+        // Guard: headers containing "month" (e.g. "abbreviated_month_date",
+        // "long_full_month_date") are specific date formats, not generic iso_8601.
+        // Let the model decide those from values.
         return Some("datetime.timestamp.iso_8601");
     }
     if h.contains("year") {
@@ -8770,6 +8805,263 @@ datetime.component.day_of_week:
             "country must be a location type"
         );
         // Both city and country are location types — same-domain override should apply
+    }
+
+    // ── Sharpen header bugfix tests (spec: 2026-04-12-sharpen-header-bugfixes) ──
+
+    #[test]
+    fn ac01_bitcoin_address_not_captured_by_address_hint() {
+        // "bitcoin_address" must NOT match the address keyword — it should return
+        // None so the model's bitcoin_address prediction is preserved.
+        assert_eq!(
+            header_hint("bitcoin_address"),
+            None,
+            "bitcoin_address must not match the address keyword"
+        );
+        assert_eq!(
+            header_hint("btc_address"),
+            None,
+            "btc_address must not match the address keyword"
+        );
+        assert_eq!(
+            header_hint("crypto_address"),
+            None,
+            "crypto_address must not match the address keyword"
+        );
+        assert_eq!(
+            header_hint("wallet_address"),
+            None,
+            "wallet_address must not match the address keyword"
+        );
+        // Regression: street_address and full_address still work
+        assert_eq!(
+            header_hint("street_address"),
+            Some("geography.address.street_address"),
+            "street_address should still return street_address"
+        );
+        assert_eq!(
+            header_hint("full_address"),
+            Some("geography.address.full_address"),
+            "full_address should still return full_address"
+        );
+        assert_eq!(
+            header_hint("home_address"),
+            Some("geography.address.full_address"),
+            "home_address should still return full_address"
+        );
+    }
+
+    #[test]
+    fn ac02_ipv6_header_returns_ip_v6() {
+        // "ip_v6" normalizes to "ip v6" — the v6 check must fire before the
+        // generic ip_v4 catch-all.
+        assert_eq!(
+            header_hint("ip_v6"),
+            Some("technology.internet.ip_v6"),
+            "ip_v6 should return ip_v6"
+        );
+        assert_eq!(
+            header_hint("server_ipv6"),
+            Some("technology.internet.ip_v6"),
+            "server_ipv6 should return ip_v6"
+        );
+        assert_eq!(
+            header_hint("ipv6_address"),
+            Some("technology.internet.ip_v6"),
+            "ipv6_address should return ip_v6"
+        );
+        // Regression: source_ip still returns ip_v4 (exact match arm)
+        assert_eq!(
+            header_hint("source_ip"),
+            Some("technology.internet.ip_v4"),
+            "source_ip should still return ip_v4"
+        );
+        // Regression: ip_address still returns ip_v4
+        assert_eq!(
+            header_hint("ip_address"),
+            Some("technology.internet.ip_v4"),
+            "ip_address should still return ip_v4"
+        );
+    }
+
+    #[test]
+    fn ac04_icao_header_hint() {
+        assert_eq!(
+            header_hint("icao"),
+            Some("geography.transportation.icao_code"),
+            "icao should hint to icao_code"
+        );
+        assert_eq!(
+            header_hint("ICAO"),
+            Some("geography.transportation.icao_code"),
+            "ICAO (uppercase) should hint to icao_code"
+        );
+        assert_eq!(
+            header_hint("icao_code"),
+            Some("geography.transportation.icao_code"),
+            "icao_code should hint to icao_code"
+        );
+    }
+
+    #[test]
+    fn debug_icao_sharpen_override() {
+        // Full apply_header_sharpen test: icao hint should override unlocode
+        let mock = crate::inference::MockClassifier::new("geography.transportation.unlocode");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("geography.transportation.unlocode", 0.919);
+        let sample: Vec<String> = vec!["EGLL".into(), "KJFK".into(), "LFPG".into()];
+
+        // Verify header_hint works
+        let hint = header_hint("icao");
+        assert_eq!(hint, Some("geography.transportation.icao_code"));
+
+        cc.apply_header_sharpen(&mut result, "icao", &sample);
+
+        eprintln!("result.label = {}", result.label);
+        eprintln!("result.rule = {:?}", result.disambiguation_rule);
+        assert_eq!(
+            result.label, "geography.transportation.icao_code",
+            "icao hint must override unlocode@0.919 via same-category path"
+        );
+    }
+
+    #[test]
+    fn debug_ipv6_sharpen_override() {
+        // Full apply_header_sharpen test: ip_v6 hint should override ip_v4
+        let mock = crate::inference::MockClassifier::new("technology.internet.ip_v4");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("technology.internet.ip_v4", 0.70);
+        let sample: Vec<String> = vec!["2001:db8::1".into(); 5];
+
+        let hint = header_hint("ip_v6");
+        assert_eq!(hint, Some("technology.internet.ip_v6"));
+
+        cc.apply_header_sharpen(&mut result, "ip_v6", &sample);
+
+        eprintln!("result.label = {}", result.label);
+        eprintln!("result.rule = {:?}", result.disambiguation_rule);
+        assert_eq!(
+            result.label, "technology.internet.ip_v6",
+            "ip_v6 hint must override ip_v4@0.70 via same-category path"
+        );
+    }
+
+    #[test]
+    fn ac04_author_header_hint() {
+        assert_eq!(
+            header_hint("author"),
+            Some("identity.person.full_name"),
+            "author should hint to full_name"
+        );
+        assert_eq!(
+            header_hint("authors"),
+            Some("identity.person.full_name"),
+            "authors should hint to full_name"
+        );
+        assert_eq!(
+            header_hint("author_name"),
+            Some("identity.person.full_name"),
+            "author_name should hint to full_name"
+        );
+    }
+
+    /// Helper: create a ColumnResult for threshold tests.
+    fn make_result(label: &str, confidence: f32) -> ColumnResult {
+        ColumnResult {
+            label: label.to_string(),
+            confidence,
+            vote_distribution: vec![(label.to_string(), 1.0)],
+            disambiguation_applied: false,
+            disambiguation_rule: None,
+            samples_used: 10,
+            detected_locale: None,
+            is_generic: false,
+            column_features: None,
+        }
+    }
+
+    #[test]
+    fn ac03a_same_category_hardcoded_override_unconditional() {
+        // Path A: hardcoded "phone" hint overrides ssn@1.00 because both are
+        // identity.person.* — same category, no confidence threshold.
+        let mock = crate::inference::MockClassifier::new("identity.person.ssn");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("identity.person.ssn", 1.00);
+        let sample: Vec<String> = vec!["555-0100".into(); 5];
+
+        cc.apply_header_sharpen(&mut result, "phone", &sample);
+
+        assert_eq!(
+            result.label, "identity.person.phone_number",
+            "phone hint must override ssn@1.00 (same category, hardcoded)"
+        );
+        assert!(
+            result.disambiguation_applied,
+            "disambiguation_applied should be true"
+        );
+        assert_eq!(
+            result.disambiguation_rule.as_deref(),
+            Some("header_hint_same_category:phone"),
+            "rule should be header_hint_same_category"
+        );
+    }
+
+    #[test]
+    fn ac03b_same_domain_hardcoded_override_below_095() {
+        // Path B: hardcoded "year" hint overrides compact_ym@0.83 because
+        // both are datetime.* (same domain) and 0.83 < 0.95.
+        let mock = crate::inference::MockClassifier::new("datetime.date.compact_ym");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("datetime.date.compact_ym", 0.83);
+        let sample: Vec<String> = vec!["2024".into(); 5];
+
+        cc.apply_header_sharpen(&mut result, "year", &sample);
+
+        assert_eq!(
+            result.label, "datetime.component.year",
+            "year hint must override compact_ym@0.83 (same domain, < 0.90)"
+        );
+        assert!(result.disambiguation_applied);
+    }
+
+    #[test]
+    fn ac03b_same_domain_hardcoded_override_url_over_docker_ref() {
+        // Path B: hardcoded "url" hint overrides docker_ref@0.60 because
+        // both are technology.* (same domain) and 0.60 < 0.95.
+        let mock = crate::inference::MockClassifier::new("technology.development.docker_ref");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("technology.development.docker_ref", 0.60);
+        let sample: Vec<String> = vec!["https://example.com/track/123".into(); 5];
+
+        cc.apply_header_sharpen(&mut result, "tracking_url", &sample);
+
+        assert_eq!(
+            result.label, "technology.internet.url",
+            "url hint must override docker_ref@0.60 (same domain, < 0.90)"
+        );
+        assert!(result.disambiguation_applied);
+    }
+
+    #[test]
+    fn ac03b_same_domain_hardcoded_does_not_override_at_095() {
+        // Regression: a hardcoded same-domain hint does NOT override when
+        // confidence >= 0.95 — the model is very confident.
+        // Uses phone→ssn (identity.person vs identity.government, same domain).
+        let mock = crate::inference::MockClassifier::new("identity.government.ssn");
+        let cc = ColumnClassifier::with_defaults(Box::new(mock));
+        let mut result = make_result("identity.government.ssn", 0.96);
+        let sample: Vec<String> = vec!["123-45-6789".into(); 5];
+
+        cc.apply_header_sharpen(&mut result, "phone", &sample);
+
+        assert_eq!(
+            result.label, "identity.government.ssn",
+            "hardcoded hint must NOT override at confidence >= 0.95"
+        );
+        assert!(
+            !result.disambiguation_applied,
+            "disambiguation should not be applied at >= 0.95"
+        );
     }
 
     // ── ColumnFeatures aggregation tests (NNFT-266) ─────────────────────
