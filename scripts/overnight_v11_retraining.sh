@@ -21,9 +21,10 @@
 #   - Label remap at data/label_remap.json
 #
 # Usage:
-#   ./scripts/overnight_v11_retraining.sh                 # Full pipeline
-#   ./scripts/overnight_v11_retraining.sh --skip-data     # Skip data prep
-#   ./scripts/overnight_v11_retraining.sh --epochs N      # Override epoch count
+#   ./scripts/overnight_v11_retraining.sh                          # Full pipeline
+#   ./scripts/overnight_v11_retraining.sh --skip-data              # Skip data prep
+#   ./scripts/overnight_v11_retraining.sh --skip-data --skip-train # Eval + bundle only
+#   ./scripts/overnight_v11_retraining.sh --epochs N               # Override epoch count
 #
 # Output:
 #   output/multibranch-training/v11-blend-70-30.ftmb       — Training data
@@ -44,12 +45,14 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/overnight-v11-retraining.log"
 
 SKIP_DATA=false
+SKIP_TRAIN=false
 EPOCHS=40
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skip-data)  SKIP_DATA=true; shift ;;
-        --epochs)     EPOCHS="$2"; shift 2 ;;
+        --skip-data)   SKIP_DATA=true; shift ;;
+        --skip-train)  SKIP_TRAIN=true; shift ;;
+        --epochs)      EPOCHS="$2"; shift 2 ;;
         --help|-h)
             sed -n '2,/^set -/p' "$0" | grep '^#' | sed 's/^# \?//'
             exit 0
@@ -427,7 +430,9 @@ echo " Sibling context: $SIBLING_CTX_DIR/"
 echo " Data: $FTMB_FILE (70/30 distilled/synthetic)"
 echo "================================================================"
 
-if [[ -f "$MODEL_DIR/model.safetensors" ]]; then
+if [[ "$SKIP_TRAIN" == "true" ]] && [[ -f "$MODEL_DIR/model.safetensors" ]]; then
+    echo "[Train] --skip-train: using existing model at $MODEL_DIR"
+elif [[ -f "$MODEL_DIR/model.safetensors" ]]; then
     echo "[Train] Model already exists at $MODEL_DIR, skipping training"
 else
     cargo run --bin finetype --no-default-features --features metal --release -- \
