@@ -34,15 +34,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.6.12] - 2026-03-13
 
-_Changelog not maintained for this release. See git log for changes._
+### Fixed
+
+- **Sense→Sharpen safety valve** — When Sense was confident but wrong (e.g., 0.999 predicting "Text" for numeric data), and >90% of CharCNN votes were masked out, the valve didn't fire. Now falls back to unmasked votes when masked_out_fraction > 0.9. Fixed earthquake `horizontalError` misclassified as `boolean.initials` instead of `decimal_number`. (#7)
+
+### Added
+
+- **Pipeline tracing with `--verbose`** — `finetype profile --verbose` and `finetype load --verbose` enable debug-level tracing at 6 decision points: Sense prediction, raw votes, mask application, header hint, feature rule, and final result. Zero-cost when inactive. Replaces need for `RUST_LOG`. (decision 0035, #6)
 
 ## [0.6.11] - 2026-03-13
 
-_Changelog not maintained for this release. See git log for changes._
+### Added
+
+- **`finetype validate` command** — Schema-driven CSV validation as a standalone quality gate. Generates table-level JSON Schema from profiling, then validates rows against it. Per-row error collection, per-column pass rates, file-level quality grade. Outputs `.valid.csv`, `.invalid.csv`, `.errors.jsonl`. Also available via MCP server. (#2)
+- **Disambiguation rule F6** — Demote `file.extension` for short (2-3 char) alphabetic codes without dots. Fixed earthquake columns (`magType`, `net`, `locationSource`, `magSource`) misclassified as file extensions. (#4)
+- **Multi-label eval mapping** — Coarse eval labels now map to all valid FineType types, fixing measurement gap where correct predictions counted as misses. 275 gt_label entries. (#5)
+
+### Changed
+
+- **README restructured for end users** — Trimmed developer-focused content, fixed broken links, added early release disclaimer. (#1)
+
+### Discovery
+
+- **Learned disambiguator spike** — Extracted 144-dim features for 278 eval columns. Explored replacing rule cascade with a trained model. Removed `id`→`increment` header hint that caused earthquake ID misclassification (decision 0034). (#3)
 
 ## [0.6.10] - 2026-03-11
 
-_Changelog not maintained for this release. See git log for changes._
+### Added
+
+- **Sibling-context attention training** — Training pipeline for the 2-layer self-attention module over Model2Vec header embeddings. FrozenSense with constant tensors for gradient isolation. Evaluation report documented.
+- **Disambiguation rule F5** — Demote `numeric_code` to `integer_number` when values have no leading zeros.
+
+### Changed
+
+- **Rebrand Noon → Meridian** — Updated GitHub org (`noon-org` → `meridian-online`), domain (`noon.sh` → `meridian.online`), HuggingFace org. Product name (FineType) unchanged. (decision 002)
+- **Categorical broad_type changed from VARCHAR to ENUM** — More accurate DuckDB type mapping for categorical columns.
 
 ## [0.6.9] - 2026-03-11
 
