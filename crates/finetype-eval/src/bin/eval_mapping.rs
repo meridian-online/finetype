@@ -211,8 +211,8 @@ fn load_taxonomy_labels(labels_dir: &PathBuf) -> Result<BTreeSet<String>> {
     let pattern = labels_dir.join("definitions_*.yaml");
     let pattern_str = pattern.to_string_lossy();
 
-    for entry in glob::glob(&pattern_str)
-        .with_context(|| format!("Invalid glob pattern: {pattern_str}"))?
+    for entry in
+        glob::glob(&pattern_str).with_context(|| format!("Invalid glob pattern: {pattern_str}"))?
     {
         let path = entry?;
         let text = std::fs::read_to_string(&path)

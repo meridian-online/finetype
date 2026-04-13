@@ -1,0 +1,340 @@
+dataset,column_name,gt_label
+titanic,PassengerId,id
+titanic,Survived,boolean
+titanic,Pclass,class
+titanic,Name,name
+titanic,Sex,gender
+titanic,Age,number
+titanic,SibSp,number
+titanic,Parch,number
+titanic,Ticket,code
+titanic,Fare,price
+titanic,Cabin,code
+titanic,Embarked,category
+airports,id,id
+airports,name,airport name
+airports,city,city
+airports,country,country
+airports,iata,iata
+airports,icao,icao
+airports,latitude,latitude
+airports,longitude,longitude
+airports,altitude,number
+airports,utc_offset,utc offset
+airports,timezone,time zone
+airports,type,category
+airports,source,category
+countries,name,country
+countries,alpha-2,country code
+countries,alpha-3,country code
+countries,country-code,code
+countries,iso_3166-2,code
+countries,region,region
+countries,sub-region,region
+countries,region-code,code
+countries,sub-region-code,code
+covid_timeseries,Date,date
+covid_timeseries,Country,country
+covid_timeseries,Confirmed,number
+covid_timeseries,Recovered,number
+covid_timeseries,Deaths,number
+us_states,State,state
+us_states,Abbreviation,code
+world_cities,name,city
+world_cities,country,country
+world_cities,subcountry,region
+world_cities,geonameid,id
+iris,sepal_length,decimal number
+iris,sepal_width,decimal number
+iris,petal_length,decimal number
+iris,petal_width,decimal number
+iris,species,category
+ecommerce_orders,order_id,code
+ecommerce_orders,customer_email,email
+ecommerce_orders,order_date,date
+ecommerce_orders,total_price,price
+ecommerce_orders,currency,currency
+ecommerce_orders,credit_card_last4,code
+ecommerce_orders,shipping_country,country
+ecommerce_orders,shipping_postal_code,postal code
+ecommerce_orders,status,status
+ecommerce_orders,is_gift,boolean
+ecommerce_orders,tracking_url,url
+ecommerce_orders,phone,telephone
+tech_systems,server_hostname,hostname
+tech_systems,ip_address,ip_v4
+tech_systems,mac_address,mac address
+tech_systems,os,operating system
+tech_systems,version,version
+tech_systems,language,language
+tech_systems,port,port
+tech_systems,uuid,uuid
+tech_systems,api_key,code
+tech_systems,user_agent,user agent
+tech_systems,log_timestamp,timestamp
+tech_systems,request_url,url
+people_directory,full_name,name
+people_directory,first_name,first name
+people_directory,last_name,last name
+people_directory,email,email
+people_directory,phone,telephone
+people_directory,age,number
+people_directory,gender,gender
+people_directory,ssn,code
+people_directory,date_of_birth,date
+people_directory,company,entity name
+people_directory,job_title,occupation
+people_directory,salary,price
+people_directory,height_cm,height
+people_directory,weight_kg,weight
+financial_data,date,date
+financial_data,ticker,code
+financial_data,open_price,price
+financial_data,close_price,price
+financial_data,high_price,price
+financial_data,low_price,price
+financial_data,volume,number
+financial_data,market_cap,value
+financial_data,pe_ratio,decimal number
+financial_data,dividend_yield,percentage
+financial_data,currency,currency
+financial_data,exchange,category
+datetime_formats,iso_date,date
+datetime_formats,us_date,date
+datetime_formats,eu_date,date
+datetime_formats,iso_timestamp,timestamp
+datetime_formats,sql_timestamp,sql timestamp
+datetime_formats,unix_epoch,time
+datetime_formats,unix_ms,time
+datetime_formats,year,year
+datetime_formats,month_name,month name
+datetime_formats,day_of_week,day of week
+datetime_formats,time_24h,time 24h
+datetime_formats,duration_iso,duration
+datetime_formats,utc_offset,utc offset
+datetime_formats,timezone,time zone
+geography_data,city,city
+geography_data,country_code,country code
+geography_data,country,country
+geography_data,region,region
+geography_data,postal_code,postal code
+geography_data,latitude,latitude
+geography_data,longitude,longitude
+geography_data,coordinates,coordinates
+geography_data,full_address,address
+geography_data,street_number,number
+geography_data,elevation_m,number
+codes_and_ids,isbn,isbn
+codes_and_ids,issn,issn
+codes_and_ids,ean,ean
+codes_and_ids,uuid,uuid
+codes_and_ids,credit_card,credit card number
+codes_and_ids,swift_code,swift code
+codes_and_ids,iban,code
+codes_and_ids,hex_color,color
+codes_and_ids,mime_type,file format
+codes_and_ids,locale,language code
+codes_and_ids,sha256,hash
+codes_and_ids,semantic_version,version
+medical_records,patient_id,id
+medical_records,npi,npi
+medical_records,first_name,first name
+medical_records,last_name,last name
+medical_records,date_of_birth,date
+medical_records,gender,gender
+medical_records,blood_pressure,value
+medical_records,heart_rate,number
+medical_records,temperature_f,decimal number
+medical_records,weight_lbs,weight
+medical_records,height_in,height
+medical_records,diagnosis_code,code
+medical_records,visit_date,date
+medical_records,is_admitted,boolean
+books_catalog,isbn,isbn
+books_catalog,title,title
+books_catalog,author,author
+books_catalog,publisher,entity name
+books_catalog,year_published,year
+books_catalog,pages,number
+books_catalog,language,language
+books_catalog,rating,rating
+books_catalog,price_usd,price
+books_catalog,url,url
+books_catalog,description,description
+network_logs,timestamp,timestamp
+network_logs,source_ip,ip_v4
+network_logs,destination_ip,ip_v4
+network_logs,method,category
+network_logs,url_path,code
+network_logs,status_code,http status code
+network_logs,response_time_ms,number
+network_logs,user_agent,user agent
+network_logs,request_id,uuid
+network_logs,content_type,file format
+network_logs,payload_size_bytes,number
+network_logs,query_params,code
+scientific_measurements,experiment_id,id
+scientific_measurements,measurement_unit,measurement unit
+scientific_measurements,value,decimal number
+scientific_measurements,percentage,percentage
+scientific_measurements,formula,code
+scientific_measurements,ph_value,decimal number
+scientific_measurements,temperature_celsius,decimal number
+scientific_measurements,pressure_atm,decimal number
+scientific_measurements,timestamp,timestamp
+scientific_measurements,latitude,latitude
+scientific_measurements,longitude,longitude
+multilingual,name,name
+multilingual,address,address
+multilingual,postal_code,postal code
+multilingual,phone,telephone
+multilingual,date,date
+multilingual,price,price
+multilingual,locale,language code
+multilingual,country,country
+sports_events,event_id,code
+sports_events,sport,category
+sports_events,venue,entity name
+sports_events,country,country
+sports_events,event_date,date
+sports_events,start_time,time 24h
+sports_events,duration_minutes,number
+sports_events,attendance,number
+sports_events,ticket_price,price
+sports_events,status,status
+sports_events,is_broadcast,boolean
+sports_events,viewer_rating,percentage
+datetime_formats_extended,eu_dot_date,eu dot date
+datetime_formats_extended,abbreviated_month_date,abbreviated month date
+datetime_formats_extended,long_full_month_date,long full month date
+datetime_formats_extended,time_12h,time 12h
+datetime_formats_extended,time_12h_seconds,time 12h seconds
+datetime_formats_extended,rfc_2822_timestamp,rfc 2822 timestamp
+datetime_formats_extended,american_timestamp,american timestamp
+datetime_formats_extended,european_timestamp,european timestamp
+api_users_json,address.city,city
+api_users_json,address.country,country code
+api_users_json,address.postal_code,postal code
+api_users_json,email,email
+api_users_json,name,name
+api_users_json,phone,telephone
+api_users_json,profile_url,url
+ecommerce_orders_json,currency,currency code
+ecommerce_orders_json,customer_email,email
+ecommerce_orders_json,is_express,boolean
+ecommerce_orders_json,order_date,iso timestamp
+ecommerce_orders_json,order_id,alphanumeric id
+ecommerce_orders_json,product,category
+ecommerce_orders_json,quantity,number
+ecommerce_orders_json,status,status
+ecommerce_orders_json,total,decimal number
+ecommerce_orders_json,unit_price,price
+server_logs_json,bytes_sent,number
+server_logs_json,client_ip,ip_v4
+server_logs_json,method,http method
+server_logs_json,path,route
+server_logs_json,request_url,url
+server_logs_json,response_time_ms,decimal number
+server_logs_json,status_code,http status code
+server_logs_json,timestamp,iso timestamp milliseconds
+server_logs_json,user_agent,user agent
+weather_stations_json,humidity_pct,decimal number
+weather_stations_json,location.city,city
+weather_stations_json,location.country,country code
+weather_stations_json,location.latitude,latitude
+weather_stations_json,location.longitude,longitude
+weather_stations_json,observation_date,iso date
+weather_stations_json,precipitation_mm,decimal number
+weather_stations_json,station_name,entity name
+weather_stations_json,temperature_c,decimal number
+weather_stations_json,wind_speed_kmh,decimal number
+new_geography,wkt,wkt
+new_geography,geojson,geojson
+new_geography,h3,h3
+new_geography,geohash,geohash
+new_geography,plus_code,plus code
+new_geography,dms,dms
+new_geography,mgrs,mgrs
+new_geography,iso6346,iso6346
+new_geography,hs_code,hs code
+new_geography,unlocode,unlocode
+new_technology,ulid,ulid
+new_technology,tsid,tsid
+new_technology,snowflake_id,snowflake id
+new_technology,aws_arn,aws arn
+new_technology,s3_uri,s3 uri
+new_technology,jwt,jwt
+new_technology,docker_ref,docker ref
+new_technology,git_sha,git sha
+new_technology,cidr,cidr
+new_technology,urn,urn
+new_technology,data_uri,data uri
+new_identity,icd10,icd10
+new_identity,loinc,loinc
+new_identity,cpt,cpt
+new_identity,hcpcs,hcpcs
+new_identity,vin,vin
+new_identity,eu_vat,eu vat
+new_identity,ssn,ssn
+new_identity,ein,ein
+new_identity,pan_india,pan india
+new_identity,abn,abn
+new_identity,orcid,orcid
+new_identity,email_display,email display
+new_identity,phone_e164,phone e164
+new_identity,upc,upc
+new_identity,isrc,isrc
+new_finance,figi,figi
+new_finance,aba_routing,aba routing
+new_finance,bsb,bsb
+new_representation,cas_number,cas number
+new_representation,inchi,inchi
+new_representation,smiles,smiles
+new_representation,color_hsl,color hsl
+earthquakes_2024,time,iso timestamp milliseconds
+earthquakes_2024,latitude,latitude
+earthquakes_2024,longitude,longitude
+earthquakes_2024,depth,decimal number
+earthquakes_2024,mag,decimal number
+earthquakes_2024,magType,category
+earthquakes_2024,nst,number
+earthquakes_2024,gap,decimal number
+earthquakes_2024,dmin,decimal number
+earthquakes_2024,rms,decimal number
+earthquakes_2024,net,category
+earthquakes_2024,id,alphanumeric id
+earthquakes_2024,updated,iso timestamp milliseconds
+earthquakes_2024,place,address
+earthquakes_2024,type,category
+earthquakes_2024,horizontalError,decimal number
+earthquakes_2024,depthError,decimal number
+earthquakes_2024,magError,decimal number
+earthquakes_2024,magNst,number
+earthquakes_2024,status,status
+earthquakes_2024,locationSource,category
+earthquakes_2024,magSource,category
+datetime_coverage,compact_ymd,compact ymd
+datetime_coverage,rfc_3339,rfc 3339
+datetime_coverage,dmy_dash,dmy dash
+datetime_coverage,ymd_dot,ymd dot
+datetime_coverage,quarter,quarter
+datetime_coverage,fiscal_year,fiscal year
+datetime_coverage,iso_8601_offset,iso 8601 offset
+datetime_coverage,iso_week,iso week
+datetime_coverage,clf_timestamp,clf timestamp
+datetime_coverage,syslog_bsd,syslog bsd
+datetime_coverage,mdy_dash,mdy dash
+datetime_coverage,compact_dmy,compact dmy
+finance_coverage,currency_symbol,currency symbol
+finance_coverage,bitcoin_address,bitcoin address
+finance_coverage,isin,isin
+finance_coverage,cusip,cusip
+finance_coverage,lei,lei
+representation_coverage,scientific_notation,scientific notation
+representation_coverage,decimal_number_comma,decimal number comma
+representation_coverage,file_size,file size
+representation_coverage,integer_number,integer number
+technology_coverage,ip_v6,ip_v6
+technology_coverage,calver,calver
+technology_coverage,ip_v4_with_port,ip_v4 with port
+technology_coverage,username,username

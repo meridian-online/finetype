@@ -1,0 +1,336 @@
+dataset,column_name,predicted_type,eval_method,format_or_transform,confidence,total_values,parse_success,parse_fail,success_rate
+countries,region-code,datetime.date.compact_dmy,strptime,%d%m%Y,0.42652401328086853,247,0,247,0
+covid_timeseries,Date,datetime.date.iso,strptime,%Y-%m-%d,0.7728890180587769,1000,1000,0,100
+ecommerce_orders,order_date,datetime.date.iso,strptime,%Y-%m-%d,0.6194440722465515,100,100,0,100
+tech_systems,version,datetime.date.dmy_short_dot,strptime,%d.%m.%y,0.9958970546722412,80,75,5,93.8
+tech_systems,log_timestamp,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,1,80,80,0,100
+financial_data,date,datetime.date.iso,strptime,%Y-%m-%d,0.6823611259460449,100,100,0,100
+datetime_formats,iso_date,datetime.date.iso,strptime,%Y-%m-%d,0.9543213844299316,80,80,0,100
+datetime_formats,us_date,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.5,80,0,80,0
+datetime_formats,eu_date,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.5,80,0,80,0
+datetime_formats,iso_timestamp,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,1,80,80,0,100
+datetime_formats,sql_timestamp,datetime.timestamp.sql_standard,strptime,%Y-%m-%d %H:%M:%S,1,80,80,0,100
+datetime_formats,unix_ms,datetime.timestamp.iso_8601_compact,strptime,%Y%m%dT%H%M%S,0.738609790802002,80,0,80,0
+datetime_formats,year,datetime.date.compact_ym,strptime,%Y%m,0.9999940395355225,80,0,80,0
+datetime_formats,time_24h,datetime.time.hms_24h,strptime,%H:%M:%S,0.9999978542327881,80,80,0,100
+datetime_formats,duration_iso,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.9828489422798157,80,0,80,0
+codes_and_ids,semantic_version,datetime.date.dmy_short_dot,strptime,%d.%m.%y,0.5042997002601624,80,23,57,28.7
+medical_records,patient_id,datetime.timestamp.iso_microseconds,strptime,%Y-%m-%dT%H:%M:%S.%f,0.6875274181365967,60,0,60,0
+medical_records,visit_date,datetime.date.iso,strptime,%Y-%m-%d,0.5781713128089905,60,60,0,100
+network_logs,timestamp,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%S.%gZ,0.699999988079071,100,100,0,100
+network_logs,status_code,datetime.date.compact_ym,strptime,%Y%m,0.5402923226356506,100,0,100,0
+scientific_measurements,ph_value,datetime.date.dmy_short_dot,strptime,%d.%m.%y,0.9999675750732422,50,0,50,0
+scientific_measurements,timestamp,datetime.timestamp.iso_8601_offset,strptime,%Y-%m-%dT%H:%M:%S%z,0.9173175692558289,50,0,50,0
+multilingual,date,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.5,60,0,60,0
+sports_events,event_date,datetime.date.iso,strptime,%Y-%m-%d,0.9509170651435852,100,100,0,100
+sports_events,start_time,datetime.time.hm_24h,strptime,%H:%M,0.9944530129432678,100,100,0,100
+datetime_formats_extended,eu_dot_date,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.9858740568161011,80,0,80,0
+datetime_formats_extended,abbreviated_month_date,datetime.date.abbrev_month_no_comma,strptime,%b %d %Y,0.5273706316947937,80,0,80,0
+datetime_formats_extended,long_full_month_date,datetime.date.full_month_no_comma,strptime,%B %d %Y,0.5120466947555542,80,0,80,0
+datetime_formats_extended,time_12h,datetime.time.hm_12h,strptime,%I:%M %p,0.9999916553497314,80,80,0,100
+datetime_formats_extended,time_12h_seconds,datetime.time.hms_12h,strptime,%I:%M:%S %p,1,80,80,0,100
+datetime_formats_extended,rfc_2822_timestamp,datetime.timestamp.rfc_2822,strptime,"%a, %d %b %Y %H:%M:%S %z",1,80,80,0,100
+datetime_formats_extended,american_timestamp,datetime.timestamp.mdy_12h,strptime,%m/%d/%Y %I:%M %p,1,80,80,0,100
+datetime_formats_extended,european_timestamp,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.699999988079071,80,0,80,0
+weather_stations_json,observation_date,datetime.timestamp.iso_8601,strptime,%Y-%m-%dT%H:%M:%SZ,0.699999988079071,0,0,0,0
+weather_stations_json,precipitation_mm,datetime.date.dmy_short_dot,strptime,%d.%m.%y,0.9998745918273926,0,0,0,0
+earthquakes_2024,time,datetime.timestamp.iso_8601_milliseconds,strptime,%Y-%m-%dT%H:%M:%S.%gZ,0.5431826710700989,14132,14132,0,100
+earthquakes_2024,rms,datetime.date.dmy_short_dot,strptime,%d.%m.%y,0.8197723031044006,14131,0,14131,0
+earthquakes_2024,updated,datetime.timestamp.iso_8601_milliseconds,strptime,%Y-%m-%dT%H:%M:%S.%gZ,0.8085916638374329,14132,14132,0,100
+earthquakes_2024,magError,datetime.date.dmy_short_dot,strptime,%d.%m.%y,0.9931682348251343,14011,0,14011,0
+datetime_coverage,compact_ymd,datetime.date.compact_dmy,strptime,%d%m%Y,0.3777729272842407,25,12,13,48
+datetime_coverage,rfc_3339,datetime.timestamp.rfc_3339,strptime,%Y-%m-%d %H:%M:%S%:z,1,0,0,0,0
+datetime_coverage,dmy_dash,datetime.date.mdy_dash,strptime,%m-%d-%Y,0.49152901768684387,25,9,16,36
+datetime_coverage,ymd_dot,datetime.date.dmy_dot,strptime,%d.%m.%Y,0.5463335514068604,25,0,25,0
+datetime_coverage,iso_8601_offset,datetime.timestamp.iso_8601_offset,strptime,%Y-%m-%dT%H:%M:%S%z,0.9348734021186829,25,25,0,100
+datetime_coverage,iso_week,datetime.date.iso_week,strptime,%G-W%V,0.9886858463287354,25,25,0,100
+datetime_coverage,clf_timestamp,datetime.timestamp.clf,strptime,%d/%b/%Y:%H:%M:%S %z,0.9999988079071045,25,0,25,0
+datetime_coverage,syslog_bsd,datetime.timestamp.syslog_bsd,strptime,%b %e %H:%M:%S,0.9995706677436829,0,0,0,0
+datetime_coverage,mdy_dash,datetime.date.mdy_dash,strptime,%m-%d-%Y,0.4752342998981476,25,25,0,100
+datetime_coverage,compact_dmy,datetime.date.compact_dmy,strptime,%d%m%Y,0.5472776889801025,25,25,0,100
+titanic,PassengerId,representation.identifier.increment,transform,CAST({col} AS BIGINT),0.9999996423721313,891,891,0,100
+titanic,Survived,representation.boolean.binary,transform,CAST({col} AS BOOLEAN),1,891,891,0,100
+titanic,Pclass,representation.discrete.ordinal,transform,CAST({col} AS VARCHAR),1,891,891,0,100
+titanic,Name,geography.location.city,transform,CAST({col} AS VARCHAR),0.9904120564460754,891,891,0,100
+titanic,Sex,identity.person.gender,transform,CAST({col} AS VARCHAR),1,891,891,0,100
+titanic,Age,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.5,714,714,0,100
+titanic,SibSp,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.6000000238418579,891,891,0,100
+titanic,Parch,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),1,891,891,0,100
+titanic,Fare,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.999626874923706,891,891,0,100
+titanic,Embarked,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),1,889,889,0,100
+airports,id,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.699999988079071,7698,7698,0,100
+airports,name,geography.address.full_address,transform,CAST({col} AS VARCHAR),0.9999908208847046,7698,7698,0,100
+airports,city,geography.location.city,transform,CAST({col} AS VARCHAR),1,7649,7649,0,100
+airports,country,geography.location.country,transform,CAST({col} AS VARCHAR),0.6000000238418579,7698,7698,0,100
+airports,iata,geography.transportation.iata_code,transform,UPPER(CAST({col} AS VARCHAR)),0.9566429853439331,7698,7698,0,100
+airports,icao,geography.transportation.unlocode,transform,UPPER(CAST({col} AS VARCHAR)),0.9998822212219238,7698,7698,0,100
+airports,latitude,geography.coordinate.latitude,transform,CAST({col} AS DOUBLE),0.9658005833625793,7698,7698,0,100
+airports,longitude,geography.coordinate.longitude,transform,CAST({col} AS DOUBLE),0.6936185359954834,7698,7698,0,100
+airports,altitude,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),1,7698,7698,0,100
+airports,utc_offset,datetime.offset.utc,transform,{col},0.5,7698,7698,0,100
+airports,timezone,datetime.offset.iana,transform,{col},0.9788211584091187,7698,7698,0,100
+airports,type,datetime.component.periodicity,transform,{col},0.34823518991470337,7698,7698,0,100
+airports,source,representation.text.entity_name,transform,CAST({col} AS VARCHAR),0.4764874279499054,7698,7698,0,100
+countries,name,geography.location.region,transform,CAST({col} AS VARCHAR),0.995097815990448,249,249,0,100
+countries,alpha-2,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.5,249,249,0,100
+countries,alpha-3,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.9999997615814209,249,249,0,100
+countries,country-code,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.627781093120575,249,249,0,100
+countries,iso_3166-2,identity.commerce.isrc,transform,CAST({col} AS VARCHAR),0.608597993850708,249,249,0,100
+countries,sub-region-code,representation.identifier.numeric_code,transform,CAST({col} AS VARCHAR),0.7886046171188354,247,247,0,100
+covid_timeseries,Country,geography.location.country,transform,CAST({col} AS VARCHAR),0.6000000238418579,1000,1000,0,100
+covid_timeseries,Confirmed,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.9997095465660095,1000,1000,0,100
+covid_timeseries,Recovered,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.760952889919281,1000,1000,0,100
+covid_timeseries,Deaths,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.9999996423721313,1000,1000,0,100
+us_states,Abbreviation,geography.transportation.iata_code,transform,UPPER(CAST({col} AS VARCHAR)),0.5144839286804199,51,51,0,100
+world_cities,name,geography.location.city,transform,CAST({col} AS VARCHAR),0.9996919631958008,33237,33237,0,100
+world_cities,country,geography.location.country,transform,CAST({col} AS VARCHAR),0.7746310830116272,33237,33237,0,100
+world_cities,geonameid,finance.banking.aba_routing,transform,CAST({col} AS VARCHAR),0.8771810531616211,33237,33237,0,100
+iris,sepal_length,representation.numeric.scientific_notation,transform,CAST({col} AS DOUBLE),0.9524289965629578,150,150,0,100
+iris,sepal_width,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.9900623559951782,150,150,0,100
+iris,petal_length,representation.numeric.scientific_notation,transform,CAST({col} AS DOUBLE),0.7322299480438232,150,150,0,100
+iris,petal_width,finance.rate.yield,transform,"CAST(REGEXP_REPLACE({col}, '%$', '') AS DECIMAL(10,4)) / 100",0.6831839084625244,150,150,0,100
+iris,species,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.5346880555152893,150,150,0,100
+ecommerce_orders,order_id,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.5900959968566895,100,100,0,100
+ecommerce_orders,customer_email,identity.person.email,transform,LOWER(CAST({col} AS VARCHAR)),1,100,100,0,100
+ecommerce_orders,total_price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.7307493090629578,100,100,0,100
+ecommerce_orders,credit_card_last4,geography.address.postal_code,transform,CAST({col} AS VARCHAR),0.9996967315673828,100,100,0,100
+ecommerce_orders,shipping_country,datetime.offset.iana,transform,{col},0.9903616905212402,100,100,0,100
+ecommerce_orders,shipping_postal_code,geography.address.postal_code,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+ecommerce_orders,status,datetime.component.periodicity,transform,{col},0.9979709982872009,100,100,0,100
+ecommerce_orders,is_gift,representation.boolean.terms,transform,CAST({col} AS BOOLEAN),0.9999734163284302,100,100,0,100
+ecommerce_orders,tracking_url,technology.internet.url,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+ecommerce_orders,phone,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.9823970794677734,100,100,0,100
+tech_systems,server_hostname,technology.internet.hostname,transform,CAST({col} AS VARCHAR),0.921927809715271,80,80,0,100
+tech_systems,ip_address,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+tech_systems,mac_address,technology.internet.mac_address,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+tech_systems,language,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.5,80,80,0,100
+tech_systems,port,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.699999988079071,80,80,0,100
+tech_systems,uuid,representation.identifier.uuid,transform,CAST({col} AS UUID),1,80,80,0,100
+tech_systems,api_key,technology.cryptographic.token_urlsafe,transform,CAST({col} AS VARCHAR),0.9999972581863403,80,80,0,100
+tech_systems,user_agent,representation.format.color_hsl,transform,CAST({col} AS VARCHAR),0.181490957736969,80,80,0,100
+tech_systems,request_url,technology.internet.url,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+people_directory,full_name,identity.person.email_display,transform,CAST({col} AS VARCHAR),0.9999998807907104,100,100,0,100
+people_directory,first_name,identity.person.first_name,transform,CAST({col} AS VARCHAR),0.9983277916908264,100,100,0,100
+people_directory,last_name,identity.person.last_name,transform,CAST({col} AS VARCHAR),0.6653571724891663,100,100,0,100
+people_directory,email,identity.person.email,transform,LOWER(CAST({col} AS VARCHAR)),1,100,100,0,100
+people_directory,phone,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.9799410700798035,100,100,0,100
+people_directory,age,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.5,100,100,0,100
+people_directory,gender,identity.person.gender,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+people_directory,ssn,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.9971792697906494,100,100,0,100
+people_directory,company,representation.text.entity_name,transform,CAST({col} AS VARCHAR),0.804390013217926,100,100,0,100
+people_directory,job_title,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.5,100,100,0,100
+people_directory,salary,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.7816458940505981,100,100,0,100
+people_directory,height_cm,identity.person.height,transform,"CASE
+  WHEN UPPER({col}) LIKE '%FT%' OR {col} LIKE '%\\''%' THEN
+    (CAST(REGEXP_EXTRACT({col}, '^([0-9]+)') AS DOUBLE) * 30.48) +
+    (CAST(COALESCE(REGEXP_EXTRACT({col}, '\\'([0-9]+)'), '0') AS DOUBLE) * 2.54)
+  WHEN UPPER({col}) LIKE '%IN%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 2.54
+  ELSE CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
+END
+",0.9977791905403137,0,0,0,0
+people_directory,weight_kg,identity.person.weight,transform,"CASE
+  WHEN UPPER({col}) LIKE '%LB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) / 2.20462
+  ELSE CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
+END
+",0.5,100,100,0,100
+financial_data,open_price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.9998526573181152,100,100,0,100
+financial_data,close_price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.9999368190765381,100,100,0,100
+financial_data,high_price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.9996803998947144,100,100,0,100
+financial_data,low_price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.9719486832618713,100,100,0,100
+financial_data,volume,representation.identifier.increment,transform,CAST({col} AS BIGINT),0.9077631831169128,100,100,0,100
+financial_data,market_cap,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),0.8073409795761108,100,100,0,100
+financial_data,pe_ratio,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.9999939203262329,100,100,0,100
+financial_data,dividend_yield,representation.numeric.percentage,transform,"CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\.[0-9]+)?)') AS DOUBLE)",1,100,100,0,100
+financial_data,exchange,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.5,100,100,0,100
+datetime_formats,unix_epoch,datetime.epoch.unix_seconds,transform,to_timestamp({col}::BIGINT),0.8202082514762878,80,80,0,100
+datetime_formats,month_name,datetime.component.month_name,transform,{col},0.8651213049888611,80,80,0,100
+datetime_formats,day_of_week,datetime.component.day_of_week,transform,{col},1,80,80,0,100
+datetime_formats,utc_offset,datetime.offset.utc,transform,{col},0.9791593551635742,80,80,0,100
+datetime_formats,timezone,datetime.offset.iana,transform,{col},1,80,80,0,100
+geography_data,city,geography.location.city,transform,CAST({col} AS VARCHAR),0.9999958276748657,100,100,0,100
+geography_data,country_code,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.5,100,100,0,100
+geography_data,country,geography.location.country,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+geography_data,postal_code,geography.address.postal_code,transform,CAST({col} AS VARCHAR),0.5,100,100,0,100
+geography_data,latitude,geography.coordinate.latitude,transform,CAST({col} AS DOUBLE),0.699999988079071,100,100,0,100
+geography_data,longitude,geography.coordinate.longitude,transform,CAST({col} AS DOUBLE),0.699999988079071,100,100,0,100
+geography_data,coordinates,geography.coordinate.coordinates,transform,"ST_Point({col}::DOUBLE, CAST(REGEXP_EXTRACT({col}, ',([^,]+)') AS DOUBLE))",0.9999991655349731,0,0,0,0
+geography_data,full_address,geography.address.full_address,transform,CAST({col} AS VARCHAR),0.9274604320526123,100,100,0,100
+geography_data,elevation_m,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.9999992847442627,100,100,0,100
+codes_and_ids,isbn,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.9457690119743347,80,80,0,100
+codes_and_ids,issn,identity.commerce.issn,transform,CAST({col} AS VARCHAR),0.6268787384033203,80,80,0,100
+codes_and_ids,ean,identity.commerce.ean,transform,CAST({col} AS VARCHAR),0.7431608438491821,80,80,0,100
+codes_and_ids,uuid,representation.identifier.uuid,transform,CAST({col} AS UUID),1,80,80,0,100
+codes_and_ids,credit_card,finance.payment.credit_card_number,transform,CAST({col} AS VARCHAR),0.5500680208206177,80,80,0,100
+codes_and_ids,swift_code,finance.banking.swift_bic,transform,UPPER(CAST({col} AS VARCHAR)),0.5,80,80,0,100
+codes_and_ids,iban,technology.identifier.snowflake_id,transform,epoch_ms(({col}::BIGINT >> 22) + 1288834974657),0.5006343126296997,0,0,0,0
+codes_and_ids,hex_color,representation.format.color_hex,transform,UPPER(CAST({col} AS VARCHAR)),0.9999477863311768,80,80,0,100
+codes_and_ids,mime_type,representation.file.mime_type,transform,LOWER(CAST({col} AS VARCHAR)),0.9999996423721313,80,80,0,100
+codes_and_ids,locale,technology.code.locale_code,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+codes_and_ids,sha256,finance.crypto.ethereum_address,transform,LOWER(CAST({col} AS VARCHAR)),0.8778277635574341,80,80,0,100
+medical_records,npi,identity.medical.npi,transform,CAST({col} AS VARCHAR),0.5,60,60,0,100
+medical_records,first_name,identity.person.email_display,transform,CAST({col} AS VARCHAR),1,60,60,0,100
+medical_records,last_name,identity.person.last_name,transform,CAST({col} AS VARCHAR),0.5332157015800476,60,60,0,100
+medical_records,gender,identity.person.gender,transform,CAST({col} AS VARCHAR),1,60,60,0,100
+medical_records,blood_pressure,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.8869914412498474,60,0,60,0
+medical_records,heart_rate,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),1,60,60,0,100
+medical_records,temperature_f,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.5,60,60,0,100
+medical_records,weight_lbs,identity.person.weight,transform,"CASE
+  WHEN UPPER({col}) LIKE '%LB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) / 2.20462
+  ELSE CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
+END
+",0.9912163019180298,60,60,0,100
+medical_records,height_in,identity.person.height,transform,"CASE
+  WHEN UPPER({col}) LIKE '%FT%' OR {col} LIKE '%\\''%' THEN
+    (CAST(REGEXP_EXTRACT({col}, '^([0-9]+)') AS DOUBLE) * 30.48) +
+    (CAST(COALESCE(REGEXP_EXTRACT({col}, '\\'([0-9]+)'), '0') AS DOUBLE) * 2.54)
+  WHEN UPPER({col}) LIKE '%IN%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 2.54
+  ELSE CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
+END
+",0.7680385708808899,0,0,0,0
+medical_records,diagnosis_code,identity.medical.hcpcs,transform,CAST({col} AS VARCHAR),0.9997515082359314,60,60,0,100
+medical_records,is_admitted,representation.boolean.terms,transform,CAST({col} AS BOOLEAN),0.9999973773956299,60,60,0,100
+books_catalog,isbn,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.9840494394302368,60,60,0,100
+books_catalog,title,container.array.whitespace_separated,transform,CAST({col} AS VARCHAR),0.9978049397468567,60,60,0,100
+books_catalog,author,identity.person.email_display,transform,CAST({col} AS VARCHAR),0.9999955892562866,60,60,0,100
+books_catalog,publisher,representation.text.entity_name,transform,CAST({col} AS VARCHAR),0.3329436480998993,60,60,0,100
+books_catalog,year_published,datetime.component.year,transform,{col}::SMALLINT,1,60,60,0,100
+books_catalog,pages,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),1,60,60,0,100
+books_catalog,language,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.999724805355072,60,60,0,100
+books_catalog,rating,representation.discrete.ordinal,transform,CAST({col} AS VARCHAR),0.9873027801513672,60,60,0,100
+books_catalog,price_usd,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.9999223947525024,60,60,0,100
+books_catalog,url,technology.internet.url,transform,CAST({col} AS VARCHAR),1,60,60,0,100
+books_catalog,description,container.array.whitespace_separated,transform,CAST({col} AS VARCHAR),0.9961523413658142,60,60,0,100
+network_logs,source_ip,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+network_logs,destination_ip,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+network_logs,method,technology.internet.http_method,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+network_logs,url_path,technology.internet.url,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+network_logs,response_time_ms,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),1,100,100,0,100
+network_logs,user_agent,technology.development.docker_ref,transform,CAST({col} AS VARCHAR),0.7486206293106079,100,100,0,100
+network_logs,request_id,representation.identifier.uuid,transform,CAST({col} AS UUID),1,100,100,0,100
+network_logs,content_type,technology.internet.url,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+network_logs,payload_size_bytes,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.5,100,100,0,100
+network_logs,query_params,container.key_value.query_string,transform,CAST({col} AS VARCHAR),0.9956454038619995,100,100,0,100
+scientific_measurements,experiment_id,identity.commerce.issn,transform,CAST({col} AS VARCHAR),0.5275366902351379,50,50,0,100
+scientific_measurements,measurement_unit,geography.transportation.iata_code,transform,UPPER(CAST({col} AS VARCHAR)),0.7464478015899658,50,50,0,100
+scientific_measurements,value,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.9976372718811035,50,50,0,100
+scientific_measurements,percentage,representation.numeric.percentage,transform,"CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\.[0-9]+)?)') AS DOUBLE)",1,50,50,0,100
+scientific_measurements,formula,finance.banking.swift_bic,transform,UPPER(CAST({col} AS VARCHAR)),0.940713107585907,50,50,0,100
+scientific_measurements,temperature_celsius,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),1,50,50,0,100
+scientific_measurements,pressure_atm,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),1,50,50,0,100
+scientific_measurements,latitude,geography.coordinate.latitude,transform,CAST({col} AS DOUBLE),0.74875408411026,50,50,0,100
+scientific_measurements,longitude,geography.coordinate.longitude,transform,CAST({col} AS DOUBLE),0.699999988079071,50,50,0,100
+multilingual,name,identity.person.full_name,transform,CAST({col} AS VARCHAR),0.352262020111084,60,60,0,100
+multilingual,address,geography.address.full_address,transform,CAST({col} AS VARCHAR),0.5,60,60,0,100
+multilingual,postal_code,geography.address.postal_code,transform,CAST({col} AS VARCHAR),1,60,60,0,100
+multilingual,phone,identity.person.phone_number,transform,CAST({col} AS VARCHAR),0.9924126267433167,60,60,0,100
+multilingual,price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.7762729525566101,60,60,0,100
+multilingual,locale,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.3322101831436157,60,60,0,100
+multilingual,country,geography.location.country,transform,CAST({col} AS VARCHAR),0.5,60,60,0,100
+sports_events,event_id,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.5381350517272949,100,100,0,100
+sports_events,sport,representation.discrete.categorical,transform,CAST({col} AS VARCHAR),0.5950760245323181,100,100,0,100
+sports_events,venue,representation.text.entity_name,transform,CAST({col} AS VARCHAR),0.5,100,100,0,100
+sports_events,country,geography.location.country,transform,CAST({col} AS VARCHAR),1,100,100,0,100
+sports_events,duration_minutes,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.8540840744972229,100,100,0,100
+sports_events,attendance,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.5,100,100,0,100
+sports_events,ticket_price,finance.currency.amount,transform,"CAST(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(CASE WHEN {col} LIKE '(%' THEN '-' || REPLACE(REPLACE({col}, '(', ''), ')', '') ELSE {col} END, '^[^0-9\-]+', ''), '[^0-9\.\-]', '', 'g'), ',', '', 'g'), '\s+', '', 'g') AS DECIMAL(18,2))",0.9967764019966125,100,100,0,100
+sports_events,status,datetime.component.periodicity,transform,{col},1,100,100,0,100
+sports_events,is_broadcast,representation.boolean.terms,transform,CAST({col} AS BOOLEAN),0.9121096730232239,100,100,0,100
+sports_events,viewer_rating,representation.numeric.percentage,transform,"CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\.[0-9]+)?)') AS DOUBLE)",1,100,100,0,100
+api_users_json,address.city,geography.location.city,transform,CAST({col} AS VARCHAR),0.8441157341003418,0,0,0,0
+api_users_json,address.country,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),1,0,0,0,0
+api_users_json,address.postal_code,geography.address.postal_code,transform,CAST({col} AS VARCHAR),0.7376721501350403,0,0,0,0
+api_users_json,email,identity.person.email,transform,LOWER(CAST({col} AS VARCHAR)),0.6284836530685425,0,0,0,0
+api_users_json,name,identity.person.first_name,transform,CAST({col} AS VARCHAR),0.9524260759353638,0,0,0,0
+api_users_json,phone,identity.government.abn,transform,CAST({col} AS VARCHAR),0.9978141784667969,0,0,0,0
+api_users_json,profile_url,technology.internet.url,transform,CAST({col} AS VARCHAR),0.8763227462768555,0,0,0,0
+weather_stations_json,humidity_pct,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.9990234375,0,0,0,0
+weather_stations_json,location.city,geography.location.city,transform,CAST({col} AS VARCHAR),0.9998273253440857,0,0,0,0
+weather_stations_json,location.country,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.9999037981033325,0,0,0,0
+weather_stations_json,location.latitude,geography.coordinate.latitude,transform,CAST({col} AS DOUBLE),0.994862973690033,0,0,0,0
+weather_stations_json,location.longitude,geography.coordinate.longitude,transform,CAST({col} AS DOUBLE),1,0,0,0,0
+weather_stations_json,station_name,representation.text.entity_name,transform,CAST({col} AS VARCHAR),0.5,0,0,0,0
+weather_stations_json,temperature_c,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.7554641962051392,0,0,0,0
+weather_stations_json,wind_speed_kmh,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),0.7331560254096985,0,0,0,0
+new_geography,wkt,geography.format.wkt,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_geography,geojson,geography.format.wkt,transform,CAST({col} AS VARCHAR),0.9909639358520508,80,80,0,100
+new_geography,h3,geography.index.h3,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_geography,geohash,geography.coordinate.geohash,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_geography,plus_code,geography.coordinate.plus_code,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_geography,dms,geography.coordinate.dms,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_geography,mgrs,geography.coordinate.mgrs,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_geography,iso6346,geography.transportation.iso6346,transform,CAST({col} AS VARCHAR),0.9999704360961914,80,80,0,100
+new_geography,hs_code,geography.transportation.hs_code,transform,CAST({col} AS VARCHAR),0.9999983310699463,80,80,0,100
+new_geography,unlocode,geography.transportation.unlocode,transform,UPPER(CAST({col} AS VARCHAR)),1,80,80,0,100
+new_technology,ulid,technology.identifier.ulid,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,tsid,technology.identifier.tsid,transform,CAST({col} AS VARCHAR),0.7587645053863525,80,80,0,100
+new_technology,snowflake_id,technology.identifier.snowflake_id,transform,epoch_ms(({col}::BIGINT >> 22) + 1288834974657),0.7397964596748352,80,80,0,100
+new_technology,aws_arn,technology.cloud.aws_arn,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,s3_uri,technology.cloud.s3_uri,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,jwt,technology.cryptographic.jwt,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,docker_ref,technology.development.docker_ref,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,git_sha,finance.crypto.ethereum_address,transform,LOWER(CAST({col} AS VARCHAR)),0.9116291403770447,80,80,0,100
+new_technology,cidr,technology.internet.cidr,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,urn,technology.internet.urn,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_technology,data_uri,technology.internet.data_uri,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_identity,icd10,identity.medical.icd10,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_identity,loinc,identity.medical.loinc,transform,CAST({col} AS VARCHAR),0.9980313181877136,80,80,0,100
+new_identity,cpt,identity.medical.cpt,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_identity,hcpcs,identity.medical.hcpcs,transform,CAST({col} AS VARCHAR),0.9999994039535522,80,80,0,100
+new_identity,vin,identity.government.vin,transform,CAST({col} AS VARCHAR),0.9999994039535522,80,80,0,100
+new_identity,eu_vat,identity.government.eu_vat,transform,CAST({col} AS VARCHAR),0.999298095703125,80,80,0,100
+new_identity,ssn,identity.government.ssn,transform,CAST({col} AS VARCHAR),0.9965323209762573,80,80,0,100
+new_identity,ein,identity.government.ein,transform,CAST({col} AS VARCHAR),0.7073264122009277,80,80,0,100
+new_identity,pan_india,identity.government.pan_india,transform,CAST({col} AS VARCHAR),0.9999390840530396,80,80,0,100
+new_identity,abn,identity.government.abn,transform,CAST({col} AS VARCHAR),0.9999995231628418,80,80,0,100
+new_identity,orcid,identity.academic.orcid,transform,CAST({col} AS VARCHAR),0.999992847442627,80,80,0,100
+new_identity,email_display,identity.person.email_display,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_identity,phone_e164,identity.person.phone_e164,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_identity,upc,identity.commerce.ean,transform,CAST({col} AS VARCHAR),0.699999988079071,80,80,0,100
+new_identity,isrc,identity.commerce.isrc,transform,CAST({col} AS VARCHAR),0.9999988079071045,80,80,0,100
+new_finance,figi,finance.securities.figi,transform,UPPER(CAST({col} AS VARCHAR)),1,80,80,0,100
+new_finance,aba_routing,finance.banking.aba_routing,transform,CAST({col} AS VARCHAR),0.996023416519165,80,80,0,100
+new_finance,bsb,finance.banking.bsb,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_representation,cas_number,representation.scientific.cas_number,transform,CAST({col} AS VARCHAR),0.9977155923843384,80,80,0,100
+new_representation,inchi,representation.scientific.inchi,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_representation,smiles,representation.scientific.smiles,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+new_representation,color_hsl,representation.format.color_hsl,transform,CAST({col} AS VARCHAR),1,80,80,0,100
+earthquakes_2024,latitude,geography.coordinate.latitude,transform,CAST({col} AS DOUBLE),1,14132,14132,0,100
+earthquakes_2024,longitude,geography.coordinate.longitude,transform,CAST({col} AS DOUBLE),1,14132,14132,0,100
+earthquakes_2024,depth,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.699999988079071,14132,14132,0,100
+earthquakes_2024,mag,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.9896736145019531,14132,14132,0,100
+earthquakes_2024,magType,representation.identifier.alphanumeric_id,transform,CAST({col} AS VARCHAR),0.18186849355697632,14132,14132,0,100
+earthquakes_2024,nst,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),1,14081,14081,0,100
+earthquakes_2024,gap,identity.medical.icd10,transform,CAST({col} AS VARCHAR),0.4130392074584961,14080,14080,0,100
+earthquakes_2024,dmin,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),0.661639392375946,14080,14080,0,100
+earthquakes_2024,net,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.9990384578704834,14132,14132,0,100
+earthquakes_2024,id,geography.coordinate.geohash,transform,CAST({col} AS VARCHAR),0.9821887612342834,14132,14132,0,100
+earthquakes_2024,place,geography.location.city,transform,CAST({col} AS VARCHAR),0.31267049908638,14132,14132,0,100
+earthquakes_2024,type,representation.text.word,transform,LOWER(CAST({col} AS VARCHAR)),0.5532315969467163,14132,14132,0,100
+earthquakes_2024,horizontalError,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),0.7603122591972351,14072,14072,0,100
+earthquakes_2024,depthError,technology.internet.ip_v4,transform,CAST({col} AS VARCHAR),0.7484794855117798,14132,14132,0,100
+earthquakes_2024,magNst,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.9999955892562866,14069,14069,0,100
+earthquakes_2024,status,identity.person.gender,transform,CAST({col} AS VARCHAR),0.6902989745140076,14132,14132,0,100
+earthquakes_2024,locationSource,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.7751348614692688,14132,14132,0,100
+earthquakes_2024,magSource,geography.location.country_code,transform,UPPER(CAST({col} AS VARCHAR)),0.57508784532547,14132,14132,0,100
+datetime_coverage,quarter,datetime.period.quarter,transform,"make_date(CAST(regexp_extract({col}, '(\d{4})') AS INT), (CAST(regexp_extract({col}, 'Q([1-4])') AS INT) - 1) * 3 + 1, 1)",0.9999680519104004,25,0,25,0
+datetime_coverage,fiscal_year,datetime.period.fiscal_year,transform,"CAST(regexp_extract({col}, 'FY(\d{2,4})') AS VARCHAR)",1,25,25,0,100
+finance_coverage,currency_symbol,technology.code.locale_code,transform,CAST({col} AS VARCHAR),0.965226411819458,25,25,0,100
+finance_coverage,bitcoin_address,geography.address.full_address,transform,CAST({col} AS VARCHAR),0.9999992847442627,25,25,0,100
+finance_coverage,isin,identity.government.eu_vat,transform,CAST({col} AS VARCHAR),0.8047098517417908,25,25,0,100
+finance_coverage,cusip,identity.government.eu_vat,transform,CAST({col} AS VARCHAR),0.8940892219543457,25,25,0,100
+finance_coverage,lei,finance.securities.lei,transform,CAST({col} AS VARCHAR),0.9970237612724304,25,25,0,100
+representation_coverage,scientific_notation,representation.numeric.decimal_number,transform,CAST({col} AS DOUBLE),1,25,25,0,100
+representation_coverage,decimal_number_comma,representation.numeric.decimal_number_comma,transform,"CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE)",0.8090039491653442,25,25,0,100
+representation_coverage,file_size,representation.file.file_size,transform,"CASE
+  WHEN UPPER({col}) LIKE '%GB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 1024 * 1024 * 1024
+  WHEN UPPER({col}) LIKE '%MB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 1024 * 1024
+  WHEN UPPER({col}) LIKE '%KB%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE) * 1024
+  WHEN UPPER({col}) LIKE '%B%' THEN CAST(REGEXP_EXTRACT({col}, '^([0-9.]+)') AS DOUBLE)
+  ELSE CAST({col} AS BIGINT)
+END
+",1,25,25,0,100
+representation_coverage,integer_number,representation.numeric.integer_number,transform,CAST({col} AS BIGINT),0.997448742389679,25,25,0,100
+technology_coverage,ip_v6,technology.cryptographic.hash,transform,CAST({col} AS VARCHAR),0.5540061593055725,25,25,0,100
+technology_coverage,calver,technology.development.calver,transform,CAST({col} AS VARCHAR),0.6563559174537659,25,25,0,100
+technology_coverage,ip_v4_with_port,technology.internet.cidr,transform,CAST({col} AS VARCHAR),0.9043867588043213,25,25,0,100
+technology_coverage,username,identity.person.username,transform,LOWER(CAST({col} AS VARCHAR)),0.9999910593032837,25,25,0,100

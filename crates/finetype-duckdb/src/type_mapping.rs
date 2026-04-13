@@ -84,8 +84,7 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         "technology.internet.http_method" => "VARCHAR",
 
         // ── technology.cryptographic ───────────────────────────────────
-        "technology.cryptographic.hash"
-        | "technology.cryptographic.token_urlsafe" => "VARCHAR",
+        "technology.cryptographic.hash" | "technology.cryptographic.token_urlsafe" => "VARCHAR",
 
         // ── technology.development ─────────────────────────────────────
         "technology.development.boolean" => "BOOLEAN", // legacy label

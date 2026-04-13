@@ -753,7 +753,7 @@ mod tests {
         assert!(!config.has_header_branch());
         assert_eq!(config.n_classes, 250);
         assert_eq!(config.merged_dim(), 564); // 3-branch only
-        // New fields default to backward-compatible values
+                                              // New fields default to backward-compatible values
         assert_eq!(config.activation, Activation::ReLU);
         assert!(!config.use_layer_norm);
     }

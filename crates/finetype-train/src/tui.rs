@@ -666,8 +666,7 @@ mod tui_impl {
             " Initialising...".to_string()
         } else {
             let batch_info = if state.current_total_batches > 0 {
-                let batch_pct = ((state.current_batch as f64
-                    / state.current_total_batches as f64)
+                let batch_pct = ((state.current_batch as f64 / state.current_total_batches as f64)
                     * 100.0) as u16;
                 format!(
                     "  │  Batch {}/{} [{}%]",

@@ -32,10 +32,7 @@ pub fn is_label_match(predicted: &str, expected: &str) -> bool {
         return true;
     }
     // DMY/MDY dash dates are inherently ambiguous (DD-MM vs MM-DD)
-    const DMY_MDY_SET: &[&str] = &[
-        "datetime.date.dmy_dash",
-        "datetime.date.mdy_dash",
-    ];
+    const DMY_MDY_SET: &[&str] = &["datetime.date.dmy_dash", "datetime.date.mdy_dash"];
     if DMY_MDY_SET.contains(&expected) && DMY_MDY_SET.contains(&predicted) {
         return true;
     }
@@ -63,8 +60,7 @@ pub fn is_label_match(predicted: &str, expected: &str) -> bool {
         return true;
     }
     // IP hierarchy: ip_v4 captures the core format of ip_v4_with_port
-    if expected == "technology.internet.ip_v4_with_port"
-        && predicted == "technology.internet.ip_v4"
+    if expected == "technology.internet.ip_v4_with_port" && predicted == "technology.internet.ip_v4"
     {
         return true;
     }

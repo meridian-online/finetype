@@ -1,0 +1,350 @@
+{
+  "actionability_success": 527836,
+  "actionability_total": 544436,
+  "domain_accuracy_pct": 88.5,
+  "domain_correct": 201,
+  "domain_total": 227,
+  "label_accuracy_pct": 81.5,
+  "label_correct": 185,
+  "label_total": 227,
+  "misclassifications": [
+    {
+      "column": "author",
+      "confidence": 0.9999852180480957,
+      "dataset": "books_catalog",
+      "expected": "identity.person.full_name",
+      "gt_label": "author",
+      "predicted": "identity.person.email_display"
+    },
+    {
+      "column": "full_name",
+      "confidence": 0.9998689889907837,
+      "dataset": "people_directory",
+      "expected": "identity.person.full_name",
+      "gt_label": "name",
+      "predicted": "identity.person.email_display"
+    },
+    {
+      "column": "bitcoin_address",
+      "confidence": 0.9998466968536377,
+      "dataset": "finance_coverage",
+      "expected": "finance.crypto.bitcoin_address",
+      "gt_label": "bitcoin address",
+      "predicted": "geography.address.full_address"
+    },
+    {
+      "column": "year",
+      "confidence": 0.9991059899330139,
+      "dataset": "datetime_formats",
+      "expected": "datetime.component.year",
+      "gt_label": "year",
+      "predicted": "datetime.date.compact_ym"
+    },
+    {
+      "column": "first_name",
+      "confidence": 0.9977140426635742,
+      "dataset": "medical_records",
+      "expected": "identity.person.first_name",
+      "gt_label": "first name",
+      "predicted": "identity.person.email_display"
+    },
+    {
+      "column": "user_agent",
+      "confidence": 0.9968283772468567,
+      "dataset": "network_logs",
+      "expected": "technology.internet.user_agent",
+      "gt_label": "user agent",
+      "predicted": "technology.development.docker_ref"
+    },
+    {
+      "column": "precipitation_mm",
+      "confidence": 0.9967017769813538,
+      "dataset": "weather_stations_json",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "datetime.date.dmy_short_dot"
+    },
+    {
+      "column": "magError",
+      "confidence": 0.9954586029052734,
+      "dataset": "earthquakes_2024",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "datetime.date.dmy_short_dot"
+    },
+    {
+      "column": "ph_value",
+      "confidence": 0.994416356086731,
+      "dataset": "scientific_measurements",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "datetime.date.dmy_short_dot"
+    },
+    {
+      "column": "scientific_notation",
+      "confidence": 0.9943922162055969,
+      "dataset": "representation_coverage",
+      "expected": "representation.numeric.scientific_notation",
+      "gt_label": "scientific notation",
+      "predicted": "representation.numeric.decimal_number"
+    },
+    {
+      "column": "phone",
+      "confidence": 0.9943248629570007,
+      "dataset": "api_users_json",
+      "expected": "identity.person.phone_number",
+      "gt_label": "telephone",
+      "predicted": "identity.government.abn"
+    },
+    {
+      "column": "id",
+      "confidence": 0.9942706823348999,
+      "dataset": "earthquakes_2024",
+      "expected": "representation.identifier.alphanumeric_id",
+      "gt_label": "alphanumeric id",
+      "predicted": "geography.coordinate.geohash"
+    },
+    {
+      "column": "icao",
+      "confidence": 0.9933245778083801,
+      "dataset": "airports",
+      "expected": "geography.transportation.icao_code",
+      "gt_label": "icao",
+      "predicted": "geography.transportation.unlocode"
+    },
+    {
+      "column": "phone",
+      "confidence": 0.9843740463256836,
+      "dataset": "ecommerce_orders",
+      "expected": "identity.person.phone_number",
+      "gt_label": "telephone",
+      "predicted": "identity.government.ssn"
+    },
+    {
+      "column": "shipping_country",
+      "confidence": 0.9792979955673218,
+      "dataset": "ecommerce_orders",
+      "expected": "geography.location.country",
+      "gt_label": "country",
+      "predicted": "datetime.offset.iana"
+    },
+    {
+      "column": "ip_v4_with_port",
+      "confidence": 0.979058563709259,
+      "dataset": "technology_coverage",
+      "expected": "technology.internet.ip_v4_with_port",
+      "gt_label": "ip_v4 with port",
+      "predicted": "technology.internet.cidr"
+    },
+    {
+      "column": "git_sha",
+      "confidence": 0.9490649104118347,
+      "dataset": "new_technology",
+      "expected": "technology.cryptographic.hash",
+      "gt_label": "git sha",
+      "predicted": "finance.crypto.ethereum_address"
+    },
+    {
+      "column": "user_agent",
+      "confidence": 0.9488013386726379,
+      "dataset": "server_logs_json",
+      "expected": "technology.internet.user_agent",
+      "gt_label": "user agent",
+      "predicted": "container.object.json_array"
+    },
+    {
+      "column": "phone",
+      "confidence": 0.9482746124267578,
+      "dataset": "people_directory",
+      "expected": "identity.person.phone_number",
+      "gt_label": "telephone",
+      "predicted": "identity.government.ssn"
+    },
+    {
+      "column": "depthError",
+      "confidence": 0.9466946125030518,
+      "dataset": "earthquakes_2024",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "technology.internet.ip_v4"
+    },
+    {
+      "column": "sha256",
+      "confidence": 0.9164670705795288,
+      "dataset": "codes_and_ids",
+      "expected": "technology.cryptographic.hash",
+      "gt_label": "hash",
+      "predicted": "finance.crypto.ethereum_address"
+    },
+    {
+      "column": "geojson",
+      "confidence": 0.9068928360939026,
+      "dataset": "new_geography",
+      "expected": "container.object.json",
+      "gt_label": "geojson",
+      "predicted": "geography.format.wkt"
+    },
+    {
+      "column": "eu_dot_date",
+      "confidence": 0.7902005910873413,
+      "dataset": "datetime_formats_extended",
+      "expected": "datetime.date.dmy_dot",
+      "gt_label": "eu dot date",
+      "predicted": "datetime.timestamp.iso_8601"
+    },
+    {
+      "column": "cusip",
+      "confidence": 0.7711743116378784,
+      "dataset": "finance_coverage",
+      "expected": "finance.securities.cusip",
+      "gt_label": "cusip",
+      "predicted": "identity.government.eu_vat"
+    },
+    {
+      "column": "wind_speed_kmh",
+      "confidence": 0.761303722858429,
+      "dataset": "weather_stations_json",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "technology.internet.ip_v4"
+    },
+    {
+      "column": "locale",
+      "confidence": 0.7314282655715942,
+      "dataset": "multilingual",
+      "expected": "technology.code.locale_code",
+      "gt_label": "language code",
+      "predicted": "representation.file.extension"
+    },
+    {
+      "column": "status_code",
+      "confidence": 0.7216101288795471,
+      "dataset": "network_logs",
+      "expected": "representation.numeric.integer_number",
+      "gt_label": "http status code",
+      "predicted": "datetime.date.compact_ymd"
+    },
+    {
+      "column": "server_hostname",
+      "confidence": 0.7180567383766174,
+      "dataset": "tech_systems",
+      "expected": "technology.internet.hostname",
+      "gt_label": "hostname",
+      "predicted": "technology.cloud.s3_uri"
+    },
+    {
+      "column": "sepal_length",
+      "confidence": 0.7159131765365601,
+      "dataset": "iris",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "representation.numeric.scientific_notation"
+    },
+    {
+      "column": "measurement_unit",
+      "confidence": 0.7128073573112488,
+      "dataset": "scientific_measurements",
+      "expected": "representation.scientific.measurement_unit",
+      "gt_label": "measurement unit",
+      "predicted": "geography.transportation.iata_code"
+    },
+    {
+      "column": "profile_url",
+      "confidence": 0.699999988079071,
+      "dataset": "api_users_json",
+      "expected": "technology.internet.url",
+      "gt_label": "url",
+      "predicted": "technology.container.docker_ref"
+    },
+    {
+      "column": "name",
+      "confidence": 0.689302921295166,
+      "dataset": "multilingual",
+      "expected": "identity.person.full_name",
+      "gt_label": "name",
+      "predicted": "representation.discrete.categorical"
+    },
+    {
+      "column": "port",
+      "confidence": 0.6840035915374756,
+      "dataset": "tech_systems",
+      "expected": "representation.numeric.integer_number",
+      "gt_label": "port",
+      "predicted": "identity.commerce.ean"
+    },
+    {
+      "column": "ip_v6",
+      "confidence": 0.6793106198310852,
+      "dataset": "technology_coverage",
+      "expected": "technology.internet.ip_v6",
+      "gt_label": "ip_v6",
+      "predicted": "technology.cryptographic.hash"
+    },
+    {
+      "column": "isin",
+      "confidence": 0.6445547342300415,
+      "dataset": "finance_coverage",
+      "expected": "finance.securities.isin",
+      "gt_label": "isin",
+      "predicted": "finance.banking.iban"
+    },
+    {
+      "column": "swift_code",
+      "confidence": 0.6120131611824036,
+      "dataset": "codes_and_ids",
+      "expected": "finance.banking.swift_bic",
+      "gt_label": "swift code",
+      "predicted": "finance.securities.isin"
+    },
+    {
+      "column": "dmin",
+      "confidence": 0.6033531427383423,
+      "dataset": "earthquakes_2024",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "technology.internet.ip_v4"
+    },
+    {
+      "column": "order_id",
+      "confidence": 0.595736563205719,
+      "dataset": "ecommerce_orders_json",
+      "expected": "representation.identifier.alphanumeric_id",
+      "gt_label": "alphanumeric id",
+      "predicted": "geography.coordinate.dms"
+    },
+    {
+      "column": "petal_length",
+      "confidence": 0.5625419616699219,
+      "dataset": "iris",
+      "expected": "representation.numeric.decimal_number",
+      "gt_label": "decimal number",
+      "predicted": "representation.numeric.scientific_notation"
+    },
+    {
+      "column": "user_agent",
+      "confidence": 0.4570716619491577,
+      "dataset": "tech_systems",
+      "expected": "technology.internet.user_agent",
+      "gt_label": "user agent",
+      "predicted": "technology.development.docker_ref"
+    },
+    {
+      "column": "currency_symbol",
+      "confidence": 0.4296688437461853,
+      "dataset": "finance_coverage",
+      "expected": "finance.currency.currency_symbol",
+      "gt_label": "currency symbol",
+      "predicted": "technology.code.locale_code"
+    },
+    {
+      "column": "status_code",
+      "confidence": 0.3716862201690674,
+      "dataset": "server_logs_json",
+      "expected": "representation.numeric.integer_number",
+      "gt_label": "http status code",
+      "predicted": "datetime.date.compact_ym"
+    }
+  ],
+  "num_datasets": 35,
+  "timestamp": "2026-04-11 22:16"
+}

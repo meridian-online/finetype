@@ -1290,7 +1290,6 @@ impl Generator {
                 }
             }
 
-
             // ── identifier (3 types) ──────────────────────────────────
             ("identifier", "ulid") => {
                 // Crockford Base32: 0-9, A-H, J-K, M-N, P-T, V-X, Y-Z (no I, L, O, U)

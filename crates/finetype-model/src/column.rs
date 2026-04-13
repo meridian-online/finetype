@@ -2553,7 +2553,11 @@ fn value_sharpen(
     // must be within [-180, 180]; if >20% of values exceed that, they're not coords.
     // Must fire BEFORE Rule 3 (coordinate disambiguation) to filter non-coordinates.
     if result_label == COORDINATE_PAIR.0 || result_label == COORDINATE_PAIR.1 {
-        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
         if non_empty.len() >= 3 {
             let mut parseable = 0usize;
             let mut out_of_range = 0usize;
@@ -2568,7 +2572,10 @@ fn value_sharpen(
             if parseable >= 3 && (out_of_range as f32 / parseable as f32) > 0.1 {
                 return Some((
                     "representation.numeric.decimal_number".to_string(),
-                    format!("coordinate_plausibility_gate:out_of_range={}/{}", out_of_range, parseable),
+                    format!(
+                        "coordinate_plausibility_gate:out_of_range={}/{}",
+                        out_of_range, parseable
+                    ),
                 ));
             }
         }
@@ -2665,7 +2672,11 @@ fn value_sharpen(
     // HS codes are structured digit groups: 4 digits + optional dot-separated 2-digit
     // groups (e.g., "8471.30", "8471.30.00"). Plain decimals like "3.14" or "0.887" fail.
     if result_label == "geography.transportation.hs_code" {
-        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
         if non_empty.len() >= 3 {
             let match_count = non_empty.iter().filter(|v| is_hs_code_format(v)).count();
             let match_rate = match_count as f32 / non_empty.len() as f32;
@@ -2717,7 +2728,11 @@ fn value_sharpen(
     // ISIN format (2-letter country code + 9 alphanumeric + 1 check digit).
     // ISRC format is different: CC-XXX-YY-NNNNN with dashes.
     if result_label == "identity.commerce.isrc" {
-        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
         if non_empty.len() >= 3 {
             let isin_count = non_empty.iter().filter(|v| is_isin_format(v)).count();
             let isin_rate = isin_count as f32 / non_empty.len() as f32;
@@ -2734,7 +2749,11 @@ fn value_sharpen(
     // match ISSN format (DDDD-DDDD, dash at position 4) rather than EIN (DD-DDDDDDD,
     // dash at position 2).
     if result_label == "identity.government.ein" {
-        let non_empty: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
         if non_empty.len() >= 3 {
             let issn_count = non_empty.iter().filter(|v| is_issn_format(v)).count();
             let issn_rate = issn_count as f32 / non_empty.len() as f32;
@@ -3025,7 +3044,9 @@ fn feature_disambiguate(
         && !f3_neg_guard
         && !f3_dot_var_guard
     {
-        let hs_in_votes = votes.iter().any(|(l, _)| l == "geography.transportation.hs_code");
+        let hs_in_votes = votes
+            .iter()
+            .any(|(l, _)| l == "geography.transportation.hs_code");
         if hs_in_votes {
             let hs_votes = votes
                 .iter()
@@ -4371,13 +4392,15 @@ fn is_hs_code_format(s: &str) -> bool {
         // No dots: must be 4-10 pure digits (e.g., "847130")
         1 => {
             let len = parts[0].len();
-            len >= 4 && len <= 10 && parts[0].chars().all(|c| c.is_ascii_digit())
+            (4..=10).contains(&len) && parts[0].chars().all(|c| c.is_ascii_digit())
         }
         // Dotted: first group 4 digits, subsequent groups exactly 2 digits
         2..=4 => {
             parts[0].len() == 4
                 && parts[0].chars().all(|c| c.is_ascii_digit())
-                && parts[1..].iter().all(|p| p.len() == 2 && p.chars().all(|c| c.is_ascii_digit()))
+                && parts[1..]
+                    .iter()
+                    .all(|p| p.len() == 2 && p.chars().all(|c| c.is_ascii_digit()))
         }
         _ => false,
     }
@@ -9593,7 +9616,12 @@ datetime.component.day_of_week:
     fn test_r20_hs_code_gate_keeps_real_hs_codes() {
         // Real HS codes should NOT be demoted
         let values: Vec<String> = vec![
-            "8471.30", "8471.30.00", "6204.62", "8517.12", "0901.21", "2204.10",
+            "8471.30",
+            "8471.30.00",
+            "6204.62",
+            "8517.12",
+            "0901.21",
+            "2204.10",
         ]
         .into_iter()
         .map(String::from)
@@ -9632,9 +9660,12 @@ datetime.component.day_of_week:
     fn test_r21_coordinate_gate_demotes_out_of_range() {
         // Earthquake depth values — many exceed 180, not coordinates
         let values: Vec<String> = vec![
-            "127.013", "573.817", "201.998", "10.0", "224.419",
-            "177.684", "97.335", "671.0", "450.2", "300.1",
-        ].into_iter().map(String::from).collect();
+            "127.013", "573.817", "201.998", "10.0", "224.419", "177.684", "97.335", "671.0",
+            "450.2", "300.1",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "geography.coordinate.longitude", 0.94, None);
         assert!(result.is_some(), "R21 should fire for out-of-range values");
@@ -9647,14 +9678,30 @@ datetime.component.day_of_week:
     fn test_r21_coordinate_gate_keeps_real_coordinates() {
         // Real longitude values — all within [-180, 180]
         let values: Vec<String> = vec![
-            "-122.4194", "139.6917", "2.3522", "-73.9857", "151.2093",
-            "-43.1729", "28.9784", "-3.7038", "103.8198", "-46.6333",
-        ].into_iter().map(String::from).collect();
+            "-122.4194",
+            "139.6917",
+            "2.3522",
+            "-73.9857",
+            "151.2093",
+            "-43.1729",
+            "28.9784",
+            "-3.7038",
+            "103.8198",
+            "-46.6333",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "geography.coordinate.longitude", 0.95, None);
         // Should NOT fire — these are valid longitude values
         assert!(
-            result.is_none() || result.as_ref().unwrap().1.contains("coordinate_disambiguation"),
+            result.is_none()
+                || result
+                    .as_ref()
+                    .unwrap()
+                    .1
+                    .contains("coordinate_disambiguation"),
             "R21 should not fire for valid coordinates"
         );
     }
@@ -9664,9 +9711,16 @@ datetime.component.day_of_week:
     fn test_r22_upc_gate_corrects_to_ean() {
         // EAN-13 values (13 digits) misclassified as UPC (12 digits)
         let values: Vec<String> = vec![
-            "1794213764625", "4293423898067", "6324920385397",
-            "3683935437077", "5078019484874", "8706648142321",
-        ].into_iter().map(String::from).collect();
+            "1794213764625",
+            "4293423898067",
+            "6324920385397",
+            "3683935437077",
+            "5078019484874",
+            "8706648142321",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "identity.commerce.upc", 0.999, None);
         assert!(result.is_some(), "R22 should fire for 13-digit values");
@@ -9679,9 +9733,16 @@ datetime.component.day_of_week:
     fn test_r22_upc_gate_demotes_wrong_length() {
         // 10-digit values (e.g., NPI) misclassified as UPC
         let values: Vec<String> = vec![
-            "1966662179", "6579926978", "2527909147",
-            "9953906342", "2157414996", "6989529491",
-        ].into_iter().map(String::from).collect();
+            "1966662179",
+            "6579926978",
+            "2527909147",
+            "9953906342",
+            "2157414996",
+            "6989529491",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "identity.commerce.upc", 0.94, None);
         assert!(result.is_some(), "R22 should fire for non-12-digit values");
@@ -9694,9 +9755,16 @@ datetime.component.day_of_week:
     fn test_r22_upc_gate_keeps_real_upc() {
         // Real UPC values (12 digits)
         let values: Vec<String> = vec![
-            "012345678905", "036000291452", "070330507227",
-            "042100005264", "040000000068", "041570056103",
-        ].into_iter().map(String::from).collect();
+            "012345678905",
+            "036000291452",
+            "070330507227",
+            "042100005264",
+            "040000000068",
+            "041570056103",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "identity.commerce.upc", 0.99, None);
         // Should NOT fire — these are valid UPC values
@@ -9711,9 +9779,16 @@ datetime.component.day_of_week:
     fn test_r23_isin_gate_corrects_isrc() {
         // ISIN values misclassified as ISRC
         let values: Vec<String> = vec![
-            "US0378331005", "GB0002634946", "DE0007164600",
-            "JP3435000009", "FR0000120271", "CA0585861085",
-        ].into_iter().map(String::from).collect();
+            "US0378331005",
+            "GB0002634946",
+            "DE0007164600",
+            "JP3435000009",
+            "FR0000120271",
+            "CA0585861085",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "identity.commerce.isrc", 0.97, None);
         assert!(result.is_some(), "R23 should fire for ISIN-format values");
@@ -9727,9 +9802,16 @@ datetime.component.day_of_week:
     fn test_r24_issn_gate_corrects_ein() {
         // ISSN values misclassified as EIN
         let values: Vec<String> = vec![
-            "1781-2253", "8371-5342", "6910-7471",
-            "2908-3721", "8987-7548", "4149-8688",
-        ].into_iter().map(String::from).collect();
+            "1781-2253",
+            "8371-5342",
+            "6910-7471",
+            "2908-3721",
+            "8987-7548",
+            "4149-8688",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let result = value_sharpen(&values, "identity.government.ein", 0.91, None);
         assert!(result.is_some(), "R24 should fire for ISSN-format values");
@@ -9749,7 +9831,7 @@ datetime.component.day_of_week:
         assert!(!is_isin_format("SE3YX3859059")); // ISRC: positions 2-4 = "3YX"
         assert!(!is_isin_format("NLEK47515013")); // ISRC: positions 2-4 = "EK4"
         assert!(!is_isin_format("CAHRM7311593")); // ISRC: positions 2-4 = "HRM"
-        // Invalid — other formats
+                                                  // Invalid — other formats
         assert!(!is_isin_format("US-Z03-98-12345")); // ISRC with dashes
         assert!(!is_isin_format("1234567890AB")); // starts with digits
         assert!(!is_isin_format("USABC")); // too short

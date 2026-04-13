@@ -2336,13 +2336,25 @@ mod tests {
 
         // Training mode
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, Some(&header_feats), true)
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                true,
+            )
             .unwrap();
         assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
 
         // Eval mode
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, Some(&header_feats), false)
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                false,
+            )
             .unwrap();
         assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
     }
@@ -2374,11 +2386,23 @@ mod tests {
         let vars = varmap.all_vars();
         let initial_values: Vec<Vec<f32>> = vars
             .iter()
-            .map(|v| v.as_tensor().flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .map(|v| {
+                v.as_tensor()
+                    .flatten_all()
+                    .unwrap()
+                    .to_vec1::<f32>()
+                    .unwrap()
+            })
             .collect();
 
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, Some(&header_feats), true)
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                true,
+            )
             .unwrap();
         let loss = candle_nn::loss::cross_entropy(&logits, &targets).unwrap();
 
@@ -2391,7 +2415,13 @@ mod tests {
 
         let updated_values: Vec<Vec<f32>> = vars
             .iter()
-            .map(|v| v.as_tensor().flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .map(|v| {
+                v.as_tensor()
+                    .flatten_all()
+                    .unwrap()
+                    .to_vec1::<f32>()
+                    .unwrap()
+            })
             .collect();
 
         let n_changed: usize = initial_values
@@ -2445,8 +2475,14 @@ mod tests {
         // But the actual values should differ (different activations + different norm)
         let relu_vec = relu_out.flatten_all().unwrap().to_vec1::<f32>().unwrap();
         let gelu_vec = gelu_out.flatten_all().unwrap().to_vec1::<f32>().unwrap();
-        let any_different = relu_vec.iter().zip(gelu_vec.iter()).any(|(a, b)| (a - b).abs() > 1e-6);
-        assert!(any_different, "ReLU and GELU models should produce different outputs");
+        let any_different = relu_vec
+            .iter()
+            .zip(gelu_vec.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+        assert!(
+            any_different,
+            "ReLU and GELU models should produce different outputs"
+        );
     }
 
     #[test]
