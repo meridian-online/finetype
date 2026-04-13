@@ -12,12 +12,22 @@ Cargo.lock
 
 # macOS
 .DS_Store
+._*
 
-# Model artifacts (push to HuggingFace)
+# Model artifacts (push to HuggingFace, decision 0014)
+# Only the `default` symlink is tracked — everything else is downloaded at
+# build time via .github/scripts/download-model.sh or set via FINETYPE_MODEL_DIR.
 models/**/*.bin
 models/**/*.safetensors
+models/**/config.json
 models/**/config.yaml
+models/**/label_map.json
 models/**/labels.json
+models/**/results.json
+models/**/eval/
+models/*.csv
+models/*.json
+models/*.md
 !models/.gitkeep
 
 # Generated training data
