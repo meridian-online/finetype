@@ -1,20 +1,28 @@
 ---
 name: release
 description: >
-  Release a new FineType model version — pre-flight checks, HuggingFace upload,
-  symlink update, card/CLAUDE.md refresh, and commit.
+  Release FineType — model publish to HuggingFace, GitHub release with
+  cross-platform binaries, Homebrew tap update.
 user-invocable: true
 ---
 
 # /release
 
-Ship a trained model to HuggingFace so the DuckDB extension, CI, and end users pick it up.
+Two release types: **model** (publish trained weights to HuggingFace) and **binary** (cut a GitHub release with cross-platform binaries + Homebrew update).
+
+## Versioning Policy
+
+**Prefer patch releases** (0.6.x) over minor bumps. Reserve minor (0.x.0) for breaking changes to the CLI interface, DuckDB extension API, or taxonomy structure.
 
 ## Usage
 
 ```
-/release <model_dir>
+/release model <model_dir>    # Publish model to HuggingFace
+/release binary               # Cut a GitHub release (bump version, tag, push)
+/release                      # Both: publish model + cut binary release
 ```
+
+### Model Release
 
 Where `<model_dir>` is a path under `models/` (e.g. `models/sherlock-v11`).
 
@@ -112,12 +120,88 @@ Released {model_name} to HuggingFace.
   DuckDB extension and CI will download automatically.
 ```
 
-## Rollback
+### Binary Release
 
-If a release needs to be reverted:
+Cut a GitHub release with cross-platform binaries.
 
+#### 1. Pre-flight Checks
+
+1. **CI is green** — all jobs on the current main branch must pass.
+2. **No uncommitted changes** — `git status` must be clean.
+3. **Tests pass locally** — `cargo test -p finetype-model` must pass.
+4. **Zero warnings** — `cargo build --workspace 2>&1 | grep "^warning\[" | head -1` must be empty.
+
+#### 2. Bump Version
+
+Bump the **patch** version in the workspace `Cargo.toml` (e.g. `0.6.12` → `0.6.13`). All crates use `version.workspace = true` so this is the only file to change.
+
+```bash
+# Update version in Cargo.toml
+# Then verify it compiles:
+cargo check --workspace
+```
+
+#### 3. Update CHANGELOG.md
+
+Move the `[Unreleased]` section contents into a new version heading. Follow [Keep a Changelog](https://keepachangelog.com/) format:
+
+```markdown
+## [0.6.X] - YYYY-MM-DD
+
+### Changed
+- ...
+
+### Added
+- ...
+
+### Fixed
+- ...
+```
+
+Categories: `Changed`, `Added`, `Fixed`, `Removed`, `Discovery` (for research findings).
+
+Compile the changelog from:
+1. `git log v{prev}..HEAD --oneline` — all commits since last release
+2. Specs completed since last release (check `specs/` dates)
+3. Decisions made since last release (check `decisions/` dates)
+
+Focus on user-visible changes: model accuracy, new commands/flags, bug fixes, performance. Skip internal refactors unless architecturally significant.
+
+If prior releases have placeholder entries (`_Changelog not maintained_`), leave them — don't backfill.
+
+#### 4. Update CLAUDE.md
+
+Update the `**Version:**` line in CLAUDE.md to match the new version.
+
+#### 5. Commit, Tag, Push
+
+```bash
+git add Cargo.toml CLAUDE.md CHANGELOG.md
+git commit -m "Release v0.6.X"
+git tag v0.6.X
+git push && git push --tags
+```
+
+The `v*` tag triggers `.github/workflows/release.yml` which:
+- Builds cross-platform binaries (Linux x86/arm, macOS x86/arm, Windows)
+- Creates a GitHub release with auto-generated release notes
+- Updates the Homebrew tap formula (`meridian-online/homebrew-tap`)
+- Dispatches install script update to `install.meridian.online`
+
+#### 6. Verify
+
+1. Check the [release page](https://github.com/meridian-online/finetype/releases) for the new version
+2. Verify all 5 platform builds completed
+3. Test: `brew upgrade finetype` (after Homebrew tap updates)
+
+### Rollback
+
+**Model rollback:**
 1. Revert the `models/default` symlink to the previous model
 2. Commit and push — CI and DuckDB extension will revert on next download
 3. HuggingFace files can stay (old versions are still available by path)
 
-The previous model's files remain in the HF repo — no data is deleted.
+**Binary rollback:**
+1. Delete the GitHub release and tag if builds failed
+2. If already published: cut a new patch release with the fix
+3. Homebrew users get the fix on next `brew upgrade`

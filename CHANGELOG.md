@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.13] - 2026-04-14
+
+### Changed
+
+- **Default model: sherlock-v11** — Multi-branch 4-branch model (char+embed+stats+header) replaces sherlock-v4-sibling as default. Single forward pass per column. Published to HuggingFace (`meridian-online/finetype-model`).
+- **Profile eval: 201/227 (88.5% label, 91.2% domain)** — Expanded from 190 to 227 columns across 35 datasets. 6 ground-truth corrections, 3 broken transform fixes, phantom label match cleanup.
+- **Sharpen header bugfixes** — Fixed bitcoin address false match, IPv6 routing before IPv4 catch-all, same-category unconditional override, same-domain threshold raised 0.50→0.95, added ICAO/author header hints, guarded date keyword from month-specific formats. Three confirmed eval fixes (phone→ssn, abbreviated_month_date, long_full_month_date).
+- **CLI smoke tests updated for multi-branch** — All `infer` tests now use `--mode column` (multi-branch is column-level only). 24 tests passing.
+
+### Added
+
+- **Pure Rust training crate** (`finetype-train`) — Candle-based training with Metal auto-detection. GELU+LayerNorm infrastructure. TUI dashboard with ratatui.
+- **Autoresearch infrastructure** — PyTorch training loop + RunPod remote training. Overnight retraining scripts.
+- **`/release` skill** — Model publishing to HuggingFace + GitHub binary release workflow.
+- **12 capability cards** — Distilled from project docs and codebase for capability tracking.
+
+### Fixed
+
+- **CI fully green** — Fixed cargo fmt drift, clippy `RangeInclusive::contains` lint, `.gitignore` patterns for current model format.
+- **Dead code warnings** — Removed unused `IS_HEX_STRING`, `gen_paragraph`, `cross_entropy_loss`, `device` field.
+
+### Discovery
+
+- **Hint/threshold ceiling at 201/227** — Remaining 26 misclassifications are model-level (high-confidence false positives, cross-domain confusion). Rule-based tuning cannot reach them. Retraining needed (decision 0038).
+
+## [0.6.12] - 2026-03-13
+
+_Changelog not maintained for this release. See git log for changes._
+
+## [0.6.11] - 2026-03-13
+
+_Changelog not maintained for this release. See git log for changes._
+
+## [0.6.10] - 2026-03-11
+
+_Changelog not maintained for this release. See git log for changes._
+
 ## [0.6.9] - 2026-03-11
 
 ### Fixed
