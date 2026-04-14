@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.14] - 2026-04-14
+
+### Fixed
+
+- **Embed multi-branch model in release binary** — The multi-branch model (9.2 MB safetensors + config + label map) was not embedded in the CLI binary, causing `finetype profile` to fail with "Failed to read config.json" when installed via Homebrew or run outside the repo. Added `MultiBranchClassifier::from_bytes()` constructor, embed the 3 model files via `build.rs`, and fall back to embedded bytes when the model directory doesn't exist on disk. All commands now work standalone.
+
 ## [0.6.13] - 2026-04-14
 
 ### Changed

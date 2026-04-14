@@ -361,13 +361,30 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
 
     if is_tiered {
         generate_tiered_embeds(&model_dir, &mut code);
-        // Generate empty flat stubs so main.rs compiles regardless of model type
+        // Generate empty flat/multi-branch stubs so main.rs compiles regardless of model type
         code.push_str("\npub const FLAT_WEIGHTS: &[u8] = &[];\n");
         code.push_str("pub const FLAT_LABELS: &[u8] = &[];\n");
         code.push_str("pub const FLAT_CONFIG: &[u8] = &[];\n");
+        code.push_str("\npub const MB_WEIGHTS: &[u8] = &[];\n");
+        code.push_str("pub const MB_CONFIG: &[u8] = &[];\n");
+        code.push_str("pub const MB_LABELS: &[u8] = &[];\n");
         code.push_str("\npub const EMBEDDED_MODEL_TYPE: &str = \"tiered\";\n");
     } else if is_multi_branch {
-        // Multi-branch models are loaded at runtime — generate empty stubs
+        // Embed multi-branch model files (model.safetensors, config.json, label_map.json)
+        let weights_path = portable_path(&model_dir.join("model.safetensors"));
+        let config_path = portable_path(&model_dir.join("config.json"));
+        let labels_path = portable_path(&model_dir.join("label_map.json"));
+        code.push_str(&format!(
+            "\npub const MB_WEIGHTS: &[u8] = include_bytes!(\"{weights_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const MB_CONFIG: &[u8] = include_bytes!(\"{config_path}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const MB_LABELS: &[u8] = include_bytes!(\"{labels_path}\");\n"
+        ));
+
+        // Generate empty stubs for CharCNN/tiered so main.rs compiles regardless
         code.push_str("\npub const FLAT_WEIGHTS: &[u8] = &[];\n");
         code.push_str("pub const FLAT_LABELS: &[u8] = &[];\n");
         code.push_str("pub const FLAT_CONFIG: &[u8] = &[];\n");
@@ -376,9 +393,12 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         code.push_str("\npub const EMBEDDED_MODEL_TYPE: &str = \"multi-branch\";\n");
     } else {
         generate_flat_embeds(&model_dir, &mut code);
-        // Generate empty tiered stubs
+        // Generate empty tiered/multi-branch stubs
         code.push_str("\npub const TIER_GRAPH: &[u8] = &[];\n");
         code.push_str("pub fn get_tiered_model_data(_: &str) -> Option<(&'static [u8], &'static [u8], &'static [u8])> { None }\n");
+        code.push_str("\npub const MB_WEIGHTS: &[u8] = &[];\n");
+        code.push_str("pub const MB_CONFIG: &[u8] = &[];\n");
+        code.push_str("pub const MB_LABELS: &[u8] = &[];\n");
         code.push_str("\npub const EMBEDDED_MODEL_TYPE: &str = \"flat\";\n");
     }
 

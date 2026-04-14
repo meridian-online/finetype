@@ -237,15 +237,38 @@ impl MultiBranchClassifier {
         // Load config
         let config_bytes = std::fs::read(dir.join("config.json"))
             .map_err(|e| InferenceError::InvalidPath(format!("Failed to read config.json: {e}")))?;
-        let config: MultiBranchConfig = serde_json::from_slice(&config_bytes).map_err(|e| {
-            InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
-        })?;
 
         // Load label map
         let label_bytes = std::fs::read(dir.join("label_map.json")).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to read label_map.json: {e}"))
         })?;
-        let labels: Vec<String> = serde_json::from_slice(&label_bytes).map_err(|e| {
+
+        // Load weights
+        let model_bytes = std::fs::read(dir.join("model.safetensors")).map_err(|e| {
+            InferenceError::InvalidPath(format!("Failed to read model.safetensors: {e}"))
+        })?;
+
+        // Load Model2Vec resources
+        let m2v = Self::load_model2vec(dir)?;
+
+        Self::from_bytes(&config_bytes, &label_bytes, &model_bytes, m2v)
+    }
+
+    /// Construct a MultiBranchClassifier from raw byte slices.
+    ///
+    /// Used by the CLI to load from embedded model data (release binaries)
+    /// when the model directory doesn't exist on disk.
+    pub fn from_bytes(
+        config_bytes: &[u8],
+        label_bytes: &[u8],
+        model_bytes: &[u8],
+        model2vec: Model2VecResources,
+    ) -> Result<Self, InferenceError> {
+        let config: MultiBranchConfig = serde_json::from_slice(config_bytes).map_err(|e| {
+            InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
+        })?;
+
+        let labels: Vec<String> = serde_json::from_slice(label_bytes).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to parse label_map.json: {e}"))
         })?;
 
@@ -257,12 +280,8 @@ impl MultiBranchClassifier {
             )));
         }
 
-        // Load weights
         let device = Device::Cpu;
-        let model_bytes = std::fs::read(dir.join("model.safetensors")).map_err(|e| {
-            InferenceError::InvalidPath(format!("Failed to read model.safetensors: {e}"))
-        })?;
-        let tensors = candle_core::safetensors::load_buffer(&model_bytes, &device)
+        let tensors = candle_core::safetensors::load_buffer(model_bytes, &device)
             .map_err(|e| InferenceError::InvalidPath(format!("Failed to load safetensors: {e}")))?;
 
         let vb = VarBuilder::from_tensors(tensors, DType::F32, &device);
@@ -360,9 +379,6 @@ impl MultiBranchClassifier {
             }
         };
 
-        // Load Model2Vec resources
-        let m2v = Self::load_model2vec(dir)?;
-
         Ok(Self {
             char_branch,
             embed_branch,
@@ -374,7 +390,7 @@ impl MultiBranchClassifier {
             head,
             config,
             labels,
-            model2vec: m2v,
+            model2vec,
         })
     }
 

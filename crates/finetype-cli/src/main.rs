@@ -776,43 +776,42 @@ fn cmd_mcp() -> Result<()> {
 
     // Build column classifier — prefer multi-branch, fall back to CharCNN
     let model_path = PathBuf::from("models/default");
-    let mut column_classifier =
-        if let Ok(mb) = finetype_model::MultiBranchClassifier::load(&model_path) {
-            eprintln!(
-                "Loaded multi-branch classifier ({} classes)",
-                mb.n_classes()
+    let mut column_classifier = if let Ok(mb) = load_multi_branch_classifier(&model_path) {
+        eprintln!(
+            "Loaded multi-branch classifier ({} classes)",
+            mb.n_classes()
+        );
+        let mut cc = ColumnClassifier::with_multi_branch(mb, config);
+        wire_model2vec_and_siblings(&mut cc);
+        cc
+    } else {
+        eprintln!("No multi-branch model found, falling back to CharCNN");
+        let char_classifier = load_char_classifier(&model_path)?;
+        if let Some(semantic) = load_semantic_hint() {
+            eprintln!("Loaded semantic hint classifier (Model2Vec)");
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(
+                Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
+                config,
+                semantic,
             );
-            let mut cc = ColumnClassifier::with_multi_branch(mb, config);
-            wire_model2vec_and_siblings(&mut cc);
+            if let Some(entity) = entity {
+                eprintln!("Loaded entity classifier (full_name demotion gate)");
+                cc.set_entity_classifier(entity);
+            }
+            wire_sense(&mut cc);
+            wire_sibling_context(&mut cc);
             cc
         } else {
-            eprintln!("No multi-branch model found, falling back to CharCNN");
-            let char_classifier = load_char_classifier(&model_path)?;
-            if let Some(semantic) = load_semantic_hint() {
-                eprintln!("Loaded semantic hint classifier (Model2Vec)");
-                let entity = load_entity_classifier(&semantic);
-                let mut cc = ColumnClassifier::with_semantic_hint(
-                    Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
-                    config,
-                    semantic,
-                );
-                if let Some(entity) = entity {
-                    eprintln!("Loaded entity classifier (full_name demotion gate)");
-                    cc.set_entity_classifier(entity);
-                }
-                wire_sense(&mut cc);
-                wire_sibling_context(&mut cc);
-                cc
-            } else {
-                let mut cc = ColumnClassifier::new(
-                    Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
-                    config,
-                );
-                wire_sense(&mut cc);
-                wire_sibling_context(&mut cc);
-                cc
-            }
-        };
+            let mut cc = ColumnClassifier::new(
+                Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
+                config,
+            );
+            wire_sense(&mut cc);
+            wire_sibling_context(&mut cc);
+            cc
+        }
+    };
 
     // Load taxonomy for validation-based disambiguation
     let taxonomy_path = PathBuf::from("labels");
@@ -1389,7 +1388,7 @@ fn cmd_infer(
             ..Default::default()
         };
         let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-            let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+            let mb = load_multi_branch_classifier(&model)?;
             ColumnClassifier::with_multi_branch(mb, config)
         } else {
             let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
@@ -1665,7 +1664,7 @@ fn cmd_infer_batch(
     };
 
     let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+        let mb = load_multi_branch_classifier(&model)?;
         eprintln!(
             "Loaded multi-branch classifier ({} classes)",
             mb.n_classes()
@@ -1817,6 +1816,38 @@ fn cmd_infer_batch(
     );
 
     Ok(())
+}
+
+/// Load a MultiBranchClassifier: try the model directory first, then fall back to
+/// the embedded model if the path doesn't exist (release binaries).
+fn load_multi_branch_classifier(model: &PathBuf) -> Result<finetype_model::MultiBranchClassifier> {
+    if model.exists() && model.join("config.json").exists() {
+        finetype_model::MultiBranchClassifier::load(model).map_err(Into::into)
+    } else {
+        #[cfg(feature = "embed-models")]
+        {
+            if embedded::EMBEDDED_MODEL_TYPE == "multi-branch" && !embedded::MB_WEIGHTS.is_empty() {
+                // Load Model2Vec resources (disk or embedded)
+                let m2v = load_model2vec_resources().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Multi-branch model requires Model2Vec resources but none found"
+                    )
+                })?;
+                return finetype_model::MultiBranchClassifier::from_bytes(
+                    embedded::MB_CONFIG,
+                    embedded::MB_LABELS,
+                    embedded::MB_WEIGHTS,
+                    m2v,
+                )
+                .map_err(Into::into);
+            }
+        }
+        anyhow::bail!(
+            "Model directory {:?} not found and no embedded multi-branch model available. \
+             Set FINETYPE_MODEL_DIR or build with `embed-models` feature.",
+            model
+        )
+    }
 }
 
 /// Load a CharClassifier: try the model directory first, then fall back to
@@ -3066,7 +3097,7 @@ fn cmd_load(
         ..Default::default()
     };
     let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+        let mb = load_multi_branch_classifier(&model)?;
         eprintln!(
             "Loaded multi-branch classifier ({} classes)",
             mb.n_classes()
@@ -3754,7 +3785,7 @@ fn cmd_profile(
         ..Default::default()
     };
     let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = finetype_model::MultiBranchClassifier::load(&model)?;
+        let mb = load_multi_branch_classifier(&model)?;
         eprintln!(
             "Loaded multi-branch classifier ({} classes)",
             mb.n_classes()
