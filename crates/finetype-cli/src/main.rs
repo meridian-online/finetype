@@ -5738,10 +5738,7 @@ mod tests {
         // decimal_number should get CAST even though it's a generic type
         let transform = Some("CAST({col} AS DOUBLE)".to_string());
         let expr = build_load_expr("ticket_price", "DOUBLE", &transform);
-        assert_eq!(
-            expr,
-            "CAST(\"ticket_price\" AS DOUBLE) AS \"ticket_price\""
-        );
+        assert_eq!(expr, "CAST(\"ticket_price\" AS DOUBLE) AS \"ticket_price\"");
     }
 
     #[test]
