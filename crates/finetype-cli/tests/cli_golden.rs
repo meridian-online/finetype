@@ -462,30 +462,31 @@ fn golden_load_datetime_formats() {
         "load output should contain CREATE TABLE"
     );
 
-    // Key columns should have correct DuckDB types (not VARCHAR)
+    // Key columns should have correct DuckDB types (not VARCHAR).
+    // All column names are double-quoted (decision 0047).
     assert!(
-        ddl.contains("::DATE AS iso_date"),
-        "iso_date should be DATE"
+        ddl.contains("::DATE AS \"iso_date\""),
+        "iso_date should be DATE, got:\n{ddl}"
     );
     assert!(
-        ddl.contains("strptime(iso_timestamp"),
+        ddl.contains("strptime(\"iso_timestamp\""),
         "iso_timestamp should use strptime"
     );
     assert!(
-        ddl.contains("to_timestamp(unix_epoch"),
+        ddl.contains("to_timestamp(\"unix_epoch\""),
         "unix_epoch should use to_timestamp"
     );
     assert!(
-        ddl.contains("to_timestamp(unix_ms"),
+        ddl.contains("to_timestamp(\"unix_ms\""),
         "unix_ms should use to_timestamp"
     );
     assert!(
-        ddl.contains("::TIME AS time_24h"),
+        ddl.contains("::TIME AS \"time_24h\""),
         "time_24h should be TIME"
     );
     // duration_iso is passed through (VARCHAR) — no ::INTERVAL cast in load
     assert!(
-        ddl.contains("duration_iso"),
+        ddl.contains("\"duration_iso\""),
         "duration_iso column should be present"
     );
 
@@ -503,17 +504,18 @@ fn golden_load_ecommerce_orders() {
 
     assert!(ddl.contains("CREATE TABLE"), "should contain CREATE TABLE");
 
-    // Typed columns should not be plain VARCHAR
+    // Typed columns should not be plain VARCHAR.
+    // All column names are double-quoted (decision 0047).
     assert!(
-        ddl.contains("::DATE AS order_date"),
+        ddl.contains("::DATE AS \"order_date\""),
         "order_date should be DATE"
     );
     assert!(
-        ddl.contains("AS DOUBLE) AS total_price"),
+        ddl.contains("AS DOUBLE) AS \"total_price\""),
         "total_price should be DOUBLE"
     );
     assert!(
-        ddl.contains("AS BOOLEAN) AS is_gift"),
+        ddl.contains("AS BOOLEAN) AS \"is_gift\""),
         "is_gift should be BOOLEAN"
     );
 

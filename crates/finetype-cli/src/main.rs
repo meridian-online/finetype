@@ -258,8 +258,8 @@ enum Commands {
         #[arg(long, default_value = "10")]
         limit: usize,
 
-        /// Disable DuckDB normalize_names (preserve original column names)
-        #[arg(long)]
+        /// Deprecated: column names are now always quoted (normalize_names removed)
+        #[arg(long, hide = true)]
         no_normalize_names: bool,
 
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, use VARCHAR)
@@ -3086,7 +3086,7 @@ fn cmd_load(
     model_type: ModelType,
     sharp_only: bool,
     limit: usize,
-    no_normalize_names: bool,
+    _no_normalize_names: bool, // deprecated: column names are now always quoted
     enum_threshold: usize,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
@@ -3162,8 +3162,6 @@ fn cmd_load(
         let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("data");
         sanitise_identifier(stem)
     });
-
-    let normalize = !no_normalize_names;
 
     // Profile each column and collect type info
     struct LoadColumn {
@@ -3249,15 +3247,11 @@ fn cmd_load(
     // all_varchar=true ensures FineType controls all type casting via transforms.
     // Without it, DuckDB auto_detect may cast columns (e.g., dates) before our
     // transform expressions can operate on them.
-    // normalize_names=true delegates column name normalization to DuckDB (decision 0036).
-    let read_csv_params = if normalize {
-        format!(
-            "read_csv('{}', all_varchar=true, normalize_names=true)",
-            file_str
-        )
-    } else {
-        format!("read_csv('{}', all_varchar=true)", file_str)
-    };
+    //
+    // normalize_names is NOT used — it renames reserved-word columns (name→_name,
+    // type→_type) before the SELECT sees them, breaking our column references.
+    // Instead, all column names are double-quoted for safety. Supersedes decision 0036.
+    let read_csv_params = format!("read_csv('{}', all_varchar=true)", file_str);
 
     // Header comment
     let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
@@ -3353,9 +3347,9 @@ fn cmd_load(
 
 /// Build a SELECT expression for a column in the CTAS.
 ///
-/// Uses the original column name (quoted if needed) to reference the source.
-/// Column name normalization is delegated to DuckDB's `normalize_names=true`
-/// in the `read_csv()` call (decision 0036).
+/// All column names are double-quoted for safety — handles reserved words
+/// (name, type, source), spaces, and special characters without relying on
+/// DuckDB's normalize_names (which renames columns before SELECT sees them).
 /// VARCHAR/generic columns use bare column ref; typed columns use the transform.
 fn build_load_expr(original_name: &str, duckdb_type: &str, transform: &Option<String>) -> String {
     let col_ref = format_column_name(original_name);
@@ -3413,18 +3407,13 @@ fn duckdb_to_arrow_type(duckdb_type: &str) -> serde_json::Value {
     }
 }
 
-/// Format a column name for SQL, quoting if it contains non-identifier characters.
+/// Format a column name for SQL.
+///
+/// Always quotes with double-quotes for safety — this prevents breakage from
+/// DuckDB reserved words (name, type, source, etc.), spaces, special chars,
+/// and digit-leading names. Standard SQL-compliant.
 fn format_column_name(name: &str) -> String {
-    let needs_quoting = name.contains('.')
-        || name.contains(' ')
-        || name.contains('[')
-        || name.contains('-')
-        || name.starts_with(|c: char| c.is_ascii_digit());
-    if needs_quoting {
-        format!("\"{}\"", name)
-    } else {
-        name.to_string()
-    }
+    format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5720,20 +5709,28 @@ mod tests {
         assert_eq!(content["model_type"], "charcnn");
     }
 
-    // NNFT-252: Load command expression tests (updated for decision 0036 —
-    // normalization delegated to DuckDB, no more alias-based normalization)
+    // Load command expression tests — all column names are double-quoted for safety
+    // (supersedes decision 0036, which used normalize_names=true and broke on
+    // reserved words like name→_name).
     #[test]
     fn test_build_load_expr_varchar_no_cast() {
-        // VARCHAR types should be bare column references
+        // VARCHAR types should be bare (quoted) column references
         let expr = build_load_expr("name", "VARCHAR", &None);
-        assert_eq!(expr, "name");
+        assert_eq!(expr, "\"name\"");
     }
 
     #[test]
     fn test_build_load_expr_varchar_quoted() {
-        // Column names with spaces need quoting but no alias (DuckDB normalizes)
+        // Column names with spaces are safely quoted
         let expr = build_load_expr("First Name", "VARCHAR", &None);
         assert_eq!(expr, "\"First Name\"");
+    }
+
+    #[test]
+    fn test_build_load_expr_reserved_word() {
+        // Reserved words (type, source, name) must be quoted to avoid DuckDB errors
+        let expr = build_load_expr("type", "VARCHAR", &None);
+        assert_eq!(expr, "\"type\"");
     }
 
     #[test]
@@ -5741,7 +5738,10 @@ mod tests {
         // decimal_number should get CAST even though it's a generic type
         let transform = Some("CAST({col} AS DOUBLE)".to_string());
         let expr = build_load_expr("ticket_price", "DOUBLE", &transform);
-        assert_eq!(expr, "CAST(ticket_price AS DOUBLE) AS ticket_price");
+        assert_eq!(
+            expr,
+            "CAST(\"ticket_price\" AS DOUBLE) AS \"ticket_price\""
+        );
     }
 
     #[test]
@@ -5749,13 +5749,20 @@ mod tests {
         // integer_number should get CAST even though it's a generic type
         let transform = Some("CAST({col} AS BIGINT)".to_string());
         let expr = build_load_expr("count", "BIGINT", &transform);
-        assert_eq!(expr, "CAST(count AS BIGINT) AS count");
+        assert_eq!(expr, "CAST(\"count\" AS BIGINT) AS \"count\"");
     }
 
     #[test]
     fn test_build_load_expr_no_transform_non_varchar() {
         // Non-VARCHAR without explicit transform falls back to simple CAST
         let expr = build_load_expr("flag", "BOOLEAN", &None);
-        assert_eq!(expr, "CAST(flag AS BOOLEAN) AS flag");
+        assert_eq!(expr, "CAST(\"flag\" AS BOOLEAN) AS \"flag\"");
+    }
+
+    #[test]
+    fn test_format_column_name_with_embedded_quotes() {
+        // Double-quotes in column names are escaped per SQL standard
+        let name = format_column_name("col\"name");
+        assert_eq!(name, "\"col\"\"name\"");
     }
 }

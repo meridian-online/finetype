@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.15] - 2026-04-14
+
+### Fixed
+
+- **Fix `load | duckdb` with reserved-word columns** — `finetype load` generated SQL with `normalize_names=true` in the `read_csv()` call, which renames DuckDB reserved-word columns (`name` → `_name`, `type` → `_type`, `source` → `_source`) before the SELECT clause references them, causing `Binder Error: Referenced column "name" not found`. All column names are now always double-quoted in generated SQL, and `normalize_names` is no longer used. Supersedes decision 0036 (see decision 0047).
+
+### Added
+
+- **Smoke test: `load | duckdb` round-trip** — New smoke test verifies `finetype load` output with reserved-word column names is valid DuckDB SQL.
+
 ## [0.6.14] - 2026-04-14
 
 ### Fixed

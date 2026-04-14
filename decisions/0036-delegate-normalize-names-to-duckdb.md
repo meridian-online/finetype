@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by 0047
 date-created: 2026-03-15
 date-modified: 2026-03-15
 ---
