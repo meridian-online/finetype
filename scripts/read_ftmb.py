@@ -2,7 +2,8 @@
 """Read and inspect a .ftmb (FineType Multi-Branch) binary file.
 
 Supports v1 (3 branches: char, embed, stats), v2 (4 branches:
-char, embed, stats, header), and v3 (table-grouped with sibling headers).
+char, embed, stats, header), v3 (table-grouped with sibling headers),
+and v4 (v3 + 239-dim validation features per record).
 
 Usage:
     python3 scripts/read_ftmb.py <file.ftmb> [--records N] [--type KEY] [--stats]
@@ -25,8 +26,8 @@ MAGIC = b"FTMB"
 def read_header(f):
     """Read and validate the FTMB header.
 
-    Returns: (version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups)
-    header_dim is 0 for v1 files. n_groups is 0 for v1/v2 files.
+    Returns: (version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups, valid_dim)
+    header_dim is 0 for v1 files. n_groups is 0 for v1/v2 files. valid_dim is 0 for v1/v2/v3.
     """
     magic = f.read(4)
     if magic != MAGIC:
@@ -34,13 +35,14 @@ def read_header(f):
         sys.exit(1)
 
     (version,) = struct.unpack("<I", f.read(4))
-    if version not in (1, 2, 3):
+    if version not in (1, 2, 3, 4):
         print(f"ERROR: Unknown version: {version}", file=sys.stderr)
         sys.exit(1)
 
     (n_records,) = struct.unpack("<Q", f.read(8))
     char_dim, embed_dim, stats_dim = struct.unpack("<HHH", f.read(6))
 
+    valid_dim = 0
     if version == 1:
         _padding = f.read(2)
         header_dim = 0
@@ -49,11 +51,14 @@ def read_header(f):
         (header_dim,) = struct.unpack("<H", f.read(2))
         n_groups = 0
     else:
-        # v3: header_dim + n_groups + reserved
+        # v3/v4: header_dim + n_groups + reserved
         (header_dim,) = struct.unpack("<H", f.read(2))
         n_groups, _reserved = struct.unpack("<HH", f.read(4))
+        if version >= 4:
+            # v4: 2 additional bytes for valid_dim
+            (valid_dim,) = struct.unpack("<H", f.read(2))
 
-    return version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups
+    return version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups, valid_dim
 
 
 def read_record(f, char_dim, embed_dim, stats_dim, header_dim):
@@ -76,12 +81,12 @@ def read_record(f, char_dim, embed_dim, stats_dim, header_dim):
     return label, char_feat, embed_feat, stats_feat
 
 
-def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim):
-    """Read a single v3 table group.
+def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim, valid_dim=0):
+    """Read a single v3/v4 table group.
 
     Returns: (sibling_headers, records) where records is a list of
-    (label, column_index, char_feat, embed_feat, stats_feat, header_feat).
-    Returns None at EOF.
+    (label, column_index, char_feat, embed_feat, stats_feat, header_feat[, valid_feat]).
+    v4 records include valid_feat. Returns None at EOF.
     """
     data = f.read(4)
     if len(data) < 4:
@@ -103,7 +108,11 @@ def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim):
         embed_feat = list(struct.unpack(f"<{embed_dim}f", f.read(embed_dim * 4)))
         stats_feat = list(struct.unpack(f"<{stats_dim}f", f.read(stats_dim * 4)))
         header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
-        records.append((label, column_index, char_feat, embed_feat, stats_feat, header_feat))
+        if valid_dim > 0:
+            valid_feat = list(struct.unpack(f"<{valid_dim}f", f.read(valid_dim * 4)))
+            records.append((label, column_index, char_feat, embed_feat, stats_feat, header_feat, valid_feat))
+        else:
+            records.append((label, column_index, char_feat, embed_feat, stats_feat, header_feat))
 
     return sibling_headers, records
 
@@ -155,7 +164,7 @@ def main():
             sys.exit(1)
 
     with open(path, "rb") as f:
-        version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups = read_header(f)
+        version, n_records, char_dim, embed_dim, stats_dim, header_dim, n_groups, valid_dim = read_header(f)
 
         print(f"FTMB File: {path}")
         print(f"  Version:    {version}")
@@ -167,6 +176,8 @@ def main():
             print(f"  Header dim: {header_dim}")
         if version >= 3:
             print(f"  Groups:     {n_groups}")
+        if version >= 4:
+            print(f"  Valid dim:  {valid_dim}")
         print()
 
         type_counts = Counter()
@@ -176,14 +187,16 @@ def main():
         branch_names = [("char", char_dim), ("embed", embed_dim), ("stats", stats_dim)]
         if header_dim > 0:
             branch_names.append(("header", header_dim))
+        if valid_dim > 0:
+            branch_names.append(("valid", valid_dim))
 
         if version >= 3:
-            # v3: read table groups
+            # v3/v4: read table groups
             group_sizes = []
             record_idx = 0
 
             for g_idx in range(n_groups):
-                result = read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim)
+                result = read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim, valid_dim)
                 if result is None:
                     print(f"WARNING: EOF at group {g_idx} (expected {n_groups})")
                     break
@@ -191,9 +204,14 @@ def main():
                 sibling_headers, records = result
                 group_sizes.append(len(records))
 
-                for label, column_index, char_feat, embed_feat, stats_feat, header_feat in records:
+                for rec in records:
+                    # v3: (label, col_idx, char, embed, stats, header)
+                    # v4: (label, col_idx, char, embed, stats, header, valid)
+                    label = rec[0]
+                    column_index = rec[1]
+                    feats = list(rec[2:])  # all feature vectors
+
                     type_counts[label] += 1
-                    feats = [char_feat, embed_feat, stats_feat, header_feat]
 
                     if verify:
                         for (name, _dim), feat in zip(branch_names, feats):
@@ -218,7 +236,7 @@ def main():
 
                     record_idx += 1
 
-            # v3 group summary
+            # v3/v4 group summary
             if group_sizes:
                 avg_size = sum(group_sizes) / len(group_sizes)
                 min_size = min(group_sizes)
