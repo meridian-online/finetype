@@ -1002,6 +1002,7 @@ fn cmd_train_multi_branch(
     let embed_dim = header.embed_dim as usize;
     let stats_dim = header.stats_dim as usize;
     let header_dim = header.header_dim as usize;
+    let valid_dim = header.valid_dim as usize;
 
     let train_data = MultiBranchDataset::from_records_with_groups(
         &train_records,
@@ -1010,6 +1011,7 @@ fn cmd_train_multi_branch(
         embed_dim,
         stats_dim,
         header_dim,
+        valid_dim,
         Some(train_groups),
     )?;
     let val_data = MultiBranchDataset::from_records_with_groups(
@@ -1019,6 +1021,7 @@ fn cmd_train_multi_branch(
         embed_dim,
         stats_dim,
         header_dim,
+        valid_dim,
         Some(val_groups),
     )?;
 

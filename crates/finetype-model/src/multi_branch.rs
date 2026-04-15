@@ -30,6 +30,7 @@ use crate::inference::InferenceError;
 use crate::model2vec_shared::Model2VecResources;
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder};
+use finetype_core::Taxonomy;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -82,6 +83,19 @@ pub struct MultiBranchConfig {
     /// Whether to use LayerNorm instead of BatchNorm, and add input LayerNorm to all branches.
     #[serde(default)]
     pub use_layer_norm: bool,
+    /// Input dimension for validation features (pass rates per type, e.g. 239).
+    /// Defaults to 0 for backward compatibility with v11 and earlier models.
+    #[serde(default)]
+    pub valid_dim: usize,
+    /// Hidden layer sizes for the validation branch (2 layers).
+    /// Defaults to [0, 0] for old configs. Recommended: [128, 64].
+    #[serde(default)]
+    pub valid_hidden: [usize; 2],
+    /// Ordered type keys used at training time for validation feature indexing.
+    /// Stored to decouple inference from exact taxonomy version — types added
+    /// after training get zero pass rates, types removed are ignored.
+    #[serde(default)]
+    pub type_index_keys: Vec<String>,
 }
 
 impl MultiBranchConfig {
@@ -90,13 +104,20 @@ impl MultiBranchConfig {
         self.header_dim > 0 && self.header_hidden[0] > 0 && self.header_hidden[1] > 0
     }
 
+    /// Whether the validation branch is enabled (valid_dim > 0 with valid hidden dims).
+    pub fn has_validation_branch(&self) -> bool {
+        self.valid_dim > 0 && self.valid_hidden[0] > 0 && self.valid_hidden[1] > 0
+    }
+
     fn merged_dim(&self) -> usize {
-        let base = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
+        let mut dim = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
         if self.has_header_branch() {
-            base + self.header_hidden[1]
-        } else {
-            base
+            dim += self.header_hidden[1];
         }
+        if self.has_validation_branch() {
+            dim += self.valid_hidden[1];
+        }
+        dim
     }
 }
 
@@ -209,6 +230,7 @@ pub struct MultiBranchClassifier {
     embed_branch: BranchWeights,
     stats_branch: BranchWeights,
     header_branch: Option<BranchWeights>,
+    validation_branch: Option<BranchWeights>,
     merge_norm: MergeNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
@@ -218,6 +240,9 @@ pub struct MultiBranchClassifier {
     labels: Vec<String>,
     /// Model2Vec resources for embedding extraction.
     model2vec: Model2VecResources,
+    /// Validation feature extractor (built from config.type_index_keys).
+    /// None when the model has no validation branch (v11 and earlier).
+    validation_extractor: Option<crate::validation_features::ValidationFeatureExtractor>,
 }
 
 impl MultiBranchClassifier {
@@ -328,11 +353,48 @@ impl MultiBranchClassifier {
             None
         };
 
-        let merged_dim = if header_branch.is_some() {
-            config.merged_dim()
+        // Load validation branch if config enables it and weights exist
+        // No input LayerNorm — pass rates are already bounded [0, 1].
+        let validation_branch = if config.has_validation_branch() {
+            match BranchWeights::new(
+                config.valid_dim,
+                config.valid_hidden,
+                &config.activation,
+                vb.pp("validation"),
+            ) {
+                Ok(branch) => Some(branch),
+                Err(e) => {
+                    tracing::warn!(
+                        "Validation branch configured but weights missing, disabling: {e}"
+                    );
+                    None
+                }
+            }
         } else {
-            // Fall back to 3-branch merged dim if header branch not loaded
-            config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1]
+            None
+        };
+
+        // Build validation feature extractor from saved type_index_keys
+        let validation_extractor =
+            if validation_branch.is_some() && !config.type_index_keys.is_empty() {
+                Some(
+                    crate::validation_features::ValidationFeatureExtractor::from_type_keys(
+                        config.type_index_keys.clone(),
+                    ),
+                )
+            } else {
+                None
+            };
+
+        let merged_dim = {
+            let mut dim = config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1];
+            if header_branch.is_some() {
+                dim += config.header_hidden[1];
+            }
+            if validation_branch.is_some() {
+                dim += config.valid_hidden[1];
+            }
+            dim
         };
 
         // Merge normalization: LayerNorm (new) or BatchNorm (legacy)
@@ -384,6 +446,7 @@ impl MultiBranchClassifier {
             embed_branch,
             stats_branch,
             header_branch,
+            validation_branch,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -391,6 +454,7 @@ impl MultiBranchClassifier {
             config,
             labels,
             model2vec,
+            validation_extractor,
         })
     }
 
@@ -425,10 +489,15 @@ impl MultiBranchClassifier {
     ///
     /// `header` is the column name. When non-empty and the model has a header branch,
     /// it is embedded via Model2Vec and fed through the 4th branch.
+    ///
+    /// `taxonomy` enables the validation branch (v12+). When provided and the model
+    /// has a validation extractor, validation pass rates are computed and fed through
+    /// the 5th branch. Pass `None` for v11 and earlier models.
     pub fn classify_column(
         &self,
         values: &[String],
         header: &str,
+        taxonomy: Option<&Taxonomy>,
     ) -> Result<(String, f32), InferenceError> {
         if values.is_empty() {
             return Ok(("unknown".to_string(), 0.0));
@@ -469,7 +538,16 @@ impl MultiBranchClassifier {
             None
         };
 
-        let hidden = self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref())?;
+        // Extract validation features if the model has a validation branch
+        let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
+
+        let hidden = self.forward_trunk(
+            &char_t,
+            &embed_t,
+            &stats_t,
+            header_t.as_ref(),
+            valid_t.as_ref(),
+        )?;
 
         // Head-specific forward pass + probability extraction
         let probs_vec = match &self.head {
@@ -523,10 +601,13 @@ impl MultiBranchClassifier {
     /// (e.g., from sibling-context attention) instead of embedding the raw
     /// header string via Model2Vec. Used when sibling context is available
     /// to pass enriched header embeddings into the multi-branch model.
+    ///
+    /// `taxonomy` enables the validation branch (v12+). See `classify_column()`.
     pub fn classify_column_with_enriched_header(
         &self,
         values: &[String],
         enriched_header: &Tensor, // [D] — already enriched by sibling attention
+        taxonomy: Option<&Taxonomy>,
     ) -> Result<(String, f32), InferenceError> {
         if values.is_empty() {
             return Ok(("unknown".to_string(), 0.0));
@@ -561,7 +642,16 @@ impl MultiBranchClassifier {
             None
         };
 
-        let hidden = self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref())?;
+        // Extract validation features if the model has a validation branch
+        let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
+
+        let hidden = self.forward_trunk(
+            &char_t,
+            &embed_t,
+            &stats_t,
+            header_t.as_ref(),
+            valid_t.as_ref(),
+        )?;
 
         // Head-specific forward pass (same as classify_column)
         let probs_vec = match &self.head {
@@ -606,6 +696,28 @@ impl MultiBranchClassifier {
         Ok((label, *max_prob))
     }
 
+    /// Compute validation features as a tensor, if the model has a validation branch.
+    ///
+    /// Returns `Some(Tensor)` of shape `[1, valid_dim]` when the model has a
+    /// validation extractor and a taxonomy is provided. Returns `None` otherwise
+    /// (v11 models or when taxonomy is unavailable — forward_trunk fills zeros).
+    fn compute_validation_tensor(
+        &self,
+        value_refs: &[&str],
+        taxonomy: Option<&Taxonomy>,
+        device: &Device,
+    ) -> Result<Option<Tensor>, InferenceError> {
+        let extractor = match (&self.validation_extractor, taxonomy) {
+            (Some(ext), Some(tax)) => (ext, tax),
+            _ => return Ok(None),
+        };
+
+        let feats = extractor.0.extract(value_refs, extractor.1);
+        let t = Tensor::from_slice(&feats, (1, extractor.0.dim()), device)
+            .map_err(|e| InferenceError::InvalidPath(format!("validation tensor: {e}")))?;
+        Ok(Some(t))
+    }
+
     /// Forward pass through the trunk (branches + merge), returning the hidden
     /// representation before the classification head.
     fn forward_trunk(
@@ -614,6 +726,7 @@ impl MultiBranchClassifier {
         embed_feats: &Tensor,
         stats_feats: &Tensor,
         header_feats: Option<&Tensor>,
+        validation_feats: Option<&Tensor>,
     ) -> Result<Tensor, InferenceError> {
         let char_out = self
             .char_branch
@@ -628,8 +741,11 @@ impl MultiBranchClassifier {
             .forward(stats_feats)
             .map_err(|e| InferenceError::InvalidPath(format!("stats forward: {e}")))?;
 
-        let merged = if let Some(ref hb) = self.header_branch {
-            let batch_size = char_out
+        // Collect branch outputs for concatenation
+        let mut branches = vec![char_out, embed_out, stats_out];
+
+        if let Some(ref hb) = self.header_branch {
+            let batch_size = branches[0]
                 .dim(0)
                 .map_err(|e| InferenceError::InvalidPath(format!("batch dim: {e}")))?;
             let header_input = match header_feats {
@@ -644,12 +760,31 @@ impl MultiBranchClassifier {
             let header_out = hb
                 .forward(&header_input)
                 .map_err(|e| InferenceError::InvalidPath(format!("header forward: {e}")))?;
-            Tensor::cat(&[char_out, embed_out, stats_out, header_out], 1)
-                .map_err(|e| InferenceError::InvalidPath(format!("concat: {e}")))?
-        } else {
-            Tensor::cat(&[char_out, embed_out, stats_out], 1)
-                .map_err(|e| InferenceError::InvalidPath(format!("concat: {e}")))?
-        };
+            branches.push(header_out);
+        }
+
+        if let Some(ref vb) = self.validation_branch {
+            let batch_size = branches[0]
+                .dim(0)
+                .map_err(|e| InferenceError::InvalidPath(format!("batch dim: {e}")))?;
+            let valid_input = match validation_feats {
+                Some(vf) => vf.clone(),
+                None => Tensor::zeros(
+                    (batch_size, self.config.valid_dim),
+                    candle_core::DType::F32,
+                    char_feats.device(),
+                )
+                .map_err(|e| InferenceError::InvalidPath(format!("valid zeros: {e}")))?,
+            };
+            let valid_out = vb
+                .forward(&valid_input)
+                .map_err(|e| InferenceError::InvalidPath(format!("validation forward: {e}")))?;
+            branches.push(valid_out);
+        }
+
+        let branch_refs: Vec<Tensor> = branches;
+        let merged = Tensor::cat(&branch_refs, 1)
+            .map_err(|e| InferenceError::InvalidPath(format!("concat: {e}")))?;
 
         // Merge normalization
         let normed = match &self.merge_norm {
@@ -839,6 +974,60 @@ mod tests {
         let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.head_type, HeadType::Hierarchical);
         assert_eq!(config.n_classes, 250);
+    }
+
+    #[test]
+    fn ac05_config_deserialization_with_validation_branch() {
+        let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 512,
+            "stats_dim": 27,
+            "header_dim": 128,
+            "valid_dim": 239,
+            "char_hidden": [300, 300],
+            "embed_hidden": [200, 200],
+            "stats_hidden": [128, 64],
+            "header_hidden": [128, 64],
+            "valid_hidden": [128, 64],
+            "merge_hidden": [500, 500],
+            "n_classes": 250,
+            "dropout": 0.35,
+            "head_type": "Flat",
+            "type_index_keys": ["container.data.csv", "datetime.date.iso_8601"]
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.valid_dim, 239);
+        assert_eq!(config.valid_hidden, [128, 64]);
+        assert!(config.has_validation_branch());
+        assert_eq!(config.type_index_keys.len(), 2);
+        // 5-branch merged_dim: 300 + 200 + 64 + 64 + 64 = 692
+        assert_eq!(config.merged_dim(), 692);
+    }
+
+    #[test]
+    fn ac06_config_backward_compat_no_validation() {
+        // Old config without valid_dim/valid_hidden — should default to no validation
+        let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 512,
+            "stats_dim": 27,
+            "header_dim": 128,
+            "char_hidden": [300, 300],
+            "embed_hidden": [200, 200],
+            "stats_hidden": [128, 64],
+            "header_hidden": [128, 64],
+            "merge_hidden": [500, 500],
+            "n_classes": 250,
+            "dropout": 0.35,
+            "head_type": "Flat"
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.valid_dim, 0);
+        assert_eq!(config.valid_hidden, [0, 0]);
+        assert!(!config.has_validation_branch());
+        assert!(config.type_index_keys.is_empty());
+        // 4-branch merged_dim: 300 + 200 + 64 + 64 = 628
+        assert_eq!(config.merged_dim(), 628);
     }
 
     #[test]

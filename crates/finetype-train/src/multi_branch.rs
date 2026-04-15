@@ -80,6 +80,14 @@ pub struct MultiBranchConfig {
     /// Defaults to [128, 64] for new models, [0, 0] for old configs.
     #[serde(default)]
     pub header_hidden: [usize; 2],
+    /// Input dimension for validation pass-rate features (one per taxonomy type).
+    /// Defaults to 0 for backward compatibility with old configs (no validation branch).
+    #[serde(default)]
+    pub valid_dim: usize,
+    /// Hidden layer sizes for the validation branch (2 layers).
+    /// Defaults to [128, 64] for new models, [0, 0] for old configs.
+    #[serde(default)]
+    pub valid_hidden: [usize; 2],
     /// Hidden layer sizes for the merge trunk (2 layers).
     pub merge_hidden: [usize; 2],
     /// Number of output classes.
@@ -109,6 +117,8 @@ impl Default for MultiBranchConfig {
             embed_hidden: [200, 200],
             stats_hidden: [128, 64],
             header_hidden: [128, 64],
+            valid_dim: 0,
+            valid_hidden: [0, 0],
             merge_hidden: [500, 500],
             n_classes: 250,
             dropout: 0.35,
@@ -125,14 +135,21 @@ impl MultiBranchConfig {
         self.header_dim > 0 && self.header_hidden[0] > 0 && self.header_hidden[1] > 0
     }
 
+    /// Whether the validation branch is enabled (valid_dim > 0 with valid hidden dims).
+    pub fn has_validation_branch(&self) -> bool {
+        self.valid_dim > 0 && self.valid_hidden[0] > 0 && self.valid_hidden[1] > 0
+    }
+
     /// Compute the merged dimension (sum of final branch hidden sizes).
     pub fn merged_dim(&self) -> usize {
-        let base = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
+        let mut dim = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
         if self.has_header_branch() {
-            base + self.header_hidden[1]
-        } else {
-            base
+            dim += self.header_hidden[1];
         }
+        if self.has_validation_branch() {
+            dim += self.valid_hidden[1];
+        }
+        dim
     }
 
     /// Save config to JSON file.
@@ -268,6 +285,7 @@ pub struct MultiBranchModel {
     embed_branch: BranchWeights,
     stats_branch: BranchWeights,
     header_branch: Option<BranchWeights>,
+    valid_branch: Option<BranchWeights>,
     merge_norm: MergeNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
@@ -286,6 +304,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
+            valid_branch,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -298,6 +317,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
+            valid_branch,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -320,6 +340,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
+            valid_branch,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -336,6 +357,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
+            valid_branch,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -360,6 +382,7 @@ impl MultiBranchModel {
         BranchWeights,
         BranchWeights,
         BranchWeights,
+        Option<BranchWeights>,
         Option<BranchWeights>,
         MergeNorm,
         Linear,
@@ -404,6 +427,19 @@ impl MultiBranchModel {
             None
         };
 
+        // Validation branch: no input LayerNorm — pass rates are bounded [0, 1].
+        let valid_branch = if config.has_validation_branch() {
+            Some(BranchWeights::new(
+                config.valid_dim,
+                config.valid_hidden,
+                config.dropout,
+                &config.activation,
+                vb.pp("valid"),
+            )?)
+        } else {
+            None
+        };
+
         let merged_dim = config.merged_dim();
 
         // Merge normalization: LayerNorm (new) or BatchNorm (legacy)
@@ -433,6 +469,7 @@ impl MultiBranchModel {
             embed_branch,
             stats_branch,
             header_branch,
+            valid_branch,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -443,12 +480,14 @@ impl MultiBranchModel {
     ///
     /// Returns the hidden representation `[B, merge_hidden[1]]` before the classification head.
     /// `header_feats` is optional — pass `None` for old 3-branch models.
+    /// `valid_feats` is optional — pass `None` when no validation branch.
     pub fn forward_trunk(
         &self,
         char_feats: &Tensor,
         embed_feats: &Tensor,
         stats_feats: &Tensor,
         header_feats: Option<&Tensor>,
+        valid_feats: Option<&Tensor>,
         train: bool,
     ) -> candle_core::Result<Tensor> {
         // Process each branch independently
@@ -456,9 +495,13 @@ impl MultiBranchModel {
         let embed_out = self.embed_branch.forward(embed_feats, train)?;
         let stats_out = self.stats_branch.forward(stats_feats, train)?;
 
-        // Concatenate branch outputs: [B, merged_dim]
-        let merged = if let Some(ref hb) = &self.header_branch {
-            let batch_size = char_out.dim(0)?;
+        // Collect branch outputs for concatenation
+        let mut branch_outputs = vec![char_out, embed_out, stats_out];
+
+        let batch_size = branch_outputs[0].dim(0)?;
+
+        // Optional header branch
+        if let Some(ref hb) = &self.header_branch {
             let header_input = match header_feats {
                 Some(hf) => hf.clone(),
                 None => Tensor::zeros(
@@ -468,10 +511,25 @@ impl MultiBranchModel {
                 )?,
             };
             let header_out = hb.forward(&header_input, train)?;
-            Tensor::cat(&[char_out, embed_out, stats_out, header_out], 1)?
-        } else {
-            Tensor::cat(&[char_out, embed_out, stats_out], 1)?
-        };
+            branch_outputs.push(header_out);
+        }
+
+        // Optional validation branch
+        if let Some(ref vb_weights) = &self.valid_branch {
+            let valid_input = match valid_feats {
+                Some(vf) => vf.clone(),
+                None => Tensor::zeros(
+                    (batch_size, self.config.valid_dim),
+                    DType::F32,
+                    char_feats.device(),
+                )?,
+            };
+            let valid_out = vb_weights.forward(&valid_input, train)?;
+            branch_outputs.push(valid_out);
+        }
+
+        // Concatenate branch outputs: [B, merged_dim]
+        let merged = Tensor::cat(&branch_outputs, 1)?;
 
         // Merge normalization
         let normed = match &self.merge_norm {
@@ -523,10 +581,17 @@ impl MultiBranchModel {
         embed_feats: &Tensor,
         stats_feats: &Tensor,
         header_feats: Option<&Tensor>,
+        valid_feats: Option<&Tensor>,
         train: bool,
     ) -> candle_core::Result<Tensor> {
-        let hidden =
-            self.forward_trunk(char_feats, embed_feats, stats_feats, header_feats, train)?;
+        let hidden = self.forward_trunk(
+            char_feats,
+            embed_feats,
+            stats_feats,
+            header_feats,
+            valid_feats,
+            train,
+        )?;
 
         if let Some(ref head) = self.head {
             // Flat head: logits
@@ -550,10 +615,17 @@ impl MultiBranchModel {
         embed_feats: &Tensor,
         stats_feats: &Tensor,
         header_feats: Option<&Tensor>,
+        valid_feats: Option<&Tensor>,
         train: bool,
     ) -> candle_core::Result<(Tensor, Vec<Tensor>, Vec<Vec<Option<Tensor>>>)> {
-        let hidden =
-            self.forward_trunk(char_feats, embed_feats, stats_feats, header_feats, train)?;
+        let hidden = self.forward_trunk(
+            char_feats,
+            embed_feats,
+            stats_feats,
+            header_feats,
+            valid_feats,
+            train,
+        )?;
 
         match &self.hierarchical {
             Some(ref hier) => hier.forward_levels(&hidden),
@@ -597,7 +669,15 @@ const FTMB_HEADER_SIZE_V2: usize = 24;
 
 /// Header size in bytes for v3 (28 bytes).
 /// v3: 4 magic + 4 version + 8 n_records + 2+2+2+2 dims + 2 n_groups + 2 reserved = 28.
+#[allow(dead_code)]
 const FTMB_HEADER_SIZE_V3: usize = 28;
+
+/// Format version for validation-branch writes (v4 adds validation features).
+const FTMB_VERSION_V4: u32 = 4;
+
+/// Header size in bytes for v4 (30 bytes).
+/// v4: v3 header (28 bytes) + 2 valid_dim = 30.
+pub const FTMB_HEADER_SIZE_V4: usize = 30;
 
 /// A single training record with label and feature vectors.
 #[derive(Debug, Clone)]
@@ -612,6 +692,8 @@ pub struct TrainingRecord {
     pub stats_features: Vec<f32>,
     /// Header embedding features (Model2Vec, 128-dim). Empty for v1 data.
     pub header_features: Vec<f32>,
+    /// Validation pass-rate features (one per taxonomy type). Empty for v1/v2/v3 data.
+    pub validation_features: Vec<f32>,
 }
 
 /// A group of training records from the same table, with sibling header names.
@@ -721,15 +803,17 @@ pub struct FtmbHeader {
     pub header_dim: u16,
     /// Number of table groups. 0 for v1/v2 files.
     pub n_groups: u16,
+    /// Validation feature dimension. 0 for v1/v2/v3 files.
+    pub valid_dim: u16,
 }
 
-/// Read the header from an FTMB binary file. Supports v1, v2, and v3.
+/// Read the header from an FTMB binary file. Supports v1, v2, v3, and v4.
 pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     let mut file = std::fs::File::open(path)
         .with_context(|| format!("Failed to open training data file: {}", path.display()))?;
 
     // Read the common prefix first (24 bytes covers v1/v2 fully)
-    let mut header = [0u8; FTMB_HEADER_SIZE_V3];
+    let mut header = [0u8; FTMB_HEADER_SIZE_V4];
     // Read at least the v2 header size to determine version
     file.read_exact(&mut header[..FTMB_HEADER_SIZE_V2])
         .context("Failed to read FTMB header")?;
@@ -743,9 +827,9 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     }
 
     let version = u32::from_le_bytes(header[4..8].try_into().unwrap());
-    if version != 1 && version != 2 && version != 3 {
+    if version != 1 && version != 2 && version != 3 && version != 4 {
         bail!(
-            "Unsupported FTMB version: {} (expected 1, 2, or 3)",
+            "Unsupported FTMB version: {} (expected 1, 2, 3, or 4)",
             version
         );
     }
@@ -762,11 +846,20 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
         0
     };
 
-    // v3: read the additional 4 bytes (n_groups + reserved)
+    // v3+: read the additional 4 bytes (n_groups + reserved)
     let n_groups = if version >= 3 {
         file.read_exact(&mut header[24..28])
             .context("Failed to read v3 header extension")?;
         u16::from_le_bytes(header[24..26].try_into().unwrap())
+    } else {
+        0
+    };
+
+    // v4: read the additional 2 bytes (valid_dim)
+    let valid_dim = if version >= 4 {
+        file.read_exact(&mut header[28..30])
+            .context("Failed to read v4 header extension")?;
+        u16::from_le_bytes(header[28..30].try_into().unwrap())
     } else {
         0
     };
@@ -779,14 +872,16 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
         stats_dim,
         header_dim,
         n_groups,
+        valid_dim,
     })
 }
 
-/// Read all training records from an FTMB binary file. Supports v1, v2, and v3.
+/// Read all training records from an FTMB binary file. Supports v1, v2, v3, and v4.
 ///
 /// v1 files are loaded with zero-vector header_features (graceful degradation).
 /// v1/v2 files return a single table group containing all records with empty sibling headers.
 /// v3 files return proper table groups with sibling header metadata.
+/// v4 files additionally contain validation_features per record.
 pub fn read_training_data(
     path: &Path,
 ) -> Result<(FtmbHeader, Vec<TrainingRecord>, Vec<TableGroup>)> {
@@ -794,7 +889,7 @@ pub fn read_training_data(
         .with_context(|| format!("Failed to open training data file: {}", path.display()))?;
 
     // Read common header prefix (24 bytes for v1/v2)
-    let mut header_buf = [0u8; FTMB_HEADER_SIZE_V3];
+    let mut header_buf = [0u8; FTMB_HEADER_SIZE_V4];
     file.read_exact(&mut header_buf[..FTMB_HEADER_SIZE_V2])
         .context("Failed to read FTMB header")?;
 
@@ -802,9 +897,9 @@ pub fn read_training_data(
         bail!("Invalid FTMB magic");
     }
     let version = u32::from_le_bytes(header_buf[4..8].try_into().unwrap());
-    if version != 1 && version != 2 && version != 3 {
+    if version != 1 && version != 2 && version != 3 && version != 4 {
         bail!(
-            "Unsupported FTMB version: {} (expected 1, 2, or 3)",
+            "Unsupported FTMB version: {} (expected 1, 2, 3, or 4)",
             version
         );
     }
@@ -819,11 +914,20 @@ pub fn read_training_data(
         0
     };
 
-    // v3: read additional 4 bytes
+    // v3+: read additional 4 bytes (n_groups + reserved)
     let n_groups = if version >= 3 {
         file.read_exact(&mut header_buf[24..28])
             .context("Failed to read v3 header extension")?;
         u16::from_le_bytes(header_buf[24..26].try_into().unwrap()) as usize
+    } else {
+        0
+    };
+
+    // v4: read additional 2 bytes (valid_dim)
+    let valid_dim = if version >= 4 {
+        file.read_exact(&mut header_buf[28..30])
+            .context("Failed to read v4 header extension")?;
+        u16::from_le_bytes(header_buf[28..30].try_into().unwrap()) as usize
     } else {
         0
     };
@@ -836,6 +940,7 @@ pub fn read_training_data(
         stats_dim: stats_dim as u16,
         header_dim: header_dim as u16,
         n_groups: n_groups as u16,
+        valid_dim: valid_dim as u16,
     };
 
     let mut records = Vec::with_capacity(n_records as usize);
@@ -904,6 +1009,18 @@ pub fn read_training_data(
                     header_features.push(f32::from_le_bytes(f32_buf));
                 }
 
+                // v4: read validation features; otherwise empty
+                let validation_features = if version >= 4 && valid_dim > 0 {
+                    let mut vf = Vec::with_capacity(valid_dim);
+                    for _ in 0..valid_dim {
+                        file.read_exact(&mut f32_buf)?;
+                        vf.push(f32::from_le_bytes(f32_buf));
+                    }
+                    vf
+                } else {
+                    Vec::new()
+                };
+
                 group_indices.push(record_offset);
                 records.push(TrainingRecord {
                     label,
@@ -911,6 +1028,7 @@ pub fn read_training_data(
                     embed_features,
                     stats_features,
                     header_features,
+                    validation_features,
                 });
                 record_offset += 1;
             }
@@ -958,12 +1076,25 @@ pub fn read_training_data(
                 vec![0.0f32; header_dim]
             };
 
+            // v4: read validation features; otherwise empty
+            let validation_features = if version >= 4 && valid_dim > 0 {
+                let mut vf = Vec::with_capacity(valid_dim);
+                for _ in 0..valid_dim {
+                    file.read_exact(&mut f32_buf)?;
+                    vf.push(f32::from_le_bytes(f32_buf));
+                }
+                vf
+            } else {
+                Vec::new()
+            };
+
             records.push(TrainingRecord {
                 label,
                 char_features,
                 embed_features,
                 stats_features,
                 header_features,
+                validation_features,
             });
         }
 
@@ -1095,6 +1226,143 @@ pub fn write_training_data_v3(
                 file.write_all(&v.to_le_bytes())?;
             }
             for &v in &record.header_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Write training records to an FTMB v4 binary file with validation features.
+///
+/// v4 extends v3 by adding `valid_dim` validation pass-rate features per record.
+/// Each record's features are written as: char + embed + stats + header + validation.
+#[allow(clippy::too_many_arguments)]
+pub fn write_training_data_v4(
+    path: &Path,
+    records: &[TrainingRecord],
+    table_groups: &[TableGroup],
+    char_dim: u16,
+    embed_dim: u16,
+    stats_dim: u16,
+    header_dim: u16,
+    valid_dim: u16,
+) -> Result<()> {
+    let mut file = std::fs::File::create(path)
+        .with_context(|| format!("Failed to create training data file: {}", path.display()))?;
+
+    // Count total records across all groups
+    let total_records: usize = table_groups.iter().map(|g| g.record_indices.len()).sum();
+    if total_records != records.len() {
+        bail!(
+            "Table groups reference {} records but {} were provided",
+            total_records,
+            records.len()
+        );
+    }
+
+    // Write v4 header (30 bytes)
+    file.write_all(FTMB_MAGIC)?;
+    file.write_all(&FTMB_VERSION_V4.to_le_bytes())?;
+    file.write_all(&(records.len() as u64).to_le_bytes())?;
+    file.write_all(&char_dim.to_le_bytes())?;
+    file.write_all(&embed_dim.to_le_bytes())?;
+    file.write_all(&stats_dim.to_le_bytes())?;
+    file.write_all(&header_dim.to_le_bytes())?;
+    file.write_all(&(table_groups.len() as u16).to_le_bytes())?;
+    file.write_all(&[0u8; 2])?; // reserved
+    file.write_all(&valid_dim.to_le_bytes())?;
+
+    // Write each table group
+    for group in table_groups {
+        // Group header: n_columns + n_sibling_headers
+        file.write_all(&(group.record_indices.len() as u16).to_le_bytes())?;
+        file.write_all(&(group.sibling_headers.len() as u16).to_le_bytes())?;
+
+        // Write sibling headers
+        for header_name in &group.sibling_headers {
+            let header_bytes = header_name.as_bytes();
+            if header_bytes.len() > u16::MAX as usize {
+                bail!(
+                    "Sibling header too long ({} bytes): {}",
+                    header_bytes.len(),
+                    header_name
+                );
+            }
+            file.write_all(&(header_bytes.len() as u16).to_le_bytes())?;
+            file.write_all(header_bytes)?;
+        }
+
+        // Write records for this group
+        for (col_idx, &record_idx) in group.record_indices.iter().enumerate() {
+            let record = &records[record_idx];
+
+            // Label
+            let label_bytes = record.label.as_bytes();
+            if label_bytes.len() > u16::MAX as usize {
+                bail!(
+                    "Label too long ({} bytes): {}",
+                    label_bytes.len(),
+                    record.label
+                );
+            }
+            file.write_all(&(label_bytes.len() as u16).to_le_bytes())?;
+            file.write_all(label_bytes)?;
+
+            // Column index into sibling_headers
+            file.write_all(&(col_idx as u16).to_le_bytes())?;
+
+            // Validate and write features
+            if record.char_features.len() != char_dim as usize {
+                bail!(
+                    "char_features length {} != expected {}",
+                    record.char_features.len(),
+                    char_dim
+                );
+            }
+            if record.embed_features.len() != embed_dim as usize {
+                bail!(
+                    "embed_features length {} != expected {}",
+                    record.embed_features.len(),
+                    embed_dim
+                );
+            }
+            if record.stats_features.len() != stats_dim as usize {
+                bail!(
+                    "stats_features length {} != expected {}",
+                    record.stats_features.len(),
+                    stats_dim
+                );
+            }
+            if record.header_features.len() != header_dim as usize {
+                bail!(
+                    "header_features length {} != expected {}",
+                    record.header_features.len(),
+                    header_dim
+                );
+            }
+            if record.validation_features.len() != valid_dim as usize {
+                bail!(
+                    "validation_features length {} != expected {}",
+                    record.validation_features.len(),
+                    valid_dim
+                );
+            }
+
+            for &v in &record.char_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.embed_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.stats_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.header_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.validation_features {
                 file.write_all(&v.to_le_bytes())?;
             }
         }
@@ -1346,6 +1614,8 @@ pub struct MultiBranchDataset {
     pub stats_feats: Vec<f32>,
     /// Header embedding features, flat [N * header_dim].
     pub header_feats: Vec<f32>,
+    /// Validation pass-rate features, flat [N * valid_dim].
+    pub valid_feats: Vec<f32>,
     /// Label indices [N].
     pub labels: Vec<u32>,
     /// Number of samples.
@@ -1355,6 +1625,7 @@ pub struct MultiBranchDataset {
     pub embed_dim: usize,
     pub stats_dim: usize,
     pub header_dim: usize,
+    pub valid_dim: usize,
     /// Table groups from v3 data. Empty for v1/v2 data (single group with all records).
     pub table_groups: Vec<TableGroup>,
 }
@@ -1379,11 +1650,13 @@ impl MultiBranchDataset {
             embed_dim,
             stats_dim,
             header_dim,
+            0,
             None,
         )
     }
 
     /// Build a dataset from training records with explicit table group metadata.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_records_with_groups(
         records: &[TrainingRecord],
         label_to_idx: &std::collections::HashMap<String, u32>,
@@ -1391,6 +1664,7 @@ impl MultiBranchDataset {
         embed_dim: usize,
         stats_dim: usize,
         header_dim: usize,
+        valid_dim: usize,
         table_groups: Option<Vec<TableGroup>>,
     ) -> Result<Self> {
         let n = records.len();
@@ -1398,6 +1672,7 @@ impl MultiBranchDataset {
         let mut embed_feats_flat = Vec::with_capacity(n * embed_dim);
         let mut stats_feats = Vec::with_capacity(n * stats_dim);
         let mut header_feats = Vec::with_capacity(n * header_dim);
+        let mut valid_feats_flat = Vec::with_capacity(n * valid_dim);
         let mut labels = Vec::with_capacity(n);
 
         for record in records {
@@ -1419,6 +1694,18 @@ impl MultiBranchDataset {
                     header_dim - record.header_features.len(),
                 ));
             }
+            // Pad or truncate validation features to expected dim
+            if valid_dim > 0 {
+                if record.validation_features.len() >= valid_dim {
+                    valid_feats_flat.extend_from_slice(&record.validation_features[..valid_dim]);
+                } else {
+                    valid_feats_flat.extend_from_slice(&record.validation_features);
+                    valid_feats_flat.extend(std::iter::repeat_n(
+                        0.0f32,
+                        valid_dim - record.validation_features.len(),
+                    ));
+                }
+            }
         }
 
         // Use provided groups or create a single default group
@@ -1438,12 +1725,14 @@ impl MultiBranchDataset {
             embed_feats: embed_feats_flat,
             stats_feats,
             header_feats,
+            valid_feats: valid_feats_flat,
             labels,
             n_samples: n,
             char_dim,
             embed_dim,
             stats_dim,
             header_dim,
+            valid_dim,
             table_groups: groups,
         })
     }
@@ -1460,19 +1749,28 @@ impl MultiBranchDataset {
 
     /// Extract a batch of tensors for the given sample indices.
     ///
-    /// Returns `(char, embed, stats, header, labels)`. When `header_dim == 0`,
-    /// the header tensor is a zero-width `[B, 0]` tensor.
+    /// Returns `(char, embed, stats, header, valid, labels)`. When `header_dim == 0`,
+    /// the header tensor is `None`. When `valid_dim == 0`, the valid tensor is `None`.
+    #[allow(clippy::type_complexity)]
     pub fn batch(
         &self,
         indices: &[usize],
         device: &Device,
-    ) -> candle_core::Result<(Tensor, Tensor, Tensor, Option<Tensor>, Tensor)> {
+    ) -> candle_core::Result<(
+        Tensor,
+        Tensor,
+        Tensor,
+        Option<Tensor>,
+        Option<Tensor>,
+        Tensor,
+    )> {
         let bs = indices.len();
 
         let mut char_batch = Vec::with_capacity(bs * self.char_dim);
         let mut embed_batch = Vec::with_capacity(bs * self.embed_dim);
         let mut stats_batch = Vec::with_capacity(bs * self.stats_dim);
         let mut header_batch = Vec::with_capacity(bs * self.header_dim);
+        let mut valid_batch = Vec::with_capacity(bs * self.valid_dim);
         let mut label_batch = Vec::with_capacity(bs);
 
         for &i in indices {
@@ -1490,6 +1788,12 @@ impl MultiBranchDataset {
                     &self.header_feats[header_start..header_start + self.header_dim],
                 );
             }
+            if self.valid_dim > 0 {
+                let valid_start = i * self.valid_dim;
+                valid_batch.extend_from_slice(
+                    &self.valid_feats[valid_start..valid_start + self.valid_dim],
+                );
+            }
             label_batch.push(self.labels[i]);
         }
 
@@ -1501,9 +1805,14 @@ impl MultiBranchDataset {
         } else {
             None
         };
+        let valid_t = if self.valid_dim > 0 {
+            Some(Tensor::new(valid_batch.as_slice(), device)?.reshape((bs, self.valid_dim))?)
+        } else {
+            None
+        };
         let labels_t = Tensor::new(label_batch.as_slice(), device)?;
 
-        Ok((char_t, embed_t, stats_t, header_t, labels_t))
+        Ok((char_t, embed_t, stats_t, header_t, valid_t, labels_t))
     }
 
     /// Extract a batch from whole table groups, optionally enriching headers via
@@ -1516,12 +1825,20 @@ impl MultiBranchDataset {
     ///
     /// For groups with empty sibling_headers (v1/v2 data), header features pass through
     /// unchanged regardless of `frozen_ctx`.
+    #[allow(clippy::type_complexity)]
     pub fn batch_groups(
         &self,
         group_indices: &[usize],
         frozen_ctx: Option<&FrozenSiblingContext>,
         device: &Device,
-    ) -> Result<(Tensor, Tensor, Tensor, Option<Tensor>, Tensor)> {
+    ) -> Result<(
+        Tensor,
+        Tensor,
+        Tensor,
+        Option<Tensor>,
+        Option<Tensor>,
+        Tensor,
+    )> {
         // Collect all record indices from the selected groups
         let mut all_indices = Vec::new();
         // Track group boundaries for per-group header enrichment
@@ -1546,8 +1863,13 @@ impl MultiBranchDataset {
             } else {
                 None
             };
+            let valid_t = if self.valid_dim > 0 {
+                Some(Tensor::zeros((0, self.valid_dim), DType::F32, device)?)
+            } else {
+                None
+            };
             let labels_t = Tensor::zeros(0, DType::U32, device)?;
-            return Ok((char_t, embed_t, stats_t, header_t, labels_t));
+            return Ok((char_t, embed_t, stats_t, header_t, valid_t, labels_t));
         }
 
         // Build base batch from flat indices
@@ -1555,6 +1877,7 @@ impl MultiBranchDataset {
         let mut embed_batch = Vec::with_capacity(bs * self.embed_dim);
         let mut stats_batch = Vec::with_capacity(bs * self.stats_dim);
         let mut header_batch = Vec::with_capacity(bs * self.header_dim);
+        let mut valid_batch = Vec::with_capacity(bs * self.valid_dim);
         let mut label_batch = Vec::with_capacity(bs);
 
         for &i in &all_indices {
@@ -1570,6 +1893,12 @@ impl MultiBranchDataset {
                 let header_start = i * self.header_dim;
                 header_batch.extend_from_slice(
                     &self.header_feats[header_start..header_start + self.header_dim],
+                );
+            }
+            if self.valid_dim > 0 {
+                let valid_start = i * self.valid_dim;
+                valid_batch.extend_from_slice(
+                    &self.valid_feats[valid_start..valid_start + self.valid_dim],
                 );
             }
             label_batch.push(self.labels[i]);
@@ -1615,7 +1944,13 @@ impl MultiBranchDataset {
             None
         };
 
-        Ok((char_t, embed_t, stats_t, header_t, labels_t))
+        let valid_t = if self.valid_dim > 0 {
+            Some(Tensor::new(valid_batch.as_slice(), device)?.reshape((bs, self.valid_dim))?)
+        } else {
+            None
+        };
+
+        Ok((char_t, embed_t, stats_t, header_t, valid_t, labels_t))
     }
 }
 
@@ -1839,6 +2174,15 @@ pub fn train_multi_branch(
         );
     }
 
+    if model_config.has_validation_branch() {
+        tracing::info!(
+            "Validation branch: [{} → {} → {}]",
+            model_config.valid_dim,
+            model_config.valid_hidden[0],
+            model_config.valid_hidden[1],
+        );
+    }
+
     if is_hierarchical {
         let hier = model.hierarchical_head().unwrap();
         let h = hier.hierarchy();
@@ -1935,7 +2279,7 @@ pub fn train_multi_branch(
 
         // Training loop
         for batch_num in 0..total_batches {
-            let (char_t, embed_t, stats_t, header_t, labels_t) = if use_group_batching {
+            let (char_t, embed_t, stats_t, header_t, valid_t, labels_t) = if use_group_batching {
                 train_data.batch_groups(&group_batches[batch_num], frozen_ref, &device)?
             } else {
                 train_data.batch(&flat_batches[batch_num], &device)?
@@ -1945,8 +2289,14 @@ pub fn train_multi_branch(
             let loss = if is_hierarchical {
                 let hier = model.hierarchical_head().unwrap();
                 let hierarchy = hier.hierarchy();
-                let (domain_logits, cat_logits, leaf_logits) =
-                    model.forward_levels(&char_t, &embed_t, &stats_t, header_t.as_ref(), true)?;
+                let (domain_logits, cat_logits, leaf_logits) = model.forward_levels(
+                    &char_t,
+                    &embed_t,
+                    &stats_t,
+                    header_t.as_ref(),
+                    valid_t.as_ref(),
+                    true,
+                )?;
                 compute_hierarchical_loss(
                     &domain_logits,
                     &cat_logits,
@@ -1956,7 +2306,14 @@ pub fn train_multi_branch(
                     &device,
                 )?
             } else {
-                let logits = model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), true)?;
+                let logits = model.forward(
+                    &char_t,
+                    &embed_t,
+                    &stats_t,
+                    header_t.as_ref(),
+                    valid_t.as_ref(),
+                    true,
+                )?;
                 candle_nn::loss::cross_entropy(&logits, &labels_t)?
             };
 
@@ -1966,7 +2323,14 @@ pub fn train_multi_branch(
             train_loss_sum += loss_val as f64 * bs as f64;
 
             // Accuracy via forward (product probabilities for hier, logits for flat)
-            let output = model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), false)?;
+            let output = model.forward(
+                &char_t,
+                &embed_t,
+                &stats_t,
+                header_t.as_ref(),
+                valid_t.as_ref(),
+                false,
+            )?;
             let acc = compute_accuracy(&output, &labels_t)?;
             train_correct_sum += acc as f64 * bs as f64;
             train_samples += bs;
@@ -1990,7 +2354,7 @@ pub fn train_multi_branch(
             let mut val_samples = 0usize;
 
             for batch_idx in &val_batches {
-                let (char_t, embed_t, stats_t, header_t, labels_t) =
+                let (char_t, embed_t, stats_t, header_t, valid_t, labels_t) =
                     val_data.batch(batch_idx, &device)?;
                 let bs = batch_idx.len();
 
@@ -2002,6 +2366,7 @@ pub fn train_multi_branch(
                         &embed_t,
                         &stats_t,
                         header_t.as_ref(),
+                        valid_t.as_ref(),
                         false,
                     )?;
                     let loss = compute_hierarchical_loss(
@@ -2014,16 +2379,28 @@ pub fn train_multi_branch(
                     )?;
                     loss.to_scalar::<f32>()?
                 } else {
-                    let logits =
-                        model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), false)?;
+                    let logits = model.forward(
+                        &char_t,
+                        &embed_t,
+                        &stats_t,
+                        header_t.as_ref(),
+                        valid_t.as_ref(),
+                        false,
+                    )?;
                     let loss = candle_nn::loss::cross_entropy(&logits, &labels_t)?;
                     loss.to_scalar::<f32>()?
                 };
 
                 val_loss_sum += loss_val as f64 * bs as f64;
 
-                let output =
-                    model.forward(&char_t, &embed_t, &stats_t, header_t.as_ref(), false)?;
+                let output = model.forward(
+                    &char_t,
+                    &embed_t,
+                    &stats_t,
+                    header_t.as_ref(),
+                    valid_t.as_ref(),
+                    false,
+                )?;
                 let acc = compute_accuracy(&output, &labels_t)?;
                 val_correct_sum += acc as f64 * bs as f64;
                 val_samples += bs;
@@ -2148,13 +2525,13 @@ mod tests {
 
         // Training mode
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, None, true)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, None, true)
             .unwrap();
         assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
 
         // Eval mode
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, None, false)
             .unwrap();
         assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
     }
@@ -2191,7 +2568,7 @@ mod tests {
 
         // Forward + backward
         let logits = model
-            .forward(&char_feats, &embed_feats, &stats_feats, None, true)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, None, true)
             .unwrap();
         let loss = candle_nn::loss::cross_entropy(&logits, &targets).unwrap();
 
@@ -2249,10 +2626,12 @@ mod tests {
             embed_dim: 512,
             stats_dim: 27,
             header_dim: 128,
+            valid_dim: 0,
             char_hidden: [300, 300],
             embed_hidden: [200, 200],
             stats_hidden: [128, 64],
             header_hidden: [128, 64],
+            valid_hidden: [0, 0],
             merge_hidden: [500, 500],
             n_classes: 250,
             dropout: 0.35,
@@ -2341,6 +2720,7 @@ mod tests {
                 &embed_feats,
                 &stats_feats,
                 Some(&header_feats),
+                None,
                 true,
             )
             .unwrap();
@@ -2353,6 +2733,7 @@ mod tests {
                 &embed_feats,
                 &stats_feats,
                 Some(&header_feats),
+                None,
                 false,
             )
             .unwrap();
@@ -2401,6 +2782,7 @@ mod tests {
                 &embed_feats,
                 &stats_feats,
                 Some(&header_feats),
+                None,
                 true,
             )
             .unwrap();
@@ -2463,10 +2845,10 @@ mod tests {
         let stats_feats = Tensor::randn(0.0f32, 1.0, (1, 27), &device).unwrap();
 
         let relu_out = relu_model
-            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, None, false)
             .unwrap();
         let gelu_out = gelu_model
-            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, None, false)
             .unwrap();
 
         // Both should produce valid logits with same shape
@@ -2494,6 +2876,7 @@ mod tests {
                 embed_features: (0..512).map(|j| (i * 512 + j) as f32 * 0.002).collect(),
                 stats_features: (0..27).map(|j| (i * 27 + j) as f32 * 0.1).collect(),
                 header_features: (0..128).map(|j| (i * 128 + j) as f32 * 0.003).collect(),
+                validation_features: Vec::new(),
             })
             .collect();
 
@@ -2611,6 +2994,7 @@ mod tests {
                 embed_features: vec![i as f32 * 2.0; 6],
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
+                validation_features: Vec::new(),
             })
             .collect();
 
@@ -2644,6 +3028,7 @@ mod tests {
                 embed_features: vec![i as f32 * 2.0; 512],
                 stats_features: vec![i as f32 * 3.0; 27],
                 header_features: vec![i as f32 * 4.0; 128],
+                validation_features: Vec::new(),
             })
             .collect();
 
@@ -2657,7 +3042,7 @@ mod tests {
         assert_eq!(dataset.len(), 5);
 
         let device = Device::Cpu;
-        let (char_t, embed_t, stats_t, header_t, labels_t) =
+        let (char_t, embed_t, stats_t, header_t, _valid_t, labels_t) =
             dataset.batch(&[0, 2, 4], &device).unwrap();
         assert_eq!(char_t.dims(), &[3, 960]);
         assert_eq!(embed_t.dims(), &[3, 512]);
@@ -2699,6 +3084,7 @@ mod tests {
                 header_features: (0..128)
                     .map(|j| if j % 3 == class_idx { 0.5 + bias } else { 0.05 })
                     .collect(),
+                validation_features: Vec::new(),
             });
         }
 
@@ -2812,13 +3198,13 @@ mod tests {
 
         // forward() returns product probabilities [B, n_classes]
         let output = model
-            .forward(&char_feats, &embed_feats, &stats_feats, None, false)
+            .forward(&char_feats, &embed_feats, &stats_feats, None, None, false)
             .unwrap();
         assert_eq!(output.dims(), &[batch_size, labels.len()]);
 
         // forward_levels() returns per-level logits
         let (domain_logits, cat_logits, leaf_logits) = model
-            .forward_levels(&char_feats, &embed_feats, &stats_feats, None, false)
+            .forward_levels(&char_feats, &embed_feats, &stats_feats, None, None, false)
             .unwrap();
 
         // 4 domains: container, datetime, geography, identity
@@ -2866,7 +3252,7 @@ mod tests {
         let hier = model.hierarchical_head().unwrap();
         let hierarchy = hier.hierarchy();
         let (domain_logits, cat_logits, leaf_logits) = model
-            .forward_levels(&char_feats, &embed_feats, &stats_feats, None, true)
+            .forward_levels(&char_feats, &embed_feats, &stats_feats, None, None, true)
             .unwrap();
         let loss = compute_hierarchical_loss(
             &domain_logits,
@@ -2962,6 +3348,7 @@ mod tests {
                         }
                     })
                     .collect(),
+                validation_features: Vec::new(),
             });
         }
 
@@ -3029,6 +3416,7 @@ mod tests {
                 embed_features: vec![i as f32 * 2.0; 6],
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
+                validation_features: Vec::new(),
             })
             .collect();
 
@@ -3141,6 +3529,7 @@ mod tests {
                 embed_features: vec![i as f32 * 2.0; 6],
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
+                validation_features: Vec::new(),
             })
             .collect();
 
@@ -3231,6 +3620,7 @@ mod tests {
                 embed_features: vec![i as f32 * 2.0; 6],
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
+                validation_features: Vec::new(),
             })
             .collect();
 
@@ -3261,13 +3651,14 @@ mod tests {
             6,
             4,
             5,
+            0,
             Some(groups),
         )
         .unwrap();
 
         // Batch first group only
         let device = Device::Cpu;
-        let (char_t, embed_t, stats_t, header_t, labels_t) =
+        let (char_t, embed_t, stats_t, header_t, _valid_t, labels_t) =
             dataset.batch_groups(&[0], None, &device).unwrap();
         assert_eq!(char_t.dims(), &[3, 8]);
         assert_eq!(embed_t.dims(), &[3, 6]);
@@ -3277,8 +3668,416 @@ mod tests {
         assert_eq!(labels_t.dims(), &[3]);
 
         // Batch both groups
-        let (char_t, _, _, _, labels_t) = dataset.batch_groups(&[0, 1], None, &device).unwrap();
+        let (char_t, _, _, _, _, labels_t) = dataset.batch_groups(&[0, 1], None, &device).unwrap();
         assert_eq!(char_t.dims(), &[6, 8]);
         assert_eq!(labels_t.dims(), &[6]);
+    }
+
+    // ---- ac-03: FTMB v4 round-trip ----
+
+    #[test]
+    fn test_ftmb_v4_roundtrip() {
+        // Write 10 records with known validation features (alternating 0.0/1.0),
+        // read back, verify exact f32 equality for all feature vectors.
+        let valid_dim: usize = 239;
+        let records: Vec<TrainingRecord> = (0..10)
+            .map(|i| {
+                // Alternating pattern: even indices get 0.0, odd get 1.0
+                let validation_features: Vec<f32> = (0..valid_dim)
+                    .map(|j| if (i + j) % 2 == 0 { 0.0 } else { 1.0 })
+                    .collect();
+                TrainingRecord {
+                    label: format!("test.type.t_{i}"),
+                    char_features: vec![i as f32 * 1.0; 8],
+                    embed_features: vec![i as f32 * 2.0; 6],
+                    stats_features: vec![i as f32 * 3.0; 4],
+                    header_features: vec![i as f32 * 4.0; 5],
+                    validation_features,
+                }
+            })
+            .collect();
+
+        let groups = vec![
+            TableGroup {
+                record_indices: vec![0, 1, 2, 3, 4],
+                sibling_headers: vec![
+                    "a".to_string(),
+                    "b".to_string(),
+                    "c".to_string(),
+                    "d".to_string(),
+                    "e".to_string(),
+                ],
+            },
+            TableGroup {
+                record_indices: vec![5, 6, 7, 8, 9],
+                sibling_headers: vec![
+                    "f".to_string(),
+                    "g".to_string(),
+                    "h".to_string(),
+                    "i".to_string(),
+                    "j".to_string(),
+                ],
+            },
+        ];
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data_v4(tmp.path(), &records, &groups, 8, 6, 4, 5, valid_dim as u16)
+            .unwrap();
+
+        let (header, loaded, loaded_groups) = read_training_data(tmp.path()).unwrap();
+
+        // Verify header
+        assert_eq!(header.version, 4);
+        assert_eq!(header.n_records, 10);
+        assert_eq!(header.char_dim, 8);
+        assert_eq!(header.embed_dim, 6);
+        assert_eq!(header.stats_dim, 4);
+        assert_eq!(header.header_dim, 5);
+        assert_eq!(header.n_groups, 2);
+        assert_eq!(header.valid_dim, valid_dim as u16);
+        assert_eq!(loaded.len(), 10);
+        assert_eq!(loaded_groups.len(), 2);
+
+        // Verify every record's features match exactly
+        for (orig, read) in records.iter().zip(loaded.iter()) {
+            assert_eq!(orig.label, read.label);
+            assert_eq!(orig.char_features, read.char_features);
+            assert_eq!(orig.embed_features, read.embed_features);
+            assert_eq!(orig.stats_features, read.stats_features);
+            assert_eq!(orig.header_features, read.header_features);
+            assert_eq!(
+                orig.validation_features, read.validation_features,
+                "Validation features must round-trip exactly for record {}",
+                orig.label
+            );
+            assert_eq!(read.validation_features.len(), valid_dim);
+        }
+
+        // Verify group metadata
+        assert_eq!(loaded_groups[0].record_indices, vec![0, 1, 2, 3, 4]);
+        assert_eq!(loaded_groups[1].record_indices, vec![5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn test_ftmb_v4_header_is_30_bytes() {
+        // Verify that v4 header is exactly 30 bytes as specified in ac-03.
+        assert_eq!(FTMB_HEADER_SIZE_V4, 30);
+
+        let records = vec![TrainingRecord {
+            label: "test.type.t_0".to_string(),
+            char_features: vec![1.0; 4],
+            embed_features: vec![2.0; 3],
+            stats_features: vec![3.0; 2],
+            header_features: vec![4.0; 5],
+            validation_features: vec![0.5; 10],
+        }];
+        let groups = vec![TableGroup {
+            record_indices: vec![0],
+            sibling_headers: vec!["col".to_string()],
+        }];
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data_v4(tmp.path(), &records, &groups, 4, 3, 2, 5, 10).unwrap();
+
+        // Read raw bytes: first 4 bytes should be "FTMB", next 4 should be version 4
+        let raw = std::fs::read(tmp.path()).unwrap();
+        assert_eq!(&raw[0..4], b"FTMB");
+        assert_eq!(u32::from_le_bytes([raw[4], raw[5], raw[6], raw[7]]), 4);
+        // valid_dim at offset 28-29
+        assert_eq!(
+            u16::from_le_bytes([raw[28], raw[29]]),
+            10,
+            "valid_dim should be at offset 28"
+        );
+    }
+
+    // ---- ac-04: v4 reader backward compatibility ----
+
+    #[test]
+    fn test_ftmb_v4_reader_v1_compat_validation_zeros() {
+        // Write a v1-format file and verify v4-aware reader fills validation_features
+        // with empty vec (valid_dim=0 means no validation features).
+        use std::io::Write;
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let mut file = std::fs::File::create(tmp.path()).unwrap();
+
+        let char_dim: u16 = 4;
+        let embed_dim: u16 = 3;
+        let stats_dim: u16 = 2;
+        let n_records: u64 = 2;
+
+        // Write v1 header
+        file.write_all(b"FTMB").unwrap();
+        file.write_all(&1u32.to_le_bytes()).unwrap();
+        file.write_all(&n_records.to_le_bytes()).unwrap();
+        file.write_all(&char_dim.to_le_bytes()).unwrap();
+        file.write_all(&embed_dim.to_le_bytes()).unwrap();
+        file.write_all(&stats_dim.to_le_bytes()).unwrap();
+        file.write_all(&[0u8; 2]).unwrap(); // padding
+
+        // Write 2 records
+        for i in 0..2u16 {
+            let label = format!("type_{i}");
+            let label_bytes = label.as_bytes();
+            file.write_all(&(label_bytes.len() as u16).to_le_bytes())
+                .unwrap();
+            file.write_all(label_bytes).unwrap();
+            for j in 0..char_dim {
+                file.write_all(&((i * 10 + j) as f32).to_le_bytes())
+                    .unwrap();
+            }
+            for j in 0..embed_dim {
+                file.write_all(&((i * 10 + j) as f32 * 0.5).to_le_bytes())
+                    .unwrap();
+            }
+            for j in 0..stats_dim {
+                file.write_all(&((i * 10 + j) as f32 * 0.1).to_le_bytes())
+                    .unwrap();
+            }
+        }
+        drop(file);
+
+        let (header, records, _groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 1);
+        assert_eq!(header.valid_dim, 0);
+
+        for record in &records {
+            assert!(
+                record.validation_features.is_empty(),
+                "v1 files should produce empty validation_features"
+            );
+            assert!(
+                record.header_features.is_empty(),
+                "v1 files should produce empty header_features"
+            );
+        }
+    }
+
+    #[test]
+    fn test_ftmb_v4_reader_v2_compat_validation_zeros() {
+        // Write a v2 file using write_training_data, verify validation_features are empty.
+        let records: Vec<TrainingRecord> = (0..3)
+            .map(|i| TrainingRecord {
+                label: format!("test.type.t_{i}"),
+                char_features: vec![i as f32; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+                validation_features: Vec::new(),
+            })
+            .collect();
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data(tmp.path(), &records, 8, 6, 4, 5).unwrap();
+
+        let (header, loaded, _groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 2);
+        assert_eq!(header.valid_dim, 0);
+
+        for (orig, read) in records.iter().zip(loaded.iter()) {
+            assert_eq!(orig.label, read.label);
+            assert_eq!(orig.char_features, read.char_features);
+            assert_eq!(orig.embed_features, read.embed_features);
+            assert_eq!(orig.stats_features, read.stats_features);
+            assert_eq!(orig.header_features, read.header_features);
+            assert!(
+                read.validation_features.is_empty(),
+                "v2 files should produce empty validation_features"
+            );
+        }
+    }
+
+    #[test]
+    fn test_ftmb_v4_reader_v3_compat_validation_zeros() {
+        // Write a v3 file using write_training_data_v3, verify validation_features
+        // are empty when read back.
+        let records: Vec<TrainingRecord> = (0..4)
+            .map(|i| TrainingRecord {
+                label: format!("test.type.t_{i}"),
+                char_features: vec![i as f32; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+                validation_features: Vec::new(),
+            })
+            .collect();
+
+        let groups = vec![
+            TableGroup {
+                record_indices: vec![0, 1],
+                sibling_headers: vec!["x".to_string(), "y".to_string()],
+            },
+            TableGroup {
+                record_indices: vec![2, 3],
+                sibling_headers: vec!["a".to_string(), "b".to_string()],
+            },
+        ];
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data_v3(tmp.path(), &records, &groups, 8, 6, 4, 5).unwrap();
+
+        let (header, loaded, loaded_groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 3);
+        assert_eq!(header.valid_dim, 0);
+        assert_eq!(loaded_groups.len(), 2);
+
+        for (orig, read) in records.iter().zip(loaded.iter()) {
+            assert_eq!(orig.label, read.label);
+            assert_eq!(orig.char_features, read.char_features);
+            assert_eq!(orig.embed_features, read.embed_features);
+            assert_eq!(orig.stats_features, read.stats_features);
+            assert_eq!(orig.header_features, read.header_features);
+            assert!(
+                read.validation_features.is_empty(),
+                "v3 files should produce empty validation_features"
+            );
+        }
+    }
+
+    // ---- ac-05: Model forward pass with validation branch ----
+
+    #[test]
+    fn test_forward_pass_with_validation_branch() {
+        // Construct model with valid_dim=239, verify forward pass succeeds
+        // and output shape matches n_classes.
+        let config = MultiBranchConfig {
+            valid_dim: 239,
+            valid_hidden: [128, 64],
+            ..MultiBranchConfig::default()
+        };
+        assert!(config.has_validation_branch());
+        // 5-branch merged_dim: 300 + 200 + 64 + 64 + 64 = 692
+        assert_eq!(config.merged_dim(), 692);
+
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+
+        let batch_size = 5;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        let header_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.header_dim), &device).unwrap();
+        let valid_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.valid_dim), &device).unwrap();
+
+        // Forward pass with all 5 branches
+        let logits = model
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                Some(&valid_feats),
+                false,
+            )
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+
+        // Training mode also works
+        let logits = model
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                Some(&valid_feats),
+                true,
+            )
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+    }
+
+    #[test]
+    fn test_forward_pass_without_validation_branch() {
+        // Construct model with valid_dim=0 (default), verify forward pass
+        // works without validation branch — backward compat.
+        let config = MultiBranchConfig::default();
+        assert!(!config.has_validation_branch());
+        assert_eq!(config.valid_dim, 0);
+        // 4-branch merged_dim: 300 + 200 + 64 + 64 = 628
+        assert_eq!(config.merged_dim(), 628);
+
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+
+        let batch_size = 5;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        let header_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.header_dim), &device).unwrap();
+
+        // Forward pass with 4 branches, no validation
+        let logits = model
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                None,
+                false,
+            )
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+    }
+
+    // ---- ac-10: Dataset with validation features ----
+
+    #[test]
+    fn test_dataset_batch_with_validation_features() {
+        // Create a dataset with validation features and verify the batch
+        // returns a valid_feats tensor with the correct shape.
+        let valid_dim = 10;
+        let records: Vec<TrainingRecord> = (0..5)
+            .map(|i| TrainingRecord {
+                label: format!("identity.person.type_{}", i % 3),
+                char_features: vec![i as f32; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+                validation_features: (0..valid_dim).map(|j| (i + j) as f32 * 0.1).collect(),
+            })
+            .collect();
+
+        let mut label_to_idx = std::collections::HashMap::new();
+        label_to_idx.insert("identity.person.type_0".to_string(), 0u32);
+        label_to_idx.insert("identity.person.type_1".to_string(), 1u32);
+        label_to_idx.insert("identity.person.type_2".to_string(), 2u32);
+
+        let dataset = MultiBranchDataset::from_records_with_groups(
+            &records,
+            &label_to_idx,
+            8,
+            6,
+            4,
+            5,
+            valid_dim,
+            None,
+        )
+        .unwrap();
+
+        let device = Device::Cpu;
+        let (char_t, embed_t, stats_t, header_t, valid_t, labels_t) =
+            dataset.batch(&[0, 1, 2, 3, 4], &device).unwrap();
+        assert_eq!(char_t.dims(), &[5, 8]);
+        assert_eq!(embed_t.dims(), &[5, 6]);
+        assert_eq!(stats_t.dims(), &[5, 4]);
+        let header_t = header_t.expect("header should be Some");
+        assert_eq!(header_t.dims(), &[5, 5]);
+        let valid_t = valid_t.expect("valid should be Some when valid_dim > 0");
+        assert_eq!(valid_t.dims(), &[5, valid_dim]);
+        assert_eq!(labels_t.dims(), &[5]);
     }
 }

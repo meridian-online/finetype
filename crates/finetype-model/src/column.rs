@@ -1981,7 +1981,7 @@ impl ColumnClassifier {
         let samples_used = sample.len();
 
         // Step 1: Classify via multi-branch (feature extraction + forward pass)
-        let (label, confidence) = mb.classify_column(&sample, header)?;
+        let (label, confidence) = mb.classify_column(&sample, header, self.taxonomy.as_ref())?;
 
         // Step 2: Compute deterministic ColumnFeatures (36-dim, no neural inference)
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
@@ -2077,8 +2077,11 @@ impl ColumnClassifier {
         let samples_used = sample.len();
 
         // Step 1: Classify via multi-branch with enriched header
-        let (label, confidence) =
-            mb.classify_column_with_enriched_header(&sample, enriched_header)?;
+        let (label, confidence) = mb.classify_column_with_enriched_header(
+            &sample,
+            enriched_header,
+            self.taxonomy.as_ref(),
+        )?;
 
         // Step 2: Compute deterministic ColumnFeatures
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
