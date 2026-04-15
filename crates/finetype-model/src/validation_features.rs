@@ -112,11 +112,7 @@ impl ValidationFeatureExtractor {
     /// Types that exist in the training mapping but not in the current taxonomy
     /// get 0.0. Types in the current taxonomy but not in the training mapping
     /// are ignored (they have no index in the feature vector).
-    pub fn extract_aligned(
-        &self,
-        values: &[&str],
-        taxonomy: &Taxonomy,
-    ) -> Vec<f32> {
+    pub fn extract_aligned(&self, values: &[&str], taxonomy: &Taxonomy) -> Vec<f32> {
         // When the extractor was built from the taxonomy itself, alignment is identity.
         // When built from a saved mapping, only types in both the mapping and taxonomy
         // get non-zero pass rates.
@@ -163,9 +159,7 @@ mod tests {
         );
 
         // country has no pattern constraint — should also pass (loose validation)
-        let country_idx = extractor
-            .index_of("geography.location.country")
-            .unwrap();
+        let country_idx = extractor.index_of("geography.location.country").unwrap();
         // country validation has minLength:2, maxLength:100 — "US" passes
         // But the key discriminator is: country_code has ENUM + pattern,
         // so random 2-letter strings would fail country_code but pass country.
@@ -196,9 +190,7 @@ mod tests {
         let values: Vec<&str> = vec!["40.7", "-33.8", "91.5"];
         let features = extractor.extract(&values, &taxonomy);
 
-        let lat_idx = extractor
-            .index_of("geography.coordinate.latitude")
-            .unwrap();
+        let lat_idx = extractor.index_of("geography.coordinate.latitude").unwrap();
         let dec_idx = extractor
             .index_of("representation.numeric.decimal_number")
             .unwrap();
@@ -236,16 +228,11 @@ mod tests {
         let extractor = ValidationFeatureExtractor::new(&taxonomy);
 
         // email_display values with angle brackets
-        let values: Vec<&str> = vec![
-            "John Doe <john@example.com>",
-            "Jane Smith <jane@corp.com>",
-        ];
+        let values: Vec<&str> = vec!["John Doe <john@example.com>", "Jane Smith <jane@corp.com>"];
         let features = extractor.extract(&values, &taxonomy);
 
         let email_idx = extractor.index_of("identity.person.email").unwrap();
-        let display_idx = extractor
-            .index_of("identity.person.email_display")
-            .unwrap();
+        let display_idx = extractor.index_of("identity.person.email_display").unwrap();
 
         // email_display should pass (angle bracket pattern matches)
         assert!(

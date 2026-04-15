@@ -1188,8 +1188,14 @@ datetime.timestamp.iso_8601:
 
         // Invalid: not in ISO 3166-1 enum
         assert!(!validator.is_valid("QQ"), "QQ is not an assigned code");
-        assert!(!validator.is_valid("XX"), "XX is user-assigned, not in enum");
-        assert!(!validator.is_valid("ZZ"), "ZZ is user-assigned, not in enum");
+        assert!(
+            !validator.is_valid("XX"),
+            "XX is user-assigned, not in enum"
+        );
+        assert!(
+            !validator.is_valid("ZZ"),
+            "ZZ is user-assigned, not in enum"
+        );
 
         // Invalid: wrong format (pattern still enforced)
         assert!(!validator.is_valid("A1"), "A1 fails pattern check");

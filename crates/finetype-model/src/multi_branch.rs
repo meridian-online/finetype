@@ -375,19 +375,19 @@ impl MultiBranchClassifier {
         };
 
         // Build validation feature extractor from saved type_index_keys
-        let validation_extractor = if validation_branch.is_some()
-            && !config.type_index_keys.is_empty()
-        {
-            Some(crate::validation_features::ValidationFeatureExtractor::from_type_keys(
-                config.type_index_keys.clone(),
-            ))
-        } else {
-            None
-        };
+        let validation_extractor =
+            if validation_branch.is_some() && !config.type_index_keys.is_empty() {
+                Some(
+                    crate::validation_features::ValidationFeatureExtractor::from_type_keys(
+                        config.type_index_keys.clone(),
+                    ),
+                )
+            } else {
+                None
+            };
 
         let merged_dim = {
-            let mut dim =
-                config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1];
+            let mut dim = config.char_hidden[1] + config.embed_hidden[1] + config.stats_hidden[1];
             if header_branch.is_some() {
                 dim += config.header_hidden[1];
             }
@@ -541,8 +541,13 @@ impl MultiBranchClassifier {
         // Extract validation features if the model has a validation branch
         let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
 
-        let hidden =
-            self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref(), valid_t.as_ref())?;
+        let hidden = self.forward_trunk(
+            &char_t,
+            &embed_t,
+            &stats_t,
+            header_t.as_ref(),
+            valid_t.as_ref(),
+        )?;
 
         // Head-specific forward pass + probability extraction
         let probs_vec = match &self.head {
@@ -640,8 +645,13 @@ impl MultiBranchClassifier {
         // Extract validation features if the model has a validation branch
         let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
 
-        let hidden =
-            self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref(), valid_t.as_ref())?;
+        let hidden = self.forward_trunk(
+            &char_t,
+            &embed_t,
+            &stats_t,
+            header_t.as_ref(),
+            valid_t.as_ref(),
+        )?;
 
         // Head-specific forward pass (same as classify_column)
         let probs_vec = match &self.head {
