@@ -61,9 +61,11 @@ CHAR_DIM = 960
 EMBED_DIM = 512
 STATS_DIM = 27
 HEADER_DIM = 128
+VALID_DIM = 239
 MAGIC = b"FTMB"
 VERSION_V2 = 2
 VERSION_V3 = 3
+VERSION_V4 = 4
 
 # Column-level types that may cause negative transfer (same as prepare_spike_data.py)
 COLUMN_LEVEL_TYPES = {
@@ -1118,15 +1120,17 @@ def group_distilled_by_proximity(ordered_columns, rng, group_min=5, group_max=15
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def extract_features(finetype_bin, values, header=None):
+def extract_features(finetype_bin, values, header=None, include_validation=False):
     """Call `finetype extract-features` to get feature vectors for a column.
 
-    Returns: dict with 'char', 'embed', 'stats', 'header_features' arrays,
-             or None on failure.
+    Returns: dict with 'char', 'embed', 'stats', 'header_features' arrays
+             (and 'validation' when include_validation=True), or None on failure.
     """
     cmd = [finetype_bin, "extract-features", "--json"]
     if header:
         cmd.extend(["--header", header])
+    if include_validation:
+        cmd.append("--validation")
 
     try:
         result = subprocess.run(
@@ -1271,6 +1275,52 @@ def write_ftmb_v3(path, table_groups):
                 f.write(struct.pack(f"<{HEADER_DIM}f", *rec["header"]))
 
 
+def write_ftmb_v4(path, table_groups, valid_dim=VALID_DIM):
+    """Write table-grouped records to a .ftmb v4 binary file.
+
+    Same structure as v3, but with a 30-byte header (adds valid_dim at offset 28)
+    and validation features appended to each record.
+
+    table_groups: list of dicts with 'sibling_headers' and 'records'.
+    Each record must have 'validation' key with valid_dim floats.
+    """
+    n_records = sum(len(g["records"]) for g in table_groups)
+    n_groups = len(table_groups)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        # File header (30 bytes): v3 header (28) + valid_dim (2)
+        f.write(MAGIC)
+        f.write(struct.pack("<I", VERSION_V4))
+        f.write(struct.pack("<Q", n_records))
+        f.write(struct.pack("<HHHH", CHAR_DIM, EMBED_DIM, STATS_DIM, HEADER_DIM))
+        f.write(struct.pack("<HH", n_groups, 0))  # n_groups + reserved
+        f.write(struct.pack("<H", valid_dim))  # v4: validation dimension
+
+        # Table groups (same as v3, with validation features appended per record)
+        for group in table_groups:
+            sibling_headers = group["sibling_headers"]
+            records = group["records"]
+
+            f.write(struct.pack("<HH", len(records), len(sibling_headers)))
+
+            for hdr in sibling_headers:
+                hdr_bytes = hdr.encode("utf-8")
+                f.write(struct.pack("<H", len(hdr_bytes)))
+                f.write(hdr_bytes)
+
+            for rec in records:
+                label_bytes = rec["label"].encode("utf-8")
+                f.write(struct.pack("<H", len(label_bytes)))
+                f.write(label_bytes)
+                f.write(struct.pack("<H", rec["column_index"]))
+                f.write(struct.pack(f"<{CHAR_DIM}f", *rec["char"]))
+                f.write(struct.pack(f"<{EMBED_DIM}f", *rec["embed"]))
+                f.write(struct.pack(f"<{STATS_DIM}f", *rec["stats"]))
+                f.write(struct.pack(f"<{HEADER_DIM}f", *rec["header"]))
+                f.write(struct.pack(f"<{valid_dim}f", *rec["validation"]))
+
+
 def read_ftmb(path):
     """Read a .ftmb binary file (v1, v2, or v3).
 
@@ -1405,12 +1455,15 @@ def run_preflight_check(finetype_bin, blended, num_types=10, cols_per_type=5):
         return True
 
 
-def _extract_and_validate(finetype_bin, type_key, col_values, header):
+def _extract_and_validate(finetype_bin, type_key, col_values, header,
+                          include_validation=False):
     """Extract features for a single column and validate dimensions.
 
-    Returns: (type_key, char, embed, stats, header_feat) or None on failure.
+    Returns: (type_key, char, embed, stats, header_feat[, valid_feat]) or None on failure.
+    When include_validation=True, returns 6-tuple with validation features.
     """
-    features = extract_features(finetype_bin, col_values, header=header)
+    features = extract_features(finetype_bin, col_values, header=header,
+                                include_validation=include_validation)
     if features is None:
         return None
 
@@ -1420,16 +1473,26 @@ def _extract_and_validate(finetype_bin, type_key, col_values, header):
     header_feat = features.get("header_features", [0.0] * HEADER_DIM)
 
     # Validate dimensions
-    for name, feat, expected in [
+    checks = [
         ("char", char_feat, CHAR_DIM),
         ("embed", embed_feat, EMBED_DIM),
         ("stats", stats_feat, STATS_DIM),
         ("header", header_feat, HEADER_DIM),
-    ]:
+    ]
+
+    valid_feat = None
+    if include_validation:
+        valid_feat = features.get("validation", [0.0] * VALID_DIM)
+        checks.append(("validation", valid_feat, VALID_DIM))
+
+    for name, feat, expected in checks:
         if len(feat) != expected:
             print(f"  Warning: {type_key} {name} dim {len(feat)} != {expected}",
                   file=sys.stderr)
             return None
+
+    if include_validation:
+        return type_key, char_feat, embed_feat, stats_feat, header_feat, valid_feat
 
     return type_key, char_feat, embed_feat, stats_feat, header_feat
 
@@ -1484,14 +1547,15 @@ def _run_v2_pipeline(blended, finetype_bin, output_path, workers, start_time):
 
 def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
                      workers, ratio_distilled, samples_per_type,
-                     taxonomy_types, rng, start_time):
-    """Run v3 table-grouped extraction and write pipeline.
+                     taxonomy_types, rng, start_time,
+                     include_validation=False):
+    """Run v3/v4 table-grouped extraction and write pipeline.
 
     1. Assemble synthetic columns into table groups
     2. Group distilled columns by proximity
     3. Extract features per-table-group (preserving group structure)
     4. Interleave synthetic and distilled groups
-    5. Write FTMB v3
+    5. Write FTMB v3 or v4 (v4 includes validation features)
 
     Returns: (n_records, n_groups, errors) tuple.
     """
@@ -1550,7 +1614,8 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
 
     def process_item(item):
         g_idx, c_idx, label, values, header = item
-        result = _extract_and_validate(finetype_bin, label, values, header)
+        result = _extract_and_validate(finetype_bin, label, values, header,
+                                       include_validation=include_validation)
         return g_idx, c_idx, header, result
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -1575,8 +1640,9 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
                     file=sys.stderr,
                 )
 
-    # ─── Assemble v3 table groups ──────────────────────────────
-    print("\nAssembling v3 table groups...")
+    # ─── Assemble table groups ──────────────────────────────
+    fmt_label = "v4" if include_validation else "v3"
+    print(f"\nAssembling {fmt_label} table groups...")
     v3_groups = []
     total_records = 0
 
@@ -1586,8 +1652,12 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
         for c_idx in range(len(table)):
             if (g_idx, c_idx) in results_map:
                 header, result = results_map[(g_idx, c_idx)]
-                label, char_f, embed_f, stats_f, header_f = result
-                group_columns.append((label, header, char_f, embed_f, stats_f, header_f))
+                if include_validation:
+                    label, char_f, embed_f, stats_f, header_f, valid_f = result
+                    group_columns.append((label, header, char_f, embed_f, stats_f, header_f, valid_f))
+                else:
+                    label, char_f, embed_f, stats_f, header_f = result
+                    group_columns.append((label, header, char_f, embed_f, stats_f, header_f, None))
 
         if len(group_columns) < 2:
             # Skip groups with fewer than 2 successful columns
@@ -1598,15 +1668,18 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
 
         # Build records with column_index pointing into sibling_headers
         records = []
-        for col_idx, (label, header, char_f, embed_f, stats_f, header_f) in enumerate(group_columns):
-            records.append({
+        for col_idx, (label, header, char_f, embed_f, stats_f, header_f, valid_f) in enumerate(group_columns):
+            rec = {
                 "label": label,
                 "column_index": col_idx,
                 "char": char_f,
                 "embed": embed_f,
                 "stats": stats_f,
                 "header": header_f,
-            })
+            }
+            if include_validation:
+                rec["validation"] = valid_f
+            records.append(rec)
 
         v3_groups.append({
             "sibling_headers": sibling_headers,
@@ -1614,9 +1687,12 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
         })
         total_records += len(records)
 
-    # ─── Write v3 binary file ──────────────────────────────────
+    # ─── Write binary file ──────────────────────────────────
     print(f"\nWriting {total_records} records in {len(v3_groups)} groups to {output_path}...")
-    write_ftmb_v3(output_path, v3_groups)
+    if include_validation:
+        write_ftmb_v4(output_path, v3_groups)
+    else:
+        write_ftmb_v3(output_path, v3_groups)
 
     return total_records, len(v3_groups), errors
 
@@ -1677,8 +1753,8 @@ def main():
             i += 2
         elif args[i] == "--format":
             output_format = args[i + 1]
-            if output_format not in ("v2", "v3"):
-                print(f"ERROR: --format must be 'v2' or 'v3', got '{output_format}'",
+            if output_format not in ("v2", "v3", "v4"):
+                print(f"ERROR: --format must be 'v2', 'v3', or 'v4', got '{output_format}'",
                       file=sys.stderr)
                 sys.exit(1)
             i += 2
@@ -1707,7 +1783,8 @@ def main():
             print(f"Unknown argument: {args[i]}", file=sys.stderr)
             sys.exit(1)
 
-    version = VERSION_V3 if output_format == "v3" else VERSION_V2
+    version = {"v2": VERSION_V2, "v3": VERSION_V3, "v4": VERSION_V4}[output_format]
+    include_validation = output_format == "v4"
     rng = random.Random(seed)
 
     print(f"FTMB output format: {output_format}")
@@ -1911,12 +1988,14 @@ def main():
         n_groups = 0
         type_counts = Counter(r[0] for r in records)
     else:
+        # v3 and v4 use the same table-grouped pipeline
         n_records, n_groups, errors = _run_v3_pipeline(
             synthetic, ordered_distilled, finetype_bin, output_path,
             workers, ratio_distilled, samples_per_type,
             taxonomy_types, rng, start_time,
+            include_validation=include_validation,
         )
-        type_counts = None  # v3 groups don't easily yield per-type counts
+        type_counts = None  # v3/v4 groups don't easily yield per-type counts
 
     file_size = os.path.getsize(output_path)
     print(f"  File size: {file_size / (1024*1024):.1f} MB")

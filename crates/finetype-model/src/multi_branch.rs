@@ -109,7 +109,8 @@ impl MultiBranchConfig {
         self.valid_dim > 0 && self.valid_hidden[0] > 0 && self.valid_hidden[1] > 0
     }
 
-    fn merged_dim(&self) -> usize {
+    /// Total dimension of the merged trunk input (sum of all branch hidden[1] dims).
+    pub fn merged_dim(&self) -> usize {
         let mut dim = self.char_hidden[1] + self.embed_hidden[1] + self.stats_hidden[1];
         if self.has_header_branch() {
             dim += self.header_hidden[1];

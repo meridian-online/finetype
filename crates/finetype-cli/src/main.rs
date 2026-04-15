@@ -451,6 +451,11 @@ enum Commands {
         /// Read input as a JSON array instead of one value per line
         #[arg(long)]
         json: bool,
+
+        /// Include validation pass-rate features (239-dim, one per taxonomy type).
+        /// Requires taxonomy to be available (labels/ directory or embedded).
+        #[arg(long)]
+        validation: bool,
     },
 
     /// Evaluate model accuracy on a test set
@@ -760,7 +765,11 @@ fn main() -> Result<()> {
             model_config,
         ),
 
-        Commands::ExtractFeatures { header, json } => cmd_extract_features(header, json),
+        Commands::ExtractFeatures {
+            header,
+            json,
+            validation,
+        } => cmd_extract_features(header, json, validation),
     }
 }
 
@@ -1159,10 +1168,14 @@ fn cmd_train_multi_branch(
 /// - stats: 27-dim column-level statistics
 ///
 /// Outputs JSON to stdout.
-fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> {
+fn cmd_extract_features(
+    header: Option<String>,
+    json_input: bool,
+    include_validation: bool,
+) -> Result<()> {
     use finetype_model::{
         extract_char_distribution, extract_column_stats, extract_embedding_aggregation,
-        CHAR_DIST_DIM, COLUMN_STATS_DIM, EMBED_AGG_DIM,
+        ValidationFeatureExtractor, CHAR_DIST_DIM, COLUMN_STATS_DIM, EMBED_AGG_DIM,
     };
 
     // Read values from stdin
@@ -1223,8 +1236,21 @@ fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> 
         }
     };
 
+    // 5. Validation pass-rate features (239-dim, requires taxonomy with compiled validators)
+    let (validation_features, type_index_keys) = if include_validation {
+        let taxonomy_path = PathBuf::from("labels");
+        let mut taxonomy = load_taxonomy(&taxonomy_path)?;
+        taxonomy.compile_validators();
+        let extractor = ValidationFeatureExtractor::new(&taxonomy);
+        let feats = extractor.extract(&value_refs, &taxonomy);
+        let keys: Vec<String> = extractor.type_keys().to_vec();
+        (feats, keys)
+    } else {
+        (Vec::new(), Vec::new())
+    };
+
     // Output as JSON
-    let output = json!({
+    let mut output = json!({
         "char": char_features.to_vec(),
         "embed": embed_features.to_vec(),
         "stats": stats_features.to_vec(),
@@ -1232,6 +1258,11 @@ fn cmd_extract_features(header: Option<String>, json_input: bool) -> Result<()> 
         "header": header,
         "n_values": values.len(),
     });
+
+    if include_validation {
+        output["validation"] = json!(validation_features);
+        output["type_index_keys"] = json!(type_index_keys);
+    }
 
     let stdout = io::stdout();
     serde_json::to_writer(stdout.lock(), &output)?;
