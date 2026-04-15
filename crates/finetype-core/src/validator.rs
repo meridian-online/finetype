@@ -1159,4 +1159,42 @@ datetime.timestamp.iso_8601:
         assert!(!compiled.is_valid("100000"));
         assert!(!compiled.is_valid("986233")); // payload_size_bytes range
     }
+
+    // ── ac-01: country_code ISO 3166-1 enum validation ──────────────────
+
+    #[test]
+    fn ac01_country_code_enum_validates_official_codes() {
+        // Load real taxonomy to test the country_code definition with enum
+        let labels_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("labels");
+        let mut taxonomy = Taxonomy::from_directory(&labels_dir).unwrap();
+        taxonomy.compile_validators();
+
+        let validator = taxonomy
+            .get_validator("geography.location.country_code")
+            .expect("country_code should have a validator");
+
+        // Valid officially-assigned codes
+        assert!(validator.is_valid("US"), "US should be valid");
+        assert!(validator.is_valid("AU"), "AU should be valid");
+        assert!(validator.is_valid("JP"), "JP should be valid");
+        assert!(validator.is_valid("GB"), "GB should be valid");
+        assert!(validator.is_valid("DE"), "DE should be valid");
+        assert!(validator.is_valid("ZW"), "ZW (last code) should be valid");
+
+        // Invalid: not in ISO 3166-1 enum
+        assert!(!validator.is_valid("QQ"), "QQ is not an assigned code");
+        assert!(!validator.is_valid("XX"), "XX is user-assigned, not in enum");
+        assert!(!validator.is_valid("ZZ"), "ZZ is user-assigned, not in enum");
+
+        // Invalid: wrong format (pattern still enforced)
+        assert!(!validator.is_valid("A1"), "A1 fails pattern check");
+        assert!(!validator.is_valid("usa"), "lowercase fails pattern");
+        assert!(!validator.is_valid("U"), "single char fails pattern");
+        assert!(!validator.is_valid("USA"), "3 chars fails pattern");
+    }
 }
