@@ -2169,9 +2169,7 @@ impl Generator {
                         "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK",
                         "YT",
                     ],
-                    "EN_AU" => &[
-                        "NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT",
-                    ],
+                    "EN_AU" => &["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"],
                     _ => &[
                         // US states + DC + territories (default)
                         "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID",
