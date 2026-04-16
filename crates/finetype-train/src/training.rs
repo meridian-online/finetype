@@ -3,6 +3,7 @@
 use anyhow::Result;
 use candle_core::{DType, Device, Tensor, D};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // ── Early Stopping ───────────────────────────────────────────────────────────
 
@@ -162,6 +163,10 @@ pub struct EpochMetrics {
     pub val_accuracy: f32,
     pub learning_rate: f64,
     pub epoch_time_secs: f32,
+    /// Per-branch L2 gradient norms (e.g., "char" → 0.42, "embed" → 0.31).
+    /// None for metrics from training runs before gradient norm monitoring.
+    #[serde(default)]
+    pub branch_gradient_norms: Option<HashMap<String, f32>>,
 }
 
 /// Summary of a complete training run.
@@ -352,5 +357,62 @@ mod tests {
         // 11/3 = 3 full batches + remainder of 2 (kept, since 2 >= 2)
         assert_eq!(batches.len(), 4);
         assert_eq!(batches[3].len(), 2);
+    }
+
+    #[test]
+    fn test_epoch_metrics_backward_compat_without_gradient_norms() {
+        // Old results.json entries don't have branch_gradient_norms — must still deserialize.
+        let json = r#"{
+            "epoch": 5,
+            "train_loss": 1.23,
+            "val_loss": 1.10,
+            "train_accuracy": 0.45,
+            "val_accuracy": 0.52,
+            "learning_rate": 0.0001,
+            "epoch_time_secs": 95.2
+        }"#;
+        let m: EpochMetrics = serde_json::from_str(json).unwrap();
+        assert_eq!(m.epoch, 5);
+        assert!(m.branch_gradient_norms.is_none());
+    }
+
+    #[test]
+    fn test_epoch_metrics_with_gradient_norms() {
+        let json = r#"{
+            "epoch": 0,
+            "train_loss": 2.50,
+            "val_loss": 2.40,
+            "train_accuracy": 0.10,
+            "val_accuracy": 0.12,
+            "learning_rate": 0.001,
+            "epoch_time_secs": 120.0,
+            "branch_gradient_norms": {"char": 0.42, "embed": 0.31, "stats": 0.55, "header": 0.28, "valid": 0.19}
+        }"#;
+        let m: EpochMetrics = serde_json::from_str(json).unwrap();
+        let norms = m.branch_gradient_norms.as_ref().unwrap();
+        assert_eq!(norms.len(), 5);
+        assert!((norms["char"] - 0.42).abs() < 1e-6);
+        assert!((norms["valid"] - 0.19).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_epoch_metrics_roundtrip_with_gradient_norms() {
+        let mut norms = HashMap::new();
+        norms.insert("char".to_string(), 1.5f32);
+        norms.insert("embed".to_string(), 0.8);
+        let m = EpochMetrics {
+            epoch: 3,
+            train_loss: 0.5,
+            val_loss: 0.6,
+            train_accuracy: 0.85,
+            val_accuracy: 0.80,
+            learning_rate: 0.0005,
+            epoch_time_secs: 60.0,
+            branch_gradient_norms: Some(norms),
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        let m2: EpochMetrics = serde_json::from_str(&json).unwrap();
+        assert_eq!(m2.branch_gradient_norms.as_ref().unwrap().len(), 2);
+        assert!((m2.branch_gradient_norms.as_ref().unwrap()["char"] - 1.5).abs() < 1e-6);
     }
 }

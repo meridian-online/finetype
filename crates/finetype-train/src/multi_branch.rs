@@ -1963,6 +1963,65 @@ fn count_parameters(varmap: &VarMap) -> usize {
         .sum()
 }
 
+/// Compute per-branch L2 gradient norms from a GradStore and VarMap.
+///
+/// Groups parameters by branch prefix (e.g., "char.l1.weight" → "char",
+/// "merge_l1.weight" → "merge", "head.weight" → "head") and computes the
+/// L2 norm (sqrt of sum of squared gradient values) for each branch.
+///
+/// Returns a HashMap with branch names as keys and L2 norms as values.
+fn compute_branch_gradient_norms(
+    varmap: &VarMap,
+    grads: &candle_core::backprop::GradStore,
+) -> std::collections::HashMap<String, f32> {
+    let data = varmap.data().lock().unwrap();
+    let mut branch_sq_sums: std::collections::HashMap<String, f32> =
+        std::collections::HashMap::new();
+
+    for (name, var) in data.iter() {
+        // Determine branch from parameter name prefix.
+        // Parameter names follow the pattern: "branch.layer.param"
+        // e.g., "char.l1.weight", "embed.l2.bias", "header.input_ln.weight",
+        //        "valid.l1.weight", "merge_l1.weight", "merge_bn.running_mean",
+        //        "merge_ln.weight", "head.weight"
+        let branch = if name.starts_with("char.") {
+            "char"
+        } else if name.starts_with("embed.") {
+            "embed"
+        } else if name.starts_with("stats.") {
+            "stats"
+        } else if name.starts_with("header.") {
+            "header"
+        } else if name.starts_with("valid.") {
+            "valid"
+        } else if name.starts_with("merge_") {
+            "merge"
+        } else if name.starts_with("head.") || name.starts_with("hier_") {
+            "head"
+        } else {
+            "other"
+        };
+
+        if let Some(grad) = grads.get(var.as_tensor()) {
+            // Sum of squared gradient values (for L2 norm computation).
+            if let Ok(sq_sum) = grad
+                .sqr()
+                .and_then(|sq| sq.sum_all())
+                .and_then(|s| s.to_dtype(candle_core::DType::F32))
+                .and_then(|s| s.to_scalar::<f32>())
+            {
+                *branch_sq_sums.entry(branch.to_string()).or_insert(0.0) += sq_sum;
+            }
+        }
+    }
+
+    // Take sqrt to get L2 norm.
+    branch_sq_sums
+        .into_iter()
+        .map(|(branch, sq_sum)| (branch, sq_sum.sqrt()))
+        .collect()
+}
+
 /// Compute hierarchical multi-level cross-entropy loss.
 ///
 /// Decomposes flat label indices into domain/category/type targets using the
@@ -2095,6 +2154,7 @@ pub fn train_multi_branch(
     use candle_nn::{AdamW, Optimizer, ParamsAdamW};
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use std::collections::HashMap;
 
     let (device, device_name) = crate::get_device();
     eprintln!("Using {device_name} device");
@@ -2238,6 +2298,8 @@ pub fn train_multi_branch(
         let mut train_loss_sum = 0.0f64;
         let mut train_correct_sum = 0.0f64;
         let mut train_samples = 0usize;
+        let mut epoch_grad_norms: HashMap<String, f64> = HashMap::new();
+        let mut grad_norm_batch_count = 0usize;
 
         // Build batches: group-based (with frozen enrichment) or flat (traditional)
         let group_batches: Vec<Vec<usize>>;
@@ -2317,7 +2379,17 @@ pub fn train_multi_branch(
                 candle_nn::loss::cross_entropy(&logits, &labels_t)?
             };
 
-            optimizer.backward_step(&loss)?;
+            // Manual backward + step so we can capture gradient norms.
+            let grads = loss.backward()?;
+
+            // Accumulate per-branch gradient norms for this epoch.
+            let batch_norms = compute_branch_gradient_norms(&varmap, &grads);
+            for (branch, norm) in &batch_norms {
+                *epoch_grad_norms.entry(branch.clone()).or_insert(0.0) += *norm as f64;
+            }
+            grad_norm_batch_count += 1;
+
+            optimizer.step(&grads)?;
 
             let loss_val: f32 = loss.to_scalar()?;
             train_loss_sum += loss_val as f64 * bs as f64;
@@ -2413,6 +2485,20 @@ pub fn train_multi_branch(
 
         let epoch_time = epoch_start.elapsed().as_secs_f32();
 
+        // Average gradient norms across batches for this epoch.
+        let branch_gradient_norms = if grad_norm_batch_count > 0 {
+            Some(
+                epoch_grad_norms
+                    .iter()
+                    .map(|(branch, sum)| {
+                        (branch.clone(), (*sum / grad_norm_batch_count as f64) as f32)
+                    })
+                    .collect::<HashMap<String, f32>>(),
+            )
+        } else {
+            None
+        };
+
         let metrics = EpochMetrics {
             epoch,
             train_loss,
@@ -2421,6 +2507,7 @@ pub fn train_multi_branch(
             val_accuracy,
             learning_rate: lr,
             epoch_time_secs: epoch_time,
+            branch_gradient_norms,
         };
         renderer.on_epoch_end(&metrics);
         epoch_metrics.push(metrics);
@@ -4079,5 +4166,189 @@ mod tests {
         let valid_t = valid_t.expect("valid should be Some when valid_dim > 0");
         assert_eq!(valid_t.dims(), &[5, valid_dim]);
         assert_eq!(labels_t.dims(), &[5]);
+    }
+
+    // ---- ac-06: Validation branch resize to [192, 128] ----
+
+    #[test]
+    fn test_v13_validation_branch_resize() {
+        // Verify that valid_hidden=[192, 128] works correctly.
+        // This matches the v13 config: v12 architecture with wider validation branch.
+        let config = MultiBranchConfig {
+            char_hidden: [450, 450],
+            embed_hidden: [300, 300],
+            stats_hidden: [192, 96],
+            header_hidden: [192, 96],
+            valid_dim: 239,
+            valid_hidden: [192, 128],
+            merge_hidden: [750, 750],
+            ..MultiBranchConfig::default()
+        };
+        assert!(config.has_validation_branch());
+        // v13 merged_dim: 450 + 300 + 96 + 96 + 128 = 1070
+        assert_eq!(config.merged_dim(), 1070);
+
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+
+        let batch_size = 4;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        let header_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.header_dim), &device).unwrap();
+        let valid_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.valid_dim), &device).unwrap();
+
+        // Forward pass with v13-sized validation branch
+        let logits = model
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                Some(&valid_feats),
+                false,
+            )
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+
+        // Training mode also works
+        let logits = model
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                Some(&valid_feats),
+                true,
+            )
+            .unwrap();
+        assert_eq!(logits.dims(), &[batch_size, config.n_classes]);
+    }
+
+    #[test]
+    fn test_v13_config_json_deserialization() {
+        // Verify that a v13 config.json with valid_hidden=[192, 128] deserializes correctly.
+        let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 512,
+            "stats_dim": 27,
+            "header_dim": 128,
+            "valid_dim": 240,
+            "char_hidden": [450, 450],
+            "embed_hidden": [300, 300],
+            "stats_hidden": [192, 96],
+            "header_hidden": [192, 96],
+            "valid_hidden": [192, 128],
+            "merge_hidden": [750, 750],
+            "n_classes": 240,
+            "dropout": 0.35,
+            "head_type": "Flat",
+            "activation": "ReLU",
+            "use_layer_norm": false
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.valid_dim, 240);
+        assert_eq!(config.valid_hidden, [192, 128]);
+        assert!(config.has_validation_branch());
+        // v13 merged_dim: 450 + 300 + 96 + 96 + 128 = 1070
+        assert_eq!(config.merged_dim(), 1070);
+    }
+
+    #[test]
+    fn test_default_config_valid_hidden_backward_compat() {
+        // Verify MultiBranchConfig defaults still have valid_hidden=[0, 0].
+        // This is critical for backward compatibility — do NOT change.
+        let config = MultiBranchConfig::default();
+        assert_eq!(config.valid_hidden, [0, 0]);
+        assert_eq!(config.valid_dim, 0);
+        assert!(!config.has_validation_branch());
+    }
+
+    // ---- ac-07: Per-branch gradient norm monitoring ----
+
+    #[test]
+    fn test_gradient_norm_computation() {
+        // Verify compute_branch_gradient_norms returns non-zero norms
+        // for all branches after a backward pass.
+        let device = Device::Cpu;
+        let config = MultiBranchConfig {
+            valid_dim: 239,
+            valid_hidden: [128, 64],
+            ..MultiBranchConfig::default()
+        };
+
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+
+        let batch_size = 4;
+        let char_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.char_dim), &device).unwrap();
+        let embed_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.embed_dim), &device).unwrap();
+        let stats_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.stats_dim), &device).unwrap();
+        let header_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.header_dim), &device).unwrap();
+        let valid_feats =
+            Tensor::randn(0.0f32, 1.0, (batch_size, config.valid_dim), &device).unwrap();
+
+        // Forward + backward
+        let logits = model
+            .forward(
+                &char_feats,
+                &embed_feats,
+                &stats_feats,
+                Some(&header_feats),
+                Some(&valid_feats),
+                true,
+            )
+            .unwrap();
+        let targets = Tensor::new(&[0u32, 1, 2, 3], &device).unwrap();
+        let loss = candle_nn::loss::cross_entropy(&logits, &targets).unwrap();
+        let grads = loss.backward().unwrap();
+
+        let norms = compute_branch_gradient_norms(&varmap, &grads);
+
+        // All 5 branches + merge + head should have non-zero gradient norms
+        assert!(norms.contains_key("char"), "char branch missing from norms");
+        assert!(
+            norms.contains_key("embed"),
+            "embed branch missing from norms"
+        );
+        assert!(
+            norms.contains_key("stats"),
+            "stats branch missing from norms"
+        );
+        assert!(
+            norms.contains_key("header"),
+            "header branch missing from norms"
+        );
+        assert!(
+            norms.contains_key("valid"),
+            "valid branch missing from norms"
+        );
+        assert!(
+            norms.contains_key("merge"),
+            "merge branch missing from norms"
+        );
+        assert!(norms.contains_key("head"), "head branch missing from norms");
+
+        // All norms should be positive and finite
+        for (branch, norm) in &norms {
+            assert!(
+                *norm > 0.0 && norm.is_finite(),
+                "branch {} has invalid norm: {}",
+                branch,
+                norm
+            );
+        }
     }
 }

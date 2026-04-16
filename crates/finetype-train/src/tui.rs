@@ -806,6 +806,7 @@ mod tui_impl {
                 val_accuracy: *va,
                 learning_rate: *lr,
                 epoch_time_secs: *t,
+                branch_gradient_norms: None,
             });
         }
 

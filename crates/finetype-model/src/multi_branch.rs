@@ -1038,4 +1038,31 @@ mod tests {
             "/tmp/nonexistent-finetype-test"
         ));
     }
+
+    #[test]
+    fn ac06_config_deserialization_v13_validation_branch() {
+        // v13 config with valid_hidden=[192, 128] (wider validation branch).
+        let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 512,
+            "stats_dim": 27,
+            "header_dim": 128,
+            "valid_dim": 240,
+            "char_hidden": [450, 450],
+            "embed_hidden": [300, 300],
+            "stats_hidden": [192, 96],
+            "header_hidden": [192, 96],
+            "valid_hidden": [192, 128],
+            "merge_hidden": [750, 750],
+            "n_classes": 240,
+            "dropout": 0.35,
+            "head_type": "Flat"
+        }"#;
+        let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.valid_dim, 240);
+        assert_eq!(config.valid_hidden, [192, 128]);
+        assert!(config.has_validation_branch());
+        // v13 merged_dim: 450 + 300 + 96 + 96 + 128 = 1070
+        assert_eq!(config.merged_dim(), 1070);
+    }
 }

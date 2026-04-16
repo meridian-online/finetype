@@ -862,6 +862,7 @@ pub fn train_entity(
             val_accuracy,
             learning_rate: lr,
             epoch_time_secs: epoch_time,
+            branch_gradient_norms: None,
         };
 
         if epoch % 10 == 0 || epoch == config.epochs - 1 {
