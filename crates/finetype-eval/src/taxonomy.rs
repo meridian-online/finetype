@@ -159,7 +159,7 @@ pub fn load_taxonomy_stats(labels_dir: &Path) -> Result<TaxonomyStats> {
             *stats.domains.entry(domain).or_insert(0) += 1;
 
             let get_str = |field: &str| -> Option<&str> {
-                map.get(&serde_yaml::Value::String(field.to_string()))
+                map.get(serde_yaml::Value::String(field.to_string()))
                     .and_then(|v| v.as_str())
             };
 
@@ -170,14 +170,14 @@ pub fn load_taxonomy_stats(labels_dir: &Path) -> Result<TaxonomyStats> {
             }
 
             if map
-                .get(&serde_yaml::Value::String("validation".to_string()))
+                .get(serde_yaml::Value::String("validation".to_string()))
                 .is_some()
             {
                 stats.with_validation += 1;
             }
 
             if map
-                .get(&serde_yaml::Value::String(
+                .get(serde_yaml::Value::String(
                     "validation_by_locale".to_string(),
                 ))
                 .is_some()
