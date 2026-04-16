@@ -761,8 +761,8 @@ fi
 # --- Profile eval gate check ---
 
 if [[ -f "$V13_REPORT" ]]; then
-    V13_CORRECT=$(grep "Profile label accuracy" "$V13_REPORT" | head -1 | grep -oP '\d+(?=/)')
-    V13_TOTAL=$(grep "Profile label accuracy" "$V13_REPORT" | head -1 | grep -oP '(?<=/)\d+')
+    V13_CORRECT=$(grep "Profile label accuracy" "$V13_REPORT" | head -1 | sed 's/.*| //' | sed 's/\/.*//')
+    V13_TOTAL=$(grep "Profile label accuracy" "$V13_REPORT" | head -1 | sed 's/.*\///' | sed 's/ .*//')
 
     if [[ -n "$V13_CORRECT" ]] && [[ -n "$V13_TOTAL" ]]; then
         echo "[Gate] Profile eval: $V13_CORRECT/$V13_TOTAL"
