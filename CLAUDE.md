@@ -30,25 +30,25 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 ## Current State
 
 **Version:** 0.6.15
-**Taxonomy:** 239 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 24, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
-**Default model:** Multi-branch→Sharpen pipeline with sherlock-v11 (4-branch: char+embed+stats+header). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **201/227 (88.5% label, 91.2% domain)** on 35 datasets. Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
+**Taxonomy:** 240 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 25, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
+**Default model:** Multi-branch→Sharpen pipeline with sherlock-v13 (5-branch: char+embed+stats+header+validation). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **212/227 (93.4% label, 93.8% domain)** on 35 datasets. Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
 **Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 19 value-based disambiguation rules (R1–R19), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
-**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 374 model tests, zero warnings.
+**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 383 model tests, zero warnings.
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent work
 
+- **v13 retrain — data quality + architecture** (m-16) — Retrained with 4 tiers of improvements from the v12 data quality audit: distilled data decontamination (removed state_code→country_code remap, dropped mislabeled SSN/user_agent rows, filtered phone/postal), new validation patterns (http_method, user_agent, latitude, geohash tightened), distilled cap at 600/type with hard-negative mining, and validation branch resize ([128,64]→[192,128]). Added `geography.location.state_code` as 240th type. Per-branch gradient norms logged to results.json. Profile eval: **201→212/227 (+11 columns, 93.4% label, 93.8% domain)**. Sprint goal exceeded. Specs: `specs/2026-04-16-v13-retrain/`, `specs/2026-04-16-v12-data-quality-audit/`.
+- **v12 data quality audit** — Fixed validation branch loading bug (vb.pp prefix mismatch). Audited all 23 v12 misclassifications. Root causes: model_error(9), training_collision(8), data_gap(6). Produced retrain brief with 4 priority tiers that drove v13. Spec: `specs/2026-04-16-v12-data-quality-audit/`.
 - **v11 retraining + accuracy gap closure** — Retrained multi-branch model (sherlock-v11) with 70/30 distillation-heavy mix. Expanded eval from 190 to 227 columns across 35 datasets. Audited 34 misclassifications, fixed 6 ground-truth labels, 3 broken transforms, and phantom label matches. Specs: `specs/2026-04-12-accuracy-gap-retraining/`, `specs/2026-04-12-sharpen-header-bugfixes/`.
-- **Sharpen header bugfixes** — Fixed address keyword capturing bitcoin addresses, ipv6 routing before ip_v4 catch-all, same-category unconditional override, same-domain threshold raised to 0.95, added icao/author hints, guarded date keyword from month-specific formats. Three confirmed eval fixes (phone→ssn, abbreviated_month_date, long_full_month_date). Profile eval 199→201/227 across three iterations. **Finding: hint/threshold tuning has reached its ceiling at 201/227. Remaining 26 misclassifications are model-level (decision 0038).**
-- **Candle autoresearch port** — Ported overnight training findings to pure Rust Candle crate. GELU+LayerNorm infrastructure added but not adopted for v11 (decision 0046). Spec: `specs/2026-04-11-candle-autoresearch-port/`.
 - **Multi-branch pipeline integration** (m-15) — Replaced Sense+CharCNN with multi-branch as the default inference pipeline. Sharpen layer (feature_sharpen F1–F6, value_sharpen R1–R19, header hints) post-processes multi-branch output. Decisions 0041–0042.
 
 ### What's next
 
-- **Retraining for remaining 26 misclassifications** — The top 8 are at ≥0.86 confidence (model-level confusion: decimal_number↔version/latitude, country↔country_code, user_agent misrouting). No rule or hint can reach these. Next model version must address them via training data improvements.
-- **Publish v11 to HuggingFace** — Required for DuckDB extension runtime download.
-- **Actionability format_string gaps** — Expanded eval set exposed empty format_strings on iso_8601, iso, dmy_short_dot (96.7% overall vs 99.9% on old eval set). These are taxonomy definition gaps, not model issues.
+- **Publish v13 to HuggingFace** — Required for DuckDB extension runtime download. v12 was never published (superseded by v13).
+- **15 remaining misclassifications** — Hierarchical subtypes (data_uri→url, email_display→email, phone_e164→phone_number), country↔country_code, user_agent→jwt, decimal_number confusion. Needs fresh audit to determine next approach.
+- **Actionability format_string gaps** — Expanded eval set exposed empty format_strings on iso_8601, iso, dmy_short_dot (99.9% overall after v13). These are taxonomy definition gaps, not model issues.
 
 ### Architectural direction (settled — do not re-ask)
 
@@ -191,7 +191,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v11: **201/227 (88.5% label, 91.2% domain)**. 35 datasets, 227 columns, 239-type taxonomy. Run on Mac with `FINETYPE_MODEL_DIR=models/sherlock-v11`.
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v13: **212/227 (93.4% label, 93.8% domain)**. 35 datasets, 227 columns, 240-type taxonomy. Run on Mac with `FINETYPE_MODEL_DIR=models/sherlock-v13`.
 **Actionability eval** — 96.7% transform success rate (494k/511k values). Below old baseline (99.9%) due to expanded eval set exposing format_string gaps.
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
@@ -200,7 +200,7 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Multi-branch accuracy gap closure (m-16):** Current: 201/227 (88.5%) with v11+Sharpen. Sharpen tuning (hints, thresholds) has reached its ceiling — remaining 26 misclassifications require retraining (decision 0038). Key model-level gaps: decimal_number↔version/latitude false positives, country↔country_code confusion, user_agent misrouting, date format ambiguity (iso vs mdy/dmy variants). Next steps: publish v11 to HuggingFace, retrain for remaining gaps, fix actionability format_string coverage.
+**Multi-branch accuracy gap closure (m-16): COMPLETE.** Shipped sherlock-v13: 212/227 (93.4% label, 93.8% domain) — up from 201/227 with v11. Four tiers of improvements: distilled data decontamination, validation pattern gaps, class balance (cap 600/type + hard negatives), validation branch architecture resize. 15 misclassifications remain for future work. Next: publish v13 to HuggingFace, audit remaining 15 for v14 planning.
 
 ## Decision Register
 
