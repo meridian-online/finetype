@@ -361,7 +361,7 @@ impl MultiBranchClassifier {
                 config.valid_dim,
                 config.valid_hidden,
                 &config.activation,
-                vb.pp("validation"),
+                vb.pp("valid"),
             ) {
                 Ok(branch) => Some(branch),
                 Err(e) => {

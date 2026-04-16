@@ -7,7 +7,7 @@ constraints:
   - Inspect upstream data (distilled CSV values + synthetic generator output) — feature vectors alone don't explain root cause
   - All 23 v12 misclassifications audited with equal rigour — no priority triage
   - GT corrections committed directly to eval ground truth per decision 0037
-  - Include confidence analysis for the 9 persistent errors that got more confident in v12
+  - Include confidence analysis for the 6 persistent errors that got more confident in v12
   - Prior audit findings (specs/2026-04-12 eval-audit-v2, specs/2026-03-26 collisions) are starting context, not repeated work
 
 acceptance_criteria:
@@ -32,20 +32,20 @@ acceptance_criteria:
   - id: ac-03
     ac_type: doc
     description: >
-      Training data inspection for the 8 regressed types. For each regression pair
-      (e.g., phone_number vs ssn), sample 20 distilled examples and 20 synthetic
+      Training data inspection for the 4 regressed items plus 8 key confusion pairs.
+      For each regression and high-confusion pair, sample distilled and synthetic
       examples from each type and report: value overlap rate, distinguishing features,
       and whether the types are genuinely confusable from the data.
-    verification: 8 regression pairs inspected with sample data and overlap analysis.
+    verification: 4 regression pairs + 8 confusion pairs inspected with sample data and overlap analysis.
 
   - id: ac-04
     ac_type: doc
     description: >
-      Confidence analysis for the 9 persistent errors that increased in confidence.
+      Confidence analysis for the 6 persistent errors that increased in confidence.
       For each, extract the v12 validation features (239-dim) and report which
       taxonomy types the values pass validation for. Determine whether the validation
       branch is reinforcing or neutral toward the wrong prediction.
-    verification: 9 persistent errors analysed with validation feature breakdown.
+    verification: 6 persistent errors analysed with validation feature breakdown.
 
   - id: ac-05
     ac_type: code
