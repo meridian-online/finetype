@@ -159,7 +159,7 @@ mod tests {
         );
 
         // country has no pattern constraint — should also pass (loose validation)
-        let country_idx = extractor.index_of("geography.location.country").unwrap();
+        let _country_idx = extractor.index_of("geography.location.country").unwrap();
         // country validation has minLength:2, maxLength:100 — "US" passes
         // But the key discriminator is: country_code has ENUM + pattern,
         // so random 2-letter strings would fail country_code but pass country.
