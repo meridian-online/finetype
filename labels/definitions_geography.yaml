@@ -336,6 +336,126 @@ geography.location.country_code:
     ISO 3166-1 alpha-2 standard. Enum contains 249 officially-assigned codes.
     User-assigned ranges (AA, QM-QZ, XA-XZ, ZZ) excluded.
 
+geography.location.state_code:
+  title: "State/Province Code"
+  description: >
+    2-letter state or province abbreviation. Locale-specific due to
+    country-dependent subdivision codes (e.g., US states, CA provinces,
+    AU states/territories).
+  designation: locale_specific
+  locales: [EN_US, EN_CA, EN_AU]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "UPPER(CAST({col} AS VARCHAR))"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^[A-Z]{2}$"
+  validation_by_locale:
+    EN_US:
+      type: string
+      enum:
+        - "AL"
+        - "AK"
+        - "AZ"
+        - "AR"
+        - "CA"
+        - "CO"
+        - "CT"
+        - "DE"
+        - "FL"
+        - "GA"
+        - "HI"
+        - "ID"
+        - "IL"
+        - "IN"
+        - "IA"
+        - "KS"
+        - "KY"
+        - "LA"
+        - "ME"
+        - "MD"
+        - "MA"
+        - "MI"
+        - "MN"
+        - "MS"
+        - "MO"
+        - "MT"
+        - "NE"
+        - "NV"
+        - "NH"
+        - "NJ"
+        - "NM"
+        - "NY"
+        - "NC"
+        - "ND"
+        - "OH"
+        - "OK"
+        - "OR"
+        - "PA"
+        - "RI"
+        - "SC"
+        - "SD"
+        - "TN"
+        - "TX"
+        - "UT"
+        - "VT"
+        - "VA"
+        - "WA"
+        - "WV"
+        - "WI"
+        - "WY"
+        - "DC"
+        - "AS"
+        - "GU"
+        - "MP"
+        - "PR"
+        - "VI"
+    EN_CA:
+      type: string
+      enum:
+        - "AB"
+        - "BC"
+        - "MB"
+        - "NB"
+        - "NL"
+        - "NS"
+        - "NT"
+        - "NU"
+        - "ON"
+        - "PE"
+        - "QC"
+        - "SK"
+        - "YT"
+    EN_AU:
+      type: string
+      enum:
+        - "ACT"
+        - "NSW"
+        - "NT"
+        - "QLD"
+        - "SA"
+        - "TAS"
+        - "VIC"
+        - "WA"
+  tier: [VARCHAR, location]
+  release_priority: 4
+  aliases: [state_abbreviation, province_code]
+  samples:
+    - "CA"
+    - "NY"
+    - "TX"
+    - "FL"
+    - "ON"
+  references: null
+  notes: >
+    New in v13. Separated from country_code remap (state_code→country_code
+    was causing US state abbreviations like OR, CA, FL to train as country
+    codes). Locale-specific: US (50 states + DC + territories), CA
+    (13 provinces/territories), AU (8 states/territories). AU codes are
+    2-3 letters but universal pattern is ^[A-Z]{2}$ for the dominant case.
+
 geography.location.continent:
   title: "Continent Name"
   description: >
@@ -1042,6 +1162,7 @@ geography.coordinate.latitude:
     type: number
     minimum: -90
     maximum: 90
+    pattern: "^-?([0-8]?\\d(\\.\\d+)?|90(\\.0+)?)$"
   tier: [DOUBLE, coordinate]
   release_priority: 4
   aliases: [lat]
@@ -1135,7 +1256,7 @@ geography.coordinate.geohash:
   decompose: null
   validation:
     type: string
-    pattern: "^[0-9b-hjkmnp-z]{4,12}$"
+    pattern: "^[0-9b-hjkmnp-z]{6,12}$"
   tier: [VARCHAR, coordinate]
   release_priority: 3
   aliases: null
@@ -1144,11 +1265,13 @@ geography.coordinate.geohash:
     - "u4pruydqqvj"
     - "dr5ru7c02wnm"
     - "gbsuv7ztq"
-    - "ezs42"
+    - "ezs42e"
   references: null
   notes: >
     Invented by Gustavo Niemeyer. Public-domain algorithm. Each additional
-    character divides the cell into 32 sub-cells.
+    character divides the cell into 32 sub-cells. v13: Minimum length
+    tightened from 4 to 6 to reduce false positives on short lowercase
+    alphanumeric strings (e.g., short IDs).
 
 geography.coordinate.plus_code:
   title: "Plus Code (Open Location Code)"

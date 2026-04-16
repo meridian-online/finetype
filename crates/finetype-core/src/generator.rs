@@ -2144,12 +2144,12 @@ impl Generator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DOMAIN: geography (25 types)
+    // DOMAIN: geography (26 types)
     // ═══════════════════════════════════════════════════════════════════════════
 
     fn gen_geography(&mut self, category: &str, type_name: &str) -> Result<String, GeneratorError> {
         match (category, type_name) {
-            // ── location (5 types) ───────────────────────────────────────
+            // ── location (6 types) ───────────────────────────────────────
             ("location", "country") => {
                 let countries = locale_data::countries(self.current_locale());
                 Ok(countries[self.rng.gen_range(0..countries.len())].to_string())
@@ -2159,6 +2159,28 @@ impl Generator {
                     "US", "GB", "CA", "AU", "DE", "FR", "JP", "CN", "IN", "BR", "MX", "IT", "ES",
                     "KR", "RU", "NL", "CH", "SE", "NO", "DK",
                 ];
+                Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
+            }
+            ("location", "state_code") => {
+                // 2-letter state/province abbreviation
+                let locale = self.current_locale();
+                let codes: &[&str] = match locale {
+                    "EN_CA" => &[
+                        "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK",
+                        "YT",
+                    ],
+                    "EN_AU" => &[
+                        "NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT",
+                    ],
+                    _ => &[
+                        // US states + DC + territories (default)
+                        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID",
+                        "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS",
+                        "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK",
+                        "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV",
+                        "WI", "WY", "DC", "AS", "GU", "MP", "PR", "VI",
+                    ],
+                };
                 Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
             }
             ("location", "continent") => {
@@ -2291,7 +2313,7 @@ impl Generator {
             }
             ("coordinate", "geohash") => {
                 let alphabet = b"0123456789bcdefghjkmnpqrstuvwxyz";
-                let len = self.rng.gen_range(4..=12);
+                let len = self.rng.gen_range(6..=12);
                 let hash: String = (0..len)
                     .map(|_| alphabet[self.rng.gen_range(0..alphabet.len())] as char)
                     .collect();

@@ -16,7 +16,7 @@
   "geography.location.county": "geography.location.region",
   "geography.location.street_suffix": "geography.address.street_suffix",
   "geography.location.us_state": "geography.location.region",
-  "geography.region.state_code": "geography.location.country_code",
+  "geography.region.state_code": "geography.location.state_code",
 
   "identity.credential.isbn": "identity.commerce.isbn",
   "identity.organization.company_name": "representation.text.entity_name",

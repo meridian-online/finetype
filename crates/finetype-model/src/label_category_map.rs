@@ -7,7 +7,7 @@
 //! Categories:
 //!   temporal (85) — all `datetime.*`
 //!   numeric (26) — numeric values, measurements, currency amounts, rates
-//!   geographic (25) — all `geography.*`
+//!   geographic (25) — all `geography.*` (24→25 in v13: +state_code)
 //!   entity (9) — person names, entity names
 //!   format (52) — structured identifiers, codes, sequences
 //!   text (29) — free text, low-cardinality enums, categorical
@@ -151,6 +151,7 @@ const GEOGRAPHIC_LABELS: &[&str] = &[
     "geography.location.country",
     "geography.location.country_code",
     "geography.location.region",
+    "geography.location.state_code",
     "geography.transportation.hs_code",
     "geography.transportation.iata_code",
     "geography.transportation.icao_code",
@@ -439,9 +440,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_239() {
+    fn test_total_is_240() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 239, "Map should contain exactly 239 types");
+        assert_eq!(map.len(), 240, "Map should contain exactly 240 types");
     }
 
     #[test]
@@ -450,8 +451,8 @@ mod tests {
         assert_eq!(NUMERIC_LABELS.len(), 23, "numeric should have 23 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
-            24,
-            "geographic should have 24 types"
+            25,
+            "geographic should have 25 types"
         );
         assert_eq!(ENTITY_LABELS.len(), 8, "entity should have 8 types");
         assert_eq!(FORMAT_LABELS.len(), 79, "format should have 79 types");
@@ -549,8 +550,8 @@ mod tests {
         let geographic = map.eligible_labels(BroadCategory::Geographic);
         assert_eq!(
             geographic.len(),
-            24,
-            "geographic eligible should be 24 (no incoming overlaps)"
+            25,
+            "geographic eligible should be 25 (no incoming overlaps)"
         );
 
         let numeric = map.eligible_labels(BroadCategory::Numeric);

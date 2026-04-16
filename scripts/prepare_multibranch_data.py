@@ -36,6 +36,9 @@ Options:
     --validate-labels       Run label validation pass on distilled data before blending
     --oversample-types T    Comma-separated list of type keys to oversample (e.g. "hs_code,latitude")
     --oversample-mult N     Oversampling multiplier for confused types (default: 3)
+    --filter-distilled      Filter known-bad distilled data (v13 AC-02: ssn, user_agent, phone, postal)
+    --distilled-cap N       Cap distilled rows per type at N (v13 AC-04: use 600)
+    --hard-negatives N      Generate N hard-negative decimal_number columns in [-90,90] (v13 AC-05: use 75)
     --skip-preflight        Skip preflight extraction check
     -h, --help              Show help
 """
@@ -45,6 +48,7 @@ import gzip
 import json
 import os
 import random
+import re
 import struct
 import subprocess
 import sys
@@ -61,7 +65,7 @@ CHAR_DIM = 960
 EMBED_DIM = 512
 STATS_DIM = 27
 HEADER_DIM = 128
-VALID_DIM = 239
+VALID_DIM = 240
 MAGIC = b"FTMB"
 VERSION_V2 = 2
 VERSION_V3 = 3
@@ -279,7 +283,11 @@ HEADER_VARIATIONS = {
     ],
     "geography.location.state": [
         "state", "State", "STATE", "state_name", "province",
-        "state_code", "region", "stateName", "state_province",
+        "region", "stateName", "state_province",
+    ],
+    "geography.location.state_code": [
+        "state_code", "state", "State", "STATE", "st", "state_abbr",
+        "state_abbreviation", "province_code", "region_code",
     ],
     "geography.location.country": [
         "country", "Country", "COUNTRY", "country_name", "nation",
@@ -843,6 +851,157 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
     return dict(columns_by_type), ordered_columns, stats
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Distilled data filtering (v13 AC-02)
+#
+# Removes known-bad distilled rows before blending. These are rows where the
+# Sherlock distilled data contains mislabeled examples that confuse the model.
+# Filtering runs BEFORE the distilled cap (AC-04).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Types to drop entirely (all distilled rows are mislabeled)
+_DROP_ALL_TYPES = {
+    "identity.government.ssn",      # 3 rows, all partial dates like "-- --, 1918"
+    "technology.internet.user_agent", # 4 rows, all person names / product descriptions
+}
+
+# Phone number: keep only rows where values look like actual phone numbers
+_PHONE_PATTERN = re.compile(
+    r"^[\s]*[\+]?[\d\s\-\.\(\)]{7,}$"
+)
+
+# Postal code: keep only rows where values match numeric postal code patterns
+_POSTAL_PATTERN = re.compile(
+    r"^[\s]*\d{3,10}[\s]*$|^[\s]*[A-Z]\d[A-Z]\s?\d[A-Z]\d[\s]*$|^[\s]*\d{5}-\d{4}[\s]*$"
+)
+
+
+def _column_matches_pattern(values, pattern, min_match_rate=0.5):
+    """Check if at least min_match_rate of values match the pattern."""
+    if not values:
+        return False
+    matches = sum(1 for v in values if pattern.match(str(v)))
+    return matches / len(values) >= min_match_rate
+
+
+def filter_distilled_columns(columns_by_type, ordered_columns):
+    """Filter known-bad distilled data (v13 AC-02).
+
+    - Drops ALL rows for ssn and user_agent (all mislabeled)
+    - Filters phone_number to keep only phone-format values
+    - Filters postal_code to keep only numeric postal code patterns
+
+    Args:
+        columns_by_type: dict[str, list[tuple[list[str], str]]]
+        ordered_columns: list[tuple[str, list[str], str]]
+
+    Returns:
+        filtered_columns_by_type, filtered_ordered, stats dict
+    """
+    stats = {
+        "dropped_types": [],
+        "filtered_phone": 0,
+        "filtered_postal": 0,
+        "total_dropped_columns": 0,
+    }
+
+    # Drop entire types
+    for type_key in _DROP_ALL_TYPES:
+        if type_key in columns_by_type:
+            count = len(columns_by_type[type_key])
+            del columns_by_type[type_key]
+            stats["dropped_types"].append((type_key, count))
+            stats["total_dropped_columns"] += count
+
+    # Filter phone_number: keep only columns with actual phone-format values
+    phone_key = "identity.person.phone_number"
+    if phone_key in columns_by_type:
+        original = columns_by_type[phone_key]
+        filtered = [
+            (vals, hdr) for vals, hdr in original
+            if _column_matches_pattern(vals, _PHONE_PATTERN)
+        ]
+        dropped = len(original) - len(filtered)
+        stats["filtered_phone"] = dropped
+        stats["total_dropped_columns"] += dropped
+        if filtered:
+            columns_by_type[phone_key] = filtered
+        else:
+            del columns_by_type[phone_key]
+
+    # Filter postal_code: keep only columns with numeric postal code patterns
+    postal_key = "geography.address.postal_code"
+    if postal_key in columns_by_type:
+        original = columns_by_type[postal_key]
+        filtered = [
+            (vals, hdr) for vals, hdr in original
+            if _column_matches_pattern(vals, _POSTAL_PATTERN)
+        ]
+        dropped = len(original) - len(filtered)
+        stats["filtered_postal"] = dropped
+        stats["total_dropped_columns"] += dropped
+        if filtered:
+            columns_by_type[postal_key] = filtered
+        else:
+            del columns_by_type[postal_key]
+
+    # Rebuild ordered_columns to match
+    drop_set = _DROP_ALL_TYPES.copy()
+    remaining_by_type = {}
+    for type_key, cols in columns_by_type.items():
+        remaining_by_type[type_key] = set(id(c) for c in cols)
+
+    filtered_ordered = []
+    for label, vals, hdr in ordered_columns:
+        if label in drop_set:
+            continue
+        # For filtered types, we can't match by id since ordered_columns
+        # has different tuple objects. Re-filter inline.
+        if label == phone_key and not _column_matches_pattern(vals, _PHONE_PATTERN):
+            continue
+        if label == postal_key and not _column_matches_pattern(vals, _POSTAL_PATTERN):
+            continue
+        filtered_ordered.append((label, vals, hdr))
+
+    return columns_by_type, filtered_ordered, stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Distilled cap (v13 AC-04)
+#
+# Caps distilled rows per type at a maximum to prevent over-represented types
+# from dominating the training mix. Runs AFTER filtering (AC-02) and BEFORE
+# the 70/30 blend.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def cap_distilled_columns(columns_by_type, max_per_type, rng):
+    """Cap distilled columns per type to max_per_type via random sampling.
+
+    Args:
+        columns_by_type: dict[str, list[tuple[list[str], str]]]
+        max_per_type: maximum distilled columns per type (e.g. 600)
+        rng: random.Random instance for reproducible sampling
+
+    Returns:
+        capped_columns_by_type, stats dict
+    """
+    stats = {
+        "capped_types": [],
+        "total_dropped_columns": 0,
+    }
+
+    for type_key in list(columns_by_type.keys()):
+        cols = columns_by_type[type_key]
+        if len(cols) > max_per_type:
+            original_count = len(cols)
+            columns_by_type[type_key] = rng.sample(cols, max_per_type)
+            dropped = original_count - max_per_type
+            stats["capped_types"].append((type_key, original_count, max_per_type))
+            stats["total_dropped_columns"] += dropped
+
+    return columns_by_type, stats
+
+
 def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, min_values,
                                 oversample_types=None, oversample_multiplier=3):
     """Generate synthetic training data via finetype generate, grouped as columns.
@@ -923,6 +1082,77 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
         return columns_by_type
     finally:
         os.unlink(tmp_path)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Hard-negative mining (v13 AC-05)
+#
+# Generates synthetic decimal_number columns in the [-90, 90] range with
+# non-geographic headers. Teaches the model that small decimals aren't always
+# latitude. These AUGMENT (not replace) existing decimal_number synthetic data.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Headers that signal non-geographic context for decimal values in [-90, 90]
+_HARD_NEGATIVE_HEADERS = [
+    "error", "score", "depth", "rating", "percentage", "delta", "offset",
+    "temperature", "weight", "balance", "margin", "deviation", "bias",
+    "threshold", "tolerance", "gain", "loss", "variance", "slope",
+    "coefficient", "factor", "index", "ratio", "spread", "diff",
+    "change", "shift", "adjustment", "correction", "residual",
+    "amplitude", "magnitude", "intensity", "level", "grade",
+    "rank", "priority", "confidence", "probability", "frequency",
+    "duration", "interval", "period", "lag", "delay",
+    "error_rate", "accuracy", "precision", "recall", "f1_score",
+    "mse", "rmse", "mae", "r_squared", "p_value",
+]
+
+
+def generate_hard_negatives(n_columns, rng, values_per_column=100):
+    """Generate hard-negative decimal_number columns in [-90, 90] range.
+
+    Each column has non-geographic headers and values that overlap with
+    the latitude range, teaching the model to use header context for
+    disambiguation.
+
+    Args:
+        n_columns: number of hard-negative columns to generate
+        rng: random.Random instance
+        values_per_column: values per column (default 100)
+
+    Returns:
+        list of (values, header) tuples for type decimal_number
+    """
+    columns = []
+    for _ in range(n_columns):
+        header = rng.choice(_HARD_NEGATIVE_HEADERS)
+        # Generate values in [-90, 90] with varying precision
+        values = []
+        for _ in range(values_per_column):
+            # Mix of value distributions:
+            r = rng.random()
+            if r < 0.3:
+                # Small values near zero (common for errors, scores)
+                val = rng.gauss(0, 10)
+            elif r < 0.6:
+                # Positive values (common for ratings, percentages)
+                val = rng.uniform(0, 90)
+            elif r < 0.8:
+                # Negative values (common for losses, deviations)
+                val = rng.uniform(-90, 0)
+            else:
+                # Full range
+                val = rng.uniform(-90, 90)
+
+            # Clamp to [-90, 90]
+            val = max(-90.0, min(90.0, val))
+
+            # Varying precision (1-6 decimal places)
+            precision = rng.randint(1, 6)
+            values.append(f"{val:.{precision}f}")
+
+        columns.append((values, header))
+
+    return columns
 
 
 def blend_columns(distilled, synthetic, ratio_distilled, samples_per_type, rng,
@@ -1718,6 +1948,9 @@ def main():
     validate_labels = False
     oversample_types = set()
     oversample_multiplier = 3
+    distilled_cap = 0  # 0 = no cap (AC-04: set to 600 for v13)
+    filter_distilled = False  # AC-02: filter known-bad distilled data
+    hard_negatives = 0  # AC-05: number of hard-negative decimal_number columns
 
     i = 0
     while i < len(args):
@@ -1776,6 +2009,15 @@ def main():
         elif args[i] == "--skip-preflight":
             skip_preflight = True
             i += 1
+        elif args[i] == "--distilled-cap":
+            distilled_cap = int(args[i + 1])
+            i += 2
+        elif args[i] == "--filter-distilled":
+            filter_distilled = True
+            i += 1
+        elif args[i] == "--hard-negatives":
+            hard_negatives = int(args[i + 1])
+            i += 2
         elif args[i] in ("-h", "--help"):
             print(__doc__)
             sys.exit(0)
@@ -1843,6 +2085,38 @@ def main():
     print(f"  {total_d_cols} columns across {len(distilled)} types")
     print(f"  {d_stats['total_values']} individual values")
 
+    # ─── Filter known-bad distilled data (v13 AC-02) ─────────────
+    if filter_distilled:
+        print(f"\nFiltering known-bad distilled data (v13 AC-02)...")
+        distilled, ordered_distilled, filter_stats = filter_distilled_columns(
+            distilled, ordered_distilled
+        )
+        if filter_stats["dropped_types"]:
+            for type_key, count in filter_stats["dropped_types"]:
+                print(f"  DROPPED all {count} columns for {type_key}")
+        if filter_stats["filtered_phone"]:
+            print(f"  Filtered {filter_stats['filtered_phone']} phone_number columns (non-phone values)")
+        if filter_stats["filtered_postal"]:
+            print(f"  Filtered {filter_stats['filtered_postal']} postal_code columns (non-postal values)")
+        total_d_cols_after = sum(len(cols) for cols in distilled.values())
+        print(f"  Total dropped: {filter_stats['total_dropped_columns']} columns")
+        print(f"  Remaining: {total_d_cols_after} columns across {len(distilled)} types")
+        total_d_cols = total_d_cols_after
+
+    # ─── Cap distilled columns per type (v13 AC-04) ───────────────
+    if distilled_cap > 0:
+        print(f"\nCapping distilled columns at {distilled_cap}/type (v13 AC-04)...")
+        distilled, cap_stats = cap_distilled_columns(distilled, distilled_cap, rng)
+        if cap_stats["capped_types"]:
+            for type_key, original, capped in cap_stats["capped_types"]:
+                print(f"  {type_key}: {original} → {capped}")
+            total_d_cols_after = sum(len(cols) for cols in distilled.values())
+            print(f"  Total dropped: {cap_stats['total_dropped_columns']} columns")
+            print(f"  Remaining: {total_d_cols_after} columns across {len(distilled)} types")
+            total_d_cols = total_d_cols_after
+        else:
+            print(f"  No types exceeded cap")
+
     # ─── Validate distilled labels (AC-4) ────────────────────────
     validation_stats = None
     if validate_labels:
@@ -1884,6 +2158,20 @@ def main():
     )
     total_s_cols = sum(len(cols) for cols in synthetic.values())
     print(f"  {total_s_cols} columns across {len(synthetic)} types")
+
+    # ─── Hard-negative mining (v13 AC-05) ─────────────────────────
+    if hard_negatives > 0:
+        print(f"\nGenerating {hard_negatives} hard-negative decimal_number columns ([-90,90] range)...")
+        hn_rng = random.Random(seed + 99)  # Offset seed for hard negatives
+        hn_columns = generate_hard_negatives(hard_negatives, hn_rng)
+        hn_type = "representation.numeric.decimal_number"
+        if hn_type in synthetic:
+            synthetic[hn_type].extend(hn_columns)
+        else:
+            synthetic[hn_type] = hn_columns
+        total_s_cols += len(hn_columns)
+        print(f"  Added {len(hn_columns)} hard-negative columns to {hn_type}")
+        print(f"  Total synthetic: {total_s_cols} columns")
 
     # ─── Validate labels ───────────────────────────────────────────
     bad_distilled = set(distilled.keys()) - taxonomy_types
@@ -2030,6 +2318,9 @@ def main():
         "ratio_distilled": ratio_distilled,
         "min_values": min_values,
         "distilled_source": distilled_path,
+        "filter_distilled": filter_distilled,
+        "distilled_cap": distilled_cap,
+        "hard_negatives": hard_negatives,
         "taxonomy_types": len(taxonomy_types),
         "blended_types": len(blended_types),
         "records_written": n_records,

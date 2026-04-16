@@ -251,6 +251,7 @@ technology.internet.user_agent:
   decompose: null
   validation:
     type: string
+    pattern: "^(Mozilla/|curl/|python-requests/|Wget/|Go-http-client/|axios/|PostmanRuntime/|kube-probe/|Java/|okhttp/|Apache-HttpClient/|libcurl/|node-fetch/|Dalvik/|CFNetwork/|Lynx/|Links |Scrapy/|bot|spider|crawl)"
     minLength: 10
     maxLength: 500
   tier: [VARCHAR, internet]
@@ -262,8 +263,10 @@ technology.internet.user_agent:
     - "curl/7.64.1"
   references: null
   notes: >
-    v1 migration: Was internet.user_agent. No strict regex — validation is
-    simple length check. Parse with dedicated UA parser for details.
+    v1 migration: Was internet.user_agent. v13: Added prefix-based pattern
+    for validation branch signal. Checks for known UA prefixes (Mozilla/,
+    curl/, python-requests/, etc.) and common bot/spider/crawler identifiers.
+    Parse with dedicated UA parser for full details.
 
 technology.internet.http_method:
   title: "HTTP Method"
@@ -279,6 +282,7 @@ technology.internet.http_method:
   decompose: null
   validation:
     type: string
+    pattern: "^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)$"
     enum: [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, CONNECT]
   tier: [VARCHAR, internet]
   release_priority: 3
@@ -291,6 +295,8 @@ technology.internet.http_method:
   notes: >
     v1 migration: Was internet.http_method marked broad_words. Lower priority
     due to high cardinality but limited semantic information.
+    v13: Added explicit pattern for validation branch signal (100% pass rate
+    for methods vs 33% for IATA's ^[A-Z]{3}$).
 
 # technology.internet.http_status_code: REMOVED in NNFT-242
 # False positives on plain integer columns. Range 100-599 overlaps heavily with integer_number.
