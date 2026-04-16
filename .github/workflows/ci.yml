@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - run: rustup show # installs toolchain + components from rust-toolchain.toml
       - run: cargo fmt --all -- --check
 
   clippy:
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh

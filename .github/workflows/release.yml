@@ -38,9 +38,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          targets: ${{ matrix.target }}
+      - run: rustup show # installs toolchain from rust-toolchain.toml
+      - run: rustup target add ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
         with:
