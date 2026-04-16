@@ -200,7 +200,12 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Multi-branch accuracy gap closure (m-16): COMPLETE.** Shipped sherlock-v13: 212/227 (93.4% label, 93.8% domain) — up from 201/227 with v11. Four tiers of improvements: distilled data decontamination, validation pattern gaps, class balance (cap 600/type + hard negatives), validation branch architecture resize. 15 misclassifications remain for future work. Next: publish v13 to HuggingFace, audit remaining 15 for v14 planning.
+**Publish quality + close format gaps (m-17).** Three workstreams:
+1. **Audit 15 remaining misclassifications** — discovery to determine if v14 retrain is warranted or if the remaining errors need taxonomy/rule changes. Hierarchical subtypes (data_uri→url, email_display→email, phone_e164→phone_number), country↔country_code, user_agent→jwt, decimal_number confusion.
+2. **Fix actionability format_string gaps** — iso_8601, iso, dmy_short_dot have empty format_strings. Taxonomy definition fixes, not model changes.
+3. **PII flag in JSON Schema** — card 0012. Add `x-finetype-pii` to schema output based on taxonomy type. No model changes.
+
+Previous: m-16 COMPLETE — shipped sherlock-v13 (212/227, 93.4%) + v0.6.16 release.
 
 ## Decision Register
 
