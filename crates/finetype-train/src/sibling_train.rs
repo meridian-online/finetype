@@ -345,6 +345,7 @@ pub fn train_sibling_context(
             val_accuracy,
             learning_rate: lr,
             epoch_time_secs: epoch_time,
+            branch_gradient_norms: None,
         });
 
         tracing::info!(

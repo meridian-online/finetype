@@ -379,6 +379,7 @@ pub fn train_sense(
             val_accuracy: val_broad_acc,
             learning_rate: lr,
             epoch_time_secs: epoch_time,
+            branch_gradient_norms: None,
         });
 
         tracing::info!(
