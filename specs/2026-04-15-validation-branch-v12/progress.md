@@ -9,7 +9,7 @@
 - [x] Validation uses CompiledValidator::is_valid() (patterns + numeric ranges) — extract() delegates to taxonomy.get_validator() → is_valid()
 - [x] ISO 3166-1 alpha-2 enum added to country_code — 249 codes in definitions_geography.yaml
 - [x] 5th branch: validation(239) → Dense → Dense → merge — BranchWeights loaded when valid_dim>0, forward_trunk concatenates output
-- [ ] v11 weights NOT frozen — full retrain
+- [x] v11 weights NOT frozen — full retrain — overnight script ready, v12 config with 5-branch architecture
 - [x] No Sharpen rules (F1-F6, R1-R24) modified — only multi_branch.rs and column.rs (taxonomy threading) touched
 - [x] No taxonomy types added or removed — only country_code validation gained enum field
 - [x] Type-to-index mapping stored in model config — type_index_keys in MultiBranchConfig, deserialized from config.json
