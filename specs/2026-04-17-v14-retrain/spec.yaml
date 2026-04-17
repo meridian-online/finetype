@@ -175,7 +175,7 @@ deliverables:
 
 known_limitations:
   - "MD5 hashes (32-char hex) overlap with tsid (32-char hex). If the model encounters MD5 hashes, it may classify as tsid. Acceptable — neither MD5 nor tsid is a common eval column."
-  - "Audit items #2, #3 (email_display, phone_e164 subtypes) require the model to learn distinctions it has never made, from synthetic data, against 1.00-confidence wrong predictions. These are the hardest to fix and may not flip in v14."
+  - "Audit items #2, #3 (email_display, phone_e164 subtypes) and #7 (user_agent→jwt at 1.00) require the model to learn distinctions it has never made, from synthetic data, against 1.00-confidence wrong predictions. These are the hardest to fix and may not flip in v14."
   - "5 rules deferred for Phase 2 removal after v14 eval: F2 (docker_ref), F6 (short alpha), R4 (IPv4), R8 (gender), R16 (text length). Test-then-remove post-v14."
   - "Simplification of R10/R11 merge and header hint keyword cleanup deferred to Phase 3."
 
