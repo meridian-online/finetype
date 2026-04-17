@@ -870,17 +870,56 @@ impl Generator {
                 Ok(words.join("-"))
             }
             ("internet", "user_agent") => {
-                let agents = [
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-                    "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
-                    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
-                    "curl/8.4.0",
-                    "python-requests/2.31.0",
-                    "Go-http-client/2.0",
-                ];
-                Ok(agents[self.rng.gen_range(0..agents.len())].to_string())
+                // v14 AC-03(b): Diverse UAs — browser, tool, bot, and short UAs.
+                // Weighted to produce realistic distribution: ~50% browser, ~30% tool, ~20% bot.
+                let r = self.rng.gen_range(0..100);
+                let agent = if r < 50 {
+                    // Browser UAs (diverse platforms and versions)
+                    let browser_uas = [
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+                        "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+                        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+                        "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36",
+                        "Mozilla/5.0 (iPad; CPU OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+                    ];
+                    browser_uas[self.rng.gen_range(0..browser_uas.len())]
+                } else if r < 80 {
+                    // Tool/library UAs (short format — key for breaking JWT false pattern)
+                    let tool_uas = [
+                        "curl/8.4.0",
+                        "python-requests/2.31.0",
+                        "Go-http-client/2.0",
+                        "kube-probe/1.28",
+                        "Wget/1.21.4",
+                        "HTTPie/3.2.2",
+                        "axios/1.6.2",
+                        "node-fetch/3.3.2",
+                        "okhttp/4.12.0",
+                        "Apache-HttpClient/4.5.14",
+                        "libcurl/8.4.0 OpenSSL/3.0.12",
+                        "Ruby/3.2.2",
+                        "Dart/3.2 (dart:io)",
+                        "grpc-go/1.60.0",
+                    ];
+                    tool_uas[self.rng.gen_range(0..tool_uas.len())]
+                } else {
+                    // Bot/crawler UAs
+                    let bot_uas = [
+                        "Googlebot/2.1 (+http://www.google.com/bot.html)",
+                        "Bingbot/2.0 (+http://www.bing.com/bingbot.htm)",
+                        "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+                        "Twitterbot/1.0",
+                        "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+                        "LinkedInBot/1.0 (compatible; Mozilla/5.0)",
+                        "Prometheus/2.48.0",
+                        "Datadog/Agent/7.50.0",
+                    ];
+                    bot_uas[self.rng.gen_range(0..bot_uas.len())]
+                };
+                Ok(agent.to_string())
             }
             ("internet", "http_method") => {
                 let methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
@@ -967,9 +1006,10 @@ impl Generator {
             // ── cryptographic (4 types) ──────────────────────────────────
             // uuid moved to representation.identifier in NNFT-178
             ("cryptographic", "hash") => {
-                // Generate MD5 (32), SHA1 (40), or SHA256 (64) length hashes
-                let lengths = [32, 40, 64];
-                let len = lengths[self.rng.gen_range(0..3)];
+                // Generate SHA-1 (40) or SHA-256 (64) length hashes.
+                // v14 AC-02(d): Bias toward 40/64-char to separate from tsid (32-char).
+                // MD5 (32-char) overlaps with tsid — known limitation.
+                let len = if self.rng.gen_bool(0.5) { 64 } else { 40 };
                 Ok(self.gen_hex_string(len))
             }
             ("cryptographic", "token_urlsafe") => {
@@ -2957,7 +2997,8 @@ impl Generator {
             }
             ("identifier", "alphanumeric_id") => {
                 // Generate mixed letter+digit identifier patterns.
-                let pattern_idx = self.rng.gen_range(0..10);
+                // v14 AC-02(e): Added prefix+code patterns (11-12) for earthquake IDs etc.
+                let pattern_idx = self.rng.gen_range(0..13);
                 match pattern_idx {
                     // PREFIX-NNNNN (product/ticket codes)
                     0 => {
@@ -3024,12 +3065,49 @@ impl Generator {
                         Ok(format!("{}.{}.{}", letter, n1, n2))
                     }
                     // LLLNNNNN (compact alphanumeric)
-                    _ => {
+                    9 => {
                         let l1 = (b'A' + self.rng.gen_range(0..26)) as char;
                         let l2 = (b'A' + self.rng.gen_range(0..26)) as char;
                         let l3 = (b'a' + self.rng.gen_range(0..26)) as char;
                         let num = self.rng.gen_range(10000..99999);
                         Ok(format!("{}{}{}{}", l1, l2, l3, num))
+                    }
+                    // v14 AC-02(e): prefix+code patterns (e.g., "us6000pgkh" earthquake IDs)
+                    10 => {
+                        let prefixes = ["us", "nc", "ci", "ak", "hv", "pr", "nn"];
+                        let prefix = prefixes[self.rng.gen_range(0..prefixes.len())];
+                        let num = self.rng.gen_range(1000..99999);
+                        let suffix: String = (0..4)
+                            .map(|_| (b'a' + self.rng.gen_range(0..26)) as char)
+                            .collect();
+                        Ok(format!("{}{}{}", prefix, num, suffix))
+                    }
+                    // v14 AC-02(e): alphanumeric reference codes (e.g., "A1B2C3D4")
+                    11 => {
+                        let len = self.rng.gen_range(6..12);
+                        let code: String = (0..len)
+                            .map(|i| {
+                                if i % 2 == 0 {
+                                    (b'A' + self.rng.gen_range(0..26)) as char
+                                } else {
+                                    (b'0' + self.rng.gen_range(0..10)) as char
+                                }
+                            })
+                            .collect();
+                        Ok(code)
+                    }
+                    // v14 AC-02(e): versioned identifiers (e.g., "v2.3.1", "r1234")
+                    _ => {
+                        let prefixes = ["v", "r", "b", "p"];
+                        let prefix = prefixes[self.rng.gen_range(0..prefixes.len())];
+                        let num = self.rng.gen_range(1..9999);
+                        if self.rng.gen_bool(0.5) {
+                            let minor = self.rng.gen_range(0..20);
+                            let patch = self.rng.gen_range(0..50);
+                            Ok(format!("{}{}.{}.{}", prefix, num, minor, patch))
+                        } else {
+                            Ok(format!("{}{}", prefix, num))
+                        }
                     }
                 }
             }

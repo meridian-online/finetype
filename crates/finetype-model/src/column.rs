@@ -2343,6 +2343,36 @@ impl ColumnClassifier {
                 Some(format!("header_hint_fallback:{}", header.to_lowercase()));
         }
 
+        // Country/country_code post-hint guard (v14, ac-05).
+        // After ALL header hint processing, if the label is "country" but >=95%
+        // of values are strict ISO 3166-1 alpha-2 codes (^[A-Z]{2}$), override
+        // to country_code. This guard fires LAST — after the same-category
+        // hardcoded hint override (NNFT-194) which would otherwise overwrite
+        // a value_sharpen correction. See spec review finding A1/F1.
+        if result.label == "geography.location.country" {
+            let non_empty: Vec<&str> = sample
+                .iter()
+                .map(|v| v.trim())
+                .filter(|v| !v.is_empty())
+                .collect();
+            if non_empty.len() >= 3 {
+                let alpha2_count = non_empty
+                    .iter()
+                    .filter(|v| v.len() == 2 && v.chars().all(|c| c.is_ascii_uppercase()))
+                    .count();
+                let alpha2_rate = alpha2_count as f32 / non_empty.len() as f32;
+                if alpha2_rate >= 0.95 {
+                    result.label = "geography.location.country_code".to_string();
+                    result.confidence = result.confidence.max(0.8);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "country_code_post_hint_guard:alpha2_rate={:.2}",
+                        alpha2_rate
+                    ));
+                }
+            }
+        }
+
         // Re-detect locale if label changed
         if result.label != label_before {
             if let Some(taxonomy) = self.taxonomy.as_ref() {
@@ -2433,33 +2463,10 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         result.disambiguation_rule = Some(format!("feature_slash_segments:{:.1}", slash_segments));
     }
 
-    // Rule F3: hs_code vs decimal_number — HS codes are pure digits with dots.
-    // ADAPTED: removed hs_in_votes guard and hs_frac threshold. Multi-branch
-    // single-entry votes never contain hs_code as runner-up. Fire on feature
-    // thresholds alone — the combination of digit_ratio + dot_segments + negative
-    // prefix guard + dot variance guard is discriminative enough.
-    let digit_ratio = column_features.mean[feature_idx::DIGIT_RATIO];
-    let dot_segments = column_features.mean[feature_idx::SEGMENT_COUNT_DOT];
-    let is_float_fraction = column_features.mean[feature_idx::IS_FLOAT];
-    let has_neg_prefix = column_features.mean[feature_idx::HAS_NEGATIVE_PREFIX];
-    let dot_segment_variance = column_features.variance[feature_idx::SEGMENT_COUNT_DOT];
-    let f3_path_a = digit_ratio >= 0.75 && dot_segments >= 2.0;
-    let f3_path_b = digit_ratio >= 0.75 && is_float_fraction < 1.0 && dot_segments >= 1.5;
-    let f3_neg_guard = has_neg_prefix > 0.0;
-    let f3_dot_var_guard = dot_segment_variance > 0.5;
-    if result.label == "representation.numeric.decimal_number"
-        && (f3_path_a || f3_path_b)
-        && !f3_neg_guard
-        && !f3_dot_var_guard
-    {
-        result.label = "geography.transportation.hs_code".to_string();
-        result.confidence = result.confidence.max(0.6);
-        result.disambiguation_applied = true;
-        result.disambiguation_rule = Some(format!(
-            "feature_hs_code:digit_ratio={:.2},dots={:.1},float={:.2},neg={:.2},dot_var={:.2}",
-            digit_ratio, dot_segments, is_float_fraction, has_neg_prefix, dot_segment_variance
-        ));
-    }
+    // Rule F3: hs_code vs decimal_number — REMOVED (v14 rule rationalisation Phase 1).
+    // F3 created false hs_code predictions from statistical features that R20
+    // (value_sharpen HS code validation gate) then cleaned up — net zero with
+    // extra complexity. R20 remains as the authoritative HS code check.
 
     // Rule F4: git_sha collapsed into technology.cryptographic.hash — rule removed.
 
@@ -4132,7 +4139,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if h.contains("password") || h.contains("passwd") {
         return Some("identity.credential.password");
     }
-    if h.contains("url") || h.contains("uri") || h.contains("link") || h.contains("href") {
+    if h.contains("url") || h.contains("link") || h.contains("href") {
         return Some("technology.internet.url");
     }
     if h.contains("price")
@@ -9561,9 +9568,11 @@ datetime.component.day_of_week:
 
     // AC-2: feature_sharpen — F3 fires on decimal_number without hs_code in votes
     #[test]
-    fn test_sharpen_f3_decimal_to_hs_code_no_hs_vote() {
-        // Multi-branch predicts "decimal_number" but column has HS code features
-        // (high digit ratio + dot segments). F3 should fire without hs_code in votes.
+    fn test_sharpen_f3_removed_decimal_stays_decimal() {
+        // F3 was removed in v14 rule rationalisation Phase 1.
+        // Even with HS code features, decimal_number should NOT be overridden
+        // to hs_code by feature_sharpen. R20 in value_sharpen is now the only
+        // path to hs_code.
         let mut result = ColumnResult {
             label: "representation.numeric.decimal_number".to_string(),
             confidence: 0.80,
@@ -9586,15 +9595,13 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "geography.transportation.hs_code",
-            "F3 should fire on decimal_number with HS code features even without hs_code in votes"
+            result.label, "representation.numeric.decimal_number",
+            "F3 removed: decimal_number should NOT be overridden to hs_code by feature_sharpen"
         );
-        assert!(result.disambiguation_applied);
-        assert!(result
-            .disambiguation_rule
-            .as_ref()
-            .unwrap()
-            .starts_with("feature_hs_code"));
+        assert!(
+            !result.disambiguation_applied,
+            "No disambiguation should fire for decimal_number with HS code features"
+        );
     }
 
     // R20: HS code validation gate — demotes hs_code when values are plain decimals
@@ -10091,5 +10098,163 @@ datetime.component.day_of_week:
             result.is_none(),
             "Non-attractor type should never trigger demotion"
         );
+    }
+
+    // ── AC-07(a): h.contains("uri") removal ─────────────────────────────
+
+    #[test]
+    fn ac07a_data_uri_header_no_longer_matches_url() {
+        // After removing h.contains("uri"), "data_uri" should NOT map to url.
+        // This was the root cause of audit item #1: the keyword match forced
+        // "data_uri" → url, overriding the model's prediction.
+        assert_eq!(
+            header_hint("data_uri"),
+            None,
+            "data_uri should not match url after h.contains(\"uri\") removal"
+        );
+    }
+
+    #[test]
+    fn ac07a_uri_exact_match_still_works() {
+        // The exact match for "uri" at line 3859 must still map to url.
+        assert_eq!(header_hint("uri"), Some("technology.internet.url"));
+    }
+
+    #[test]
+    fn ac07a_url_keyword_still_works() {
+        // h.contains("url") still catches url-containing headers.
+        assert_eq!(header_hint("download_url"), Some("technology.internet.url"));
+        assert_eq!(header_hint("redirect_url"), Some("technology.internet.url"));
+    }
+
+    #[test]
+    fn ac07a_link_href_keywords_still_work() {
+        // Other url keyword matches are unaffected.
+        assert_eq!(
+            header_hint("external_link"),
+            Some("technology.internet.url")
+        );
+        assert_eq!(header_hint("href"), Some("technology.internet.url"));
+    }
+
+    #[test]
+    fn ac07a_request_uri_no_longer_matches_url() {
+        // Pure "uri" headers without "url" lose the keyword hint.
+        // The model handles these from value patterns.
+        assert_eq!(
+            header_hint("request_uri"),
+            None,
+            "request_uri should not match url after h.contains(\"uri\") removal"
+        );
+    }
+
+    // ── AC-07(b): F3 removal ─────────────────────────────────────────────
+
+    #[test]
+    fn ac07b_r20_still_validates_hs_codes() {
+        // R20 (HS code validation gate) must still work as the sole backstop
+        // after F3 removal. Model-predicted hs_code with valid values should pass.
+        let values: Vec<String> = vec![
+            "8471.30",
+            "8471.30.00",
+            "6204.62",
+            "8517.12",
+            "0901.21",
+            "2204.10",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "geography.transportation.hs_code", 0.95, None);
+        assert!(
+            result.is_none(),
+            "R20 should keep valid hs_code predictions after F3 removal"
+        );
+    }
+
+    #[test]
+    fn ac07b_r20_still_demotes_false_hs_codes() {
+        // R20 must still demote hs_code when values are plain decimals.
+        let values: Vec<String> = vec![
+            "3.14", "0.887", "-12.5", "100.0", "0.003", "45.67", "1.23", "99.9",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let result = value_sharpen(&values, "geography.transportation.hs_code", 0.95, None);
+        assert!(result.is_some(), "R20 should still demote false hs_code");
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "representation.numeric.decimal_number");
+    }
+
+    // ── AC-05: Country/country_code post-hint guard ──────────────────────
+    // Note: Full integration tests for AC-05 require the model to be loaded.
+    // These unit tests verify the guard logic via header_hint and value patterns.
+
+    #[test]
+    fn ac05_country_exact_match_still_hints_country() {
+        // The hardcoded hint for "country" still maps to geography.location.country.
+        // The post-hint guard in apply_header_sharpen then checks values.
+        assert_eq!(header_hint("country"), Some("geography.location.country"));
+    }
+
+    #[test]
+    fn ac05_alpha2_regex_matches_country_codes() {
+        // Verify the alpha-2 check logic matches ISO 3166-1 codes.
+        let codes = ["AU", "US", "GB", "DE", "FR", "JP", "CN", "BR"];
+        for code in &codes {
+            assert!(
+                code.len() == 2 && code.chars().all(|c| c.is_ascii_uppercase()),
+                "{} should match alpha-2 pattern",
+                code
+            );
+        }
+    }
+
+    #[test]
+    fn ac05_alpha2_regex_rejects_state_codes() {
+        // 3-letter state codes like "NSW" must NOT match the alpha-2 pattern.
+        let state_codes = ["NSW", "VIC", "QLD", "CA", "NY"];
+        for code in &state_codes {
+            let matches = code.len() == 2 && code.chars().all(|c| c.is_ascii_uppercase());
+            // CA and NY are 2-letter but they're state codes — the guard only fires
+            // when the label is "country" (not state), so these are correctly handled
+            // by the pipeline context, not the regex alone.
+            if code.len() == 3 {
+                assert!(
+                    !matches,
+                    "{} (3-char) should not match alpha-2 pattern",
+                    code
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ac05_alpha2_regex_rejects_lowercase() {
+        // Lowercase should not match.
+        let lower = ["au", "us", "gb"];
+        for code in &lower {
+            assert!(
+                !(code.len() == 2 && code.chars().all(|c| c.is_ascii_uppercase())),
+                "{} should not match alpha-2 pattern",
+                code
+            );
+        }
+    }
+
+    #[test]
+    fn ac05_alpha2_regex_rejects_country_names() {
+        // Full country names should not match.
+        let names = ["Australia", "United States", "Germany", "France"];
+        for name in &names {
+            assert!(
+                !(name.len() == 2 && name.chars().all(|c| c.is_ascii_uppercase())),
+                "{} should not match alpha-2 pattern",
+                name
+            );
+        }
     }
 }

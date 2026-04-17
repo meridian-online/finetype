@@ -37,8 +37,11 @@ Options:
     --oversample-types T    Comma-separated list of type keys to oversample (e.g. "hs_code,latitude")
     --oversample-mult N     Oversampling multiplier for confused types (default: 3)
     --filter-distilled      Filter known-bad distilled data (v13 AC-02: ssn, user_agent, phone, postal)
+    --decontaminate         Per-value subtype decontamination (v14 AC-01: url, email, phone_number)
     --distilled-cap N       Cap distilled rows per type at N (v13 AC-04: use 600)
     --hard-negatives N      Generate N hard-negative decimal_number columns in [-90,90] (v13 AC-05: use 75)
+    --accounting-negatives N Generate N hard-negative decimal_number columns with accounting headers (v14 AC-02b)
+    --status-negatives N    Generate N hard-negative integer_number columns with status headers (v14 AC-02c)
     --skip-preflight        Skip preflight extraction check
     -h, --help              Show help
 """
@@ -967,6 +970,99 @@ def filter_distilled_columns(columns_by_type, ordered_columns):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Subtype decontamination (v14 AC-01)
+#
+# Per-value filtering within parent type columns. Unlike filter_distilled_columns
+# (which drops entire columns), this removes individual values that match a child
+# subtype pattern, then keeps the column if it still has enough values.
+#
+# - url: remove values matching ^data: (data URIs belong to data_uri subtype)
+# - email: remove values matching .+\s*<.+@.+> (display format belongs to email_display)
+# - phone_number: remove values matching ^\+\d{7,15}$ (pure E.164 belongs to phone_e164)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Contamination patterns: values that belong to a child subtype, not the parent
+_DECONTAMINATION_RULES = {
+    "technology.internet.url": {
+        "pattern": re.compile(r"^data:", re.IGNORECASE),
+        "subtype": "technology.internet.data_uri",
+        "description": "data: scheme URIs",
+    },
+    "identity.person.email": {
+        "pattern": re.compile(r".+\s*<.+@.+>"),
+        "subtype": "identity.person.email_display",
+        "description": "Name <email> display format",
+    },
+    "identity.person.phone_number": {
+        "pattern": re.compile(r"^\+\d{7,15}$"),
+        "subtype": "identity.person.phone_e164",
+        "description": "pure E.164 format (no spaces/dashes)",
+    },
+}
+
+
+def decontaminate_subtypes(columns_by_type, min_values=5):
+    """Per-value subtype decontamination within parent type columns (v14 AC-01).
+
+    For each parent type with a decontamination rule, removes individual values
+    that match the child subtype pattern. Columns with fewer than min_values
+    remaining values after filtering are dropped entirely.
+
+    Args:
+        columns_by_type: dict[str, list[tuple[list[str], str]]]
+        min_values: minimum values per column to keep after filtering
+
+    Returns:
+        columns_by_type (mutated), stats dict
+    """
+    stats = {
+        "types_processed": [],
+        "total_values_removed": 0,
+        "total_columns_dropped": 0,
+    }
+
+    for type_key, rule in _DECONTAMINATION_RULES.items():
+        if type_key not in columns_by_type:
+            continue
+
+        pattern = rule["pattern"]
+        original_cols = columns_by_type[type_key]
+        original_count = len(original_cols)
+        original_values = sum(len(vals) for vals, _ in original_cols)
+
+        filtered_cols = []
+        for vals, hdr in original_cols:
+            clean_vals = [v for v in vals if not pattern.match(str(v))]
+            if len(clean_vals) >= min_values:
+                filtered_cols.append((clean_vals, hdr))
+
+        values_removed = original_values - sum(len(vals) for vals, _ in filtered_cols)
+        cols_dropped = original_count - len(filtered_cols)
+
+        if filtered_cols:
+            columns_by_type[type_key] = filtered_cols
+        else:
+            del columns_by_type[type_key]
+
+        type_stats = {
+            "type": type_key,
+            "subtype": rule["subtype"],
+            "description": rule["description"],
+            "original_columns": original_count,
+            "remaining_columns": len(filtered_cols),
+            "columns_dropped": cols_dropped,
+            "original_values": original_values,
+            "values_removed": values_removed,
+            "removal_rate": values_removed / max(original_values, 1),
+        }
+        stats["types_processed"].append(type_stats)
+        stats["total_values_removed"] += values_removed
+        stats["total_columns_dropped"] += cols_dropped
+
+    return columns_by_type, stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Distilled cap (v13 AC-04)
 #
 # Caps distilled rows per type at a maximum to prevent over-represented types
@@ -1093,6 +1189,7 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Headers that signal non-geographic context for decimal values in [-90, 90]
+# v14 AC-04: Added "gap", "depthError", "dmin" from specific audit failures
 _HARD_NEGATIVE_HEADERS = [
     "error", "score", "depth", "rating", "percentage", "delta", "offset",
     "temperature", "weight", "balance", "margin", "deviation", "bias",
@@ -1104,6 +1201,22 @@ _HARD_NEGATIVE_HEADERS = [
     "duration", "interval", "period", "lag", "delay",
     "error_rate", "accuracy", "precision", "recall", "f1_score",
     "mse", "rmse", "mae", "r_squared", "p_value",
+    # v14 audit-specific headers (items #8, #9)
+    "gap", "depthError", "dmin", "gap_width", "depth_error",
+]
+
+# Headers for accounting-adjacent hard-negative decimal_number columns (v14 AC-02b)
+_ACCOUNTING_NEGATIVE_HEADERS = [
+    "amount", "total", "sum", "balance", "subtotal",
+    "grand_total", "net_amount", "gross_amount", "tax_amount",
+    "discount", "fee", "charge", "payment", "refund",
+    "debit", "credit", "revenue", "expense", "profit",
+]
+
+# Headers for HTTP status code hard-negative integer_number columns (v14 AC-02c)
+_STATUS_CODE_HEADERS = [
+    "status", "status_code", "http_status", "response_code",
+    "statusCode", "http_code", "response_status",
 ]
 
 
@@ -1150,6 +1263,84 @@ def generate_hard_negatives(n_columns, rng, values_per_column=100):
             precision = rng.randint(1, 6)
             values.append(f"{val:.{precision}f}")
 
+        columns.append((values, header))
+
+    return columns
+
+
+def generate_accounting_negatives(n_columns, rng, values_per_column=100):
+    """Generate hard-negative decimal_number columns with accounting headers (v14 AC-02b).
+
+    These teach the model that decimal values with accounting-adjacent headers
+    ("amount", "total", "balance") are decimal_number, not amount_accounting.
+    amount_accounting requires currency formatting (symbols, commas) — bare decimals
+    are just decimal_number.
+
+    Args:
+        n_columns: number of hard-negative columns to generate
+        rng: random.Random instance
+        values_per_column: values per column (default 100)
+
+    Returns:
+        list of (values, header) tuples for type decimal_number
+    """
+    columns = []
+    for _ in range(n_columns):
+        header = rng.choice(_ACCOUNTING_NEGATIVE_HEADERS)
+        values = []
+        for _ in range(values_per_column):
+            r = rng.random()
+            if r < 0.4:
+                # Positive amounts (common for totals, fees)
+                val = rng.uniform(0.01, 99999.99)
+            elif r < 0.7:
+                # Small values (common for rates, percentages)
+                val = rng.uniform(0.001, 100.0)
+            elif r < 0.9:
+                # Negative values (common for discounts, refunds)
+                val = rng.uniform(-9999.99, -0.01)
+            else:
+                # Zero or near-zero
+                val = rng.uniform(-0.01, 0.01)
+
+            precision = rng.choice([1, 2, 2, 2, 3, 4])  # Bias toward 2 decimals
+            values.append(f"{val:.{precision}f}")
+
+        columns.append((values, header))
+
+    return columns
+
+
+def generate_status_code_negatives(n_columns, rng, values_per_column=100):
+    """Generate hard-negative integer_number columns with status headers (v14 AC-02c).
+
+    HTTP status codes (200, 301, 404, 500) with "status" headers teach the model
+    these are integer_number, not postal_code. Postal codes shouldn't appear in
+    the 100-599 range with status context.
+
+    Args:
+        n_columns: number of hard-negative columns to generate
+        rng: random.Random instance
+        values_per_column: values per column (default 100)
+
+    Returns:
+        list of (values, header) tuples for type integer_number
+    """
+    # Common HTTP status codes with realistic frequency distribution
+    status_codes = {
+        200: 40, 201: 5, 204: 3, 206: 1,
+        301: 5, 302: 5, 304: 8,
+        400: 8, 401: 5, 403: 5, 404: 10, 405: 1, 408: 1, 429: 2,
+        500: 5, 502: 2, 503: 3, 504: 1,
+    }
+    weighted_codes = []
+    for code, weight in status_codes.items():
+        weighted_codes.extend([str(code)] * weight)
+
+    columns = []
+    for _ in range(n_columns):
+        header = rng.choice(_STATUS_CODE_HEADERS)
+        values = [rng.choice(weighted_codes) for _ in range(values_per_column)]
         columns.append((values, header))
 
     return columns
@@ -1950,7 +2141,10 @@ def main():
     oversample_multiplier = 3
     distilled_cap = 0  # 0 = no cap (AC-04: set to 600 for v13)
     filter_distilled = False  # AC-02: filter known-bad distilled data
+    decontaminate = False  # v14 AC-01: per-value subtype decontamination
     hard_negatives = 0  # AC-05: number of hard-negative decimal_number columns
+    accounting_negatives = 0  # v14 AC-02b: accounting-context hard negatives
+    status_negatives = 0  # v14 AC-02c: status code hard negatives
 
     i = 0
     while i < len(args):
@@ -2015,8 +2209,17 @@ def main():
         elif args[i] == "--filter-distilled":
             filter_distilled = True
             i += 1
+        elif args[i] == "--decontaminate":
+            decontaminate = True
+            i += 1
         elif args[i] == "--hard-negatives":
             hard_negatives = int(args[i + 1])
+            i += 2
+        elif args[i] == "--accounting-negatives":
+            accounting_negatives = int(args[i + 1])
+            i += 2
+        elif args[i] == "--status-negatives":
+            status_negatives = int(args[i + 1])
             i += 2
         elif args[i] in ("-h", "--help"):
             print(__doc__)
@@ -2103,6 +2306,29 @@ def main():
         print(f"  Remaining: {total_d_cols_after} columns across {len(distilled)} types")
         total_d_cols = total_d_cols_after
 
+    # ─── Per-value subtype decontamination (v14 AC-01) ────────────
+    if decontaminate:
+        print(f"\nDecontaminating subtype values in parent columns (v14 AC-01)...")
+        distilled, decontam_stats = decontaminate_subtypes(distilled, min_values)
+        for ts in decontam_stats["types_processed"]:
+            print(f"  {ts['type']}: removed {ts['values_removed']} {ts['description']} values "
+                  f"({ts['removal_rate']:.1%}), {ts['columns_dropped']} columns dropped, "
+                  f"{ts['remaining_columns']}/{ts['original_columns']} columns remaining")
+            if ts["removal_rate"] > 0.20:
+                print(f"    WARNING: >{20}% values removed from {ts['type']} — check decontamination pattern")
+        total_d_cols_after = sum(len(cols) for cols in distilled.values())
+        print(f"  Total values removed: {decontam_stats['total_values_removed']}")
+        print(f"  Total columns dropped: {decontam_stats['total_columns_dropped']}")
+        print(f"  Remaining: {total_d_cols_after} columns across {len(distilled)} types")
+        total_d_cols = total_d_cols_after
+        # Rebuild ordered_distilled to match decontaminated distilled
+        # (ordered_distilled still has original values — rebuild from columns_by_type)
+        ordered_distilled = [
+            (label, vals, hdr) for label, vals, hdr in ordered_distilled
+            if label not in _DECONTAMINATION_RULES
+            or not all(_DECONTAMINATION_RULES[label]["pattern"].match(str(v)) for v in vals)
+        ]
+
     # ─── Cap distilled columns per type (v13 AC-04) ───────────────
     if distilled_cap > 0:
         print(f"\nCapping distilled columns at {distilled_cap}/type (v13 AC-04)...")
@@ -2159,7 +2385,7 @@ def main():
     total_s_cols = sum(len(cols) for cols in synthetic.values())
     print(f"  {total_s_cols} columns across {len(synthetic)} types")
 
-    # ─── Hard-negative mining (v13 AC-05) ─────────────────────────
+    # ─── Hard-negative mining (v13 AC-05 + v14 AC-04) ──────────────
     if hard_negatives > 0:
         print(f"\nGenerating {hard_negatives} hard-negative decimal_number columns ([-90,90] range)...")
         hn_rng = random.Random(seed + 99)  # Offset seed for hard negatives
@@ -2172,6 +2398,35 @@ def main():
         total_s_cols += len(hn_columns)
         print(f"  Added {len(hn_columns)} hard-negative columns to {hn_type}")
         print(f"  Total synthetic: {total_s_cols} columns")
+
+    # ─── Accounting hard negatives (v14 AC-02b) ──────────────────
+    if accounting_negatives > 0:
+        print(f"\nGenerating {accounting_negatives} accounting-context hard-negative decimal_number columns...")
+        acct_rng = random.Random(seed + 200)
+        acct_columns = generate_accounting_negatives(accounting_negatives, acct_rng)
+        acct_type = "representation.numeric.decimal_number"
+        if acct_type in synthetic:
+            synthetic[acct_type].extend(acct_columns)
+        else:
+            synthetic[acct_type] = acct_columns
+        total_s_cols += len(acct_columns)
+        print(f"  Added {len(acct_columns)} accounting hard-negative columns to {acct_type}")
+
+    # ─── Status code hard negatives (v14 AC-02c) ─────────────────
+    if status_negatives > 0:
+        print(f"\nGenerating {status_negatives} status-code hard-negative integer_number columns...")
+        status_rng = random.Random(seed + 300)
+        status_columns = generate_status_code_negatives(status_negatives, status_rng)
+        status_type = "representation.numeric.integer_number"
+        if status_type in synthetic:
+            synthetic[status_type].extend(status_columns)
+        else:
+            synthetic[status_type] = status_columns
+        total_s_cols += len(status_columns)
+        print(f"  Added {len(status_columns)} status-code hard-negative columns to {status_type}")
+
+    if hard_negatives > 0 or accounting_negatives > 0 or status_negatives > 0:
+        print(f"  Total synthetic after hard negatives: {total_s_cols} columns")
 
     # ─── Validate labels ───────────────────────────────────────────
     bad_distilled = set(distilled.keys()) - taxonomy_types
