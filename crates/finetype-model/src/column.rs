@@ -2263,7 +2263,7 @@ impl ColumnClassifier {
                     "header_hint_same_category:{}",
                     header.to_lowercase()
                 ));
-                return;
+                // No return — fall through to post-hint guards (e.g., country_code guard).
             }
         }
 
