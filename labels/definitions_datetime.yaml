@@ -177,13 +177,14 @@ datetime.timestamp.rfc_3339:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
-  format_string: "%Y-%m-%d %H:%M:%S%:z"
-  transform: "strptime({col}, '%Y-%m-%d %H:%M:%S%:z')"
+  format_string: "%Y-%m-%d %H:%M:%S%z"
+  format_string_alt: "%Y-%m-%d %H:%M:%SZ"
+  transform: "strptime({col}, '%Y-%m-%d %H:%M:%S%z')"
   transform_ext: null
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$"
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}([+-]\\d{2}:\\d{2}|Z)$"
   tier: [TIMESTAMPTZ, timestamp]
   release_priority: 5
   aliases: []
@@ -191,6 +192,7 @@ datetime.timestamp.rfc_3339:
     - "2024-01-15 10:30:00+00:00"
     - "2019-12-31 23:59:59-05:00"
     - "2023-06-01 12:00:00+09:00"
+    - "2024-03-15 10:30:00Z"
   references:
     - title: "RFC 3339 - Date and Time on the Internet"
       link: "https://www.rfc-editor.org/rfc/rfc3339"
@@ -198,9 +200,9 @@ datetime.timestamp.rfc_3339:
     RFC 3339 §5.6 allows both T and space as date/time separator.
     For classification purposes, space-separated = rfc_3339,
     T-separated = iso_8601_offset. This enables Tier 2 disambiguation
-    via a simple character check. Transform uses CASE to handle both:
-    CASE WHEN {col} LIKE '%T%' THEN strptime({col}, '%Y-%m-%dT%H:%M:%S%:z')
-    ELSE strptime({col}, '%Y-%m-%d %H:%M:%S%:z') END
+    via a simple character check. format_string_alt handles the Z (UTC)
+    timezone indicator; primary format_string handles numeric offsets.
+    DuckDB %z handles +HH:MM but not Z, hence the alt format.
 
 datetime.timestamp.sql_standard:
   title: SQL Standard
@@ -1790,8 +1792,8 @@ datetime.timestamp.syslog_bsd:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
-  format_string: "%b %e %H:%M:%S"
-  transform: "strptime(CAST(YEAR(CURRENT_DATE) AS VARCHAR) || ' ' || {col}, '%Y %b %e %H:%M:%S')"
+  format_string: "%b %-d %H:%M:%S"
+  transform: "strptime(CAST(YEAR(CURRENT_DATE) AS VARCHAR) || ' ' || {col}, '%Y %b %-d %H:%M:%S')"
   transform_ext: null
   decompose: null
   validation:
@@ -1939,8 +1941,8 @@ datetime.timestamp.ctime:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
-  format_string: "%a %b %e %H:%M:%S %Y"
-  transform: "strptime({col}, '%a %b %e %H:%M:%S %Y')"
+  format_string: "%a %b %-d %H:%M:%S %Y"
+  transform: "strptime({col}, '%a %b %-d %H:%M:%S %Y')"
   transform_ext: null
   decompose: null
   validation:
@@ -2773,11 +2775,11 @@ datetime.period.quarter:
   locales: [UNIVERSAL]
   broad_type: DATE
   format_string: null
-  transform: "make_date(CAST(regexp_extract({col}, '(\\d{4})') AS INT), (CAST(regexp_extract({col}, 'Q([1-4])') AS INT) - 1) * 3 + 1, 1)"
+  transform: "make_date(CAST(regexp_extract({col}, '(\\d{4})', 1) AS INT), (CAST(regexp_extract({col}, 'Q([1-4])', 1) AS INT) - 1) * 3 + 1, 1)"
   transform_ext: null
   decompose:
-    year: "CAST(regexp_extract({col}, '(\\d{4})') AS INT)"
-    quarter: "CAST(regexp_extract({col}, 'Q([1-4])') AS INT)"
+    year: "CAST(regexp_extract({col}, '(\\d{4})', 1) AS INT)"
+    quarter: "CAST(regexp_extract({col}, 'Q([1-4])', 1) AS INT)"
   validation:
     type: string
     pattern: "^(Q[1-4]\\s?\\d{4}|\\d{4}[\\s-]?Q[1-4])$"
@@ -2805,10 +2807,10 @@ datetime.period.fiscal_year:
   locales: [UNIVERSAL]
   broad_type: VARCHAR
   format_string: null
-  transform: "CAST(regexp_extract({col}, 'FY(\\d{2,4})') AS VARCHAR)"
+  transform: "CAST(regexp_extract({col}, 'FY(\\d{2,4})', 1) AS VARCHAR)"
   transform_ext: null
   decompose:
-    year: "CAST(regexp_extract({col}, 'FY(\\d{2,4})') AS INT)"
+    year: "CAST(regexp_extract({col}, 'FY(\\d{2,4})', 1) AS INT)"
   validation:
     type: string
     pattern: "^FY\\d{2,4}$"
