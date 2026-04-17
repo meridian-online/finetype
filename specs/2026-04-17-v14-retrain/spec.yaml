@@ -124,6 +124,24 @@ acceptance_criteria:
   - id: ac-07
     ac_type: code
     description: >
+      Rule rationalisation Phase 1 (safe removals from rule audit):
+      (a) Remove h.contains("uri") keyword match from header_hint() at
+      ~line 4135. The exact match for "uri" at ~line 3859 already covers
+      the intended case. The keyword match actively causes audit item #1
+      by mapping "data_uri" headers to url. (b) Remove F3 (HS code feature
+      rule) from feature_sharpen(). R20 (HS code validation gate) in
+      value_sharpen is the definitive check. F3 creates false hs_code
+      predictions that R20 then cleans up — net zero with extra complexity.
+    verification: >
+      h.contains("uri") no longer exists in header_hint(). Exact match
+      "uri" at line 3859 still works. F3 code block removed from
+      feature_sharpen(). cargo test -p finetype-model passes. url columns
+      in eval set still correct (no regression from removing keyword match).
+      hs_code column in eval set still correct (R20 handles it alone).
+
+  - id: ac-08
+    ac_type: code
+    description: >
       Training run: Train v14 with all ac-01 through ac-04 data changes.
       Same config as v13 (50 epochs, 1200 cols/type, 70/30 blend, Metal).
       Model saved to models/sherlock-v14/.
@@ -132,7 +150,7 @@ acceptance_criteria:
       results.json, label_map.json. results.json has epoch metrics.
       branch_gradient_norms present for all 5 branches.
 
-  - id: ac-08
+  - id: ac-09
     ac_type: code
     description: >
       Eval run: Profile eval on all 35 datasets (227 columns). Generate eval
@@ -140,7 +158,8 @@ acceptance_criteria:
       Document which of the 15 audit items were fixed and which remain.
       Column-level regression diff: compare every column prediction between
       v13 and v14 to catch label swaps where one fix causes a different
-      regression.
+      regression. For removed rules (ac-07), verify no regression on columns
+      those rules previously corrected.
     verification: >
       models/sherlock-v14/eval/report.md exists. Misclassification list
       compared item-by-item against v13 audit. Column-level diff shows
@@ -150,14 +169,15 @@ acceptance_criteria:
 deliverables:
   - scripts/prepare_multibranch_data.py — updated data pipeline with per-value decontamination + collision fixes
   - scripts/overnight_v14_retraining.sh — training + eval script with pre-training audit gate
-  - crates/finetype-model/src/column.rs — country_code post-hint guard in apply_header_sharpen
+  - crates/finetype-model/src/column.rs — country_code post-hint guard, h.contains("uri") removal, F3 removal
   - crates/finetype-core/src/generator.rs — generator improvements for affected types (if needed)
   - models/sherlock-v14/ — trained model + eval results
 
 known_limitations:
-  - "Audit item #1 (data_uri): h.contains('uri') header hint at line 4135 maps 'data_uri' headers to url. Even with perfect retraining, this hint may override correct predictions. Removing it is cleanup (not a new rule) but conflicts with decision 0042's deprecation intent. Accepted risk — retrain may be sufficient if model confidence exceeds same-domain threshold."
   - "MD5 hashes (32-char hex) overlap with tsid (32-char hex). If the model encounters MD5 hashes, it may classify as tsid. Acceptable — neither MD5 nor tsid is a common eval column."
-  - "Audit items #1, #2, #3 (hierarchical subtypes) require the model to learn distinctions it has never made, from synthetic data, against 1.00-confidence wrong predictions. These are the hardest to fix and may not all flip in v14."
+  - "Audit items #2, #3 (email_display, phone_e164 subtypes) require the model to learn distinctions it has never made, from synthetic data, against 1.00-confidence wrong predictions. These are the hardest to fix and may not flip in v14."
+  - "5 rules deferred for Phase 2 removal after v14 eval: F2 (docker_ref), F6 (short alpha), R4 (IPv4), R8 (gender), R16 (text length). Test-then-remove post-v14."
+  - "Simplification of R10/R11 merge and header hint keyword cleanup deferred to Phase 3."
 
 evaluation_principles:
   - principle: "Fix what the audit found — every item gets addressed or documented"
@@ -176,11 +196,12 @@ exit_conditions:
   - Item-by-item comparison against v13 audit published
 
 metadata:
-  version: "1.1"
-  timestamp: "2026-04-17T14:00:00Z"
+  version: "1.2"
+  timestamp: "2026-04-17T16:00:00Z"
   ambiguity_score: 0.05
   interview_ref: null
   review_ref: "specs/2026-04-17-v14-retrain/review-spec-2026-04-17.md"
   prior_art:
     - "specs/2026-04-17-v13-misclassification-audit/audit.md"
+    - "specs/2026-04-17-v14-retrain/rule-audit.md"
     - "specs/2026-04-16-v13-retrain/spec.yaml"
