@@ -31,29 +31,31 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.16
 **Taxonomy:** 240 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 25, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
-**Default model:** Multi-branch→Sharpen pipeline with sherlock-v13 (5-branch: char+embed+stats+header+validation). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **212/227 (93.4% label, 93.8% domain)** on 35 datasets. Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
-**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 19 value-based disambiguation rules (R1–R19), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85).
+**Default model:** Multi-branch→Sharpen pipeline with sherlock-v14 (5-branch: char+embed+stats+header+validation). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **218/227 (96.0% label, 95.2% domain)** on 35 datasets. Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
+**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 21 value-based disambiguation rules (R1–R27, some gaps), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
-**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 383 model tests, zero warnings.
+**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 407 model tests, zero warnings.
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent work
 
-- **v13 retrain — data quality + architecture** (m-16) — Retrained with 4 tiers of improvements from the v12 data quality audit: distilled data decontamination (removed state_code→country_code remap, dropped mislabeled SSN/user_agent rows, filtered phone/postal), new validation patterns (http_method, user_agent, latitude, geohash tightened), distilled cap at 600/type with hard-negative mining, and validation branch resize ([128,64]→[192,128]). Added `geography.location.state_code` as 240th type. Per-branch gradient norms logged to results.json. Profile eval: **201→212/227 (+11 columns, 93.4% label, 93.8% domain)**. Sprint goal exceeded. Specs: `specs/2026-04-16-v13-retrain/`, `specs/2026-04-16-v12-data-quality-audit/`.
-- **v12 data quality audit** — Fixed validation branch loading bug (vb.pp prefix mismatch). Audited all 23 v12 misclassifications. Root causes: model_error(9), training_collision(8), data_gap(6). Produced retrain brief with 4 priority tiers that drove v13. Spec: `specs/2026-04-16-v12-data-quality-audit/`.
-- **v11 retraining + accuracy gap closure** — Retrained multi-branch model (sherlock-v11) with 70/30 distillation-heavy mix. Expanded eval from 190 to 227 columns across 35 datasets. Audited 34 misclassifications, fixed 6 ground-truth labels, 3 broken transforms, and phantom label matches. Specs: `specs/2026-04-12-accuracy-gap-retraining/`, `specs/2026-04-12-sharpen-header-bugfixes/`.
+- **v15 Option C — selective hint narrowing** — Subtractive approach: narrowed 7 harmful `header_hint()` keyword matches and added 2 value-based rules (R25 HTTP status guard, R27 year/compact_ym gate). Fixed 13 columns with net code deletion in hints. Profile eval: **215→218/227 (+3 net, 96.0% label, 95.2% domain)**. Remaining 9 wrong are model errors. Decision 0048 (value-based rules only). Spec: `specs/2026-04-18-v15-value-rules/`.
+- **v14 model trained and promoted** — 50 epochs, 127 min on Metal, best val_acc 91.2%. Country_code guard bugfix (+2 columns). Profile eval: **212→215/227 (94.7% label, 93.8% domain)**. Symlink `models/default → sherlock-v14`.
+- **v13 retrain — data quality + architecture** (m-16) — Retrained with 4 tiers of improvements from the v12 data quality audit: distilled data decontamination, new validation patterns, distilled cap at 600/type with hard-negative mining, and validation branch resize ([128,64]→[192,128]). Added `geography.location.state_code` as 240th type. Profile eval: **201→212/227 (+11 columns, 93.4% label, 93.8% domain)**. Specs: `specs/2026-04-16-v13-retrain/`, `specs/2026-04-16-v12-data-quality-audit/`.
 - **Multi-branch pipeline integration** (m-15) — Replaced Sense+CharCNN with multi-branch as the default inference pipeline. Sharpen layer (feature_sharpen F1–F6, value_sharpen R1–R19, header hints) post-processes multi-branch output. Decisions 0041–0042.
 
 ### What's next
 
-- **Publish v13 to HuggingFace** — Required for DuckDB extension runtime download. v12 was never published (superseded by v13).
-- **15 remaining misclassifications** — Hierarchical subtypes (data_uri→url, email_display→email, phone_e164→phone_number), country↔country_code, user_agent→jwt, decimal_number confusion. Needs fresh audit to determine next approach.
-- **Actionability format_string gaps** — Expanded eval set exposed empty format_strings on iso_8601, iso, dmy_short_dot (99.9% overall after v13). These are taxonomy definition gaps, not model issues.
+- **Publish v14 to HuggingFace** — Required for DuckDB extension runtime download.
+- **9 remaining misclassifications** — All model errors: user_agent→jwt (×1), phone→ssn (×2), user_agent→whitespace_separated (×1), method→iata_code (×1), id→username (×1), hostname→plain_text (×1), geojson→dms (×1), locale→locale_code (×1). Needs v16 retrain or training data improvements.
+- **5 Model2Vec-harmed columns** — sha256→tsid, gap→amount_accounting, depthError→latitude, user_agent→plain_text, mdy_dash→dmy_dash were fixed by keyword narrowing (freeing from hardcoded hint cascade), but 5 similar columns remain harmed by Model2Vec semantic matching. Decision 0042 direction.
+- **Actionability format_string gaps** — Expanded eval set exposed empty format_strings on iso_8601, iso, dmy_short_dot (99.9% overall). Taxonomy definition fixes.
 
 ### Architectural direction (settled — do not re-ask)
 
 - **Multi-branch as Sense replacement** (decision 0041): The multi-branch model (sherlock-v4-sibling) is the default classifier. It replaces both Sense and CharCNN — single forward pass per column. The Sharpen layer (feature_sharpen, value_sharpen, header hints) post-processes multi-branch output. Rules are progressively retired as the model improves.
-- **Remove regex header hints** (decision 0042): Regex-based `header_hint()` and hardcoded header rules are deprecated in favour of learned approaches — multi-branch header branch (Model2Vec), sibling-context attention, and Model2Vec semantic matching. No more regex rabbit holes.
+- **Remove regex header hints** (decision 0042): Regex-based `header_hint()` and hardcoded header rules are deprecated in favour of learned approaches — multi-branch header branch (Model2Vec), sibling-context attention, and Model2Vec semantic matching. No more regex rabbit holes. v15 Option C furthered this by narrowing 7 harmful keyword matches.
+- **Value-based rules only** (decision 0048): New disambiguation rules must check actual column values, not header metadata. Header-dependent disambiguation waits for model improvements.
 - **Strength through simplification** (decision 0038): Prefer retraining over adding disambiguation rules. Rules are a last resort when the model demonstrably cannot learn a pattern.
 
 ## Architecture
