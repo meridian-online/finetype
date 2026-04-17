@@ -2808,6 +2808,49 @@ fn value_sharpen(
         }
     }
 
+    // Rule 27: Year vs compact_ym gate (v15, Option C)
+    // If model predicts compact_ym but ≥90% of values are exactly 4 digits
+    // AND ≥80% of those 4-digit values fall in 1900–2100 (plausible years),
+    // override to year. compact_ym is strictly 6 digits (YYYYMM); 4-digit
+    // values are years, not compact year-month. The year range check prevents
+    // false positives on non-year 4-digit values (spec review finding L1).
+    if result_label == "datetime.date.compact_ym" {
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() >= 3 {
+            let four_digit_count = non_empty
+                .iter()
+                .filter(|v| v.len() == 4 && v.chars().all(|c| c.is_ascii_digit()))
+                .count();
+            let four_digit_rate = four_digit_count as f32 / non_empty.len() as f32;
+            if four_digit_rate >= 0.90 {
+                // Check year plausibility: ≥80% in 1900–2100
+                let year_count = non_empty
+                    .iter()
+                    .filter(|v| {
+                        v.len() == 4
+                            && v.parse::<u16>()
+                                .map(|n| (1900..=2100).contains(&n))
+                                .unwrap_or(false)
+                    })
+                    .count();
+                let year_rate = year_count as f32 / non_empty.len() as f32;
+                if year_rate >= 0.80 {
+                    return Some((
+                        "datetime.component.year".to_string(),
+                        format!(
+                            "year_compact_ym_gate:four_digit={:.2},year_range={:.2}",
+                            four_digit_rate, year_rate
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
     None
 }
 
@@ -3943,9 +3986,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "city" | "city name" => {
             return Some("geography.location.city");
         }
-        "state" | "province" | "region" => {
+        "state" | "province" => {
             return Some("geography.location.state");
         }
+        // "region" removed — model predicts region correctly; exact-matching it
+        // to state was wrong for datasets where subcountry values are regions
+        // (v15, Option C keyword audit).
         "currency" | "currency code" => {
             return Some("identity.financial.currency_code");
         }
@@ -4002,8 +4048,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "npi" | "npi number" => {
             return Some("identity.medical.npi");
         }
-        "ean" | "barcode" | "gtin" | "upc" => {
+        "ean" | "barcode" | "gtin" => {
             return Some("identity.commerce.ean");
+        }
+        "upc" => {
+            return Some("identity.commerce.upc");
         }
         // Operating system
         "os" | "operating system" | "platform" => {
@@ -4013,10 +4062,10 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role" | "position" => {
             return Some("representation.discrete.categorical");
         }
-        // Subcountry / subregion → state/province level
-        "subcountry" | "subregion" | "sub region" | "sub country" => {
-            return Some("geography.location.state");
-        }
+        // Subcountry / subregion — removed (v15, Option C keyword audit).
+        // Model predicts region correctly for subcountry columns; these exact
+        // matches forced state, which was wrong for world_cities/subcountry.
+        // Let the model decide from values.
         // Embarked / boarding columns — categorical
         "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
             return Some("representation.discrete.categorical");
@@ -4036,10 +4085,16 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
 
     // Keyword/substring matching (less specific)
-    if h.contains("email") || h.contains("e mail") {
+    // Guard: "email_display" headers should NOT match — the model correctly
+    // identifies email_display from value patterns (v15, Option C keyword audit).
+    if (h.contains("email") || h.contains("e mail")) && !h.contains("display") {
         return Some("identity.person.email");
     }
-    if h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax") {
+    // Guard: "phone_e164" headers should NOT match — the model correctly
+    // identifies E.164 from value patterns (v15, Option C keyword audit).
+    if (h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax"))
+        && !h.contains("e164")
+    {
         return Some("identity.person.phone_number");
     }
     // IPv6 — check before the generic ip_v4 catch-all so "ip_v6", "server_ipv6",
@@ -4050,7 +4105,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
     }
     // IP address — match " ip" suffix, "ip " prefix, or " ip " infix
     // (underscores already replaced with spaces, exact "ip" handled above)
-    if h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip ") {
+    // Guard: "ip_v4_with_port" headers should NOT match — the model correctly
+    // identifies ip_v4_with_port from value patterns (v15, Option C keyword audit).
+    if (h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip "))
+        && !h.contains("port")
+    {
         return Some("technology.internet.ip_v4");
     }
     if h.contains("zip") || h.contains("postal") || h.contains("postcode") {
@@ -4188,10 +4247,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("representation.numeric.decimal_number");
     }
-    // Response time / latency — numeric measurements (NNFT-254)
+    // Latency / elapsed / duration — numeric measurements (NNFT-254)
+    // "response time" removed — model correctly handles both integer and decimal
+    // response time columns (v15, Option C keyword audit).
     // "duration" excluded when it looks like ISO 8601 (duration_iso, duration_8601)
-    if h.contains("response time")
-        || h.contains("latency")
+    if h.contains("latency")
         || h.contains("elapsed")
         || (h.contains("duration") && !h.contains("iso") && !h.contains("8601"))
     {
@@ -4630,6 +4690,20 @@ fn disambiguate_numeric(
                 "datetime.component.year".to_string(),
                 "numeric_year_detection".to_string(),
             ));
+        }
+        // R25 guard: HTTP status code gate (v15, Option C).
+        // If all values are 3-digit and ≥90% are in 100-599 (HTTP status range),
+        // these are status codes, not postal codes. Keep the model's prediction.
+        if digit_lengths.iter().all(|&l| l == 3) {
+            let status_count = parsed
+                .iter()
+                .filter(|&&v| (100..=599).contains(&v))
+                .count();
+            let status_rate = status_count as f64 / parsed.len() as f64;
+            if status_rate >= 0.90 {
+                // Don't convert to postal_code — return None to keep model prediction
+                return None;
+            }
         }
         // Consistent digit length, typical postal range → postal code
         return Some((
@@ -6070,11 +6144,9 @@ mod tests {
             header_hint("attendance"),
             Some("representation.numeric.integer_number")
         );
-        // Substring match
-        assert_eq!(
-            header_hint("response_time_ms"),
-            Some("representation.numeric.integer_number")
-        );
+        // "response time" removed in v15 Option C — model handles both
+        // integer and decimal response times correctly without hints.
+        assert_eq!(header_hint("response_time_ms"), None);
         assert_eq!(
             header_hint("payload_size_bytes"),
             Some("representation.numeric.integer_number")
@@ -6110,6 +6182,189 @@ mod tests {
         assert_eq!(header_hint("xyz"), None);
         assert_eq!(header_hint("data"), None);
         assert_eq!(header_hint("column1"), None);
+    }
+
+    // === v15 Option C keyword guard tests ===
+
+    #[test]
+    fn ac01_r25_http_status_gate_fires_on_status_codes() {
+        // 3-digit HTTP status codes in 100-599 should NOT be converted to postal_code.
+        // R25 is now a guard inside R12's disambiguate_numeric — when the model
+        // predicts integer_number and values are 3-digit 100-599, R12 should NOT
+        // override to postal_code.
+        let values: Vec<String> = vec!["200", "404", "500", "301", "503"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        // When model predicts integer_number, R12 fires but R25 guard blocks postal_code
+        let result = value_sharpen(
+            &values,
+            "representation.numeric.integer_number",
+            0.8,
+            None,
+        );
+        // Should NOT return postal_code
+        if let Some((label, _)) = &result {
+            assert_ne!(
+                label, "geography.address.postal_code",
+                "R25 guard should prevent postal_code for HTTP status codes"
+            );
+        }
+    }
+
+    #[test]
+    fn ac01_r25_http_status_gate_preserves_real_postal_codes() {
+        // 5-digit postal codes: non-sequential, consistent 5-digit length
+        let values: Vec<String> =
+            vec!["10001", "90210", "33139", "60601", "02134", "94102", "30308"]
+                .into_iter()
+                .map(String::from)
+                .collect();
+        let result = value_sharpen(
+            &values,
+            "representation.numeric.integer_number",
+            0.8,
+            None,
+        );
+        assert!(result.is_some(), "R12 should fire on 5-digit postal codes");
+        let (label, _) = result.unwrap();
+        assert_eq!(label, "geography.address.postal_code");
+    }
+
+    #[test]
+    fn ac01_r25_http_status_gate_preserves_3digit_postal() {
+        // 3-digit values outside HTTP range (≥600): Icelandic postal codes
+        // Non-sequential to avoid increment detection
+        let values: Vec<String> = vec!["601", "900", "750", "602", "850", "700", "801"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(
+            &values,
+            "representation.numeric.integer_number",
+            0.8,
+            None,
+        );
+        // <90% in 100-599 range (0% in this case), so R25 guard doesn't fire
+        if let Some((label, _)) = &result {
+            assert_eq!(
+                label, "geography.address.postal_code",
+                "3-digit values outside 100-599 should still be postal_code"
+            );
+        }
+    }
+
+    #[test]
+    fn ac03_r27_year_vs_compact_ym_fires_on_years() {
+        // 4-digit years should override compact_ym
+        let values: Vec<String> = vec!["2022", "2021", "2023", "2020", "2019"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(&values, "datetime.date.compact_ym", 0.8, None);
+        assert!(result.is_some(), "R27 should fire on 4-digit years");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "datetime.component.year");
+        assert!(rule.starts_with("year_compact_ym_gate:"));
+    }
+
+    #[test]
+    fn ac03_r27_year_vs_compact_ym_preserves_real_compact_ym() {
+        // 6-digit YYYYMM should NOT trigger R27
+        let values: Vec<String> = vec!["202201", "202312", "202406"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(&values, "datetime.date.compact_ym", 0.8, None);
+        if let Some((_, rule)) = &result {
+            assert!(
+                !rule.starts_with("year_compact_ym_gate:"),
+                "R27 should not fire on 6-digit compact_ym values"
+            );
+        }
+    }
+
+    #[test]
+    fn ac03_r27_year_range_rejects_non_year_4digit() {
+        // 4-digit values outside 1900-2100 should NOT trigger R27
+        let values: Vec<String> = vec!["1234", "5678", "9012", "3456"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(&values, "datetime.date.compact_ym", 0.8, None);
+        if let Some((_, rule)) = &result {
+            assert!(
+                !rule.starts_with("year_compact_ym_gate:"),
+                "R27 should not fire on non-year 4-digit values"
+            );
+        }
+    }
+
+    #[test]
+    fn v15_email_display_guard() {
+        // "email_display" should NOT match the email hint
+        assert_eq!(header_hint("email_display"), None);
+        // But "email" still matches
+        assert_eq!(header_hint("email"), Some("identity.person.email"));
+        // And "customer_email" still matches
+        assert_eq!(
+            header_hint("customer_email"),
+            Some("identity.person.email")
+        );
+    }
+
+    #[test]
+    fn v15_phone_e164_guard() {
+        // "phone_e164" should NOT match the phone hint
+        assert_eq!(header_hint("phone_e164"), None);
+        // But "phone" still matches
+        assert_eq!(header_hint("phone"), Some("identity.person.phone_number"));
+        // And "phone_number" still matches
+        assert_eq!(
+            header_hint("phone_number"),
+            Some("identity.person.phone_number")
+        );
+    }
+
+    #[test]
+    fn v15_ip_port_guard() {
+        // "ip_v4_with_port" should NOT match the ip_v4 hint
+        assert_eq!(header_hint("ip_v4_with_port"), None);
+        // But "ip_address" still matches
+        assert_eq!(
+            header_hint("ip_address"),
+            Some("technology.internet.ip_v4")
+        );
+        // And "server_ip" still matches
+        assert_eq!(
+            header_hint("server_ip"),
+            Some("technology.internet.ip_v4")
+        );
+    }
+
+    #[test]
+    fn v15_upc_maps_to_upc_not_ean() {
+        // "upc" should map to identity.commerce.upc, not ean
+        assert_eq!(header_hint("upc"), Some("identity.commerce.upc"));
+        // "ean" still maps to ean
+        assert_eq!(header_hint("ean"), Some("identity.commerce.ean"));
+        // "barcode" still maps to ean
+        assert_eq!(header_hint("barcode"), Some("identity.commerce.ean"));
+    }
+
+    #[test]
+    fn v15_region_not_mapped_to_state() {
+        // "region" should NOT map to state — model handles this correctly
+        assert_eq!(header_hint("region"), None);
+        // But "state" and "province" still map to state
+        assert_eq!(header_hint("state"), Some("geography.location.state"));
+        assert_eq!(header_hint("province"), Some("geography.location.state"));
+    }
+
+    #[test]
+    fn v15_subcountry_not_mapped_to_state() {
+        // "subcountry" should NOT map to state — model predicts region correctly
+        assert_eq!(header_hint("subcountry"), None);
     }
 
     #[test]
