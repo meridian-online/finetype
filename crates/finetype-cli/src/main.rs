@@ -2732,9 +2732,10 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     if let Some(transform_ext) = &def.transform_ext {
         schema.insert("x-finetype-transform-ext".into(), json!(transform_ext));
     }
-    if def.pii == Some(true) {
-        schema.insert("x-finetype-pii".into(), json!(true));
-    }
+    schema.insert(
+        "x-finetype-pii".into(),
+        json!(def.pii.unwrap_or(false)),
+    );
 
     serde_json::Value::Object(schema)
 }
@@ -2759,38 +2760,54 @@ fn cmd_schema_table(
 
     // Load model + taxonomy (same setup as cmd_profile)
     eprintln!("Loading model from {:?}", model);
-    let classifier: Box<dyn ValueClassifier> = Box::new(load_char_classifier(&model)?);
-
     let config = ColumnConfig {
         sample_size: 100,
         ..Default::default()
     };
-    let mut column_classifier = if let Some(semantic) = load_semantic_hint() {
-        eprintln!("Loaded semantic hint classifier (Model2Vec)");
-        let entity = load_entity_classifier(&semantic);
-        let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-        if let Some(entity) = entity {
-            eprintln!("Loaded entity classifier (full_name demotion gate)");
-            cc.set_entity_classifier(entity);
-        }
+    let mut column_classifier = if let Ok(mb) = load_multi_branch_classifier(&model) {
+        eprintln!(
+            "Loaded multi-branch classifier ({} classes)",
+            mb.n_classes()
+        );
+        let mut cc = ColumnClassifier::with_multi_branch(mb, config);
+        wire_model2vec_and_siblings(&mut cc);
         cc
     } else {
-        ColumnClassifier::new(classifier, config)
+        eprintln!("No multi-branch model found, falling back to CharCNN");
+        let classifier: Box<dyn ValueClassifier> = Box::new(load_char_classifier(&model)?);
+        if let Some(semantic) = load_semantic_hint() {
+            eprintln!("Loaded semantic hint classifier (Model2Vec)");
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+            if let Some(entity) = entity {
+                eprintln!("Loaded entity classifier (full_name demotion gate)");
+                cc.set_entity_classifier(entity);
+            }
+            wire_sense(&mut cc);
+            wire_sibling_context(&mut cc);
+            cc
+        } else {
+            let mut cc = ColumnClassifier::new(classifier, config);
+            wire_sense(&mut cc);
+            wire_sibling_context(&mut cc);
+            cc
+        }
     };
 
-    // Load taxonomy for validation-based attractor demotion
-    let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path)?;
-    enrichment_taxonomy.compile_validators();
-    enrichment_taxonomy.compile_locale_validators();
-    eprintln!(
-        "Loaded taxonomy ({} types)",
-        enrichment_taxonomy.labels().len()
-    );
-    column_classifier.set_taxonomy(enrichment_taxonomy.clone());
-
-    // Wire up Sense classifier
-    wire_sense(&mut column_classifier);
-    wire_sibling_context(&mut column_classifier);
+    // Load taxonomy for validation-based attractor demotion + schema enrichment
+    let taxonomy_path_labels = std::path::PathBuf::from("labels");
+    let enrichment_taxonomy = if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path_labels) {
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+        eprintln!(
+            "Loaded taxonomy ({} types)",
+            taxonomy.labels().len()
+        );
+        column_classifier.set_taxonomy(taxonomy.clone());
+        taxonomy
+    } else {
+        load_taxonomy(&taxonomy_path)?
+    };
 
     // Read the input file
     eprintln!("Reading {:?}", input);
@@ -2965,6 +2982,10 @@ fn cmd_schema_table(
             if let Some(fmt) = &def.format_string {
                 prop.insert("x-finetype-format-string".into(), json!(fmt));
             }
+            prop.insert(
+                "x-finetype-pii".into(),
+                json!(def.pii.unwrap_or(false)),
+            );
         } else {
             // Label not found in taxonomy — basic string schema
             prop.insert("type".into(), json!("string"));
@@ -2975,6 +2996,7 @@ fn cmd_schema_table(
                 "x-finetype-confidence".into(),
                 json!((col.confidence * 1000.0).round() / 1000.0),
             );
+            prop.insert("x-finetype-pii".into(), json!(false));
         }
 
         // --stats: observed data constraints (AC-2)

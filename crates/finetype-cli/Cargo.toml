@@ -8,6 +8,7 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "CLI for FineType semantic type classification"
+default-run = "finetype"
 
 [[bin]]
 name = "finetype"

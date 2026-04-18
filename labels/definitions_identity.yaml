@@ -1275,7 +1275,6 @@ identity.government.ein:
   notes: >
     IRS-assigned. First two digits are the campus/service center code.
     Required for business tax filings, hiring, and bank accounts.
-  pii: true
 
 identity.government.pan_india:
   title: "Indian PAN"
@@ -1339,7 +1338,6 @@ identity.government.abn:
   notes: >
     ABN includes a check digit algorithm based on modulus 89.
     The first two digits are derived from the check digit calculation.
-  pii: true
 
 # ═════════════════════════════════════════════════════════════════════
 # CATEGORY: academic

@@ -276,6 +276,7 @@ finance.payment.credit_card_number:
   validation:
     type: string
     pattern: "^[0-9]{13,19}$"
+  pii: true
   tier: [VARCHAR, payment]
   release_priority: 4
   aliases: [pan, credit_card]
@@ -470,7 +471,6 @@ finance.banking.aba_routing:
     The 9th digit is a weighted checksum (weights 3,7,1 repeating, sum mod 10 = 0).
   designation: locale_specific
   locales: [EN_US]
-  pii: true
   broad_type: VARCHAR
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
@@ -508,7 +508,6 @@ finance.banking.bsb:
     last three digits identify the branch.
   designation: locale_specific
   locales: [EN_AU]
-  pii: true
   broad_type: VARCHAR
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
