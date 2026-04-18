@@ -2489,6 +2489,28 @@ def main():
     total_s_cols = sum(len(cols) for cols in synthetic.values())
     print(f"  {total_s_cols} columns across {len(synthetic)} types")
 
+    # ─── Drop mislabeled types from synthetic data (v16 AC-03) ─────
+    # Types in _DROP_ALL_TYPES have mislabeled distilled data, but their
+    # synthetic patterns also overlap with common types (e.g., swift_bic
+    # uppercase strings → country_code, cpt 5-digit codes → postal_code).
+    # Keeping synthetic data for these types introduces noise that hurts
+    # other predictions (empirically: 232 types → 233/242, 239 types →
+    # 229/242). The model relies on header hints to classify these types
+    # at inference time, which works well for types with distinctive headers.
+    if filter_distilled:
+        dropped_syn = []
+        for type_key in _DROP_ALL_TYPES:
+            if type_key in synthetic:
+                count = len(synthetic[type_key])
+                del synthetic[type_key]
+                dropped_syn.append((type_key, count))
+                total_s_cols -= count
+        if dropped_syn:
+            print(f"\n  Dropped {len(dropped_syn)} overlapping types from synthetic data:")
+            for tk, c in dropped_syn:
+                print(f"    {tk}: {c} columns")
+            print(f"  Synthetic after drops: {total_s_cols} columns across {len(synthetic)} types")
+
     # ─── Hard-negative mining (v13 AC-05 + v14 AC-04) ──────────────
     if hard_negatives > 0:
         print(f"\nGenerating {hard_negatives} hard-negative decimal_number columns ([-90,90] range)...")

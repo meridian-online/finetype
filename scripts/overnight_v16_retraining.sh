@@ -340,16 +340,19 @@ if min_type_count < 50:
 else:
     print(f'  PASS')
 
-# Gate 3: Total types >= 239 (password excluded from generation)
+# Gate 3: Total types >= 232
+# _DROP_ALL_TYPES removes 7 types from both distilled and synthetic (their synthetic
+# patterns overlap with common types, introducing noise — empirically 232 types
+# performs better than 239). Password is excluded from generation. Total: 240 - 7 - 1 = 232.
 total_types = len(label_counts)
-print(f'Gate 3: Total types = {total_types} (gate: >=239)')
-if total_types < 239:
-    print(f'FAIL: Only {total_types} types, expected >=239')
+expected_min = 232  # 240 - 7 dropped - 1 password
+print(f'Gate 3: Total types = {total_types} (gate: >={expected_min})')
+if total_types < expected_min:
+    print(f'FAIL: Only {total_types} types, expected >={expected_min}')
     sys.exit(1)
 else:
     if total_types < 240:
-        missing = set()
-        print(f'  PASS (note: {240 - total_types} type(s) missing — password excluded from generation)')
+        print(f'  PASS (note: {240 - total_types} type(s) excluded — dropped/password)')
     else:
         print(f'  PASS')
 
@@ -362,15 +365,16 @@ if max_type_count > 1500:
     for k, v in sorted(heavy_types.items(), key=lambda x: -x[1])[:5]:
         print(f'  {k}: {v}')
 
-# Gate 5 (v16): Verify mislabeled types are actually dropped
-v16_dropped = ['finance.banking.swift_bic', 'technology.internet.http_method',
-               'representation.file.excel_format', 'identity.medical.loinc',
-               'identity.medical.cpt']
-leaked = [t for t in v16_dropped if t in label_counts]
+# Gate 5 (v16): Verify mislabeled types are absent (dropped from both distilled + synthetic)
+_dropped_types = ['finance.banking.swift_bic', 'technology.internet.http_method',
+                  'representation.file.excel_format', 'identity.medical.loinc',
+                  'identity.medical.cpt', 'identity.government.ssn',
+                  'technology.internet.user_agent']
+leaked = [t for t in _dropped_types if t in label_counts]
 if leaked:
-    print(f'FAIL: v16 mislabeled types still present: {leaked}')
+    print(f'FAIL: Dropped types still present in training data: {leaked}')
     sys.exit(1)
-print(f'Gate 5: v16 mislabeled types dropped — PASS')
+print(f'Gate 5: All {len(_dropped_types)} dropped types absent — PASS')
 
 # Summary
 print(f'')
