@@ -46,9 +46,9 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### What's next
 
-- **9 remaining misclassifications** — All model errors: user_agent→jwt (×1), phone→ssn (×2), user_agent→whitespace_separated (×1), method→iata_code (×1), id→username (×1), hostname→plain_text (×1), geojson→dms (×1), locale→locale_code (×1). Needs v16 retrain or training data improvements.
-- **5 Model2Vec-harmed columns** — sha256→tsid, gap→amount_accounting, depthError→latitude, user_agent→plain_text, mdy_dash→dmy_dash were fixed by keyword narrowing (freeing from hardcoded hint cascade), but 5 similar columns remain harmed by Model2Vec semantic matching. Decision 0042 direction.
-- **2 actionability below-target** — multilingual/date (33.3%, mixed format data), tech_systems/version (93.8%, ambiguous X.Y.Z values). Both need model retraining.
+- **v16 retrain** — 9 remaining misclassifications are all model errors. Training/eval data audit needed to eliminate mislabeled examples before retraining. Key confusions: phone→ssn (×2), user_agent→jwt/whitespace_separated (×2), method→iata_code, id→username, hostname→plain_text, geojson→dms, locale→locale_code.
+- **5 Model2Vec-harmed columns** — Decision 0042 direction. May improve with retrain.
+- **2 actionability below-target** — multilingual/date (33.3%), tech_systems/version (93.8%). Both misclassification-driven, should improve with retrain.
 
 ### Architectural direction (settled — do not re-ask)
 
@@ -122,7 +122,7 @@ Tier 0 (root): DuckDB-type router (VARCHAR, BIGINT, DOUBLE, DATE, etc.)
 
 ### Taxonomy structure
 
-Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (12), datetime (84), finance (31), geography (25), identity (34), representation (36), technology (28).
+Labels: `domain.category.type` (e.g., `identity.person.email`). 7 domains: container (11), datetime (84), finance (28), geography (25), identity (33), representation (33), technology (26).
 
 Each definition in `labels/definitions_*.yaml` specifies: `broad_type` (DuckDB type), `format_string`, `transform` (SQL expression), `validation`, `tier`, `decompose`.
 
@@ -201,12 +201,11 @@ To add regression datasets: create CSV in `/home/hugh/datasets/`, add to `eval/d
 
 ## Sprint Goal
 
-**Publish quality + close format gaps (m-17).** Three workstreams:
-1. **Audit 15 remaining misclassifications** — discovery to determine if v14 retrain is warranted or if the remaining errors need taxonomy/rule changes. Hierarchical subtypes (data_uri→url, email_display→email, phone_e164→phone_number), country↔country_code, user_agent→jwt, decimal_number confusion.
-2. **Fix actionability format_string gaps** — iso_8601, iso, dmy_short_dot have empty format_strings. Taxonomy definition fixes, not model changes.
-3. **PII flag in JSON Schema** — card 0012. Add `x-finetype-pii` to schema output based on taxonomy type. No model changes.
+**v16 retrain — clean data, higher accuracy (m-18).** Two workstreams:
+1. **Training + eval data audit** — Audit all training and eval data for misclassifications. The iso_8601 catch-all was masking prediction errors (us_date, eu_date, clf_timestamp etc. all predicted as iso_8601). Clean data is prerequisite for meaningful retrain.
+2. **v16 retrain** — Retrain multi-branch model on clean data. Target: fix 9 remaining model errors, improve actionability on 2 below-target columns.
 
-Previous: m-16 COMPLETE — shipped sherlock-v13 (212/227, 93.4%) + v0.6.16 release.
+Previous: m-17 COMPLETE — PII detection (card 0012), actionability audit P1–P5, v15 Option C (218/227, 96.0%).
 
 ## Decision Register
 

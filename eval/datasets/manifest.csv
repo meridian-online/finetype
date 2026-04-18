@@ -33,7 +33,7 @@ countries,eval/datasets/csv/countries.csv,region,region
 countries,eval/datasets/csv/countries.csv,sub-region,region
 countries,eval/datasets/csv/countries.csv,region-code,code
 countries,eval/datasets/csv/countries.csv,sub-region-code,code
-covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Date,date
+covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Date,iso date
 covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Country,country
 covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Confirmed,number
 covid_timeseries,eval/datasets/csv/covid_timeseries.csv,Recovered,number
@@ -51,7 +51,7 @@ iris,eval/datasets/csv/iris.csv,petal_width,decimal number
 iris,eval/datasets/csv/iris.csv,species,category
 ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,order_id,code
 ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,customer_email,email
-ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,order_date,date
+ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,order_date,iso date
 ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,total_price,price
 ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,currency,currency
 ecommerce_orders,eval/datasets/csv/ecommerce_orders.csv,credit_card_last4,code
@@ -80,14 +80,14 @@ people_directory,eval/datasets/csv/people_directory.csv,email,email
 people_directory,eval/datasets/csv/people_directory.csv,phone,telephone
 people_directory,eval/datasets/csv/people_directory.csv,age,number
 people_directory,eval/datasets/csv/people_directory.csv,gender,gender
-people_directory,eval/datasets/csv/people_directory.csv,ssn,code
-people_directory,eval/datasets/csv/people_directory.csv,date_of_birth,date
+people_directory,eval/datasets/csv/people_directory.csv,ssn,ssn
+people_directory,eval/datasets/csv/people_directory.csv,date_of_birth,iso date
 people_directory,eval/datasets/csv/people_directory.csv,company,entity name
 people_directory,eval/datasets/csv/people_directory.csv,job_title,occupation
-people_directory,eval/datasets/csv/people_directory.csv,salary,price
+people_directory,eval/datasets/csv/people_directory.csv,salary,number
 people_directory,eval/datasets/csv/people_directory.csv,height_cm,height
 people_directory,eval/datasets/csv/people_directory.csv,weight_kg,weight
-financial_data,eval/datasets/csv/financial_data.csv,date,date
+financial_data,eval/datasets/csv/financial_data.csv,date,iso date
 financial_data,eval/datasets/csv/financial_data.csv,ticker,code
 financial_data,eval/datasets/csv/financial_data.csv,open_price,price
 financial_data,eval/datasets/csv/financial_data.csv,close_price,price
@@ -99,9 +99,9 @@ financial_data,eval/datasets/csv/financial_data.csv,pe_ratio,decimal number
 financial_data,eval/datasets/csv/financial_data.csv,dividend_yield,percentage
 financial_data,eval/datasets/csv/financial_data.csv,currency,currency
 financial_data,eval/datasets/csv/financial_data.csv,exchange,category
-datetime_formats,eval/datasets/csv/datetime_formats.csv,iso_date,date
-datetime_formats,eval/datasets/csv/datetime_formats.csv,us_date,date
-datetime_formats,eval/datasets/csv/datetime_formats.csv,eu_date,date
+datetime_formats,eval/datasets/csv/datetime_formats.csv,iso_date,iso date
+datetime_formats,eval/datasets/csv/datetime_formats.csv,us_date,mdy slash
+datetime_formats,eval/datasets/csv/datetime_formats.csv,eu_date,dmy slash
 datetime_formats,eval/datasets/csv/datetime_formats.csv,iso_timestamp,timestamp
 datetime_formats,eval/datasets/csv/datetime_formats.csv,sql_timestamp,sql timestamp
 datetime_formats,eval/datasets/csv/datetime_formats.csv,unix_epoch,time
@@ -130,24 +130,24 @@ codes_and_ids,eval/datasets/csv/codes_and_ids.csv,ean,ean
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,uuid,uuid
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,credit_card,credit card number
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,swift_code,swift code
-codes_and_ids,eval/datasets/csv/codes_and_ids.csv,iban,code
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,iban,iban
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,hex_color,color
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,mime_type,file format
-codes_and_ids,eval/datasets/csv/codes_and_ids.csv,locale,language code
+codes_and_ids,eval/datasets/csv/codes_and_ids.csv,locale,locale code
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,sha256,hash
 codes_and_ids,eval/datasets/csv/codes_and_ids.csv,semantic_version,version
 medical_records,eval/datasets/csv/medical_records.csv,patient_id,id
 medical_records,eval/datasets/csv/medical_records.csv,npi,npi
 medical_records,eval/datasets/csv/medical_records.csv,first_name,first name
 medical_records,eval/datasets/csv/medical_records.csv,last_name,last name
-medical_records,eval/datasets/csv/medical_records.csv,date_of_birth,date
+medical_records,eval/datasets/csv/medical_records.csv,date_of_birth,iso date
 medical_records,eval/datasets/csv/medical_records.csv,gender,gender
 medical_records,eval/datasets/csv/medical_records.csv,heart_rate,number
 medical_records,eval/datasets/csv/medical_records.csv,temperature_f,decimal number
 medical_records,eval/datasets/csv/medical_records.csv,weight_lbs,weight
 medical_records,eval/datasets/csv/medical_records.csv,height_in,height
-medical_records,eval/datasets/csv/medical_records.csv,diagnosis_code,code
-medical_records,eval/datasets/csv/medical_records.csv,visit_date,date
+medical_records,eval/datasets/csv/medical_records.csv,diagnosis_code,icd10
+medical_records,eval/datasets/csv/medical_records.csv,visit_date,iso date
 medical_records,eval/datasets/csv/medical_records.csv,is_admitted,boolean
 books_catalog,eval/datasets/csv/books_catalog.csv,isbn,isbn
 books_catalog,eval/datasets/csv/books_catalog.csv,title,title
@@ -160,10 +160,10 @@ books_catalog,eval/datasets/csv/books_catalog.csv,rating,rating
 books_catalog,eval/datasets/csv/books_catalog.csv,price_usd,price
 books_catalog,eval/datasets/csv/books_catalog.csv,url,url
 books_catalog,eval/datasets/csv/books_catalog.csv,description,description
-network_logs,eval/datasets/csv/network_logs.csv,timestamp,timestamp
+network_logs,eval/datasets/csv/network_logs.csv,timestamp,iso timestamp milliseconds
 network_logs,eval/datasets/csv/network_logs.csv,source_ip,ip_v4
 network_logs,eval/datasets/csv/network_logs.csv,destination_ip,ip_v4
-network_logs,eval/datasets/csv/network_logs.csv,method,category
+network_logs,eval/datasets/csv/network_logs.csv,method,http method
 network_logs,eval/datasets/csv/network_logs.csv,url_path,code
 network_logs,eval/datasets/csv/network_logs.csv,status_code,http status code
 network_logs,eval/datasets/csv/network_logs.csv,response_time_ms,number
@@ -195,7 +195,7 @@ sports_events,eval/datasets/csv/sports_events.csv,event_id,code
 sports_events,eval/datasets/csv/sports_events.csv,sport,category
 sports_events,eval/datasets/csv/sports_events.csv,venue,entity name
 sports_events,eval/datasets/csv/sports_events.csv,country,country
-sports_events,eval/datasets/csv/sports_events.csv,event_date,date
+sports_events,eval/datasets/csv/sports_events.csv,event_date,iso date
 sports_events,eval/datasets/csv/sports_events.csv,start_time,time 24h
 sports_events,eval/datasets/csv/sports_events.csv,duration_minutes,number
 sports_events,eval/datasets/csv/sports_events.csv,attendance,number

@@ -2487,6 +2487,36 @@ mappings:
     finetype_domain: datetime
     match_quality: direct
     expand: false
+  - gt_label: mdy slash
+    source: profile_eval
+    finetype_label: datetime.date.mdy_slash
+    finetype_labels:
+      - datetime.date.mdy_slash
+      - datetime.date.dmy_slash
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: dmy slash
+    source: profile_eval
+    finetype_label: datetime.date.dmy_slash
+    finetype_labels:
+      - datetime.date.dmy_slash
+      - datetime.date.mdy_slash
+    finetype_domain: datetime
+    match_quality: direct
+    expand: false
+  - gt_label: iban
+    source: profile_eval
+    finetype_label: finance.banking.iban
+    finetype_domain: finance
+    match_quality: direct
+    expand: false
+  - gt_label: locale code
+    source: profile_eval
+    finetype_label: technology.code.locale_code
+    finetype_domain: technology
+    match_quality: direct
+    expand: false
   - gt_label: compact dmy
     source: profile_eval
     finetype_label: datetime.date.compact_dmy

@@ -381,6 +381,12 @@ clf timestamp,profile_eval,datetime.timestamp.clf,datetime,direct,false
 syslog bsd,profile_eval,datetime.timestamp.syslog_bsd,datetime,direct,false
 mdy dash,profile_eval,datetime.date.mdy_dash,datetime,direct,false
 mdy dash,profile_eval,datetime.date.dmy_dash,datetime,direct,false
+mdy slash,profile_eval,datetime.date.mdy_slash,datetime,direct,false
+mdy slash,profile_eval,datetime.date.dmy_slash,datetime,direct,false
+dmy slash,profile_eval,datetime.date.dmy_slash,datetime,direct,false
+dmy slash,profile_eval,datetime.date.mdy_slash,datetime,direct,false
+iban,profile_eval,finance.banking.iban,finance,direct,false
+locale code,profile_eval,technology.code.locale_code,technology,direct,false
 compact dmy,profile_eval,datetime.date.compact_dmy,datetime,direct,false
 currency symbol,profile_eval,finance.currency.currency_symbol,finance,direct,false
 currency symbol,profile_eval,finance.currency.currency_code,finance,direct,false

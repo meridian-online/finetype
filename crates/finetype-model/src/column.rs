@@ -4208,7 +4208,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("geography.address.street_address");
     }
     if h.contains("born") || h.contains("birth") || h.contains("dob") {
-        return Some("datetime.date.iso_date");
+        return Some("datetime.date.iso");
     }
     // Specific timestamp formats — must precede the generic date/timestamp catch-all.
     // Note: underscores are already replaced with spaces by header normalization.
@@ -6114,8 +6114,8 @@ mod tests {
             Some("datetime.timestamp.iso_8601")
         );
         assert_eq!(header_hint("year"), Some("datetime.component.year"));
-        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso_date"));
-        assert_eq!(header_hint("dob"), Some("datetime.date.iso_date"));
+        assert_eq!(header_hint("birth_date"), Some("datetime.date.iso"));
+        assert_eq!(header_hint("dob"), Some("datetime.date.iso"));
         // Specific timestamp formats take priority over generic catch-all
         assert_eq!(
             header_hint("rfc_2822_timestamp"),
