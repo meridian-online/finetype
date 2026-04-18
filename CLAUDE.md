@@ -32,24 +32,23 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 **Version:** 0.6.16
 **Taxonomy:** 240 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 25, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
 **Default model:** Multi-branch→Sharpen pipeline with sherlock-v14 (5-branch: char+embed+stats+header+validation). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **218/227 (96.0% label, 95.2% domain)** on 35 datasets. Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
-**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 21 value-based disambiguation rules (R1–R27, some gaps), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85).
+**Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 23 value-based disambiguation rules (R1–R31, some gaps), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85), datetime specificity guard (prevents iso_8601 catch-all from overriding specific datetime predictions).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
-**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 407 model tests, zero warnings.
+**CI status:** All checks pass (fmt, clippy, test, taxonomy check). 413 model tests, zero warnings.
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server (`finetype mcp`)
 
 ### Recent work
 
+- **Actionability audit + P1–P5 fixes** — Audited 10 columns with <95% actionability, traced to 3 root causes: header hint catch-all (7 cols), version/date confusion (2), compound value (1). Fixed eval JSON pipeline bug (P1: `timestamp_format='disabled'`), added datetime specificity guard (P2: iso_8601 catch-all no longer overrides specific predictions), added R31 version vs dmy_short_dot gate (P3), tightened timestamp interchangeability into format-compatible families (P4), removed blood_pressure from eval (P5). Actionability below-target: 10 → 2. Published v14 to HuggingFace (root files confirmed current). Spec: `specs/2026-04-18-v15-value-rules/actionability-audit-2026-04-18.md`.
 - **v15 Option C — selective hint narrowing** — Subtractive approach: narrowed 7 harmful `header_hint()` keyword matches and added 2 value-based rules (R25 HTTP status guard, R27 year/compact_ym gate). Fixed 13 columns with net code deletion in hints. Profile eval: **215→218/227 (+3 net, 96.0% label, 95.2% domain)**. Remaining 9 wrong are model errors. Decision 0048 (value-based rules only). Spec: `specs/2026-04-18-v15-value-rules/`.
 - **v14 model trained and promoted** — 50 epochs, 127 min on Metal, best val_acc 91.2%. Country_code guard bugfix (+2 columns). Profile eval: **212→215/227 (94.7% label, 93.8% domain)**. Symlink `models/default → sherlock-v14`.
 - **v13 retrain — data quality + architecture** (m-16) — Retrained with 4 tiers of improvements from the v12 data quality audit: distilled data decontamination, new validation patterns, distilled cap at 600/type with hard-negative mining, and validation branch resize ([128,64]→[192,128]). Added `geography.location.state_code` as 240th type. Profile eval: **201→212/227 (+11 columns, 93.4% label, 93.8% domain)**. Specs: `specs/2026-04-16-v13-retrain/`, `specs/2026-04-16-v12-data-quality-audit/`.
-- **Multi-branch pipeline integration** (m-15) — Replaced Sense+CharCNN with multi-branch as the default inference pipeline. Sharpen layer (feature_sharpen F1–F6, value_sharpen R1–R19, header hints) post-processes multi-branch output. Decisions 0041–0042.
 
 ### What's next
 
-- **Publish v14 to HuggingFace** — Required for DuckDB extension runtime download.
 - **9 remaining misclassifications** — All model errors: user_agent→jwt (×1), phone→ssn (×2), user_agent→whitespace_separated (×1), method→iata_code (×1), id→username (×1), hostname→plain_text (×1), geojson→dms (×1), locale→locale_code (×1). Needs v16 retrain or training data improvements.
 - **5 Model2Vec-harmed columns** — sha256→tsid, gap→amount_accounting, depthError→latitude, user_agent→plain_text, mdy_dash→dmy_dash were fixed by keyword narrowing (freeing from hardcoded hint cascade), but 5 similar columns remain harmed by Model2Vec semantic matching. Decision 0042 direction.
-- **Actionability format_string gaps** — Expanded eval set exposed empty format_strings on iso_8601, iso, dmy_short_dot (99.9% overall). Taxonomy definition fixes.
+- **2 actionability below-target** — multilingual/date (33.3%, mixed format data), tech_systems/version (93.8%, ambiguous X.Y.Z values). Both need model retraining.
 
 ### Architectural direction (settled — do not re-ask)
 
@@ -193,8 +192,8 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v13: **212/227 (93.4% label, 93.8% domain)**. 35 datasets, 227 columns, 240-type taxonomy. Run on Mac with `FINETYPE_MODEL_DIR=models/sherlock-v13`.
-**Actionability eval** — 96.7% transform success rate (494k/511k values). Below old baseline (99.9%) due to expanded eval set exposing format_string gaps.
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v14: **218/227 (96.0% label, 95.2% domain)**. 35 datasets, 226 columns (blood_pressure removed), 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD).
+**Actionability eval** — 578743/578789 (100%) transform success rate. 2 below-target columns remaining (multilingual/date, tech_systems/version).
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
 
