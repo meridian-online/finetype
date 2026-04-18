@@ -864,8 +864,13 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
 
 # Types to drop entirely (all distilled rows are mislabeled)
 _DROP_ALL_TYPES = {
-    "identity.government.ssn",      # 3 rows, all partial dates like "-- --, 1918"
-    "technology.internet.user_agent", # 4 rows, all person names / product descriptions
+    "identity.government.ssn",           # 3 rows, all partial dates like "-- --, 1918"
+    "technology.internet.user_agent",     # 4 rows, all person names / product descriptions
+    "finance.banking.swift_bic",         # v16: 5 rows, all county/country names not BIC codes
+    "technology.internet.http_method",    # v16: 6 rows, all random uppercase text not HTTP methods
+    "representation.file.excel_format",  # v16: 16 rows, CLI commands / country names / durations
+    "identity.medical.loinc",            # v16: 7 rows, sports scores not LOINC codes
+    "identity.medical.cpt",              # v16: 4 rows, mixed integers / text not CPT codes
 }
 
 # Phone number: keep only rows where values look like actual phone numbers
@@ -878,12 +883,37 @@ _POSTAL_PATTERN = re.compile(
     r"^[\s]*\d{3,10}[\s]*$|^[\s]*[A-Z]\d[A-Z]\s?\d[A-Z]\d[\s]*$|^[\s]*\d{5}-\d{4}[\s]*$"
 )
 
+# v16: ICAO code — 4-letter uppercase, must start with known ICAO prefix
+_ICAO_PATTERN = re.compile(r"^[A-Z]{4}$")
+_ICAO_PREFIXES = {"K", "C", "E", "L", "R", "Z", "U", "V", "W", "S", "F", "D", "H", "O", "P", "Y", "B", "G", "M", "N", "T", "A"}
+
+# v16: UN/LOCODE — 5-char alphanumeric, starting with 2-letter country code
+_UNLOCODE_PATTERN = re.compile(r"^[A-Z]{2}[A-Z0-9]{3}$")
+
+# v16: EAN — 13 or 8 digit barcode with valid check digit
+_EAN_PATTERN = re.compile(r"^\d{8}$|^\d{13}$")
+
+# v16: ISO 8601 duration — must start with P
+_ISO_DURATION_PATTERN = re.compile(r"^P[\dTYMWDHS\.]+$")
+
 
 def _column_matches_pattern(values, pattern, min_match_rate=0.5):
     """Check if at least min_match_rate of values match the pattern."""
     if not values:
         return False
     matches = sum(1 for v in values if pattern.match(str(v)))
+    return matches / len(values) >= min_match_rate
+
+
+def _column_matches_icao(values, min_match_rate=0.5):
+    """Check if values match ICAO airport code patterns (4-letter, known prefix)."""
+    if not values:
+        return False
+    matches = 0
+    for v in values:
+        s = str(v).strip()
+        if _ICAO_PATTERN.match(s) and s[0] in _ICAO_PREFIXES:
+            matches += 1
     return matches / len(values) >= min_match_rate
 
 
@@ -948,8 +978,79 @@ def filter_distilled_columns(columns_by_type, ordered_columns):
         else:
             del columns_by_type[postal_key]
 
+    # v16: Filter ICAO codes — keep only columns with valid ICAO prefix patterns
+    icao_key = "geography.transportation.icao_code"
+    if icao_key in columns_by_type:
+        original = columns_by_type[icao_key]
+        filtered = [
+            (vals, hdr) for vals, hdr in original
+            if _column_matches_icao(vals)
+        ]
+        dropped = len(original) - len(filtered)
+        stats["filtered_icao"] = dropped
+        stats["total_dropped_columns"] += dropped
+        if filtered:
+            columns_by_type[icao_key] = filtered
+        else:
+            del columns_by_type[icao_key]
+
+    # v16: Filter UN/LOCODE — keep only columns with valid LOCODE format
+    unlocode_key = "geography.transportation.unlocode"
+    if unlocode_key in columns_by_type:
+        original = columns_by_type[unlocode_key]
+        filtered = [
+            (vals, hdr) for vals, hdr in original
+            if _column_matches_pattern(vals, _UNLOCODE_PATTERN)
+        ]
+        dropped = len(original) - len(filtered)
+        stats["filtered_unlocode"] = dropped
+        stats["total_dropped_columns"] += dropped
+        if filtered:
+            columns_by_type[unlocode_key] = filtered
+        else:
+            del columns_by_type[unlocode_key]
+
+    # v16: Filter EAN — keep only columns with valid EAN-format barcodes
+    ean_key = "identity.commerce.ean"
+    if ean_key in columns_by_type:
+        original = columns_by_type[ean_key]
+        filtered = [
+            (vals, hdr) for vals, hdr in original
+            if _column_matches_pattern(vals, _EAN_PATTERN)
+        ]
+        dropped = len(original) - len(filtered)
+        stats["filtered_ean"] = dropped
+        stats["total_dropped_columns"] += dropped
+        if filtered:
+            columns_by_type[ean_key] = filtered
+        else:
+            del columns_by_type[ean_key]
+
+    # v16: Filter ISO 8601 duration — keep only columns with P... pattern
+    duration_key = "datetime.duration.iso_8601"
+    if duration_key in columns_by_type:
+        original = columns_by_type[duration_key]
+        filtered = [
+            (vals, hdr) for vals, hdr in original
+            if _column_matches_pattern(vals, _ISO_DURATION_PATTERN)
+        ]
+        dropped = len(original) - len(filtered)
+        stats["filtered_duration"] = dropped
+        stats["total_dropped_columns"] += dropped
+        if filtered:
+            columns_by_type[duration_key] = filtered
+        else:
+            del columns_by_type[duration_key]
+
     # Rebuild ordered_columns to match
     drop_set = _DROP_ALL_TYPES.copy()
+    # v16 filtered types (in addition to phone + postal)
+    _V16_FILTERED_TYPES = {
+        icao_key: lambda vals: _column_matches_icao(vals),
+        unlocode_key: lambda vals: _column_matches_pattern(vals, _UNLOCODE_PATTERN),
+        ean_key: lambda vals: _column_matches_pattern(vals, _EAN_PATTERN),
+        duration_key: lambda vals: _column_matches_pattern(vals, _ISO_DURATION_PATTERN),
+    }
     remaining_by_type = {}
     for type_key, cols in columns_by_type.items():
         remaining_by_type[type_key] = set(id(c) for c in cols)
@@ -963,6 +1064,9 @@ def filter_distilled_columns(columns_by_type, ordered_columns):
         if label == phone_key and not _column_matches_pattern(vals, _PHONE_PATTERN):
             continue
         if label == postal_key and not _column_matches_pattern(vals, _POSTAL_PATTERN):
+            continue
+        # v16 filters
+        if label in _V16_FILTERED_TYPES and not _V16_FILTERED_TYPES[label](vals):
             continue
         filtered_ordered.append((label, vals, hdr))
 
