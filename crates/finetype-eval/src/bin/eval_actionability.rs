@@ -24,7 +24,7 @@ fn is_json_file(file_path: &str) -> bool {
 fn read_expr(file_path: &str) -> String {
     let escaped = file_path.replace('\'', "''");
     if is_json_file(file_path) {
-        format!("read_json_auto('{escaped}')")
+        format!("read_json_auto('{escaped}', timestamp_format='disabled')")
     } else {
         format!("read_csv('{escaped}', auto_detect=true, all_varchar=true)")
     }

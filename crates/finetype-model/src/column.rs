@@ -2245,6 +2245,20 @@ impl ColumnClassifier {
             return;
         }
 
+        // Guard: iso_8601 date/timestamp catch-all should not override specific
+        // datetime predictions. The catch-all (h.contains("date"/"timestamp") →
+        // iso_8601) fires for any header containing those words, but the model's
+        // header branch processes these words and produces a more specific datetime
+        // prediction (mdy_slash, clf, dmy_hm, etc.). Trust the model's specificity
+        // over the generic catch-all. Aligns with decision 0042 direction.
+        if hinted_type == "datetime.timestamp.iso_8601"
+            && hint_is_hardcoded
+            && result.label.starts_with("datetime.")
+            && result.label != "datetime.timestamp.iso_8601"
+        {
+            return;
+        }
+
         // Same-category hardcoded hint override (NNFT-194)
         // Hardcoded hints are definitive for same-category overrides — no confidence
         // threshold. E.g. "phone" → phone_number overrides ssn@1.00 because both
@@ -2805,6 +2819,43 @@ fn value_sharpen(
             &[(result_label.to_string(), 1)], // Minimal vote entry for the function signature
         ) {
             return Some((label, rule));
+        }
+    }
+
+    // Rule 31: Version vs dmy_short_dot gate.
+    // If model predicts dmy_short_dot but ≥30% of X.Y.Z values have segments
+    // that are impossible as DD.MM.YY dates (day=0, month>12, month=0, year>99),
+    // override to version. Version strings like "0.2.53" and "6.27.84" are
+    // structurally similar to "DD.MM.YY" but have out-of-range segments.
+    // The 30% threshold catches obvious version columns while allowing actual
+    // dmy_short_dot columns with occasional malformed entries through.
+    if result_label == "datetime.date.dmy_short_dot" {
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() >= 3 {
+            let invalid_date_count = non_empty
+                .iter()
+                .filter(|v| {
+                    let parts: Vec<&str> = v.split('.').collect();
+                    if parts.len() != 3 {
+                        return false;
+                    }
+                    let day = parts[0].parse::<u32>().unwrap_or(1);
+                    let month = parts[1].parse::<u32>().unwrap_or(1);
+                    let year = parts[2].parse::<u32>().unwrap_or(0);
+                    day == 0 || day > 31 || month == 0 || month > 12 || year > 99
+                })
+                .count();
+            let invalid_rate = invalid_date_count as f32 / non_empty.len() as f32;
+            if invalid_rate >= 0.30 {
+                return Some((
+                    "technology.development.version".to_string(),
+                    format!("version_dmy_short_dot_gate:invalid_date={:.2}", invalid_rate),
+                ));
+            }
         }
     }
 
@@ -6365,6 +6416,56 @@ mod tests {
     fn v15_subcountry_not_mapped_to_state() {
         // "subcountry" should NOT map to state — model predicts region correctly
         assert_eq!(header_hint("subcountry"), None);
+    }
+
+    // ── R31: Version vs dmy_short_dot gate ──────────────────────────────
+
+    #[test]
+    fn r31_version_overrides_dmy_short_dot_on_invalid_dates() {
+        // Version strings with out-of-range date segments should override dmy_short_dot.
+        // 0.2.53 → day=0 (invalid), 6.27.84 → month=27 (invalid), etc.
+        let values: Vec<String> = vec!["0.2.53", "6.27.84", "4.24.59", "7.23.74", "5.14.89"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(&values, "datetime.date.dmy_short_dot", 0.99, None);
+        assert!(result.is_some(), "R31 should fire on version-like values");
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "technology.development.version");
+        assert!(rule.starts_with("version_dmy_short_dot_gate:"));
+    }
+
+    #[test]
+    fn r31_preserves_real_dmy_short_dot() {
+        // Actual DD.MM.YY dates should NOT trigger R31.
+        let values: Vec<String> = vec!["15.06.23", "01.12.22", "28.03.24", "10.01.21", "05.09.20"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(&values, "datetime.date.dmy_short_dot", 0.99, None);
+        if let Some((_, rule)) = &result {
+            assert!(
+                !rule.starts_with("version_dmy_short_dot_gate:"),
+                "R31 should not fire on valid DMY dates"
+            );
+        }
+    }
+
+    #[test]
+    fn r31_borderline_valid_dates_stay_dmy() {
+        // Version strings that happen to be valid dates (10.6.2, 9.1.11)
+        // should NOT trigger R31 — below 30% threshold.
+        let values: Vec<String> = vec!["10.6.2", "9.1.11", "3.1.16", "8.4.8", "5.3.7"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let result = value_sharpen(&values, "datetime.date.dmy_short_dot", 0.99, None);
+        if let Some((_, rule)) = &result {
+            assert!(
+                !rule.starts_with("version_dmy_short_dot_gate:"),
+                "R31 should not fire when most values are valid dates"
+            );
+        }
     }
 
     #[test]
