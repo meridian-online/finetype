@@ -182,11 +182,16 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 - **`TuiRenderer`** — ratatui alternate-screen dashboard (live loss/accuracy charts, epoch table, progress bar). Feature-gated behind `tui` (default on). No `enable_raw_mode()` — safe for unattended overnight runs.
 - **`LogRenderer`** — `tracing::info!` fallback. Used when TUI init fails or `--no-tui` is passed.
 
-**`results.json`** is the canonical source of training metrics — written by the training loop to the model output directory (e.g., `models/sherlock-v7/results.json`). Contains a JSON array of `EpochMetrics`:
+**`results.json`** is the canonical source of training metrics — written **incrementally** (atomic temp+rename after each epoch) to the model output directory (e.g., `models/sherlock-v16/results.json`). Contains a JSON array of `EpochMetrics`:
 ```json
 [{"epoch": 0, "train_loss": 1.23, "val_loss": 1.10, "train_accuracy": 0.45, "val_accuracy": 0.52, "learning_rate": 0.0001, "epoch_time_secs": 95.2}, ...]
 ```
-**Do not parse log files for training metrics.** Read `results.json` directly — overnight scripts, comparison queries, and post-hoc analysis should all use this structured output.
+**`epochs.jsonl`** — one compact JSON line per epoch, appended during training. Survives `tee` capture (unlike TUI escape codes). Use this for `tail -f` monitoring:
+```bash
+tail -f models/sherlock-v16/epochs.jsonl
+# {"epoch":1,"train_loss":5.4321,"val_loss":5.1234,"train_acc":0.0512,"val_acc":0.0634,"lr":1.00e-4,"time":152.3}
+```
+**Do not parse log files for training metrics.** Read `results.json` or `epochs.jsonl` directly — overnight scripts, comparison queries, and post-hoc analysis should all use this structured output.
 
 **`TrainingSummary`** is returned by `train_multi_branch()`: `best_epoch`, `best_val_accuracy`, `total_epochs`, `total_time_secs`, `epoch_metrics: Vec<EpochMetrics>`.
 
@@ -252,7 +257,7 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Training crate | `crates/finetype-train/src/` |
 | Training TUI + renderer trait | `crates/finetype-train/src/tui.rs` |
 | Multi-branch training loop | `crates/finetype-train/src/multi_branch.rs` |
-| Training metrics (per model) | `models/<name>/results.json` |
+| Training metrics (per model) | `models/<name>/results.json`, `models/<name>/epochs.jsonl` |
 | Eval binaries | `crates/finetype-eval/src/bin/` |
 | Golden integration tests | `crates/finetype-cli/tests/cli_golden.rs` |
 | Eval config + schema mapping | `eval/config.env`, `eval/schema_mapping.yaml` |

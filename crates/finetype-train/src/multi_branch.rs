@@ -2524,6 +2524,30 @@ pub fn train_multi_branch(
             epoch_time,
         );
 
+        // Write incremental results.json (atomic: write temp then rename)
+        // This lets monitoring scripts read training progress during long runs.
+        let results_path = config.output_dir.join("results.json");
+        let results_tmp = config.output_dir.join("results.json.tmp");
+        if let Ok(json) = serde_json::to_string_pretty(&epoch_metrics) {
+            let _ = std::fs::write(&results_tmp, &json)
+                .and_then(|_| std::fs::rename(&results_tmp, &results_path));
+        }
+
+        // Append to epochs.jsonl — one compact JSON line per epoch, survives tee capture.
+        // Unlike the TUI output, these lines are plain text and greppable.
+        let epochs_path = config.output_dir.join("epochs.jsonl");
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&epochs_path)
+        {
+            let _ = writeln!(
+                f,
+                r#"{{"epoch":{},"train_loss":{:.4},"val_loss":{:.4},"train_acc":{:.4},"val_acc":{:.4},"lr":{:.2e},"time":{:.1}}}"#,
+                epoch + 1, train_loss, val_loss, train_accuracy, val_accuracy, lr, epoch_time,
+            );
+        }
+
         // Early stopping on val accuracy
         let should_stop = early_stopping.step(epoch, val_accuracy);
 
@@ -2558,7 +2582,7 @@ pub fn train_multi_branch(
     // Save model config
     model_config.save(&config.output_dir.join("config.json"))?;
 
-    // Save training results
+    // Final results.json write (ensures completeness even if incremental writes failed)
     let results_json = serde_json::to_string_pretty(&epoch_metrics)?;
     std::fs::write(config.output_dir.join("results.json"), &results_json)?;
 
