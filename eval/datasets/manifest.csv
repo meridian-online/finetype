@@ -142,7 +142,6 @@ medical_records,eval/datasets/csv/medical_records.csv,first_name,first name
 medical_records,eval/datasets/csv/medical_records.csv,last_name,last name
 medical_records,eval/datasets/csv/medical_records.csv,date_of_birth,date
 medical_records,eval/datasets/csv/medical_records.csv,gender,gender
-medical_records,eval/datasets/csv/medical_records.csv,blood_pressure,value
 medical_records,eval/datasets/csv/medical_records.csv,heart_rate,number
 medical_records,eval/datasets/csv/medical_records.csv,temperature_f,decimal number
 medical_records,eval/datasets/csv/medical_records.csv,weight_lbs,weight

@@ -1,3 +1,54 @@
+/// Check whether two timestamp subtypes belong to the same format family.
+/// Types within a family are precision or offset variants of each other —
+/// predicting iso_8601 when the GT is iso_8601_milliseconds is acceptable,
+/// but predicting iso_8601 when the GT is clf or mdy_12h is not.
+fn is_same_timestamp_family(a: &str, b: &str) -> bool {
+    const FAMILIES: &[&[&str]] = &[
+        // ISO 8601 family (precision and offset variants, including RFC 3339)
+        &[
+            "datetime.timestamp.iso_8601",
+            "datetime.timestamp.iso_8601_compact",
+            "datetime.timestamp.iso_8601_microseconds",
+            "datetime.timestamp.iso_8601_offset",
+            "datetime.timestamp.iso_8601_milliseconds",
+            "datetime.timestamp.iso_8601_millis_offset",
+            "datetime.timestamp.iso_8601_micros_offset",
+            "datetime.timestamp.rfc_3339",
+            "datetime.timestamp.iso_microseconds",
+            "datetime.timestamp.iso_space_zulu",
+        ],
+        // SQL family (precision and offset variants)
+        &[
+            "datetime.timestamp.sql_standard",
+            "datetime.timestamp.sql_microseconds",
+            "datetime.timestamp.sql_milliseconds",
+            "datetime.timestamp.sql_microseconds_offset",
+        ],
+        // RFC 2822 family
+        &[
+            "datetime.timestamp.rfc_2822",
+            "datetime.timestamp.rfc_2822_ordinal",
+        ],
+        // US MDY family (12h/24h variants)
+        &[
+            "datetime.timestamp.mdy_12h",
+            "datetime.timestamp.mdy_24h",
+        ],
+        // EU DMY family (separator variants)
+        &[
+            "datetime.timestamp.dmy_hm",
+            "datetime.timestamp.dot_dmy_24h",
+        ],
+        // YMD non-ISO family (separator variants)
+        &[
+            "datetime.timestamp.slash_ymd_24h",
+            "datetime.timestamp.dot_ymd_24h",
+        ],
+    ];
+
+    FAMILIES.iter().any(|family| family.contains(&a) && family.contains(&b))
+}
+
 /// Check label match with interchangeability rules (matches eval_profile.sql).
 pub fn is_label_match(predicted: &str, expected: &str) -> bool {
     if predicted == expected {
@@ -13,9 +64,11 @@ pub fn is_label_match(predicted: &str, expected: &str) -> bool {
     if expected.starts_with("datetime.time.") && predicted.starts_with("datetime.time.") {
         return true;
     }
-    // Timestamp sub-types are interchangeable
+    // Timestamp sub-types: only format-compatible families are interchangeable.
+    // Previously all datetime.timestamp.* were treated as equivalent, which masked
+    // real errors (e.g., iso_8601 predicted for clf or mdy_12h counted as correct).
     if expected.starts_with("datetime.timestamp.") && predicted.starts_with("datetime.timestamp.") {
-        return true;
+        return is_same_timestamp_family(predicted, expected);
     }
     // Geographic hierarchy interchangeable
     const GEO_SET: &[&str] = &[
@@ -115,10 +168,64 @@ mod tests {
     }
 
     #[test]
-    fn test_timestamp_interchangeable() {
+    fn test_timestamp_iso_family_interchangeable() {
+        // Within ISO family — precision variants are interchangeable
         assert!(is_label_match(
             "datetime.timestamp.iso_8601",
             "datetime.timestamp.iso_8601_microseconds"
+        ));
+        assert!(is_label_match(
+            "datetime.timestamp.iso_8601",
+            "datetime.timestamp.rfc_3339"
+        ));
+        assert!(is_label_match(
+            "datetime.timestamp.iso_8601_milliseconds",
+            "datetime.timestamp.iso_8601_offset"
+        ));
+    }
+
+    #[test]
+    fn test_timestamp_sql_family_interchangeable() {
+        assert!(is_label_match(
+            "datetime.timestamp.sql_standard",
+            "datetime.timestamp.sql_microseconds"
+        ));
+    }
+
+    #[test]
+    fn test_timestamp_cross_family_not_interchangeable() {
+        // ISO vs CLF — different format families
+        assert!(!is_label_match(
+            "datetime.timestamp.iso_8601",
+            "datetime.timestamp.clf"
+        ));
+        // ISO vs MDY — different format families
+        assert!(!is_label_match(
+            "datetime.timestamp.iso_8601",
+            "datetime.timestamp.mdy_12h"
+        ));
+        // ISO vs DMY — different format families
+        assert!(!is_label_match(
+            "datetime.timestamp.iso_8601",
+            "datetime.timestamp.dmy_hm"
+        ));
+        // ISO vs syslog — different format families
+        assert!(!is_label_match(
+            "datetime.timestamp.iso_8601",
+            "datetime.timestamp.syslog_bsd"
+        ));
+        // CLF vs syslog — both standalone, not interchangeable
+        assert!(!is_label_match(
+            "datetime.timestamp.clf",
+            "datetime.timestamp.syslog_bsd"
+        ));
+    }
+
+    #[test]
+    fn test_timestamp_mdy_family_interchangeable() {
+        assert!(is_label_match(
+            "datetime.timestamp.mdy_12h",
+            "datetime.timestamp.mdy_24h"
         ));
     }
 
