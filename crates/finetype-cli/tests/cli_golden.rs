@@ -205,7 +205,11 @@ fn assert_column_domain(
 
 /// Path to a dataset CSV file (eval/datasets/csv/).
 fn dataset_path(name: &str) -> PathBuf {
-    workspace_root().join("eval").join("datasets").join("csv").join(name)
+    workspace_root()
+        .join("eval")
+        .join("datasets")
+        .join("csv")
+        .join(name)
 }
 
 /// Path to a fixture CSV file (tests/fixtures/).
@@ -268,11 +272,7 @@ fn golden_profile_ecommerce_orders() {
     assert_column_type(&cols, "order_date", "datetime.date.iso");
     assert_column_type(&cols, "total_price", "finance.currency.amount");
     assert_column_type(&cols, "currency", "finance.currency.currency_code");
-    assert_column_type(
-        &cols,
-        "credit_card_last4",
-        "geography.address.postal_code",
-    );
+    assert_column_type(&cols, "credit_card_last4", "geography.address.postal_code");
     assert_column_type(&cols, "shipping_country", "geography.location.country");
     assert_column_type(
         &cols,

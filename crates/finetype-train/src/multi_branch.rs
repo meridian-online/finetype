@@ -2544,7 +2544,13 @@ pub fn train_multi_branch(
             let _ = writeln!(
                 f,
                 r#"{{"epoch":{},"train_loss":{:.4},"val_loss":{:.4},"train_acc":{:.4},"val_acc":{:.4},"lr":{:.2e},"time":{:.1}}}"#,
-                epoch + 1, train_loss, val_loss, train_accuracy, val_accuracy, lr, epoch_time,
+                epoch + 1,
+                train_loss,
+                val_loss,
+                train_accuracy,
+                val_accuracy,
+                lr,
+                epoch_time,
             );
         }
 

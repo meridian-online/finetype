@@ -2732,10 +2732,7 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     if let Some(transform_ext) = &def.transform_ext {
         schema.insert("x-finetype-transform-ext".into(), json!(transform_ext));
     }
-    schema.insert(
-        "x-finetype-pii".into(),
-        json!(def.pii.unwrap_or(false)),
-    );
+    schema.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
 
     serde_json::Value::Object(schema)
 }
@@ -2799,10 +2796,7 @@ fn cmd_schema_table(
     let enrichment_taxonomy = if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path_labels) {
         taxonomy.compile_validators();
         taxonomy.compile_locale_validators();
-        eprintln!(
-            "Loaded taxonomy ({} types)",
-            taxonomy.labels().len()
-        );
+        eprintln!("Loaded taxonomy ({} types)", taxonomy.labels().len());
         column_classifier.set_taxonomy(taxonomy.clone());
         taxonomy
     } else {
@@ -2982,10 +2976,7 @@ fn cmd_schema_table(
             if let Some(fmt) = &def.format_string {
                 prop.insert("x-finetype-format-string".into(), json!(fmt));
             }
-            prop.insert(
-                "x-finetype-pii".into(),
-                json!(def.pii.unwrap_or(false)),
-            );
+            prop.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
         } else {
             // Label not found in taxonomy — basic string schema
             prop.insert("type".into(), json!("string"));

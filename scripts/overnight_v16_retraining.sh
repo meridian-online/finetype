@@ -340,12 +340,13 @@ if min_type_count < 50:
 else:
     print(f'  PASS')
 
-# Gate 3: Total types >= 232
-# _DROP_ALL_TYPES removes 7 types from both distilled and synthetic (their synthetic
-# patterns overlap with common types, introducing noise — empirically 232 types
-# performs better than 239). Password is excluded from generation. Total: 240 - 7 - 1 = 232.
+# Gate 3: Total types >= 239
+# _DROP_DISTILLED_TYPES removes 7 types from distilled data only; synthetic
+# generators for those types remain (see handover 2026-04-19 — dropping from
+# both caused v16 seed-42 to regress to 226/242). Password is excluded from
+# generation. Total expected: 240 - 1 password = 239.
 total_types = len(label_counts)
-expected_min = 232  # 240 - 7 dropped - 1 password
+expected_min = 239  # 240 taxonomy types - 1 password (no generator)
 print(f'Gate 3: Total types = {total_types} (gate: >={expected_min})')
 if total_types < expected_min:
     print(f'FAIL: Only {total_types} types, expected >={expected_min}')
@@ -521,7 +522,9 @@ echo "[Eval] Running profile eval..."
 # Delete cached results to force re-evaluation with new model
 rm -f eval/eval_output/profile_results.csv
 
-FINETYPE_MODEL_DIR="$MODEL_DIR" make eval-report 2>&1
+# NB: profile_eval.sh reads FINETYPE_MODEL (passed to CLI as --model).
+# FINETYPE_MODEL_DIR is only honoured by the DuckDB extension.
+FINETYPE_MODEL="$MODEL_DIR" make eval-report 2>&1
 
 echo ""
 echo "[Eval] Profile eval complete: $(date)"
@@ -616,6 +619,7 @@ echo " Model: $MODEL_DIR/"
 echo " Log: $LOG_FILE"
 echo " Spec: specs/2026-04-18-v16-data-audit-retrain/spec.yaml"
 echo ""
-echo " To promote v16 as default:"
-echo "   ln -sf sherlock-v16 models/default"
+echo " To promote v16 as default (use -sfn; BSD ln otherwise follows the"
+echo " existing symlink into the old target dir on macOS):"
+echo "   ln -sfn sherlock-v16 models/default"
 echo "================================================================"

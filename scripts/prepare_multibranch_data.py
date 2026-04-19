@@ -862,8 +862,9 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
 # Filtering runs BEFORE the distilled cap (AC-04).
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Types to drop entirely (all distilled rows are mislabeled)
-_DROP_ALL_TYPES = {
+# Types to drop entirely from DISTILLED data (all distilled rows are mislabeled).
+# Synthetic generators for these types are fine — see _DROP_SYNTHETIC_TYPES below.
+_DROP_DISTILLED_TYPES = {
     "identity.government.ssn",           # 3 rows, all partial dates like "-- --, 1918"
     "technology.internet.user_agent",     # 4 rows, all person names / product descriptions
     "finance.banking.swift_bic",         # v16: 5 rows, all county/country names not BIC codes
@@ -872,6 +873,19 @@ _DROP_ALL_TYPES = {
     "identity.medical.loinc",            # v16: 7 rows, sports scores not LOINC codes
     "identity.medical.cpt",              # v16: 4 rows, mixed integers / text not CPT codes
 }
+
+# Backwards-compatibility alias. Historically this set was applied to both
+# distilled and synthetic data, which gave these types zero training examples
+# (first v16 sweep scored 226/242 vs v14's 233/242 — regression). The sweep
+# eval that originally seemed to justify dropping synthetic data was
+# misconfigured (FINETYPE_MODEL_DIR instead of FINETYPE_MODEL) and was
+# actually scoring v14 throughout. We now keep synthetic data for every type.
+_DROP_ALL_TYPES = _DROP_DISTILLED_TYPES
+
+# Types to drop entirely from SYNTHETIC data (empty by default — generators
+# are trustworthy). Populate only if a specific synthetic generator is shown
+# to produce noise that measurably harms other predictions.
+_DROP_SYNTHETIC_TYPES: set[str] = set()
 
 # Phone number: keep only rows where values look like actual phone numbers
 _PHONE_PATTERN = re.compile(
@@ -2489,24 +2503,24 @@ def main():
     total_s_cols = sum(len(cols) for cols in synthetic.values())
     print(f"  {total_s_cols} columns across {len(synthetic)} types")
 
-    # ─── Drop mislabeled types from synthetic data (v16 AC-03) ─────
-    # Types in _DROP_ALL_TYPES have mislabeled distilled data, but their
-    # synthetic patterns also overlap with common types (e.g., swift_bic
-    # uppercase strings → country_code, cpt 5-digit codes → postal_code).
-    # Keeping synthetic data for these types introduces noise that hurts
-    # other predictions (empirically: 232 types → 233/242, 239 types →
-    # 229/242). The model relies on header hints to classify these types
-    # at inference time, which works well for types with distinctive headers.
-    if filter_distilled:
+    # ─── Drop mislabeled types from synthetic data (v16 handover fix) ──
+    # Previously this block iterated _DROP_ALL_TYPES, giving 7 types zero
+    # training data and causing the first v16 sweep to regress to 226/242
+    # (vs v14's 233/242). The "keeping synthetic data hurts" evidence was
+    # based on a misconfigured eval that actually scored v14, not v16.
+    #
+    # We now only drop synthetic data for types explicitly listed in
+    # _DROP_SYNTHETIC_TYPES (empty by default). Generators are trustworthy.
+    if filter_distilled and _DROP_SYNTHETIC_TYPES:
         dropped_syn = []
-        for type_key in _DROP_ALL_TYPES:
+        for type_key in _DROP_SYNTHETIC_TYPES:
             if type_key in synthetic:
                 count = len(synthetic[type_key])
                 del synthetic[type_key]
                 dropped_syn.append((type_key, count))
                 total_s_cols -= count
         if dropped_syn:
-            print(f"\n  Dropped {len(dropped_syn)} overlapping types from synthetic data:")
+            print(f"\n  Dropped {len(dropped_syn)} types from synthetic data:")
             for tk, c in dropped_syn:
                 print(f"    {tk}: {c} columns")
             print(f"  Synthetic after drops: {total_s_cols} columns across {len(synthetic)} types")

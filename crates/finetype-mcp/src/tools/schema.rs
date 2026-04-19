@@ -73,10 +73,7 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
     if let Some(alt) = &def.format_string_alt {
         schema.insert("x-format-string-alt".into(), json!(alt));
     }
-    schema.insert(
-        "x-finetype-pii".into(),
-        json!(def.pii.unwrap_or(false)),
-    );
+    schema.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
 
     serde_json::Value::Object(schema)
 }
@@ -269,10 +266,7 @@ async fn handle_file(
             if let Some(fmt) = &def.format_string {
                 prop.insert("x-finetype-format-string".into(), json!(fmt));
             }
-            prop.insert(
-                "x-finetype-pii".into(),
-                json!(def.pii.unwrap_or(false)),
-            );
+            prop.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
         } else {
             prop.insert("type".into(), json!("string"));
             prop.insert("x-finetype-label".into(), json!(result.label));

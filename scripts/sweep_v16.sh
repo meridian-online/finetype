@@ -176,7 +176,9 @@ print(f'{best[\"val_accuracy\"]:.4f}')
     # --- Eval ---
     echo "[Seed $SEED] Running profile eval..."
     rm -f eval/eval_output/profile_results.csv
-    FINETYPE_MODEL_DIR="$MODEL_DIR" make eval-report 2>&1
+    # NB: profile_eval.sh reads FINETYPE_MODEL (passed to CLI as --model).
+    # FINETYPE_MODEL_DIR is only honoured by the DuckDB extension.
+    FINETYPE_MODEL="$MODEL_DIR" make eval-report 2>&1
 
     # Extract eval score
     EVAL_SCORE=$(python3 -c "
@@ -240,8 +242,12 @@ if [[ "$BEST_EVAL" -ge 233 ]]; then
     echo "Best model meets target (>= 233/242). Promoting..."
     rm -rf "$V16_DIR"
     cp -r "$BEST_MODEL_DIR" "$V16_DIR"
-    ln -sf sherlock-v16 models/default
-    echo "  models/default -> sherlock-v16 (from seed $BEST_SEED)"
+    # NB: on BSD ln (macOS), `ln -sf NEW EXISTING_SYMLINK_TO_DIR` creates
+    # the link INSIDE the existing target directory. `-n` tells ln not to
+    # follow symlinks to directories. `-sfn` is portable (GNU + BSD).
+    rm -f models/default
+    ln -sfn sherlock-v16 models/default
+    echo "  models/default -> $(readlink models/default) (from seed $BEST_SEED)"
     echo ""
     echo "v16 is live. Run golden tests to verify:"
     echo "  cargo test -p finetype-cli --test cli_golden -- --ignored"
