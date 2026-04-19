@@ -57,6 +57,20 @@ hostname→hostname) and one regressed (fiscal_year→year).
 Option C is deferred as a separate card; it would further improve accuracy
 but wasn't necessary to ship v16.
 
+### Promotion deferred to release PR (2026-04-20)
+
+Flipping `models/default → sherlock-v16` in this PR breaks CI because
+`.github/scripts/download-model.sh` reads `models/default` and fetches
+the pointed-to model from HuggingFace — where sherlock-v16 hasn't been
+published yet (that's a release-scope task). The spec for m-18 was
+"train + evaluate v16", not "release v16", so promotion is deferred.
+
+This PR therefore keeps `models/default → sherlock-v14` and ships only
+the training-pipeline fixes. The promotion steps (symlink flip, golden
+test update, `eval/eval_output/report.md` refresh, HuggingFace publish,
+version bump, release tag, Homebrew bump) are tracked in
+`specs/2026-04-20-v16-release/`.
+
 ### Consequences
 
 - Good, because the 7 types now have ~1200 synthetic columns each to learn
