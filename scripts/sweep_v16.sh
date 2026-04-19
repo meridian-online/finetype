@@ -176,7 +176,9 @@ print(f'{best[\"val_accuracy\"]:.4f}')
     # --- Eval ---
     echo "[Seed $SEED] Running profile eval..."
     rm -f eval/eval_output/profile_results.csv
-    FINETYPE_MODEL_DIR="$MODEL_DIR" make eval-report 2>&1
+    # NB: profile_eval.sh reads FINETYPE_MODEL (passed to CLI as --model).
+    # FINETYPE_MODEL_DIR is only honoured by the DuckDB extension.
+    FINETYPE_MODEL="$MODEL_DIR" make eval-report 2>&1
 
     # Extract eval score
     EVAL_SCORE=$(python3 -c "
