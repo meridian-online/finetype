@@ -31,7 +31,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.16
 **Taxonomy:** 240 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 25, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
-**Default model:** Multi-branch→Sharpen pipeline with sherlock-v14 (5-branch: char+embed+stats+header+validation). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **233/242 (96.3% label, 95.5% domain)** on 35 datasets (242 columns after ground truth corrections). Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
+**Default model:** Multi-branch→Sharpen pipeline with sherlock-v16 (5-branch: char+embed+stats+header+validation). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **235/242 (97.1% label, 96.3% domain)** on 35 datasets (242 columns after ground truth corrections). Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
 **Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 23 value-based disambiguation rules (R1–R31, some gaps), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85), datetime specificity guard (prevents iso_8601 catch-all from overriding specific datetime predictions).
 **Codebase:** ~20k lines of Rust across 9 crates (including finetype-train for pure Rust ML training, finetype-mcp for MCP server). Zero Python dependencies (build + runtime).
 **CI status:** All checks pass (fmt, clippy, test, taxonomy check). 413 model tests, zero warnings.
@@ -39,16 +39,17 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ### Recent work
 
-- **v16 data audit (m-18, in progress)** — Corrected 17 eval ground truth labels, added 15 new GT columns (242 total, was 227). Fixed `label_remap.json` broken chains (description/title/sentence/paragraph → plain_text). Dropped 7 types with garbage distilled data from training (`_DROP_ALL_TYPES`). Added 4 value-pattern filters for distilled data quality. v14 on corrected eval: **233/242 (96.3%)**. First v16 retrain attempt regressed to 226/242 — root cause: `_DROP_ALL_TYPES` drops from BOTH distilled and synthetic, giving 7 types zero training data. Fix: split into distilled-only drop. Also found sweep script bug: `FINETYPE_MODEL_DIR` env var not used by CLI (use `FINETYPE_MODEL` instead). Spec: `specs/2026-04-18-v16-data-audit-retrain/`. Handover: `specs/2026-04-18-v16-data-audit-retrain/handover-2026-04-19.md`.
+- **v16 data audit + retrain (m-18, COMPLETE)** — Corrected 17 eval ground truth labels, added 15 new GT columns (242 total, was 227). Fixed `label_remap.json` broken chains (description/title/sentence/paragraph → plain_text). Split `_DROP_ALL_TYPES` into `_DROP_DISTILLED_TYPES` (7 types, mislabeled distilled rows) and `_DROP_SYNTHETIC_TYPES` (empty — generators retained). Added 4 value-pattern filters for distilled data quality. Fixed eval env var (`FINETYPE_MODEL_DIR` → `FINETYPE_MODEL`) and BSD `ln -sf` gotcha in promotion. Final 3-seed sweep (seeds 42/43/44 × 100 epochs): seed 43 won at 235/242 (97.1%), promoted as `models/default`. Net +2 over v14: 3 fixes (phone/method/hostname), 1 regression (fiscal_year→year, domain still correct). Decision: 0049. Spec: `specs/2026-04-18-v16-data-audit-retrain/`.
 - **v15 Option C — selective hint narrowing** — Narrowed 7 harmful `header_hint()` keyword matches, added R25/R27 value-based rules. Profile eval: **215→218/227 (+3 net)**. Decision 0048 (value-based rules only). Spec: `specs/2026-04-18-v15-value-rules/`.
 - **v14 model trained and promoted** — 50 epochs, 127 min on Metal, best val_acc 91.2%. Symlink `models/default → sherlock-v14`.
 - **v13 retrain — data quality + architecture** (m-16) — Distilled data decontamination, validation branch resize. Profile eval: **201→212/227 (+11)**. Specs: `specs/2026-04-16-v13-retrain/`.
 
 ### What's next
 
-- **v16 retrain (immediate)** — Fix `_DROP_ALL_TYPES` split: drop 7 types from distilled only, keep synthetic data for all. Fix sweep eval to use `FINETYPE_MODEL` env var. Re-run multi-seed sweep. Target: beat v14's 233/242 on corrected eval. See handover notes.
-- **v14's 9 remaining errors on corrected eval** — geojson→plain_text, user_agent (×3, dropped from training), method→iata_code (dropped), hostname→docker_ref, locale→alphanumeric_id, gap→year, git_sha→tsid. Some may resolve with v16 retrain if synthetic data is retained.
-- **2 actionability below-target** — multilingual/date (33.3%), tech_systems/version (93.8%). Both misclassification-driven, should improve with retrain.
+- **v0.6.17 release** — Package v16 (tar.gz + SHA256), publish to HuggingFace, tag GitHub release, update Homebrew tap. Out of scope for m-18; use `/release` skill.
+- **v16's 7 remaining errors on corrected eval** — user_agent (×2, still misclassified as jwt/docker_ref), geojson→plain_text, phone→ssn (people_directory), id→username (earthquakes_2024), fiscal_year→year (datetime_coverage, regression vs v14), locale→categorical (multilingual). Candidates for a follow-up data-quality card; none resolvable by simple disambiguation rules (blocked by decision 0048).
+- **Fix distilled data for swift_bic / http_method / cpt / loinc / excel_format / ssn / user_agent** (follow-up to decision 0049) — relabel the ~45 mislabeled distilled rows so the 7 types have real distilled coverage on top of synthetic. Separate card.
+- **2 actionability below-target** — multilingual/date (33.3%), tech_systems/version (93.8%). Both misclassification-driven; may resolve if the 7 v16 errors are addressed.
 
 ### Architectural direction (settled — do not re-ask)
 
@@ -197,7 +198,7 @@ tail -f models/sherlock-v16/epochs.jsonl
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v14: **233/242 (96.3% label, 95.5% domain)**. 35 datasets, 242 columns (corrected ground truth, 17 labels fixed, 15 new columns added). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD). **Note:** `FINETYPE_MODEL_DIR` env var is for the DuckDB extension only. The CLI uses `--model` flag (default: `models/default`). The eval script respects `FINETYPE_MODEL` env var (passed as `--model`).
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v16: **235/242 (97.1% label, 96.3% domain)**. 35 datasets, 242 columns (corrected ground truth, 17 labels fixed, 15 new columns added). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD). **Note:** `FINETYPE_MODEL_DIR` env var is for the DuckDB extension only. The CLI uses `--model` flag (default: `models/default`). The eval script respects `FINETYPE_MODEL` env var (passed as `--model`).
 **Actionability eval** — 578903/578949 (100%) transform success rate. 2 below-target columns remaining (multilingual/date, tech_systems/version).
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
@@ -206,9 +207,16 @@ To add regression datasets: create CSV in `/Users/hugh/datasets/finetype/`, add 
 
 ## Sprint Goal
 
-**v16 retrain — clean data, higher accuracy (m-18).** Two workstreams:
-1. **Training + eval data audit** — DONE. Corrected 17 eval GT labels, added 15 new GT columns, fixed label_remap chains, dropped 7 types with garbage distilled data, added 4 value-pattern filters. v14 on corrected eval: 233/242.
-2. **v16 retrain** — IN PROGRESS. First attempt regressed (226/242) because `_DROP_ALL_TYPES` removed types from synthetic data too. Fix: split to distilled-only drop, keep synthetic. Then re-run multi-seed sweep with fixed eval (`FINETYPE_MODEL` not `FINETYPE_MODEL_DIR`). Target: beat 233/242. See handover: `specs/2026-04-18-v16-data-audit-retrain/handover-2026-04-19.md`.
+**m-18 COMPLETE — v16 retrain shipped.** Corrected eval ground truth
+(+17 labels fixed, +15 new columns → 242 total), split `_DROP_ALL_TYPES`
+to preserve synthetic data for the 7 types with bad distilled data, fixed
+the eval env-var bug (`FINETYPE_MODEL_DIR` → `FINETYPE_MODEL`) and the
+BSD `ln -sf` promotion bug. Seed 43 promoted at **235/242 (97.1%)**, net
++2 over v14. Decision: 0049. Spec: `specs/2026-04-18-v16-data-audit-retrain/`.
+
+**Next sprint (m-19 — TBD):** candidates include v0.6.17 release, distilled-
+data relabelling for the 7 still-error-prone types, or the deferred PII
+detection card (`specs/2026-04-18-pii-detection/`).
 
 Previous: m-17 COMPLETE — PII detection (card 0012), actionability audit P1–P5, v15 Option C (233/242 on corrected eval, 96.3%).
 
