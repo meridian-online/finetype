@@ -2853,7 +2853,10 @@ fn value_sharpen(
             if invalid_rate >= 0.30 {
                 return Some((
                     "technology.development.version".to_string(),
-                    format!("version_dmy_short_dot_gate:invalid_date={:.2}", invalid_rate),
+                    format!(
+                        "version_dmy_short_dot_gate:invalid_date={:.2}",
+                        invalid_rate
+                    ),
                 ));
             }
         }
@@ -4158,9 +4161,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     // (underscores already replaced with spaces, exact "ip" handled above)
     // Guard: "ip_v4_with_port" headers should NOT match — the model correctly
     // identifies ip_v4_with_port from value patterns (v15, Option C keyword audit).
-    if (h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip "))
-        && !h.contains("port")
-    {
+    if (h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip ")) && !h.contains("port") {
         return Some("technology.internet.ip_v4");
     }
     if h.contains("zip") || h.contains("postal") || h.contains("postcode") {
@@ -4746,10 +4747,7 @@ fn disambiguate_numeric(
         // If all values are 3-digit and ≥90% are in 100-599 (HTTP status range),
         // these are status codes, not postal codes. Keep the model's prediction.
         if digit_lengths.iter().all(|&l| l == 3) {
-            let status_count = parsed
-                .iter()
-                .filter(|&&v| (100..=599).contains(&v))
-                .count();
+            let status_count = parsed.iter().filter(|&&v| (100..=599).contains(&v)).count();
             let status_rate = status_count as f64 / parsed.len() as f64;
             if status_rate >= 0.90 {
                 // Don't convert to postal_code — return None to keep model prediction
@@ -6248,12 +6246,7 @@ mod tests {
             .map(String::from)
             .collect();
         // When model predicts integer_number, R12 fires but R25 guard blocks postal_code
-        let result = value_sharpen(
-            &values,
-            "representation.numeric.integer_number",
-            0.8,
-            None,
-        );
+        let result = value_sharpen(&values, "representation.numeric.integer_number", 0.8, None);
         // Should NOT return postal_code
         if let Some((label, _)) = &result {
             assert_ne!(
@@ -6266,17 +6259,13 @@ mod tests {
     #[test]
     fn ac01_r25_http_status_gate_preserves_real_postal_codes() {
         // 5-digit postal codes: non-sequential, consistent 5-digit length
-        let values: Vec<String> =
-            vec!["10001", "90210", "33139", "60601", "02134", "94102", "30308"]
-                .into_iter()
-                .map(String::from)
-                .collect();
-        let result = value_sharpen(
-            &values,
-            "representation.numeric.integer_number",
-            0.8,
-            None,
-        );
+        let values: Vec<String> = vec![
+            "10001", "90210", "33139", "60601", "02134", "94102", "30308",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let result = value_sharpen(&values, "representation.numeric.integer_number", 0.8, None);
         assert!(result.is_some(), "R12 should fire on 5-digit postal codes");
         let (label, _) = result.unwrap();
         assert_eq!(label, "geography.address.postal_code");
@@ -6290,12 +6279,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let result = value_sharpen(
-            &values,
-            "representation.numeric.integer_number",
-            0.8,
-            None,
-        );
+        let result = value_sharpen(&values, "representation.numeric.integer_number", 0.8, None);
         // <90% in 100-599 range (0% in this case), so R25 guard doesn't fire
         if let Some((label, _)) = &result {
             assert_eq!(
@@ -6358,10 +6342,7 @@ mod tests {
         // But "email" still matches
         assert_eq!(header_hint("email"), Some("identity.person.email"));
         // And "customer_email" still matches
-        assert_eq!(
-            header_hint("customer_email"),
-            Some("identity.person.email")
-        );
+        assert_eq!(header_hint("customer_email"), Some("identity.person.email"));
     }
 
     #[test]
@@ -6382,15 +6363,9 @@ mod tests {
         // "ip_v4_with_port" should NOT match the ip_v4 hint
         assert_eq!(header_hint("ip_v4_with_port"), None);
         // But "ip_address" still matches
-        assert_eq!(
-            header_hint("ip_address"),
-            Some("technology.internet.ip_v4")
-        );
+        assert_eq!(header_hint("ip_address"), Some("technology.internet.ip_v4"));
         // And "server_ip" still matches
-        assert_eq!(
-            header_hint("server_ip"),
-            Some("technology.internet.ip_v4")
-        );
+        assert_eq!(header_hint("server_ip"), Some("technology.internet.ip_v4"));
     }
 
     #[test]

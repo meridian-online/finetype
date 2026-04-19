@@ -30,10 +30,7 @@ fn is_same_timestamp_family(a: &str, b: &str) -> bool {
             "datetime.timestamp.rfc_2822_ordinal",
         ],
         // US MDY family (12h/24h variants)
-        &[
-            "datetime.timestamp.mdy_12h",
-            "datetime.timestamp.mdy_24h",
-        ],
+        &["datetime.timestamp.mdy_12h", "datetime.timestamp.mdy_24h"],
         // EU DMY family (separator variants)
         &[
             "datetime.timestamp.dmy_hm",
@@ -46,7 +43,9 @@ fn is_same_timestamp_family(a: &str, b: &str) -> bool {
         ],
     ];
 
-    FAMILIES.iter().any(|family| family.contains(&a) && family.contains(&b))
+    FAMILIES
+        .iter()
+        .any(|family| family.contains(&a) && family.contains(&b))
 }
 
 /// Check label match with interchangeability rules (matches eval_profile.sql).
