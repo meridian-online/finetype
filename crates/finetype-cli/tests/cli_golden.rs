@@ -282,8 +282,8 @@ fn golden_profile_ecommerce_orders() {
     assert_column_type(&cols, "status", "representation.discrete.categorical");
     assert_column_type(&cols, "is_gift", "representation.boolean.terms");
     assert_column_type(&cols, "tracking_url", "technology.internet.url");
-    // phone→ssn is a known model misclassification (9 remaining errors)
-    assert_column_type(&cols, "phone", "identity.government.ssn");
+    // v16: phone correctly classified as phone_number (v14 misclassified as ssn).
+    assert_column_type(&cols, "phone", "identity.person.phone_number");
 
     // Broad types for key columns
     assert_column_broad_type(&cols, "order_date", "DATE");
