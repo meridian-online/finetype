@@ -1,14 +1,34 @@
 #!/usr/bin/env bash
 # Download the active model from HuggingFace.
-# Reads models/default symlink to determine which model version to fetch.
-# Supports both flat models (single dir) and tiered models (multiple subdirs).
+# Resolution precedence:
+#   1. FINETYPE_CI_MODEL env var (if set AND non-empty after whitespace trim) — CI authoritative source.
+#   2. readlink models/default — runtime default on Linux/macOS.
+#   3. cat models/default — fallback for Windows, where git may check out
+#      symlinks as plain text files.
+# If all three yield an empty/whitespace name, the script exits non-zero
+# with a clear error — no malformed URLs reach curl.
+#
+# FINETYPE_CI_MODEL is read ONLY by this script. CLI binary, MCP server,
+# DuckDB extension, and all eval scripts ignore it. See spec
+# specs/2026-04-20-ci-decouple-default-symlink/spec.yaml.
 set -euo pipefail
 
 REPO="https://huggingface.co/meridian-online/finetype-model/resolve/main"
-# readlink works on Linux/macOS; fall back to cat for Windows where
-# git may check out symlinks as plain text files.
-MODEL_DIR=$(readlink models/default 2>/dev/null || cat models/default)
-MODEL_DIR=$(echo "${MODEL_DIR}" | tr -d '\r')
+
+# Use `${VAR:-}` (colon-dash) so empty string is treated as unset under `set -u`.
+MODEL_DIR="${FINETYPE_CI_MODEL:-}"
+if [ -z "${MODEL_DIR}" ]; then
+  # Fall back to models/default. readlink on Linux/macOS, cat on Windows.
+  MODEL_DIR=$(readlink models/default 2>/dev/null || cat models/default 2>/dev/null || true)
+fi
+# Strip CRLF (from Windows-checked-out plain-text symlinks) and surrounding whitespace.
+MODEL_DIR=$(printf '%s' "${MODEL_DIR}" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+if [ -z "${MODEL_DIR}" ]; then
+  echo "ERROR: cannot resolve model — FINETYPE_CI_MODEL unset/empty AND models/default missing or empty." >&2
+  echo "       Set FINETYPE_CI_MODEL=<model-dir> or create the models/default symlink before running this script." >&2
+  exit 1
+fi
 
 echo "Active model: ${MODEL_DIR}"
 mkdir -p "models/${MODEL_DIR}"

@@ -60,7 +60,7 @@ Release from tag push to live binaries: ~12 minutes. Zero manual steps after `gi
 ## Follow-up work
 
 - **N=1 email regression** (`specs/2026-04-20-v16-n1-email-regression/card.md`) — narrow but real. v16 fails on a single email value in column mode where v14 succeeded. Workaround in smoke tests; investigation deferred.
-- **CI hygiene — decouple download-model.sh from `models/default`** (`specs/2026-04-20-ci-decouple-default-symlink/card.md`) — the root cause of this release's "publish HF first, then flip symlink" dance. Next promotion PR should not need this ordering.
+- **CI hygiene — decouple download-model.sh from `models/default`** (`specs/2026-04-20-ci-decouple-default-symlink/spec.yaml`) — the root cause of this release's "publish HF first, then flip symlink" dance. Next promotion PR should not need this ordering. **Addressed:** option A (env-var pin) specced and implemented — `FINETYPE_CI_MODEL` in workflow-level `env:` blocks. See also the 7-finding spec review (`review-spec-2026-04-20.md`) and progress tracker (`progress.md`).
 - **Distilled data relabelling** for the 7 bad-distilled types (decision 0049 option C) — likely further accuracy gains from doing the root-cause fix.
 
 ## Notes
