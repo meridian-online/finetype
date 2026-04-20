@@ -282,21 +282,33 @@ technology.internet.http_method:
   decompose: null
   validation:
     type: string
-    pattern: "^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)$"
-    enum: [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, CONNECT]
+    # 27 case variants = 9 HTTP methods × {UPPER, lower, Title}. Enumerated
+    # explicitly in both pattern AND enum because CompiledValidator applies
+    # them conjunctively (crates/finetype-core/src/validator.rs delegates to
+    # jsonschema::Validator). (?i) on pattern alone does NOT help — enum is
+    # exact-string, so "Get" would pass pattern but fail enum.
+    # See spec specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3).
+    pattern: "^(GET|Get|get|POST|Post|post|PUT|Put|put|DELETE|Delete|delete|PATCH|Patch|patch|HEAD|Head|head|OPTIONS|Options|options|TRACE|Trace|trace|CONNECT|Connect|connect)$"
+    enum: [GET, Get, get, POST, Post, post, PUT, Put, put, DELETE, Delete, delete, PATCH, Patch, patch, HEAD, Head, head, OPTIONS, Options, options, TRACE, Trace, trace, CONNECT, Connect, connect]
   tier: [VARCHAR, internet]
   release_priority: 3
   aliases: null
   samples:
     - "GET"
-    - "POST"
-    - "DELETE"
+    - "post"
+    - "Delete"
   references: null
   notes: >
     v1 migration: Was internet.http_method marked broad_words. Lower priority
     due to high cardinality but limited semantic information.
     v13: Added explicit pattern for validation branch signal (100% pass rate
     for methods vs 33% for IATA's ^[A-Z]{3}$).
+    v17: Expanded enum + pattern to 27 case variants (UPPER/lower/Title per
+    method) to fix the v16 training-audit finding where distilled http_method
+    rows (SAN JOAQUIN, GOAT, OPERATING, IN PROGRESS, ENROUTE) caused
+    misclassification. Cascade: multi-branch validation-branch pass-rate
+    feature becomes ~1.0 for real HTTP-method columns regardless of case
+    (was ~1/3 when only UPPER variants passed). Realised only after retrain.
 
 # technology.internet.http_status_code: REMOVED in NNFT-242
 # False positives on plain integer columns. Range 100-599 overlaps heavily with integer_number.

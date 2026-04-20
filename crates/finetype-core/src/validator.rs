@@ -616,6 +616,33 @@ mod tests {
         }
     }
 
+    /// HTTP method schema mirroring the v17 taxonomy: 27 case variants of
+    /// 9 methods enumerated in both pattern AND enum. See
+    /// labels/definitions_technology.yaml (technology.internet.http_method)
+    /// and spec specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml.
+    fn http_method_schema() -> Validation {
+        const VARIANTS: [&str; 27] = [
+            "GET", "Get", "get",
+            "POST", "Post", "post",
+            "PUT", "Put", "put",
+            "DELETE", "Delete", "delete",
+            "PATCH", "Patch", "patch",
+            "HEAD", "Head", "head",
+            "OPTIONS", "Options", "options",
+            "TRACE", "Trace", "trace",
+            "CONNECT", "Connect", "connect",
+        ];
+        Validation {
+            schema_type: Some("string".to_string()),
+            pattern: Some(format!("^({})$", VARIANTS.join("|"))),
+            min_length: None,
+            max_length: None,
+            minimum: None,
+            maximum: None,
+            enum_values: Some(VARIANTS.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+
     // ── Single-value validation tests ────────────────────────────────────
 
     #[test]
@@ -917,6 +944,70 @@ datetime.timestamp.iso_8601:
         assert!(compiled.is_valid("1"));
         assert!(!compiled.is_valid("maybe"));
         assert!(!compiled.is_valid("TRUE "));
+    }
+
+    /// AC-07 (spec specs/2026-04-20-distilled-data-relabel-7-types/): the
+    /// HTTP-method validator accepts all 27 case variants (9 methods ×
+    /// {UPPER, lower, Title}) and rejects non-method strings, mixed-case
+    /// outside the 27, whitespace-contaminated, and adjacent tokens.
+    ///
+    /// This test is the verification for the v17 schema expansion. It
+    /// documents the fact that `CompiledValidator` applies pattern AND
+    /// enum conjunctively — enumerating variants in both is required.
+    #[test]
+    fn ac07_http_method_case_variants() {
+        let compiled = CompiledValidator::new(&http_method_schema()).unwrap();
+
+        // 27 positive cases — every variant in the enum should be valid.
+        let positives = [
+            "GET", "Get", "get",
+            "POST", "Post", "post",
+            "PUT", "Put", "put",
+            "DELETE", "Delete", "delete",
+            "PATCH", "Patch", "patch",
+            "HEAD", "Head", "head",
+            "OPTIONS", "Options", "options",
+            "TRACE", "Trace", "trace",
+            "CONNECT", "Connect", "connect",
+        ];
+        for variant in positives {
+            assert!(
+                compiled.is_valid(variant),
+                "expected `{variant}` to validate as http_method"
+            );
+        }
+
+        // Negatives — non-method strings (the v16 training-audit bad-distilled rows).
+        for bad in ["GOAT", "SAN JOAQUIN", "PATROL", "OPERATING", "IN PROGRESS", "ENROUTE"] {
+            assert!(
+                !compiled.is_valid(bad),
+                "expected `{bad}` to reject as http_method"
+            );
+        }
+
+        // Negatives — mixed-case outside the 27-variant list.
+        for bad in ["gET", "POSt", "geT", "DeLeTe", "pATCH"] {
+            assert!(
+                !compiled.is_valid(bad),
+                "expected mixed-case `{bad}` to reject (not in 27-variant enum)"
+            );
+        }
+
+        // Negatives — whitespace-contaminated.
+        for bad in [" GET", "GET ", "GET\n", "\tGET", "POST\r"] {
+            assert!(
+                !compiled.is_valid(bad),
+                "expected whitespace-contaminated `{bad:?}` to reject"
+            );
+        }
+
+        // Negatives — adjacent tokens (request-line fragments).
+        for bad in ["GET /", "GET HTTP/1.1", "POST /users", "DELETE /api/v1"] {
+            assert!(
+                !compiled.is_valid(bad),
+                "expected adjacent-token `{bad}` to reject"
+            );
+        }
     }
 
     #[test]
