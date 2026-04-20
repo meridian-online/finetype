@@ -9,8 +9,27 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
+  # CI's authoritative model name. Read only by .github/scripts/download-model.sh.
+  # See specs/2026-04-20-ci-decouple-default-symlink/spec.yaml for the promotion flow.
+  FINETYPE_CI_MODEL: sherlock-v16
 
 jobs:
+  download-model-test:
+    name: download-model.sh tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run resolution test harness
+        run: .github/scripts/test-download-model.sh
+
+  drift-check:
+    name: CI model vs symlink drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for drift between FINETYPE_CI_MODEL and models/default
+        run: .github/scripts/check-ci-model-drift.sh
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

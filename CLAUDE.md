@@ -230,6 +230,41 @@ Browse: `ls decisions/` or use Ctrl+B (fzf + glow preview).
 
 Covers: inference pipeline, model architecture, embeddings & hints, rules & disambiguation, taxonomy, validation, schema & validate command (0031–0033), training, evaluation methodology, and distribution.
 
+## Release & Model Promotion
+
+### Model-name env vars
+
+Three env vars exist — each is read by exactly one consumer. Do not conflate.
+
+```
+| Env var              | Consumer                           | Purpose                                     |
+|----------------------|------------------------------------|---------------------------------------------|
+| FINETYPE_CI_MODEL    | .github/scripts/download-model.sh  | CI's authoritative model name for fetches   |
+| FINETYPE_MODEL       | CLI, eval scripts                  | Path passed to `finetype --model`           |
+| FINETYPE_MODEL_DIR   | DuckDB extension                   | Local path override (bypasses HF download)  |
+```
+
+CLI/MCP/DuckDB/eval code does NOT read `FINETYPE_CI_MODEL`. The runtime
+default remains `models/default` for every non-CI consumer.
+
+### Promotion flow (new model → release)
+
+After the v0.6.17 release we decoupled CI from the `models/default` symlink
+(see `specs/2026-04-20-ci-decouple-default-symlink/`). The new 3-step flow:
+
+1. **Publish to HuggingFace** — upload the trained model directory to
+   `meridian-online/finetype-model` on HF.
+2. **Bump `FINETYPE_CI_MODEL`** in `.github/workflows/ci.yml` and
+   `.github/workflows/release.yml` (workflow-level `env:` blocks).
+3. **Flip `models/default`** — `ln -sfn <new-model> models/default`.
+
+Steps 2 and 3 may ship in the same PR. Step 1 must precede step 2 (or step 2
+can be deferred if the promotion is purely a runtime change).
+
+A non-blocking drift check (`.github/scripts/check-ci-model-drift.sh`) warns
+in CI when `FINETYPE_CI_MODEL` and `models/default` disagree — legitimate
+during promotion PRs, but visible so divergence isn't silent for weeks.
+
 ## Build & Test
 
 ```bash
