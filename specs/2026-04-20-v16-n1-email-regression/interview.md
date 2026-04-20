@@ -1,9 +1,10 @@
-# v16 N=1 email regression — investigate
+# v16 N=1 email regression — investigate (interview)
 
-**Status:** open
+**Status:** interview (investigation pending)
 **Created:** 2026-04-20
 **Severity:** low (edge-case, not a user-common path)
 **Related:** decision 0049, v0.6.17 release PR
+**Next step:** `/orb:discovery` to reproduce + locate the cause, then `/orb:spec` once a fix direction is chosen (rule vs retrain)
 
 ## Context
 

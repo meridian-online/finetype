@@ -1,0 +1,130 @@
+goal: >
+  Decouple CI model fetches from the `models/default` symlink so that a
+  promotion PR can land before (or in the same PR as) the HuggingFace
+  publish, without CI failing on the intermediate state. Implement
+  option A: introduce a `FINETYPE_CI_MODEL` env var that CI uses as
+  the authoritative model name, with `models/default` remaining the
+  runtime default for the CLI, MCP server, and DuckDB extension.
+
+constraints:
+  - "Surgical changes only — do not rewrite download-model.sh from scratch"
+  - "Runtime behaviour of `models/default` is UNCHANGED (CLI/MCP/DuckDB still resolve through the symlink)"
+  - "No new CI secrets introduced (HuggingFace write access stays out of scope — that's option D, deferred)"
+  - "Local dev workflows (cargo test, ./scripts/eval.sh, make eval-report) remain unaffected — no env var required"
+  - "When FINETYPE_CI_MODEL is unset, download-model.sh falls back to reading `models/default` (current behaviour preserved)"
+  - "Env var value is a model directory name (e.g. 'sherlock-v16'), not a URL"
+  - "Changes confined to: .github/scripts/download-model.sh, .github/workflows/ci.yml, .github/workflows/release.yml"
+
+acceptance_criteria:
+  - id: AC-1
+    description: >
+      `.github/scripts/download-model.sh` resolves the model name from
+      `FINETYPE_CI_MODEL` first, falling back to `models/default` when
+      the env var is unset or empty. The fallback path is the exact
+      current behaviour (readlink → cat).
+    verification: >
+      Script unit test or shellcheck-style review. Run the script twice:
+      once with `FINETYPE_CI_MODEL=sherlock-v16` (confirms env var wins)
+      and once unset (confirms symlink fallback works). Both download the
+      expected files. Existing behaviour preserved when env var is absent.
+
+  - id: AC-2
+    description: >
+      `.github/workflows/ci.yml` sets `FINETYPE_CI_MODEL` at the job or
+      workflow level for every job that calls download-model.sh
+      (Test, Clippy, CLI Smoke Tests, Taxonomy Check). Value matches
+      the currently-promoted model (sherlock-v16 as of this spec).
+    verification: >
+      Grep ci.yml for `FINETYPE_CI_MODEL`. Confirm it's set in every
+      job that references download-model.sh. Run a CI workflow on a
+      branch where `models/default` points at a non-existent model —
+      CI should still pass because the env var overrides.
+
+  - id: AC-3
+    description: >
+      `.github/workflows/release.yml` sets `FINETYPE_CI_MODEL` for every
+      platform build job that calls download-model.sh. Value matches
+      the model being released.
+    verification: >
+      Grep release.yml for `FINETYPE_CI_MODEL`. Confirm all five platform
+      matrix jobs (Linux x86/arm, macOS x86/arm, Windows) resolve the
+      variable. Bundled binary contains the expected model.
+
+  - id: AC-4
+    description: >
+      Promotion test: a PR that flips `models/default` to a model NOT yet
+      on HuggingFace passes CI as long as `FINETYPE_CI_MODEL` still points
+      at a published model. The reverse is also true — bumping the env
+      var to an unpublished model fails CI loudly (not silently).
+    verification: >
+      Create a throwaway test branch: flip `models/default` to
+      `sherlock-v99` (does not exist on HF), keep `FINETYPE_CI_MODEL`
+      at `sherlock-v16`. CI passes. Then flip `FINETYPE_CI_MODEL` to
+      `sherlock-v99` — CI fails at download step with a 404. Revert
+      both after verification.
+
+  - id: AC-5
+    description: >
+      Documentation updated: `CLAUDE.md` Release section notes that CI
+      uses `FINETYPE_CI_MODEL` rather than `models/default`, so the
+      new promotion flow is (1) publish to HF, (2) bump env var in
+      workflow files, (3) flip `models/default` — with steps 2 and 3
+      landable in the same PR.
+    verification: >
+      CLAUDE.md diff shows the new promotion workflow. `specs/2026-04-20-
+      v16-release/handover.md` (retro) links back here as the fix for
+      the "HuggingFace first" dance.
+
+  - id: AC-6
+    description: >
+      Local development is unaffected. Running `cargo test`, `make
+      eval-report`, and `./scripts/eval.sh` without setting
+      `FINETYPE_CI_MODEL` produces identical behaviour to today.
+    verification: >
+      On a clean checkout post-merge: `unset FINETYPE_CI_MODEL; make ci`
+      passes. `./scripts/eval.sh` resolves the model via the usual
+      runtime path. No new env var required for day-to-day dev.
+
+ontology_schema:
+  name: "CiModelResolution"
+  description: "How CI resolves which model to download"
+  fields:
+    - name: "env_var_name"
+      type: "string"
+      description: "FINETYPE_CI_MODEL"
+    - name: "env_var_value"
+      type: "string"
+      description: "Model directory name, e.g. sherlock-v16"
+    - name: "fallback_source"
+      type: "string"
+      description: "models/default symlink (preserved current behaviour when env var unset)"
+    - name: "resolution_order"
+      type: "array"
+      description: "[env_var, symlink_target]"
+
+evaluation_principles:
+  - principle: "Ordering-independence — promotion PRs no longer require HF-first"
+    weight: 0.40
+  - principle: "Minimal surface — fewest lines of workflow/script change"
+    weight: 0.25
+  - principle: "No silent failures — unpublished model = loud CI failure, not fallback"
+    weight: 0.20
+  - principle: "Runtime unaffected — CLI/MCP/DuckDB behaviour identical"
+    weight: 0.15
+
+exit_conditions:
+  - "download-model.sh resolves FINETYPE_CI_MODEL with symlink fallback (AC-1)"
+  - "ci.yml and release.yml both set the env var for every relevant job (AC-2, AC-3)"
+  - "Symlink-unpublished-model test passes CI (AC-4)"
+  - "CLAUDE.md documents the new promotion flow (AC-5)"
+  - "Local dev unaffected without setting the env var (AC-6)"
+
+metadata:
+  version: "1.0"
+  timestamp: "2026-04-20T00:00:00Z"
+  ambiguity_score: 0.15
+  interview_ref: "specs/2026-04-20-ci-decouple-default-symlink/interview.md"
+  risk_tier: "LOW"
+  parent_release: "specs/2026-04-20-v16-release/handover.md"
+  deferred_alternatives:
+    - "Option D — HuggingFace publish as CI step (needs HF write token in CI secrets; revisit if option A proves insufficient)"
