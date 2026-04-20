@@ -58,6 +58,12 @@ output/distillation-v3/sherlock_batch_*.csv
 output/distillation-v3/sherlock_batch_*.done
 output/distillation-v3/distill_concat.log
 
+# v17: per-type v4 distilled CSVs are reproducible via loaders/*.py;
+# track the loaders + SOURCES.md, not the CSVs or HTTP cache.
+output/distillation-v4/*.csv
+output/distillation-v4/loaders/_cache/
+output/multibranch-training/
+
 # Agent-generated temp scripts
 classify_batch_*.py
 write_batch_*.py

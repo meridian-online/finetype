@@ -585,8 +585,8 @@ representation.file.excel_format:
   decompose: null
   validation:
     type: string
-    pattern: "^[#0.,;\\[\\]$€£¥%EeAaPpMm/dDyYhHsS ?:\"\\-+()<>\\w]*$"
-    minLength: 2
+    pattern: "^[#0.,;\\[\\]$€£¥%EeAaPpMm/dDyYhHsS ?:\"\\-+()<>=@*!\\w]*$"
+    minLength: 1
     maxLength: 100
   tier: [VARCHAR, file]
   release_priority: 3

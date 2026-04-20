@@ -24,10 +24,10 @@
 
 ## Acceptance Criteria
 
-- [ ] **ac-01** — Per-type loaders under `output/distillation-v4/loaders/` for public-dataset types in sourcing_table (currently user_agent, LOINC). Fallback-to-generator if candidates fail review.
-- [ ] **ac-02** — Generator improvements for SWIFT BIC, CPT, Excel format, SSN; each meets target + `improvements_required` list.
-- [ ] **ac-03** — `output/distillation-v4/SOURCES.md` consistent with top-level `sourcing_table:` field.
-- [ ] **ac-04** — `scripts/prepare_multibranch_data.py` consumes v4 CSVs; `_DROP_DISTILLED_TYPES` updated (user_agent + LOINC removed; SWIFT/CPT/Excel/SSN/http_method remain).
+- [x] **ac-01** — `output/distillation-v4/loaders/user_agent.py` (17,812 unique UAs via ua-parser/uap-core Apache-2.0 fixtures) + `output/distillation-v4/loaders/loinc.py` (2,109 unique codes via NIH NLM Clinical Tables API). Both CSVs emitted with `value,label` schema. Cached under `loaders/_cache/` for offline re-runs. **LOINC attribution string captured for propagation to ac-12 HF model card.**
+- [x] **ac-02** — Generator improvements in `crates/finetype-core/src/generator.rs`: SWIFT BIC (~175 ISO country codes, 8/11-char mix, XXX branch suffix), CPT (Cat I 00100-99999 / Cat II NNNNF / Cat III NNNNT), Excel format (12 weighted branches incl. locale prefix, threshold conditionals, multi-section, colour codes), SSN (full SSA range + dashed/undashed mix). `labels/definitions_identity.yaml` + `definitions_representation.yaml` patterns widened for new SSN/Excel output. `cargo run -- check` passes 240/240. `cargo test -p finetype-core` passes 161/161.
+- [x] **ac-03** — `output/distillation-v4/SOURCES.md` written. Covers all 7 types with per-type path, source, license, v16 failure motivation, and (for http_method) the 3-surface cascade. LOINC attribution obligation flagged for ac-12.
+- [x] **ac-04** — `scripts/prepare_multibranch_data.py` updated: (a) `_DROP_DISTILLED_TYPES` narrowed to 5 types (SSN, SWIFT BIC, CPT, Excel format, http_method); (b) new `_V4_OVERRIDE_TYPES = {user_agent, loinc}`; (c) `_DROP_ALL_TYPES` preserved as union to keep v3 contamination filter behaviour unchanged; (d) new `load_v4_distilled_columns()` loads CSVs from `output/distillation-v4/`, deterministic shuffle + chunk into synthetic columns of `--v4-column-size` (default 100) values; (e) merged into pipeline after v3 filter step with v3-overlap warning. Smoke test: 2 files, 19,921 rows, 22 LOINC cols + 179 UA cols.
 - [x] **ac-05** — `scripts/validate_label_remap.py` exists; chain traversal; exits non-zero on broken chain. Smoke-tested clean (240 canonical keys, 37 remap entries, exit 0) and fixture-tested broken (exit 1).
 - [x] **ac-06** — `labels/definitions_technology.yaml` L283-298 enum + pattern both enumerate 27 HTTP-method case variants. `cargo run -- check` passes 240/240. SOURCES.md entry deferred to ac-03.
 - [x] **ac-07** — Unit test `ac07_http_method_case_variants` in `crates/finetype-core/src/validator.rs`: 27 positives + negatives (GOAT/SAN JOAQUIN/PATROL; gET/POSt; " GET"/"GET \n"; "GET /"/"POST /users"). All 46 validator tests pass.
@@ -73,3 +73,39 @@ Day 3 (2026-04-22): eval + ship
   - `0053-training-gate-88-floor.md` — 88% catastrophic floor + 88–91.2% manual-review band with Hugh sign-off.
 
 Next: commit Day 1 work, then move to Day 2 data sourcing (ac-01, ac-02, ac-03, ac-04).
+
+## Day 2 log
+
+**2026-04-20** — Day 2 COMPLETE (same calendar day; early finish). 4 of 14 ACs done this push (9 of 14 total). Split across two parallel subagents + lead coordination:
+
+**Agent A — ac-01 (public-dataset loaders, Python):**
+- `output/distillation-v4/loaders/user_agent.py` — pulls ua-parser/uap-core test fixtures (Apache-2.0) from 3 raw GitHub URLs. 17,812 unique UAs.
+- `output/distillation-v4/loaders/loinc.py` — NIH NLM Clinical Tables API (no auth, no click-through). 2,109 unique codes via single-letter term sweep a–d.
+- Both loaders cache responses under `_cache/` for offline re-runs.
+- LOINC attribution obligation captured in the loader docstring; must propagate to HF model card at ac-12.
+- Deviation from spec: MIMIC-IV primary candidate swapped for NLM Clinical Tables (stricter authority, no credentials). Same-path refinement, not a fallback-to-generator path-swap.
+- Pyright import-style fix: `from urllib.error import HTTPError` (submodule import style had stale diagnostic issue).
+
+**Agent B — ac-02 (Rust generators):**
+- `crates/finetype-core/src/generator.rs`: 4 generator blocks rewritten.
+  - SWIFT BIC (~line 3393): expanded to ~175 ISO 3166-1 codes, 40% major-bank bias, 45/55 11-char vs 8-char, 15% XXX branch marker.
+  - CPT (~line 2014): Category I 00100–99999 + Category II NNNNF + Category III NNNNT, weighted 85/8/6 with 1% rare PLA U.
+  - Excel format (~line 2743): 12 weighted branches (locale-prefixed currency, threshold conditionals, 20-unit literal-suffix, multi-section with 6 colour codes, text placeholder, edge cases).
+  - SSN (~line 2063): full SSA-valid ranges (area 001..899 excl 666; group 01..99; serial 0001..9999); 80% dashed / 20% undashed.
+- `labels/definitions_identity.yaml` + `definitions_representation.yaml`: SSN pattern widened for dashed+undashed; Excel char-class extended with `@ * ! =` and `minLength: 2→1`.
+- New unit tests `ac02_*_unique_and_structured` pin uniqueness bars.
+- `cargo run -- check` → 240/240 passing, 12000/12000 samples (100%).
+- `cargo test -p finetype-core` → 161 passed, 0 failed.
+- Dead code noted (unreachable `("payment", "swift_bic")` at ~line 1812) left in place — out of v17 scope.
+
+**Lead — ac-03 (SOURCES.md) + ac-04 (prep script):**
+- `output/distillation-v4/SOURCES.md` — per-type entries for all 7 types + overview table + LOINC attribution block + fallback-to-generator section (empty for v17).
+- `scripts/prepare_multibranch_data.py`:
+  - New `_V4_OVERRIDE_TYPES = {user_agent, loinc}` introduced alongside narrowed `_DROP_DISTILLED_TYPES` (now 5 types).
+  - `_DROP_ALL_TYPES = _V4_OVERRIDE_TYPES | _DROP_DISTILLED_TYPES` preserves the v3 contamination-filter invariant.
+  - New `load_v4_distilled_columns(v4_dir, min_values, column_size, rng)` function: reads per-type CSVs, deterministic shuffle, chunk into ~100-value synthetic columns.
+  - Wired into `main()` after `filter_distilled_columns()` step; v3-overlap warning + replace (not mix) semantics if any v3 rows leak through.
+  - New CLI flags: `--distilled-v4-dir` (default `output/distillation-v4`), `--v4-column-size` (default 100).
+  - Smoke test: 2 files loaded, 19,921 total values, 22 LOINC columns + 179 UA columns. All ac-04 grep assertions pass.
+
+Next: corpus freeze + ac-10 (v16 baseline capture) + kick off ac-09 (sweep_v17.sh overnight).
