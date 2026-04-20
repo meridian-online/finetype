@@ -32,11 +32,11 @@
 - [x] **ac-06** — `labels/definitions_technology.yaml` L283-298 enum + pattern both enumerate 27 HTTP-method case variants. `cargo run -- check` passes 240/240. SOURCES.md entry deferred to ac-03.
 - [x] **ac-07** — Unit test `ac07_http_method_case_variants` in `crates/finetype-core/src/validator.rs`: 27 positives + negatives (GOAT/SAN JOAQUIN/PATROL; gET/POSt; " GET"/"GET \n"; "GET /"/"POST /users"). All 46 validator tests pass.
 - [x] **ac-08** — Decision 0049 amended in place: HTML comment under frontmatter + "Update 2026-04-20 — v17 layers distilled data on top" section. Status stays `accepted`.
-- [ ] **ac-09** — 3-seed sweep completes via `scripts/sweep_v17.sh`. All-seeds-fail-floor halt path exercised if needed. results.json + epochs.jsonl per seed.
+- [x] **ac-09** — 3-seed sweep completed cleanly via `scripts/sweep_v17.sh`. Wall clock 9h 07m (16:05 AEST → 01:13 AEST). All 3 seeds AUTO_ACCEPT. Seed 42: val_acc 0.9136 / eval 235/242. Seed 43: val_acc 0.9143 / eval 232/242. Seed 44: val_acc 0.9143 / eval 235/242. Winner: seed 44. Patience-15 early-stopped each seed (42@ep53, 43@ep47, 44@ep56). Artefacts: `models/sherlock-v17-seed-{42,43,44}/`, `results/sweep-v17.log`, `results/sweep-v17-summary.csv`.
 - [x] **ac-10** — v16 baseline captured at corpus-freeze: **235/242 (97.1% label, 96.3% domain)**. Pinned in `v16-baseline.md`: eval inputs SHA `debedc15f6a339abb23135b8e4938cde7cc4a9f9`, CLI `finetype 0.6.17`, timestamp `2026-04-20T06:02:03Z`, model `models/sherlock-v16`. Effective promotion gate: `v17_winner ≥ 235`.
-- [ ] **ac-11** — Profile eval per seed; winner = highest profile > highest val_acc > lowest seed. Hugh sign-off for manual-review band. No-promotion halt if winner < max(235, v16_baseline).
-- [ ] **ac-12** — HF upload first (curl -fsI captured in progress.md with timestamp); same-PR workflow bump + symlink flip; drift-check silent; rollback if ac-13 fails.
-- [ ] **ac-13** — v0.6.18 released: Cargo.toml bump, tag push, 5-platform binaries, Homebrew bump, report.md refresh.
+- [x] **ac-11** — Winner = seed 44 (eval 235/242, val_acc 0.9143). Gate passes at the floor: `235 ≥ max(235, 235)`. Sign-off not required (val_acc ≥ 0.912 auto-accept). **Per-column diff vs v16 revealed 3 fixes / 3 non-target regressions / 2 persistent user_agent failures — net zero. See decision 0054.**
+- [~] **ac-12** — **HOLD.** No promotion. Per decision 0054, v17's identical eval score + non-target regressions do not justify a user-facing release. v16 remains the shipped model (`models/default`). v4 artefacts stay on branch for future reuse.
+- [~] **ac-13** — **HOLD.** No v0.6.18 release in this sprint. Deferred until a retrain ships a clear eval win under an expanded eval set.
 - [x] **ac-14** — 4 MADR files drafted: 0050 (sourcing policy), 0051 (http_method ENUM-only + 3-surface cascade), 0052 (scope-aware eval gate), 0053 (training gate 88% floor + manual-review band). Each references the v17 spec.
 
 ## Sequencing
@@ -124,3 +124,40 @@ Next: corpus freeze + ac-10 (v16 baseline capture) + kick off ac-09 (sweep_v17.s
 - **Sweep launched in background.** Expected wall-clock ~7-8h if seeds early-stop like v16, worst-case ~13h. Status monitored via `tail -f results/sweep-v17.log` or `tail -f models/sherlock-v17-seed-*/epochs.jsonl`.
 
 Next (on sweep completion): ac-11 (winner selection + possible Hugh sign-off) → ac-12 (HF upload + promotion PR) → ac-13 (v0.6.18 release tag).
+
+## Day 3 log — sweep result, no-promote decision
+
+**2026-04-21** — 12 of 14 ACs done (`x`), 2 on HOLD (`~`: ac-12, ac-13). Spec closed out as "relabel validated, not shipped."
+
+**Sweep result (ac-09)** — All 3 seeds AUTO_ACCEPT. Winner: seed 44 (val_acc 0.9143, eval 235/242). Wall clock 9h 07m. No anomalies; patience-15 early-stopped cleanly.
+
+**Winner selection (ac-11)** — Gate passes at the floor: `235 ≥ max(235, 235)`. But per-column diff against v16 tells a different story from the headline:
+
+```
+Fixes (v16 wrong → v17 correct):
+  - people_directory / phone (SSN false positive cleared — target-type win)
+  - datetime_coverage / fiscal_year  (non-target, incidental)
+  - multilingual / locale            (non-target, incidental)
+
+Regressions (v16 correct → v17 wrong):
+  - earthquakes_2024 / gap           → amount_accounting (non-target)
+  - tech_systems / server_hostname   → plain_text (non-target)
+  - new_geography / hs_code          → decimal_number (non-target)
+
+Persistent target-type failures:
+  - tech_systems / user_agent — still jwt (1.00 conf)
+  - network_logs / user_agent — now whitespace_separated (was docker_ref)
+```
+
+**No-promote decision (ac-12, ac-13 on HOLD)** — Documented in `decisions/0054-hold-v17-no-promotion.md`.
+
+Key observations:
+- Relabel partially worked: SSN fix is real (17,812-wide data + widened validator did its job on the FP case).
+- 17,812 real UAs **did not** fix the two failing user_agent columns. These are edge cases (UAs that lexically resemble JWTs / whitespace-separated tokens). More data won't fix them.
+- 5 of 7 target types (swift_bic, http_method, cpt, loinc, excel_format) have **zero** eval coverage. Relabel success on those types is structurally unmeasurable under the current eval set.
+- Three regressions on non-target columns — pure cost, no upside, not understood yet.
+
+**Follow-ups (tracked outside this spec):**
+1. Discovery session on eval-set expansion (covers the 5 uncovered target types + user_agent edge-case variety).
+2. Follow-up card: investigate 2 persistent user_agent failures and 3 v17 regressions under expanded eval.
+3. v4 artefacts stay on branch — loaders, SOURCES.md, generator changes, prep-script v4 integration are reusable for future retrains.
