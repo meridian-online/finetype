@@ -33,7 +33,7 @@
 - [x] **ac-07** — Unit test `ac07_http_method_case_variants` in `crates/finetype-core/src/validator.rs`: 27 positives + negatives (GOAT/SAN JOAQUIN/PATROL; gET/POSt; " GET"/"GET \n"; "GET /"/"POST /users"). All 46 validator tests pass.
 - [x] **ac-08** — Decision 0049 amended in place: HTML comment under frontmatter + "Update 2026-04-20 — v17 layers distilled data on top" section. Status stays `accepted`.
 - [ ] **ac-09** — 3-seed sweep completes via `scripts/sweep_v17.sh`. All-seeds-fail-floor halt path exercised if needed. results.json + epochs.jsonl per seed.
-- [ ] **ac-10** — v16 baseline captured at corpus-freeze → `v16-baseline.md` with score/git-SHA/timestamp/CLI-version.
+- [x] **ac-10** — v16 baseline captured at corpus-freeze: **235/242 (97.1% label, 96.3% domain)**. Pinned in `v16-baseline.md`: eval inputs SHA `debedc15f6a339abb23135b8e4938cde7cc4a9f9`, CLI `finetype 0.6.17`, timestamp `2026-04-20T06:02:03Z`, model `models/sherlock-v16`. Effective promotion gate: `v17_winner ≥ 235`.
 - [ ] **ac-11** — Profile eval per seed; winner = highest profile > highest val_acc > lowest seed. Hugh sign-off for manual-review band. No-promotion halt if winner < max(235, v16_baseline).
 - [ ] **ac-12** — HF upload first (curl -fsI captured in progress.md with timestamp); same-PR workflow bump + symlink flip; drift-check silent; rollback if ac-13 fails.
 - [ ] **ac-13** — v0.6.18 released: Cargo.toml bump, tag push, 5-platform binaries, Homebrew bump, report.md refresh.
@@ -109,3 +109,18 @@ Next: commit Day 1 work, then move to Day 2 data sourcing (ac-01, ac-02, ac-03, 
   - Smoke test: 2 files loaded, 19,921 total values, 22 LOINC columns + 179 UA columns. All ac-04 grep assertions pass.
 
 Next: corpus freeze + ac-10 (v16 baseline capture) + kick off ac-09 (sweep_v17.sh overnight).
+
+## Day 2 evening log — corpus freeze + ac-10 + sweep kickoff
+
+**2026-04-20** — 10 of 14 ACs done. Corpus frozen; v16 baseline pinned; sweep launched.
+
+- **ac-10 complete.** `FINETYPE_MODEL=models/sherlock-v16 make eval-report` → 235/242 (97.1%). Captured in `v16-baseline.md` with eval inputs SHA `debedc15f6a339abb23135b8e4938cde7cc4a9f9`, timestamp `2026-04-20T06:02:03Z`, CLI `finetype 0.6.17`. Effective promotion gate for v17: `winner_score ≥ 235` (since `max(235, v16_baseline) = 235`).
+- **`scripts/sweep_v17.sh` written.** Adapted from `sweep_v16.sh`:
+  - Consumes v4 distilled dir via new prep-script flags (`--distilled-v4-dir`, `--v4-column-size`).
+  - Training gate enforced: `val_acc < 0.88` → REJECT (no eval); `[0.88, 0.912)` → FLAG_MANUAL (eval runs, but ac-11 requires Hugh sign-off); `≥ 0.912` → AUTO_ACCEPT.
+  - **No auto-promotion.** Winner selection is explicit ac-11 work.
+  - All-seeds-fail-floor halt path: exits non-zero with investigation prompt.
+  - Output: `models/sherlock-v17-seed-{42,43,44}/`, `results/sweep-v17.log`, `results/sweep-v17-summary.csv`.
+- **Sweep launched in background.** Expected wall-clock ~7-8h if seeds early-stop like v16, worst-case ~13h. Status monitored via `tail -f results/sweep-v17.log` or `tail -f models/sherlock-v17-seed-*/epochs.jsonl`.
+
+Next (on sweep completion): ac-11 (winner selection + possible Hugh sign-off) → ac-12 (HF upload + promotion PR) → ac-13 (v0.6.18 release tag).
