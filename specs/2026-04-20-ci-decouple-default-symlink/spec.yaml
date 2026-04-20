@@ -10,121 +10,201 @@ constraints:
   - "Surgical changes only — do not rewrite download-model.sh from scratch"
   - "Runtime behaviour of `models/default` is UNCHANGED (CLI/MCP/DuckDB still resolve through the symlink)"
   - "No new CI secrets introduced (HuggingFace write access stays out of scope — that's option D, deferred)"
-  - "Local dev workflows (cargo test, ./scripts/eval.sh, make eval-report) remain unaffected — no env var required"
-  - "When FINETYPE_CI_MODEL is unset, download-model.sh falls back to reading `models/default` (current behaviour preserved)"
+  - "Local dev workflows (cargo test, ./scripts/eval.sh, make eval-report) remain unaffected — no env var required on already-bootstrapped dev machines"
+  - "When FINETYPE_CI_MODEL is unset OR empty, download-model.sh falls back to reading `models/default` (current behaviour preserved). Empty string is treated as unset — use `${FINETYPE_CI_MODEL:-...}` form, not `${FINETYPE_CI_MODEL-...}`"
   - "Env var value is a model directory name (e.g. 'sherlock-v16'), not a URL"
-  - "Changes confined to: .github/scripts/download-model.sh, .github/workflows/ci.yml, .github/workflows/release.yml"
+  - "If resolution produces an empty or whitespace-only model name, the script exits non-zero with a clear error — no malformed URLs reach curl"
+  - "FINETYPE_CI_MODEL is read ONLY by `.github/scripts/download-model.sh`. CLI binary, MCP server, DuckDB extension, eval scripts, and all Cargo targets ignore it — no namespace collision with existing FINETYPE_MODEL / FINETYPE_MODEL_DIR"
+  - "Env var is set at workflow-level `env:` in both ci.yml and release.yml (one line per workflow, covers all jobs and matrix legs) — satisfies the Minimal-surface principle"
+  - "Workflow-level `env:` values propagate to fork PRs (they are hardcoded in the workflow file, not secrets) — fork CI continues to work"
+  - "Verification MUST NOT mutate `models/default` on any branch that could be merged to main — the symlink is the runtime source of truth for every CLI/MCP/DuckDB user"
+  - "Changes confined to: .github/scripts/download-model.sh, .github/workflows/ci.yml, .github/workflows/release.yml, CLAUDE.md"
 
 acceptance_criteria:
   - id: AC-1
     description: >
-      `.github/scripts/download-model.sh` resolves the model name from
-      `FINETYPE_CI_MODEL` first, falling back to `models/default` when
-      the env var is unset or empty. The fallback path is the exact
-      current behaviour (readlink → cat).
+      `.github/scripts/download-model.sh` resolves the model name with the
+      following precedence: (1) `FINETYPE_CI_MODEL` if set AND non-empty,
+      (2) `readlink models/default`, (3) `cat models/default`. Uses
+      `${FINETYPE_CI_MODEL:-...}` shell form (colon-dash) so empty string
+      is treated as unset. If all three sources yield an empty/whitespace
+      model name, the script exits non-zero with a clear error message
+      (e.g. "ERROR: cannot resolve model — FINETYPE_CI_MODEL unset and
+      models/default missing") BEFORE any curl invocation. Existing
+      behaviour is preserved when the env var is absent — readlink→cat
+      fallback unchanged.
     verification: >
-      Script unit test or shellcheck-style review. Run the script twice:
-      once with `FINETYPE_CI_MODEL=sherlock-v16` (confirms env var wins)
-      and once unset (confirms symlink fallback works). Both download the
-      expected files. Existing behaviour preserved when env var is absent.
+      Automated — add a small shell test harness (e.g.
+      `tests/download-model.sh` or `.github/scripts/test-download-model.sh`)
+      that exercises four cases in a temp dir:
+      (a) `FINETYPE_CI_MODEL=sherlock-v16` with models/default missing →
+          resolves to sherlock-v16, downloads successfully.
+      (b) `FINETYPE_CI_MODEL=""` (empty) with `models/default → sherlock-v14`
+          symlink → falls back to sherlock-v14 (confirms `:-` semantics).
+      (c) `unset FINETYPE_CI_MODEL` with models/default missing → script
+          exits non-zero with clear error, no curl issued.
+      (d) `FINETYPE_CI_MODEL="   "` (whitespace) → treated as unresolvable,
+          exits non-zero with clear error.
+      Cases (a) and (b) may stub `curl` to avoid network hits. Wire into
+      CI as a new job or a step in an existing job.
 
   - id: AC-2
     description: >
-      `.github/workflows/ci.yml` sets `FINETYPE_CI_MODEL` at the job or
-      workflow level for every job that calls download-model.sh
-      (Test, Clippy, CLI Smoke Tests, Taxonomy Check). Value matches
-      the currently-promoted model (sherlock-v16 as of this spec).
+      `.github/workflows/ci.yml` sets `FINETYPE_CI_MODEL` at workflow-level
+      `env:` (single key, top of file). Value matches the currently-
+      promoted model name (sherlock-v16 as of this spec). All four jobs
+      that invoke download-model.sh (Test, Clippy, CLI Smoke Tests,
+      Taxonomy Check — lines 22-65 of current ci.yml) inherit the value
+      automatically via workflow-level env propagation; no per-job
+      duplication.
     verification: >
-      Grep ci.yml for `FINETYPE_CI_MODEL`. Confirm it's set in every
-      job that references download-model.sh. Run a CI workflow on a
-      branch where `models/default` points at a non-existent model —
-      CI should still pass because the env var overrides.
+      Grep ci.yml for `FINETYPE_CI_MODEL` — expect exactly one occurrence
+      at top-level `env:`. Run `make ci` or push a CI-only branch; all
+      four jobs succeed. In their logs, download-model.sh prints
+      `Active model: sherlock-v16` (or equivalent), confirming the env
+      var was resolved.
 
   - id: AC-3
     description: >
-      `.github/workflows/release.yml` sets `FINETYPE_CI_MODEL` for every
-      platform build job that calls download-model.sh. Value matches
-      the model being released.
+      `.github/workflows/release.yml` sets `FINETYPE_CI_MODEL` at
+      workflow-level `env:` (single key). The single `build` job uses a
+      5-entry platform matrix (x86_64-linux, aarch64-linux, x86_64-darwin,
+      aarch64-darwin, x86_64-windows) — workflow-level env covers all
+      matrix legs automatically. As a side-benefit, the Windows build
+      leg no longer depends on git's symlink checkout behaviour for
+      `models/default` (the env var sidesteps both `readlink` and `cat`).
     verification: >
-      Grep release.yml for `FINETYPE_CI_MODEL`. Confirm all five platform
-      matrix jobs (Linux x86/arm, macOS x86/arm, Windows) resolve the
-      variable. Bundled binary contains the expected model.
+      Grep release.yml for `FINETYPE_CI_MODEL` — expect exactly one
+      occurrence at top-level `env:`. On the next tagged release, all
+      five matrix legs bundle the env-var-pinned model. Windows leg log
+      shows resolution via env var, not readlink/cat.
 
   - id: AC-4
     description: >
-      Promotion test: a PR that flips `models/default` to a model NOT yet
-      on HuggingFace passes CI as long as `FINETYPE_CI_MODEL` still points
-      at a published model. The reverse is also true — bumping the env
-      var to an unpublished model fails CI loudly (not silently).
+      Ordering-independence is proven by a non-destructive, mechanical
+      verification — the `FINETYPE_CI_MODEL` override path is exercised
+      without mutating `models/default` on any real branch. Two cases
+      are confirmed: (1) env var pointing at a published model succeeds
+      regardless of the symlink state; (2) env var pointing at an
+      unpublished model fails loudly (non-zero exit + HTTP 404 in the
+      log), not silently.
     verification: >
-      Create a throwaway test branch: flip `models/default` to
-      `sherlock-v99` (does not exist on HF), keep `FINETYPE_CI_MODEL`
-      at `sherlock-v16`. CI passes. Then flip `FINETYPE_CI_MODEL` to
-      `sherlock-v99` — CI fails at download step with a 404. Revert
-      both after verification.
+      The AC-1 test harness already covers case (1) and the empty-/
+      unresolvable-name half of case (2) without touching models/default.
+      For the "published vs unpublished HF name" half of case (2), use
+      `workflow_dispatch` to run the script manually with
+      `FINETYPE_CI_MODEL=sherlock-nonexistent-xxx` — confirm the job
+      fails at the curl step with a 404 and a readable error message.
+      EXPLICITLY FORBIDDEN: flipping `models/default` to a non-existent
+      model on any branch, including throwaway branches (too easy to
+      merge by mistake).
 
   - id: AC-5
     description: >
-      Documentation updated: `CLAUDE.md` Release section notes that CI
-      uses `FINETYPE_CI_MODEL` rather than `models/default`, so the
-      new promotion flow is (1) publish to HF, (2) bump env var in
-      workflow files, (3) flip `models/default` — with steps 2 and 3
-      landable in the same PR.
+      Documentation updated: `CLAUDE.md` Release section (or equivalent)
+      describes the new promotion workflow and includes a small table
+      disambiguating the three env vars (`FINETYPE_CI_MODEL` —
+      download-model.sh only; `FINETYPE_MODEL` — CLI/eval-script model
+      path; `FINETYPE_MODEL_DIR` — DuckDB extension only). The new
+      promotion flow reads: (1) publish to HF, (2) bump
+      `FINETYPE_CI_MODEL` in workflow `env:` blocks, (3) flip
+      `models/default` — steps 2 and 3 may land in the same PR.
+      `specs/2026-04-20-v16-release/handover.md` gets a one-line
+      back-reference noting this spec is the fix for the
+      "HuggingFace-first" dance.
     verification: >
-      CLAUDE.md diff shows the new promotion workflow. `specs/2026-04-20-
-      v16-release/handover.md` (retro) links back here as the fix for
-      the "HuggingFace first" dance.
+      CLAUDE.md diff shows the env-var table and the 3-step promotion
+      flow. handover.md diff shows the back-reference. Reviewers can
+      locate the naming distinction in under 30 seconds of searching
+      CLAUDE.md.
 
   - id: AC-6
     description: >
-      Local development is unaffected. Running `cargo test`, `make
-      eval-report`, and `./scripts/eval.sh` without setting
-      `FINETYPE_CI_MODEL` produces identical behaviour to today.
+      Local development on an already-bootstrapped dev machine is
+      unaffected. Running `cargo test`, `make eval-report`, and
+      `./scripts/eval.sh` without setting `FINETYPE_CI_MODEL` produces
+      identical behaviour to today. Fresh-clone bootstrap is explicitly
+      unchanged — devs still run `download-model.sh` (it falls back to
+      `models/default` when the env var is unset).
     verification: >
-      On a clean checkout post-merge: `unset FINETYPE_CI_MODEL; make ci`
-      passes. `./scripts/eval.sh` resolves the model via the usual
-      runtime path. No new env var required for day-to-day dev.
+      On an already-bootstrapped dev machine: `unset FINETYPE_CI_MODEL;
+      make ci` passes. `./scripts/eval.sh` resolves the model via the
+      usual `--model` / `FINETYPE_MODEL` path and does not consult
+      `FINETYPE_CI_MODEL`. Grep confirms: no non-CI code path reads
+      `FINETYPE_CI_MODEL`.
+
+  - id: AC-7
+    description: >
+      Divergence is visible: a lightweight check warns (not fails) when
+      `FINETYPE_CI_MODEL` and `readlink models/default` disagree on
+      `main`. This prevents silent drift where CI tests against model-N
+      while `models/default` points at model-M for weeks. The check
+      runs as a non-blocking CI step (warning in job output, optional
+      annotation) — not a gate. Divergence is legitimate during a
+      promotion PR; the warning just ensures someone sees it.
+    verification: >
+      New non-blocking step (or standalone script invoked by an existing
+      job) compares the resolved values and emits `::warning::` when
+      they differ. Test: open a PR that bumps the env var without
+      flipping the symlink → CI run shows the warning annotation.
+      Flip the symlink to match → warning disappears on the next run.
 
 ontology_schema:
   name: "CiModelResolution"
-  description: "How CI resolves which model to download"
+  description: "How CI resolves which model to download, and how it relates to runtime resolution"
   fields:
     - name: "env_var_name"
       type: "string"
-      description: "FINETYPE_CI_MODEL"
+      description: "FINETYPE_CI_MODEL — consumed ONLY by download-model.sh"
     - name: "env_var_value"
       type: "string"
-      description: "Model directory name, e.g. sherlock-v16"
+      description: "Model directory name, e.g. sherlock-v16. Must be non-empty after whitespace trim"
+    - name: "shell_form"
+      type: "string"
+      description: "${FINETYPE_CI_MODEL:-fallback} — colon-dash form, treats empty as unset"
     - name: "fallback_source"
       type: "string"
-      description: "models/default symlink (preserved current behaviour when env var unset)"
+      description: "models/default (readlink → cat). Used when env var unset/empty"
     - name: "resolution_order"
       type: "array"
-      description: "[env_var, symlink_target]"
+      description: "[FINETYPE_CI_MODEL if set and non-empty, readlink models/default, cat models/default, error]"
+    - name: "runtime_env_vars"
+      type: "array"
+      description: "Distinct, untouched: FINETYPE_MODEL (CLI/eval), FINETYPE_MODEL_DIR (DuckDB)"
+    - name: "divergence_signal"
+      type: "string"
+      description: "Non-blocking CI warning when env var and symlink target disagree on main"
 
 evaluation_principles:
   - principle: "Ordering-independence — promotion PRs no longer require HF-first"
-    weight: 0.40
-  - principle: "Minimal surface — fewest lines of workflow/script change"
+    weight: 0.35
+  - principle: "No silent failures — empty/invalid/unpublished model = loud CI failure with clear error, never a malformed curl"
     weight: 0.25
-  - principle: "No silent failures — unpublished model = loud CI failure, not fallback"
-    weight: 0.20
-  - principle: "Runtime unaffected — CLI/MCP/DuckDB behaviour identical"
+  - principle: "Minimal surface — single workflow-level env: key per workflow file"
     weight: 0.15
+  - principle: "Runtime unaffected — CLI/MCP/DuckDB/eval behaviour identical"
+    weight: 0.15
+  - principle: "Visibility — env-var vs symlink divergence surfaces as a warning, not silent drift"
+    weight: 0.10
 
 exit_conditions:
-  - "download-model.sh resolves FINETYPE_CI_MODEL with symlink fallback (AC-1)"
-  - "ci.yml and release.yml both set the env var for every relevant job (AC-2, AC-3)"
-  - "Symlink-unpublished-model test passes CI (AC-4)"
-  - "CLAUDE.md documents the new promotion flow (AC-5)"
-  - "Local dev unaffected without setting the env var (AC-6)"
+  - "download-model.sh resolves FINETYPE_CI_MODEL with `:-` form and symlink fallback; empty/whitespace errors loudly (AC-1)"
+  - "Automated shell test harness covers env-set, env-empty, env-unset+no-symlink, whitespace cases (AC-1)"
+  - "ci.yml and release.yml each set FINETYPE_CI_MODEL exactly once at workflow-level env: (AC-2, AC-3)"
+  - "Ordering-independence verified without mutating models/default (AC-4)"
+  - "CLAUDE.md includes env-var disambiguation table + 3-step promotion flow (AC-5)"
+  - "Local dev unaffected on bootstrapped machines; fresh clone path unchanged (AC-6)"
+  - "Divergence warning visible on PR runs when env var and symlink disagree (AC-7)"
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   timestamp: "2026-04-20T00:00:00Z"
-  ambiguity_score: 0.15
+  ambiguity_score: 0.10
   interview_ref: "specs/2026-04-20-ci-decouple-default-symlink/interview.md"
+  review_ref: "specs/2026-04-20-ci-decouple-default-symlink/review-spec-2026-04-20.md"
   risk_tier: "LOW"
   parent_release: "specs/2026-04-20-v16-release/handover.md"
   deferred_alternatives:
     - "Option D — HuggingFace publish as CI step (needs HF write token in CI secrets; revisit if option A proves insufficient)"
+  revision_notes:
+    - "v1.1 — tightened AC-1 empty-string / set -u semantics, replaced AC-4 destructive verification with mechanical workflow_dispatch test, added AC-7 divergence visibility, clarified env-var namespace vs FINETYPE_MODEL / FINETYPE_MODEL_DIR, pinned workflow-level env: placement, noted Windows readlink sidestep and fork-PR propagation — addresses review-spec-2026-04-20.md findings"
