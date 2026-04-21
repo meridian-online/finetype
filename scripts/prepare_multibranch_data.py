@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 """Prepare feature-vector training data for the multi-branch model.
 
+Train/eval leakage firewall
+---------------------------
+This script enforces Layer 2 of the leakage-prevention contract defined
+in `orbit/decisions/0056-train-eval-leakage-prevention.md` (MADR 0056).
+On every invocation it filters any training rows whose (header, value)
+pair collides with an eval row recorded in `eval/row_hashes.tsv`, using
+the shared normaliser at `scripts/eval_leakage/__init__.py` (ac-06 +
+ac-07, spec 2026-04-21-eval-expansion). The filter is active by default
+and can be disabled with `--no-dedup` (diagnostic only; do not ship
+models trained with `--no-dedup`).
+
+Purpose
+-------
 Reads distilled data (sherlock_distilled.csv.gz) and synthetic data
 (from finetype generate), blends them per-type, extracts 4 feature
 branches via `finetype extract-features`, and writes a binary .ftmb file.
@@ -60,6 +73,18 @@ import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+# ac-07 (spec 2026-04-21-eval-expansion): import shared leakage-prevention
+# normaliser + hasher. Lives in scripts/eval_leakage/ so both this filter
+# and scripts/compute_row_hashes.py use the same code path — per
+# orbit/decisions/0056-train-eval-leakage-prevention.md.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from eval_leakage import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    row_hash as _eval_row_hash,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Constants
@@ -740,6 +765,90 @@ def validate_distilled_labels(distilled, finetype_bin, min_match_rate=0.5):
 # ═══════════════════════════════════════════════════════════════════════════════
 # Data loading (reused from prepare_spike_data.py)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+def load_eval_row_hashes(hashes_path):
+    """Load eval row hashes from a TSV file (ac-07).
+
+    Accepts files written by scripts/compute_row_hashes.py. Tolerates the
+    header/comment lines so tooling-produced files load cleanly.
+
+    Returns a set of hex hash strings. Empty set if the file is missing —
+    callers decide whether that's fatal (it's not: we log a warning and
+    skip filtering, rather than silently passing an un-firewalled corpus).
+    """
+    p = Path(hashes_path)
+    if not p.exists():
+        return set()
+    hashes = set()
+    with open(p, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.rstrip("\n")
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("dataset\t"):
+                # Header row
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 4:
+                hashes.add(parts[3])
+    return hashes
+
+
+def filter_eval_leakage(columns_by_type, eval_hashes, min_values):
+    """Filter out training values whose (header, value) hash matches eval (ac-07).
+
+    Applies the shared-normaliser hash per value; drops matching values from
+    each column, then drops columns that fall below min_values.
+
+    Args:
+        columns_by_type: dict[type_key → list[(values, header)]]
+        eval_hashes: set of hex hashes (loaded from eval/row_hashes.tsv)
+        min_values: minimum values a column must have post-filter to survive
+
+    Returns:
+        (filtered_dict, stats) where stats is dict with:
+            total_values_seen, values_removed, columns_dropped, columns_affected
+    """
+    stats = {
+        "total_values_seen": 0,
+        "values_removed": 0,
+        "columns_dropped": 0,
+        "columns_affected": 0,
+    }
+    if not eval_hashes:
+        return columns_by_type, stats
+
+    out = {}
+    for type_key, cols in columns_by_type.items():
+        kept_cols = []
+        for entry in cols:
+            # Entry may be (values, header) tuple per this codebase's convention
+            if len(entry) == 2:
+                values, header = entry
+            else:
+                # Defensive: handle 3-tuples (label, values, header) if seen
+                header = entry[-1]
+                values = entry[-2]
+
+            stats["total_values_seen"] += len(values)
+            filtered_values = []
+            column_affected = False
+            for v in values:
+                if _eval_row_hash(header or "", str(v)) in eval_hashes:
+                    stats["values_removed"] += 1
+                    column_affected = True
+                    continue
+                filtered_values.append(v)
+            if column_affected:
+                stats["columns_affected"] += 1
+            if len(filtered_values) >= min_values:
+                kept_cols.append((filtered_values, header))
+            else:
+                stats["columns_dropped"] += 1
+        if kept_cols:
+            out[type_key] = kept_cols
+    return out, stats
 
 
 def load_taxonomy_types(finetype_bin):
@@ -2376,6 +2485,10 @@ def main():
     accounting_negatives = 0  # v14 AC-02b: accounting-context hard negatives
     status_negatives = 0  # v14 AC-02c: status code hard negatives
 
+    # ac-07 (spec 2026-04-21-eval-expansion): leakage filter
+    eval_row_hashes_path = "eval/row_hashes.tsv"
+    no_dedup = False
+
     i = 0
     while i < len(args):
         if args[i] == "--distilled":
@@ -2457,6 +2570,16 @@ def main():
         elif args[i] == "--status-negatives":
             status_negatives = int(args[i + 1])
             i += 2
+        elif args[i] == "--eval-row-hashes":
+            eval_row_hashes_path = args[i + 1]
+            i += 2
+        elif args[i] == "--no-dedup":
+            # Emergency rollback / diagnostics escape hatch (ac-07).
+            # Bypasses the row-hash firewall. Use with care — the firewall
+            # is mandated live in production by constraint #3 of the
+            # eval-expansion spec.
+            no_dedup = True
+            i += 1
         elif args[i] in ("-h", "--help"):
             print(__doc__)
             sys.exit(0)
@@ -2643,14 +2766,11 @@ def main():
         ]
 
     # ─── Eval dataset contamination check (AC-5f) ───────────────
-    if distilled:
-        contaminated_count = 0
-        for type_key, cols in list(distilled.items()):
-            # Check if any column headers suggest eval dataset origin
-            # (distilled data from Sherlock doesn't have source_file, so check headers)
-            pass  # Note: Sherlock distilled data doesn't carry source file metadata.
-                  # Contamination check is done at the overnight script level via
-                  # eval dataset name matching against the distilled corpus index.
+    # Note: Sherlock distilled data doesn't carry source-file metadata, so
+    # no header-level contamination check is applied here. The authoritative
+    # firewall is the row-hash filter below (ac-07, MADR 0056); the legacy
+    # overnight-script check remains for dataset-name matching at a different
+    # granularity.
 
     # ─── Generate synthetic data ───────────────────────────────────
     effective_synth = synthetic_columns_per_type * (oversample_multiplier if oversample_types else 1)
@@ -2740,6 +2860,38 @@ def main():
             (label, vals, hdr) for label, vals, hdr in ordered_distilled
             if label not in bad_distilled
         ]
+
+    # ─── Eval-leakage filter (ac-07, spec 2026-04-21-eval-expansion) ──
+    # Strip any training value whose (normalised_header, normalised_value)
+    # hash matches an entry in eval/row_hashes.tsv. Applied to both
+    # distilled and synthetic BEFORE blending so downstream accounting
+    # reflects the post-firewall corpus.
+    #
+    # Active by default; --no-dedup is the escape hatch. See MADR 0056
+    # (orbit/decisions/0056-train-eval-leakage-prevention.md) for the
+    # rationale + known blind spots.
+    if no_dedup:
+        print(f"\nEval-leakage filter: DISABLED via --no-dedup (diagnostics only).")
+    else:
+        print(f"\nEval-leakage filter: loading row hashes from {eval_row_hashes_path}...")
+        eval_hashes = load_eval_row_hashes(eval_row_hashes_path)
+        if not eval_hashes:
+            print(f"  WARNING: no hashes loaded ({eval_row_hashes_path} missing or empty).")
+            print(f"           Training corpus is NOT firewalled against eval leakage.")
+            print(f"           Run scripts/compute_row_hashes.py to generate.")
+        else:
+            print(f"  {len(eval_hashes)} eval row hashes loaded")
+            distilled, d_leak = filter_eval_leakage(distilled, eval_hashes, min_values)
+            synthetic, s_leak = filter_eval_leakage(synthetic, eval_hashes, min_values)
+            print(f"  Distilled: removed {d_leak['values_removed']:,} / "
+                  f"{d_leak['total_values_seen']:,} values "
+                  f"(-{d_leak['columns_dropped']} columns)")
+            print(f"  Synthetic: removed {s_leak['values_removed']:,} / "
+                  f"{s_leak['total_values_seen']:,} values "
+                  f"(-{s_leak['columns_dropped']} columns)")
+            # Recompute totals for visibility
+            total_d_cols = sum(len(cols) for cols in distilled.values())
+            total_s_cols = sum(len(cols) for cols in synthetic.values())
 
     # ─── Blend (for v2) or assemble tables (for v3) ──────────────
     if output_format == "v2":

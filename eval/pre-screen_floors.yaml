@@ -1,0 +1,113 @@
+# Pre-screen floors for eval/datasets/manifest.csv columns.
+#
+# Source of truth for the `pass_floors` boolean emitted by the ac-01
+# pre-screen script. Called (not re-derived) by ac-04's verification
+# of replace-flagged columns.
+#
+# Policy: orbit/decisions/0055-eval-realism-dimensions.md
+# Spec:   orbit/specs/2026-04-21-eval-expansion/spec.yaml (ac-01, ac-04)
+#
+# A column passes floors IFF every metric below passes its applicable
+# floor. Family overrides shadow defaults when a column's type falls
+# into the family.
+#
+# Metrics:
+#   null_rate         — fraction of values that are null/empty
+#   unique_ratio      — |distinct| / |total|
+#   shannon_entropy   — Shannon entropy of the value distribution, bits
+#   top_1_skew        — fraction of rows held by the most common value
+#   whitespace_ratio  — fraction of values with leading/trailing whitespace
+#   format_variance   — count of distinct surface formats (for datetime etc.)
+
+defaults:
+  null_rate:
+    max: 0.20
+  unique_ratio:
+    # No default; must be specified per family.
+    # Freeform text columns have no unique_ratio constraint.
+  shannon_entropy:
+    min: 1.5
+  top_1_skew:
+    max: 0.50
+  whitespace_ratio:
+    max: 0.10
+  format_variance:
+    # No default; family-specific.
+
+# Family overrides — matched by type prefix (domain.category.*).
+# First-match wins; defaults fill in unspecified metrics.
+families:
+
+  # id-like families — high unique_ratio expected
+  - match_prefix: "identity.person.id"
+    unique_ratio: { min: 0.95 }
+    shannon_entropy: { min: 4.0 }
+  - match_prefix: "identity.technology.uuid"
+    unique_ratio: { min: 0.99 }
+    shannon_entropy: { min: 4.0 }
+  - match_prefix: "finance.account"
+    unique_ratio: { min: 0.90 }
+    shannon_entropy: { min: 3.0 }
+  - match_prefix: "identity.medical.cpt"
+    # carve-out; synthetic-necessary permitted but floors still apply
+    unique_ratio: { min: 0.5 }
+    shannon_entropy: { min: 2.0 }
+  - match_prefix: "identity.medical.loinc"
+    unique_ratio: { min: 0.5 }
+    shannon_entropy: { min: 2.0 }
+  - match_prefix: "identity.person.ssn"
+    unique_ratio: { min: 0.95 }
+    shannon_entropy: { min: 4.0 }
+    null_rate: { max: 0.50 }
+  - match_prefix: "identity.government"
+    null_rate: { max: 0.50 }
+    unique_ratio: { min: 0.90 }
+  - match_prefix: "finance.institution.swift_bic"
+    unique_ratio: { min: 0.5 }
+    shannon_entropy: { min: 2.0 }
+  - match_prefix: "finance.account.credit_card_number"
+    unique_ratio: { min: 0.95 }
+    shannon_entropy: { min: 4.0 }
+
+  # Categorical families — low unique_ratio, low entropy acceptable
+  - match_prefix: "representation.enumeration"
+    unique_ratio: { max: 0.50 }
+    shannon_entropy: { min: 0.5 }
+    top_1_skew: { max: 0.90 }  # single-value dominance permitted
+  - match_prefix: "geography.country"
+    unique_ratio: { max: 0.50 }
+    shannon_entropy: { min: 1.0 }
+  - match_prefix: "geography.region"
+    unique_ratio: { max: 0.70 }
+    shannon_entropy: { min: 1.0 }
+
+  # Freeform families — no unique_ratio, higher whitespace tolerance
+  - match_prefix: "representation.freetext"
+    whitespace_ratio: { max: 0.30 }
+    shannon_entropy: { min: 3.0 }
+
+  # Datetime families — format_variance matters
+  - match_prefix: "datetime"
+    format_variance: { min: 1 }  # at least one format present
+    shannon_entropy: { min: 2.0 }
+
+  # Technology identifier families
+  - match_prefix: "technology.internet"
+    unique_ratio: { min: 0.60 }
+    shannon_entropy: { min: 3.0 }
+  - match_prefix: "technology.systems"
+    unique_ratio: { min: 0.30 }  # versions can repeat
+    shannon_entropy: { min: 1.5 }
+  - match_prefix: "technology.format.excel_format"
+    unique_ratio: { min: 0.10 }
+    shannon_entropy: { min: 0.5 }
+
+# --- End of configuration ---
+#
+# Reviewer notes for future expansion:
+#   - Families are matched greedy by longest prefix; add specific rules
+#     above general ones.
+#   - When adding a new family, include the match_prefix in this file
+#     AND update MADR 0055's floors table snapshot.
+#   - If a floor is found to gatekeep real-world columns unfairly during
+#     ac-04, adjust here and note the movement in orbit/specs/2026-04-21-eval-expansion/progress.md.

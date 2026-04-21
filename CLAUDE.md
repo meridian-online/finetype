@@ -200,7 +200,7 @@ tail -f models/sherlock-v16/epochs.jsonl
 
 ### Evaluation infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v16: **235/242 (97.1% label, 96.3% domain)**. 35 datasets, 242 columns (corrected ground truth, 17 labels fixed, 15 new columns added). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD). **Note:** `FINETYPE_MODEL_DIR` env var is for the DuckDB extension only. The CLI uses `--model` flag (default: `models/default`). The eval script respects `FINETYPE_MODEL` env var (passed as `--model`).
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v16: **235/242 (97.1% label, 96.3% domain)** on the pre-expansion 242-column eval. Post-eval-expansion (m-19): **297/352 (84.4% label, 91.8% domain)** diagnostic re-score on the expanded 448-row manifest with 110 newly-covered types surfaced (see `orbit/specs/2026-04-21-eval-expansion/`). Manifest schema: 7 columns (`dataset, file_path, column_name, gt_label, source_url, licence, fetched_date`). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD). **Note:** `FINETYPE_MODEL_DIR` env var is for the DuckDB extension only. The CLI uses `--model` flag (default: `models/default`). The eval script respects `FINETYPE_MODEL` env var (passed as `--model`).
 **Actionability eval** — 578903/578949 (100%) transform success rate. 2 below-target columns remaining (multilingual/date, tech_systems/version).
 **External benchmarks:** GitTables 1M (47.1% label), SOTAB CTA (43.6% label) — format-detectable subset only.
 **Dashboard:** `make eval-report` generates `eval/eval_output/report.md`.
@@ -209,18 +209,53 @@ To add regression datasets: create CSV in `/Users/hugh/datasets/finetype/`, add 
 
 ## Sprint Goal
 
-**m-18 COMPLETE — v16 retrain shipped.** Corrected eval ground truth
-(+17 labels fixed, +15 new columns → 242 total), split `_DROP_ALL_TYPES`
-to preserve synthetic data for the 7 types with bad distilled data, fixed
-the eval env-var bug (`FINETYPE_MODEL_DIR` → `FINETYPE_MODEL`) and the
-BSD `ln -sf` promotion bug. Seed 43 promoted at **235/242 (97.1%)**, net
-+2 over v14. Decision: 0049. Spec: `orbit/specs/2026-04-18-v16-data-audit-retrain/`.
+**m-19 IN FLIGHT — eval-corpus expansion (Phase A+B).** Closing the
+realism / coverage / leakage gaps surfaced by the v17 hold (decision
+0054). Three deliverables, all shipping before any v18 sweep may start:
 
-**Next sprint (m-19 — TBD):** candidates include v0.6.17 release, distilled-
-data relabelling for the 7 still-error-prone types, or the deferred PII
-detection card (`orbit/specs/2026-04-18-pii-detection/`).
+1. **Realism standard + programmatic pre-screen + human-reviewed triage.**
+   `scripts/prescreen_eval.py` computes 6 metrics (null_rate,
+   unique_ratio, whitespace_ratio, format_variance, shannon_entropy,
+   top_1_skew) against the pinned floors in MADR 0055; triage.md is a
+   draft worklist (338 keep / 0 augment / 0 replace on existing rows)
+   awaiting Hugh's human review. Restricted-registry carve-out for 6
+   types (identity.medical.cpt/loinc, identity.government.ssn/ein,
+   finance.banking.swift_bic, finance.payment.credit_card_number) under
+   `provenance_status = synthetic-necessary`.
+2. **Coverage floor — every taxonomy type has ≥1 eval column.**
+   `scripts/eval_coverage_check.py` is the machine gate.
+   `eval/datasets/csv/coverage_closure_phase_ab.csv` (110 columns × 6
+   rows) closes the zero-coverage gap; schema_mapping.yaml extended by
+   110 identity mappings. Final: 240/240 types covered, exit 0.
+3. **Train/eval leakage firewall — two-layer defence.** (a) Source-level
+   role manifest at `eval/datasets/sources.yaml` (35 sources, role=eval).
+   (b) Row-hash SHA256 filter at `scripts/prepare_multibranch_data.py`
+   (active-by-default) over normalised (header, sample-values) via shared
+   normaliser at `scripts/eval_leakage/__init__.py`. Hash table at
+   `eval/row_hashes.tsv` regenerated against the expanded 448-row
+   manifest (237,860 distinct rows across 441 columns).
 
-Previous: m-17 COMPLETE — PII detection (card 0012), actionability audit P1–P5, v15 Option C (233/242 on corrected eval, 96.3%).
+**Manifest schema migrated 4→7 columns** (`source_url`, `licence`,
+`fetched_date`). `eval/profile_eval.sh` patched to read 7 fields;
+Rust `csv::Reader` consumers tolerant via `.get(index)` semantics.
+**v18 retrain block** enforced in `scripts/sweep_v17.sh` header comment
++ sprint policy: no v18 model sweep may start until Phase A+B ships.
+
+**Decisions:** 0055 (realism dimensions), 0056 (leakage prevention),
+0057 (coverage floor) — all drafted `proposed`, move to `accepted`
+after verifying ACs ship. Card: `orbit/cards/0002-semantic-type-detection.yaml`.
+Spec: `orbit/specs/2026-04-21-eval-expansion/spec.yaml`.
+
+**v16 diagnostic re-score on expanded eval:** 297/352 (84.4% label,
+91.8% domain) — expected drop from 235/242 (97.1%) as newly-covered
+types surface v16's weak spots. Diagnostic only, not a promotion
+baseline. Phase C (edge-case second-column coverage per type) is
+explicitly out of scope.
+
+Previous: m-18 COMPLETE — v16 retrain shipped at 235/242 (97.1%) on
+corrected eval. Spec: `orbit/specs/2026-04-18-v16-data-audit-retrain/`.
+m-17 COMPLETE — PII detection (card 0012), actionability audit P1–P5,
+v15 Option C (233/242 on corrected eval).
 
 ## Decision Register
 
@@ -312,6 +347,12 @@ cargo test -p finetype-cli --test cli_golden -- --ignored
 | Data preparation (multi-branch) | `scripts/prepare_multibranch_data.py` |
 | Label remap (distilled→canonical) | `data/label_remap.json` |
 | Training/eval/package scripts | `scripts/train.sh`, `scripts/eval.sh`, `scripts/package.sh` |
+| Eval manifest (7-col, 448 rows) | `eval/datasets/manifest.csv` |
+| Source role manifest | `eval/datasets/sources.yaml` |
+| Row-hash leakage firewall | `eval/row_hashes.tsv`, `scripts/eval_leakage/__init__.py`, `scripts/compute_row_hashes.py` |
+| Eval pre-screen | `scripts/prescreen_eval.py`, `eval/pre-screen_floors.yaml` |
+| Coverage gate | `scripts/eval_coverage_check.py`, `eval/datasets/csv/coverage_closure_phase_ab.csv` |
+| Licence allowlist | `eval/licence_allowlist.txt` |
 
 ## Workflow (orbit)
 
