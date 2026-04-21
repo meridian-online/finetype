@@ -40,6 +40,7 @@ specs:
   - "orbit/specs/2026-04-12-accuracy-gap-retraining/"
   - "orbit/specs/2026-04-12-sharpen-header-bugfixes/"
   - "orbit/specs/2026-04-15-validation-branch-v12/"
+  - "orbit/specs/2026-04-21-eval-expansion/"
 
 references:
   - "README.md"

@@ -35,6 +35,25 @@
 # Training gate rationale: v14 shipped at 91.2% val_acc; 88% is ~3pp
 # below (≈1σ on typical training variance). The true promotion gate is
 # profile eval (ac-11), not val_acc.
+#
+# ───────────────────────────────────────────────────────────────────
+# v18 RETRAIN BLOCK (spec: orbit/specs/2026-04-21-eval-expansion/, ac-13)
+# ───────────────────────────────────────────────────────────────────
+# No v18 model sweep may start until the eval-expansion Phase A+B ships.
+# Enforced by spec ac-13 + constraint #4 (retrain block).
+#
+# Phase A+B deliverables required before any sweep_v18.sh runs:
+#   1. eval/datasets/manifest.csv extended to 7 columns + populated  [ac-02]
+#   2. Pre-screen + triage executed (replace worklist cleared)       [ac-03/04]
+#   3. Coverage gate: every taxonomy type has ≥1 eval column         [ac-05]
+#   4. Row-hash firewall: eval/row_hashes.tsv regenerated            [ac-06]
+#      + scripts/prepare_multibranch_data.py filter active-by-default [ac-07]
+#   5. sources.yaml role manifest present                            [ac-08]
+#   6. v16 diagnostic re-score on expanded eval                      [ac-12]
+#
+# Do NOT copy this script to sweep_v18.sh and run it until all six are
+# checked off in orbit/specs/2026-04-21-eval-expansion/progress.md.
+# ───────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

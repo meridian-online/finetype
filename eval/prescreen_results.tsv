@@ -1,0 +1,339 @@
+dataset	file_path	column_name	gt_label	full_type	total	non_null	null_rate	unique_ratio	whitespace_ratio	format_variance	shannon_entropy	top_1_skew	pass_floors	pass_notes	error
+titanic	eval/datasets/csv/titanic.csv	PassengerId	id	id	891	891	0.0000	1.0000	0.0000	1	9.7993	0.0011	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Survived	boolean	boolean	891	891	0.0000	0.0022	0.0000	1	0.9607	0.6162	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Pclass	class	class	891	891	0.0000	0.0034	0.0000	1	1.4393	0.5511	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Name	name	name	891	891	0.0000	1.0000	0.0022	1	9.7993	0.0011	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Sex	gender	gender	891	891	0.0000	0.0022	0.0000	1	0.9362	0.6476	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Age	number	number	891	714	0.1987	0.1232	0.0000	2	5.8366	0.0420	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	SibSp	number	number	891	891	0.0000	0.0079	0.0000	1	1.3386	0.6824	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Parch	number	number	891	891	0.0000	0.0079	0.0000	1	1.1283	0.7609	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Ticket	code	code	891	891	0.0000	0.7643	0.0000	3	9.2330	0.0079	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Fare	price	price	891	891	0.0000	0.2783	0.0000	2	7.0426	0.0483	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Cabin	code	code	891	204	0.7710	0.7206	0.0000	1	7.0657	0.0196	False	null_rate:above max 0.2;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+titanic	eval/datasets/csv/titanic.csv	Embarked	category	category	891	889	0.0022	0.0034	0.0000	1	1.0969	0.7244	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	id	id	id	7698	7698	0.0000	1.0000	0.0000	1	12.9103	0.0001	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	name	airport name	airport name	7698	7698	0.0000	0.9948	0.0000	1	12.8995	0.0004	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	city	city	city	7698	7649	0.0064	0.9093	0.0010	1	12.6898	0.0012	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	country	country	country	7698	7698	0.0000	0.0308	0.0000	1	5.8799	0.1964	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	iata	iata	iata	7698	7698	0.0000	0.7889	0.0000	2	10.6571	0.2112	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	icao	icao	icao	7698	7698	0.0000	1.0000	0.0000	1	12.9103	0.0001	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	latitude	latitude	latitude	7698	7698	0.0000	0.9981	0.0000	1	12.9064	0.0003	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	longitude	longitude	longitude	7698	7698	0.0000	0.9984	0.0000	1	12.9072	0.0003	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	altitude	number	number	7698	7698	0.0000	0.3276	0.0000	1	10.2538	0.0266	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	utc_offset	utc offset	utc offset	7698	7698	0.0000	0.0053	0.0000	2	4.2959	0.1538	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	timezone	time zone	time zone	7698	7698	0.0000	0.0400	0.0000	1	6.5257	0.1326	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	type	category	category	7698	7698	0.0000	0.0001	0.0000	1	-0.0000	1.0000	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+airports	eval/datasets/csv/airports.csv	source	category	category	7698	7698	0.0000	0.0001	0.0000	1	-0.0000	1.0000	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	name	country	country	249	249	0.0000	1.0000	0.0000	1	7.9600	0.0040	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	alpha-2	country code	country code	249	249	0.0000	1.0000	0.0000	1	7.9600	0.0040	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	alpha-3	country code	country code	249	249	0.0000	1.0000	0.0000	1	7.9600	0.0040	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	country-code	code	code	249	249	0.0000	1.0000	0.0000	1	7.9600	0.0040	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	iso_3166-2	code	code	249	249	0.0000	1.0000	0.0000	1	7.9600	0.0040	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	region	region	region	249	247	0.0080	0.0202	0.0000	1	2.2834	0.2429	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	sub-region	region	region	249	247	0.0080	0.0688	0.0000	1	3.5830	0.2146	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	region-code	code	code	249	247	0.0080	0.0202	0.0000	1	2.2834	0.2429	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+countries	eval/datasets/csv/countries.csv	sub-region-code	code	code	249	247	0.0080	0.0688	0.0000	1	3.5830	0.2146	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+covid_timeseries	eval/datasets/csv/covid_timeseries.csv	Date	iso date	iso date	1000	1000	0.0000	0.8160	0.0000	1	9.5978	0.0020	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+covid_timeseries	eval/datasets/csv/covid_timeseries.csv	Country	country	country	1000	1000	0.0000	0.0020	0.0000	1	0.6887	0.8160	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+covid_timeseries	eval/datasets/csv/covid_timeseries.csv	Confirmed	number	number	1000	1000	0.0000	0.8610	0.0000	1	9.3029	0.0800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+covid_timeseries	eval/datasets/csv/covid_timeseries.csv	Recovered	number	number	1000	1000	0.0000	0.5410	0.0000	1	6.5384	0.3680	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+covid_timeseries	eval/datasets/csv/covid_timeseries.csv	Deaths	number	number	1000	1000	0.0000	0.6430	0.0000	1	8.5129	0.1100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+us_states	eval/datasets/csv/us_states.csv	State	state	state	51	51	0.0000	1.0000	0.0000	1	5.6724	0.0196	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+us_states	eval/datasets/csv/us_states.csv	Abbreviation	code	code	51	51	0.0000	1.0000	0.0000	1	5.6724	0.0196	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+world_cities	eval/datasets/csv/world_cities.csv	name	city	city	10000	10000	0.0000	0.9598	0.0000	1	13.2023	0.0005	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+world_cities	eval/datasets/csv/world_cities.csv	country	country	country	10000	10000	0.0000	0.0066	0.0000	1	4.0023	0.2345	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+world_cities	eval/datasets/csv/world_cities.csv	subcountry	region	region	10000	9985	0.0015	0.0725	0.0000	1	7.7071	0.0452	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+world_cities	eval/datasets/csv/world_cities.csv	geonameid	id	id	10000	10000	0.0000	1.0000	0.0000	1	13.2877	0.0001	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+iris	eval/datasets/csv/iris.csv	sepal_length	decimal number	decimal number	150	150	0.0000	0.2333	0.0000	1	4.8220	0.0667	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+iris	eval/datasets/csv/iris.csv	sepal_width	decimal number	decimal number	150	150	0.0000	0.1533	0.0000	1	4.0117	0.1733	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+iris	eval/datasets/csv/iris.csv	petal_length	decimal number	decimal number	150	150	0.0000	0.2867	0.0000	1	5.0338	0.0933	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+iris	eval/datasets/csv/iris.csv	petal_width	decimal number	decimal number	150	150	0.0000	0.1467	0.0000	1	4.0657	0.1867	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+iris	eval/datasets/csv/iris.csv	species	category	category	150	150	0.0000	0.0200	0.0000	1	1.5850	0.3333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	order_id	code	code	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	customer_email	email	email	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	order_date	iso date	iso date	100	100	0.0000	0.9800	0.0000	1	6.6039	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	total_price	price	price	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	currency	currency	currency	100	100	0.0000	0.0600	0.0000	1	2.5632	0.2200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	credit_card_last4	code	code	100	100	0.0000	0.9900	0.0000	1	6.6239	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	shipping_country	country	country	100	100	0.0000	0.0700	0.0000	1	2.7826	0.2000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	shipping_postal_code	postal code	postal code	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	status	status	status	100	100	0.0000	0.0500	0.0000	1	2.2970	0.2500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	is_gift	boolean	boolean	100	100	0.0000	0.0200	0.0000	1	0.9928	0.5500	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	tracking_url	url	url	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders	eval/datasets/csv/ecommerce_orders.csv	phone	telephone	telephone	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	server_hostname	hostname	hostname	80	80	0.0000	0.7625	0.0000	1	5.7781	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	ip_address	ip_v4	ip_v4	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	mac_address	mac address	mac address	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	os	operating system	operating system	80	80	0.0000	0.0625	0.0000	1	2.3097	0.2375	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	version	version	version	80	80	0.0000	0.9750	0.0000	1	6.2719	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	language	language	language	80	80	0.0000	0.1000	0.0000	1	2.9346	0.1875	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	port	port	port	80	80	0.0000	0.1250	0.0000	1	3.2379	0.1625	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	uuid	uuid	uuid	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	api_key	code	code	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	user_agent	user agent	user agent	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	log_timestamp	timestamp	timestamp	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+tech_systems	eval/datasets/csv/tech_systems.csv	request_url	url	url	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	full_name	name	name	100	100	0.0000	0.8500	0.0000	1	6.3439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	first_name	first name	first name	100	100	0.0000	0.1900	0.0000	1	4.1447	0.1000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	last_name	last name	last name	100	100	0.0000	0.1000	0.0000	1	3.2607	0.1500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	email	email	email	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	phone	telephone	telephone	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	age	number	number	100	100	0.0000	0.4900	0.0000	1	5.4398	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	gender	gender	gender	100	100	0.0000	0.0300	0.0000	1	1.5207	0.4700	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	ssn	ssn	ssn	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	date_of_birth	iso date	iso date	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	company	entity name	entity name	100	100	0.0000	0.0800	0.0000	1	2.9304	0.1900	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	job_title	occupation	occupation	100	100	0.0000	0.0800	0.0000	2	2.9812	0.1700	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	salary	number	number	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	height_cm	height	height	100	100	0.0000	0.9000	0.0000	1	6.4288	0.0300	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+people_directory	eval/datasets/csv/people_directory.csv	weight_kg	weight	weight	100	100	0.0000	0.8800	0.0000	1	6.3839	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	date	iso date	iso date	100	100	0.0000	0.9100	0.0000	1	6.4563	0.0300	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	ticker	code	code	100	100	0.0000	0.1000	0.0000	2	3.2495	0.1500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	open_price	price	price	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	close_price	price	price	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	high_price	price	price	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	low_price	price	price	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	volume	number	number	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	market_cap	value	value	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	pe_ratio	decimal number	decimal number	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	dividend_yield	percentage	percentage	100	100	0.0000	0.9200	0.0000	1	6.4839	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	currency	currency	currency	100	100	0.0000	0.0100	0.0000	1	-0.0000	1.0000	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+financial_data	eval/datasets/csv/financial_data.csv	exchange	category	category	100	100	0.0000	0.0200	0.0000	1	0.9988	0.5200	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	iso_date	iso date	iso date	80	80	0.0000	0.9875	0.0000	1	6.2969	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	us_date	mdy slash	mdy slash	80	80	0.0000	0.9875	0.0000	1	6.2969	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	eu_date	dmy slash	dmy slash	80	80	0.0000	0.9875	0.0000	1	6.2969	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	iso_timestamp	timestamp	timestamp	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	sql_timestamp	sql timestamp	sql timestamp	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	unix_epoch	time	time	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	unix_ms	time	time	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	year	year	year	80	80	0.0000	0.0500	0.0000	1	1.9973	0.2750	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	month_name	month name	month name	80	80	0.0000	0.1500	0.0000	1	3.5439	0.1250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	day_of_week	day of week	day of week	80	80	0.0000	0.0875	0.0000	1	2.7774	0.1875	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	time_24h	time 24h	time 24h	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	duration_iso	duration	duration	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	utc_offset	utc offset	utc offset	80	80	0.0000	0.0875	0.0000	1	2.7515	0.2250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats	eval/datasets/csv/datetime_formats.csv	timezone	time zone	time zone	80	80	0.0000	0.0750	0.0000	1	2.5206	0.2500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	city	city	city	100	100	0.0000	0.1000	0.0000	1	3.2909	0.1200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	country_code	country code	country code	100	100	0.0000	0.1000	0.0000	1	3.2909	0.1200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	country	country	country	100	100	0.0000	0.1000	0.0000	1	3.2909	0.1200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	region	region	region	100	100	0.0000	0.1000	0.0000	2	3.2909	0.1200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	postal_code	postal code	postal code	100	100	0.0000	0.1000	0.0000	2	3.2909	0.1200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	latitude	latitude	latitude	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	longitude	longitude	longitude	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	coordinates	coordinates	coordinates	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	full_address	address	address	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	street_number	number	number	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+geography_data	eval/datasets/csv/geography_data.csv	elevation_m	number	number	100	100	0.0000	0.9800	0.0000	1	6.6039	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	isbn	isbn	isbn	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	issn	issn	issn	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	ean	ean	ean	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	uuid	uuid	uuid	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	credit_card	credit card number	credit card number	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	swift_code	swift code	swift code	80	80	0.0000	0.6250	0.0000	1	5.5092	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	iban	iban	iban	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	hex_color	color	color	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	mime_type	file format	file format	80	80	0.0000	0.0750	0.0000	1	2.5472	0.2250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	locale	locale code	locale code	80	80	0.0000	0.1250	0.0000	1	3.2349	0.1500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	sha256	hash	hash	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+codes_and_ids	eval/datasets/csv/codes_and_ids.csv	semantic_version	version	version	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	patient_id	id	id	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	npi	npi	npi	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	first_name	first name	first name	60	60	0.0000	0.3333	0.0000	1	4.1570	0.1000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	last_name	last name	last name	60	60	0.0000	0.1667	0.0000	1	3.2574	0.1500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	date_of_birth	iso date	iso date	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	gender	gender	gender	60	60	0.0000	0.0333	0.0000	1	0.9871	0.5667	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	heart_rate	number	number	60	60	0.0000	0.6833	0.0000	1	5.1817	0.0667	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	temperature_f	decimal number	decimal number	60	60	0.0000	0.7333	0.0000	1	5.3232	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	weight_lbs	weight	weight	60	60	0.0000	0.9667	0.0000	1	5.8276	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	height_in	height	height	60	60	0.0000	0.3833	0.0000	1	4.3379	0.1000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	diagnosis_code	icd10	icd10	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	visit_date	iso date	iso date	60	60	0.0000	0.9167	0.0000	1	5.7402	0.0333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+medical_records	eval/datasets/csv/medical_records.csv	is_admitted	boolean	boolean	60	60	0.0000	0.1000	0.0000	3	2.4248	0.3000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	isbn	isbn	isbn	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	title	title	title	60	60	0.0000	0.4500	0.0000	1	4.5733	0.0833	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	author	author	author	60	60	0.0000	0.8833	0.0000	1	5.6610	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	publisher	entity name	entity name	60	60	0.0000	0.1333	0.0000	1	2.9400	0.2000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	year_published	year	year	60	60	0.0000	0.5000	0.0000	1	4.7647	0.0667	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	pages	number	number	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	language	language	language	60	60	0.0000	0.1000	0.0000	1	2.5392	0.2333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	rating	rating	rating	60	60	0.0000	0.4667	0.0000	1	4.6505	0.0833	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	price_usd	price	price	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	url	url	url	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+books_catalog	eval/datasets/csv/books_catalog.csv	description	description	description	60	60	0.0000	0.2000	0.0000	1	3.4429	0.1667	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	timestamp	iso timestamp milliseconds	iso timestamp milliseconds	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	source_ip	ip_v4	ip_v4	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	destination_ip	ip_v4	ip_v4	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	method	http method	http method	100	100	0.0000	0.0500	0.0000	1	2.2799	0.2900	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	url_path	code	code	100	100	0.0000	0.0700	0.0000	1	2.7420	0.2100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	status_code	http status code	http status code	100	100	0.0000	0.1100	0.0000	1	3.4030	0.1400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	response_time_ms	number	number	100	100	0.0000	0.9900	0.0000	1	6.6239	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	user_agent	user agent	user agent	100	100	0.0000	0.7100	0.0000	1	6.0412	0.0300	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	request_id	uuid	uuid	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	content_type	file format	file format	100	100	0.0000	0.0400	0.0000	1	1.9912	0.2800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	payload_size_bytes	number	number	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+network_logs	eval/datasets/csv/network_logs.csv	query_params	code	code	100	100	0.0000	0.9500	0.0000	1	6.5439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	experiment_id	id	id	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	measurement_unit	measurement unit	measurement unit	50	50	0.0000	0.3400	0.0000	2	3.9611	0.1000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	value	decimal number	decimal number	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	percentage	percentage	percentage	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	formula	code	code	50	50	0.0000	0.1600	0.0000	1	2.7127	0.3000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	ph_value	decimal number	decimal number	50	50	0.0000	0.8800	0.0000	1	5.3888	0.0600	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	temperature_celsius	decimal number	decimal number	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	pressure_atm	decimal number	decimal number	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	timestamp	timestamp	timestamp	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	latitude	latitude	latitude	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+scientific_measurements	eval/datasets/csv/scientific_measurements.csv	longitude	longitude	longitude	50	50	0.0000	1.0000	0.0000	1	5.6439	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	name	name	name	60	60	0.0000	0.2500	0.0000	1	3.7490	0.1167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	address	address	address	60	60	0.0000	0.8500	0.0000	1	5.5943	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	postal_code	postal code	postal code	60	60	0.0000	1.0000	0.0000	2	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	phone	telephone	telephone	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	date	date	date	60	60	0.0000	1.0000	0.0000	3	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	price	price	price	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	locale	language code	language code	60	60	0.0000	0.0500	0.0000	1	1.5850	0.3333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+multilingual	eval/datasets/csv/multilingual.csv	country	country	country	60	60	0.0000	0.0500	0.0000	1	1.5850	0.3333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	event_id	code	code	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	sport	category	category	100	100	0.0000	0.1000	0.0000	1	3.2058	0.2100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	venue	entity name	entity name	100	100	0.0000	0.1000	0.0000	1	3.2937	0.1400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	country	country	country	100	100	0.0000	0.1000	0.0000	2	3.2730	0.1500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	event_date	iso date	iso date	100	100	0.0000	0.9600	0.0000	1	6.5639	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	start_time	time 24h	time 24h	100	100	0.0000	0.4800	0.0000	1	5.3827	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	duration_minutes	number	number	100	100	0.0000	0.0500	0.0000	1	2.3012	0.2300	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	attendance	number	number	100	100	0.0000	1.0000	0.0000	1	6.6439	0.0100	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	ticket_price	price	price	100	100	0.0000	0.9900	0.0000	1	6.6239	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	status	status	status	100	100	0.0000	0.0500	0.0000	1	2.3033	0.2500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	is_broadcast	boolean	boolean	100	100	0.0000	0.0200	0.0000	1	0.9974	0.5300	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+sports_events	eval/datasets/csv/sports_events.csv	viewer_rating	percentage	percentage	100	100	0.0000	0.9800	0.0000	1	6.6039	0.0200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	eu_dot_date	eu dot date	eu dot date	80	80	0.0000	0.9625	0.0000	1	6.2469	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	abbreviated_month_date	abbreviated month date	abbreviated month date	80	80	0.0000	0.9625	0.0000	1	6.2469	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	long_full_month_date	long full month date	long full month date	80	80	0.0000	0.9625	0.0000	1	6.2469	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	time_12h	time 12h	time 12h	80	80	0.0000	0.9875	0.0000	1	6.2969	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	time_12h_seconds	time 12h seconds	time 12h seconds	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	rfc_2822_timestamp	rfc 2822 timestamp	rfc 2822 timestamp	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	american_timestamp	american timestamp	american timestamp	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_formats_extended	eval/datasets/csv/datetime_formats_extended.csv	european_timestamp	european timestamp	european timestamp	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	address.city	city	city	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	address.country	country code	country code	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	address.postal_code	postal code	postal code	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	email	email	email	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	name	name	name	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	phone	telephone	telephone	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+api_users_json	eval/datasets/json/api_users.json	profile_url	url	url	60	60	0.0000	1.0000	0.0000	1	5.9069	0.0167	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	currency	currency code	currency code	25	25	0.0000	0.1600	0.0000	1	1.5996	0.5200	False	null_rate:ok;shannon_entropy:ok;top_1_skew:above max 0.5;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	customer_email	email	email	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	is_express	boolean	boolean	25	25	0.0000	0.0800	0.0000	1	0.9427	0.6400	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	order_date	iso timestamp	iso timestamp	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	order_id	alphanumeric id	alphanumeric id	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	product	category	category	25	25	0.0000	0.6400	0.0000	1	3.9239	0.0800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	quantity	number	number	25	25	0.0000	0.2000	0.0000	1	1.4644	0.6800	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	status	status	status	25	25	0.0000	0.1200	0.0000	1	1.5755	0.3600	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	total	decimal number	decimal number	25	25	0.0000	0.8800	0.0000	1	4.4039	0.0800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+ecommerce_orders_json	eval/datasets/json/ecommerce_orders.ndjson	unit_price	price	price	25	25	0.0000	0.6400	0.0000	1	3.9239	0.0800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	bytes_sent	number	number	25	25	0.0000	0.8800	0.0000	1	4.3239	0.1600	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	client_ip	ip_v4	ip_v4	25	25	0.0000	0.8800	0.0000	1	4.3737	0.1200	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	method	http method	http method	25	25	0.0000	0.2400	0.0000	1	1.9392	0.5200	False	null_rate:ok;shannon_entropy:ok;top_1_skew:above max 0.5;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	path	route	route	25	25	0.0000	0.9200	0.0000	1	4.4839	0.0800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	request_url	url	url	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	response_time_ms	decimal number	decimal number	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	status_code	http status code	http status code	25	25	0.0000	0.3600	0.0000	1	2.1095	0.6000	False	null_rate:ok;shannon_entropy:ok;top_1_skew:above max 0.5;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	timestamp	iso timestamp milliseconds	iso timestamp milliseconds	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+server_logs_json	eval/datasets/json/server_logs.ndjson	user_agent	user agent	user agent	25	25	0.0000	0.8000	0.0000	1	4.1337	0.1600	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	humidity_pct	decimal number	decimal number	60	60	0.0000	0.9833	0.0000	1	5.8736	0.0333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	location.city	city	city	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	location.country	country code	country code	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	location.latitude	latitude	latitude	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	location.longitude	longitude	longitude	60	0	1.0000	0.0000	0.0000	0	0.0000	0.0000	False	null_rate:above max 0.2;shannon_entropy:below min 1.5;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	observation_date	iso date	iso date	60	60	0.0000	0.0833	0.0000	1	2.3219	0.2000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	precipitation_mm	decimal number	decimal number	60	60	0.0000	0.9667	0.0000	1	5.8402	0.0333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	station_name	entity name	entity name	60	60	0.0000	0.2000	0.0000	2	3.5850	0.0833	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	temperature_c	decimal number	decimal number	60	60	0.0000	0.9333	0.0000	1	5.7610	0.0500	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+weather_stations_json	eval/datasets/json/weather_stations.json	wind_speed_kmh	decimal number	decimal number	60	60	0.0000	0.9667	0.0000	1	5.8402	0.0333	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	wkt	wkt	wkt	80	80	0.0000	0.9750	0.0000	1	6.2625	0.0375	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	geojson	geojson	geojson	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	h3	h3	h3	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	geohash	geohash	geohash	80	80	0.0000	1.0000	0.0000	2	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	plus_code	plus code	plus code	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	dms	dms	dms	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	mgrs	mgrs	mgrs	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	iso6346	iso6346	iso6346	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	hs_code	hs code	hs code	80	80	0.0000	1.0000	0.0000	2	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_geography	eval/datasets/csv/new_geography.csv	unlocode	unlocode	unlocode	80	80	0.0000	1.0000	0.0000	2	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	ulid	ulid	ulid	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	tsid	tsid	tsid	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	snowflake_id	snowflake id	snowflake id	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	aws_arn	aws arn	aws arn	80	80	0.0000	0.1500	0.0000	1	3.5230	0.1250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	s3_uri	s3 uri	s3 uri	80	80	0.0000	0.9750	0.0000	1	6.2719	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	jwt	jwt	jwt	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	docker_ref	docker ref	docker ref	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	git_sha	git sha	git sha	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	cidr	cidr	cidr	80	80	0.0000	0.9875	0.0000	1	6.2969	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	urn	urn	urn	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_technology	eval/datasets/csv/new_technology.csv	data_uri	data uri	data uri	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	icd10	icd10	icd10	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	loinc	loinc	loinc	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	cpt	cpt	cpt	80	80	0.0000	1.0000	0.0000	2	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	hcpcs	hcpcs	hcpcs	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	vin	vin	vin	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	eu_vat	eu vat	eu vat	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	ssn	ssn	ssn	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	ein	ein	ein	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	pan_india	pan india	pan india	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	abn	abn	abn	80	80	0.0000	1.0000	0.0000	2	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	orcid	orcid	orcid	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	email_display	email display	email display	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	phone_e164	phone e164	phone e164	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	upc	upc	upc	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_identity	eval/datasets/csv/new_identity.csv	isrc	isrc	isrc	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_finance	eval/datasets/csv/new_finance.csv	figi	figi	figi	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_finance	eval/datasets/csv/new_finance.csv	aba_routing	aba routing	aba routing	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_finance	eval/datasets/csv/new_finance.csv	bsb	bsb	bsb	80	80	0.0000	0.9875	0.0000	1	6.2969	0.0250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_representation	eval/datasets/csv/new_representation.csv	cas_number	cas number	cas number	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_representation	eval/datasets/csv/new_representation.csv	inchi	inchi	inchi	80	80	0.0000	0.1500	0.0000	1	3.4843	0.1250	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_representation	eval/datasets/csv/new_representation.csv	smiles	smiles	smiles	80	80	0.0000	0.2125	0.0000	2	3.9710	0.1000	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+new_representation	eval/datasets/csv/new_representation.csv	color_hsl	color hsl	color hsl	80	80	0.0000	1.0000	0.0000	1	6.3219	0.0125	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	time	iso timestamp milliseconds	iso timestamp milliseconds	10000	10000	0.0000	1.0000	0.0000	1	13.2877	0.0001	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	latitude	latitude	latitude	10000	10000	0.0000	0.9944	0.0000	1	13.2765	0.0002	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	longitude	longitude	longitude	10000	10000	0.0000	0.9927	0.0000	1	13.2730	0.0003	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	depth	decimal number	decimal number	10000	10000	0.0000	0.5905	0.0000	2	8.6927	0.3631	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	mag	decimal number	decimal number	10000	10000	0.0000	0.0078	0.0000	2	3.7529	0.1458	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	magType	category	category	10000	10000	0.0000	0.0008	0.0000	1	0.7884	0.8587	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	nst	number	number	10000	9965	0.0035	0.0282	0.0000	1	6.7098	0.0278	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	gap	decimal number	decimal number	10000	9964	0.0036	0.0276	0.0000	1	7.5186	0.0109	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	dmin	decimal number	decimal number	10000	9964	0.0036	0.5574	0.0000	1	12.1886	0.0010	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	rms	decimal number	decimal number	10000	9999	0.0001	0.0148	0.0000	2	6.4903	0.0202	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	net	category	category	10000	10000	0.0000	0.0010	0.0000	1	0.1472	0.9857	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	id	alphanumeric id	alphanumeric id	10000	10000	0.0000	1.0000	0.0000	1	13.2877	0.0001	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	updated	iso timestamp milliseconds	iso timestamp milliseconds	10000	10000	0.0000	0.2613	0.0000	1	10.2172	0.0070	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	place	address	address	10000	10000	0.0000	0.7108	0.0002	1	11.6436	0.0288	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	type	category	category	10000	10000	0.0000	0.0001	0.0000	1	-0.0000	1.0000	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	horizontalError	decimal number	decimal number	10000	9959	0.0041	0.1620	0.0000	2	10.3022	0.0022	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	depthError	decimal number	decimal number	10000	10000	0.0000	0.4775	0.0000	2	11.3290	0.0039	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	magError	decimal number	decimal number	10000	9917	0.0083	0.0268	0.0000	1	7.5409	0.0122	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	magNst	number	number	10000	9957	0.0043	0.0335	0.0000	1	6.3236	0.0414	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	status	status	status	10000	10000	0.0000	0.0002	0.0000	1	0.0015	0.9999	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	locationSource	category	category	10000	10000	0.0000	0.0010	0.0000	1	0.1472	0.9857	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+earthquakes_2024	eval/datasets/csv/earthquakes_2024.csv	magSource	category	category	10000	10000	0.0000	0.0013	0.0000	1	0.1564	0.9850	False	null_rate:ok;shannon_entropy:below min 1.5;top_1_skew:above max 0.5;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	compact_ymd	compact ymd	compact ymd	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	rfc_3339	rfc 3339	rfc 3339	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	dmy_dash	dmy dash	dmy dash	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	ymd_dot	ymd dot	ymd dot	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	quarter	quarter	quarter	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	fiscal_year	fiscal year	fiscal year	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	iso_8601_offset	iso 8601 offset	iso 8601 offset	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	iso_week	iso week	iso week	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	clf_timestamp	clf timestamp	clf timestamp	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	syslog_bsd	syslog bsd	syslog bsd	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	mdy_dash	mdy dash	mdy dash	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+datetime_coverage	eval/datasets/csv/datetime_coverage.csv	compact_dmy	compact dmy	compact dmy	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+finance_coverage	eval/datasets/csv/finance_coverage.csv	currency_symbol	currency symbol	currency symbol	25	25	0.0000	0.7200	0.0000	3	4.0839	0.0800	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+finance_coverage	eval/datasets/csv/finance_coverage.csv	bitcoin_address	bitcoin address	bitcoin address	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+finance_coverage	eval/datasets/csv/finance_coverage.csv	isin	isin	isin	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+finance_coverage	eval/datasets/csv/finance_coverage.csv	cusip	cusip	cusip	25	25	0.0000	1.0000	0.0000	2	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+finance_coverage	eval/datasets/csv/finance_coverage.csv	lei	lei	lei	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+representation_coverage	eval/datasets/csv/representation_coverage.csv	scientific_notation	scientific notation	scientific notation	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+representation_coverage	eval/datasets/csv/representation_coverage.csv	decimal_number_comma	decimal number comma	decimal number comma	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+representation_coverage	eval/datasets/csv/representation_coverage.csv	file_size	file size	file size	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+representation_coverage	eval/datasets/csv/representation_coverage.csv	integer_number	integer number	integer number	25	25	0.0000	1.0000	0.0000	2	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+technology_coverage	eval/datasets/csv/technology_coverage.csv	ip_v6	ip_v6	ip_v6	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+technology_coverage	eval/datasets/csv/technology_coverage.csv	calver	calver	calver	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+technology_coverage	eval/datasets/csv/technology_coverage.csv	ip_v4_with_port	ip_v4 with port	ip_v4 with port	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	
+technology_coverage	eval/datasets/csv/technology_coverage.csv	username	username	username	25	25	0.0000	1.0000	0.0000	1	4.6439	0.0400	True	null_rate:ok;shannon_entropy:ok;top_1_skew:ok;whitespace_ratio:ok	

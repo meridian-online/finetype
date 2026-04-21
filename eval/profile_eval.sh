@@ -11,9 +11,12 @@
 #   ./eval/profile_eval.sh eval/datasets/manifest.csv
 #   make eval-profile MANIFEST=eval/datasets/manifest.csv
 #
-# Manifest format (CSV):
-#   dataset,file_path,column_name,gt_label
-#   titanic,/path/to/titanic.csv,Survived,boolean
+# Manifest format (CSV, 7 columns since 2026-04-21):
+#   dataset,file_path,column_name,gt_label,source_url,licence,fetched_date
+#   titanic,/path/to/titanic.csv,Survived,boolean,https://www.kaggle.com/c/titanic,public-domain,2024-01-15
+# Legacy 4-column manifests are not supported — bash `read -r` with 7 named
+# fields folds anything beyond field 7 into fetched_date (unused), but with
+# 4 fields only, source_url/licence/fetched_date read as empty strings.
 #   titanic,/path/to/titanic.csv,Age,age
 #   titanic,/path/to/titanic.csv,Embarked,category
 #
@@ -75,9 +78,13 @@ ERRORS=0
 # Using newline-separated string for bash 3.2 compatibility (macOS)
 SEEN_FILES=""
 
-while IFS=, read -r dataset file_path column_name gt_label; do
+while IFS=, read -r dataset file_path column_name gt_label source_url licence fetched_date; do
     # Skip header
     if [ "$dataset" = "dataset" ]; then continue; fi
+
+    # source_url, licence, fetched_date are read but unused in profile phase
+    # (they exist to document provenance — see orbit/specs/2026-04-21-eval-expansion/)
+    # The read spec lists all 7 fields so extra columns are not folded into gt_label.
 
     # Skip if already profiled this file
     key="${dataset}:${file_path}"
@@ -145,11 +152,11 @@ GT_FILE="$OUTPUT_DIR/ground_truth.csv"
 echo "dataset,column_name,gt_label" > "$GT_FILE"
 
 GT_COUNT=0
-while IFS=, read -r dataset file_path column_name gt_label; do
+while IFS=, read -r dataset file_path column_name gt_label source_url licence fetched_date; do
     # Skip header
     if [ "$dataset" = "dataset" ]; then continue; fi
 
-    # Write GT annotation
+    # Write GT annotation (only the 3 fields the downstream DuckDB eval needs)
     echo "${dataset},${column_name},${gt_label}" >> "$GT_FILE"
     GT_COUNT=$((GT_COUNT + 1))
 done < "$MANIFEST"

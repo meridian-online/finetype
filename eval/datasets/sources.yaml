@@ -1,0 +1,276 @@
+# eval/datasets/sources.yaml — role manifest for train↔eval leakage firewall
+#
+# Each entry records a unique source_url and its role:
+#   eval            — used ONLY for evaluation, NEVER for training
+#   train           — used ONLY for training, NEVER for evaluation
+#   both-forbidden  — contaminated source; excluded from both sides
+#
+# Resolution rule (MADR 0056 §Layer 1):
+#   When a source appears on both sides, eval keeps the source and training
+#   must relocate to an alternative. Any source that cannot be safely relocated
+#   is tracked in progress.md under `un-relocatable training sources`.
+#
+# Populated from eval/datasets/manifest.csv (ac-02). Regenerate with:
+#   python scripts/build_sources_yaml.py  (future helper)
+
+version: 1
+generated: 2026-04-21
+
+sources:
+  - source_url: repo://eval/datasets/csv/airports.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [airports]
+
+  - source_url: repo://eval/datasets/csv/books_catalog.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [books_catalog]
+
+  - source_url: repo://eval/datasets/csv/codes_and_ids.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [codes_and_ids]
+
+  - source_url: repo://eval/datasets/csv/countries.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [countries]
+
+  - source_url: repo://eval/datasets/csv/covid_timeseries.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [covid_timeseries]
+
+  - source_url: repo://eval/datasets/csv/datetime_coverage.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [datetime_coverage]
+
+  - source_url: repo://eval/datasets/csv/datetime_formats.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [datetime_formats]
+
+  - source_url: repo://eval/datasets/csv/datetime_formats_extended.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [datetime_formats_extended]
+
+  - source_url: repo://eval/datasets/csv/earthquakes_2024.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [earthquakes_2024]
+
+  - source_url: repo://eval/datasets/csv/ecommerce_orders.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [ecommerce_orders]
+
+  - source_url: repo://eval/datasets/csv/finance_coverage.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [finance_coverage]
+
+  - source_url: repo://eval/datasets/csv/financial_data.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [financial_data]
+
+  - source_url: repo://eval/datasets/csv/geography_data.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [geography_data]
+
+  - source_url: repo://eval/datasets/csv/iris.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [iris]
+
+  - source_url: repo://eval/datasets/csv/medical_records.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [medical_records]
+
+  - source_url: repo://eval/datasets/csv/multilingual.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [multilingual]
+
+  - source_url: repo://eval/datasets/csv/network_logs.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [network_logs]
+
+  - source_url: repo://eval/datasets/csv/new_finance.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [new_finance]
+
+  - source_url: repo://eval/datasets/csv/new_geography.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [new_geography]
+
+  - source_url: repo://eval/datasets/csv/new_identity.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [new_identity]
+
+  - source_url: repo://eval/datasets/csv/new_representation.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [new_representation]
+
+  - source_url: repo://eval/datasets/csv/new_technology.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [new_technology]
+
+  - source_url: repo://eval/datasets/csv/people_directory.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [people_directory]
+
+  - source_url: repo://eval/datasets/csv/representation_coverage.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [representation_coverage]
+
+  - source_url: repo://eval/datasets/csv/scientific_measurements.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [scientific_measurements]
+
+  - source_url: repo://eval/datasets/csv/sports_events.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [sports_events]
+
+  - source_url: repo://eval/datasets/csv/tech_systems.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [tech_systems]
+
+  - source_url: repo://eval/datasets/csv/technology_coverage.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [technology_coverage]
+
+  - source_url: repo://eval/datasets/csv/titanic.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [titanic]
+
+  - source_url: repo://eval/datasets/csv/us_states.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [us_states]
+
+  - source_url: repo://eval/datasets/csv/world_cities.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [world_cities]
+
+  - source_url: repo://eval/datasets/json/api_users.json
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [api_users_json]
+
+  - source_url: repo://eval/datasets/json/ecommerce_orders.ndjson
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [ecommerce_orders_json]
+
+  - source_url: repo://eval/datasets/json/server_logs.ndjson
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [server_logs_json]
+
+  - source_url: repo://eval/datasets/json/weather_stations.json
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Internal curated eval corpus; see repo-local file at path."
+    datasets: [weather_stations_json]
+
+  # Phase A+B coverage closure — 110 hand-curated columns added under ac-05
+  # to hit the ≥1-column-per-type floor. Provenance: hand-curated,
+  # author-attested. 6 rows per column (pass ac-05's ≥5 floor). This is
+  # the only source carrying `synthetic-necessary` provenance for the 6
+  # restricted-registry carve-out types (cpt, loinc, ssn, ein, swift_bic,
+  # credit_card_number) per MADR 0055.
+  - source_url: repo://eval/datasets/csv/coverage_closure_phase_ab.csv
+    role: eval
+    licence: internal
+    fetched_date: 2026-04-21
+    attribution: "Hand-curated representative format examples added during eval-expansion Phase A+B (spec 2026-04-21-eval-expansion, ac-05). Author-attested."
+    datasets: [coverage_closure_phase_ab]

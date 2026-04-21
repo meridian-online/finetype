@@ -1,0 +1,37 @@
+# FineType eval licence allowlist
+#
+# Every licence value in eval/datasets/manifest.csv must be in this file.
+# Validated by ac-02's licence-check under orbit/specs/2026-04-21-eval-expansion/
+# (see MADR 0055 — Eval Realism Dimensions — for the policy).
+#
+# Lines starting with # are comments. One licence per line.
+# Format: SPDX identifier OR free-form value from the approved set below.
+#
+# Free-form values (only these are permitted):
+internal
+public-domain
+unknown-investigating
+
+# SPDX identifiers — add as needed
+# https://spdx.org/licenses/
+MIT
+Apache-2.0
+BSD-2-Clause
+BSD-3-Clause
+CC0-1.0
+CC-BY-4.0
+CC-BY-SA-4.0
+CC-BY-NC-4.0
+CC-BY-ND-4.0
+CC-BY-NC-SA-4.0
+ODbL-1.0
+PDDL-1.0
+ODC-By-1.0
+GPL-2.0
+GPL-3.0
+LGPL-2.1
+LGPL-3.0
+MPL-2.0
+ISC
+Unlicense
+WTFPL
