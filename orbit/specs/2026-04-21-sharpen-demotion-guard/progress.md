@@ -122,11 +122,45 @@ old `disambiguate_categorical`).
 CLI emits `text.word`. This matches the column's short-string shape
 and is NOT `categorical` — which is the guard's designed effect.
 
-**Expected win not realised:** `technology.internet.http_method`.
-The multi-branch model never predicted `http_method` on this 6-row
-short-string column, so a demotion guard — which can only PRESERVE
-top-1 — cannot recover it. Matches the pattern observed for
-`excel_format` in ac-04. Root cause is shared: distilled data for the
+**Expected win not realised in the 110-column eval context:**
+`technology.internet.http_method`. In the 110-column
+`coverage_closure_phase_ab.csv` under full sibling-context attention
+(`cmd_profile` → `classify_columns_with_context`, main.rs:3983), the
+raw multi-branch top-1 is `representation.text.word` (conf 0.373),
+NOT `http_method`. A demotion guard can only PRESERVE top-1 — it
+cannot change it.
+
+**Context-dependency matters — the guard DOES rescue http_method
+outside the sibling-heavy eval:**
+
+```
+| Invocation                                           | Raw top-1                       | Guard effect            |
+|------------------------------------------------------|---------------------------------|-------------------------|
+| `finetype load` (per-column, no cross-col context)   | technology.internet.http_method | preserves (rescue)     |
+| `finetype profile` on single-column CSV              | technology.internet.http_method | preserves (conf 0.858) |
+| `finetype profile` on 110-col coverage_closure CSV   | representation.text.word        | preserves text.word    |
+```
+
+So: the guard's designed effect (preserve validator-passing top-1)
+works in both standalone and `load` paths. The 110-column eval
+failure mode is a raw-classifier prediction problem (sibling-context
+shift pulls http_method's prediction toward `text.word`), not a
+guard problem. Matches the pattern observed for `excel_format` in
+ac-04.
+
+**Enum-loading separate concern.** Even when the classifier correctly
+emits `technology.internet.http_method`, `finetype load` does NOT
+emit `CREATE TYPE http_method_t AS ENUM (...)` or `CAST(... AS
+http_method_t)` — it emits plain VARCHAR passthrough. Reason: load's
+ENUM emission (main.rs:3268) gates on `broad_type == "ENUM"`, and
+the taxonomy entry at labels/definitions_technology.yaml:278 has
+`broad_type: VARCHAR` despite enum-constrained validation. ENUM
+loading is decoupled from ENUM validation. This is pre-existing
+behaviour, not introduced by this spec, but the two claims ("the
+guard preserved http_method" and "http_method loads as a DuckDB ENUM
+column") are separable — the guard covers the former only.
+
+Root cause is shared: distilled data for the
 7 short-string types (swift_bic, http_method, cpt, loinc,
 excel_format, ssn, user_agent) carries mislabeled rows (CLAUDE.md
 "What's next" item).
