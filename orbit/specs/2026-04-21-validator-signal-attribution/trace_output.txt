@@ -1,0 +1,88 @@
+    Finished `release` profile [optimized] target(s) in 0.53s
+     Running `target/release/examples/validator_signal_trace`
+Loading model from /Users/hugh/github/meridian-online/finetype/models/default
+Loading taxonomy from /Users/hugh/github/meridian-online/finetype/labels
+============================================================
+  coverage_closure_phase_ab/http_method
+  expected: technology.internet.http_method
+  values  : GET, POST, PUT, DELETE, PATCH, HEAD (6 items)
+------------------------------------------------------------
+  top-10 validation pass rates:
+    1.000  container.array.comma_separated
+    1.000  container.array.pipe_separated
+    1.000  container.array.semicolon_separated
+    1.000  container.array.whitespace_separated
+    1.000  container.object.csv
+    1.000  geography.address.postal_code
+    1.000  geography.address.street_name
+    1.000  geography.coordinate.longitude
+    1.000  geography.location.city
+    1.000  geography.location.country
+  expected type pass rate: 1.000 (rank: 25 of 240)
+  prediction (normal)  : technology.internet.http_method (0.595)
+  prediction (ablated) : technology.internet.http_method (0.512)  [validation branch zeroed]
+  attribution          : BOTH CORRECT (validation branch not needed here)
+
+============================================================
+  coverage_closure_phase_ab/excel_format
+  expected: representation.file.excel_format
+  values  : xlsx, xls, csv, ods, xlsm, xlsb (6 items)
+------------------------------------------------------------
+  top-10 validation pass rates:
+    1.000  container.array.comma_separated
+    1.000  container.array.pipe_separated
+    1.000  container.array.semicolon_separated
+    1.000  container.array.whitespace_separated
+    1.000  container.object.csv
+    1.000  geography.address.postal_code
+    1.000  geography.address.street_name
+    1.000  geography.coordinate.longitude
+    1.000  geography.location.city
+    1.000  geography.location.country
+  expected type pass rate: 1.000 (rank: 19 of 240)
+  prediction (normal)  : representation.text.word (0.335)
+  prediction (ablated) : representation.text.entity_name (0.988)  [validation branch zeroed]
+  attribution          : BOTH WRONG, DIFFERENT LABELS (branch shifts but doesn't fix)
+
+============================================================
+  geography_data/country_code
+  expected: geography.location.country_code
+  values  : DE, IN, CA, DE, AE, IN (10 items)
+------------------------------------------------------------
+  top-10 validation pass rates:
+    1.000  container.array.comma_separated
+    1.000  container.array.pipe_separated
+    1.000  container.array.semicolon_separated
+    1.000  container.array.whitespace_separated
+    1.000  container.object.csv
+    1.000  geography.address.street_name
+    1.000  geography.coordinate.longitude
+    1.000  geography.location.city
+    1.000  geography.location.country
+    1.000  geography.location.country_code <-- expected
+  expected type pass rate: 1.000 (rank: 10 of 240)
+  prediction (normal)  : geography.location.country_code (0.994)
+  prediction (ablated) : geography.location.country_code (0.328)  [validation branch zeroed]
+  attribution          : BOTH CORRECT (validation branch not needed here)
+
+============================================================
+  people_directory/email
+  expected: identity.person.email
+  values  : william.jones34@outlook.com, barbara.jones54@company.com, sarah.williams38@gmail.com, susan.garcia48@company.com, mary.williams18@gmail.com, david.brown98@gmail.com (10 items)
+------------------------------------------------------------
+  top-10 validation pass rates:
+    1.000  container.array.comma_separated
+    1.000  container.array.pipe_separated
+    1.000  container.array.semicolon_separated
+    1.000  container.array.whitespace_separated
+    1.000  container.object.csv
+    1.000  geography.address.full_address
+    1.000  geography.address.street_name
+    1.000  geography.coordinate.longitude
+    1.000  geography.location.city
+    1.000  geography.location.country
+  expected type pass rate: 1.000 (rank: 12 of 240)
+  prediction (normal)  : identity.person.email (0.995)
+  prediction (ablated) : identity.person.username (0.777)  [validation branch zeroed]
+  attribution          : BRANCH RESCUES (validation is the deciding signal)
+
