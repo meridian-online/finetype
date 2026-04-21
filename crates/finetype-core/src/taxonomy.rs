@@ -180,9 +180,7 @@ fn is_rejected_body(body: &str) -> bool {
             // Accept any comma-separated or single-number body containing
             // only digits and at most one comma.
             let is_length_only = !inner.is_empty()
-                && inner
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || c == ',')
+                && inner.chars().all(|c| c.is_ascii_digit() || c == ',')
                 && inner.chars().filter(|c| *c == ',').count() <= 1;
             if is_length_only {
                 return true;
@@ -1249,10 +1247,7 @@ representation.discrete.categorical:
     #[test]
     fn dgd_ac01_imprecise_alnum_space() {
         let v = validation_with_pattern(r"^[A-Za-z0-9 ]+$");
-        assert!(
-            !v.is_precise(),
-            "^[A-Za-z0-9 ]+$ must NOT be precise"
-        );
+        assert!(!v.is_precise(), "^[A-Za-z0-9 ]+$ must NOT be precise");
     }
 
     #[test]

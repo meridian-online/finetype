@@ -45,7 +45,7 @@ acceptance_criteria:
             regex-parsing is NOT required.
       Returns `false` for validations with neither enum nor pattern.
       Unit-tested in the same module.
-    verification: "Unit tests in the defining module cover at minimum: (a) Validation with non-empty enum → true; (b) pattern=`^[A-Z]{2}$` → true (anchored, bounded, restricted class); (c) pattern=`^.+$` → false; (d) pattern=`^\\S+$` → false; (e) pattern=`^\\w+$` → false; (f) pattern=`^[A-Za-z0-9_]+$` → false (rejected alphanumeric-id pattern); (g) pattern=`^[A-Za-z0-9 ]+$` → false; (h) Validation with only min/max length (no enum, no pattern) → false; (i) pattern=None and enum=None → false. All pass via `cargo test -p finetype-core is_precise`."
+    verification: "Unit tests in the defining module cover at minimum: (a) Validation with non-empty enum → true; (b) pattern=`^[A-Z]{2}$` → true (anchored, bounded, restricted class); (c) pattern=`^.+$` → false; (d) pattern=`^\\S+$` → false; (e) pattern=`^\\w+$` → false; (f) pattern=`^[A-Za-z0-9_]+$` → false (rejected alphanumeric-id pattern); (g) pattern=`^[A-Za-z0-9 ]+$` → false; (h) Validation with only min/max length (no enum, no pattern) → false; (i) pattern=None and enum=None → false. All pass via `cargo test -p finetype-core dgd_ac01` (tests are prefixed per metadata.test_prefix; the earlier `is_precise` filter string was stale and matches zero tests)."
 
   - id: ac-01b
     ac_type: code
@@ -232,7 +232,7 @@ exit_conditions:
   - "PR description references the discovery findings, MADR 0059, the taxonomy audit TSV, and both pre/post profile_results CSVs."
 
 metadata:
-  version: "1.2"
+  version: "1.3"
   test_prefix: "dgd"
   timestamp: "2026-04-21T00:00:00Z"
   ambiguity_score: 0.10
@@ -246,3 +246,4 @@ metadata:
   revision_log:
     - "v1.1 (2026-04-21): addressed review-spec-2026-04-21.md findings. HIGH: relocated is_precise() from CompiledValidator to Validation (CompiledValidator discards raw pattern/enum). MEDIUM: added ac-01b taxonomy audit; expanded rejected-pattern set to cover common loose anchored regexes; pinned delta-script contract in ac-05; added rollback/tightening constraint. LOW: pinned !s.trim().is_empty() semantics; strengthened ac-06 to gate on content; required baseline re-run on same merge-base commit; made ac-04 explicitly end-to-end."
     - "v1.2 (2026-04-21): assumption-reversal amendments driven by implementation evidence. (1) ac-04 verification reframed — original expected `representation.file.excel_format` output, but the raw multi-branch top-1 on the excel_format column is `representation.text.word` (documented in discovery findings.md). A demotion guard can preserve top-1, not promote it. Amended verification: post-patch label != `representation.discrete.categorical`. Observed post-value: `representation.text.word`. Promotion to `excel_format` is a separate training-data problem, deferred. (2) ac-05 delta-script contract amended — the originally-pinned `scripts/eval_delta_by_coverage.py --json | jq '.regressions'` command does not exist on main (the script is a single-snapshot reporter, not a differ). Rather than change a shared sprint script, ac-05 now uses `orbit/specs/.../eval-artefacts/compute_regressions.py`, which implements the same label-match logic and emits regressions.tsv/improvements.tsv/changes.tsv/summary.txt. Result verified: `regressions: 0`, `improvements: 1` (word column, gt text.word), 5 neutral changes (including excel_format and http_method, both moving from categorical to text.word). See progress.md 'Assumption Reversal' section."
+    - "v1.3 (2026-04-21): addressed review-pr-2026-04-21.md LOW findings pre-merge. (1) ac-01 verification filter updated from stale `cargo test -p finetype-core is_precise` (matches 0 tests) to `cargo test -p finetype-core dgd_ac01` (matches the 16 prefix-compliant tests). (2) `cargo fmt` applied to 3 files this PR touched (taxonomy.rs, precise_audit.rs, validator_signal_trace.rs). Findings #3 (MADR single-commit landing), #4 (text.word pattern frontier), #5 (empty-column edge case) are non-blocking per the review — logged here for traceability."

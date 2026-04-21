@@ -33,8 +33,7 @@ fn workspace_root() -> PathBuf {
 fn dgd_ac01b_emit_precise_audit_tsv() {
     let root = workspace_root();
     let labels_dir = root.join("labels");
-    let out_path = root
-        .join("orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv");
+    let out_path = root.join("orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv");
 
     let taxonomy = Taxonomy::from_directory(&labels_dir)
         .expect("load taxonomy from labels/ — is labels/ present in workspace?");
@@ -72,9 +71,7 @@ fn dgd_ac01b_emit_precise_audit_tsv() {
 
         // TSV-escape the pattern: replace tabs and newlines (should be
         // absent in practice, but defence in depth).
-        let pattern_esc = pattern_raw
-            .replace('\t', "\\t")
-            .replace('\n', "\\n");
+        let pattern_esc = pattern_raw.replace('\t', "\\t").replace('\n', "\\n");
 
         rows.push(format!(
             "{}\t{}\t{}\t{}",

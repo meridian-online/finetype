@@ -62,17 +62,18 @@ fn main() -> Result<()> {
         println!("  {}/{}", t.dataset, t.column);
         println!("  expected: {}", t.expected);
         let preview: Vec<&str> = t.values.iter().take(6).map(|s| s.as_str()).collect();
-        println!("  values  : {} ({} items)", preview.join(", "), t.values.len());
+        println!(
+            "  values  : {} ({} items)",
+            preview.join(", "),
+            t.values.len()
+        );
         println!("------------------------------------------------------------");
 
         let value_refs: Vec<&str> = t.values.iter().map(|s| s.as_str()).collect();
         let features = extractor.extract(&value_refs, &taxonomy);
 
-        let mut indexed: Vec<(usize, f32)> = features
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        let mut indexed: Vec<(usize, f32)> =
+            features.iter().enumerate().map(|(i, &v)| (i, v)).collect();
         indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         println!("  top-10 validation pass rates:");
