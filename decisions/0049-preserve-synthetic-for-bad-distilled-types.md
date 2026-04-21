@@ -3,6 +3,14 @@ status: accepted
 date-created: 2026-04-20
 date-modified: 2026-04-20
 ---
+
+<!--
+  2026-04-20: Amended (not superseded) by the v17 retrain spec
+  `specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml`. See the
+  "Update 2026-04-20 — v17 layers distilled data on top" section below.
+  Core thesis (keep synthetic generators for the 7 types) is unchanged.
+-->
+
 # 0049. Preserve Synthetic Training Data for Types with Bad Distilled Data
 
 ## Context and Problem Statement
@@ -86,9 +94,41 @@ version bump, release tag, Homebrew bump) are tracked in
   `FINETYPE_MODEL_DIR`) is also captured in the same commit and prevents the
   measurement loop from lying again.
 
+## Update 2026-04-20 — v17 layers distilled data on top
+
+The v17 retrain spec
+(`specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml`) amends this
+decision by **adding** real distilled data for a subset of the 7 types,
+rather than reversing the synthetic-retention thesis:
+
+- `technology.internet.user_agent` — public-dataset path (Kaggle/GitHub
+  UA corpus → `output/distillation-v4/loaders/user_agent.py`). REMOVED
+  from `_DROP_DISTILLED_TYPES` in the v17 prep script.
+- `identity.medical.loinc` — public-dataset path (published code subset
+  → `output/distillation-v4/loaders/loinc.py`). REMOVED from
+  `_DROP_DISTILLED_TYPES` in the v17 prep script.
+- `finance.banking.swift_bic`, `identity.medical.cpt`,
+  `representation.file.excel_format`, `identity.government.ssn` —
+  **improved generators** (≥1000 unique values; ≥500 for Excel format).
+  Generators audited against v16 eval failures. Still in
+  `_DROP_DISTILLED_TYPES` (no distilled rows consumed).
+- `technology.internet.http_method` — **YAML-schema-only** path. The
+  enum + pattern in `labels/definitions_technology.yaml` expanded to
+  all 27 case variants (9 methods × {UPPER, lower, Title}). No new
+  distilled rows, no generator change. Still in
+  `_DROP_DISTILLED_TYPES`.
+
+Status of this decision remains `accepted`. The synthetic-retention
+principle is preserved for all 7 types: every type still has a
+synthetic generator feeding into training. The v17 changes are
+additive (distilled data layered on top for 2 types) or orthogonal
+(schema-only for http_method). See the v17 spec for the full sourcing
+table.
+
 ## References
 
-- Spec: `specs/2026-04-18-v16-data-audit-retrain/spec.yaml`
+- Spec: `specs/2026-04-18-v16-data-audit-retrain/spec.yaml` (v16 retrain)
+- v17 spec: `specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml`
 - Handover: `specs/2026-04-18-v16-data-audit-retrain/handover-2026-04-19.md`
 - Sweep results: `results/sweep-v16-summary.csv` (seed 43 promoted)
 - Code: `scripts/prepare_multibranch_data.py` (`_DROP_DISTILLED_TYPES`,

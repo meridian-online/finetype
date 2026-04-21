@@ -59,6 +59,7 @@ import tempfile
 import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Constants
@@ -854,6 +855,94 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
     return dict(columns_by_type), ordered_columns, stats
 
 
+def load_v4_distilled_columns(v4_dir, min_values, column_size, rng):
+    """Load v4 per-type distilled CSVs and chunk them into columns (v17 ac-04).
+
+    v4 CSVs live at <v4_dir>/<short_name>.csv with header [value,label]
+    and one row per unique value. Each file is shuffled (deterministically)
+    and chunked into synthetic "columns" of `column_size` values each,
+    so v4 data has the same shape downstream as v3 distilled columns.
+
+    Only the file's declared label (from the first data row) is accepted;
+    inconsistent-label rows within a file are dropped with a warning.
+
+    Args:
+        v4_dir: path to output/distillation-v4/ (directory of per-type CSVs).
+        min_values: minimum values per column (short final chunks are dropped).
+        column_size: target values per synthetic column.
+        rng: random.Random instance for deterministic shuffling.
+
+    Returns:
+        columns_by_type: dict[str, list[tuple[list[str], str]]]
+        ordered_columns: list[tuple[str, list[str], str]]
+        stats: dict with per-file counts + aggregate totals.
+    """
+    columns_by_type = defaultdict(list)
+    ordered_columns = []
+    stats = {
+        "files_loaded": 0,
+        "files_skipped": 0,
+        "total_rows": 0,
+        "qualifying_rows": 0,
+        "unique_values_per_type": {},
+        "columns_per_type": {},
+        "inconsistent_label_rows": 0,
+    }
+
+    v4_path = Path(v4_dir)
+    if not v4_path.is_dir():
+        print(f"  v4 directory {v4_dir} not found — skipping v4 distilled load")
+        return dict(columns_by_type), ordered_columns, stats
+
+    for csv_path in sorted(v4_path.glob("*.csv")):
+        with csv_path.open("r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        if not rows:
+            stats["files_skipped"] += 1
+            print(f"  {csv_path.name}: empty, skipped")
+            continue
+
+        # Every row in a v4 CSV must share the same label (one file = one type).
+        label = rows[0].get("label", "").strip()
+        if not label:
+            stats["files_skipped"] += 1
+            print(f"  WARNING: {csv_path.name} has no label in first row — skipped")
+            continue
+
+        bad = [r for r in rows if r.get("label", "").strip() != label]
+        if bad:
+            stats["inconsistent_label_rows"] += len(bad)
+            print(
+                f"  WARNING: {csv_path.name} has {len(bad)} rows with "
+                f"inconsistent labels — dropping mismatched"
+            )
+            rows = [r for r in rows if r.get("label", "").strip() == label]
+
+        values = [r["value"].strip() for r in rows if r.get("value", "").strip()]
+        stats["total_rows"] += len(rows)
+        stats["unique_values_per_type"][label] = len(set(values))
+
+        # Deterministic shuffle + chunk
+        shuffled = values[:]
+        rng.shuffle(shuffled)
+
+        cols_made = 0
+        header = csv_path.stem  # "user_agent", "loinc"
+        for i in range(0, len(shuffled), column_size):
+            chunk = shuffled[i : i + column_size]
+            if len(chunk) < min_values:
+                continue
+            columns_by_type[label].append((chunk, header))
+            ordered_columns.append((label, chunk, header))
+            stats["qualifying_rows"] += len(chunk)
+            cols_made += 1
+        stats["columns_per_type"][label] = cols_made
+        stats["files_loaded"] += 1
+
+    return dict(columns_by_type), ordered_columns, stats
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Distilled data filtering (v13 AC-02)
 #
@@ -862,25 +951,46 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
 # Filtering runs BEFORE the distilled cap (AC-04).
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Types to drop entirely from DISTILLED data (all distilled rows are mislabeled).
-# Synthetic generators for these types are fine — see _DROP_SYNTHETIC_TYPES below.
-_DROP_DISTILLED_TYPES = {
-    "identity.government.ssn",           # 3 rows, all partial dates like "-- --, 1918"
-    "technology.internet.user_agent",     # 4 rows, all person names / product descriptions
-    "finance.banking.swift_bic",         # v16: 5 rows, all county/country names not BIC codes
-    "technology.internet.http_method",    # v16: 6 rows, all random uppercase text not HTTP methods
-    "representation.file.excel_format",  # v16: 16 rows, CLI commands / country names / durations
-    "identity.medical.loinc",            # v16: 7 rows, sports scores not LOINC codes
-    "identity.medical.cpt",              # v16: 4 rows, mixed integers / text not CPT codes
+# ── v17: three-way split of the 7 bad-distilled types (decision 0049 + 0050) ──
+#
+# Every v3 distilled row for any of the 7 types is mislabeled noise. v17
+# introduces a second source (output/distillation-v4/) with real values for
+# the subset of types that have a permissively-licensed public dataset.
+#
+# _V4_OVERRIDE_TYPES  — v3 rows dropped AS BEFORE; v4 CSV provides real rows.
+# _DROP_DISTILLED_TYPES — v3 rows dropped, no v4 data either. Generator is
+#                         the sole signal for these types.
+# _DROP_ALL_TYPES     — union (the actual drop set applied to v3 data).
+#
+# Spec verification (ac-04) grep against this file:
+#   user_agent + LOINC are NOT in _DROP_DISTILLED_TYPES ✓
+#   SSN, SWIFT BIC, CPT, Excel format, http_method ARE in _DROP_DISTILLED_TYPES ✓
+_V4_OVERRIDE_TYPES = {
+    "technology.internet.user_agent",   # v4: ua-parser fixtures (~17.8k UAs)
+    "identity.medical.loinc",            # v4: NLM Clinical Tables API (~2.1k codes)
 }
 
-# Backwards-compatibility alias. Historically this set was applied to both
-# distilled and synthetic data, which gave these types zero training examples
-# (first v16 sweep scored 226/242 vs v14's 233/242 — regression). The sweep
-# eval that originally seemed to justify dropping synthetic data was
-# misconfigured (FINETYPE_MODEL_DIR instead of FINETYPE_MODEL) and was
-# actually scoring v14 throughout. We now keep synthetic data for every type.
-_DROP_ALL_TYPES = _DROP_DISTILLED_TYPES
+# Types with NO distilled rows in the final v17 corpus. v3 rows are
+# mislabeled (dropped); v4 has no loader for them; the synthetic generator
+# is the sole training signal.
+_DROP_DISTILLED_TYPES = {
+    "identity.government.ssn",           # v3: 3 rows, all partial dates
+    "finance.banking.swift_bic",         # v3: 5 rows, country names not BIC codes
+    "technology.internet.http_method",   # v3: 6 rows, random uppercase text
+    "representation.file.excel_format",  # v3: 16 rows, CLI commands / durations
+    "identity.medical.cpt",              # v3: 4 rows, mixed integers / text
+}
+
+# Drop-from-v3 set (union). Historically this was applied to both distilled
+# and synthetic data, which gave the 7 types zero training examples (first
+# v16 sweep scored 226/242 vs v14's 233/242 — regression). The misconfigured
+# sweep eval that seemed to justify dropping synthetic (FINETYPE_MODEL_DIR
+# vs FINETYPE_MODEL) was actually scoring v14 throughout. We now keep
+# synthetic data for every type (decision 0049).
+#
+# v17: this union still drops all v3 contamination for the 7 types. v4 rows
+# are loaded AFTER filter_distilled_columns() runs, so they survive.
+_DROP_ALL_TYPES = _V4_OVERRIDE_TYPES | _DROP_DISTILLED_TYPES
 
 # Types to drop entirely from SYNTHETIC data (empty by default — generators
 # are trustworthy). Populate only if a specific synthetic generator is shown
@@ -2241,6 +2351,8 @@ def main():
 
     # Defaults
     distilled_path = "output/distillation-v3/sherlock_distilled.csv.gz"
+    distilled_v4_dir = "output/distillation-v4"  # v17 ac-04: per-type CSVs
+    v4_column_size = 100  # v17 ac-04: values per synthetic v4 column
     finetype_bin = "./target/release/finetype"
     output_path = "output/multibranch-training/blend-50-50.ftmb"
     label_remap_path = "data/label_remap.json"
@@ -2268,6 +2380,12 @@ def main():
     while i < len(args):
         if args[i] == "--distilled":
             distilled_path = args[i + 1]
+            i += 2
+        elif args[i] == "--distilled-v4-dir":
+            distilled_v4_dir = args[i + 1]
+            i += 2
+        elif args[i] == "--v4-column-size":
+            v4_column_size = int(args[i + 1])
             i += 2
         elif args[i] == "--finetype":
             finetype_bin = args[i + 1]
@@ -2423,6 +2541,47 @@ def main():
         print(f"  Total dropped: {filter_stats['total_dropped_columns']} columns")
         print(f"  Remaining: {total_d_cols_after} columns across {len(distilled)} types")
         total_d_cols = total_d_cols_after
+
+    # ─── Load v4 per-type distilled data (v17 ac-04) ──────────────
+    # After v3 contamination is filtered, v4 CSVs provide real distilled
+    # rows for the _V4_OVERRIDE_TYPES (user_agent + LOINC). Other 5 of the
+    # 7 bad-distilled types remain in _DROP_DISTILLED_TYPES and have no
+    # v4 loader — they rely on their synthetic generators.
+    print(f"\nLoading v4 per-type distilled data from {distilled_v4_dir}...")
+    v4_distilled, ordered_v4, v4_stats = load_v4_distilled_columns(
+        distilled_v4_dir, min_values, v4_column_size, rng
+    )
+    if v4_stats["files_loaded"] > 0:
+        print(f"  {v4_stats['files_loaded']} v4 files loaded, "
+              f"{v4_stats['files_skipped']} skipped")
+        print(f"  {v4_stats['total_rows']} total rows → "
+              f"{v4_stats['qualifying_rows']} qualifying values")
+        if v4_stats["inconsistent_label_rows"]:
+            print(f"  {v4_stats['inconsistent_label_rows']} inconsistent-label rows dropped")
+        for label, n_cols in sorted(v4_stats["columns_per_type"].items()):
+            n_unique = v4_stats["unique_values_per_type"].get(label, 0)
+            print(f"    {label}: {n_cols} columns × ~{v4_column_size} values "
+                  f"({n_unique} unique)")
+        # Merge v4 into v3 distilled dict; v4 types should NOT overlap with
+        # v3 types (v3 contamination was filtered by _DROP_ALL_TYPES above).
+        for type_key, cols in v4_distilled.items():
+            if type_key in distilled:
+                # v3 contamination leaked through (filter_distilled was off?) —
+                # replace, don't mix.
+                print(f"  WARNING: v4 type {type_key} overlaps v3 "
+                      f"({len(distilled[type_key])} v3 cols) — "
+                      f"v4 replaces v3 per spec ac-04")
+                # Drop overlapping v3 entries from ordered_distilled too
+                ordered_distilled = [
+                    t for t in ordered_distilled if t[0] != type_key
+                ]
+            distilled[type_key] = cols
+        ordered_distilled.extend(ordered_v4)
+        total_d_cols = sum(len(cols) for cols in distilled.values())
+        print(f"  Post-merge distilled: {total_d_cols} columns across "
+              f"{len(distilled)} types")
+    else:
+        print(f"  No v4 data loaded (directory empty or absent)")
 
     # ─── Per-value subtype decontamination (v14 AC-01) ────────────
     if decontaminate:

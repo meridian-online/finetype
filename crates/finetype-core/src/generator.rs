@@ -2012,13 +2012,33 @@ impl Generator {
                 Ok(format!("{}-{}", num, check))
             }
             ("medical", "cpt") => {
-                if self.rng.gen_bool(0.8) {
-                    let code = self.rng.gen_range(10000..99999u32);
-                    Ok(format!("{}", code))
+                // CPT (Current Procedural Terminology) — codes only, no
+                // AMA-copyrighted descriptors. v17 ac-02 improvements:
+                //   - Category I: 5-digit 00100..=99999 (the current range
+                //     covers the entire published space; earlier versions
+                //     skipped 00100..09999).
+                //   - Category II (performance measurement): 4 digits + 'F'.
+                //   - Category III (emerging technology): 4 digits + 'T'.
+                //   - PLA/temporary "U" suffix retained at low frequency for
+                //     compatibility with the existing YAML pattern.
+                // Distribution: Category I dominates real-world usage.
+                let dice = self.rng.gen_range(0..100u32);
+                if dice < 85 {
+                    // Category I: zero-padded 5-digit codes, 00100..=99999.
+                    let code = self.rng.gen_range(100..=99_999u32);
+                    Ok(format!("{:05}", code))
+                } else if dice < 93 {
+                    // Category II: performance measurement (F suffix).
+                    let code = self.rng.gen_range(1..=9999u32);
+                    Ok(format!("{:04}F", code))
+                } else if dice < 99 {
+                    // Category III: emerging technology (T suffix).
+                    let code = self.rng.gen_range(1..=9999u32);
+                    Ok(format!("{:04}T", code))
                 } else {
-                    let code = self.rng.gen_range(1000..9999u32);
-                    let suffix = ['F', 'T', 'U'][self.rng.gen_range(0..3)];
-                    Ok(format!("{}{}", code, suffix))
+                    // PLA / temporary (U suffix) — rare.
+                    let code = self.rng.gen_range(1..=9999u32);
+                    Ok(format!("{:04}U", code))
                 }
             }
             ("medical", "hcpcs") => {
@@ -2061,18 +2081,33 @@ impl Generator {
                 }
             },
             ("government", "ssn") => {
-                // Area number: 001–899, excluding 000 (never issued) and 666 (reserved)
+                // US Social Security Number — SYNTHETIC ONLY.
+                //
+                // PRIVACY: This generator never uses any real-world SSN.
+                // Values are uniformly sampled within SSA-valid ranges.
+                //
+                // v17 ac-02 improvements:
+                //   - Area number 001..=899 excluding 666 (SSA-reserved).
+                //     Area 900..=999 (tax-ID range) is excluded.
+                //   - Group number 01..=99 (00 never issued).
+                //   - Serial number 0001..=9999 (0000 never issued).
+                //   - Emits both dashed (XXX-XX-XXXX) and no-dash
+                //     (XXXXXXXXX) variants to match real-world
+                //     column-data diversity. Dashed form is primary.
                 let area = loop {
                     let a = self.rng.gen_range(1..=899u32);
                     if a != 666 {
                         break a;
                     }
                 };
-                // Group number: 01–99 (00 never issued)
                 let group = self.rng.gen_range(1..=99u32);
-                // Serial number: 0001–9999 (0000 never issued)
                 let serial = self.rng.gen_range(1..=9999u32);
-                Ok(format!("{:03}-{:02}-{:04}", area, group, serial))
+                // 80% dashed (canonical), 20% no-dash.
+                if self.rng.gen_bool(0.8) {
+                    Ok(format!("{:03}-{:02}-{:04}", area, group, serial))
+                } else {
+                    Ok(format!("{:03}{:02}{:04}", area, group, serial))
+                }
             }
             ("government", "ein") => {
                 let prefix = self.rng.gen_range(10..99u32);
@@ -2721,86 +2756,196 @@ impl Generator {
                 Ok(format!("{} {}", size, unit))
             }
             ("file", "excel_format") => {
-                // Excel custom number format strings
-                let choice = self.rng.gen_range(0..8);
+                // Excel custom number format strings.
+                //
+                // v17 ac-02 improvements:
+                //   - Expanded token grammar (# 0 , . ; [ ] $ € £ ¥ % E e
+                //     A/a P/p M/m / d D y Y h H s S). Locale codes
+                //     [$-409] / [$-40C] / [$-C09] emitted with realistic
+                //     bracket syntax.
+                //   - Multi-section syntax: positive;negative;zero;text.
+                //   - Date/time variants (ISO, US, EU, long-form) and
+                //     AM/PM / 24-hour variants.
+                //   - Colour conditionals ([Red], [Green], [Blue],
+                //     [Magenta], [Cyan], [Yellow]) and threshold
+                //     conditionals ([>N], [<N], [=N]).
+                //   - Text / literal suffixes (e.g. `0"kg"`, `@`).
+                //
+                // Character set stays within the YAML validation pattern.
+                let decimals_s = |n: usize| if n == 0 { String::new() } else { format!(".{}", "0".repeat(n)) };
+                // Weighted branch selection — favour the high-cardinality
+                // branches (currency/dates/multi-section/thresholds) so the
+                // generator saturates >500 unique values quickly.
+                let weights = [3u32, 10, 3, 10, 8, 10, 4, 3, 12, 12, 8, 6];
+                let total: u32 = weights.iter().sum();
+                let mut pick = self.rng.gen_range(0..total);
+                let mut choice = 0usize;
+                for (i, w) in weights.iter().enumerate() {
+                    if pick < *w {
+                        choice = i;
+                        break;
+                    }
+                    pick -= *w;
+                }
                 let fmt = match choice {
-                    // Number formats
+                    // ── Plain number formats (grouped / ungrouped) ─────────
                     0 => {
-                        let decimals = self.rng.gen_range(0..5);
-                        if decimals == 0 {
-                            "#,##0".to_string()
-                        } else {
-                            format!("#,##0.{}", "0".repeat(decimals))
-                        }
+                        let decimals = self.rng.gen_range(0..6);
+                        let body = if self.rng.gen_bool(0.6) { "#,##0" } else { "0" };
+                        format!("{}{}", body, decimals_s(decimals))
                     }
-                    // Currency formats
+                    // ── Currency formats (symbol or locale-prefixed) ───────
                     1 => {
-                        let symbols = ["$", "€", "£", "¥"];
-                        let sym = symbols[self.rng.gen_range(0..symbols.len())];
                         let decimals = self.rng.gen_range(0..3);
-                        if decimals == 0 {
-                            format!("{}#,##0", sym)
+                        let grouped = if self.rng.gen_bool(0.85) { "#,##0" } else { "0" };
+                        if self.rng.gen_bool(0.35) {
+                            // Locale-prefixed, e.g. [$-409] for en-US.
+                            let locales = [
+                                "[$-409]", "[$-809]", "[$-40C]", "[$-407]", "[$-C09]",
+                                "[$-410]", "[$-804]", "[$-411]", "[$-419]", "[$-C0A]",
+                                "[$-416]", "[$-413]", "[$-40A]", "[$-41D]",
+                            ];
+                            let loc = locales[self.rng.gen_range(0..locales.len())];
+                            let sym = ["$", "€", "£", "¥"][self.rng.gen_range(0..4)];
+                            format!("{}{}{}{}", loc, sym, grouped, decimals_s(decimals))
                         } else {
-                            format!("{}#,##0.{}", sym, "0".repeat(decimals))
+                            let sym = ["$", "€", "£", "¥"][self.rng.gen_range(0..4)];
+                            // Trailing vs leading symbol variants.
+                            if self.rng.gen_bool(0.8) {
+                                format!("{}{}{}", sym, grouped, decimals_s(decimals))
+                            } else {
+                                format!("{}{} {}", grouped, decimals_s(decimals), sym)
+                            }
                         }
                     }
-                    // Percentage formats
+                    // ── Percentage formats ─────────────────────────────────
                     2 => {
-                        let decimals = self.rng.gen_range(0..4);
-                        if decimals == 0 {
-                            "0%".to_string()
-                        } else {
-                            format!("0.{}%", "0".repeat(decimals))
-                        }
+                        let decimals = self.rng.gen_range(0..5);
+                        let body = if self.rng.gen_bool(0.5) { "0" } else { "#,##0" };
+                        format!("{}{}%", body, decimals_s(decimals))
                     }
-                    // Date formats
+                    // ── Date formats (ISO, US, EU, mixed) ──────────────────
                     3 => {
                         let fmts = [
-                            "mm/dd/yyyy",
-                            "dd/mm/yyyy",
-                            "yyyy-mm-dd",
-                            "m/d/yy",
-                            "d-mmm-yy",
-                            "d-mmm",
-                            "mmm-yy",
-                            "dd-mmm-yyyy",
-                            "yyyy/mm/dd",
-                            "mm-dd-yyyy",
+                            "m/d/yyyy", "mm/dd/yyyy", "mm/dd/yy", "m/d/yy",
+                            "d/m/yyyy", "dd/mm/yyyy", "dd/mm/yy",
+                            "yyyy-mm-dd", "yy-mm-dd", "yyyy/mm/dd", "yyyymmdd",
+                            "d-mmm", "d-mmm-yy", "d-mmm-yyyy", "dd-mmm-yyyy",
+                            "mmm-yy", "mmmm-yy", "mmmm d, yyyy", "mmm d, yyyy",
+                            "dddd, mmmm d, yyyy", "ddd, mmm d yyyy",
+                            "mm-dd-yyyy", "m.d.yyyy", "d.m.yyyy",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
-                    // Time formats
+                    // ── Time formats ───────────────────────────────────────
                     4 => {
                         let fmts = [
-                            "h:mm:ss AM/PM",
-                            "h:mm AM/PM",
-                            "h:mm:ss",
-                            "hh:mm:ss",
-                            "hh:mm",
-                            "mm:ss",
-                            "h:mm:ss.00",
+                            "h:mm AM/PM", "h:mm:ss AM/PM", "hh:mm AM/PM",
+                            "h:mm", "h:mm:ss", "hh:mm", "hh:mm:ss",
+                            "mm:ss", "mm:ss.0", "h:mm:ss.00",
+                            "[h]:mm", "[h]:mm:ss", "[mm]:ss", "[ss]",
+                            "h:mm:ss.000",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
-                    // Scientific notation
+                    // ── Combined date + time ───────────────────────────────
                     5 => {
-                        let decimals = self.rng.gen_range(1..5);
-                        format!("0.{}E+00", "0".repeat(decimals))
+                        let dates = ["m/d/yyyy", "yyyy-mm-dd", "d-mmm-yy", "dd/mm/yyyy"];
+                        let times = ["h:mm", "h:mm:ss", "h:mm AM/PM", "hh:mm:ss"];
+                        let d = dates[self.rng.gen_range(0..dates.len())];
+                        let t = times[self.rng.gen_range(0..times.len())];
+                        format!("{} {}", d, t)
                     }
-                    // Fraction formats
+                    // ── Scientific notation ────────────────────────────────
                     6 => {
-                        let fmts = ["# ?/?", "# ??/??", "# ???/???", "# ?/2", "# ?/4", "# ?/8"];
+                        let decimals = self.rng.gen_range(1..6);
+                        let exp_digits = self.rng.gen_range(1..=3);
+                        let e_char = if self.rng.gen_bool(0.5) { "E" } else { "e" };
+                        let sign = if self.rng.gen_bool(0.7) { "+" } else { "-" };
+                        format!("0.{}{}{}{}", "0".repeat(decimals), e_char, sign, "0".repeat(exp_digits))
+                    }
+                    // ── Fractions ──────────────────────────────────────────
+                    7 => {
+                        let fmts = [
+                            "# ?/?", "# ??/??", "# ???/???",
+                            "# ?/2", "# ?/4", "# ?/8", "# ?/16",
+                            "# ?/10", "# ?/100",
+                        ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
-                    // Conditional / multi-section formats
+                    // ── Multi-section (positive;negative;zero;text) ────────
+                    8 => {
+                        let decimals = self.rng.gen_range(0..4);
+                        let grouped = if self.rng.gen_bool(0.7) { "#,##0" } else { "0" };
+                        let body = format!("{}{}", grouped, decimals_s(decimals));
+                        let colours = [
+                            "[Red]", "[Green]", "[Blue]", "[Magenta]", "[Cyan]", "[Yellow]",
+                        ];
+                        let colour = colours[self.rng.gen_range(0..colours.len())];
+                        let variant = self.rng.gen_range(0..8);
+                        match variant {
+                            0 => format!("{};-{}", body, body),
+                            1 => format!("{};({})", body, body),
+                            2 => format!("{};{}-{}", body, colour, body),
+                            3 => format!("{};{}({})", body, colour, body),
+                            4 => format!("{};-{};0", body, body),
+                            5 => format!("{};-{};0;@", body, body),
+                            6 => format!("{};{}-{};0;@", body, colour, body),
+                            _ => format!("{};{}({});\"-\";@", body, colour, body),
+                        }
+                    }
+                    // ── Threshold conditionals ─────────────────────────────
+                    9 => {
+                        // Pick a round threshold (10, 100, 1000, 10000, etc.).
+                        let exp = self.rng.gen_range(1..=5u32);
+                        let threshold = 10u32.pow(exp);
+                        let op = [">", ">=", "<", "<=", "="][self.rng.gen_range(0..5)];
+                        let decimals = self.rng.gen_range(0..3);
+                        let grouped = if self.rng.gen_bool(0.6) { "#,##0" } else { "0" };
+                        let body = format!("{}{}", grouped, decimals_s(decimals));
+                        let colours = ["[Red]", "[Green]", "[Blue]", "[Magenta]", "[Cyan]"];
+                        let colour = colours[self.rng.gen_range(0..colours.len())];
+                        if self.rng.gen_bool(0.5) {
+                            format!("[{}{}]{};{}{}", op, threshold, body, colour, body)
+                        } else {
+                            format!("[{}{}]{}{};{}", op, threshold, colour, body, body)
+                        }
+                    }
+                    // ── Literal-text suffix / prefix units ─────────────────
+                    10 => {
+                        let units = [
+                            "kg", "g", "mg", "m", "cm", "mm", "km", "lb", "oz",
+                            "bp", "pts", "units", "pcs", "ea", "hrs", "min",
+                            "sec", "days", "items", "%",
+                        ];
+                        let unit = units[self.rng.gen_range(0..units.len())];
+                        let decimals = self.rng.gen_range(0..4);
+                        let grouped = if self.rng.gen_bool(0.5) { "#,##0" } else { "0" };
+                        let body = format!("{}{}", grouped, decimals_s(decimals));
+                        if self.rng.gen_bool(0.7) {
+                            format!("{}\" {}\"", body, unit)
+                        } else {
+                            format!("\"{}: \"{}", unit, body)
+                        }
+                    }
+                    // ── Text placeholder / pass-through / canned fixtures ──
                     _ => {
                         let fmts = [
-                            "#,##0.00;(#,##0.00)",
-                            "#,##0.00;[Red](#,##0.00)",
-                            "$#,##0.00;($#,##0.00)",
-                            "0.00;-0.00;0",
-                            "#,##0;-#,##0;\"--\"",
-                            "[>100]#,##0;[Red]#,##0",
+                            "@",
+                            "\"Status: \"@",
+                            "\"ID-\"@",
+                            "[$USD] #,##0.00",
+                            "[$GBP] #,##0.00",
+                            "[$EUR] #,##0.00",
+                            "[$JPY] #,##0",
+                            "0.00;[Red]-0.00",
+                            "#,##0;(#,##0);\"--\"",
+                            "#,##0,\"K\"",
+                            "#,##0,,\"M\"",
+                            "#,##0,,,\"B\"",
+                            "0.00\"E-03\"",
+                            "General",
+                            "Text",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
@@ -3391,34 +3536,73 @@ impl Generator {
                 Ok(format!("{}{}{}", country, check, bban))
             }
             ("banking", "swift_bic") => {
-                // SWIFT/BIC generator (moved from identity.payment in v0.5.1)
-                let countries = [
-                    "US", "GB", "DE", "FR", "CH", "JP", "AU", "SG", "HK", "NL", "IT", "ES", "CA",
-                    "SE", "NO", "DK", "BE", "AT", "IE", "LU",
+                // SWIFT/BIC generator (moved from identity.payment in v0.5.1).
+                // v17 ac-02: broadened ISO 3166-1 alpha-2 coverage (~130 codes
+                // from the active SWIFT country list), biased toward major
+                // financial centres to mirror real-world frequency.
+                //
+                // Structure: 4-letter bank + 2-letter country (ISO 3166-1
+                // alpha-2) + 2-char location (alphanumeric) + optional 3-char
+                // branch (alphanumeric). "XXX" branch is the documented
+                // head-office marker and is emitted with small probability.
+                const ISO_3166_ALPHA2: &[&str] = &[
+                    "AD", "AE", "AF", "AG", "AL", "AM", "AO", "AR", "AT", "AU", "AZ", "BA", "BB",
+                    "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BN", "BO", "BR", "BS", "BT", "BW",
+                    "BY", "BZ", "CA", "CD", "CF", "CG", "CH", "CI", "CL", "CM", "CN", "CO", "CR",
+                    "CU", "CV", "CY", "CZ", "DE", "DJ", "DK", "DO", "DZ", "EC", "EE", "EG", "ER",
+                    "ES", "ET", "FI", "FJ", "FR", "GA", "GB", "GE", "GH", "GM", "GN", "GQ", "GR",
+                    "GT", "GW", "GY", "HK", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN",
+                    "IQ", "IR", "IS", "IT", "JM", "JO", "JP", "KE", "KG", "KH", "KR", "KW", "KY",
+                    "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA",
+                    "MC", "MD", "ME", "MG", "MK", "ML", "MM", "MN", "MO", "MR", "MT", "MU", "MV",
+                    "MW", "MX", "MY", "MZ", "NA", "NE", "NG", "NI", "NL", "NO", "NP", "NZ", "OM",
+                    "PA", "PE", "PG", "PH", "PK", "PL", "PT", "PY", "QA", "RO", "RS", "RU", "RW",
+                    "SA", "SB", "SC", "SD", "SE", "SG", "SI", "SK", "SL", "SN", "SO", "SR", "SV",
+                    "SY", "SZ", "TD", "TG", "TH", "TJ", "TM", "TN", "TO", "TR", "TT", "TW", "TZ",
+                    "UA", "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "VU", "WS", "YE", "ZA",
+                    "ZM", "ZW",
                 ];
+                // Major financial centres — sampled with 40% probability to
+                // keep the distribution realistic.
+                const MAJORS: &[&str] = &[
+                    "US", "GB", "DE", "FR", "CH", "JP", "AU", "SG", "HK", "NL", "IT", "ES", "CA",
+                    "SE", "BE", "AT", "IE", "LU",
+                ];
+                let country = if self.rng.gen_bool(0.4) {
+                    MAJORS[self.rng.gen_range(0..MAJORS.len())]
+                } else {
+                    ISO_3166_ALPHA2[self.rng.gen_range(0..ISO_3166_ALPHA2.len())]
+                };
                 let bank: String = (0..4)
                     .map(|_| (b'A' + self.rng.gen_range(0..26)) as char)
                     .collect();
-                let country = countries[self.rng.gen_range(0..countries.len())];
+                // Location: alphanumeric; bias toward letters to look realistic.
                 let location: String = (0..2)
                     .map(|_| {
-                        if self.rng.gen_bool(0.7) {
+                        if self.rng.gen_bool(0.75) {
                             (b'A' + self.rng.gen_range(0..26)) as char
                         } else {
                             (b'0' + self.rng.gen_range(0..10)) as char
                         }
                     })
                     .collect();
-                if self.rng.gen_bool(0.4) {
-                    let branch: String = (0..3)
-                        .map(|_| {
-                            if self.rng.gen_bool(0.7) {
-                                (b'A' + self.rng.gen_range(0..26)) as char
-                            } else {
-                                (b'0' + self.rng.gen_range(0..10)) as char
-                            }
-                        })
-                        .collect();
+                // 45% emit 11-char (8-char head office + 3-char branch).
+                if self.rng.gen_bool(0.45) {
+                    // 15% of branched codes use the documented "XXX" marker
+                    // (head office by convention when 11-char form is emitted).
+                    let branch: String = if self.rng.gen_bool(0.15) {
+                        "XXX".to_string()
+                    } else {
+                        (0..3)
+                            .map(|_| {
+                                if self.rng.gen_bool(0.7) {
+                                    (b'A' + self.rng.gen_range(0..26)) as char
+                                } else {
+                                    (b'0' + self.rng.gen_range(0..10)) as char
+                                }
+                            })
+                            .collect()
+                    };
                     Ok(format!("{}{}{}{}", bank, country, location, branch))
                 } else {
                     Ok(format!("{}{}{}", bank, country, location))
@@ -6407,5 +6591,149 @@ test.test.test:
                 type_key
             );
         }
+    }
+
+    // ── v17 ac-02: generator uniqueness + structural bars ──────────────────
+    // Each test draws (target + 200) samples, asserts ≥target unique, and
+    // spot-checks structural invariants on every sample.
+
+    fn collect_samples(key: &str, n: usize) -> Vec<String> {
+        let mut gen = Generator::with_seed(test_taxonomy(), 42);
+        (0..n).map(|_| gen.generate_value(key).unwrap()).collect()
+    }
+
+    #[test]
+    #[ignore = "printer only; run with --ignored --nocapture to see samples"]
+    fn ac02_print_samples() {
+        for key in [
+            "finance.banking.swift_bic",
+            "identity.medical.cpt",
+            "representation.file.excel_format",
+            "identity.government.ssn",
+        ] {
+            println!("=== {} ===", key);
+            let mut gen = Generator::with_seed(test_taxonomy(), 42);
+            for _ in 0..12 {
+                println!("  {}", gen.generate_value(key).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn ac02_swift_bic_unique_and_structured() {
+        let samples = collect_samples("finance.banking.swift_bic", 1200);
+        let unique: std::collections::HashSet<_> = samples.iter().cloned().collect();
+        assert!(
+            unique.len() >= 1000,
+            "swift_bic: expected ≥1000 unique, got {}",
+            unique.len()
+        );
+        for s in &samples {
+            assert!(
+                s.len() == 8 || s.len() == 11,
+                "swift_bic length must be 8 or 11, got {:?}",
+                s
+            );
+            let bytes = s.as_bytes();
+            // Positions 1-4: bank code (A-Z)
+            assert!(
+                bytes[0..4].iter().all(|b| b.is_ascii_uppercase()),
+                "bank code must be A-Z: {}",
+                s
+            );
+            // Positions 5-6: country (A-Z)
+            assert!(
+                bytes[4..6].iter().all(|b| b.is_ascii_uppercase()),
+                "country code must be A-Z: {}",
+                s
+            );
+            // Positions 7-8 (and 9-11 if branch): alphanumeric
+            assert!(
+                bytes[6..].iter().all(|b| b.is_ascii_alphanumeric()),
+                "location/branch must be alphanumeric: {}",
+                s
+            );
+        }
+    }
+
+    #[test]
+    fn ac02_cpt_unique_and_structured() {
+        let samples = collect_samples("identity.medical.cpt", 1200);
+        let unique: std::collections::HashSet<_> = samples.iter().cloned().collect();
+        assert!(
+            unique.len() >= 1000,
+            "cpt: expected ≥1000 unique, got {}",
+            unique.len()
+        );
+        let mut saw_cat1 = false;
+        let mut saw_cat2 = false;
+        let mut saw_cat3 = false;
+        for s in &samples {
+            if s.len() == 5 && s.chars().all(|c| c.is_ascii_digit()) {
+                saw_cat1 = true;
+            } else if s.len() == 5 && s.ends_with('F') {
+                saw_cat2 = true;
+            } else if s.len() == 5 && s.ends_with('T') {
+                saw_cat3 = true;
+            } else if s.len() == 5 && s.ends_with('U') {
+                // U suffix permitted by YAML pattern.
+            } else {
+                panic!("Unexpected CPT shape: {:?}", s);
+            }
+        }
+        assert!(saw_cat1, "should see Category I (5-digit) codes");
+        assert!(saw_cat2, "should see Category II (F-suffix) codes");
+        assert!(saw_cat3, "should see Category III (T-suffix) codes");
+    }
+
+    #[test]
+    fn ac02_excel_format_unique_and_structured() {
+        // Excel's legitimate format-string vocabulary is naturally smaller
+        // than SWIFT/CPT/SSN (the grammar is denser), so we draw a larger
+        // sample pool to reach ≥500 unique without biasing the generator
+        // toward artificial noise.
+        let samples = collect_samples("representation.file.excel_format", 2000);
+        let unique: std::collections::HashSet<_> = samples.iter().cloned().collect();
+        assert!(
+            unique.len() >= 500,
+            "excel_format: expected ≥500 unique, got {}",
+            unique.len()
+        );
+        for s in &samples {
+            assert!(!s.is_empty(), "format must be non-empty");
+            assert!(s.len() <= 100, "format must be ≤100 chars: {:?}", s);
+        }
+    }
+
+    #[test]
+    fn ac02_ssn_unique_and_structured() {
+        let samples = collect_samples("identity.government.ssn", 1200);
+        let unique: std::collections::HashSet<_> = samples.iter().cloned().collect();
+        assert!(
+            unique.len() >= 1000,
+            "ssn: expected ≥1000 unique, got {}",
+            unique.len()
+        );
+        let mut saw_dashed = false;
+        let mut saw_plain = false;
+        for s in &samples {
+            let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+            assert_eq!(digits.len(), 9, "ssn must have 9 digits: {:?}", s);
+            let area: u32 = digits[0..3].parse().unwrap();
+            let group: u32 = digits[3..5].parse().unwrap();
+            let serial: u32 = digits[5..9].parse().unwrap();
+            assert!(area != 0 && area != 666 && area < 900, "invalid area: {}", s);
+            assert!(group != 0, "invalid group: {}", s);
+            assert!(serial != 0, "invalid serial: {}", s);
+            if s.contains('-') {
+                saw_dashed = true;
+                assert_eq!(s.len(), 11, "dashed ssn must be 11 chars: {:?}", s);
+            } else {
+                saw_plain = true;
+                assert_eq!(s.len(), 9, "no-dash ssn must be 9 chars: {:?}", s);
+            }
+        }
+        assert!(saw_dashed, "should see dashed ssns");
+        assert!(saw_plain, "should see no-dash ssns");
     }
 }

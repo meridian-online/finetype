@@ -1229,8 +1229,8 @@ identity.government.ssn:
     serial: "REGEXP_EXTRACT({col}, '(\\d{4})$')"
   validation:
     type: string
-    pattern: "^(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}$"
-    minLength: 11
+    pattern: "^(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}$|^(?!000|666|9\\d{2})\\d{3}(?!00)\\d{2}(?!0000)\\d{4}$"
+    minLength: 9
     maxLength: 11
   tier: [VARCHAR, code]
   release_priority: 3
