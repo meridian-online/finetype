@@ -100,6 +100,94 @@ impl Validation {
         }
         serde_json::Value::Object(schema)
     }
+
+    /// Returns `true` when this validation is "precise" enough to be used
+    /// as evidence for a demotion guard.
+    ///
+    /// A validation is precise when EITHER:
+    /// - `enum_values` is present and non-empty (enum-constrained), OR
+    /// - `pattern` is present, anchored (starts with `^` and ends with `$`),
+    ///   and its body is NOT in the rejected permissive-pattern set.
+    ///
+    /// The rejected set contains patterns that accept ~any short string:
+    /// `.+`, `.*`, `\S+`, `\S*`, `\w+`, `\w*`, `[A-Za-z0-9]+`,
+    /// `[A-Za-z0-9_]+`, `[A-Za-z0-9 ]+`, `[A-Za-z0-9_\-\.]+`,
+    /// `[\w\s]+`, `[\w]+`, `[\s]+`, and any `.{0,N}` / `.{1,N}` form.
+    ///
+    /// See MADR 0059 (`orbit/decisions/0059-demotion-guard-over-promotion.md`)
+    /// and the Precision Principle in `CLAUDE.md`: *"A validation that
+    /// confirms 90% of random input is not a validation."*
+    pub fn is_precise(&self) -> bool {
+        // Branch (a): enum-constrained.
+        if let Some(vals) = &self.enum_values {
+            if !vals.is_empty() {
+                return true;
+            }
+        }
+
+        // Branch (b): anchored regex with a non-permissive body.
+        if let Some(pattern) = &self.pattern {
+            if let Some(body) = anchored_body(pattern) {
+                if !is_rejected_body(body) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+}
+
+/// Extract the body of an anchored regex (text between `^` and `$`),
+/// or `None` if the pattern isn't anchored.
+fn anchored_body(pattern: &str) -> Option<&str> {
+    let stripped = pattern.strip_prefix('^')?.strip_suffix('$')?;
+    Some(stripped)
+}
+
+/// Rejected permissive-pattern bodies (between `^` and `$`).
+///
+/// This set is the authoritative blacklist used by `Validation::is_precise`.
+/// See MADR 0059 for rationale; ac-01b's integration test audits the real
+/// taxonomy against this list and emits `precise_audit.tsv` for review.
+const REJECTED_PERMISSIVE_BODIES: &[&str] = &[
+    ".+",
+    ".*",
+    r"\S+",
+    r"\S*",
+    r"\w+",
+    r"\w*",
+    "[A-Za-z0-9]+",
+    "[A-Za-z0-9_]+",
+    "[A-Za-z0-9 ]+",
+    r"[A-Za-z0-9_\-\.]+",
+    r"[\w\s]+",
+    r"[\w]+",
+    r"[\s]+",
+];
+
+/// Returns `true` if `body` is in the rejected-permissive set, either as a
+/// literal entry in `REJECTED_PERMISSIVE_BODIES` or as a `.{M,N}` /
+/// `.{0,N}` / `.{1,N}` length-only constraint.
+fn is_rejected_body(body: &str) -> bool {
+    if REJECTED_PERMISSIVE_BODIES.contains(&body) {
+        return true;
+    }
+    // Reject `.{M,N}`, `.{N}`, `.{M,}` forms — these constrain length
+    // only, not content.
+    if let Some(rest) = body.strip_prefix(".{") {
+        if let Some(inner) = rest.strip_suffix('}') {
+            // Accept any comma-separated or single-number body containing
+            // only digits and at most one comma.
+            let is_length_only = !inner.is_empty()
+                && inner.chars().all(|c| c.is_ascii_digit() || c == ',')
+                && inner.chars().filter(|c| *c == ',').count() <= 1;
+            if is_length_only {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// A single label definition in the taxonomy.
@@ -1071,6 +1159,194 @@ representation.discrete.categorical:
         assert!(obj.get("pattern").is_some());
         assert_eq!(obj.get("minLength").unwrap(), 20);
         assert_eq!(obj.get("maxLength").unwrap(), 20);
+    }
+
+    // --- ac-01: Validation::is_precise() tests (spec:
+    // orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml) ---
+    //
+    // Prefix convention: dgd (Demotion Guard Disambiguation) per spec
+    // metadata.test_prefix. Numbering ties tests back to ac-01's four
+    // branches + literal rejected-pattern coverage.
+
+    fn validation_with_pattern(pattern: &str) -> Validation {
+        Validation {
+            schema_type: Some("string".into()),
+            pattern: Some(pattern.into()),
+            min_length: None,
+            max_length: None,
+            minimum: None,
+            maximum: None,
+            enum_values: None,
+        }
+    }
+
+    fn validation_with_enum(vals: Vec<&str>) -> Validation {
+        Validation {
+            schema_type: Some("string".into()),
+            pattern: None,
+            min_length: None,
+            max_length: None,
+            minimum: None,
+            maximum: None,
+            enum_values: Some(vals.into_iter().map(String::from).collect()),
+        }
+    }
+
+    #[test]
+    fn dgd_ac01_precise_when_enum_non_empty() {
+        // Real-world case: http_method, country_code, us_state.
+        let v = validation_with_enum(vec!["GET", "POST", "PUT", "DELETE"]);
+        assert!(v.is_precise(), "non-empty enum must be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_precise_when_anchored_char_class() {
+        // Real-world case: country_code regex `^[A-Z]{2}$`.
+        let v = validation_with_pattern(r"^[A-Z]{2}$");
+        assert!(
+            v.is_precise(),
+            "anchored regex with non-permissive body must be precise"
+        );
+    }
+
+    #[test]
+    fn dgd_ac01_precise_iso_8601_pattern() {
+        // Real taxonomy entry — datetime.timestamp.iso_8601.
+        let v = validation_with_pattern(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$");
+        assert!(v.is_precise(), "ISO-8601 anchored pattern must be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_dot_plus() {
+        // The canonical permissive pattern.
+        let v = validation_with_pattern("^.+$");
+        assert!(!v.is_precise(), "^.+$ must NOT be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_nonspace_plus() {
+        let v = validation_with_pattern(r"^\S+$");
+        assert!(!v.is_precise(), "^\\S+$ must NOT be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_word_plus() {
+        let v = validation_with_pattern(r"^\w+$");
+        assert!(!v.is_precise(), "^\\w+$ must NOT be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_alnum_underscore() {
+        let v = validation_with_pattern(r"^[A-Za-z0-9_]+$");
+        assert!(
+            !v.is_precise(),
+            "^[A-Za-z0-9_]+$ must NOT be precise (permissive identifier class)"
+        );
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_alnum_space() {
+        let v = validation_with_pattern(r"^[A-Za-z0-9 ]+$");
+        assert!(!v.is_precise(), "^[A-Za-z0-9 ]+$ must NOT be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_length_only_bound() {
+        // `.{0,N}` and `.{1,N}` admit any characters up to length N —
+        // the constraint is length, not content.
+        let v1 = validation_with_pattern("^.{0,100}$");
+        let v2 = validation_with_pattern("^.{1,50}$");
+        let v3 = validation_with_pattern("^.{5}$");
+        assert!(!v1.is_precise(), "^.{{0,100}}$ must NOT be precise");
+        assert!(!v2.is_precise(), "^.{{1,50}}$ must NOT be precise");
+        assert!(!v3.is_precise(), "^.{{5}}$ must NOT be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_unanchored_pattern() {
+        // Pattern is not anchored — `[A-Z]{2}` without `^...$`
+        // anchors could match a 2-letter substring of any longer
+        // string. Treat as imprecise.
+        let v = validation_with_pattern(r"[A-Z]{2}");
+        assert!(!v.is_precise(), "unanchored patterns must NOT be precise");
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_when_no_pattern_and_no_enum() {
+        let v = Validation {
+            schema_type: Some("string".into()),
+            pattern: None,
+            min_length: Some(1),
+            max_length: Some(100),
+            minimum: None,
+            maximum: None,
+            enum_values: None,
+        };
+        assert!(
+            !v.is_precise(),
+            "length-only validation without pattern/enum is not precise"
+        );
+    }
+
+    #[test]
+    fn dgd_ac01_imprecise_when_enum_empty() {
+        let v = validation_with_enum(vec![]);
+        assert!(!v.is_precise(), "empty enum list must NOT be precise");
+    }
+
+    // --- Real-taxonomy anchor tests (ac-01b requirement) ---
+    //
+    // ac-01b mandates that ≥3 real patterns from the
+    // `precise_audit.tsv` is_precise=false rows appear verbatim in
+    // ac-01's test module. The patterns below are sampled from the
+    // audit — all four are unanchored (no trailing `$`), so the
+    // demotion guard would never fire for them. Re-run ac-01b after
+    // any taxonomy edit to keep these in sync.
+
+    #[test]
+    fn dgd_ac01_real_imprecise_yaml_key() {
+        // From labels/definitions_container.yaml (container.object.yaml).
+        let v = validation_with_pattern(r"^[a-zA-Z_][a-zA-Z0-9_]*:\s*.*");
+        assert!(
+            !v.is_precise(),
+            "unanchored YAML-key pattern must NOT be precise"
+        );
+    }
+
+    #[test]
+    fn dgd_ac01_real_imprecise_user_agent() {
+        // From labels/definitions_technology.yaml (technology.internet.user_agent).
+        let v = validation_with_pattern(
+            r"^(Mozilla/|curl/|python-requests/|Wget/|Go-http-client/|axios/|PostmanRuntime/|kube-probe/|Java/|okhttp/|Apache-HttpClient/|libcurl/|node-fetch/|Dalvik/|CFNetwork/|Lynx/|Links |Scrapy/|Googlebot/|Bingbot/|Slackbot|Twitterbot/|facebookexternalhit/|LinkedInBot/|Prometheus/|Datadog/|Ruby/|Dart/|grpc-|HTTPie/|bot|spider|crawl)",
+        );
+        assert!(
+            !v.is_precise(),
+            "unanchored user_agent prefix pattern must NOT be precise"
+        );
+    }
+
+    #[test]
+    fn dgd_ac01_real_imprecise_wkt() {
+        // From labels/definitions_geography.yaml (geography.format.wkt).
+        let v = validation_with_pattern(
+            r"^(POINT|LINESTRING|POLYGON|MULTI(POINT|LINESTRING|POLYGON)|GEOMETRYCOLLECTION)\s*(Z|M|ZM)?\s*(\(|EMPTY)",
+        );
+        assert!(
+            !v.is_precise(),
+            "unanchored WKT pattern must NOT be precise"
+        );
+    }
+
+    #[test]
+    fn dgd_ac01_real_imprecise_amount_multisym() {
+        // From labels/definitions_finance.yaml (finance.currency.amount_multisym).
+        let v = validation_with_pattern(
+            r"^(R\$|HK\$|NT\$|S\$|A\$|C\$|NZ\$|kr|Kč|zł|Ft|lei|Rp|Rs\.?)\s?-?[0-9]",
+        );
+        assert!(
+            !v.is_precise(),
+            "unanchored multi-symbol amount pattern must NOT be precise"
+        );
     }
 
     /// Verify all taxonomy schemas from the labels/ directory compile

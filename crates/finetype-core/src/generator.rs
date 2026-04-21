@@ -2772,7 +2772,13 @@ impl Generator {
                 //   - Text / literal suffixes (e.g. `0"kg"`, `@`).
                 //
                 // Character set stays within the YAML validation pattern.
-                let decimals_s = |n: usize| if n == 0 { String::new() } else { format!(".{}", "0".repeat(n)) };
+                let decimals_s = |n: usize| {
+                    if n == 0 {
+                        String::new()
+                    } else {
+                        format!(".{}", "0".repeat(n))
+                    }
+                };
                 // Weighted branch selection — favour the high-cardinality
                 // branches (currency/dates/multi-section/thresholds) so the
                 // generator saturates >500 unique values quickly.
@@ -2797,13 +2803,17 @@ impl Generator {
                     // ── Currency formats (symbol or locale-prefixed) ───────
                     1 => {
                         let decimals = self.rng.gen_range(0..3);
-                        let grouped = if self.rng.gen_bool(0.85) { "#,##0" } else { "0" };
+                        let grouped = if self.rng.gen_bool(0.85) {
+                            "#,##0"
+                        } else {
+                            "0"
+                        };
                         if self.rng.gen_bool(0.35) {
                             // Locale-prefixed, e.g. [$-409] for en-US.
                             let locales = [
-                                "[$-409]", "[$-809]", "[$-40C]", "[$-407]", "[$-C09]",
-                                "[$-410]", "[$-804]", "[$-411]", "[$-419]", "[$-C0A]",
-                                "[$-416]", "[$-413]", "[$-40A]", "[$-41D]",
+                                "[$-409]", "[$-809]", "[$-40C]", "[$-407]", "[$-C09]", "[$-410]",
+                                "[$-804]", "[$-411]", "[$-419]", "[$-C0A]", "[$-416]", "[$-413]",
+                                "[$-40A]", "[$-41D]",
                             ];
                             let loc = locales[self.rng.gen_range(0..locales.len())];
                             let sym = ["$", "€", "£", "¥"][self.rng.gen_range(0..4)];
@@ -2827,23 +2837,50 @@ impl Generator {
                     // ── Date formats (ISO, US, EU, mixed) ──────────────────
                     3 => {
                         let fmts = [
-                            "m/d/yyyy", "mm/dd/yyyy", "mm/dd/yy", "m/d/yy",
-                            "d/m/yyyy", "dd/mm/yyyy", "dd/mm/yy",
-                            "yyyy-mm-dd", "yy-mm-dd", "yyyy/mm/dd", "yyyymmdd",
-                            "d-mmm", "d-mmm-yy", "d-mmm-yyyy", "dd-mmm-yyyy",
-                            "mmm-yy", "mmmm-yy", "mmmm d, yyyy", "mmm d, yyyy",
-                            "dddd, mmmm d, yyyy", "ddd, mmm d yyyy",
-                            "mm-dd-yyyy", "m.d.yyyy", "d.m.yyyy",
+                            "m/d/yyyy",
+                            "mm/dd/yyyy",
+                            "mm/dd/yy",
+                            "m/d/yy",
+                            "d/m/yyyy",
+                            "dd/mm/yyyy",
+                            "dd/mm/yy",
+                            "yyyy-mm-dd",
+                            "yy-mm-dd",
+                            "yyyy/mm/dd",
+                            "yyyymmdd",
+                            "d-mmm",
+                            "d-mmm-yy",
+                            "d-mmm-yyyy",
+                            "dd-mmm-yyyy",
+                            "mmm-yy",
+                            "mmmm-yy",
+                            "mmmm d, yyyy",
+                            "mmm d, yyyy",
+                            "dddd, mmmm d, yyyy",
+                            "ddd, mmm d yyyy",
+                            "mm-dd-yyyy",
+                            "m.d.yyyy",
+                            "d.m.yyyy",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
                     // ── Time formats ───────────────────────────────────────
                     4 => {
                         let fmts = [
-                            "h:mm AM/PM", "h:mm:ss AM/PM", "hh:mm AM/PM",
-                            "h:mm", "h:mm:ss", "hh:mm", "hh:mm:ss",
-                            "mm:ss", "mm:ss.0", "h:mm:ss.00",
-                            "[h]:mm", "[h]:mm:ss", "[mm]:ss", "[ss]",
+                            "h:mm AM/PM",
+                            "h:mm:ss AM/PM",
+                            "hh:mm AM/PM",
+                            "h:mm",
+                            "h:mm:ss",
+                            "hh:mm",
+                            "hh:mm:ss",
+                            "mm:ss",
+                            "mm:ss.0",
+                            "h:mm:ss.00",
+                            "[h]:mm",
+                            "[h]:mm:ss",
+                            "[mm]:ss",
+                            "[ss]",
                             "h:mm:ss.000",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
@@ -2862,14 +2899,26 @@ impl Generator {
                         let exp_digits = self.rng.gen_range(1..=3);
                         let e_char = if self.rng.gen_bool(0.5) { "E" } else { "e" };
                         let sign = if self.rng.gen_bool(0.7) { "+" } else { "-" };
-                        format!("0.{}{}{}{}", "0".repeat(decimals), e_char, sign, "0".repeat(exp_digits))
+                        format!(
+                            "0.{}{}{}{}",
+                            "0".repeat(decimals),
+                            e_char,
+                            sign,
+                            "0".repeat(exp_digits)
+                        )
                     }
                     // ── Fractions ──────────────────────────────────────────
                     7 => {
                         let fmts = [
-                            "# ?/?", "# ??/??", "# ???/???",
-                            "# ?/2", "# ?/4", "# ?/8", "# ?/16",
-                            "# ?/10", "# ?/100",
+                            "# ?/?",
+                            "# ??/??",
+                            "# ???/???",
+                            "# ?/2",
+                            "# ?/4",
+                            "# ?/8",
+                            "# ?/16",
+                            "# ?/10",
+                            "# ?/100",
                         ];
                         fmts[self.rng.gen_range(0..fmts.len())].to_string()
                     }
@@ -2879,7 +2928,12 @@ impl Generator {
                         let grouped = if self.rng.gen_bool(0.7) { "#,##0" } else { "0" };
                         let body = format!("{}{}", grouped, decimals_s(decimals));
                         let colours = [
-                            "[Red]", "[Green]", "[Blue]", "[Magenta]", "[Cyan]", "[Yellow]",
+                            "[Red]",
+                            "[Green]",
+                            "[Blue]",
+                            "[Magenta]",
+                            "[Cyan]",
+                            "[Yellow]",
                         ];
                         let colour = colours[self.rng.gen_range(0..colours.len())];
                         let variant = self.rng.gen_range(0..8);
@@ -2914,9 +2968,8 @@ impl Generator {
                     // ── Literal-text suffix / prefix units ─────────────────
                     10 => {
                         let units = [
-                            "kg", "g", "mg", "m", "cm", "mm", "km", "lb", "oz",
-                            "bp", "pts", "units", "pcs", "ea", "hrs", "min",
-                            "sec", "days", "items", "%",
+                            "kg", "g", "mg", "m", "cm", "mm", "km", "lb", "oz", "bp", "pts",
+                            "units", "pcs", "ea", "hrs", "min", "sec", "days", "items", "%",
                         ];
                         let unit = units[self.rng.gen_range(0..units.len())];
                         let decimals = self.rng.gen_range(0..4);
@@ -6722,7 +6775,11 @@ test.test.test:
             let area: u32 = digits[0..3].parse().unwrap();
             let group: u32 = digits[3..5].parse().unwrap();
             let serial: u32 = digits[5..9].parse().unwrap();
-            assert!(area != 0 && area != 666 && area < 900, "invalid area: {}", s);
+            assert!(
+                area != 0 && area != 666 && area < 900,
+                "invalid area: {}",
+                s
+            );
             assert!(group != 0, "invalid group: {}", s);
             assert!(serial != 0, "invalid serial: {}", s);
             if s.contains('-') {
