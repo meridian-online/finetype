@@ -1,0 +1,20 @@
+card: orbit/cards/0002-semantic-type-detection.yaml
+autonomy: full
+autonomy_history:
+  - {stage: design, mode: guided, completed: 2026-04-21T00:00:00Z}
+  - {stage: spec, mode: guided, completed: 2026-04-21T00:00:00Z}
+  - {stage: review-spec, mode: full, started: 2026-04-21T00:00:00Z}
+budget: 3
+iteration: 1
+current_spec: orbit/specs/2026-04-21-v18-retrain/
+status: review-spec
+history: []
+started: 2026-04-21T00:00:00Z
+review_cycles:
+  review_spec: 0
+  review_pr: 0
+review_cycle_dates:
+  review_spec: "2026-04-21"
+  review_pr: null
+notes:
+  - "v18 retrain drive. Unblocked by m-19 Phase A+B (PR #42). v16 diagnostic baseline on expanded 352-col eval: 297/352 (84.4% label, 91.8% domain). Pre-drive design inputs identified: (1) sweep data-rebuild waste — v17's sweep_v17.sh seeds the prep script (line 170) producing different data per seed, conflating data variance with training variance and costing ~60 min + 1.9 GB per sweep. Fix for v18: prep once with fixed DATA_SEED, vary training seeds only. (2) v17 data-corpus inheritance question — v4 loaders (17,812 UAs, 2,109 LOINCs) + generator improvements on branch distilled-data-relabel-7-types-v17 produced net-zero eval delta; reuse or skip? (3) Triage of ~55 v16 failures on expanded eval to decide per-type lever: data / Sharpen rule / architecture."

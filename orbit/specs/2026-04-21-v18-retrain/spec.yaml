@@ -1,0 +1,215 @@
+goal: >
+  Train and promote a sherlock-v18 model that improves v16's accuracy on
+  the expanded 352-column eval corpus (v16 baseline: 297/352 = 84.4%
+  label / 91.8% domain), without regressing v16's domain accuracy or
+  triggering concentrated per-domain regressions. Fix the sweep
+  data-prep waste inherited from v16/v17 by pinning a single data seed
+  and reusing one `.ftmb` across all training seeds.
+
+constraints:
+  - "Fixed data seed — prep runs ONCE with `DATA_SEED=42`. All training seeds reuse the same `.ftmb`. One prep artefact per sweep, not per seed."
+  - "Triage is a hard gate — no training run may start before `triage.md` enumerates every v16 misclassification on the expanded 352-col eval with a per-type lever assignment (data / Sharpen rule / architecture)."
+  - "Promotion gate (pinned v16 baseline via git SHA of eval inputs): `v18_score ≥ 297/352` on expanded eval AND per-domain regression ≤ 3 columns in any single domain. Gate must be checked before any `models/default` flip."
+  - "Leakage firewall must be active on every training run — row-hash filter in `scripts/prepare_multibranch_data.py` is on by default, `eval/datasets/sources.yaml` role manifest present, realism pre-screen passing. Log line asserting hash-filter active is required in prep output."
+  - "Scope: retrain + Sharpen adjustments only. Sharpen rules must be value-based per decision 0048 — no header-dependent rules. Taxonomy edits permitted ONLY if triage surfaces a genuine coverage gap (an expanded-eval type missing from the 240-type taxonomy). No CLI changes, no architecture changes, no Sharpen rule restructuring beyond additions."
+  - "3-seed training-only sweep — seeds {42, 43, 44}, 100 epochs each, patience 15, one shared `.ftmb`. Training gate from decision 0053 unchanged (floor 88% val_acc, auto-accept 91.2%)."
+  - "Sibling-context attention preserved — `classify_columns_with_context` remains the default profile path. v18 training data must exercise the sibling-context branch (verify during prep)."
+  - "No release promotion before gate cleared. `models/default` symlink unchanged until winner selected, gate passed, and release scope decided (decision-record outcome)."
+  - "Corpus base (v3 / v4 / v4+additions) is a triage-informed decision — must be recorded in a MADR before prep runs. Corpus choice must cite triage evidence."
+  - "Row-hash firewall verification required if v4 corpus adopted — log v4-vs-expanded-eval overlap count before training. Any non-zero overlap must be filtered by the firewall; assert zero leaked rows post-filter."
+  - "No auto-promotion. Winner selection (ac-08) and promotion decision (ac-11) are separate steps with manual checkpoints."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: gate
+    description: >
+      Triage discovery complete. `orbit/specs/2026-04-21-v18-retrain/triage.md`
+      exists and enumerates every v16 misclassification on the expanded
+      352-col eval (~55 columns). Each row tagged with `dataset,
+      column_name, gt_label, v16_label, error_category, proposed_lever`
+      where `error_category ∈ {short-string-collapse, sibling-context-pull,
+      label-confusion, taxonomy-gap, data-gap, validator-ambiguity,
+      other}` and `proposed_lever ∈ {add-data, fix-label-remap,
+      add-sharpen-rule, retrain-only, taxonomy-add, investigate-further}`.
+      Per-domain summary table included (domain: failure count, top error
+      categories).
+    verification: >
+      `triage.md` exists at the spec path. File contains a markdown table
+      with the required columns. Row count ≥ 45 (allowing triage to merge
+      related failures). A per-domain summary appears before the detail
+      table. At least one row has a non-`investigate-further` lever.
+
+  - id: ac-02
+    ac_type: code
+    description: >
+      Data-seed discipline implemented in prep. `scripts/sweep_v18.sh`
+      (new file, copy+modify of `sweep_v17.sh`) invokes
+      `prepare_multibranch_data.py` once with a pinned `--seed 42` and
+      writes output to `output/multibranch-training/v18.ftmb`. The
+      training loop then invokes `cargo run -- train-multi-branch` three
+      times with `--seed {42,43,44}` pointing at the same `.ftmb`. The
+      FTMB is NOT cleaned up between training runs (only after all 3
+      complete).
+    verification: >
+      `scripts/sweep_v18.sh` exists, is executable, and contains exactly
+      one `prepare_multibranch_data.py` invocation inside the seed loop
+      guard. `grep -c "prepare_multibranch_data.py" scripts/sweep_v18.sh`
+      returns 1 (not 3). Smoke test: dry-run with `SEEDS=(42)` completes
+      prep once and training once.
+
+  - id: ac-03
+    ac_type: doc
+    description: >
+      Corpus base decision committed as MADR. A new decision file at
+      `orbit/decisions/NNNN-v18-corpus-base.md` (next available number)
+      records the corpus choice (v3, v4, or v4+additions) with explicit
+      citations to triage.md evidence. Status `accepted` before prep runs.
+    verification: >
+      MADR file exists with status `accepted`. "Decision Outcome"
+      section names one of {v3, v4, v4 + additions} and cites at least
+      three specific triage.md rows (by dataset::column) as evidence.
+
+  - id: ac-04
+    ac_type: code
+    description: >
+      Row-hash firewall verified against chosen corpus base. Before
+      training, `scripts/sweep_v18.sh` logs (a) the corpus base source
+      paths, (b) the pre-filter row count, (c) the row-hash overlap with
+      `eval/row_hashes.tsv`, (d) the post-filter row count. Overlap > 0
+      is permitted only if the post-filter log asserts
+      `leaked_rows_after_filter: 0`.
+    verification: >
+      Sweep log (written to `results/sweep-v18.log`) contains the four
+      log lines in order. `grep -E "corpus_base|pre_filter_rows|
+      row_hash_overlap|leaked_rows_after_filter" results/sweep-v18.log |
+      wc -l` returns ≥ 4.
+
+  - id: ac-05
+    ac_type: code
+    description: >
+      3-seed sweep executes cleanly. All 3 training runs reuse
+      `output/multibranch-training/v18.ftmb`. Per-seed artefacts at
+      `models/sherlock-v18-seed-{42,43,44}/` with `results.json`,
+      `epochs.jsonl`, `config.json` (including injected
+      `type_index_keys`), `model.safetensors`, `eval/report.md`.
+      Summary CSV at `results/sweep-v18-summary.csv` with 3 data rows
+      + header.
+    verification: >
+      All three model directories exist with all six required files.
+      Summary CSV has 4 lines (header + 3 seeds). All three seeds'
+      `results.json` have ≥ 1 epoch with `val_accuracy` populated.
+
+  - id: ac-06
+    ac_type: gate
+    description: >
+      Training gate (decision 0053) passes for at least one seed. At
+      least one of the three seeds achieves `val_accuracy ≥ 0.88`
+      (floor). All three below floor is a halt condition documented in
+      progress.md with data/label-remap/config investigation path.
+    verification: >
+      At least one row in `results/sweep-v18-summary.csv` has
+      `gate_status ∈ {AUTO_ACCEPT, FLAG_MANUAL}`. If all three are
+      `REJECT`, `progress.md` contains a "Halt investigation" section
+      with at least three investigation hypotheses before continuing.
+
+  - id: ac-07
+    ac_type: gate
+    description: >
+      Promotion gate cleared. Winner seed's expanded-eval score
+      `≥ 297/352` AND per-domain regression count `≤ 3` in every domain.
+      Winner selection: highest profile-eval score > highest val_acc
+      > lowest seed number. Per-column v16→v18 diff emitted at
+      `orbit/specs/2026-04-21-v18-retrain/v16-v18-diff.md` with
+      three sections: fixes, regressions, persistent-failures.
+    verification: >
+      `v16-v18-diff.md` exists. Winner's eval score from
+      `models/sherlock-v18-seed-XX/eval/report.md` (or equivalent)
+      `≥ 297`. Python scriptable domain-regression check: for each of
+      7 domains, count columns correct-in-v16-wrong-in-v18; every
+      count ≤ 3.
+
+  - id: ac-08
+    ac_type: doc
+    description: >
+      Data-seed-discipline MADR committed. New decision file at
+      `orbit/decisions/NNNN-sweep-data-seed-discipline.md` captures the
+      rule "prep runs once per sweep with fixed data seed; training
+      seeds vary training randomness only." References v17 sweep
+      measurements (~60 min + 1.9 GB waste) and cites v18 as the first
+      adopter.
+    verification: >
+      MADR file exists with status `accepted`. "Context and Problem
+      Statement" section quantifies v17 waste. "Consequences" section
+      notes implications for future sweep scripts.
+
+  - id: ac-09
+    ac_type: doc
+    description: >
+      v18 outcome MADR committed. New decision file at
+      `orbit/decisions/NNNN-v18-outcome.md`. Status `accepted`.
+      If promoted: records corpus base, winner seed, eval delta,
+      release PR reference. If held: records hold reason (e.g.,
+      per-domain regression or net-zero outcome) and specifies v4
+      artefact disposition.
+    verification: >
+      MADR file exists with status `accepted`. Outcome section
+      explicitly states "promoted" or "held" and includes a
+      per-column fixes/regressions breakdown.
+
+  - id: ac-10
+    ac_type: gate
+    description: >
+      Release scope decided. If v18 promoted: (a) HuggingFace upload
+      complete, (b) `FINETYPE_CI_MODEL` bumped, (c) `models/default`
+      flipped, (d) PR #NN references release tag decision. If v18
+      held: MADR records hold + v18 artefacts disposition. Decision
+      recorded in `orbit/specs/2026-04-21-v18-retrain/handover.md`.
+    verification: >
+      `handover.md` exists and names the release decision (one of:
+      `v0.6.18 shipped`, `internal promotion only`, `held`). If
+      shipped, references PR URL and release tag. If held, references
+      v18 outcome MADR hold rationale.
+
+ontology_schema:
+  name: "V18RetrainWorkflow"
+  description: "The v18 retrain workflow from triage through promotion/hold."
+  fields:
+    - name: "triage_row"
+      type: "object"
+      description: "A single v16 failure on the expanded eval, tagged with lever."
+    - name: "corpus_base"
+      type: "enum[v3, v4, v4-plus-additions]"
+      description: "Training data source chosen based on triage evidence."
+    - name: "training_seed"
+      type: "integer"
+      description: "Seed for weight init + batch order (varies per run)."
+    - name: "data_seed"
+      type: "integer"
+      description: "Seed for prep randomness (fixed at 42 per sweep)."
+    - name: "sweep_outcome"
+      type: "enum[promoted, held, halted]"
+      description: "Terminal outcome across all 3 training seeds."
+
+evaluation_principles:
+  - principle: "Data-seed discipline is load-bearing — it's the primary efficiency and signal-clarity improvement v18 introduces. Any deviation requires a new MADR."
+    weight: 0.2
+  - principle: "Triage-before-sweep catches priorities before they become sunk cost — half a day of triage avoids 9h of blind sweep chasing the wrong failures."
+    weight: 0.2
+  - principle: "Per-domain floor in promotion gate prevents net-zero regressions-masking-fixes (the v17 failure mode)."
+    weight: 0.25
+  - principle: "Leakage firewall is non-negotiable — every training run verifies it's active. A promoted model trained on leaked data is worse than no promotion."
+    weight: 0.2
+  - principle: "Release-decision after gate is cleared — no premature release commitment. Ship what's earned, not what's planned."
+    weight: 0.15
+
+exit_conditions:
+  - "v18 promoted: MADR recorded, models/default flipped, release decision recorded."
+  - "v18 held: MADR records hold rationale + v4 artefact disposition + next-step analysis."
+  - "Sweep halted pre-eval: all 3 seeds below val_acc floor; halt investigation section appended to progress.md before any retry."
+
+metadata:
+  version: "1.0"
+  test_prefix: "v18r"
+  timestamp: "2026-04-21T00:00:00Z"
+  ambiguity_score: 0.115
+  interview_ref: "orbit/specs/2026-04-21-v18-retrain/interview.md"
