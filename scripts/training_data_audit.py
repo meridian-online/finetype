@@ -282,7 +282,7 @@ def main():
         "--output",
         type=str,
         default=str(
-            ROOT / "specs" / "2026-04-18-v16-data-audit-retrain" / "training-audit.md"
+            ROOT / "orbit" / "specs" / "2026-04-18-v16-data-audit-retrain" / "training-audit.md"
         ),
         help="Output report path",
     )
