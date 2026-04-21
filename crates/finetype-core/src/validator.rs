@@ -622,15 +622,9 @@ mod tests {
     /// and spec orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml.
     fn http_method_schema() -> Validation {
         const VARIANTS: [&str; 27] = [
-            "GET", "Get", "get",
-            "POST", "Post", "post",
-            "PUT", "Put", "put",
-            "DELETE", "Delete", "delete",
-            "PATCH", "Patch", "patch",
-            "HEAD", "Head", "head",
-            "OPTIONS", "Options", "options",
-            "TRACE", "Trace", "trace",
-            "CONNECT", "Connect", "connect",
+            "GET", "Get", "get", "POST", "Post", "post", "PUT", "Put", "put", "DELETE", "Delete",
+            "delete", "PATCH", "Patch", "patch", "HEAD", "Head", "head", "OPTIONS", "Options",
+            "options", "TRACE", "Trace", "trace", "CONNECT", "Connect", "connect",
         ];
         Validation {
             schema_type: Some("string".to_string()),
@@ -960,15 +954,9 @@ datetime.timestamp.iso_8601:
 
         // 27 positive cases — every variant in the enum should be valid.
         let positives = [
-            "GET", "Get", "get",
-            "POST", "Post", "post",
-            "PUT", "Put", "put",
-            "DELETE", "Delete", "delete",
-            "PATCH", "Patch", "patch",
-            "HEAD", "Head", "head",
-            "OPTIONS", "Options", "options",
-            "TRACE", "Trace", "trace",
-            "CONNECT", "Connect", "connect",
+            "GET", "Get", "get", "POST", "Post", "post", "PUT", "Put", "put", "DELETE", "Delete",
+            "delete", "PATCH", "Patch", "patch", "HEAD", "Head", "head", "OPTIONS", "Options",
+            "options", "TRACE", "Trace", "trace", "CONNECT", "Connect", "connect",
         ];
         for variant in positives {
             assert!(
@@ -978,7 +966,14 @@ datetime.timestamp.iso_8601:
         }
 
         // Negatives — non-method strings (the v16 training-audit bad-distilled rows).
-        for bad in ["GOAT", "SAN JOAQUIN", "PATROL", "OPERATING", "IN PROGRESS", "ENROUTE"] {
+        for bad in [
+            "GOAT",
+            "SAN JOAQUIN",
+            "PATROL",
+            "OPERATING",
+            "IN PROGRESS",
+            "ENROUTE",
+        ] {
             assert!(
                 !compiled.is_valid(bad),
                 "expected `{bad}` to reject as http_method"
