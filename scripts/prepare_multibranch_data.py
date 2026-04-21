@@ -2446,6 +2446,8 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
         total_records += len(records)
 
     # ─── Write binary file ──────────────────────────────────
+    _n_sibling_headers = sum(len(g["sibling_headers"]) for g in v3_groups)
+    print(f"n_sibling_headers: {_n_sibling_headers}")
     print(f"\nWriting {total_records} records in {len(v3_groups)} groups to {output_path}...")
     if include_validation:
         write_ftmb_v4(output_path, v3_groups)
@@ -2870,8 +2872,34 @@ def main():
     # Active by default; --no-dedup is the escape hatch. See MADR 0056
     # (orbit/decisions/0056-train-eval-leakage-prevention.md) for the
     # rationale + known blind spots.
+    # ─── ac-04 instrumentation markers (v18 spec) ──────────────
+    # Emit `corpus_base:` unconditionally (always) so downstream verification
+    # can assert the prep ran against the expected corpus base.
+    print(f"\ncorpus_base: {distilled_path}")
+    # Compute and emit eval hash table SHA256 unconditionally (even if the
+    # file is missing, log an explicit absent marker so ac-04 verification
+    # catches silently-disabled firewall runs).
+    try:
+        import hashlib as _hashlib
+        with open(eval_row_hashes_path, "rb") as _hf:
+            _hash_table_sha = _hashlib.sha256(_hf.read()).hexdigest()
+    except OSError:
+        _hash_table_sha = "missing"
+    print(f"eval_hash_table_sha256: {_hash_table_sha}")
+
     if no_dedup:
         print(f"\nEval-leakage filter: DISABLED via --no-dedup (diagnostics only).")
+        # ac-04: firewall active=false path. Record the markers so the
+        # sentinel arithmetic still parses, but mark filter inactive.
+        _pre_filter_rows = sum(
+            sum(len(entry[0]) if len(entry) == 2 else len(entry[-2]) for entry in cols)
+            for cols in list(distilled.values()) + list(synthetic.values())
+        )
+        print(f"pre_filter_rows: {_pre_filter_rows}")
+        print(f"row_hash_overlap: 0")
+        print(f"post_filter_rows: {_pre_filter_rows}")
+        print(f"hash_filter_active: false")
+        print(f"leaked_rows_after_filter: 0")
     else:
         print(f"\nEval-leakage filter: loading row hashes from {eval_row_hashes_path}...")
         eval_hashes = load_eval_row_hashes(eval_row_hashes_path)
@@ -2879,8 +2907,23 @@ def main():
             print(f"  WARNING: no hashes loaded ({eval_row_hashes_path} missing or empty).")
             print(f"           Training corpus is NOT firewalled against eval leakage.")
             print(f"           Run scripts/compute_row_hashes.py to generate.")
+            # ac-04: emit the markers anyway so absence is detectable
+            _pre_filter_rows = sum(
+                sum(len(entry[0]) if len(entry) == 2 else len(entry[-2]) for entry in cols)
+                for cols in list(distilled.values()) + list(synthetic.values())
+            )
+            print(f"pre_filter_rows: {_pre_filter_rows}")
+            print(f"row_hash_overlap: 0")
+            print(f"post_filter_rows: {_pre_filter_rows}")
+            print(f"hash_filter_active: false")
+            print(f"leaked_rows_after_filter: 0")
         else:
             print(f"  {len(eval_hashes)} eval row hashes loaded")
+            # ac-04: compute pre_filter_rows BEFORE applying filter
+            _pre_filter_rows = sum(
+                sum(len(entry[0]) if len(entry) == 2 else len(entry[-2]) for entry in cols)
+                for cols in list(distilled.values()) + list(synthetic.values())
+            )
             distilled, d_leak = filter_eval_leakage(distilled, eval_hashes, min_values)
             synthetic, s_leak = filter_eval_leakage(synthetic, eval_hashes, min_values)
             print(f"  Distilled: removed {d_leak['values_removed']:,} / "
@@ -2892,6 +2935,32 @@ def main():
             # Recompute totals for visibility
             total_d_cols = sum(len(cols) for cols in distilled.values())
             total_s_cols = sum(len(cols) for cols in synthetic.values())
+
+            # ─── ac-04 firewall markers ──────────────────────────
+            # sentinel arithmetic: pre - overlap = post
+            _row_hash_overlap = d_leak["values_removed"] + s_leak["values_removed"]
+            _post_filter_rows = sum(
+                sum(len(entry[0]) if len(entry) == 2 else len(entry[-2]) for entry in cols)
+                for cols in list(distilled.values()) + list(synthetic.values())
+            )
+            print(f"pre_filter_rows: {_pre_filter_rows}")
+            print(f"row_hash_overlap: {_row_hash_overlap}")
+            print(f"post_filter_rows: {_post_filter_rows}")
+            print(f"hash_filter_active: true")
+
+            # Defence-in-depth: re-hash post-filter rows and count any still matching.
+            # Expected 0. Non-zero indicates the filter did not apply to some path.
+            _leaked = 0
+            for cols in list(distilled.values()) + list(synthetic.values()):
+                for entry in cols:
+                    if len(entry) == 2:
+                        values, header = entry
+                    else:
+                        values, header = entry[-2], entry[-1]
+                    for v in values:
+                        if _eval_row_hash(header or "", str(v)) in eval_hashes:
+                            _leaked += 1
+            print(f"leaked_rows_after_filter: {_leaked}")
 
     # ─── Blend (for v2) or assemble tables (for v3) ──────────────
     if output_format == "v2":
