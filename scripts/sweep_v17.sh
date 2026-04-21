@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/sweep_v17.sh — Multi-seed training sweep for v17
 #
-# Spec: specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
+# Spec: orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
 #   — acceptance_criteria ac-09 (sweep + training gate).
 #
 # Differences from sweep_v16.sh:
@@ -316,6 +316,6 @@ echo "  If the winner's val_acc is in [${FLOOR_VAL_ACC}, ${AUTO_ACCEPT_VAL_ACC})
 echo "    require explicit Hugh sign-off on promotion PR (ac-11 manual-review)."
 echo ""
 echo "  Promotion gate: winner_score ≥ max(235, v16_baseline_score)."
-echo "  v16 baseline pinned in specs/2026-04-20-distilled-data-relabel-7-types/v16-baseline.md"
+echo "  v16 baseline pinned in orbit/specs/2026-04-20-distilled-data-relabel-7-types/v16-baseline.md"
 echo ""
 echo "  Do NOT auto-promote. Proceed via ac-12 manual promotion PR."

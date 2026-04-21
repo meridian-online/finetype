@@ -42,7 +42,7 @@
 #   results/overnight-v9-conservative.log                      — Full log
 #   results/eval-pack-sherlock-v6-gelu-conservative.tar.gz     — Eval pack for transfer
 #
-# Spec: specs/2026-04-11-candle-autoresearch-port/spec.yaml
+# Spec: orbit/specs/2026-04-11-candle-autoresearch-port/spec.yaml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -79,7 +79,7 @@ echo " Config: FTMB v3, 50/50 distilled/synthetic, seed 42"
 echo "         $EPOCHS epochs, GELU activation, LayerNorm everywhere"
 echo "         lr=0.0001, weight_decay=0.0001 (conservative — isolating arch)"
 echo " Hypothesis: v8 regression was LR, not architecture"
-echo " Spec: specs/2026-04-11-candle-autoresearch-port/"
+echo " Spec: orbit/specs/2026-04-11-candle-autoresearch-port/"
 echo "================================================================"
 echo ""
 

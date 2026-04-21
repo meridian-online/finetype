@@ -50,7 +50,7 @@
 #   models/sherlock-v14/                                    — Trained model
 #   results/overnight-v14-retraining.log                    — Full log
 #
-# Spec: specs/2026-04-17-v14-retrain/spec.yaml
+# Spec: orbit/specs/2026-04-17-v14-retrain/spec.yaml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -99,7 +99,7 @@ echo "   - AC-05: Country_code post-hint guard (code)"
 echo "   - AC-07: Rule removals (h.contains(\"uri\"), F3) (code)"
 echo ""
 echo " Target: ≥220/227 label accuracy (96.9%+)"
-echo " Spec: specs/2026-04-17-v14-retrain/"
+echo " Spec: orbit/specs/2026-04-17-v14-retrain/"
 echo "================================================================"
 echo ""
 
@@ -598,7 +598,7 @@ echo " Total elapsed: ${ELAPSED_MIN} minutes"
 echo ""
 echo " Model: $MODEL_DIR/"
 echo " Log: $LOG_FILE"
-echo " Spec: specs/2026-04-17-v14-retrain/spec.yaml"
+echo " Spec: orbit/specs/2026-04-17-v14-retrain/spec.yaml"
 echo ""
 echo " NOTE: models/default symlink stays on sherlock-v13 until"
 echo " v14 eval is verified and you run:"

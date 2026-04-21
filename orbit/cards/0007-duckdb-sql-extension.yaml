@@ -1,0 +1,52 @@
+feature: "DuckDB SQL extension"
+as_a: "data analyst working in DuckDB"
+i_want: "to detect, classify, validate, and cast column types directly in SQL queries"
+so_that: "type inference and validation live where my data already is — no context-switching"
+
+scenarios:
+  - name: "Classify a column in-query"
+    given: "a DuckDB table with untyped VARCHAR columns"
+    when: "I run SELECT finetype(col) FROM my_table"
+    then: "the column-level type is returned"
+    source_lines: "README.md: SELECT finetype('192.168.1.1') → 'technology.internet.ip_v4'"
+
+  - name: "Detailed output with confidence"
+    given: "a column I want to inspect"
+    when: "I run SELECT finetype_detail(col)"
+    then: "JSON with type, confidence, broad_type"
+    source_lines: "README.md: finetype_detail(value)"
+
+  - name: "Validate against a schema"
+    given: "loaded data and a JSON Schema"
+    when: "SELECT finetype_validate(col, schema)"
+    then: "returns 'valid' or an error message per row — filterable with WHERE"
+    source_lines: "CLAUDE.md: finetype_validate(value, schema_json) — returns 'valid' or error"
+
+  - name: "Normalise for safe casting"
+    given: "values in varied formats"
+    when: "SELECT finetype_cast(value)"
+    then: "values normalised so TRY_CAST succeeds"
+    source_lines: "README.md: finetype_cast(value)"
+
+  - name: "Recursive JSON classification"
+    given: "a column of JSON objects"
+    when: "SELECT finetype_unpack(json_col)"
+    then: "nested fields recursively classified"
+    source_lines: "README.md: finetype_unpack(json_col)"
+
+  - name: "Runtime model download"
+    given: "fresh DuckDB with extension loaded"
+    when: "first finetype function call"
+    then: "model downloaded from HuggingFace, cached locally; subsequent calls use the cache"
+    source_lines: "README.md: On first use, downloads model weights from HuggingFace and caches them locally"
+
+maturity: "established"
+goal: "6 scalar functions in DuckDB community extensions with runtime model download from HuggingFace"
+
+specs:
+  - "orbit/specs/2026-03-25-multi-branch-pipeline-integration/"
+
+references:
+  - "README.md"
+  - "CLAUDE.md"
+  - "orbit/specs/2026-03-25-multi-branch-pipeline-integration/spec.yaml"
