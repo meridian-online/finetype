@@ -27,7 +27,7 @@
 #   models/sherlock-v6-gelu/                          — Trained model
 #   results/overnight-v8-gelu.log                     — Full log
 #
-# Spec: specs/2026-04-11-candle-autoresearch-port/spec.yaml
+# Spec: orbit/specs/2026-04-11-candle-autoresearch-port/spec.yaml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -63,7 +63,7 @@ echo " Host: $(hostname) — $(uname -m)"
 echo " Config: FTMB v3, 50/50 distilled/synthetic, seed 42"
 echo "         $EPOCHS epochs, GELU activation, LayerNorm everywhere"
 echo "         lr=0.001, weight_decay=0.01 (autoresearch winner)"
-echo " Spec: specs/2026-04-11-candle-autoresearch-port/"
+echo " Spec: orbit/specs/2026-04-11-candle-autoresearch-port/"
 echo "================================================================"
 echo ""
 

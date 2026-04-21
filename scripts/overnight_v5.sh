@@ -2,7 +2,7 @@
 # scripts/overnight_v5.sh — Overnight training pipeline v5
 #
 # Improved data quality + architecture scale-up experiment.
-# Spec: specs/2026-03-25-overnight-training-v5/spec.yaml
+# Spec: orbit/specs/2026-03-25-overnight-training-v5/spec.yaml
 #
 # Pipeline:
 #   0. Preflight: Metal GPU probe + timing probe (adaptive epochs)
@@ -399,7 +399,7 @@ REPORT="$OUTPUT_DIR/comparison.md"
 cat > "$REPORT" <<'HEADER'
 # Overnight Training v5 — Comparison Report
 
-**Spec:** specs/2026-03-25-overnight-training-v5/spec.yaml
+**Spec:** orbit/specs/2026-03-25-overnight-training-v5/spec.yaml
 HEADER
 
 echo "**Date:** $(date)" >> "$REPORT"

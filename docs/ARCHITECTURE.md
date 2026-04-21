@@ -121,8 +121,10 @@ finetype/
 ├── labels/                         # Taxonomy definitions (250 types, 7 domains, YAML)
 ├── models/                         # Pre-trained models (Sense, CharCNN, Model2Vec, Entity)
 ├── eval/                           # Evaluation infrastructure (GitTables, SOTAB, profile)
-├── specs/                          # Spike findings and research
-├── decisions/                      # Architectural decision records (MADR format)
+├── orbit/                          # Workflow artefacts (Card → Design → Spec → Ship)
+│   ├── cards/                      # Feature cards
+│   ├── specs/                      # Spike findings and research
+│   └── decisions/                  # Architectural decision records (MADR format)
 ├── docs/                           # Architecture and development guides
 └── .github/workflows/              # CI/CD: fmt, clippy, test, check; release cross-compile
 ```
@@ -152,4 +154,4 @@ Key fields: `broad_type` (target DuckDB type), `transform` (DuckDB SQL expressio
 
 ## Decision Register
 
-30 architectural decisions in `decisions/` (MADR format). Browse with `ls decisions/`.
+30 architectural decisions in `orbit/decisions/` (MADR format). Browse with `ls orbit/decisions/`.

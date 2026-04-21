@@ -1,0 +1,171 @@
+goal: >
+  Diagnose all 42 baseline misclassifications on the 190-column eval set,
+  categorise each into actionable buckets, fix incorrect ground truth labels,
+  and ship a triage PR that informs follow-up accuracy improvements.
+
+context: >
+  The production Sense→Sharpen pipeline (char-cnn-v14-250) scores 148/190 (78%)
+  label accuracy on the expanded eval set. Previously reported as ~98% on a
+  smaller 174-column set. The 42 misclassifications need diagnosis before we
+  can judge whether multi-branch adds value or pursue further pipeline improvements.
+
+constraints:
+  - "Triage all failures before committing to any fix category"
+  - "Use existing eval results (profile_results.json from 2026-03-23) — re-run only after GT fixes to verify improvement"
+  - "Use DuckDB for failure analysis and clustering"
+  - "Fix GT labels and schema_mapping errors when clearly wrong"
+  - "Ship triage PR first; fix PRs follow per-bucket with separate review"
+  - "Do not modify model weights or retrain — generator YAML fixes are staged for a future training PR"
+  - "Regression test any pipeline changes against full eval set"
+
+acceptance_criteria:
+  - id: BD-1
+    description: "Baseline eval results available with misclassification detail for all columns"
+    verification: "eval/eval_output/profile_results.json exists with misclassifications array (satisfied by existing 2026-03-23 run)"
+
+  - id: BD-2
+    description: "All misclassifications extracted and listed with predicted vs expected labels"
+    verification: "DuckDB query against profile_results.json misclassifications array returns the full failure set"
+
+  - id: BD-3
+    description: "Each failure categorised into one of 7 buckets"
+    verification: "Findings doc has a table with all failures and their assigned bucket"
+
+  - id: BD-4
+    description: "Schema mapping errors and bad GT labels corrected in schema_mapping.csv"
+    verification: "Re-running eval after fixes shows fewer misclassifications"
+
+  - id: BD-5
+    description: "Each bucket has effort vs impact assessment"
+    verification: "Exact accuracy gain for schema_mapping_error and bad_gt buckets; labelled estimate bounds for sense_routing, generator_gap, missing_rule"
+
+  - id: BD-6
+    description: "Findings committed as a triage PR with categorised failure list"
+    verification: "PR opened against main with findings doc and schema_mapping fixes"
+
+  - id: BD-7
+    description: "Recommendation on which fix buckets to pursue in follow-up PRs"
+    verification: "Findings doc ends with prioritised list of next steps"
+
+failure_buckets:
+  - name: schema_mapping_error
+    description: "The finetype_label in schema_mapping.csv is wrong — GT category is correct but mapped to the wrong canonical type (e.g., 'decimal number' → integer_number instead of decimal_number)"
+    action: "Fix the finetype_label in schema_mapping.csv. Likely the dominant bucket (~19/42)."
+
+  - name: bad_gt
+    description: "Ground truth label is wrong or too ambiguous to be meaningful — the data genuinely isn't the claimed type"
+    action: "Change match_quality to 'none' or fix the GT label in schema_mapping.csv"
+
+  - name: eval_harness_bug
+    description: "The eval SQL's multi-row deduplication picks the wrong candidate for a gt_label with multiple valid mappings (e.g., 'name' → full_name is correct but scored against state)"
+    action: "Fix eval_profile.sql or schema_mapping.csv multi-row handling. Verify before triaging as pipeline failure."
+
+  - name: missing_rule
+    description: "Pipeline gets close but picks wrong sibling type — a disambiguation rule would fix it"
+    action: "Add or modify F1–F6 rules in column.rs (follow-up PR)"
+
+  - name: generator_gap
+    description: "Training data doesn't cover the pattern — generator needs expansion"
+    action: "Stage generator YAML fixes in this PR; training deferred to a follow-up PR"
+
+  - name: sense_routing
+    description: "Sense classifier routes to wrong category, masking the correct CharCNN vote"
+    action: "Adjust Sense category boundaries or masking logic (follow-up PR). Requires finetype profile --verbose to confirm."
+
+  - name: genuinely_hard
+    description: "Ambiguous without broader context (e.g., bare 'name' column, decimal vs integer)"
+    action: "Document and accept — or address via header features (Phase 2)"
+
+methodology:
+  - step: 1
+    name: "Extract failures from existing eval"
+    description: >
+      Use existing profile_results.json (2026-03-23 run). Extract misclassifications
+      array via DuckDB. Cluster by failure mode (type confusion pairs).
+      BD-1 and BD-2 are satisfied by the existing data.
+
+  - step: 2
+    name: "Verify multi-row gt_label scoring"
+    description: >
+      Before triaging, check whether multi-row gt_labels (e.g., 'name' with 6 rows)
+      are being scored correctly by the eval SQL. Run eval_profile.sql's eval_joined
+      query to verify which finetype_label is selected for ambiguous gt_labels.
+      Flag any eval_harness_bug cases.
+
+  - step: 3
+    name: "Manual triage"
+    description: >
+      For each failure, inspect actual data (sample values, header name) to determine
+      root cause. For sense_routing and generator_gap assignments, run
+      `finetype profile --verbose` on the specific dataset to see internal pipeline
+      state (Sense category, vote distribution). Assign to one of 7 buckets.
+
+  - step: 4
+    name: "Fix schema_mapping and GT errors"
+    description: >
+      Update schema_mapping.csv for confirmed schema_mapping_error and bad_gt entries.
+      Re-run eval to verify improvement and measure exact accuracy gain.
+
+  - step: 5
+    name: "Document findings"
+    description: >
+      Commit categorised failure list, effort/impact matrix, and
+      recommendations as findings.md in the spec directory.
+      Exact accuracy gain for schema_mapping_error + bad_gt buckets.
+      Labelled estimate bounds for other buckets.
+
+  - step: 6
+    name: "Open triage PR"
+    description: >
+      PR with schema_mapping.csv fixes + findings doc.
+      Follow-up fix PRs reference this triage.
+
+ontology_schema:
+  name: "MisclassificationEntry"
+  description: "A single misclassified column from the eval set"
+  fields:
+    - name: dataset
+      type: string
+      description: "Source dataset name"
+    - name: column
+      type: string
+      description: "Column header"
+    - name: expected_type
+      type: string
+      description: "Ground truth type from schema_mapping"
+    - name: predicted_type
+      type: string
+      description: "Type predicted by baseline pipeline"
+    - name: confidence
+      type: number
+      description: "Prediction confidence (0-1)"
+    - name: bucket
+      type: string
+      description: "Triage category: schema_mapping_error | bad_gt | eval_harness_bug | missing_rule | generator_gap | sense_routing | genuinely_hard"
+    - name: notes
+      type: string
+      description: "Root cause explanation and evidence"
+
+evaluation_principles:
+  - principle: "Completeness — all 42 failures triaged"
+    weight: 0.3
+  - principle: "Accuracy — correct bucket assignment with evidence"
+    weight: 0.3
+  - principle: "Actionability — clear effort/impact for each bucket"
+    weight: 0.2
+  - principle: "Correctness — GT fixes are justified by data inspection"
+    weight: 0.2
+
+exit_conditions:
+  - "All 42 failures have an assigned bucket with supporting evidence"
+  - "Bad GT labels are corrected in schema_mapping.csv"
+  - "Re-running eval shows improvement from GT fixes alone"
+  - "Findings doc with prioritised recommendations is committed"
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-03-23T00:00:00Z"
+  ambiguity_score: 0.09
+  interview_ref: "orbit/specs/2026-03-23-baseline-diagnosis/interview.md"
+  related_pr: "#21 (overnight-v2-training-pipeline)"
+  related_findings: "orbit/specs/2026-03-23-multibranch-eval-diagnosis/findings.md"

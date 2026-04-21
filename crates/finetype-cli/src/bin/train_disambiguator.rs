@@ -19,7 +19,7 @@ const N_FOLDS: usize = 5;
 fn main() -> Result<()> {
     let features_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "specs/2026-03-disambiguator-spike/features.csv".to_string());
+        .unwrap_or_else(|| "orbit/specs/2026-03-disambiguator-spike/features.csv".to_string());
 
     eprintln!("Reading features from: {}", features_path);
     let (samples, label_index, _index_to_label) = load_features(&features_path)?;

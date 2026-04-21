@@ -1,0 +1,241 @@
+goal: >
+  Fix the multi-branch eval harness (hierarchical returns 0/0), diagnose the
+  41-point accuracy gap vs production (97.7% Sense→Sharpen → 56.8% multi-branch
+  on profile eval) via manual trace of misclassifications, refactor eval output
+  to per-run JSON queryable by DuckDB, and document findings with a clear plan
+  for closing the accuracy gap. Ship all fixes on PR #21 before merge.
+
+constraints:
+  - "Multi-branch slots INTO the Sense→Sharpen pipeline — does not replace it"
+  - "Parallel path via --model-type multi-branch flag — do not modify production CharCNN path"
+  - "Eval output is per-run JSON files queryable by DuckDB — no grep/sed on markdown"
+  - "No persistent eval database — JSON files queried ad-hoc"
+  - "macOS compatible — no BSD grep -oP or other GNU-only assumptions"
+  - "Manual trace before full pipeline integration — measure before optimise"
+  - "All changes land on feat/overnight-v2-training-pipeline branch (PR #21)"
+  - "DuckDB CLI must be available — preflight check in overnight script"
+
+milestones:
+  - id: D-1
+    name: "Implement hierarchical multi-branch inference"
+    description: >
+      The hierarchical multi-branch model trained to 93.9% val accuracy but
+      eval returned 0/0. The root cause is known: MultiBranchClassifier::load()
+      at crates/finetype-model/src/multi_branch.rs:128 has a hard guard:
+      `if config.head_type != HeadType::Flat { return Err(...) }`.
+
+      Hierarchical inference is unimplemented. The fix requires:
+
+      (1) Remove the HeadType::Flat guard in load()
+      (2) Load hierarchy_map from label_map.json (or derive from labels at
+          runtime — the training crate builds the hierarchy from domain.category.type
+          label structure)
+      (3) Implement hierarchical forward pass: tree softmax with 3 levels
+          (7 domains → 43 categories → 250 types). The training crate
+          (finetype-train/src/multi_branch.rs) has the reference implementation.
+      (4) Map hierarchical predictions back to flat label indices for output
+
+      Eval output must land in model-specific directories
+      (models/<model-name>/eval/) to prevent flat and hier results from
+      overwriting each other.
+    gate: >
+      eval.sh --model models/sherlock-v2-hier produces label and domain
+      accuracy ≥ 10% (sanity floor — proves inference runs, not garbage).
+      Results are preserved in models/sherlock-v2-hier/eval/ and
+      models/sherlock-v2-flat/eval/ independently (no shared staging dir).
+    files:
+      - crates/finetype-model/src/multi_branch.rs (hierarchical inference)
+      - crates/finetype-cli/src/main.rs (multi-branch profile path)
+      - scripts/eval.sh (model-specific output dirs)
+
+  - id: D-2
+    name: "Counterfactual trace of 10 worst misclassifications"
+    description: >
+      Take the 10 highest-confidence misclassifications from the flat model
+      eval (sherlock-v2-flat/eval/report.md) and perform a COUNTERFACTUAL
+      trace: if these predictions were processed through the existing
+      Sense→Sharpen post-processing pipeline, which layers would catch
+      the error?
+
+      Note: the multi-branch model bypasses Sense classification entirely —
+      it's a direct column→type classifier. This trace asks "what WOULD
+      happen if we applied post-processing on top of multi-branch output",
+      which is exactly the question we need answered to decide on pipeline
+      integration.
+
+      For each misclassification, document:
+      (1) What the multi-branch model predicted vs expected
+      (2) What Sense category the column would be assigned (based on its data)
+      (3) Whether the Sense mask would have filtered the wrong prediction
+      (4) Whether a disambiguation rule (F1-F6) would have corrected it
+      (5) Whether a header hint would have corrected it
+      (6) Whether vote aggregation would have changed the outcome
+
+      Categorise each into: "Sense would fix", "header hint would fix",
+      "disambiguation rule would fix", "needs better training data",
+      "genuinely ambiguous".
+
+      Top 10 from the overnight results (all confidence 1.00):
+        1. airports/name: full_address → state
+        2. datetime_formats/year: compact_ym → year
+        3. codes_and_ids/sha256: git_sha → hash
+        4. people_directory/phone: ssn → phone_e164
+        5. api_users_json/address.country: country_code → country
+        6. weather_stations_json/location.country: country_code → country
+        7. codes_and_ids/swift_code: vin → swift_bic
+        8. network_logs/destination_ip: cidr → ip_v4
+        9. countries/alpha-2: iata_code → country_code
+        10. api_users_json/name: full_name → state
+    gate: >
+      Markdown document with trace table showing each misclassification,
+      which pipeline layer would catch it, and a tally of how many fall
+      into each category. This informs whether post-processing alone
+      closes the gap or training data improvements are needed.
+    files:
+      - orbit/specs/2026-03-23-multibranch-eval-diagnosis/trace-analysis.md (new)
+
+  - id: D-3
+    name: "Eval output → per-run JSON"
+    description: >
+      Refactor the eval pipeline to emit structured JSON alongside (or instead
+      of) markdown. The JSON should be queryable by DuckDB:
+
+      (1) Profile eval emits profile_results.json in model eval dir with structure:
+          { "model": "...", "timestamp": "...", "label_accuracy": N,
+            "label_total": N, "domain_accuracy": N, "domain_total": N,
+            "misclassifications": [...] }
+
+      (2) Actionability eval emits actionability_results.json in model eval dir
+
+      (3) Markdown report is generated FROM the JSON (or alongside it),
+          not the other way around
+
+      (4) Overnight script reads JSON with DuckDB:
+          duckdb -json -c "SELECT label_accuracy, label_total FROM
+          read_json('models/sherlock-v2-flat/eval/profile_results.json')"
+
+      (5) Overnight script has preflight check:
+          command -v duckdb >/dev/null 2>&1 || { echo "duckdb CLI required"; exit 1; }
+
+      This replaces the broken grep -oP approach and works on both
+      Linux and macOS.
+    gate: >
+      eval.sh produces profile_results.json and actionability_results.json
+      in model-specific eval directories. Overnight script reads them with
+      duckdb -json. Summary section displays correct accuracy numbers on macOS.
+      DuckDB CLI preflight check fails gracefully with clear error message.
+    files:
+      - scripts/eval.sh (or eval sub-scripts)
+      - scripts/overnight_sherlock.sh (summary section + preflight)
+      - eval/profile_eval.sh
+      - crates/finetype-eval/src/bin/ (if eval binary changes needed)
+
+  - id: D-4
+    name: "Findings document + accuracy plan"
+    description: >
+      Synthesise the trace analysis (D-2) and eval results (D-1) into a
+      findings document that answers:
+
+      (1) How much of the 41-point gap (vs production 97.7%) is explained
+          by missing post-processing? (Counterfactual trace from D-2)
+      (2) How much is distribution shift? (94% val accuracy is on
+          synthetic+distilled data; 57% profile eval is on real-world CSVs —
+          these are different distributions, not overfitting)
+      (3) How much requires better/different training data?
+      (4) What is the recommended integration plan for multi-branch into
+          the Sense→Sharpen pipeline?
+      (5) What accuracy target is realistic after pipeline integration?
+      (6) What training data changes (if any) are needed?
+
+      The meaningful baseline is the production Sense→Sharpen pipeline at
+      97.7% (170/174), not the multi-branch training val accuracy.
+
+      This document becomes the spec input for the next PR.
+    gate: >
+      Findings document committed with quantified gap attribution
+      (post-processing vs distribution shift vs training data),
+      recommended integration plan, and accuracy target. Reviewed
+      by Hugh before PR #21 merges.
+    files:
+      - orbit/specs/2026-03-23-multibranch-eval-diagnosis/findings.md (new)
+
+acceptance_criteria:
+  - id: AC-1
+    description: >
+      Hierarchical multi-branch model eval produces real accuracy numbers
+      (label ≥ 10%, domain ≥ 10% — sanity floor proving inference runs
+      correctly, not garbage output). Results preserved in model-specific
+      eval directories (models/<model>/eval/), not shared staging.
+    milestone: D-1
+
+  - id: AC-2
+    description: >
+      Counterfactual trace of 10 worst misclassifications completed, each
+      categorised by which pipeline layer would catch it. Tally shows
+      distribution across categories (Sense, header hint, disambiguation,
+      training data, ambiguous).
+    milestone: D-2
+
+  - id: AC-3
+    description: >
+      Eval pipeline emits per-run JSON files (profile_results.json,
+      actionability_results.json) in model-specific eval dirs. Overnight
+      script reads them with duckdb -json and displays correct summary
+      on macOS. DuckDB CLI preflight check present.
+    milestone: D-3
+
+  - id: AC-4
+    description: >
+      Findings document committed with gap attribution (vs production 97.7%
+      baseline), distinguishing post-processing, distribution shift, and
+      training data factors. Integration plan and accuracy target for next PR.
+      Reviewed before merge.
+    milestone: D-4
+
+evaluation_principles:
+  - principle: "Diagnostic rigour — findings are evidence-based, not speculative"
+    weight: 0.35
+  - principle: "Eval reliability — eval harness works for all model types on all platforms"
+    weight: 0.30
+  - principle: "Actionable plan — findings lead to a concrete next step, not just analysis"
+    weight: 0.20
+  - principle: "DuckDB integration — eval output is machine-readable and queryable"
+    weight: 0.15
+
+exit_conditions:
+  - "Both flat and hier multi-branch models produce eval scores"
+  - "Trace analysis quantifies how much of the gap post-processing would close"
+  - "Overnight script summary works on macOS (DuckDB JSON, not grep)"
+  - "Findings document reviewed and committed"
+
+known_risks:
+  - risk: "Manual trace may show post-processing only closes part of the gap"
+    severity: medium
+    mitigation: >
+      This is a valid finding, not a failure. The trace will quantify what
+      percentage falls into each category. If training data / distribution
+      shift is the bigger factor, the findings document recommends data
+      improvements for the next PR.
+  - risk: "Hierarchical inference requires porting tree softmax from training crate"
+    severity: medium
+    mitigation: >
+      The training crate (finetype-train/src/multi_branch.rs) has the reference
+      implementation of hierarchical forward pass. The inference crate needs to
+      mirror this logic: load hierarchy structure, run 3-level softmax, map
+      predictions to flat labels. The flat inference path already works as a
+      template.
+  - risk: "Eval JSON format may not capture all fields the markdown report has"
+    severity: low
+    mitigation: >
+      Start with the headline metrics (label/domain accuracy, misclassifications).
+      The markdown report can still be generated alongside for human reading.
+      JSON is the machine-readable source of truth.
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-03-23T14:00:00Z"
+  ambiguity_score: 0.09
+  interview_ref: "orbit/specs/2026-03-23-multibranch-eval-diagnosis/interview.md"
+  parent_spec: "orbit/specs/2026-03-22-multi-branch-production/spec.yaml"
+  risk_tier: "STANDARD"
+  review_ref: "orbit/specs/2026-03-23-multibranch-eval-diagnosis/review-spec-2026-03-23.md"

@@ -30,7 +30,7 @@ Rationale (v17 spec, sourcing_table user_agent row):
   instead of generator-only synthetic strings.
 
 Spec reference:
-  specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
+  orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
   acceptance_criteria: ac-01
 """
 

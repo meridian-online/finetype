@@ -33,7 +33,7 @@
 #   results/eval-pack-sherlock-v11.tar.gz                   — Eval pack
 #   results/v11-transfer-bundle.tar.gz                      — All results for Beelink transfer
 #
-# Spec: specs/2026-04-12-accuracy-gap-retraining/spec.yaml
+# Spec: orbit/specs/2026-04-12-accuracy-gap-retraining/spec.yaml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -76,7 +76,7 @@ echo " Purpose: Close accuracy gap 193/227 → 205+/227 via better data."
 echo "   Architecture unchanged (ReLU+BN, decision 0046)."
 echo "   Data mix shifted 50/50 → 70/30 distillation-heavy."
 echo ""
-echo " Spec: specs/2026-04-12-accuracy-gap-retraining/"
+echo " Spec: orbit/specs/2026-04-12-accuracy-gap-retraining/"
 echo "================================================================"
 echo ""
 
@@ -640,7 +640,7 @@ for f in "$MODEL_DIR/model.safetensors" "$MODEL_DIR/config.json" "$MODEL_DIR/lab
 done
 
 # Progress file for session continuity
-PROGRESS="specs/2026-04-12-accuracy-gap-retraining/progress.md"
+PROGRESS="orbit/specs/2026-04-12-accuracy-gap-retraining/progress.md"
 [[ -f "$PROGRESS" ]] && BUNDLE_FILES+=("$PROGRESS")
 
 if [[ ${#BUNDLE_FILES[@]} -gt 0 ]]; then

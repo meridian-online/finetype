@@ -157,7 +157,7 @@ roadmap for expanding validation coverage to more types and locales.
 
 ## References
 
-- **Decision record:** `decisions/0002-locale-detection-post-hoc-validation.md`
+- **Decision record:** `orbit/decisions/0002-locale-detection-post-hoc-validation.md`
 - **Old prototype:** `hughcameron/finetype` (Python + Burn Transformer)
 - **Tiered-v3 training log:** NNFT-126 implementation notes
 - **Precision Principle:** NNFT-132, decision-001
