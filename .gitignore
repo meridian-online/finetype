@@ -24,6 +24,7 @@ models/**/config.yaml
 models/**/label_map.json
 models/**/labels.json
 models/**/results.json
+models/**/*.jsonl
 models/**/eval/
 models/*.csv
 models/*.json
@@ -57,6 +58,7 @@ output/spike-results/
 output/distillation-v3/sherlock_batch_*.csv
 output/distillation-v3/sherlock_batch_*.done
 output/distillation-v3/distill_concat.log
+output/distillation-v3/*_distilled.csv.gz
 
 # v17: per-type v4 distilled CSVs are reproducible via loaders/*.py;
 # track the loaders + SOURCES.md, not the CSVs or HTTP cache.
