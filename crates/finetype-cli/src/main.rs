@@ -298,21 +298,36 @@ enum Commands {
         output: OutputFormat,
     },
 
-    /// Validate CSV data against a JSON Schema (quality gate)
+    /// Validate CSV data against a JSON Schema — writes result to a DuckDB .db file
     Validate {
-        /// Input CSV file
+        /// Input CSV or Parquet file
         file: PathBuf,
 
         /// JSON Schema file to validate against
         schema: PathBuf,
 
+        /// Output DuckDB database file (created if absent)
+        #[arg(long)]
+        db: PathBuf,
+
+        /// Table name to create in the output database for valid rows
+        #[arg(long)]
+        table: String,
+
+        /// Append to an existing database. Required when --db already
+        /// contains the named table or a prior finetype_reject_errors
+        /// sidecar.
+        #[arg(long)]
+        append: bool,
+
+        /// Force exit code 0 regardless of reject count (does not
+        /// affect error exit code 2).
+        #[arg(long)]
+        lenient: bool,
+
         /// Output format for summary report (plain, json)
         #[arg(short, long, default_value = "plain")]
         output: OutputFormat,
-
-        /// Print summary only — do not write sidecar files (.valid.csv, .invalid.csv, .errors.jsonl)
-        #[arg(long)]
-        summary_only: bool,
     },
 
     /// Profile a CSV file — detect column types using column-mode inference
@@ -687,9 +702,12 @@ fn main() -> Result<()> {
         Commands::Validate {
             file,
             schema,
+            db,
+            table,
+            append,
+            lenient,
             output,
-            summary_only,
-        } => cmd_validate_table(file, schema, output, summary_only),
+        } => cmd_validate_table(file, schema, db, table, append, lenient, output),
 
         Commands::Profile {
             file,
@@ -3580,29 +3598,288 @@ fn cmd_check(
 ///
 /// Produces sidecar files (.valid.csv, .invalid.csv, .errors.jsonl) by default.
 /// Use --summary-only to suppress file creation.
+// ═══════════════════════════════════════════════════════════════════════════════
+// VALIDATE — DuckDB-native reject pipeline (spec v1.2 ac-06, ac-08, ac-09, ac-10, ac-11)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Exit codes per spec ac-10.
+///
+/// - 0: no rejects, no error
+/// - 1: one or more rejects (default CI-gate)
+/// - 2: error (bad schema, file unreadable, DuckDB error, staging collision
+///      without `--append`). Not suppressed by `--lenient`.
+///
+/// `--lenient` forces 0 whenever the exit would otherwise be 1.
+fn exit_with(code: i32) -> ! {
+    std::process::exit(code);
+}
+
+/// Load + parse a JSON Schema file with structured error messages (ac-08).
+///
+/// Emits one-line `error:` messages to stderr, then exits 2. Fail-fast ordering:
+/// (1) missing-file, (2) permission-denied, (3) invalid-JSON, (4) missing
+/// `properties` object.
+fn load_schema_or_exit(schema_path: &PathBuf) -> serde_json::Value {
+    // (1) + (2): open and read. std::fs::read_to_string produces distinct
+    //     io::ErrorKind values we can discriminate on.
+    let schema_content = match std::fs::read_to_string(schema_path) {
+        Ok(s) => s,
+        Err(e) => {
+            match e.kind() {
+                std::io::ErrorKind::NotFound => {
+                    eprintln!("error: schema file not found: {}", schema_path.display());
+                }
+                std::io::ErrorKind::PermissionDenied => {
+                    eprintln!(
+                        "error: permission denied reading schema file: {}",
+                        schema_path.display()
+                    );
+                }
+                _ => {
+                    eprintln!(
+                        "error: could not read schema file {}: {}",
+                        schema_path.display(),
+                        e
+                    );
+                }
+            }
+            exit_with(2);
+        }
+    };
+
+    // (3): parse JSON. serde_json errors include a byte/line position.
+    let schema: serde_json::Value = match serde_json::from_str(&schema_content) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!(
+                "error: invalid JSON in schema file {}: {} (at line {} col {})",
+                schema_path.display(),
+                e,
+                e.line(),
+                e.column()
+            );
+            exit_with(2);
+        }
+    };
+
+    // (4): structural check — must have an object `properties`.
+    if !schema.is_object()
+        || schema
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .is_none()
+    {
+        eprintln!(
+            "error: schema file {} is missing required `properties` object",
+            schema_path.display()
+        );
+        exit_with(2);
+    }
+
+    schema
+}
+
+/// Per-column extensions carried from schema authoring time (ac-11).
+///
+/// Populated from `x-finetype-label` and `x-finetype-confidence` on each
+/// column-level schema. Missing entries are allowed — the corresponding
+/// reject columns render as NULL (graceful degradation).
+#[derive(Default)]
+struct SchemaExtensions {
+    by_column: std::collections::HashMap<String, (Option<String>, Option<f64>)>,
+}
+
+impl SchemaExtensions {
+    fn extract(schema: &serde_json::Value) -> Self {
+        let mut ext = SchemaExtensions::default();
+        if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
+            for (col_name, col_schema) in props {
+                let label = col_schema
+                    .get("x-finetype-label")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let confidence = col_schema
+                    .get("x-finetype-confidence")
+                    .and_then(|v| v.as_f64());
+                ext.by_column.insert(col_name.clone(), (label, confidence));
+            }
+        }
+        ext
+    }
+
+    fn get(&self, col_name: &str) -> (Option<String>, Option<f64>) {
+        self.by_column
+            .get(col_name)
+            .cloned()
+            .unwrap_or((None, None))
+    }
+}
+
+/// Quote a string for safe embedding as a DuckDB single-quoted literal.
+/// DuckDB doubles single-quotes inside literals.
+fn sql_quote(s: &str) -> String {
+    let escaped = s.replace('\'', "''");
+    format!("'{}'", escaped)
+}
+
+/// Quote an identifier for DuckDB. Identifiers are wrapped in double-quotes;
+/// internal double-quotes are doubled.
+fn sql_ident(s: &str) -> String {
+    let escaped = s.replace('"', "\"\"");
+    format!("\"{}\"", escaped)
+}
+
+/// Render an `Option<String>` as a SQL literal ('value' or NULL).
+fn sql_opt_str(v: &Option<String>) -> String {
+    match v {
+        Some(s) => sql_quote(s),
+        None => "NULL".to_string(),
+    }
+}
+
+/// Render an `Option<f64>` as a SQL literal (numeric or NULL).
+fn sql_opt_f64(v: &Option<f64>) -> String {
+    match v {
+        Some(f) => format!("{}", f),
+        None => "NULL".to_string(),
+    }
+}
+
+/// Run a small query against `db_path` (must exist) using the duckdb CLI
+/// and return the trimmed stdout. Returns None when the database does not
+/// exist or the query fails.
+fn duckdb_query_scalar(db_path: &PathBuf, sql: &str) -> Option<String> {
+    if !db_path.exists() {
+        return None;
+    }
+    let out = std::process::Command::new("duckdb")
+        .arg("-noheader")
+        .arg("-list")
+        .arg(db_path)
+        .arg("-c")
+        .arg(sql)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
+/// Determine the scan_id for this invocation per constraint 7 and ac-09.
+///
+/// Fresh database or no existing sidecar → 1.
+/// Existing sidecar → MAX(scan_id) + 1.
+fn next_scan_id(db_path: &PathBuf) -> i64 {
+    // Query requires the sidecar to exist. Wrap in a try/coerce so an
+    // absent table yields "0" via COALESCE.
+    let sql = "SELECT COALESCE(MAX(scan_id), 0) FROM finetype_reject_errors;";
+    match duckdb_query_scalar(db_path, sql) {
+        Some(s) => s.parse::<i64>().unwrap_or(0) + 1,
+        None => 1,
+    }
+}
+
+/// Check whether `table_name` already exists in `db_path`. Used for the
+/// ac-09 staging-collision gate (error exit 2 when not using --append).
+fn user_table_exists(db_path: &PathBuf, table_name: &str) -> bool {
+    let sql = format!(
+        "SELECT 1 FROM duckdb_tables WHERE table_name = {} LIMIT 1;",
+        sql_quote(table_name)
+    );
+    matches!(duckdb_query_scalar(db_path, &sql).as_deref(), Some("1"))
+}
+
+/// Render the reject sidecar's CREATE TABLE IF NOT EXISTS statement per
+/// ontology (spec `RejectEntry`, 13 columns).
+const REJECT_SIDECAR_DDL: &str = "\
+CREATE TABLE IF NOT EXISTS finetype_reject_errors (
+    scan_id BIGINT,
+    file_id BIGINT,
+    line BIGINT,
+    column_idx INTEGER,
+    column_name VARCHAR,
+    error_type VARCHAR,
+    csv_line VARCHAR,
+    byte_position BIGINT,
+    error_message VARCHAR,
+    type_confidence DOUBLE,
+    expected_type VARCHAR,
+    constraint_failed VARCHAR,
+    constraint_value VARCHAR
+);";
+
 fn cmd_validate_table(
     file: PathBuf,
     schema_path: PathBuf,
+    db: PathBuf,
+    table: String,
+    append: bool,
+    lenient: bool,
     output: OutputFormat,
-    summary_only: bool,
 ) -> Result<()> {
-    use finetype_core::table_validator::{split_rows, validate_table};
+    use finetype_core::table_validator::validate_table;
 
-    // Load JSON Schema
-    eprintln!("Loading schema from {:?}", schema_path);
-    let schema_content = std::fs::read_to_string(&schema_path)?;
-    let schema: serde_json::Value = serde_json::from_str(&schema_content)
-        .map_err(|e| anyhow::anyhow!("Invalid JSON Schema: {}", e))?;
+    // ── (1) Load + parse schema, fail-fast per ac-08 ─────────────────────────
+    eprintln!("Loading schema from {}", schema_path.display());
+    let schema = load_schema_or_exit(&schema_path);
+    let extensions = SchemaExtensions::extract(&schema);
 
-    // Read CSV file
-    eprintln!("Reading {:?}", file);
-    let mut rdr = csv::Reader::from_path(&file)?;
-    let headers: Vec<String> = rdr.headers()?.iter().map(|h| h.to_string()).collect();
+    // ── Input file existence check (exit 2 if missing) ───────────────────────
+    if !file.exists() {
+        eprintln!("error: input file not found: {}", file.display());
+        exit_with(2);
+    }
+
+    // ── Pre-flight: staging-collision gate (ac-09) ───────────────────────────
+    //    If the user's target table exists and --append was not supplied,
+    //    refuse with exit 2. `--append` implies explicit acceptance of an
+    //    existing .db.
+    if !append && user_table_exists(&db, &table) {
+        eprintln!(
+            "error: table '{}' already exists in {} — pass --append to reuse",
+            table,
+            db.display()
+        );
+        exit_with(2);
+    }
+
+    // ── Read input into memory (CSV path; Parquet deferred for this AC) ──────
+    //    The current implementation reads CSV directly in Rust so the
+    //    validation engine sees the same normalised Option<String> cells it
+    //    already expects. Parquet input flows through DuckDB's read_parquet
+    //    in a future iteration (tracked as ac-09 follow-up).
+    eprintln!("Reading {}", file.display());
+    let mut rdr = match csv::Reader::from_path(&file) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("error: could not read input file {}: {}", file.display(), e);
+            exit_with(2);
+        }
+    };
+    let headers: Vec<String> = match rdr.headers() {
+        Ok(h) => h.iter().map(|s| s.to_string()).collect(),
+        Err(e) => {
+            eprintln!("error: could not read CSV headers: {}", e);
+            exit_with(2);
+        }
+    };
     let n_cols = headers.len();
 
     let mut rows: Vec<Vec<Option<String>>> = Vec::new();
     for result in rdr.records() {
-        let record = result?;
+        let record = match result {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("error: CSV parse error: {}", e);
+                exit_with(2);
+            }
+        };
         let row: Vec<Option<String>> = (0..n_cols)
             .map(|i| {
                 let val = record.get(i).unwrap_or("").trim();
@@ -3615,137 +3892,187 @@ fn cmd_validate_table(
             .collect();
         rows.push(row);
     }
-
     eprintln!("Read {} rows, {} columns", rows.len(), n_cols);
 
-    // Validate
-    let result = validate_table(&headers, &rows, &schema)?;
-
-    // Split rows into valid/invalid
-    let (valid_rows, invalid_rows) = split_rows(&headers, &rows, &result);
-    let has_errors = result.invalid_rows > 0;
-
-    // Write sidecar files unless --summary-only
-    if !summary_only {
-        // Write .valid.csv
-        let valid_path = {
-            let mut name = file.file_name().unwrap().to_os_string();
-            name.push(".valid.csv");
-            file.with_file_name(name)
-        };
-        {
-            let mut wtr = csv::Writer::from_path(&valid_path)?;
-            wtr.write_record(&headers)?;
-            for row in &valid_rows {
-                wtr.write_record(row)?;
-            }
-            wtr.flush()?;
+    // ── (5) Validate via finetype_core::table_validator ──────────────────────
+    let result = match validate_table(&headers, &rows, &schema) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("error: validation engine failed: {}", e);
+            exit_with(2);
         }
+    };
 
-        // Write .invalid.csv
-        let invalid_path = {
-            let mut name = file.file_name().unwrap().to_os_string();
-            name.push(".invalid.csv");
-            file.with_file_name(name)
-        };
-        {
-            let mut wtr = csv::Writer::from_path(&invalid_path)?;
-            wtr.write_record(&headers)?;
-            for row in &invalid_rows {
-                wtr.write_record(row)?;
-            }
-            wtr.flush()?;
-        }
+    // Compute scan_id now (before generating SQL).
+    let scan_id: i64 = if append { next_scan_id(&db) } else { 1 };
 
-        // Write .errors.jsonl
-        let errors_path = {
-            let mut name = file.file_name().unwrap().to_os_string();
-            name.push(".errors.jsonl");
-            file.with_file_name(name)
-        };
-        {
-            let mut f = std::fs::File::create(&errors_path)?;
-            for row_err in &result.row_errors {
-                let json_line = serde_json::to_string(row_err)?;
-                writeln!(f, "{}", json_line)?;
-            }
-        }
+    // ── Generate SQL script (steps 3–10 of ac-09) ────────────────────────────
+    //    TEMPORARY staging table is auto-dropped when the DuckDB session
+    //    ends, providing RAII-equivalent cleanup on success AND failure
+    //    paths (ac-09 step 10 + the constraint's staging-cleanup rule).
+    let uuid = uuid::Uuid::new_v4().simple().to_string();
+    let staging_ident = format!("__finetype_staging_{}", uuid);
+    let user_table_ident = sql_ident(&table);
+    let input_literal = sql_quote(&file.to_string_lossy());
 
-        eprintln!(
-            "Wrote {} → .valid.csv ({} rows), .invalid.csv ({} rows), .errors.jsonl ({} errors)",
-            file.display(),
-            result.valid_rows,
-            result.invalid_rows,
-            result.row_errors.len()
+    // Build the staging projection: SELECT * from the input file, add a
+    // row-index column so we can filter to valid_row_indices later.
+    let read_fn = if file
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("parquet"))
+        .unwrap_or(false)
+    {
+        format!("read_parquet({})", input_literal)
+    } else {
+        format!("read_csv({}, header=true, all_varchar=true)", input_literal)
+    };
+
+    // Valid-indices filter. Render as an IN list when non-empty, otherwise
+    // use `WHERE 0=1` to select nothing.
+    let valid_filter = if result.valid_row_indices.is_empty() {
+        "WHERE 0=1".to_string()
+    } else {
+        let idx_list: Vec<String> = result
+            .valid_row_indices
+            .iter()
+            .map(|i| i.to_string())
+            .collect();
+        format!("WHERE __row_idx IN ({})", idx_list.join(","))
+    };
+
+    // If --append and the user's table already exists, INSERT INTO rather
+    // than CREATE TABLE AS. Otherwise CREATE TABLE AS from the staging.
+    let exists_before_run = user_table_exists(&db, &table);
+    let user_table_stmt = if append && exists_before_run {
+        format!(
+            "INSERT INTO {} SELECT * EXCLUDE(__row_idx) FROM {} {};",
+            user_table_ident,
+            sql_ident(&staging_ident),
+            valid_filter
+        )
+    } else {
+        format!(
+            "CREATE TABLE {} AS SELECT * EXCLUDE(__row_idx) FROM {} {};",
+            user_table_ident,
+            sql_ident(&staging_ident),
+            valid_filter
+        )
+    };
+
+    // Build reject INSERTs. One row per RejectRecord. Authored-time
+    // (expected_type, type_confidence) comes from SchemaExtensions
+    // keyed by column name — NULL when the schema lacks x-finetype-*
+    // (ac-11 graceful degradation).
+    let mut reject_values: Vec<String> = Vec::with_capacity(result.rejects.len());
+    for r in &result.rejects {
+        let (expected_type, type_confidence) = extensions.get(&r.column_name);
+        let line = (r.row_index as i64) + 1;
+        let tuple = format!(
+            "({scan_id}, 0, {line}, {col_idx}, {col_name}, 'SEMANTIC_TYPE', NULL, NULL, {err_msg}, {type_conf}, {exp_type}, {c_failed}, {c_value})",
+            scan_id = scan_id,
+            line = line,
+            col_idx = r.column_index,
+            col_name = sql_quote(&r.column_name),
+            err_msg = sql_quote(&r.error_message),
+            type_conf = sql_opt_f64(&type_confidence),
+            exp_type = sql_opt_str(&expected_type),
+            c_failed = sql_quote(&r.constraint_failed),
+            c_value = sql_opt_str(&r.constraint_value),
         );
+        reject_values.push(tuple);
     }
 
-    // Summary report (always printed to stdout)
+    let mut script = String::with_capacity(1024 + 128 * reject_values.len());
+    script.push_str("BEGIN TRANSACTION;\n");
+    script.push_str(&format!(
+        "CREATE TEMPORARY TABLE {} AS SELECT row_number() OVER () - 1 AS __row_idx, * FROM {};\n",
+        sql_ident(&staging_ident),
+        read_fn
+    ));
+    script.push_str(&user_table_stmt);
+    script.push('\n');
+    script.push_str(REJECT_SIDECAR_DDL);
+    script.push('\n');
+    if !reject_values.is_empty() {
+        script.push_str("INSERT INTO finetype_reject_errors VALUES\n");
+        script.push_str(&reject_values.join(",\n"));
+        script.push_str(";\n");
+    }
+    script.push_str("COMMIT;\n");
+    // TEMPORARY table is auto-dropped on session end — no explicit DROP
+    // needed; this is the RAII-equivalent cleanup on both success AND
+    // error paths (ac-09 step 10).
+
+    // ── Execute the script against the output .db ────────────────────────────
+    let duckdb_out = std::process::Command::new("duckdb")
+        .arg(&db)
+        .arg("-c")
+        .arg(&script)
+        .output();
+    let duckdb_out = match duckdb_out {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!(
+                "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
+                e
+            );
+            exit_with(2);
+        }
+    };
+    if !duckdb_out.status.success() {
+        eprintln!(
+            "error: duckdb execution failed: {}",
+            String::from_utf8_lossy(&duckdb_out.stderr).trim()
+        );
+        exit_with(2);
+    }
+
+    // ── Summary report ───────────────────────────────────────────────────────
+    let reject_count = result.rejects.len();
     match output {
         OutputFormat::Plain | OutputFormat::Arrow | OutputFormat::Csv | OutputFormat::Markdown => {
             println!("Validation Report");
             println!("{}", "═".repeat(60));
+            println!("  Input:        {}", file.display());
+            println!("  Schema:       {}", schema_path.display());
+            println!("  Output DB:    {}", db.display());
+            println!("  Target table: {}", table);
+            println!("  Scan ID:      {}", scan_id);
             println!();
             println!("  Total rows:   {:>6}", result.total_rows);
-            println!(
-                "  Valid rows:   {:>6}  ({:.1}%)",
-                result.valid_rows,
-                if result.total_rows > 0 {
-                    result.valid_rows as f64 / result.total_rows as f64 * 100.0
-                } else {
-                    100.0
-                }
-            );
-            println!(
-                "  Invalid rows: {:>6}  ({:.1}%)",
-                result.invalid_rows,
-                if result.total_rows > 0 {
-                    result.invalid_rows as f64 / result.total_rows as f64 * 100.0
-                } else {
-                    0.0
-                }
-            );
+            println!("  Valid rows:   {:>6}", result.valid_rows);
+            println!("  Invalid rows: {:>6}", result.invalid_rows);
+            println!("  Rejects:      {:>6}", reject_count);
             println!("  Grade:        {}", result.grade);
-            println!();
-
-            if !result.columns.is_empty() {
-                println!(
-                    "  {:<25} {:>8} {:>8} {:>8} {:>8}",
-                    "COLUMN", "VALID", "INVALID", "NULL", "PASS%"
-                );
-                println!("  {}", "─".repeat(57));
-                for col in &result.columns {
-                    println!(
-                        "  {:<25} {:>8} {:>8} {:>8} {:>7.1}%",
-                        col.name,
-                        col.valid,
-                        col.invalid,
-                        col.null,
-                        col.pass_rate * 100.0
-                    );
-                }
-            }
-            println!();
             println!("{}", "═".repeat(60));
         }
         OutputFormat::Json => {
             let report = json!({
+                "input": file.display().to_string(),
+                "schema": schema_path.display().to_string(),
+                "db": db.display().to_string(),
+                "table": table,
+                "scan_id": scan_id,
                 "total_rows": result.total_rows,
                 "valid_rows": result.valid_rows,
                 "invalid_rows": result.invalid_rows,
+                "rejects": reject_count,
                 "grade": result.grade,
-                "columns": result.columns,
-                "errors": result.row_errors,
             });
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
     }
 
-    // Exit code: 0 = all valid, 1 = some invalid
-    if has_errors {
-        std::process::exit(1);
+    // ── Exit-code grid (ac-10) ───────────────────────────────────────────────
+    if reject_count > 0 {
+        if lenient {
+            exit_with(0);
+        } else {
+            exit_with(1);
+        }
     }
-
+    // Zero rejects — always exit 0.
     Ok(())
 }
 

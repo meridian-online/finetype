@@ -45,6 +45,7 @@ goal: "6 scalar functions in DuckDB community extensions with runtime model down
 
 specs:
   - "orbit/specs/2026-03-25-multi-branch-pipeline-integration/"
+  - "orbit/specs/2026-04-22-duckdb-extension-ergonomics/spec.yaml"
 
 references:
   - "README.md"
