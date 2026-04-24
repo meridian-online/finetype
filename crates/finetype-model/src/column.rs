@@ -650,7 +650,7 @@ impl ColumnClassifier {
 
         // Sort by count descending (3-level labels)
         let mut votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
-        votes.sort_by(|a, b| b.1.cmp(&a.1));
+        votes.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Validation-based candidate elimination (NNFT-188): reject candidates
         // whose JSON Schema validation contract is violated by >50% of sample
@@ -1332,7 +1332,7 @@ impl ColumnClassifier {
                 .iter()
                 .map(|(k, v)| (k.clone(), *v))
                 .collect();
-            v.sort_by(|a, b| b.1.cmp(&a.1));
+            v.sort_by_key(|b| std::cmp::Reverse(b.1));
             v
         };
 
@@ -1353,7 +1353,7 @@ impl ColumnClassifier {
             .filter(|(label, _)| label_map.is_eligible(label, category))
             .map(|(label, count)| (label.clone(), *count))
             .collect();
-        masked_votes.sort_by(|a, b| b.1.cmp(&a.1));
+        masked_votes.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Safety valve: fall back to unmasked aggregation when Sense routing
         // is likely wrong:
@@ -1389,7 +1389,7 @@ impl ColumnClassifier {
 
         let (mut votes, mask_applied) = if should_fallback {
             let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
-            all_votes.sort_by(|a, b| b.1.cmp(&a.1));
+            all_votes.sort_by_key(|b| std::cmp::Reverse(b.1));
             (all_votes, false)
         } else {
             (masked_votes, true)

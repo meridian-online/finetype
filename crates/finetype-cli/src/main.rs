@@ -3594,10 +3594,6 @@ fn cmd_check(
 // VALIDATE — Schema-driven CSV quality gate
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Validate a CSV file against a JSON Schema.
-///
-/// Produces sidecar files (.valid.csv, .invalid.csv, .errors.jsonl) by default.
-/// Use --summary-only to suppress file creation.
 // ═══════════════════════════════════════════════════════════════════════════════
 // VALIDATE — DuckDB-native reject pipeline (spec v1.2 ac-06, ac-08, ac-09, ac-10, ac-11)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3607,7 +3603,7 @@ fn cmd_check(
 /// - 0: no rejects, no error
 /// - 1: one or more rejects (default CI-gate)
 /// - 2: error (bad schema, file unreadable, DuckDB error, staging collision
-///      without `--append`). Not suppressed by `--lenient`.
+///   without `--append`). Not suppressed by `--lenient`.
 ///
 /// `--lenient` forces 0 whenever the exit would otherwise be 1.
 fn exit_with(code: i32) -> ! {
@@ -5406,7 +5402,7 @@ fn cmd_eval_gittables(
 
             let mut sorted_domains: Vec<(String, &DomainAccuracy)> =
                 domain_acc.iter().map(|(k, v)| (k.clone(), v)).collect();
-            sorted_domains.sort_by(|a, b| b.1.total.cmp(&a.1.total));
+            sorted_domains.sort_by_key(|b| std::cmp::Reverse(b.1.total));
 
             for (domain, acc) in &sorted_domains {
                 let row_pct = acc.row_correct as f64 / acc.total as f64 * 100.0;
@@ -5538,7 +5534,7 @@ fn cmd_eval_gittables(
             let domain_results: Vec<serde_json::Value> = {
                 let mut sorted: Vec<(String, &DomainAccuracy)> =
                     domain_acc.iter().map(|(k, v)| (k.clone(), v)).collect();
-                sorted.sort_by(|a, b| b.1.total.cmp(&a.1.total));
+                sorted.sort_by_key(|b| std::cmp::Reverse(b.1.total));
                 sorted
                     .iter()
                     .map(|(domain, acc)| {
@@ -5738,7 +5734,7 @@ fn cmd_eval(
 
     // Sort confusions by count
     let mut confusion_vec: Vec<((String, String), usize)> = confusion.into_iter().collect();
-    confusion_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    confusion_vec.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     match output {
         OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown | OutputFormat::Arrow => {
