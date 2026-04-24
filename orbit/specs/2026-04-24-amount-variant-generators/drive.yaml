@@ -8,7 +8,7 @@ history: []
 started: 2026-04-24T07:00:00Z
 review_cycles:
   review_spec: 1
-  review_pr: 0
+  review_pr: 1
 review_cycle_dates:
   review_spec: 2026-04-24
-  review_pr: null
+  review_pr: 2026-04-24

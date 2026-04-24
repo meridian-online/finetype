@@ -917,11 +917,8 @@ impl MultiBranchClassifier {
             }
         };
 
-        let mut indexed: Vec<(usize, f32)> = probs_vec
-            .iter()
-            .enumerate()
-            .map(|(i, &p)| (i, p))
-            .collect();
+        let mut indexed: Vec<(usize, f32)> =
+            probs_vec.iter().enumerate().map(|(i, &p)| (i, p)).collect();
         indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let k = k.min(indexed.len());
         Ok(indexed

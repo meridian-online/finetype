@@ -35,8 +35,8 @@ fn main() {
         .unwrap_or(100);
 
     // Load CSV, extract the named column
-    let mut reader = csv::Reader::from_path(&csv)
-        .unwrap_or_else(|e| panic!("open csv {}: {e}", csv.display()));
+    let mut reader =
+        csv::Reader::from_path(&csv).unwrap_or_else(|e| panic!("open csv {}: {e}", csv.display()));
     let headers = reader
         .headers()
         .expect("csv headers")
@@ -75,8 +75,8 @@ fn main() {
         .and_then(|p| p.parent())
         .map(|p| p.join("labels"))
         .expect("resolve labels dir");
-    let taxonomy = Taxonomy::from_directory(&labels_dir)
-        .unwrap_or_else(|e| panic!("load taxonomy: {e}"));
+    let taxonomy =
+        Taxonomy::from_directory(&labels_dir).unwrap_or_else(|e| panic!("load taxonomy: {e}"));
 
     // Run top-k with the column header (not empty) — matches production path
     let topk = classifier

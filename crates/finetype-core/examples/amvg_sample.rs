@@ -22,8 +22,12 @@ fn main() {
         std::process::exit(2);
     }
     let key = &args[1];
-    let count: usize = args[2].parse().expect("count must be a non-negative integer");
-    let seed: u64 = args[3].parse().expect("seed must be a non-negative integer");
+    let count: usize = args[2]
+        .parse()
+        .expect("count must be a non-negative integer");
+    let seed: u64 = args[3]
+        .parse()
+        .expect("seed must be a non-negative integer");
 
     // Taxonomy lives at repo-root-relative `labels/`. Resolve from CARGO_MANIFEST_DIR
     // so the example binary works from any cwd.

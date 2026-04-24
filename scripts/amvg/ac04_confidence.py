@@ -3,7 +3,7 @@
 from v16, with softmax-consistency checks.
 
 Runs cargo example amvg_topk for each of the 11 target eval columns and writes
-diagnostics/confidence_topk.tsv with columns:
+diagnostics/confidence_dist.tsv with columns:
   subtype, rank, predicted_label, probability
 
 Spec v1.2 ac-04 assertions:
@@ -101,7 +101,7 @@ def main() -> None:
 
     # Write TSV
     DIAG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(DIAG_DIR / "confidence_topk.tsv", "w") as f:
+    with open(DIAG_DIR / "confidence_dist.tsv", "w") as f:
         f.write("subtype\trank\tpredicted_label\tprobability\n")
         for (col, rank, label, prob) in all_rows:
             f.write(f"{col}\t{rank}\t{label}\t{prob:.6f}\n")
@@ -120,7 +120,7 @@ def main() -> None:
 
     print(f"expected label top-1: {expected_top1}/11")
     print(f"expected label in top-5: {expected_in_top5}/11")
-    print("ac-04 artefact: diagnostics/confidence_topk.tsv")
+    print("ac-04 artefact: diagnostics/confidence_dist.tsv")
 
 
 if __name__ == "__main__":

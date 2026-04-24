@@ -82,7 +82,7 @@ def main() -> None:
     predicted_labels = sorted({p for (_, _, p) in target_rows})
     assert len(target_rows) == 11, f"expected 11 target rows, got {len(target_rows)}"
 
-    with open(DIAG_DIR / "confusion.tsv", "w") as f:
+    with open(DIAG_DIR / "confusion_matrix.tsv", "w") as f:
         f.write("expected\t" + "\t".join(predicted_labels) + "\n")
         for sub in TARGET_SUBTYPES:
             row = {p: 0 for p in predicted_labels}

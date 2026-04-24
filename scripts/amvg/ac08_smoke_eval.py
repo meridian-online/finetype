@@ -15,11 +15,13 @@ Inputs:
   eval/eval_output/ground_truth.csv     — GT annotations
   eval/schema_mapping.yaml              — GT-label → acceptable-predictions map
 
-Outputs:
-  diagnostics/target_delta.tsv                   — per 11-target delta
-  diagnostics/full_eval_delta.tsv                — all flipped non-target rows
-  diagnostics/v19_smoke_verdict.txt              — ac-09 GO/NO-GO
-  diagnostics/v19_smoke_regression_verdict.txt   — ac-10 PASS/FAIL
+Outputs (v1.3 spec contract):
+  diagnostics/v19_smoke_delta.tsv                    — 11-row target delta (ac-08)
+  diagnostics/v19_smoke_full_eval.tsv                — dense non-target delta (ac-08)
+  diagnostics/v19_smoke_verdict.txt                  — ac-09: exactly `GO` or `NO-GO`
+  diagnostics/v19_smoke_verdict.meta.tsv             — ac-09 structured context
+  diagnostics/v19_smoke_regression_verdict.txt       — ac-10: exactly `PASS` or `FAIL`
+  diagnostics/v19_smoke_regression_verdict.meta.tsv  — ac-10 structured context
 
 Gates:
   ac-09: net_lift = (target correct post) - (target correct pre) >= 3 → GO
@@ -149,65 +151,79 @@ def main() -> None:
         else:
             non_target_rows.append(row)
 
-    # ── target_delta.tsv ─────────────────────────────────────────────────────
-    with open(DIAG_DIR / "target_delta.tsv", "w") as f:
-        f.write("dataset\tcolumn\texpected\tpre_pred\tpost_pred\tpre_ok\tpost_ok\tdelta\n")
-        for ((d, c), exp, pre_p, post_p, pre_ok, post_ok) in target_rows:
+    # ── v19_smoke_delta.tsv (target set, 11 rows) ───────────────────────────
+    # Per spec ac-08: columns = {subtype, v16_predicted, v19_predicted,
+    #                             v16_correct, v19_correct, delta}
+    # delta: +1 if fix, -1 if regress, 0 otherwise.
+    with open(DIAG_DIR / "v19_smoke_delta.tsv", "w") as f:
+        f.write("subtype\tv16_predicted\tv19_predicted\tv16_correct\tv19_correct\tdelta\n")
+        for ((_d, c), _exp, pre_p, post_p, pre_ok, post_ok) in target_rows:
             if pre_ok and not post_ok:
-                delta = "REGRESS"
+                delta = -1
             elif not pre_ok and post_ok:
-                delta = "FIX"
-            elif pre_ok and post_ok:
-                delta = "STABLE_HIT"
+                delta = 1
             else:
-                delta = "STABLE_MISS"
-            f.write(f"{d}\t{c}\t{exp}\t{pre_p}\t{post_p}\t{int(pre_ok)}\t{int(post_ok)}\t{delta}\n")
+                delta = 0
+            f.write(f"{c}\t{pre_p}\t{post_p}\t{int(pre_ok)}\t{int(post_ok)}\t{delta:+d}\n")
 
     target_fixes = sum(1 for r in target_rows if not r[4] and r[5])
     target_regressions = sum(1 for r in target_rows if r[4] and not r[5])
     net_lift = target_fixes - target_regressions
 
-    # ── full_eval_delta.tsv (non-target changes only) ───────────────────────
-    with open(DIAG_DIR / "full_eval_delta.tsv", "w") as f:
-        f.write("dataset\tcolumn\texpected\tpre_pred\tpost_pred\tpre_ok\tpost_ok\tdelta\n")
-        for ((d, c), exp, pre_p, post_p, pre_ok, post_ok) in non_target_rows:
-            if pre_ok == post_ok and pre_p == post_p:
-                continue  # unchanged
+    # ── v19_smoke_full_eval.tsv (DENSE — one row per non-target eval column) ─
+    # Per spec ac-08 (v1.3): columns = {eval_column, v16_correct, v19_correct, delta}
+    # One row per non-target eval column (count reconciled to actual manifest:
+    # v1.2 cited 341 as estimate; post-expansion manifest yields N_nontarget
+    # actual as recorded in progress.md ac-08 and the .meta.tsv sidecar).
+    n_nontarget = len(non_target_rows)
+    with open(DIAG_DIR / "v19_smoke_full_eval.tsv", "w") as f:
+        f.write("eval_column\tv16_correct\tv19_correct\tdelta\n")
+        for ((d, c), _exp, _pre_p, _post_p, pre_ok, post_ok) in non_target_rows:
             if pre_ok and not post_ok:
-                delta = "REGRESS"
+                delta = -1
             elif not pre_ok and post_ok:
-                delta = "FIX"
+                delta = 1
             else:
-                delta = "LABEL_CHANGE_SAME_CORRECTNESS"
-            f.write(f"{d}\t{c}\t{exp}\t{pre_p}\t{post_p}\t{int(pre_ok)}\t{int(post_ok)}\t{delta}\n")
+                delta = 0
+            f.write(f"{d}/{c}\t{int(pre_ok)}\t{int(post_ok)}\t{delta:+d}\n")
 
     non_target_fixes = sum(1 for r in non_target_rows if not r[4] and r[5])
     non_target_regressions = sum(1 for r in non_target_rows if r[4] and not r[5])
     regression_delta = non_target_fixes - non_target_regressions  # net; negative = net regression
 
     # ── verdict files ────────────────────────────────────────────────────────
-    # ac-09
-    ac09_verdict = "GO" if net_lift >= NET_LIFT_THRESHOLD else "NO-GO"
-    with open(DIAG_DIR / "v19_smoke_verdict.txt", "w") as f:
-        f.write(f"verdict: {ac09_verdict}\n")
-        f.write(f"target_columns: 11\n")
-        f.write(f"target_fixes: {target_fixes}\n")
-        f.write(f"target_regressions: {target_regressions}\n")
-        f.write(f"net_lift: {net_lift}\n")
-        f.write(f"threshold: >= {NET_LIFT_THRESHOLD}\n")
-        f.write(f"artefact: diagnostics/target_delta.tsv\n")
-        f.write("note: net_lift in {3,4} requires 3-seed confirmation in v19-proper before promotion.\n")
+    # Spec contract (v1.3): primary verdict file contains exactly the token
+    # `GO`/`NO-GO`/`PASS`/`FAIL` — no whitespace, no trailing newline.
+    # Structured context is preserved in a companion .meta.tsv sidecar.
 
-    # ac-10
+    # ac-09 primary verdict (single token, no newline)
+    ac09_verdict = "GO" if net_lift >= NET_LIFT_THRESHOLD else "NO-GO"
+    (DIAG_DIR / "v19_smoke_verdict.txt").write_bytes(ac09_verdict.encode("utf-8"))
+    # ac-09 sidecar (structured)
+    with open(DIAG_DIR / "v19_smoke_verdict.meta.tsv", "w") as f:
+        f.write("key\tvalue\n")
+        f.write(f"verdict\t{ac09_verdict}\n")
+        f.write(f"target_columns\t11\n")
+        f.write(f"target_fixes\t{target_fixes}\n")
+        f.write(f"target_regressions\t{target_regressions}\n")
+        f.write(f"net_lift\t{net_lift}\n")
+        f.write(f"threshold\t>= {NET_LIFT_THRESHOLD}\n")
+        f.write(f"artefact\tdiagnostics/v19_smoke_delta.tsv\n")
+        f.write(f"note\tnet_lift in {{3,4}} requires 3-seed confirmation before promotion\n")
+
+    # ac-10 primary verdict (single token, no newline)
     ac10_verdict = "PASS" if regression_delta >= REGRESSION_THRESHOLD else "FAIL"
-    with open(DIAG_DIR / "v19_smoke_regression_verdict.txt", "w") as f:
-        f.write(f"verdict: {ac10_verdict}\n")
-        f.write(f"non_target_columns_compared: {len(non_target_rows)}\n")
-        f.write(f"non_target_fixes: {non_target_fixes}\n")
-        f.write(f"non_target_regressions: {non_target_regressions}\n")
-        f.write(f"regression_delta: {regression_delta}\n")
-        f.write(f"threshold: >= {REGRESSION_THRESHOLD}\n")
-        f.write(f"artefact: diagnostics/full_eval_delta.tsv\n")
+    (DIAG_DIR / "v19_smoke_regression_verdict.txt").write_bytes(ac10_verdict.encode("utf-8"))
+    # ac-10 sidecar (structured)
+    with open(DIAG_DIR / "v19_smoke_regression_verdict.meta.tsv", "w") as f:
+        f.write("key\tvalue\n")
+        f.write(f"verdict\t{ac10_verdict}\n")
+        f.write(f"non_target_columns_compared\t{n_nontarget}\n")
+        f.write(f"non_target_fixes\t{non_target_fixes}\n")
+        f.write(f"non_target_regressions\t{non_target_regressions}\n")
+        f.write(f"regression_delta\t{regression_delta}\n")
+        f.write(f"threshold\t>= {REGRESSION_THRESHOLD}\n")
+        f.write(f"artefact\tdiagnostics/v19_smoke_full_eval.tsv\n")
 
     # ── Console summary ─────────────────────────────────────────────────────
     print()
