@@ -1,0 +1,12 @@
+expected	finance.currency.amount
+finance.currency.amount_accounting	1
+finance.currency.amount_apostrophe	1
+finance.currency.amount_code_prefix	1
+finance.currency.amount_comma	1
+finance.currency.amount_comma_suffix	1
+finance.currency.amount_crypto	1
+finance.currency.amount_lakh	1
+finance.currency.amount_multisym	1
+finance.currency.amount_neg_trailing	1
+finance.currency.amount_nodecimal	1
+finance.currency.amount_space	1

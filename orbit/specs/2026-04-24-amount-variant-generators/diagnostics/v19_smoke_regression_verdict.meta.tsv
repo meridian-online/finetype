@@ -1,0 +1,8 @@
+key	value
+verdict	PASS
+non_target_columns_compared	437
+non_target_fixes	18
+non_target_regressions	8
+regression_delta	10
+threshold	>= -1
+artefact	diagnostics/v19_smoke_full_eval.tsv

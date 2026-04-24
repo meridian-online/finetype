@@ -1,0 +1,13 @@
+subtype	finance.currency.amount	finance.currency.amount_accounting	finance.currency.amount_apostrophe	finance.currency.amount_code_prefix	finance.currency.amount_comma	finance.currency.amount_comma_suffix	finance.currency.amount_crypto	finance.currency.amount_lakh	finance.currency.amount_multisym	finance.currency.amount_neg_trailing	finance.currency.amount_nodecimal	finance.currency.amount_space
+finance.currency.amount	1.0000	0.1935	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
+finance.currency.amount_accounting	0.1935	1.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
+finance.currency.amount_apostrophe	0.0000	0.0000	1.0000	0.1765	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
+finance.currency.amount_code_prefix	0.0000	0.0000	0.1765	1.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000
+finance.currency.amount_comma	0.0000	0.0000	0.0000	0.0000	1.0000	0.0976	0.0000	0.0000	0.0000	0.0000	0.0000	0.0227
+finance.currency.amount_comma_suffix	0.0000	0.0000	0.0000	0.0000	0.0976	1.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.1837
+finance.currency.amount_crypto	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	1.0000	0.0000	0.0000	0.0000	0.0000	0.0000
+finance.currency.amount_lakh	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	1.0000	0.0000	0.0000	0.0000	0.0000
+finance.currency.amount_multisym	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	1.0000	0.0000	0.0000	0.0000
+finance.currency.amount_neg_trailing	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	1.0000	0.0000	0.0000
+finance.currency.amount_nodecimal	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	1.0000	0.0000
+finance.currency.amount_space	0.0000	0.0000	0.0000	0.0000	0.0227	0.1837	0.0000	0.0000	0.0000	0.0000	0.0000	1.0000

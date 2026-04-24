@@ -42,6 +42,7 @@ specs:
   - "orbit/specs/2026-04-15-validation-branch-v12/"
   - "orbit/specs/2026-04-21-eval-expansion/"
   - "orbit/specs/2026-04-21-sharpen-demotion-guard/"
+  - "orbit/specs/2026-04-24-amount-variant-generators/"
 
 references:
   - "README.md"

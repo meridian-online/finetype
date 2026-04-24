@@ -30,3 +30,4 @@ regex = "1"
 
 [dev-dependencies]
 anyhow = { workspace = true }
+csv = { workspace = true }

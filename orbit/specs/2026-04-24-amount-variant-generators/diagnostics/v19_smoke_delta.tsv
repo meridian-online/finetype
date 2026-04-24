@@ -1,0 +1,12 @@
+subtype	v16_predicted	v19_predicted	v16_correct	v19_correct	delta
+amount_accounting	finance.currency.amount	finance.currency.amount_accounting	0	1	+1
+amount_apostrophe	finance.currency.amount	finance.currency.amount_apostrophe	0	1	+1
+amount_code_prefix	finance.currency.amount	finance.currency.amount_code_prefix	0	1	+1
+amount_comma	finance.currency.amount	finance.currency.amount_comma	0	1	+1
+amount_comma_suffix	finance.currency.amount	finance.currency.amount_comma_suffix	0	1	+1
+amount_crypto	finance.currency.amount	finance.currency.amount_crypto	0	1	+1
+amount_lakh	finance.currency.amount	finance.currency.amount_lakh	0	1	+1
+amount_multisym	finance.currency.amount	finance.currency.amount_multisym	0	1	+1
+amount_neg_trailing	finance.currency.amount	finance.currency.amount_neg_trailing	0	1	+1
+amount_nodecimal	finance.currency.amount	finance.currency.amount_nodecimal	0	1	+1
+amount_space	finance.currency.amount	finance.currency.amount_space	0	1	+1
