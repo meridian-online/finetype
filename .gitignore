@@ -50,6 +50,14 @@ __pycache__/
 # Eval outputs (generated data, not source)
 eval/eval_output/
 
+# Legacy CSV-sidecar outputs from the pre-MADR-0064 `finetype validate`
+# flow. The new flow writes a single `.db` file via --db <path>; these
+# patterns exist to keep stray pre-MADR-0064 runs out of git.
+eval/datasets/csv/*.csv.valid.csv
+eval/datasets/csv/*.csv.invalid.csv
+eval/datasets/csv/*.csv.errors.jsonl
+eval/datasets/csv/*.schema.json
+
 # Spike experiment outputs
 output/spike-training/
 output/spike-results/
