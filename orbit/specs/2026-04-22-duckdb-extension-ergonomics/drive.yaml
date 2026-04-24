@@ -1,0 +1,14 @@
+card: orbit/cards/0002-semantic-type-detection.yaml
+autonomy: guided
+budget: 3
+iteration: 1
+current_spec: orbit/specs/2026-04-22-duckdb-extension-ergonomics
+status: review
+history: []
+started: 2026-04-24T00:00:00Z
+review_cycles:
+  review_spec: 1
+  review_pr: 0
+review_cycle_dates:
+  review_spec: 2026-04-24
+  review_pr: 2026-04-24

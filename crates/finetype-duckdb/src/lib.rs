@@ -23,6 +23,7 @@ use finetype_model::{ColumnClassifier, ColumnConfig, MultiBranchClassifier};
 
 mod column_fn;
 mod normalize;
+mod spike;
 mod type_mapping;
 mod unpack;
 mod validate;
@@ -565,6 +566,16 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
 
     con.register_scalar_function::<FineTypeUnpack>("finetype_unpack")
         .expect("Failed to register finetype_unpack");
+
+    // Spike (ac-04) — NOT a production function. Registers a trivial
+    // table function to preserve the compile-time evidence that (a) vtab
+    // is active under loadable-extension and (b) scalar + table function
+    // coexistence compiles. No production use — the spike ratified
+    // rollback_plan Scenario A (see MADR 0064); the CLI calls
+    // finetype_core::table_validator::validate_table directly and writes
+    // rejects to the output .db via duckdb-rs (spec ac-06 / ac-09).
+    con.register_table_function::<spike::FineTypeSpike>("finetype_spike")
+        .expect("Failed to register finetype_spike (spike artefact — not production)");
 
     Ok(())
 }

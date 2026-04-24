@@ -177,7 +177,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 | `finetype train` | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |
 | `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
 | `finetype schema <key\|file>` | Type-level JSON Schema (by key/glob) or table-level (by file path, `--stats`, `--stdout`) |
-| `finetype validate <file> <schema>` | Schema-driven quality gate → `.valid.csv`, `.invalid.csv`, `.errors.jsonl` (`--summary-only`) |
+| `finetype validate <file> <schema> --db <out.db> --table <name>` | Schema-driven quality gate → DuckDB `.db` file with user table (valid rows) + `finetype_reject_errors` sidecar (13-col DuckDB `reject_errors` shape + FineType extensions `type_confidence`, `expected_type`, `constraint_failed`, `constraint_value`). Flags: `--append` (reuse db, scan_id++), `--lenient` (force exit 0). Exit codes: 0 no rejects / 1 rejects / 2 error. Requires `duckdb` on PATH. See MADR 0064. |
 | `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`, `--enum-threshold N`) |
 | `finetype mcp` | Start MCP server over stdio (8 tools: profile, infer, ddl, taxonomy, schema, validate, generate) |
 

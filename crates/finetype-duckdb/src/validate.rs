@@ -92,3 +92,34 @@ fn run_validation(value: &str, schema_json: &JsonValue) -> String {
     };
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ac-07: the existing scalar `finetype_validate(value, schema_json)` is
+    /// preserved unchanged by spec v1.2. 'valid' on conforming input;
+    /// non-'valid' error string on non-conforming input.
+    #[test]
+    fn test_vrp_ac07_scalar_unchanged() {
+        let schema = r#"{"type":"string"}"#;
+        assert_eq!(validate_value("hello", schema), "valid");
+
+        // A string-typed schema with a minLength of 5 rejects a 3-char value.
+        let schema2 = r#"{"type":"string","minLength":5}"#;
+        let err = validate_value("abc", schema2);
+        assert_ne!(err, "valid");
+        assert!(
+            !err.is_empty(),
+            "non-conforming input should produce a non-empty error"
+        );
+    }
+
+    /// Schema-error surfacing: malformed JSON schema strings produce an
+    /// error prefix rather than 'valid'. Preserves the existing contract.
+    #[test]
+    fn test_vrp_ac07_schema_error_prefixed() {
+        let err = validate_value("x", "not-json");
+        assert!(err.starts_with("schema error:"), "got: {}", err);
+    }
+}
