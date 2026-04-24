@@ -1,0 +1,8 @@
+verdict: GO
+target_columns: 11
+target_fixes: 11
+target_regressions: 0
+net_lift: 11
+threshold: >= 3
+artefact: diagnostics/target_delta.tsv
+note: net_lift in {3,4} requires 3-seed confirmation in v19-proper before promotion.

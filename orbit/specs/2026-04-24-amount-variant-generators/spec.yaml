@@ -1,0 +1,154 @@
+goal: |
+  Diagnose why 11 finance.currency.amount* subtypes collapse to plain
+  finance.currency.amount in v16/v18, apply mechanism-verified
+  remediation, and unblock v19 retrain with a single-seed smoke
+  baseline showing >=3 net target subtypes correctly predicted on the
+  11 eval columns AND full-eval regression <= 1 label on the 352-row
+  manifest.
+
+constraints:
+  - "Generators for all 11 amount subtypes already exist in crates/finetype-core/src/generator.rs lines 3708-3965 (amount_comma at 3708, ten more at 3835-3965). This spec does NOT write new generators from scratch. It measures what existing generators produce and fixes whatever the diagnosis names."
+  - "Remediation direction is data-led. No commitment to a specific fix (rebalance corpus / tighten generator output / value_sharpen rule / eval enrichment / real-data sourcing / retrain) until the four diagnostics in ac-01..ac-04 surface a clear mechanism in ac-05."
+  - "v19 retrain is blocked until this spec ships. No v19 sweep scripts, no v19 models (other than the smoke model required by ac-08), no v19 promotion while this spec is open. Codified by the MADR in ac-11."
+  - "Success requires BOTH a mechanism-verified fix (ac-06 + ac-07) AND a v19 smoke lift of >=3 net target subtypes correctly predicted on the 11 eval columns (ac-09) AND a full-eval non-target regression <= 1 label (ac-10). Mechanism-verified without lift means the hypothesis was wrong. Lift without mechanism means the fix is unattributable. Lift on target subtypes with regressions elsewhere means a net-worse model (v18 precedent, decision 0062)."
+  - "v19 smoke-eval scale is fixed at 1 seed x 100 epochs (seed 42 to match v18 lineage). No 3-seed sweep in this spec; that is v19-proper's job if unblocked."
+  - "No hard off-limits. Taxonomy, plain finance.currency.amount type, real-world data sourcing, and training infrastructure are all explorable if the diagnosis implicates them. Every touched area must be tabled in the PR description before merge."
+  - "The 11 target subtypes are the exact set surfaced by the v18 per-column diff (orbit/specs/2026-04-21-v18-retrain/v16-v18-diff.md): amount_accounting, amount_apostrophe, amount_code_prefix, amount_comma, amount_comma_suffix, amount_crypto, amount_lakh, amount_multisym, amount_neg_trailing, amount_nodecimal, amount_space. Plain finance.currency.amount is the control."
+  - "All diagnostic artefacts land under orbit/specs/2026-04-24-amount-variant-generators/diagnostics/ as reproducible TSV files, each regenerable from a single script committed alongside the spec."
+  - "Decision register entries (ac-05, ac-11, ac-12) are committed as separate MADR files in orbit/decisions/ and cross-referenced from progress.md."
+  - "Training-corpus fixture is pinned at output/multibranch-training/v16-blend-70-30.ftmb (existing on disk, 997 MB, v4 format, 132,825 records, manifest at v16-blend-70-30.manifest.json). The v18 FTMB was deleted post-sweep per orbit/specs/2026-04-21-v18-retrain/handover.md line 54; since v16 and v18 exhibit the same 11-subtype collapse (v18 per-column diff recorded 47 persistent failures unchanged by retraining), v16 is substantively equivalent for diagnosing this mechanism and is the shipped baseline. ac-01 computes sha256(v16-blend-70-30.ftmb) and writes it to diagnostics/v16_corpus_hash.txt as the pin."
+  - "ac-05 MADR must carry a frontmatter field `primary_mechanism` taking exactly one value from the closed enum {imbalance, overlap, confident_wrong, flat_confidence, multi_cause, other}. The `other` option requires a named-and-justified mechanism description in the MADR body. The MADR must also include a `## Ruled Out` section listing at least three candidate mechanisms that were considered and rejected, each with a one-line evidence citation. ac-07 reads the frontmatter field directly (no markdown-body parsing)."
+  - "If ac-06 remediation modifies crates/finetype-core/src/generator.rs, the PR must include (a) evidence of a passing `cargo run -- check` invocation, (b) a note describing whether `finetype generate` MCP tool output changes, and (c) ac-07's post-fix diagnostic must either re-use the pre-fix generator binary (checked out at HEAD~N) or explicitly regenerate the pre baseline using the new generator and flag the delta. This prevents pre/post comparisons that measure both sides with the post-fix code."
+  - "ac-09's net_lift gate is directional, not a statistical significance claim. net_lift values in {3, 4} (the tightest passing band) must be confirmed by a 3-seed sweep in v19-proper before any promotion. This limitation is stated explicitly in progress.md ac-09."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: "Corpus-count-per-subtype table produced for the v16 training corpus (v16-blend-70-30.ftmb, the shipped-model fixture; see constraint 10 for the v18→v16 pivot rationale). For each of the 11 amount subtypes plus plain amount, count distinct training rows that carry that label. Corpus is pinned via diagnostics/v16_corpus_hash.txt (SHA256 of the FTMB); the count script verifies the pin before tallying."
+    verification: "Artefact at diagnostics/corpus_counts.tsv with 12 rows (11 subtypes + plain amount control), columns = {subtype, row_count}. Companion artefact diagnostics/v16_corpus_hash.txt contains the SHA256 hex of v16-blend-70-30.ftmb. Test test_amvg_ac01_corpus_counts asserts 12-row file exists, each row_count is a non-negative integer, the expected subtype labels match exactly the 11 + control set, and the corpus-hash file exists with a 64-hex-char value."
+
+  - id: ac-02
+    ac_type: code
+    description: "Pairwise value-shape Jaccard matrix produced. For each of the 11 subtypes plus plain amount, sample 100 generated values via generator.generate_value(), hash each value to a char-class signature token (runs of digit/letter/separator/symbol collapsed to a canonical sequence), compute pairwise Jaccard of the signature sets."
+    verification: "Artefact at diagnostics/jaccard_matrix.tsv with 12x12 matrix (12 subtype rows x 12 subtype columns plus header). Test test_amvg_ac02_jaccard asserts (a) matrix symmetry (A_ij == A_ji to 6 dp), (b) diagonal values == 1.0, (c) all off-diagonal values in [0, 1], (d) NOT all off-diagonal values equal (at least one off-diagonal value < 0.99 — guards against degenerate signature functions that collapse every value to a single token), (e) each subtype generates at least 3 distinct signatures from its 100 samples (guards against generator monoculture)."
+
+  - id: ac-03
+    ac_type: code
+    description: "Confusion matrix on the 11 eval columns produced using v16 (models/default). For each subtype eval column in eval/datasets/csv/coverage_closure_phase_ab.csv, record v16's top-1 predicted label."
+    verification: "Artefact at diagnostics/confusion_matrix.tsv with columns = {eval_subtype, v16_predicted, is_correct}. Test test_amvg_ac03_confusion asserts structural integrity only: 11 rows, is_correct in {0, 1}, eval_subtype values match exactly the 11 target subtype labels. No threshold on the number of wrong predictions — if v16 re-eval on the refreshed corpus shows most subtypes now correct, that is a valid diagnostic outcome that feeds ac-05."
+
+  - id: ac-04
+    ac_type: code
+    description: "Per-subtype confidence distribution produced. For each of the 11 eval columns, dump v16's raw model confidence (softmax output) over the top-5 predicted labels."
+    verification: "Artefact at diagnostics/confidence_dist.tsv with 55 rows (11 subtypes x 5 top labels each), columns = {eval_subtype, rank, label, confidence}. Test test_amvg_ac04_confidence asserts (a) 55 rows, (b) rank in {1..5}, (c) each confidence strictly in (0, 1), (d) per-subtype top-1 confidence >= 1/240 (above uniform-over-240-labels), (e) per-subtype rank-ordered (row_r confidence >= row_{r+1} for r in {1..4}), (f) per-subtype top-5 sum in (0, 1.0] (sanity that output is softmax-compatible, not raw logits)."
+
+  - id: ac-05
+    ac_type: gate
+    description: "Mechanism named in a MADR. Integrate evidence from ac-01..ac-04 and declare the primary mechanism via the closed-enum frontmatter field `primary_mechanism`. The MADR must also list at least three candidate mechanisms considered and rejected in a `## Ruled Out` section, each with a one-line evidence citation. MADR refines v18 handover's 'write per-subtype generators' framing."
+    verification: "MADR exists at orbit/decisions/NNNN-amount-subtype-collapse-mechanism.md with frontmatter status: accepted, date-created: 2026-04-24, and `primary_mechanism: <one of: imbalance | overlap | confident_wrong | flat_confidence | multi_cause | other>`. If `primary_mechanism: other`, the MADR body must name the mechanism and justify it in >=3 sentences. The MADR body contains a `## Ruled Out` section listing >=3 alternative mechanisms with evidence. All four diagnostic artefact paths (ac-01..04) are cited in the MADR's Context section. Test test_amvg_ac05_madr_contract reads the frontmatter and asserts the enum value, the Ruled Out section's 3+ bullets, and the four artefact path citations."
+
+  - id: ac-06
+    ac_type: code
+    description: "Remediation applied that addresses the mechanism named in ac-05 (read from the MADR's frontmatter `primary_mechanism` field). Concrete content conditional on the named mechanism. If mechanism == multi_cause, remediation must address each named sub-cause and clearly label which diff chunk addresses which sub-cause."
+    verification: "Code or data diff lands in the PR under a labelled section 'Remediation: <primary_mechanism value>'. progress.md ac-06 entry names the fix applied and cites the files changed. If the diff touches crates/finetype-core/src/generator.rs, the PR description also includes (a) `cargo run -- check` output, (b) a note on finetype generate MCP tool output changes, (c) ac-07 test setup explicitly uses the pre-fix generator for pre baseline (via HEAD~N checkout or equivalent)."
+
+  - id: ac-07
+    ac_type: code
+    description: "Post-fix diagnostic artefact demonstrates the mechanism is measurably reduced. Rerun whichever of ac-01..ac-04 evidenced the mechanism, with the same scripts, writing the post-fix output alongside the pre-fix file. The mechanism token is read from ac-05 MADR frontmatter (`primary_mechanism` field) — no markdown-body parsing."
+    verification: |
+      Artefact at diagnostics/<primary_mechanism>_post.tsv (one per named mechanism; multi_cause produces one artefact per sub-cause).
+      Test test_amvg_ac07_mechanism_reduced reads primary_mechanism from the ac-05 MADR frontmatter and dispatches to the matching assertion:
+        - imbalance: max_count/min_count ratio in corpus_counts_post.tsv is reduced by >= 30% versus corpus_counts.tsv.
+        - overlap: mean off-diagonal Jaccard in jaccard_matrix_post.tsv is reduced by >= 0.1 versus jaccard_matrix.tsv.
+        - confident_wrong: in confusion_matrix_post.tsv, >= 3 target subtypes' top-1 prediction flips from wrong to correct.
+        - flat_confidence: in confidence_dist_post.tsv, per-subtype top-1 confidence variance increases (more decisive predictions).
+        - multi_cause: all sub-cause assertions pass; test passes only when every sub-cause's post-fix stat moves in the predicted direction.
+        - other: test reads a `post_fix_assertion` frontmatter field from the ac-05 MADR specifying the assertion predicate and expected movement.
+
+  - id: ac-08
+    ac_type: code
+    description: "v19 smoke run completed: 1 seed x 100 epochs on the post-fix corpus (seed 42, matching v18 lineage). Per-subtype label-accuracy delta vs v16 on the 11 eval columns computed. Full-eval delta on the 352-row manifest also computed."
+    verification: "Model directory at models/sherlock-v19-smoke-seed-42/ containing config.json, label_map.json, model.safetensors, results.json, epochs.jsonl. Target-subtype delta artefact at diagnostics/v19_smoke_delta.tsv with 11 rows, columns = {subtype, v16_predicted, v19_predicted, v16_correct, v19_correct, delta}. Full-eval delta artefact at diagnostics/v19_smoke_full_eval.tsv with one row per non-target eval column (341 rows), columns = {eval_column, v16_correct, v19_correct, delta}. delta is +1 if v19 correct and v16 wrong, -1 if reverse, 0 otherwise. Test test_amvg_ac08_smoke_run asserts model dir exists with all 5 files, target delta file has exactly 11 rows, full-eval delta file has 341 rows."
+
+  - id: ac-09
+    ac_type: gate
+    description: "Target-subtype unblock gate: sum(delta) >= 3 across the 11 target subtypes. Result recorded to diagnostics/v19_smoke_verdict.txt as exactly `GO` or `NO-GO` (no whitespace, no trailing newline). If this gate fails (verdict NO-GO), v19-proper remains blocked pending a follow-up spec."
+    verification: "Test test_amvg_ac09_unblock_gate reads diagnostics/v19_smoke_verdict.txt, computes net_lift from diagnostics/v19_smoke_delta.tsv, and asserts: (a) verdict file contains exactly `GO` or `NO-GO`; (b) if verdict == GO, then net_lift >= 3; (c) if verdict == NO-GO, then net_lift < 3. The test fails if verdict and net_lift disagree. progress.md ac-09 entry records the numeric net_lift, the verdict verbatim, and a one-line note that net_lift in {3, 4} requires 3-seed confirmation before promotion (constraint 13)."
+
+  - id: ac-10
+    ac_type: gate
+    description: "Non-target regression guard: full-eval delta across the 341 non-target columns must be >= -1 (i.e., no more than 1 net label regression). Result recorded to diagnostics/v19_smoke_regression_verdict.txt as exactly `PASS` or `FAIL`. If this gate fails, ac-09's GO verdict is overridden and v19-proper remains blocked."
+    verification: "Test test_amvg_ac10_regression_guard reads diagnostics/v19_smoke_regression_verdict.txt, computes regression_delta as sum of delta column in diagnostics/v19_smoke_full_eval.tsv, and asserts: (a) verdict file contains exactly `PASS` or `FAIL`; (b) if verdict == PASS, then regression_delta >= -1; (c) if verdict == FAIL, then regression_delta < -1. Additionally: if ac-09 reports GO but ac-10 reports FAIL, progress.md must record the final outcome as `NO-GO (regression override)` regardless of target-subtype lift."
+
+  - id: ac-11
+    ac_type: doc
+    description: "MADR authored codifying the v19 retrain hard gate. This decision complements decision 0062 (v18 HELD) by declaring that no v19 sweep may start until an amount-subtype collapse mechanism is diagnosed and remediated, and no v19-proper promotion may happen unless both ac-09 GO and ac-10 PASS."
+    verification: "MADR at orbit/decisions/NNNN-v19-retrain-hard-gate.md with frontmatter status: accepted, date-created: 2026-04-24. CLAUDE.md Sprint Goal section gains a one-line reference to the MADR."
+
+  - id: ac-12
+    ac_type: doc
+    description: "MADR authored recording the framing correction: 'diagnose amount-subtype collapse' supersedes v18 handover's 'write per-subtype generators from scratch' framing. Cross-references the lines in orbit/specs/2026-04-21-v18-retrain/handover.md that carried the superseded framing."
+    verification: "MADR at orbit/decisions/NNNN-amount-subtype-framing-correction.md with frontmatter status: accepted, date-created: 2026-04-24. orbit/specs/2026-04-21-v18-retrain/handover.md gains a note under its 'Follow-Up Cards (Backlog)' section pointing to this MADR."
+
+  - id: ac-13
+    ac_type: doc
+    description: "CLAUDE.md 'What's next' section updated to reflect the v19 unblock/block status based on the combined ac-09 + ac-10 outcome (GO requires both gates green). v18 handover gets a Follow-up section pointing to this spec."
+    verification: "CLAUDE.md 'What's next' diff shows either 'v19 retrain UNBLOCKED (amount-variant collapse addressed; net_lift >= 3 and non-target regression <= 1)' or 'v19 retrain REMAINS BLOCKED (amount-variant collapse persists; see <MADR ref>)' wording. orbit/specs/2026-04-21-v18-retrain/handover.md has '## Follow-up: Addressed by' section linking to this spec."
+
+ontology_schema:
+  name: "AmountSubtypeDiagnostic"
+  description: "Tracks the diagnostic -> mechanism -> remediation -> smoke arc for the 11 amount subtypes and the plain-amount control."
+  fields:
+    - name: "subtype"
+      type: "string"
+      description: "One of the 11 finance.currency.amount* leaves, or 'amount' as the control."
+    - name: "corpus_count"
+      type: "integer"
+      description: "Training-row count for this subtype in v18 corpus (ac-01)."
+    - name: "jaccard_max_peer"
+      type: "float"
+      description: "Highest off-diagonal Jaccard overlap with any other amount subtype (ac-02). Range [0, 1]."
+    - name: "v16_predicted"
+      type: "string"
+      description: "v16's top-1 predicted label on this subtype's eval column (ac-03)."
+    - name: "v16_top1_confidence"
+      type: "float"
+      description: "v16's top-1 softmax confidence on this subtype's eval column (ac-04)."
+    - name: "v19_smoke_predicted"
+      type: "string"
+      description: "v19-smoke's top-1 predicted label (ac-08). Null until ac-08 runs."
+    - name: "smoke_delta"
+      type: "integer"
+      description: "+1 if v19-smoke correct and v16 wrong, -1 if reverse, 0 otherwise (ac-09 aggregation input)."
+    - name: "full_eval_regression_delta"
+      type: "integer"
+      description: "Sum of delta over the 341 non-target eval columns (ac-10)."
+
+evaluation_principles:
+  - principle: "Honest diagnosis before commitment to a fix direction"
+    weight: 0.25
+  - principle: "Mechanism-verified remediation (not lift-alone; not mechanism-alone)"
+    weight: 0.25
+  - principle: "Reproducibility — every diagnostic artefact regenerable from a committed script with a pinned fixture"
+    weight: 0.20
+  - principle: "Sprint-policy enforcement — the v19 hard gate is codified in MADR and machine-enforced via verdict files"
+    weight: 0.20
+  - principle: "Non-target regression is blocking — v18 net-zero precedent (decision 0062) respected"
+    weight: 0.10
+
+exit_conditions:
+  - "ac-01..ac-13 all marked done in progress.md"
+  - "If ac-09 verdict == GO AND ac-10 verdict == PASS: spec ships as GO, v19-proper is unblocked, a separate v19 sprint opens"
+  - "If ac-09 verdict == NO-GO OR ac-10 verdict == FAIL: spec ships as NO-GO with data, v19-proper remains blocked until a follow-up spec"
+  - "All three MADRs (ac-05 primary mechanism, ac-11 v19 hard gate, ac-12 framing correction) exist with status: accepted"
+  - "CLAUDE.md 'What's next' and v18 handover reflect the combined outcome"
+
+metadata:
+  version: "1.2"
+  test_prefix: "amvg"
+  timestamp: "2026-04-24T08:00:00Z"
+  ambiguity_score: 0.16
+  interview_ref: "orbit/specs/2026-04-24-amount-variant-generators/interview.md"
+  changelog:
+    - "v1.0 -> v1.1 (2026-04-24): review-spec cycle 1 REQUEST_CHANGES addressed. ac-09 gate made machine-enforceable via verdict file. ac-01 corpus fixture pinned via row-hash manifest. ac-05/07 MADR contract tightened via frontmatter closed enum. New ac-10 introduces non-target regression guard. ac-06 grows generator.rs cross-caller impact constraint. ac-03 drops hypothesis pre-condition. ac-02 adds degenerate-signature guard. ac-04 adds softmax sum check. ac-09 note on 1-seed noise floor. Old ac-10/11/12 renumbered to ac-11/12/13."
+    - "v1.1 -> v1.2 (2026-04-24): pre-implementation fixture pivot from v18 to v16 corpus. v18 FTMB deleted post-sweep (handover.md line 54); v16 FTMB exists on disk and is the shipped baseline. Same 11 subtypes collapse in both models (v18 diff recorded 47 persistent failures unchanged by retraining), so v16 is substantively equivalent for mechanism diagnosis. Constraint 10 and ac-01 description/verification updated. No other ACs affected."

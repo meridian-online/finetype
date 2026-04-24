@@ -55,11 +55,25 @@ The shared FTMB at `output/multibranch-training/v18.ftmb` was deleted post-sweep
 
 ## Follow-Up Cards (Backlog)
 
+> **2026-04-24 supersession — MADR 0067.** The framing below ("needs
+> per-subtype generators", "needs generator exemplars") was a presumption
+> that the remedy lived in training data. For the amount-variant cluster
+> (item 1), that presumption was tested by
+> `orbit/specs/2026-04-24-amount-variant-generators/` and found **false**:
+> the primary mechanism was `header_hint()` over-generalisation, not a
+> training-data gap. The fix was a 12-arm table edit to
+> `crates/finetype-model/src/column.rs`; no retrain was performed; net
+> target lift was +11 / 11 on the 11 eval columns. Items 2 and 3 below
+> may or may not have the same mechanism — run the diagnostic arc
+> (ac-01..ac-04 of the amount-variant spec) on each cluster before
+> committing to training-layer work. See MADR 0065 (mechanism), MADR 0066
+> (v19 retrain hard gate), MADR 0067 (this framing correction).
+
 The v18 diff surfaces three concrete capability cards for v19:
 
-1. **Amount-variant generator card** — 11 amount subtypes collapse to plain `amount` in both v16 and v18. Needs per-subtype generators with distinct value-shape signatures (`amount_lakh: "1,23,456.78"`, `amount_apostrophe: "1'234.56"`, `amount_accounting: "(1,234.56)"`, etc.).
-2. **Container-type generator card** — 8 container types (`xml`, `csv`, `html`, `yaml`, `json_array`, `query_string`, `semicolon_separated`, `whitespace_separated`) collapse to `categorical`. Needs generator exemplars that resist the collapse.
-3. **Datetime-subtype generator card** — 6 datetime subtypes (`iso_microseconds`, `jp_era_short`, `julian`, `ordinal`, `pg_short_offset`, etc.) collapse to their nearest specific timestamp. Needs subtype-distinguishing training exemplars.
+1. **Amount-variant generator card** — ~~11 amount subtypes collapse to plain `amount` in both v16 and v18. Needs per-subtype generators with distinct value-shape signatures.~~ **SHIPPED 2026-04-24** as a pipeline-layer fix; no generator work was needed. See `orbit/specs/2026-04-24-amount-variant-generators/`.
+2. **Container-type generator card** — 8 container types (`xml`, `csv`, `html`, `yaml`, `json_array`, `query_string`, `semicolon_separated`, `whitespace_separated`) collapse to `categorical`. **Run the diagnostic arc before writing generators** — the collapse may be a Sharpen hint-layer artefact rather than a training-data gap.
+3. **Datetime-subtype generator card** — 6 datetime subtypes (`iso_microseconds`, `jp_era_short`, `julian`, `ordinal`, `pg_short_offset`, etc.) collapse to their nearest specific timestamp. **Run the diagnostic arc before writing generators** — same caveat; datetime has 84 taxonomy definitions and substring aliasing in `header_hint()` is a plausible primary cause.
 
 Also carried forward:
 
@@ -80,4 +94,4 @@ Pre-handover gate verification:
 
 ## Next Drive
 
-v19 prep requires a triage decision on the 3 follow-up generator cards (which one first, or sequenced). Recommend `/orb:discovery` on `amount-variant generators` as the largest cluster (11 persistent misses).
+v19 prep requires a triage decision on the 2 remaining follow-up clusters (container-type, datetime-subtype). The amount-variant cluster (largest, 11 persistent misses) shipped as a pipeline-layer fix on 2026-04-24 — see `orbit/specs/2026-04-24-amount-variant-generators/` and MADRs 0065/0066/0067. Recommend `/orb:discovery` on `container-type generators` next, following the same diagnostic arc (ac-01 corpus counts → ac-02 value-shape Jaccard → ac-03 confusion → ac-04 raw softmax top-k) before committing to training-layer remediation.

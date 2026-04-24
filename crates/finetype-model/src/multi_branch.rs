@@ -831,6 +831,113 @@ impl MultiBranchClassifier {
         activate(&h, "act2")
     }
 
+    /// Top-k classification surface — same input contract as `classify_column`
+    /// but returns the top-k `(label, probability)` pairs in descending order
+    /// for diagnostic use (ac-04 confidence distribution in the
+    /// amount-variant-generators spec). Internal state is identical to
+    /// `classify_column`; the only difference is we keep the full softmax
+    /// instead of discarding it after taking argmax.
+    pub fn classify_column_topk(
+        &self,
+        values: &[String],
+        header: &str,
+        taxonomy: Option<&Taxonomy>,
+        k: usize,
+    ) -> Result<Vec<(String, f32)>, InferenceError> {
+        if values.is_empty() || k == 0 {
+            return Ok(Vec::new());
+        }
+
+        let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
+
+        let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
+        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
+            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
+
+        let device = Device::Cpu;
+        let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
+        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+
+        let header_t = if self.header_branch.is_some() {
+            let header_embed = if !header.is_empty() {
+                self.model2vec
+                    .encode_one(header)
+                    .and_then(|t| t.to_vec1::<f32>().ok())
+                    .unwrap_or_else(|| vec![0.0f32; self.config.header_dim])
+            } else {
+                vec![0.0f32; self.config.header_dim]
+            };
+            Some(
+                Tensor::from_slice(&header_embed, (1, self.config.header_dim), &device)
+                    .map_err(|e| InferenceError::InvalidPath(format!("header tensor: {e}")))?,
+            )
+        } else {
+            None
+        };
+
+        let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
+
+        let hidden = self.forward_trunk(
+            &char_t,
+            &embed_t,
+            &stats_t,
+            header_t.as_ref(),
+            valid_t.as_ref(),
+        )?;
+
+        let probs_vec = match &self.head {
+            ClassificationHead::Flat(head) => {
+                let logits = head
+                    .forward_t(&hidden, false)
+                    .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))?;
+                let probs = candle_nn::ops::softmax(&logits, 1)
+                    .map_err(|e| InferenceError::InvalidPath(format!("softmax: {e}")))?;
+                probs
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?
+            }
+            ClassificationHead::Hierarchical(hier_head) => {
+                let probs = hier_head
+                    .forward(&hidden, self.config.n_classes)
+                    .map_err(|e| {
+                        InferenceError::InvalidPath(format!("hierarchical forward: {e}"))
+                    })?;
+                probs
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?
+            }
+        };
+
+        let mut indexed: Vec<(usize, f32)> = probs_vec
+            .iter()
+            .enumerate()
+            .map(|(i, &p)| (i, p))
+            .collect();
+        indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let k = k.min(indexed.len());
+        Ok(indexed
+            .into_iter()
+            .take(k)
+            .map(|(i, p)| {
+                let label = self
+                    .labels
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("unknown_idx_{i}"));
+                (label, p)
+            })
+            .collect())
+    }
+
     /// Return the number of output classes.
     pub fn n_classes(&self) -> usize {
         self.config.n_classes

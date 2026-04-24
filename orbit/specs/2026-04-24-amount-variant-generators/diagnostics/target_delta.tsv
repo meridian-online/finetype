@@ -1,0 +1,12 @@
+dataset	column	expected	pre_pred	post_pred	pre_ok	post_ok	delta
+coverage_closure_phase_ab	amount_accounting	finance.currency.amount_accounting	finance.currency.amount	finance.currency.amount_accounting	0	1	FIX
+coverage_closure_phase_ab	amount_apostrophe	finance.currency.amount_apostrophe	finance.currency.amount	finance.currency.amount_apostrophe	0	1	FIX
+coverage_closure_phase_ab	amount_code_prefix	finance.currency.amount_code_prefix	finance.currency.amount	finance.currency.amount_code_prefix	0	1	FIX
+coverage_closure_phase_ab	amount_comma	finance.currency.amount_comma	finance.currency.amount	finance.currency.amount_comma	0	1	FIX
+coverage_closure_phase_ab	amount_comma_suffix	finance.currency.amount_comma_suffix	finance.currency.amount	finance.currency.amount_comma_suffix	0	1	FIX
+coverage_closure_phase_ab	amount_crypto	finance.currency.amount_crypto	finance.currency.amount	finance.currency.amount_crypto	0	1	FIX
+coverage_closure_phase_ab	amount_lakh	finance.currency.amount_lakh	finance.currency.amount	finance.currency.amount_lakh	0	1	FIX
+coverage_closure_phase_ab	amount_multisym	finance.currency.amount_multisym	finance.currency.amount	finance.currency.amount_multisym	0	1	FIX
+coverage_closure_phase_ab	amount_neg_trailing	finance.currency.amount_neg_trailing	finance.currency.amount	finance.currency.amount_neg_trailing	0	1	FIX
+coverage_closure_phase_ab	amount_nodecimal	finance.currency.amount_nodecimal	finance.currency.amount	finance.currency.amount_nodecimal	0	1	FIX
+coverage_closure_phase_ab	amount_space	finance.currency.amount_space	finance.currency.amount	finance.currency.amount_space	0	1	FIX

@@ -4182,6 +4182,45 @@ fn header_hint(header: &str) -> Option<&'static str> {
         "fare" | "fee" | "toll" | "charge" => {
             return Some("finance.currency.amount");
         }
+        // Amount-variant exact matches (decision 0065).
+        // These MUST precede the generic `h.contains("amount")` substring
+        // matcher below — otherwise every variant header like `amount_comma`
+        // collapses to the plain `finance.currency.amount` label. See spec
+        // orbit/specs/2026-04-24-amount-variant-generators ac-01..04 for the
+        // diagnostic arc. Header normalisation replaces `_`/`-` with space.
+        "amount accounting" | "amount acc" => {
+            return Some("finance.currency.amount_accounting");
+        }
+        "amount apostrophe" => {
+            return Some("finance.currency.amount_apostrophe");
+        }
+        "amount code prefix" | "amount code" | "amount with code" => {
+            return Some("finance.currency.amount_code_prefix");
+        }
+        "amount comma" => {
+            return Some("finance.currency.amount_comma");
+        }
+        "amount comma suffix" => {
+            return Some("finance.currency.amount_comma_suffix");
+        }
+        "amount crypto" | "crypto amount" => {
+            return Some("finance.currency.amount_crypto");
+        }
+        "amount lakh" | "lakh amount" | "amount indian" => {
+            return Some("finance.currency.amount_lakh");
+        }
+        "amount multisym" | "amount multi sym" | "amount multiple symbols" => {
+            return Some("finance.currency.amount_multisym");
+        }
+        "amount neg trailing" | "amount negative trailing" => {
+            return Some("finance.currency.amount_neg_trailing");
+        }
+        "amount nodecimal" | "amount no decimal" => {
+            return Some("finance.currency.amount_nodecimal");
+        }
+        "amount space" => {
+            return Some("finance.currency.amount_space");
+        }
         _ => {}
     }
 

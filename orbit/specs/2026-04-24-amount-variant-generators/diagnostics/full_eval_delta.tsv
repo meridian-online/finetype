@@ -1,0 +1,45 @@
+dataset	column	expected	pre_pred	post_pred	pre_ok	post_ok	delta
+books_catalog	title	title	container.array.whitespace_separated	representation.text.entity_name	0	1	FIX
+countries	iso_3166-2	code	identity.medical.dea_number	representation.text.entity_name	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+countries	region-code	code	representation.numeric.integer_number	representation.identifier.numeric_code	0	1	FIX
+countries	sub-region-code	code	representation.numeric.integer_number	representation.identifier.numeric_code	0	1	FIX
+coverage_closure_phase_ab	comma_separated	container.array.comma_separated	representation.discrete.categorical	container.array.comma_separated	0	1	FIX
+coverage_closure_phase_ab	dna_sequence	representation.scientific.dna_sequence	representation.identifier.alphanumeric_id	representation.text.entity_name	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+coverage_closure_phase_ab	dot_dmy_24h	datetime.timestamp.dot_dmy_24h	datetime.timestamp.dot_dmy_24h	datetime.timestamp.sql_milliseconds	1	0	REGRESS
+coverage_closure_phase_ab	epoch_nanoseconds	datetime.timestamp.epoch_nanoseconds	datetime.epoch.unix_seconds	datetime.timestamp.epoch_nanoseconds	0	1	FIX
+coverage_closure_phase_ab	excel_format	representation.file.excel_format	representation.discrete.categorical	representation.text.word	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+coverage_closure_phase_ab	http_method	technology.internet.http_method	technology.internet.http_method	representation.text.word	1	0	REGRESS
+coverage_closure_phase_ab	iso_8601_compact	datetime.timestamp.iso_8601_compact	datetime.timestamp.iso_8601_compact	representation.identifier.alphanumeric_id	1	0	REGRESS
+coverage_closure_phase_ab	iso_8601_milliseconds	datetime.timestamp.iso_8601_milliseconds	datetime.timestamp.iso_8601_millis_offset	representation.discrete.categorical	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+coverage_closure_phase_ab	mdy_short_slash	datetime.date.mdy_short_slash	datetime.date.dmy_short_slash	datetime.date.mdy_short_slash	0	1	FIX
+coverage_closure_phase_ab	measurement_unit	representation.scientific.measurement_unit	representation.discrete.categorical	representation.text.entity_name	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+coverage_closure_phase_ab	periodicity	datetime.component.periodicity	representation.text.word	datetime.component.periodicity	0	1	FIX
+coverage_closure_phase_ab	pg_short_offset	datetime.timestamp.pg_short_offset	datetime.timestamp.dmy_hm	representation.discrete.categorical	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+coverage_closure_phase_ab	rna_sequence	representation.scientific.rna_sequence	representation.text.entity_name	representation.scientific.rna_sequence	0	1	FIX
+coverage_closure_phase_ab	sedol	finance.securities.sedol	representation.discrete.categorical	representation.identifier.alphanumeric_id	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+coverage_closure_phase_ab	semicolon_separated	container.array.semicolon_separated	container.array.semicolon_separated	representation.discrete.categorical	1	0	REGRESS
+coverage_closure_phase_ab	si_number	representation.numeric.si_number	representation.numeric.si_number	representation.file.file_size	1	0	REGRESS
+coverage_closure_phase_ab	token_urlsafe	technology.cryptographic.token_urlsafe	technology.internet.url	technology.cryptographic.token_urlsafe	0	1	FIX
+coverage_closure_phase_ab	weekday_full_month	datetime.date.weekday_full_month	datetime.date.weekday_dmy_full	datetime.date.weekday_full_month	0	1	FIX
+coverage_closure_phase_ab	whitespace_separated	container.array.whitespace_separated	representation.discrete.categorical	representation.text.entity_name	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+datetime_coverage	fiscal_year	fiscal year	datetime.period.fiscal_year	datetime.component.year	1	0	REGRESS
+datetime_coverage	mdy_dash	mdy dash	datetime.date.mdy_dash	datetime.date.dmy_dash	1	1	LABEL_CHANGE_SAME_CORRECTNESS
+earthquakes_2024	depthError	decimal number	geography.coordinate.latitude	representation.numeric.decimal_number	0	1	FIX
+earthquakes_2024	gap	decimal number	finance.currency.amount_accounting	representation.numeric.integer_number	0	1	FIX
+earthquakes_2024	locationSource	category	technology.code.locale_code	representation.scientific.measurement_unit	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+earthquakes_2024	magError	decimal number	datetime.date.dmy_short_dot	representation.numeric.decimal_number	0	1	FIX
+earthquakes_2024	magSource	category	technology.code.locale_code	representation.scientific.measurement_unit	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+earthquakes_2024	magType	category	technology.internet.top_level_domain	representation.scientific.measurement_unit	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+earthquakes_2024	net	category	technology.code.locale_code	representation.scientific.measurement_unit	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+earthquakes_2024	place	address	geography.location.region	geography.address.full_address	1	1	LABEL_CHANGE_SAME_CORRECTNESS
+earthquakes_2024	status	status	technology.internet.top_level_domain	representation.text.word	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+financial_data	market_cap	value	representation.file.file_size	representation.numeric.si_number	0	1	FIX
+financial_data	volume	number	identity.medical.npi	identity.commerce.ean	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+multilingual	date	date	datetime.date.dmy_slash	datetime.date.ymd_slash	1	0	REGRESS
+network_logs	user_agent	user agent	container.array.whitespace_separated	technology.development.docker_ref	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+new_representation	inchi	inchi	datetime.date.dmy_short_slash	representation.scientific.inchi	0	1	FIX
+new_representation	smiles	smiles	representation.discrete.categorical	representation.scientific.smiles	0	1	FIX
+people_directory	phone	telephone	identity.person.phone_number	identity.government.ssn	1	0	REGRESS
+scientific_measurements	measurement_unit	measurement unit	geography.location.state_code	representation.scientific.measurement_unit	0	0	LABEL_CHANGE_SAME_CORRECTNESS
+sports_events	status	status	datetime.component.periodicity	representation.discrete.categorical	0	1	FIX
+tech_systems	server_hostname	hostname	identity.person.email	technology.internet.hostname	0	1	FIX
