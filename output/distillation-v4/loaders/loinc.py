@@ -45,7 +45,7 @@ Sampling strategy:
   page returns up to 500 rows; we deduplicate by code.
 
 Spec reference:
-  orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
+  specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
   acceptance_criteria: ac-01
 """
 

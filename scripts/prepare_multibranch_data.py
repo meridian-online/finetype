@@ -236,6 +236,41 @@ TABLE_TEMPLATES = {
         "representation.numeric.integer_number",
         "representation.file.mime_type",
     ],
+    # --- Container-type templates (v19) ---
+    # These ensure the model sees container types in realistic table contexts.
+    # All 8 failing container types covered across 3 templates.
+    "data_exchange": [
+        "container.object.csv", "container.object.json_array",
+        "container.object.xml", "container.object.yaml",
+        "representation.file.mime_type", "representation.text.entity_name",
+        "datetime.timestamp.iso_8601",
+    ],
+    "web_content": [
+        "container.object.html", "container.key_value.query_string",
+        "technology.internet.url", "technology.internet.hostname",
+        "representation.numeric.integer_number", "datetime.timestamp.iso_8601",
+    ],
+    "log_fields": [
+        "container.array.comma_separated", "container.array.pipe_separated",
+        "container.array.semicolon_separated",
+        "container.array.whitespace_separated",
+        "technology.internet.ip_v4", "representation.text.entity_name",
+        "datetime.timestamp.iso_8601",
+    ],
+    # --- Datetime precision templates (v19) ---
+    # Exposes the 6 failing datetime subtypes in realistic table contexts.
+    "timestamp_precision": [
+        "datetime.timestamp.iso_8601_compact",
+        "datetime.timestamp.iso_8601_milliseconds",
+        "datetime.timestamp.iso_microseconds",
+        "datetime.timestamp.pg_short_offset",
+        "representation.identifier.uuid", "technology.internet.ip_v4",
+    ],
+    "international_dates": [
+        "datetime.date.jp_era_short", "datetime.date.ordinal",
+        "datetime.date.iso", "geography.location.country",
+        "identity.person.full_name", "representation.text.entity_name",
+    ],
 }
 
 # All unique types referenced in templates (for noise injection)
