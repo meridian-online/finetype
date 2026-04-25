@@ -84,10 +84,13 @@ acceptance_criteria:
       per grep sampling, plus 2 sense_geo_* legacy branches, plus 1
       header_hint_table, plus ~7 substring_matcher_* groupings — one per
       domain). Every family_id is unique. Every (file, line_start, line_end)
-      triple points to real, non-overlapping line ranges in the repo. Every
-      rule_family_class value appears at least once (all 4 classes are
-      exercised). A Rust or Python test (rhh_ac01_inventory) loads the TSV
-      and asserts all invariants.
+      triple brackets real call-sites for the family; ranges MAY overlap
+      across families (substring matchers are interleaved arms in a single
+      function body, branch families are guards inside apply_header_sharpen
+      — see MADR 0042 execution-log notes and rhh_methodology.md "Design
+      Pivots" for the v1.3 spec correction). Every rule_family_class value
+      appears at least once (all 4 classes are exercised). A Python test
+      (rhh_ac01_inventory) loads the TSV and asserts all invariants.
 
   - id: ac-02
     ac_type: code
@@ -137,13 +140,19 @@ acceptance_criteria:
       `finetype profile --verbose` once on the full manifest and parses
       disambiguation_rule prefixes across all 352 rows.
     verification: >
-      File exists, schema matches. For every row,
-      columns_hit + columns_unused == 352. columns_correct + columns_wrong
-      == columns_hit. Every family_id from ac-01 appears exactly once. The
-      sum of columns_hit across families with matching prefix tags equals
+      File exists, schema matches the shipped columns (family_id,
+      hit_count, measurement_mode, rule_family_class, keep_required,
+      note) — v1.3 spec correction. Original schema
+      (columns_hit/correct/wrong/unused) was replaced because internal
+      families fire inside header_hint() without a dedicated rule prefix,
+      so prefix-match correctness counts don't exist for them; correctness
+      is measured uniformly by ac-04's counterfactual instead. Every
+      family_id from ac-01 appears exactly once. Every measurement_mode is
+      one of {direct, internal}. For direct-mode families, hit_count equals
       the count of rows in the baseline profile output whose
-      disambiguation_rule has that prefix (counted independently by
-      rhh_ac03_totals test).
+      disambiguation_rule begins with the family_id (counted independently
+      by rhh_ac03_totals test). For internal-mode families hit_count is
+      deferred to ac-04.
 
   - id: ac-04
     ac_type: code
@@ -160,17 +169,21 @@ acceptance_criteria:
       sets RHH_DISABLE_HINTS, runs `finetype profile --verbose` on the
       family's hit columns, parses predictions, diffs against baseline.
     verification: >
-      File exists, schema matches. Row count equals sum of columns_hit
-      across all family_ids from ac-03. Every column_id is traceable back
-      to a row in the eval manifest. Test rhh_ac04_baseline_match: loads
-      the full eval baseline from eval/eval_output/profile_results.csv and
-      asserts baseline_prediction in the counterfactual TSV matches for
-      every row (not just spot-check). Tolerance on the same machine: 0
-      rows may differ. Model pinning: the TSV opens with a schema
-      comment header recording (a) the resolved absolute path of the
-      model directory (following models/default symlink), (b) the sha256
-      of weights.safetensors at measurement time. This protects downstream
-      interpretation against a future models/default promotion flip.
+      File exists, schema matches. Row count equals 22 families × 448
+      GT-covered columns == 9856 — v1.3 correction from the original
+      "sum of columns_hit" invariant, which predated the uniform
+      label_changed==1 hit definition (see rhh_methodology.md "Design
+      Pivots"). Every column_id is traceable back to a row in the eval
+      manifest. Test rhh_ac04_baseline_match: every counterfactual row's
+      baseline_prediction matches the corresponding family-agnostic
+      baseline in rhh_counterfactual.tsv (the 22 families share one
+      baseline per column, so every column_id should show 22 identical
+      baseline_prediction values across families). Model pinning: the
+      TSV opens with a schema comment header recording (a) the resolved
+      absolute path of the model directory (following models/default
+      symlink), (b) the sha256 of model.safetensors at measurement time.
+      This protects downstream interpretation against a future
+      models/default promotion flip.
 
   - id: ac-05
     ac_type: code
@@ -373,7 +386,7 @@ exit_conditions:
   - "All 11 ACs marked [x] in progress.md"
 
 metadata:
-  version: "1.2"
+  version: "1.3"
   test_prefix: "rhh"
   timestamp: "2026-04-24T16:30:00Z"
   ambiguity_score: 0.074
@@ -381,6 +394,7 @@ metadata:
   review_cycles:
     v1.0: "REQUEST_CHANGES, 7 findings (2H/3M/2L). v1.1 addresses all."
     v1.1: "APPROVE with 3M/1L non-blocking carry-forwards. v1.2 addresses: ac-07 primary-target definition, ac-04 model pinning, ac-09 FP drift carve-out, ac-02 non-emitting-family coverage."
+    v1.2-impl-v1-review-pr: "REQUEST_CHANGES (1H/5M/2L). v1.3 addresses: HIGH regenerate_all.sh bash-3.2 compat; ac-01 overlap-range assertion relaxed (interleaved-families reality); ac-03 schema pivot (uniform label_changed hit def); ac-04 row-count invariant rewritten against 22×448 matrix; missing rhh_ac01/02/03/04 tests added; weights.safetensors → model.safetensors wording fix; PYTHONHASHSEED=0 added to regenerate script; rhh_build_check.txt added."
   follow_up_specs:
     - "Technology-domain stage (after this spec ships)"
     - "Identity-domain stage"

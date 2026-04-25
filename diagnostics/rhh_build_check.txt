@@ -1,0 +1,27 @@
+=== rhh_build_check.txt — ac-02 verification artefact ===
+Generated: 2026-04-25T02:29:56Z
+
+=== 1. Default-feature build (should compile, no rhh instrumentation) ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.70s
+
+=== 2. rhh-instrumentation build (feature gate on) ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s
+
+=== 3. Public-API surface check (manual grep of pub items) ===
+-- Default build, pub items in column.rs:
+5
+Byte size of column.rs:
+437050
+
+-- Instrumentation is cfg-gated: disable_<domain> and disable_hook vars only exist when feature is on
+1
+cfg gates present (expected >0)
+
+=== 4. Zero-instruction claim (default build has no RHH calls) ===
+RHH symbols in default rlib:
+   Compiling finetype-model v0.6.17 (/Users/hugh/github/meridian-online/finetype/crates/finetype-model)
+    Finished `release` profile [optimized] target(s) in 15.84s
+0
+0
+
+=== build check complete ===

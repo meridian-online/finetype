@@ -35,6 +35,15 @@
 
 set -euo pipefail
 
+# Deterministic environment for the Python pipeline scripts. The ac-09
+# gate's byte-identical contract depends on hash-set iteration order
+# being pinned; PYTHONHASHSEED=0 achieves that. ac-04's finetype profile
+# invocation is already deterministic given a pinned model + manifest.
+export PYTHONHASHSEED=0
+
+# Compat note: this script runs on bash 3.2 (stock macOS /bin/bash).
+# No associative arrays; parallel indexed arrays instead.
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DIAG_DIR="${REPO_ROOT}/diagnostics"
 SCRIPTS="${REPO_ROOT}/scripts/rhh"
@@ -80,14 +89,32 @@ ARTEFACTS=(
 )
 
 # ----- capture pre-run fingerprints -----
-declare -A pre
+# bash 3.2 compat: parallel indexed arrays (PRE_KEYS + PRE_HASHES) in
+# place of an associative array. Lookup is via linear scan — negligible
+# for |ARTEFACTS|=7.
+PRE_KEYS=()
+PRE_HASHES=()
 for f in "${ARTEFACTS[@]}"; do
+    PRE_KEYS+=("$f")
     if [[ -f "$f" ]]; then
-        pre[$f]="$(shasum -a 256 "$f" | awk '{print $1}')"
+        PRE_HASHES+=("$(shasum -a 256 "$f" | awk '{print $1}')")
     else
-        pre[$f]="ABSENT"
+        PRE_HASHES+=("ABSENT")
     fi
 done
+
+# Lookup helper — emits the pre-hash for a given key, or empty string.
+lookup_pre() {
+    local key="$1"
+    local i
+    for (( i = 0; i < ${#PRE_KEYS[@]}; i++ )); do
+        if [[ "${PRE_KEYS[$i]}" == "$key" ]]; then
+            echo "${PRE_HASHES[$i]}"
+            return 0
+        fi
+    done
+    echo ""
+}
 
 # ----- run the pipeline -----
 echo "==> ac-01 family inventory"
@@ -126,8 +153,8 @@ drift=0
     for f in "${ARTEFACTS[@]}"; do
         hash_post="$(shasum -a 256 "$f" | awk '{print $1}')"
         echo "${hash_post}  ${f}"
-        hash_pre="${pre[$f]}"
-        if [[ "${hash_pre}" != "ABSENT" && "${hash_pre}" != "${hash_post}" ]]; then
+        hash_pre="$(lookup_pre "$f")"
+        if [[ -n "${hash_pre}" && "${hash_pre}" != "ABSENT" && "${hash_pre}" != "${hash_post}" ]]; then
             {
                 echo "DRIFT: ${f}"
                 echo "  pre:  ${hash_pre}"
