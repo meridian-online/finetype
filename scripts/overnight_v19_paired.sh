@@ -317,11 +317,11 @@ if min_type_count < 50:
     sys.exit(1)
 print(f'  PASS')
 
-# Gate 3: Total types >= 239
+# Gate 3: Total types >= 240 (all taxonomy types must be present)
 total_types = len(label_counts)
-print(f'Gate 3: Total types = {total_types} (gate: >=239)')
-if total_types < 239:
-    print(f'FAIL: Only {total_types} types')
+print(f'Gate 3: Total types = {total_types} (gate: >=240)')
+if total_types < 240:
+    print(f'FAIL: Only {total_types} types (need 240)')
     sys.exit(1)
 print(f'  PASS')
 
@@ -332,16 +332,17 @@ if max_type_count > 1500:
     heavy = {k: v for k, v in label_counts.items() if v > 1500}
     print(f'WARN: {len(heavy)} types above 1500')
 
-# Gate 5: Dropped types absent
-_dropped = ['finance.banking.swift_bic', 'technology.internet.http_method',
-            'representation.file.excel_format', 'identity.medical.loinc',
-            'identity.medical.cpt', 'identity.government.ssn',
-            'technology.internet.user_agent']
-leaked = [t for t in _dropped if t in label_counts]
-if leaked:
-    print(f'FAIL: Dropped types present: {leaked}')
-    sys.exit(1)
-print(f'Gate 5: All {len(_dropped)} dropped types absent — PASS')
+# Gate 5 (v19): v4-rehabilitated types PRESENT (v16 dropped these; v4 loaders restored them)
+_rehabilitated = ['finance.banking.swift_bic', 'technology.internet.http_method',
+                  'representation.file.excel_format', 'identity.medical.loinc',
+                  'identity.medical.cpt', 'identity.government.ssn',
+                  'technology.internet.user_agent']
+missing_rehab = [t for t in _rehabilitated if t not in label_counts]
+if missing_rehab:
+    print(f'WARN: {len(missing_rehab)} v4-rehabilitated types missing: {missing_rehab}')
+    # Not a hard fail — some may still be filtered by distilled-cap or decontamination
+present_rehab = [t for t in _rehabilitated if t in label_counts]
+print(f'Gate 5: {len(present_rehab)}/{len(_rehabilitated)} v4-rehabilitated types present — PASS')
 
 # Gate 6 (v19): Container types present with sufficient volume
 container_types = [k for k in label_counts if k.startswith('container.')]

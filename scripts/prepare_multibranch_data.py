@@ -271,6 +271,16 @@ TABLE_TEMPLATES = {
         "datetime.date.iso", "geography.location.country",
         "identity.person.full_name", "representation.text.entity_name",
     ],
+    # --- Coverage closure (v19) ---
+    # Types with generators but no template placement.
+    "scientific_records": [
+        "representation.scientific.inchi",
+        "representation.scientific.smiles",
+        "representation.identifier.uuid",
+        "representation.text.entity_name",
+        "representation.numeric.decimal_number",
+        "datetime.date.iso",
+    ],
 }
 
 # All unique types referenced in templates (for noise injection)
@@ -1514,6 +1524,8 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
                 str(values_per_type),
                 "--seed",
                 str(seed),
+                "--priority",
+                "0",  # Include all types (password is priority 0)
                 "--output",
                 tmp_path,
             ],
