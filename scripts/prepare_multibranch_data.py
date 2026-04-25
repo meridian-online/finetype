@@ -1812,8 +1812,17 @@ def assemble_synthetic_tables(synthetic_columns_by_type, rng, taxonomy_types,
     for type_key, cols in synthetic_columns_by_type.items():
         pool[type_key] = list(cols)  # copy so we can pop
 
-    # All available types for noise injection (excluding column-level types)
-    noise_candidates = [t for t in taxonomy_types if t not in COLUMN_LEVEL_TYPES]
+    # All available types for noise injection (excluding column-level types
+    # and types that only appear in one template — protect low-coverage types
+    # from being consumed as noise before their template runs)
+    _template_type_counts = {}
+    for _tpl_types in TABLE_TEMPLATES.values():
+        for _tt in _tpl_types:
+            _template_type_counts[_tt] = _template_type_counts.get(_tt, 0) + 1
+    _single_template_types = {t for t, c in _template_type_counts.items() if c == 1}
+    noise_candidates = [t for t in taxonomy_types
+                        if t not in COLUMN_LEVEL_TYPES
+                        and t not in _single_template_types]
 
     tables = []
     template_names = list(TABLE_TEMPLATES.keys())

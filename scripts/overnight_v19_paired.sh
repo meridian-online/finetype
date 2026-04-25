@@ -262,7 +262,9 @@ echo "================================================================"
 echo " Step 1.5: Pre-training Data Audit Gate (v19)"
 echo "================================================================"
 
-AUDIT_RESULT=$(python3 -c "
+# Run audit gate inline (not via command substitution) so errors are visible
+# even under set -e. The gate prints to stdout and exits non-zero on failure.
+python3 -c "
 import struct, sys
 
 path = '$FTMB_FILE'
@@ -361,15 +363,7 @@ print(f'')
 print(f'Audit summary: {total_types} types, {sum(label_counts.values())} records')
 print(f'  Per-type range: {min_type_count} — {max_type_count}')
 print(f'ALL GATES PASSED')
-" 2>&1)
-
-echo "$AUDIT_RESULT"
-
-if echo "$AUDIT_RESULT" | grep -q "^FAIL:"; then
-    echo ""
-    echo "Pre-training audit gate FAILED. Aborting."
-    exit 1
-fi
+"
 echo ""
 
 # ── Step 2: Training Runs ─────────────────────────────────────────────
