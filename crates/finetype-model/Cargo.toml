@@ -14,6 +14,12 @@ default = ["cpu"]
 cpu = []
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+# RHH (Remove-Header-Hints) instrumentation. When enabled, the runtime
+# reads RHH_DISABLE_HINTS (comma-separated family ids) and short-circuits
+# the matching rule families inside `column.rs`. When disabled (default),
+# every check compiles to a constant `false` and there is zero overhead.
+# See orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
+rhh-instrumentation = []
 
 [dependencies]
 finetype-core = { workspace = true }

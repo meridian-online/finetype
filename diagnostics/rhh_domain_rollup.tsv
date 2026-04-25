@@ -1,0 +1,16 @@
+# rhh_domain_rollup.tsv — ac-06 output
+# Source: diagnostics/rhh_family_inventory.tsv + diagnostics/rhh_classification.tsv
+# removal_readiness:
+#   READY               — model_gap == 0 AND at least one non-no-hit family.
+#   NEEDS_FORTIFICATION — model_gap > 0.
+#   NO_EVIDENCE         — all families no-hit OR total_families == 0.
+# Schema: domain\ttotal_families\tmodel_covered\tmodel_gap\tno_hit\tremoval_readiness
+domain	total_families	model_covered	model_gap	no_hit	removal_readiness
+container	0	0	0	0	NO_EVIDENCE
+datetime	1	1	0	0	READY
+finance	1	0	1	0	NEEDS_FORTIFICATION
+geography	6	0	1	5	NEEDS_FORTIFICATION
+identity	2	0	1	1	NEEDS_FORTIFICATION
+representation	3	0	1	2	NEEDS_FORTIFICATION
+technology	1	0	1	0	NEEDS_FORTIFICATION
+cross-domain	8	1	5	2	NEEDS_FORTIFICATION

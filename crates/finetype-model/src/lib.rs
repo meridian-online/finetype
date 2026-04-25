@@ -17,6 +17,7 @@ pub mod label_category_map;
 pub mod model;
 pub mod model2vec_shared;
 pub mod multi_branch;
+pub mod rhh;
 pub mod semantic;
 pub mod sense;
 pub mod sibling_context;

@@ -1,0 +1,10 @@
+# rhh_fingerprints.sha256 — produced by scripts/rhh/regenerate_all.sh
+# Artefact sha256 fingerprints after the last pipeline regeneration.
+# Byte-identical re-run is the ac-09 gate.
+62160fb7c8562eabe381bb1e3b3dc803c0d6fb98d4a309860db711e30cee18bc  diagnostics/rhh_family_inventory.tsv
+5fbebe22e2969b68c5fb12278ff3288d42835369decace96f4231a4d5065b052  diagnostics/rhh_hit_counts.tsv
+7307f368158a4fa926f11ed860ca4a97033b381cb0511cdbce7a9c92966023d4  diagnostics/rhh_counterfactual.tsv
+206033f1051236dd5970d69eeb1ff9e5af76856ce541557d2a5c242beae91376  diagnostics/rhh_counterfactual_summary.tsv
+562181aafd96f181f3ab9650b4e5a6057216ae7bf214dd168d9f40cc9624ba03  diagnostics/rhh_classification.tsv
+e85a63f84d4b956337dc913cc1037acb2f16232509292af814b7617ac6aaad00  diagnostics/rhh_domain_rollup.tsv
+28cd22a025ecfad5f7df6930a8ca25eb8a4e573f3ff4d78dddf30f2c4e661214  diagnostics/rhh_roadmap.tsv

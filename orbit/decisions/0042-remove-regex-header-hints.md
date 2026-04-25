@@ -36,3 +36,22 @@ The removal should be coordinated with the multi-branch-as-Sense integration (de
 - Good, because debugging is clearer — header influence comes from model weights, not regex rules
 - Bad, because some well-known headers (email, phone, postal_code) may temporarily lose precision during transition
 - Mitigation: validate against the 190-column eval before removing hints; if specific headers regress, add them to training data rather than re-adding rules
+
+## Execution Log
+
+- **2026-04-24 — Measurement + roadmap spec shipped.** See
+  `orbit/specs/2026-04-24-remove-header-hints/` (v1.2). The execution
+  artefact is `diagnostics/rhh_roadmap.tsv` (22 families classified
+  against the 80% counterfactual threshold). Companion files:
+  `rhh_family_inventory.tsv` (ac-01), `rhh_hit_counts.tsv` (ac-03),
+  `rhh_counterfactual.tsv` (ac-04, model pinned at sherlock-v16
+  sha256 `58dcba8ea723…`), `rhh_classification.tsv` (ac-05),
+  `rhh_domain_rollup.tsv` (ac-06), `rhh_methodology.md` (ac-08),
+  `rhh_fingerprints.sha256` (ac-09). No source-code removal in this
+  spec — per-domain follow-up specs will consume the roadmap.
+  Headline counts: 12 removable (no-hit + model-covered), 9 blocked
+  on training-data fortification, 1 gated on v19 retrain
+  (`header_hint_table`, per MADR 0065's amount-variant targets).
+  Only READY domain: datetime. Status of this MADR unchanged —
+  remains `accepted`; execution is now measurement-complete and
+  continues in per-domain successor specs.
