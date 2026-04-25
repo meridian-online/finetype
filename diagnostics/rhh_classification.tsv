@@ -1,0 +1,29 @@
+# rhh_classification.tsv — ac-05 output
+# Source: diagnostics/rhh_counterfactual.tsv
+# Threshold: 0.80
+# Hit definition: column where disabling the family changed the
+# baseline label (label_changed == 1).
+# Schema: family_id\tclassification\tcolumns_hit\tno_hint_label_correct\tno_hint_label_accuracy\trule_family_class\tkeep_required\tnotes
+family_id	classification	columns_hit	no_hint_label_correct	no_hint_label_accuracy	rule_family_class	keep_required	notes
+header_hint_table	model-gap	31	6	0.194	match_table	false	
+substring_matcher_identity	model-gap	9	0	0.000	substring	false	
+substring_matcher_technology	model-gap	2	0	0.000	substring	false	
+substring_matcher_geography	model-gap	7	2	0.286	substring	false	
+substring_matcher_datetime	model-covered	3	3	1.000	substring	false	
+substring_matcher_finance	model-gap	11	8	0.727	substring	false	
+substring_matcher_representation	model-gap	2	1	0.500	substring	false	
+header_hint_measurement	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+header_hint_location	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+header_hint_hardcoded	model-gap	4	1	0.250	branch	false	
+header_hint_generic	model-gap	4	3	0.750	branch	false	
+header_hint_fallback	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+header_hint	model-covered	1	1	1.000	branch	false	
+header_hint_cross_domain	model-gap	6	2	0.333	branch	true	keep_required (spec constraint #2)
+header_hint_same_category	model-gap	3	2	0.667	branch	true	keep_required (spec constraint #2)
+header_hint_geo_override	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+header_hint_person_override	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+header_hint_sci_measurement	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+header_hint_location_keep	no-hit	0	0	0.000	branch	false	zero-impact on current eval
+sense_geo_hint_override	no-hit	0	0	0.000	legacy_sense	false	zero-impact on current eval
+sense_geo_rescue	no-hit	0	0	0.000	legacy_sense	false	zero-impact on current eval
+sense_header_hint	no-hit	0	0	0.000	legacy_sense	false	zero-impact on current eval

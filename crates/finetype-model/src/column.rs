@@ -16,6 +16,7 @@ use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
 use crate::multi_branch::MultiBranchClassifier;
+use crate::rhh;
 use crate::semantic::SemanticHintClassifier;
 use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
 use crate::sibling_context::SiblingContextAttention;
@@ -2146,6 +2147,21 @@ impl ColumnClassifier {
     fn apply_header_sharpen(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
         let label_before = result.label.clone();
 
+        // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
+        // is off — every `disable_*` becomes a constant `false`, the optimiser
+        // eliminates the conjunctions, and there is zero runtime overhead).
+        // See orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
+        let disable_measurement = rhh::is_disabled("header_hint_measurement");
+        let disable_sci_measurement = rhh::is_disabled("header_hint_sci_measurement");
+        let disable_person_override = rhh::is_disabled("header_hint_person_override");
+        let disable_geo_override = rhh::is_disabled("header_hint_geo_override");
+        let disable_same_category = rhh::is_disabled("header_hint_same_category");
+        let disable_cross_domain = rhh::is_disabled("header_hint_cross_domain");
+        let disable_catchall = rhh::is_disabled("header_hint");
+        let disable_generic = rhh::is_disabled("header_hint_generic");
+        let disable_hardcoded = rhh::is_disabled("header_hint_hardcoded");
+        let disable_fallback = rhh::is_disabled("header_hint_fallback");
+
         // Get header hint: hardcoded first, then Model2Vec semantic
         let hardcoded_hint = header_hint(header).map(|h| h.to_string());
         let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
@@ -2173,7 +2189,8 @@ impl ColumnClassifier {
             "geography.coordinate.latitude",
             "geography.coordinate.longitude",
         ];
-        if MEASUREMENT_TYPES.contains(&hinted_type)
+        if !disable_measurement
+            && MEASUREMENT_TYPES.contains(&hinted_type)
             && MEASUREMENT_TYPES.contains(&result.label.as_str())
         {
             result.label = hinted_type.to_string();
@@ -2185,7 +2202,8 @@ impl ColumnClassifier {
         }
 
         // Scientific measurement override (coordinates → decimal when header says measurement)
-        if hinted_type == "representation.numeric.decimal_number"
+        if !disable_sci_measurement
+            && hinted_type == "representation.numeric.decimal_number"
             && COORDINATE_TYPES.contains(&result.label.as_str())
         {
             result.label = hinted_type.to_string();
@@ -2214,7 +2232,7 @@ impl ColumnClassifier {
         if PERSON_NAME_HINTS.contains(&hinted_type)
             && LOCATION_TYPES.contains(&result.label.as_str())
         {
-            if hint_is_hardcoded {
+            if !disable_person_override && hint_is_hardcoded {
                 // Hardcoded person-name hint overrides location (NNFT-235)
                 result.label = hinted_type.to_string();
                 result.confidence = result.confidence.max(0.6);
@@ -2230,7 +2248,8 @@ impl ColumnClassifier {
         }
 
         // Same-domain geographic override
-        if LOCATION_TYPES.contains(&hinted_type)
+        if !disable_geo_override
+            && LOCATION_TYPES.contains(&hinted_type)
             && LOCATION_TYPES.contains(&result.label.as_str())
             && result.label != hinted_type
             && (hint_is_hardcoded || result.confidence <= 0.90)
@@ -2263,7 +2282,7 @@ impl ColumnClassifier {
         // Hardcoded hints are definitive for same-category overrides — no confidence
         // threshold. E.g. "phone" → phone_number overrides ssn@1.00 because both
         // are identity.person.* and the header is unambiguous.
-        if hint_is_hardcoded && result.label != hinted_type {
+        if !disable_same_category && hint_is_hardcoded && result.label != hinted_type {
             let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
             let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
             if !hint_category.is_empty()
@@ -2282,7 +2301,7 @@ impl ColumnClassifier {
         }
 
         // Cross-domain hardcoded hint override (NNFT-254)
-        if hint_is_hardcoded && result.label != hinted_type {
+        if !disable_cross_domain && hint_is_hardcoded && result.label != hinted_type {
             let hint_domain = hinted_type.split('.').next().unwrap_or("");
             let pred_domain = result.label.split('.').next().unwrap_or("");
             let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
@@ -2304,7 +2323,7 @@ impl ColumnClassifier {
         }
 
         // General hint logic
-        if (result.confidence < 0.5 || is_generic) && hint_in_votes {
+        if !disable_catchall && (result.confidence < 0.5 || is_generic) && hint_in_votes {
             let hint_fraction = result
                 .vote_distribution
                 .iter()
@@ -2316,7 +2335,7 @@ impl ColumnClassifier {
             result.confidence = hint_fraction.max(0.6);
             result.disambiguation_applied = true;
             result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
-        } else if is_generic && !hint_in_votes {
+        } else if !disable_generic && is_generic && !hint_in_votes {
             // Financial model2vec guard: block model2vec financial hints with no value evidence
             let is_financial_hint = hinted_type.starts_with("finance.");
             if is_financial_hint && !hint_is_hardcoded {
@@ -2333,7 +2352,7 @@ impl ColumnClassifier {
                 result.disambiguation_rule =
                     Some(format!("header_hint_generic:{}", header.to_lowercase()));
             }
-        } else if hint_is_hardcoded && !hint_in_votes {
+        } else if !disable_hardcoded && hint_is_hardcoded && !hint_in_votes {
             // Hardcoded hint authority with domain-dependent threshold
             // Same-domain: 0.95 (was 0.90, originally 0.50) — unblocks phone@0.915
             // overriding ssn, year@0.83 overriding compact_ym, url@0.60 overriding
@@ -2349,7 +2368,7 @@ impl ColumnClassifier {
                 result.disambiguation_rule =
                     Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
             }
-        } else if result.confidence < 0.3 && !hint_in_votes {
+        } else if !disable_fallback && result.confidence < 0.3 && !hint_in_votes {
             result.label = hinted_type.to_string();
             result.confidence = 0.4;
             result.disambiguation_applied = true;
@@ -4002,8 +4021,21 @@ fn header_hint(header: &str) -> Option<&'static str> {
     let h = h.replace(['_', '-'], " ");
     let h = h.trim();
 
+    // RHH instrumentation hooks — see crate::rhh and
+    // orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02. When the
+    // `rhh-instrumentation` feature is off, all `disable_*` are constant
+    // `false` and the optimiser eliminates the conjunctions; zero overhead.
+    let disable_table = rhh::is_disabled("header_hint_table");
+    let disable_identity = rhh::is_disabled("substring_matcher_identity");
+    let disable_technology = rhh::is_disabled("substring_matcher_technology");
+    let disable_geography = rhh::is_disabled("substring_matcher_geography");
+    let disable_datetime = rhh::is_disabled("substring_matcher_datetime");
+    let disable_finance = rhh::is_disabled("substring_matcher_finance");
+    let disable_representation = rhh::is_disabled("substring_matcher_representation");
+
     // Exact or near-exact matches first (most specific)
-    match h {
+    if !disable_table {
+        match h {
         "email" | "e mail" | "email address" | "emailaddress" => {
             return Some("identity.person.email");
         }
@@ -4222,17 +4254,20 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("finance.currency.amount_space");
         }
         _ => {}
+        }
     }
 
     // Keyword/substring matching (less specific)
     // Guard: "email_display" headers should NOT match — the model correctly
     // identifies email_display from value patterns (v15, Option C keyword audit).
-    if (h.contains("email") || h.contains("e mail")) && !h.contains("display") {
+    if !disable_identity && (h.contains("email") || h.contains("e mail")) && !h.contains("display")
+    {
         return Some("identity.person.email");
     }
     // Guard: "phone_e164" headers should NOT match — the model correctly
     // identifies E.164 from value patterns (v15, Option C keyword audit).
-    if (h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax"))
+    if !disable_identity
+        && (h.contains("phone") || h.contains("tel") || h.contains("mobile") || h.contains("fax"))
         && !h.contains("e164")
     {
         return Some("identity.person.phone_number");
@@ -4240,29 +4275,37 @@ fn header_hint(header: &str) -> Option<&'static str> {
     // IPv6 — check before the generic ip_v4 catch-all so "ip_v6", "server_ipv6",
     // "ipv6_address" all route correctly. Exact "ip" / "ip address" etc. handled
     // above in the exact-match arm (→ ip_v4).
-    if h.contains("v6") || h.contains("ipv6") {
+    if !disable_technology && (h.contains("v6") || h.contains("ipv6")) {
         return Some("technology.internet.ip_v6");
     }
     // IP address — match " ip" suffix, "ip " prefix, or " ip " infix
     // (underscores already replaced with spaces, exact "ip" handled above)
     // Guard: "ip_v4_with_port" headers should NOT match — the model correctly
     // identifies ip_v4_with_port from value patterns (v15, Option C keyword audit).
-    if (h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip ")) && !h.contains("port") {
+    if !disable_technology
+        && (h.ends_with(" ip") || h.starts_with("ip ") || h.contains(" ip "))
+        && !h.contains("port")
+    {
         return Some("technology.internet.ip_v4");
     }
-    if h.contains("zip") || h.contains("postal") || h.contains("postcode") {
+    if !disable_geography
+        && (h.contains("zip") || h.contains("postal") || h.contains("postcode"))
+    {
         return Some("geography.address.postal_code");
     }
-    if h.contains("name") && (h.contains("first") || h.contains("given")) {
+    if !disable_identity && h.contains("name") && (h.contains("first") || h.contains("given")) {
         return Some("identity.person.first_name");
     }
-    if h.contains("name") && (h.contains("last") || h.contains("family") || h.contains("sur")) {
+    if !disable_identity
+        && h.contains("name")
+        && (h.contains("last") || h.contains("family") || h.contains("sur"))
+    {
         return Some("identity.person.last_name");
     }
-    if h.contains("name") && (h.contains("full") || h.contains("complete")) {
+    if !disable_identity && h.contains("name") && (h.contains("full") || h.contains("complete")) {
         return Some("identity.person.full_name");
     }
-    if h.ends_with(" name") && h != "name" {
+    if !disable_identity && h.ends_with(" name") && h != "name" {
         // Qualified: "display name", "user name", "account name" → full_name
         // Bare "name" is ambiguous (could be person, city, country, company) — let
         // Sense + CharCNN decide based on value evidence.
@@ -4274,7 +4317,8 @@ fn header_hint(header: &str) -> Option<&'static str> {
             return Some("identity.person.full_name");
         }
     }
-    if h.contains("address")
+    if !disable_geography
+        && h.contains("address")
         && !h.contains("email")
         && !h.contains("ip")
         && !h.contains("mac")
@@ -4291,32 +4335,36 @@ fn header_hint(header: &str) -> Option<&'static str> {
         }
         return Some("geography.address.full_address");
     }
-    if h.contains("street") {
+    if !disable_geography && h.contains("street") {
         return Some("geography.address.street_address");
     }
-    if h.contains("born") || h.contains("birth") || h.contains("dob") {
+    if !disable_datetime && (h.contains("born") || h.contains("birth") || h.contains("dob")) {
         return Some("datetime.date.iso");
     }
     // Specific timestamp formats — must precede the generic date/timestamp catch-all.
     // Note: underscores are already replaced with spaces by header normalization.
-    if h.contains("rfc 2822") || h.contains("rfc2822") {
+    if !disable_datetime && (h.contains("rfc 2822") || h.contains("rfc2822")) {
         return Some("datetime.timestamp.rfc_2822");
     }
-    if h.contains("rfc 3339") || h.contains("rfc3339") {
+    if !disable_datetime && (h.contains("rfc 3339") || h.contains("rfc3339")) {
         return Some("datetime.timestamp.rfc_3339");
     }
-    if h.contains("sql") && (h.contains("timestamp") || h.contains("datetime")) {
+    if !disable_datetime
+        && h.contains("sql")
+        && (h.contains("timestamp") || h.contains("datetime"))
+    {
         return Some("datetime.timestamp.sql_standard");
     }
     // Epoch/Unix timestamp substrings — must precede generic date/timestamp catch-all (NNFT-254).
     // "timestamp_unix", "unix_timestamp_ms", "epoch_created" etc.
-    if h.contains("epoch") || h.contains("unix") {
+    if !disable_datetime && (h.contains("epoch") || h.contains("unix")) {
         if h.contains("ms") || h.contains("milli") {
             return Some("datetime.epoch.unix_milliseconds");
         }
         return Some("datetime.epoch.unix_seconds");
     }
-    if (h.contains("date") || h.contains("timestamp") || h.contains("datetime"))
+    if !disable_datetime
+        && (h.contains("date") || h.contains("timestamp") || h.contains("datetime"))
         && !h.contains("month")
     {
         // Guard: headers containing "month" (e.g. "abbreviated_month_date",
@@ -4324,64 +4372,76 @@ fn header_hint(header: &str) -> Option<&'static str> {
         // Let the model decide those from values.
         return Some("datetime.timestamp.iso_8601");
     }
-    if h.contains("year") {
+    if !disable_datetime && h.contains("year") {
         return Some("datetime.component.year");
     }
-    if h.contains("weight") {
+    if !disable_identity && h.contains("weight") {
         return Some("identity.person.weight");
     }
-    if h.contains("height") {
+    if !disable_identity && h.contains("height") {
         return Some("identity.person.height");
     }
-    if h.contains("password") || h.contains("passwd") {
+    if !disable_identity && (h.contains("password") || h.contains("passwd")) {
         return Some("identity.credential.password");
     }
-    if h.contains("url") || h.contains("link") || h.contains("href") {
+    if !disable_technology && (h.contains("url") || h.contains("link") || h.contains("href")) {
         return Some("technology.internet.url");
     }
-    if h.contains("price")
-        || h.contains("cost")
-        || h.contains("amount")
-        || h.contains("salary")
-        || h.contains("revenue")
-        || h.contains("income")
-        || h.contains("wage")
-        || h.contains("budget")
-        || h.contains("expense")
+    if !disable_finance
+        && (h.contains("price")
+            || h.contains("cost")
+            || h.contains("amount")
+            || h.contains("salary")
+            || h.contains("revenue")
+            || h.contains("income")
+            || h.contains("wage")
+            || h.contains("budget")
+            || h.contains("expense"))
     {
         return Some("finance.currency.amount");
     }
     // "count" must not match "country" — use word boundary check (NNFT-254)
-    if (h.contains("count") && !h.contains("country") && !h.contains("county"))
-        || h.contains("quantity")
-        || h.contains("num ")
-        || h.starts_with("num")
-        || h.ends_with(" num")
+    if !disable_representation
+        && ((h.contains("count") && !h.contains("country") && !h.contains("county"))
+            || h.contains("quantity")
+            || h.contains("num ")
+            || h.starts_with("num")
+            || h.ends_with(" num"))
     {
         return Some("representation.numeric.integer_number");
     }
-    if h.contains("class") || h.contains("grade") || h.contains("rank") || h.contains("tier") {
+    if !disable_representation
+        && (h.contains("class") || h.contains("grade") || h.contains("rank") || h.contains("tier"))
+    {
         return Some("representation.discrete.ordinal");
     }
-    if h.contains("ticket") || h.contains("cabin") || h.contains("seat") || h.contains("room") {
+    if !disable_representation
+        && (h.contains("ticket")
+            || h.contains("cabin")
+            || h.contains("seat")
+            || h.contains("room"))
+    {
         return Some("representation.alphanumeric.alphanumeric_id");
     }
-    if h.contains("fare") || h.contains("fee") || h.contains("charge") || h.contains("toll") {
+    if !disable_finance
+        && (h.contains("fare") || h.contains("fee") || h.contains("charge") || h.contains("toll"))
+    {
         return Some("finance.currency.amount");
     }
     // Scientific / engineering measurement keywords → decimal_number (NNFT-188).
     // Numeric measurement columns like "pressure_atm" get misclassified as
     // latitude when values fall in [-90, 90]. Header keywords disambiguate.
-    if h.contains("pressure")
-        || h.contains("temperature")
-        || h.contains("voltage")
-        || h.contains("density")
-        || h.contains("velocity")
-        || h.contains("acceleration")
-        || h.contains("frequency")
-        || h.contains("resistance")
-        || h.contains("capacitance")
-        || h.contains("inductance")
+    if !disable_representation
+        && (h.contains("pressure")
+            || h.contains("temperature")
+            || h.contains("voltage")
+            || h.contains("density")
+            || h.contains("velocity")
+            || h.contains("acceleration")
+            || h.contains("frequency")
+            || h.contains("resistance")
+            || h.contains("capacitance")
+            || h.contains("inductance"))
     {
         return Some("representation.numeric.decimal_number");
     }
@@ -4389,14 +4449,17 @@ fn header_hint(header: &str) -> Option<&'static str> {
     // "response time" removed — model correctly handles both integer and decimal
     // response time columns (v15, Option C keyword audit).
     // "duration" excluded when it looks like ISO 8601 (duration_iso, duration_8601)
-    if h.contains("latency")
-        || h.contains("elapsed")
-        || (h.contains("duration") && !h.contains("iso") && !h.contains("8601"))
+    if !disable_representation
+        && (h.contains("latency")
+            || h.contains("elapsed")
+            || (h.contains("duration") && !h.contains("iso") && !h.contains("8601")))
     {
         return Some("representation.numeric.integer_number");
     }
     // Payload / byte size — numeric measurements (NNFT-254)
-    if h.contains("payload") || h.contains("bytes") || h.contains("size") {
+    if !disable_representation
+        && (h.contains("payload") || h.contains("bytes") || h.contains("size"))
+    {
         return Some("representation.numeric.integer_number");
     }
 
@@ -5252,6 +5315,142 @@ fn select_fallback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── RHH instrumentation tests (ac-02) ───────────────────────────────
+    //
+    // Default build: prove behaviour is unchanged — header_hint() returns the
+    // same family-tag for every header it used to fire on. This is the
+    // "default cargo test compiles and passes" half of ac-02 verification.
+
+    // Default-build invariants — gated to default builds only because the
+    // on-feature test (`rhh_ac02_on_feature_disable_scenarios`) mutates
+    // `RHH_DISABLE_HINTS`, and Cargo runs unit tests concurrently within a
+    // single test binary. The on-feature test is self-contained: it sets
+    // env vars to assert the disable mechanic, then restores them. These
+    // baseline tests instead assert that on a default build (feature off),
+    // the env var is read-through-noop and behaviour is unchanged.
+
+    #[test]
+    #[cfg(not(feature = "rhh-instrumentation"))]
+    fn rhh_ac02_default_build_email_match_table_unchanged() {
+        // "email" in the match table → identity.person.email
+        assert_eq!(header_hint("email"), Some("identity.person.email"));
+    }
+
+    #[test]
+    #[cfg(not(feature = "rhh-instrumentation"))]
+    fn rhh_ac02_default_build_phone_substring_unchanged() {
+        // "phone" only fires through the substring matcher (not in match table)
+        assert_eq!(header_hint("phone"), Some("identity.person.phone_number"));
+    }
+
+    #[test]
+    #[cfg(not(feature = "rhh-instrumentation"))]
+    fn rhh_ac02_default_build_zip_geography_unchanged() {
+        assert_eq!(header_hint("zip"), Some("geography.address.postal_code"));
+    }
+
+    #[test]
+    #[cfg(not(feature = "rhh-instrumentation"))]
+    fn rhh_ac02_default_build_env_var_ignored() {
+        // Even if RHH_DISABLE_HINTS is set, default builds ignore it because
+        // rhh::is_disabled compiles to a constant `false`.
+        unsafe {
+            std::env::set_var("RHH_DISABLE_HINTS", "substring_matcher_identity");
+        }
+        let result = header_hint("phone");
+        unsafe {
+            std::env::remove_var("RHH_DISABLE_HINTS");
+        }
+        assert_eq!(result, Some("identity.person.phone_number"));
+    }
+
+    // On-feature tests — gated behind `rhh-instrumentation`. Default
+    // `cargo test` (no feature) skips these entirely. Run with:
+    //   cargo test -p finetype-model --features rhh-instrumentation rhh_ac02
+    //
+    // SAFETY: env-var mutation is process-global. These tests run
+    // sequentially and each test sets, asserts, and unsets the env var
+    // within its own body. They must NOT run concurrently with anything
+    // else that reads RHH_DISABLE_HINTS — Cargo serialises tests within a
+    // single test binary by default for unit tests, and the workspace
+    // configures `--test-threads=1` is not required because each test
+    // restores RHH_DISABLE_HINTS to its prior state on exit.
+
+    /// All on-feature scenarios in one test so the shared `RHH_DISABLE_HINTS`
+    /// env var is mutated by exactly one thread at a time. Splitting this
+    /// into multiple `#[test]` functions caused parallel-test interference
+    /// with the unconditional `rhh_ac02_default_build_*` tests above.
+    #[test]
+    #[cfg(feature = "rhh-instrumentation")]
+    fn rhh_ac02_on_feature_disable_scenarios() {
+        let prior = std::env::var("RHH_DISABLE_HINTS").ok();
+
+        let restore = |prior: &Option<String>| match prior {
+            Some(v) => unsafe { std::env::set_var("RHH_DISABLE_HINTS", v) },
+            None => unsafe { std::env::remove_var("RHH_DISABLE_HINTS") },
+        };
+
+        // Scenario 1: disable substring_matcher_identity → "phone" no
+        // longer fires (it lives only in the identity substring matcher).
+        unsafe {
+            std::env::set_var("RHH_DISABLE_HINTS", "substring_matcher_identity");
+        }
+        assert_eq!(
+            header_hint("phone"),
+            None,
+            "disabling substring_matcher_identity should silence phone hint"
+        );
+
+        // Scenario 2: disabling identity must not silence technology hits.
+        // (Same env var still set from scenario 1.)
+        assert_eq!(
+            header_hint("ipv6"),
+            Some("technology.internet.ip_v6"),
+            "disabling identity must not affect technology"
+        );
+
+        // Scenario 3: disable header_hint_table + substring_matcher_identity
+        // simultaneously → "email" (which lives in the exact-match table)
+        // returns None because the match table is gated and the substring
+        // fallback for identity is also gated.
+        unsafe {
+            std::env::set_var(
+                "RHH_DISABLE_HINTS",
+                "header_hint_table,substring_matcher_identity",
+            );
+        }
+        assert_eq!(
+            header_hint("email"),
+            None,
+            "match_table+identity disable should silence email"
+        );
+
+        // Scenario 4: empty env var = no families disabled → baseline.
+        unsafe {
+            std::env::set_var("RHH_DISABLE_HINTS", "");
+        }
+        assert_eq!(
+            header_hint("phone"),
+            Some("identity.person.phone_number"),
+            "empty disable list must restore baseline"
+        );
+
+        // Scenario 5: whitespace + empty entries are tolerated.
+        unsafe {
+            std::env::set_var(
+                "RHH_DISABLE_HINTS",
+                "  substring_matcher_identity ,, ,",
+            );
+        }
+        assert_eq!(
+            header_hint("phone"),
+            None,
+            "whitespace and empty tokens must parse cleanly"
+        );
+
+        restore(&prior);
+    }
 
     // ── Disambiguation rule unit tests ──────────────────────────────────
 

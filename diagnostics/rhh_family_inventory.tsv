@@ -1,0 +1,27 @@
+# rhh_family_inventory.tsv — ac-01 output
+# Source: crates/finetype-model/src/column.rs
+# Schema: family_id\trule_family_class\tfile\tline_start\tline_end\tdomain\ttype_targets\tarm_count\tkeep_required
+# keep_required=true means spec constraint #2 forbids removal (threshold-gate families); other rows are eligible for the removal roadmap subject to ac-05 classification.
+family_id	rule_family_class	file	line_start	line_end	domain	type_targets	arm_count	keep_required
+header_hint_table	match_table	crates/finetype-model/src/column.rs	4018	4260	cross-domain	identity.person.email;technology.internet.url;technology.internet.ip_v4;technology.identifier.uuid;identity.person.gender;representation.numeric.integer_number;datetime.epoch.unix_seconds;datetime.epoch.unix_milliseconds;finance.currency.amount;finance.currency.amount_accounting;finance.currency.amount_apostrophe;finance.currency.amount_code_prefix;finance.currency.amount_comma;finance.currency.amount_comma_suffix;finance.currency.amount_crypto;finance.currency.amount_lakh;finance.currency.amount_multisym;finance.currency.amount_neg_trailing;finance.currency.amount_nodecimal;finance.currency.amount_space	45	false
+substring_matcher_identity	substring	crates/finetype-model/src/column.rs	4263	4384	identity	identity.person.email;identity.person.phone_number;identity.person.first_name;identity.person.last_name;identity.person.full_name;identity.person.weight;identity.person.height;identity.credential.password	9	false
+substring_matcher_technology	substring	crates/finetype-model/src/column.rs	4278	4387	technology	technology.internet.ip_v6;technology.internet.ip_v4;technology.internet.url	3	false
+substring_matcher_geography	substring	crates/finetype-model/src/column.rs	4291	4338	geography	geography.address.postal_code;geography.address.street_address;geography.address.full_address	3	false
+substring_matcher_datetime	substring	crates/finetype-model/src/column.rs	4341	4375	datetime	datetime.date.iso;datetime.timestamp.rfc_2822;datetime.timestamp.rfc_3339;datetime.timestamp.sql_standard;datetime.epoch.unix_seconds;datetime.epoch.unix_milliseconds;datetime.timestamp.iso_8601;datetime.component.year	7	false
+substring_matcher_finance	substring	crates/finetype-model/src/column.rs	4390	4426	finance	finance.currency.amount	2	false
+substring_matcher_representation	substring	crates/finetype-model/src/column.rs	4404	4460	representation	representation.numeric.integer_number;representation.discrete.ordinal;representation.alphanumeric.alphanumeric_id;representation.numeric.decimal_number	6	false
+header_hint_measurement	branch	crates/finetype-model/src/column.rs	980	2200	representation	representation.numeric.decimal_number;representation.numeric.integer_number	2	false
+header_hint_location	branch	crates/finetype-model/src/column.rs	1054	1054	geography	geography.coordinate.latitude;geography.coordinate.longitude;geography.address.postal_code	1	false
+header_hint_hardcoded	branch	crates/finetype-model/src/column.rs	1159	2369	cross-domain	cross-domain (routes match_table results)	2	false
+header_hint_generic	branch	crates/finetype-model/src/column.rs	1172	2353	cross-domain	cross-domain (generic substring hits)	2	false
+header_hint_fallback	branch	crates/finetype-model/src/column.rs	1181	2376	cross-domain	cross-domain (fallback tier)	2	false
+header_hint	branch	crates/finetype-model/src/column.rs	1147	2337	cross-domain	cross-domain (catchall tier)	2	false
+header_hint_cross_domain	branch	crates/finetype-model/src/column.rs	1126	2318	cross-domain	cross-domain (cross-domain hardcoded hint promotion at 0.85)	2	true
+header_hint_same_category	branch	crates/finetype-model/src/column.rs	1098	2296	cross-domain	cross-domain (same-category hardcoded hint promotion at 0.95)	2	true
+header_hint_geo_override	branch	crates/finetype-model/src/column.rs	1073	2261	geography	geography.location.* (same-domain location override)	2	false
+header_hint_person_override	branch	crates/finetype-model/src/column.rs	2241	2241	identity	identity.person.* (hardcoded person-name hint over location)	1	false
+header_hint_sci_measurement	branch	crates/finetype-model/src/column.rs	994	2213	representation	representation.numeric.decimal_number (sci-measurement override of latitude/longitude)	2	false
+header_hint_location_keep	branch	crates/finetype-model/src/column.rs	1033	1033	geography	geography.location.* (preserves model's location prediction over person-name hint)	1	false
+sense_geo_hint_override	legacy_sense	crates/finetype-model/src/column.rs	1559	1559	geography	geography.coordinate.latitude;geography.coordinate.longitude	1	false
+sense_geo_rescue	legacy_sense	crates/finetype-model/src/column.rs	1574	1574	geography	geography.coordinate.latitude;geography.coordinate.longitude	1	false
+sense_header_hint	legacy_sense	crates/finetype-model/src/column.rs	1829	1829	cross-domain	cross-domain (legacy Sense path)	1	false

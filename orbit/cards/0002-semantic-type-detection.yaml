@@ -43,6 +43,7 @@ specs:
   - "orbit/specs/2026-04-21-eval-expansion/"
   - "orbit/specs/2026-04-21-sharpen-demotion-guard/"
   - "orbit/specs/2026-04-24-amount-variant-generators/"
+  - "orbit/specs/2026-04-24-remove-header-hints/"
 
 references:
   - "README.md"

@@ -1,0 +1,32 @@
+# rhh_hit_counts.tsv — ac-03 output
+# Source: target/release/finetype profile over eval/datasets/manifest.csv
+# Model: models/default
+# Files profiled: 36/36; columns total: 453; columns with disambiguation_rule: 142
+# Schema: family_id\thit_count\tmeasurement_mode\trule_family_class\tkeep_required\tnote
+# measurement_mode:
+#   direct   — family emits <family_id>:<header> rule string; hit_count is the observed prefix-match count.
+#   internal — family fires inside header_hint() without a dedicated rule prefix; hit_count=0 here.
+#                true hit volume is measured via ac-04 counterfactual.
+family_id	hit_count	measurement_mode	rule_family_class	keep_required	note
+header_hint_table	0	internal	match_table	false	hits surface via caller families; measured by counterfactual (ac-04)
+substring_matcher_identity	0	internal	substring	false	hits surface via caller families; measured by counterfactual (ac-04)
+substring_matcher_technology	0	internal	substring	false	hits surface via caller families; measured by counterfactual (ac-04)
+substring_matcher_geography	0	internal	substring	false	hits surface via caller families; measured by counterfactual (ac-04)
+substring_matcher_datetime	0	internal	substring	false	hits surface via caller families; measured by counterfactual (ac-04)
+substring_matcher_finance	0	internal	substring	false	hits surface via caller families; measured by counterfactual (ac-04)
+substring_matcher_representation	0	internal	substring	false	hits surface via caller families; measured by counterfactual (ac-04)
+header_hint_measurement	0	direct	branch	false	
+header_hint_location	0	direct	branch	false	
+header_hint_hardcoded	11	direct	branch	false	
+header_hint_generic	11	direct	branch	false	
+header_hint_fallback	0	direct	branch	false	
+header_hint	1	direct	branch	false	
+header_hint_cross_domain	40	direct	branch	true	
+header_hint_same_category	3	direct	branch	true	
+header_hint_geo_override	2	direct	branch	false	
+header_hint_person_override	0	direct	branch	false	
+header_hint_sci_measurement	1	direct	branch	false	
+header_hint_location_keep	0	direct	branch	false	
+sense_geo_hint_override	0	direct	legacy_sense	false	
+sense_geo_rescue	0	direct	legacy_sense	false	
+sense_header_hint	0	direct	legacy_sense	false	
