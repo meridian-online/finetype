@@ -380,8 +380,10 @@ echo ""
 
 # ── Step 2: Training Runs ─────────────────────────────────────────────
 
-declare -A RUN_STATUS
-declare -A RUN_TIME
+# Track status/time per run index (bash 3.2 compatible — no associative arrays)
+RUN_NAMES=()
+RUN_STATUSES=()
+RUN_TIMES=()
 
 echo "================================================================"
 echo " Step 2: Training — ${#RUNS[@]} runs"
@@ -392,6 +394,7 @@ echo ""
 RUN_NUM=0
 for run_def in "${RUNS[@]}"; do
     IFS='|' read -r name config seed lr wd <<< "$run_def"
+    RUN_NAMES+=("$name")
     RUN_NUM=$((RUN_NUM + 1))
     MODEL_DIR="models/$name"
     ARCH=$(echo "$name" | grep -q "gelu" && echo "GELU+LN" || echo "ReLU+BN")
@@ -405,8 +408,8 @@ for run_def in "${RUNS[@]}"; do
 
     if [[ -f "$MODEL_DIR/model.safetensors" ]]; then
         echo "[Skip] Model already exists at $MODEL_DIR — skipping"
-        RUN_STATUS[$name]="SKIPPED"
-        RUN_TIME[$name]="0"
+        RUN_STATUSES+=("SKIPPED")
+        RUN_TIMES+=("0")
         continue
     fi
 
@@ -429,8 +432,8 @@ for run_def in "${RUNS[@]}"; do
 
         RUN_END=$(date +%s)
         RUN_ELAPSED=$(( (RUN_END - RUN_START) / 60 ))
-        RUN_STATUS[$name]="OK"
-        RUN_TIME[$name]="$RUN_ELAPSED"
+        RUN_STATUSES+=("OK")
+        RUN_TIMES+=("$RUN_ELAPSED")
 
         # Post-training: inject type_index_keys
         SAVED_CONFIG="$MODEL_DIR/config.json"
@@ -478,8 +481,8 @@ print(f'Injected {len(config[\"type_index_keys\"])} type_index_keys')
     else
         RUN_END=$(date +%s)
         RUN_ELAPSED=$(( (RUN_END - RUN_START) / 60 ))
-        RUN_STATUS[$name]="FAILED"
-        RUN_TIME[$name]="$RUN_ELAPSED"
+        RUN_STATUSES+=("FAILED")
+        RUN_TIMES+=("$RUN_ELAPSED")
         echo ""
         echo "[Run $RUN_NUM] FAILED after ${RUN_ELAPSED} min — continuing to next run"
     fi
@@ -500,18 +503,23 @@ echo ""
 
 printf "%-30s %-10s %-10s\n" "Run" "Status" "Time (min)"
 printf "%-30s %-10s %-10s\n" "---" "------" "----------"
-for run_def in "${RUNS[@]}"; do
-    IFS='|' read -r name _ _ _ _ <<< "$run_def"
-    printf "%-30s %-10s %-10s\n" "$name" "${RUN_STATUS[$name]:-UNKNOWN}" "${RUN_TIME[$name]:-?}"
+for i in "${!RUN_NAMES[@]}"; do
+    printf "%-30s %-10s %-10s\n" "${RUN_NAMES[$i]}" "${RUN_STATUSES[$i]:-UNKNOWN}" "${RUN_TIMES[$i]:-?}"
 done
 echo ""
 
 # Check gate condition 1: all 3 seeds per architecture must complete
 RELU_OK=0
 GELU_OK=0
-for seed in "${SEEDS[@]}"; do
-    [[ "${RUN_STATUS[sherlock-v19-relu-s$seed]}" == "OK" || "${RUN_STATUS[sherlock-v19-relu-s$seed]}" == "SKIPPED" ]] && RELU_OK=$((RELU_OK + 1))
-    [[ "${RUN_STATUS[sherlock-v19-gelu-s$seed]}" == "OK" || "${RUN_STATUS[sherlock-v19-gelu-s$seed]}" == "SKIPPED" ]] && GELU_OK=$((GELU_OK + 1))
+for i in "${!RUN_NAMES[@]}"; do
+    name="${RUN_NAMES[$i]}"
+    status="${RUN_STATUSES[$i]:-UNKNOWN}"
+    if [[ "$status" == "OK" || "$status" == "SKIPPED" ]]; then
+        case "$name" in
+            *relu*) RELU_OK=$((RELU_OK + 1)) ;;
+            *gelu*) GELU_OK=$((GELU_OK + 1)) ;;
+        esac
+    fi
 done
 
 echo "Gate condition 1 (3 seeds completed):"
