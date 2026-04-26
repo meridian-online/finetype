@@ -1,0 +1,3 @@
+architecture	gate_1_seeds	gate_2_winner	gate_3_label_delta	gate_4_domain_delta	gate_5_max_domain_regression	gate_6_diff_published	verdict
+ReLU+BN	3/3	sherlock-v19-relu-s42	-6	0	0	PASS	FAIL
+GELU+LN	0/3	sherlock-v19-gelu-s44	-44	-19	0	PASS	FAIL

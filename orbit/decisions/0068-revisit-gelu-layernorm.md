@@ -1,7 +1,7 @@
 ---
-status: proposed
+status: accepted
 date-created: 2026-04-25
-date-modified: 2026-04-25
+date-modified: 2026-04-27
 supersedes: 0046
 ---
 
@@ -58,9 +58,31 @@ Chosen option: **Option B — re-run paired comparison**, because:
 - MADR 0066 hard gate applies independently to each architecture
 - Winner takes all — no margin requirement
 
-### Outcome
+### Outcome (2026-04-27)
 
-_To be filled after sweep results._
+**GELU+LN is definitively worse. ReLU+BN remains the architecture.**
+
+Sweep completed: 6 runs (3 seeds × 2 architectures) on FTMB v5 data.
+
+**Training accuracy (val_acc):**
+- ReLU+BN: s42=91.26%, s43=91.53%, s44=91.73% — all 3 pass ≥91.2%
+- GELU+LN: s42=85.99%, s43=85.76%, s44=85.99% — ~6 pts below ReLU
+
+**Profile eval (448-row expanded manifest):**
+- v16 baseline: 371/448 (82.8% label, 88.3% domain)
+- Best ReLU (s42): 365/448 (81.4% label, 88.3% domain) — net_label_delta = −6
+- Best GELU (s44): 327/448 (72.9% label, 84.1% domain) — net_label_delta = −44
+
+**MADR 0066 gate:** Both architectures FAIL. ReLU fails Gate 3 only
+(−6 label). GELU fails Gates 1, 3, and 4 (val_acc, label, domain).
+
+The ~6-point val_acc gap from training translates to a ~10-point profile
+eval gap. GELU+LN's output distribution interacts poorly with the Sharpen
+layer even after the post-processing improvements (PR #44, #47, #48).
+
+Neither v19 architecture is promoted. v16 remains shipped. The "what if"
+is answered: GELU+LN is not the path forward for FineType's multi-branch
+architecture.
 
 ### Consequences
 

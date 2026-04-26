@@ -1,0 +1,7 @@
+model	arch	seed	val_acc	best_epoch	profile_label	profile_domain	profile_total
+sherlock-v19-relu-s42	relu	42	0.9126	34	365	396	448
+sherlock-v19-relu-s43	relu	43	0.9153	36	363	388	448
+sherlock-v19-relu-s44	relu	44	0.9173	58	285	365	448
+sherlock-v19-gelu-s42	gelu	42	0.8599	79	324	381	448
+sherlock-v19-gelu-s43	gelu	43	0.8576	80	320	377	448
+sherlock-v19-gelu-s44	gelu	44	0.8599	68	327	377	448

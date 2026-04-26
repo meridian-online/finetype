@@ -63,12 +63,14 @@ score_model() {
         return
     fi
 
-    # Profile each unique file in the manifest
+    # Profile each unique file in the manifest, save raw CSV per dataset
+    local raw_dir="$output_dir/raw"
+    mkdir -p "$raw_dir"
     local profile_csv="$output_dir/profile_results.csv"
-    echo "dataset,column_name,predicted_type,confidence" > "$profile_csv"
 
     local seen_files=""
     local errors=0
+    local file_count=0
 
     while IFS=, read -r dataset file_path column_name gt_label _rest; do
         [[ "$dataset" == "dataset" ]] && continue  # skip header
@@ -84,13 +86,31 @@ score_model() {
             continue
         fi
 
-        # Profile with the candidate model
-        FINETYPE_MODEL="$model_dir" "$FINETYPE" profile --file "$file_path" -o csv 2>/dev/null | \
-            tail -n +2 | while IFS=, read -r col pred conf _extra; do
-                echo "${dataset},${col},${pred},${conf}"
-            done >> "$profile_csv"
+        # Profile with the candidate model (--model flag, not env var)
+        # Save raw CSV — DuckDB will parse it properly (handles quoting)
+        "$FINETYPE" profile --model "$model_dir" --file "$file_path" -o csv \
+            > "$raw_dir/${dataset}.csv" 2>/dev/null
+        file_count=$((file_count + 1))
 
     done < "$MANIFEST"
+
+    if [[ $file_count -eq 0 ]]; then
+        echo "SKIP"
+        return
+    fi
+
+    # Combine raw CSVs into a single profile_results.csv using DuckDB
+    # This handles quoted fields correctly; extract dataset from filename
+    duckdb -csv -noheader -c "
+        COPY (
+            SELECT
+                regexp_extract(filename, '.*/([^/]+)\\.csv$', 1) AS dataset,
+                \"column\" AS column_name,
+                type AS predicted_type,
+                confidence
+            FROM read_csv('$raw_dir/*.csv', auto_detect=true, filename=true)
+        ) TO '$profile_csv' (HEADER, DELIMITER ',');
+    " 2>/dev/null
 
     # Score using DuckDB
     if ! command -v duckdb >/dev/null 2>&1; then
@@ -101,7 +121,7 @@ score_model() {
     local result
     result=$(duckdb -csv -noheader -c "
         CREATE TABLE gt AS
-        SELECT column_name, gt_label
+        SELECT dataset, column_name, gt_label
         FROM read_csv('$MANIFEST',
             columns={'dataset': 'VARCHAR', 'file_path': 'VARCHAR',
                      'column_name': 'VARCHAR', 'gt_label': 'VARCHAR',
@@ -110,45 +130,52 @@ score_model() {
             header=true);
 
         CREATE TABLE preds AS
-        SELECT column_name, predicted_type, confidence
-        FROM read_csv('$profile_csv',
-            columns={'dataset': 'VARCHAR', 'column_name': 'VARCHAR',
-                     'predicted_type': 'VARCHAR', 'confidence': 'DOUBLE'},
-            header=true);
+        SELECT dataset, column_name, predicted_type, confidence
+        FROM read_csv('$profile_csv', auto_detect=true);
 
         CREATE TABLE mapping AS
-        SELECT * FROM read_csv('$SCHEMA_MAPPING', auto_detect=true);
+        SELECT gt_label, finetype_label, finetype_domain
+        FROM read_csv('$SCHEMA_MAPPING', auto_detect=true);
 
-        -- Join predictions to GT via schema mapping
-        WITH matched AS (
+        -- Map GT short labels → FineType labels via schema_mapping,
+        -- then compare predictions against mapped labels.
+        -- A GT label may map to multiple finetype_labels (e.g. boolean → binary/terms).
+        -- We keep the best match per (dataset, column_name).
+        WITH candidates AS (
             SELECT
+                gt.dataset,
                 gt.column_name,
                 gt.gt_label,
                 p.predicted_type,
                 p.confidence,
+                m.finetype_label,
+                m.finetype_domain,
                 CASE
-                    WHEN gt.gt_label = p.predicted_type THEN 1
-                    WHEN EXISTS (
-                        SELECT 1 FROM mapping m
-                        WHERE m.source_type = gt.gt_label
-                        AND m.target_type = p.predicted_type
-                    ) THEN 1
-                    WHEN split_part(gt.gt_label, '.', 1) = split_part(p.predicted_type, '.', 1) THEN 0  -- same domain
+                    WHEN p.predicted_type = m.finetype_label THEN 1
+                    WHEN m.finetype_label LIKE 'representation.boolean.%'
+                         AND p.predicted_type LIKE 'representation.boolean.%' THEN 1
                     ELSE 0
                 END AS label_match,
                 CASE
-                    WHEN split_part(gt.gt_label, '.', 1) = split_part(p.predicted_type, '.', 1) THEN 1
+                    WHEN split_part(p.predicted_type, '.', 1) = m.finetype_domain THEN 1
                     ELSE 0
-                END AS domain_match,
-                split_part(gt.gt_label, '.', 1) AS gt_domain
+                END AS domain_match
             FROM gt
-            JOIN preds p USING (column_name)
+            JOIN preds p USING (dataset, column_name)
+            JOIN mapping m ON gt.gt_label = m.gt_label
+        ),
+        best AS (
+            SELECT DISTINCT ON (dataset, column_name)
+                dataset, column_name, gt_label, predicted_type, confidence,
+                finetype_label, finetype_domain, label_match, domain_match
+            FROM candidates
+            ORDER BY dataset, column_name, label_match DESC, domain_match DESC
         )
         SELECT
             count(*) AS total,
             sum(label_match) AS label_correct,
             sum(domain_match) AS domain_correct
-        FROM matched;
+        FROM best;
     " 2>/dev/null)
 
     echo "$result"
@@ -166,7 +193,7 @@ score_model_detail() {
 
     duckdb -csv -c "
         CREATE TABLE gt AS
-        SELECT column_name, gt_label
+        SELECT dataset, column_name, gt_label
         FROM read_csv('$MANIFEST',
             columns={'dataset': 'VARCHAR', 'file_path': 'VARCHAR',
                      'column_name': 'VARCHAR', 'gt_label': 'VARCHAR',
@@ -175,33 +202,49 @@ score_model_detail() {
             header=true);
 
         CREATE TABLE preds AS
-        SELECT column_name, predicted_type, confidence
-        FROM read_csv('$output_dir/profile_results.csv',
-            columns={'dataset': 'VARCHAR', 'column_name': 'VARCHAR',
-                     'predicted_type': 'VARCHAR', 'confidence': 'DOUBLE'},
-            header=true);
+        SELECT dataset, column_name, predicted_type, confidence
+        FROM read_csv('$output_dir/profile_results.csv', auto_detect=true);
 
         CREATE TABLE mapping AS
-        SELECT * FROM read_csv('$SCHEMA_MAPPING', auto_detect=true);
+        SELECT gt_label, finetype_label, finetype_domain
+        FROM read_csv('$SCHEMA_MAPPING', auto_detect=true);
 
+        -- Map GT short labels → FineType labels, keep best match per column
+        WITH candidates AS (
+            SELECT
+                gt.dataset,
+                gt.column_name,
+                gt.gt_label,
+                m.finetype_label,
+                m.finetype_domain,
+                p.predicted_type AS prediction,
+                ROUND(p.confidence, 3) AS confidence,
+                CASE
+                    WHEN p.predicted_type = m.finetype_label THEN 'MATCH'
+                    WHEN m.finetype_label LIKE 'representation.boolean.%'
+                         AND p.predicted_type LIKE 'representation.boolean.%' THEN 'MATCH'
+                    ELSE 'MISS'
+                END AS result,
+                CASE
+                    WHEN p.predicted_type = m.finetype_label THEN 1
+                    WHEN m.finetype_label LIKE 'representation.boolean.%'
+                         AND p.predicted_type LIKE 'representation.boolean.%' THEN 1
+                    ELSE 0
+                END AS label_rank
+            FROM gt
+            JOIN preds p USING (dataset, column_name)
+            JOIN mapping m ON gt.gt_label = m.gt_label
+        ),
+        best AS (
+            SELECT DISTINCT ON (dataset, column_name) *
+            FROM candidates
+            ORDER BY dataset, column_name, label_rank DESC
+        )
         SELECT
-            gt.column_name,
-            gt.gt_label,
-            p.predicted_type AS prediction,
-            ROUND(p.confidence, 3) AS confidence,
-            CASE
-                WHEN gt.gt_label = p.predicted_type THEN 'MATCH'
-                WHEN EXISTS (
-                    SELECT 1 FROM mapping m
-                    WHERE m.source_type = gt.gt_label
-                    AND m.target_type = p.predicted_type
-                ) THEN 'MATCH'
-                ELSE 'MISS'
-            END AS result,
-            split_part(gt.gt_label, '.', 1) AS domain
-        FROM gt
-        JOIN preds p USING (column_name)
-        ORDER BY domain, gt.column_name;
+            dataset, column_name, gt_label, finetype_label,
+            prediction, confidence, result, finetype_domain AS domain
+        FROM best
+        ORDER BY domain, dataset, column_name;
     " 2>/dev/null
 }
 
@@ -273,9 +316,9 @@ else
     CANDIDATES+=("v16|$BASELINE_MODEL")
 fi
 
-declare -A PROFILE_LABEL
-declare -A PROFILE_DOMAIN
-declare -A PROFILE_TOTAL
+# Store profile scores in a TSV file (bash 3.2 compatible — no associative arrays)
+SCORES_FILE="$DIAG_DIR/v19_profile_scores.tsv"
+echo -e "name\tlabel\tdomain\ttotal" > "$SCORES_FILE"
 
 for candidate in "${CANDIDATES[@]}"; do
     IFS='|' read -r cand_name cand_dir <<< "$candidate"
@@ -285,12 +328,11 @@ for candidate in "${CANDIDATES[@]}"; do
 
     if [[ "$result" == "SKIP" ]]; then
         echo "  → SKIPPED (model not found)"
-        PROFILE_LABEL[$cand_name]=""
-        PROFILE_DOMAIN[$cand_name]=""
-        PROFILE_TOTAL[$cand_name]=""
+        echo -e "${cand_name}\t\t\t" >> "$SCORES_FILE"
         continue
     elif [[ "$result" == ERROR* ]]; then
         echo "  → $result"
+        echo -e "${cand_name}\t\t\t" >> "$SCORES_FILE"
         continue
     fi
 
@@ -298,9 +340,7 @@ for candidate in "${CANDIDATES[@]}"; do
     label=$(echo "$result" | cut -d, -f2)
     domain=$(echo "$result" | cut -d, -f3)
 
-    PROFILE_LABEL[$cand_name]="$label"
-    PROFILE_DOMAIN[$cand_name]="$domain"
-    PROFILE_TOTAL[$cand_name]="$total"
+    echo -e "${cand_name}\t${label}\t${domain}\t${total}" >> "$SCORES_FILE"
 
     label_pct=$(echo "scale=1; $label * 100 / $total" | bc 2>/dev/null || echo "?")
     domain_pct=$(echo "scale=1; $domain * 100 / $total" | bc 2>/dev/null || echo "?")
@@ -308,14 +348,24 @@ for candidate in "${CANDIDATES[@]}"; do
 done
 echo ""
 
+# Helper: look up a field from the scores TSV
+_score_field() {
+    # Usage: _score_field <name> <field: label|domain|total>
+    local _name="$1" _field="$2" _col
+    case "$_field" in
+        label) _col=2 ;; domain) _col=3 ;; total) _col=4 ;; *) _col=2 ;;
+    esac
+    awk -F'\t' -v n="$_name" -v c="$_col" '$1==n {print $c}' "$SCORES_FILE"
+}
+
 # Update per-seed file with profile scores
 TEMP_SEED="$DIAG_DIR/v19_per_seed_results_tmp.tsv"
 head -1 "$PER_SEED_FILE" > "$TEMP_SEED"
 while IFS=$'\t' read -r model arch seed val_acc best_epoch _ _ _; do
     [[ "$model" == "model" ]] && continue
-    label="${PROFILE_LABEL[$model]:-}"
-    domain="${PROFILE_DOMAIN[$model]:-}"
-    total="${PROFILE_TOTAL[$model]:-}"
+    label=$(_score_field "$model" label)
+    domain=$(_score_field "$model" domain)
+    total=$(_score_field "$model" total)
     echo -e "${model}\t${arch}\t${seed}\t${val_acc}\t${best_epoch}\t${label}\t${domain}\t${total}" >> "$TEMP_SEED"
 done < "$PER_SEED_FILE"
 mv "$TEMP_SEED" "$PER_SEED_FILE"
@@ -332,7 +382,8 @@ select_best() {
 
     for seed in "${SEEDS[@]}"; do
         local name="sherlock-v19-${arch}-s${seed}"
-        local label="${PROFILE_LABEL[$name]:-0}"
+        local label
+        label=$(_score_field "$name" label)
         if [[ -n "$label" ]] && [[ "$label" -gt "$best_label" ]]; then
             best_label="$label"
             best_name="$name"
@@ -344,8 +395,13 @@ select_best() {
 BEST_RELU=$(select_best "relu")
 BEST_GELU=$(select_best "gelu")
 
-echo "Best ReLU+BN: ${BEST_RELU:-NONE} (${PROFILE_LABEL[$BEST_RELU]:-?}/${PROFILE_TOTAL[$BEST_RELU]:-?})"
-echo "Best GELU+LN: ${BEST_GELU:-NONE} (${PROFILE_LABEL[$BEST_GELU]:-?}/${PROFILE_TOTAL[$BEST_GELU]:-?})"
+echo "Best ReLU+BN: ${BEST_RELU:-NONE} ($(_score_field "$BEST_RELU" label)/$(_score_field "$BEST_RELU" total))"
+echo "Best GELU+LN: ${BEST_GELU:-NONE} ($(_score_field "$BEST_GELU" label)/$(_score_field "$BEST_GELU" total))"
+# Update baseline from fresh scoring
+BASELINE_SCORE=$(_score_field "v16" label)
+BASELINE_TOTAL=$(_score_field "v16" total)
+BASELINE_SCORE=${BASELINE_SCORE:-297}
+BASELINE_TOTAL=${BASELINE_TOTAL:-352}
 echo "Baseline v16: ${BASELINE_SCORE}/${BASELINE_TOTAL}"
 echo ""
 
@@ -583,9 +639,11 @@ evaluate_gate() {
     fi
 
     # Gates 3-6 require profile eval results
-    local label="${PROFILE_LABEL[$best_name]:-0}"
-    local domain="${PROFILE_DOMAIN[$best_name]:-0}"
-    local total="${PROFILE_TOTAL[$best_name]:-$BASELINE_TOTAL}"
+    local label domain total
+    label=$(_score_field "$best_name" label)
+    domain=$(_score_field "$best_name" domain)
+    total=$(_score_field "$best_name" total)
+    label=${label:-0}; domain=${domain:-0}; total=${total:-$BASELINE_TOTAL}
 
     # Gate 3: net_label_delta >= +1
     local label_delta=$(( label - BASELINE_SCORE ))
@@ -593,7 +651,9 @@ evaluate_gate() {
     echo "  Gate 3 (net_label_delta >= +1): ${label_delta} (${label} vs ${BASELINE_SCORE}) $g3_pass"
 
     # Gate 4: net_domain_delta >= 0
-    local v16_domain="${PROFILE_DOMAIN[v16]:-0}"
+    local v16_domain
+    v16_domain=$(_score_field "v16" domain)
+    v16_domain=${v16_domain:-0}
     local domain_delta=$(( domain - v16_domain ))
     local g4_pass=$( [[ $domain_delta -ge 0 ]] && echo "PASS" || echo "FAIL" )
     echo "  Gate 4 (net_domain_delta >= 0): ${domain_delta} $g4_pass"
@@ -610,7 +670,8 @@ evaluate_gate() {
             [[ "$arch" == "relu" ]] && d="$relu_d" || d="$gelu_d"
             d="${d//[[:space:]]/}"
             if [[ -n "$d" ]] && [[ "$d" != "-" ]]; then
-                local abs_d=$(( d < 0 ? -d : 0 ))
+                local abs_d
+                if [[ $d -lt 0 ]]; then abs_d=$(( -d )); else abs_d=0; fi
                 if [[ $d -lt 0 ]] && [[ $abs_d -gt $max_regression ]]; then
                     max_regression=$abs_d
                 fi
@@ -654,23 +715,25 @@ echo ""
 RELU_VERDICT=$(grep "ReLU" "$GATE_FILE" | cut -f8)
 GELU_VERDICT=$(grep "GELU" "$GATE_FILE" | cut -f8)
 
-RELU_LABEL="${PROFILE_LABEL[$BEST_RELU]:-0}"
-GELU_LABEL="${PROFILE_LABEL[$BEST_GELU]:-0}"
+RELU_LABEL=$(_score_field "$BEST_RELU" label); RELU_LABEL=${RELU_LABEL:-0}
+GELU_LABEL=$(_score_field "$BEST_GELU" label); GELU_LABEL=${GELU_LABEL:-0}
+RELU_TOTAL=$(_score_field "$BEST_RELU" total); RELU_TOTAL=${RELU_TOTAL:-0}
+GELU_TOTAL=$(_score_field "$BEST_GELU" total); GELU_TOTAL=${GELU_TOTAL:-0}
 
 if [[ "$RELU_VERDICT" == "PASS" ]] && [[ "$GELU_VERDICT" == "PASS" ]]; then
     # Winner takes all
     if [[ "$GELU_LABEL" -ge "$RELU_LABEL" ]]; then
-        echo "WINNER: GELU+LN ($BEST_GELU) — ${GELU_LABEL}/${PROFILE_TOTAL[$BEST_GELU]}"
+        echo "WINNER: GELU+LN ($BEST_GELU) — ${GELU_LABEL}/${GELU_TOTAL}"
         echo "Both architectures passed. GELU+LN wins (ties go to GELU per winner-takes-all)."
     else
-        echo "WINNER: ReLU+BN ($BEST_RELU) — ${RELU_LABEL}/${PROFILE_TOTAL[$BEST_RELU]}"
+        echo "WINNER: ReLU+BN ($BEST_RELU) — ${RELU_LABEL}/${RELU_TOTAL}"
         echo "Both architectures passed. ReLU+BN wins on label score."
     fi
 elif [[ "$RELU_VERDICT" == "PASS" ]]; then
-    echo "WINNER: ReLU+BN ($BEST_RELU) — ${RELU_LABEL}/${PROFILE_TOTAL[$BEST_RELU]}"
+    echo "WINNER: ReLU+BN ($BEST_RELU) — ${RELU_LABEL}/${RELU_TOTAL}"
     echo "Only ReLU+BN passed the gate."
 elif [[ "$GELU_VERDICT" == "PASS" ]]; then
-    echo "WINNER: GELU+LN ($BEST_GELU) — ${GELU_LABEL}/${PROFILE_TOTAL[$BEST_GELU]}"
+    echo "WINNER: GELU+LN ($BEST_GELU) — ${GELU_LABEL}/${GELU_TOTAL}"
     echo "Only GELU+LN passed the gate."
 else
     echo "NO WINNER: Neither architecture passed the MADR 0066 gate."
