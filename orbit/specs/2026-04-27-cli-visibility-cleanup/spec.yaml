@@ -15,12 +15,13 @@ goal: >
 constraints:
   - "Hard removal posture — no deprecation cycle. Removed flags/subcommands error immediately via clap's unknown-arg/unknown-subcommand handling. Scripts pinning old surfaces fail loudly rather than drift silently."
   - "Internal callers must continue working. `make ci` (uses `finetype check`), training data prep (uses `finetype generate`), sweep wrappers (use `finetype train`), and `scripts/eval.sh` (uses `finetype eval`) all keep working — these subcommands are hidden, not removed."
-  - "The four scripts that pass `--model <path>` (scripts/distill_batches.sh, scripts/eval.sh, scripts/train.sh, scripts/llm_label.py) MUST be migrated to export `FINETYPE_MODEL=<path>` in the same PR. No flag-removal-without-migration."
+  - "Every locus that passes `--model <path>` to the finetype binary MUST be migrated to export `FINETYPE_MODEL=<path>` in the same PR. Authoritative migration list (verified by grep, v1.1): `eval/profile_eval.sh:115` (the eval engine — primary path); `scripts/v19_compare.sh:91`; `scripts/sharpen_ablation.sh:66, 70`; `scripts/amvg/ac03_confusion.py:51`; `scripts/amvg/ac07_post_fix.py:62`; `scripts/rhh/ac03_hit_counts.py:123`; `scripts/rhh/ac04_counterfactual.py:199`; `scripts/rhh/test_rhh.py:340`. Out of scope (do NOT touch — these `--model` are NOT passed to the finetype binary): `scripts/distill_batches.sh:149` (claude CLI), `scripts/llm_label.py:51` and `scripts/llm_label.sh` (Ollama), `scripts/train.sh` (`--model-name` is a different flag — script's own output-dir name), `scripts/eval.sh:42` (its own `--model` script arg — swaps the `models/default` symlink, never invokes `finetype --model`), all `scripts/overnight_v*.sh` (they pass `--model` to `./scripts/eval.sh`, not directly to finetype)."
   - "MCP server is out of scope. MCP's `schema` tool stays verbose for v0.6.19 — it dies entirely in pipeline-reshape (v0.6.20) when `taxonomy` and `profile` absorb json-schema output."
   - "Schema verb consolidation (type-mode → taxonomy, table-mode → profile) is out of scope. The schema verb still exists in v0.6.19; only its export verbosity changes."
+  - "`load` subcommand stays public in v0.6.19 — load→validate consolidation is deferred to pipeline-reshape (v0.6.20). `load` continues to appear in `--help` and is not modified by this spec."
   - "`--model-type` flag and the legacy classifier code paths (SenseClassifier, TieredClassifier, CharClassifier — ~2,500–3,500 LOC across finetype-model + finetype-cli) are deferred. Touching them here would triple the diff and entangle two release themes. Memo `orbit/memos/2026-04-27-delete-legacy-classifiers.md` captures the follow-up scope."
   - "Doc refresh (README, full CLAUDE.md command-table audit, docs/* sweep) is a follow-up PR, not part of this spec. The minimum CLAUDE.md updates that ship here are: (a) public-vs-internal stability tier paragraph, (b) command table refreshed for the surfaces this spec changes."
-  - "Changes confined to: crates/finetype-cli/src/main.rs, crates/finetype-core/src/json_schema.rs (or wherever the JSON Schema emitter lives), CLAUDE.md, the four migration scripts, and tests. No model-crate edits. No MCP edits."
+  - "Changes confined to: crates/finetype-cli/src/main.rs (CLI subcommand defs + the schema emitter at lines 2744-2760 type-mode and 2987-3015 table-mode), CLAUDE.md, the migration scripts named above, and tests. No model-crate edits. No MCP edits — `crates/finetype-mcp/src/tools/schema.rs:65-279` is intentionally left verbose (interview Q5: MCP schema tool dies in pipeline-reshape, no investment now)."
   - "Hide mechanism is `#[command(hide = true)]` on the clap subcommand definition — same attribute already in use for `train`, `eval`, `eval-gittables`. Consistency over invention."
   - "Schema verbosity reduction edits the JSON Schema emitter once. Both schema modes (type-mode and table-mode) inherit the change in v0.6.19; `taxonomy KEY -o json-schema` and `profile -f file -o json-schema` inherit it after pipeline-reshape."
 
@@ -57,13 +58,18 @@ acceptance_criteria:
   - id: AC-3
     description: >
       `finetype eval-gittables` subcommand is removed entirely from the
-      CLI. The variant in the `Commands` enum (around `main.rs:383`) and
-      the dispatch arm (around `main.rs:743`) are deleted, along with any
-      `cmd_eval_gittables` function exclusive to it. The standalone
-      binary at `crates/finetype-eval/src/bin/eval_gittables_cli.rs`
-      remains untouched — Makefile invokes it directly. After removal,
-      `finetype eval-gittables` returns clap's "unrecognized subcommand"
-      error.
+      CLI. Note: this subcommand is already `#[command(hide = true)]`
+      today (`main.rs:382`) — it does not appear in `--help` output —
+      so the user-visible change is that explicit invocation
+      (`finetype eval-gittables ...`) now errors via clap's
+      unknown-subcommand handler instead of silently running a dead
+      handler. The variant in the `Commands` enum (around `main.rs:383`)
+      and the dispatch arm (around `main.rs:743`) are deleted, along
+      with any `cmd_eval_gittables` function exclusive to it. The
+      standalone binary at
+      `crates/finetype-eval/src/bin/eval_gittables_cli.rs` remains
+      untouched — Makefile invokes it directly via `cargo run --bin
+      eval-gittables-cli`.
     verification: >
       `finetype eval-gittables` exits non-zero with clap's unknown-
       subcommand message. `make eval-gittables` (or whichever target
@@ -71,6 +77,9 @@ acceptance_criteria:
       binary. Grep across .sh, .py, Makefile, .yml, .yaml confirms zero
       remaining references to the subcommand variant. `cargo build`
       succeeds with no dead-code warnings related to removed handlers.
+      Note: `--help` diff is NOT a verification path here — the
+      subcommand was already hidden, so its absence from `--help` is
+      pre-existing.
 
   - id: AC-4
     description: >
@@ -95,69 +104,138 @@ acceptance_criteria:
   - id: AC-5
     description: >
       `--model` flag is removed from every subcommand that accepts it.
-      The 4 internal scripts that previously passed `--model "$PATH"` are
-      migrated to export `FINETYPE_MODEL="$PATH"` before invoking the
-      CLI: scripts/distill_batches.sh, scripts/eval.sh, scripts/train.sh,
-      scripts/llm_label.py. The CLI's existing `FINETYPE_MODEL` env-var
+      Eight loci that previously passed `--model "$PATH"` to the
+      finetype binary are migrated to export `FINETYPE_MODEL="$PATH"`
+      (or inline `FINETYPE_MODEL="$PATH" finetype ...`) before invoking
+      the CLI:
+      (1) `eval/profile_eval.sh:115` — the eval engine, primary path
+      driven by `make eval-profile` and transitively by `scripts/eval.sh`;
+      (2) `scripts/v19_compare.sh:91`;
+      (3) `scripts/sharpen_ablation.sh:66`;
+      (4) `scripts/sharpen_ablation.sh:70`;
+      (5) `scripts/amvg/ac03_confusion.py:51`;
+      (6) `scripts/amvg/ac07_post_fix.py:62`;
+      (7) `scripts/rhh/ac03_hit_counts.py:123`;
+      (8) `scripts/rhh/ac04_counterfactual.py:199` (also update the
+      argparse default at line 268 — keep the script's own `--model`
+      arg for ergonomics, just don't forward it as `--model` to
+      finetype);
+      (9) `scripts/rhh/test_rhh.py:340`.
+      `scripts/eval.sh`, `scripts/train.sh`, `scripts/distill_batches.sh`,
+      `scripts/llm_label.py`, `scripts/llm_label.sh`, and the
+      `scripts/overnight_v*.sh` family are explicitly NOT in scope —
+      their `--model` flags either belong to non-finetype tools (claude,
+      Ollama) or are script-internal flags that don't reach the
+      finetype binary. The CLI's existing `FINETYPE_MODEL` env-var
       reader (already documented in CLAUDE.md's env-var table) becomes
       the single way to override the default model path. After removal,
       `finetype <verb> --model <path>` errors via clap's unknown-arg
       handler.
     verification: >
-      `finetype profile -f data.csv --model models/sherlock-v16` exits
-      non-zero with clap's unknown-arg error.
-      `FINETYPE_MODEL=models/sherlock-v16 finetype profile -f data.csv`
-      runs against the specified model. The 4 migrated scripts succeed
-      end-to-end against a non-default model (e.g.
-      `FINETYPE_MODEL=models/sherlock-v19-relu-s42 ./scripts/eval.sh`).
-      Grep across .sh and .py for `--model ` shows no remaining
-      occurrences in the migrated scripts.
+      `finetype profile -f data.csv --model models/sherlock-v19-relu-s42`
+      exits non-zero with clap's unknown-arg error.
+      `FINETYPE_MODEL=models/sherlock-v19-relu-s42 finetype profile -f
+      data.csv` runs against the specified model.
+      `FINETYPE_MODEL=models/sherlock-v19-relu-s42 make eval-profile`
+      runs end-to-end through `eval/profile_eval.sh` and produces a
+      report. Each Python diagnostic script under scripts/rhh/ and
+      scripts/amvg/ that was migrated runs at least one
+      smoke-invocation. Grep across all migrated files for
+      `"--model"` (with a finetype binary on the same command line) shows
+      zero remaining occurrences. Out-of-scope `--model` references
+      (claude, Ollama, script-internal) remain present.
 
   - id: AC-6
     description: >
-      Schema export verbosity is reduced. The JSON Schema emitter (shared
-      between schema's type-mode and table-mode) drops these derivable
-      `x-finetype-*` fields: `x-finetype-confidence`, `x-finetype-domain`,
-      `x-finetype-broad-type`, `x-finetype-transform`,
-      `x-finetype-format-string`. The emitter retains only:
-      `x-finetype-label` (the type key — primary identifier) and
-      `x-finetype-pii` (security-relevant flag, not derivable from the
-      label alone). All dropped fields remain reachable via
-      `finetype taxonomy <KEY>` (plain or json output). Both
-      `finetype schema KEY` and `finetype schema <file.csv>` emit the
-      lean shape.
-    verification: >
-      Run `finetype schema identity.person.email --stdout` and
-      `finetype schema -f eval/datasets/csv/ecommerce_orders.csv
-      --stdout`. Output contains `x-finetype-label` and `x-finetype-pii`
-      where applicable; does NOT contain `x-finetype-confidence`,
+      Schema export verbosity is reduced. The JSON Schema emitter in
+      the CLI is in TWO codepaths in `crates/finetype-cli/src/main.rs`,
+      both of which must drop the derivable fields:
+      (a) Type-mode emitter at `main.rs:2744-2760` — single property,
+          edits a `BTreeMap` named `schema`.
+      (b) Table-mode emitter at `main.rs:2987-3015` — known-label
+          branch (~2987-3004) and unknown-label branch (~3008-3015),
+          edits a `BTreeMap` named `prop` per column.
+      Fields to drop in both codepaths: `x-finetype-confidence`,
       `x-finetype-domain`, `x-finetype-broad-type`, `x-finetype-transform`,
-      `x-finetype-format-string`. Existing schema-shape tests updated
-      to assert the new lean shape. Document in CHANGELOG that consumers
-      who relied on dropped fields should query `finetype taxonomy <KEY>
-      --output json`.
+      `x-finetype-transform-ext`, `x-finetype-format-string`. The
+      emitter retains only: `x-finetype-label` (the type key — primary
+      identifier) and `x-finetype-pii` (security-relevant flag, not
+      derivable from the label alone). All dropped fields remain
+      reachable via `finetype taxonomy <KEY>` (plain or json output).
+      Both `finetype schema KEY` and `finetype schema <file.csv>` emit
+      the lean shape. The MCP duplicate emitter at
+      `crates/finetype-mcp/src/tools/schema.rs:65-279` is intentionally
+      NOT modified (interview Q5 — MCP schema tool dies in
+      pipeline-reshape v0.6.20). Downstream impact: the validate path
+      reads `x-finetype-label` and `x-finetype-confidence` from input
+      schemas (`crates/finetype-core/src/table_validator.rs:80-86`,
+      `crates/finetype-cli/src/main.rs:3701, 3705`); after this change,
+      `type_confidence` in `finetype_reject_errors` will be NULL for
+      schemas emitted by v0.6.19+ `finetype schema`. Pre-existing
+      schemas with `x-finetype-confidence` continue to populate the
+      column (the read-side parser already handles missing fields
+      gracefully — see `validate_cli.rs:373`).
+    verification: >
+      Run `finetype schema identity.person.email --stdout` (positional
+      type-key form) and `finetype schema
+      eval/datasets/csv/ecommerce_orders.csv --stdout` (positional
+      file-path form, table mode via path-sniffer). Output contains
+      `x-finetype-label` and `x-finetype-pii` where applicable; does
+      NOT contain `x-finetype-confidence`, `x-finetype-domain`,
+      `x-finetype-broad-type`, `x-finetype-transform`,
+      `x-finetype-transform-ext`, `x-finetype-format-string`. Existing
+      schema-shape tests updated to assert the new lean shape. Add a
+      `vrp_*` test that round-trips `finetype schema <csv> | finetype
+      validate <csv> <schema>` and asserts validate's
+      `finetype_reject_errors.type_confidence` is NULL across all rows.
+      CHANGELOG entry: "Schema export drops derivable `x-finetype-*`
+      fields (kept: label, pii). Consumers needing dropped fields
+      should query `finetype taxonomy <KEY> --output json`. As a
+      consequence, `finetype validate`'s `type_confidence` column is
+      NULL for schemas emitted by v0.6.19+; pre-existing schemas with
+      `x-finetype-confidence` continue to populate it."
 
   - id: AC-7
     description: >
       `finetype validate` flag pair `--db`/`--table` becomes optional-but-
-      mutually-required. clap `requires_all` (or `requires` on each
-      flag pointing at the other) enforces that supplying one without
-      the other errors at parse time. When both are absent, validate
-      runs in check-only mode — performs the validation pass via
+      mutually-required. The current command shape (per CLAUDE.md and
+      `main.rs:302-331`) takes `<file> <schema>` as positional
+      arguments — this stays unchanged. clap `requires` on each flag
+      pointing at the other enforces that supplying one without the
+      other errors at parse time. When both are absent, validate runs
+      in check-only mode — performs the validation pass via
       `finetype-core::table_validator` and reports valid/invalid counts
       to stdout, but writes no `.db` file. When both are present,
-      behaviour is identical to today (typed table + `finetype_reject_errors`
-      sidecar written to the named `.db`).
+      behaviour is identical to today (typed table +
+      `finetype_reject_errors` sidecar written to the named `.db`).
+      Sub-criteria for check-only mode:
+      (a) `--output {plain,json}` is honoured — same shapes the
+          current full-pair flow produces, just without the .db path
+          line.
+      (b) `--lenient` still forces exit 0 in check-only mode (rejects
+          counted but exit code suppressed).
+      (c) `--append` without `--db` errors via clap's existing
+          requires-relationship semantics (`--append` already requires
+          `--db` today; that constraint is preserved).
     verification: >
-      `finetype validate -f data.csv --schema schema.json` runs to
-      completion, prints valid/invalid counts, exits 0 (no rejects) or
-      1 (rejects). `finetype validate -f data.csv --schema schema.json
-      --db out.db` errors with clap's "the following required arguments
-      were not provided: --table". Same with `--table` only. Both flags
-      together reproduces the v0.6.18 behaviour byte-for-byte (same
-      tables, same row counts, same reject-error rows). Add three
-      `vrp_*` integration tests covering check-only mode, half-pair
-      rejection (both directions), full-pair behaviour-preservation.
+      `finetype validate data.csv schema.json` (positional file +
+      schema, no --db/--table) runs to completion, prints valid/invalid
+      counts, exits 0 (no rejects) or 1 (rejects).
+      `finetype validate data.csv schema.json --db out.db` errors
+      with clap's "the following required arguments were not provided:
+      --table". Same with `--table` only.
+      `finetype validate data.csv schema.json --append` errors with
+      clap's "--append requires --db".
+      `finetype validate data.csv schema.json --lenient` (check-only +
+      lenient) exits 0 even when rejects > 0.
+      `finetype validate data.csv schema.json -o json` emits the JSON
+      summary shape on stdout.
+      Both flags together reproduces the v0.6.18 behaviour
+      byte-for-byte (same tables, same row counts, same reject-error
+      rows). Add `vrp_*` integration tests covering: check-only mode
+      (plain + json output), check-only + lenient, half-pair rejection
+      (both directions), append-without-db rejection,
+      full-pair behaviour-preservation.
 
   - id: AC-8
     description: >
@@ -188,36 +266,45 @@ acceptance_criteria:
       -- --ignored` (golden integration) green — golden snapshots that
       reference removed flags or the old schema shape are updated as
       part of this PR. `make ci` (fmt + clippy + test + check) green.
-      Profile eval (`./scripts/eval.sh`) returns 369/448 (today's
-      baseline against models/default = sherlock-v19-relu-s42).
+      Profile eval (`./scripts/eval.sh`) score on the PR branch matches
+      `main` HEAD's score within ±0 (deterministic) — the underlying
+      invariant is "this PR doesn't change what the model predicts,"
+      not a numeric pin (the baseline shifts with model promotions).
     verification: >
       CI run on the PR branch shows all jobs green. Local `make ci`
-      green. `./scripts/eval.sh` output contains "369/448" or whatever
-      the current baseline is on main at the time of the PR.
+      green. Capture `./scripts/eval.sh` score on `main` HEAD and on
+      the PR branch — they match exactly. If they don't, the PR has
+      introduced an unintended pipeline change and must be
+      investigated before merge.
 
   - id: AC-10
     description: >
       `finetype --help` shows exactly the public surface intended for
-      v0.6.19: `infer`, `profile`, `schema`, `validate`, `mcp`,
-      `taxonomy`. Hidden subcommands (`check`, `generate`, `train`,
-      `eval`) are absent from the listing; `eval-gittables` is removed
-      entirely. The help output for surviving public verbs no longer
+      v0.6.19: `infer`, `profile`, `schema`, `validate`, `load`, `mcp`,
+      `taxonomy`. Note: `load` stays public this release — its
+      consolidation into `validate` is deferred to pipeline-reshape
+      (v0.6.20). Hidden subcommands (`check`, `generate`, `train`,
+      `eval`, `eval-gittables` until removed by AC-3) are absent from
+      the listing. The help output for surviving public verbs no longer
       lists `--sharp-only` or `--model`.
     verification: >
       Run `finetype --help` and capture the subcommand listing. Diff
-      against the v0.6.18 help output. Expected diff: `eval-gittables`
-      gone; `check`, `generate` no longer listed; `train`, `eval`
-      remain hidden as before. Run `finetype profile --help`,
-      `finetype validate --help`, `finetype schema --help` — none list
+      against the v0.6.18 help output. Expected diff (v0.6.18 → v0.6.19):
+      `check` no longer listed (newly hidden); `generate` no longer
+      listed (newly hidden); `train`, `eval`, `eval-gittables` already
+      hidden in v0.6.18 (no diff); `load`, `infer`, `profile`, `schema`,
+      `validate`, `mcp`, `taxonomy` continue to be listed. Run
+      `finetype profile --help`, `finetype validate --help`,
+      `finetype schema --help`, `finetype load --help` — none list
       `--sharp-only` or `--model`. Snapshot the new help outputs as
       golden files for regression protection.
 
 implementation_notes:
-  - "`#[command(hide = true)]` is the same attribute used for `train`, `eval`, `eval-gittables` today — see the existing definitions around `main.rs:274` (`check`) and follow the pattern. No changes to dispatch logic needed for hidden subcommands; they run identically, just absent from `--help`."
+  - "`#[command(hide = true)]` is the same attribute used for `train`, `eval`, `eval-gittables` today (verified: `eval-gittables` is at `main.rs:382`, already hidden) — see the existing definitions and follow the pattern. No changes to dispatch logic needed for hidden subcommands; they run identically, just absent from `--help`."
   - "`--sharp-only` cleanup is mechanical: drop the param at every signature, drop the dead gate code at the 4 evaluation sites, collapse the alternative pipeline branch at `main.rs:3330`. The gate `if !sharp_only && !column_classifier.has_multi_branch()` is always false in production — multi-branch is always present (decision 0041)."
-  - "`--model` migration pattern in scripts: replace `--model \"$MODEL_PATH\"` with `FINETYPE_MODEL=\"$MODEL_PATH\"` exported before the CLI call, OR inlined as `FINETYPE_MODEL=\"$MODEL_PATH\" finetype <verb> ...`. Pick whichever matches existing script style. Pre-existing FINETYPE_MODEL exports take precedence — verify each script doesn't already export it for an unrelated reason."
-  - "Schema emitter — single point of edit. Find the JSON Schema serialisation function (likely in `crates/finetype-core/` under a json_schema or schema module, or co-located with the schema command in `finetype-cli`); drop the five derivable fields. Both schema modes call this emitter, so one change covers both. After pipeline-reshape, `taxonomy KEY -o json-schema` and `profile -o json-schema` will share the same emitter and inherit the lean shape automatically."
-  - "Validate flag-pair: clap supports `requires` and `requires_all` attributes. The pattern is `#[arg(long, requires = \"table\")] db: Option<PathBuf>` and `#[arg(long, requires = \"db\")] table: Option<String>`. Both Optional, both pointing at the other. When both None → check-only mode; when both Some → existing typed-table + reject-sidecar flow."
+  - "`--model` migration pattern in scripts: replace `--model \"$MODEL_PATH\"` with `FINETYPE_MODEL=\"$MODEL_PATH\"` exported before the CLI call, OR inlined as `FINETYPE_MODEL=\"$MODEL_PATH\" finetype <verb> ...`. Pick whichever matches existing script style. Pre-existing FINETYPE_MODEL exports take precedence — verify each script doesn't already export it for an unrelated reason. For `eval/profile_eval.sh:115`, the existing `MODEL_FLAGS` shell var construction can be replaced with an `export FINETYPE_MODEL=\"$FINETYPE_MODEL\"` and removal of the `--model` argument from the finetype invocation a few lines down."
+  - "Schema emitter is NOT a single point of edit. Two codepaths in `crates/finetype-cli/src/main.rs`: type-mode emitter at lines 2744-2760 (single property branch), table-mode emitter at lines 2987-3015 (known-label branch ~2987-3004 + unknown-label branch ~3008-3015). Both edit `BTreeMap` collections (`schema` and `prop` respectively). Drop the same 6 fields in both — `x-finetype-confidence`, `x-finetype-domain`, `x-finetype-broad-type`, `x-finetype-transform`, `x-finetype-transform-ext`, `x-finetype-format-string`. Keep `x-finetype-label` and `x-finetype-pii`. The MCP duplicate at `crates/finetype-mcp/src/tools/schema.rs:65-279` is intentionally NOT modified (interview Q5)."
+  - "Validate flag-pair: clap supports `requires` and `requires_all` attributes. The pattern is `#[arg(long, requires = \"table\")] db: Option<PathBuf>` and `#[arg(long, requires = \"db\")] table: Option<String>`. Both Optional, both pointing at the other. When both None → check-only mode; when both Some → existing typed-table + reject-sidecar flow. The validate command takes `<file> <schema>` as positional args (CLAUDE.md line 183, `main.rs:302-331`) — those are NOT changing in this spec, only the `--db`/`--table` constraint."
   - "eval-gittables subcommand removal — sanity-check there's no `cmd_eval_gittables` function shared with the standalone binary. The standalone is at `crates/finetype-eval/src/bin/eval_gittables_cli.rs` and links its own logic; the subcommand handler in `finetype-cli` is independent. Delete the variant + dispatch arm + handler function."
   - "CLAUDE.md command-table refresh: the `finetype schema`, `finetype validate`, and any `--sharp-only`/`--model` references need a single-pass edit. Don't try to refresh the full README/docs/* in this PR — that's the follow-up doc-refresh scope."
   - "Stability-tier doc could go in CLAUDE.md (suggested above), CONTRIBUTING.md, or docs/INTERNAL_API.md. Pick CLAUDE.md — it's where the env-var disambiguation table already lives, so the audience overlap is exact."
@@ -271,10 +358,10 @@ exit_conditions:
   - "`finetype --help` shows the intended v0.6.19 public surface; help golden snapshots updated (AC-10)"
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   test_prefix: "viscl"
   timestamp: "2026-04-27T00:00:00Z"
-  ambiguity_score: 0.10
+  ambiguity_score: 0.08
   interview_ref: "orbit/specs/2026-04-27-cli-visibility-cleanup/interview.md"
   risk_tier: "LOW"
   target_release: "v0.6.19"
@@ -285,3 +372,5 @@ metadata:
     - "MCP surface audit (post-pipeline-reshape): mirror CLI public surface in MCP tools, retire MCP schema tool. Memo: 2026-04-27-mcp-surface-audit."
   decisions_to_record:
     - "Schema verb folds entirely (settled in interview Q1) — MADR `decisions/<NNNN>-schema-verb-folds-entirely.md`, linked from both this spec and the pipeline-reshape spec."
+  revision_notes:
+    - "v1.1 (2026-04-27, post-/orb:review-spec) — addresses 5 review findings before /orb:implement: (a) AC-5 script list re-audited against actual grep results — wrong scripts removed (distill_batches, eval.sh, train.sh, llm_label.py belong to claude/ollama/script-internal flags), correct list of 9 loci substituted (eval/profile_eval.sh, scripts/v19_compare.sh, scripts/sharpen_ablation.sh ×2, scripts/amvg/×2, scripts/rhh/×3); (b) AC-6 verification rewritten to use schema's positional argument (no `-f`) — `-f` points at taxonomy directory, not input file; (c) AC-7 verification rewritten to use validate's positional `<file> <schema>` form (CLAUDE.md line 183); (d) AC-3 acknowledges eval-gittables is already hidden — verification is grep + unknown-subcommand error, not --help diff; (e) AC-10 adds `load` to public surface listing (load→validate consolidation deferred to v0.6.20); (f) AC-6 emitter location pinned to two codepaths in main.rs (2744-2760 type-mode, 2987-3015 table-mode) — there is no json_schema.rs in finetype-core; MCP duplicate at mcp/tools/schema.rs:65-279 explicitly out-of-scope per interview Q5; (g) AC-7 sub-criteria added for check-only mode --output, --lenient, --append-without-db; (h) AC-9 numeric pin (369/448) replaced with deterministic-match-against-main-HEAD; (i) AC-6 CHANGELOG note added re downstream type_confidence NULL behaviour."
