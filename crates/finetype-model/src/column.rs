@@ -439,6 +439,10 @@ pub struct ColumnClassifier {
     /// ValueClassifier and Sense→Sharpen. The multi-branch model is fundamentally
     /// column-level, not value-level.
     multi_branch: Option<MultiBranchClassifier>,
+    /// Diagnostic flag: skip all Sharpen post-processing (feature_sharpen,
+    /// value_sharpen, apply_header_sharpen). Returns raw multi-branch model
+    /// output. Used for ablation studies — not exposed in public API.
+    skip_sharpen: bool,
 }
 
 impl ColumnClassifier {
@@ -449,6 +453,7 @@ impl ColumnClassifier {
             config,
             semantic_hint: None,
             taxonomy: None,
+            skip_sharpen: false,
             entity_classifier: None,
             sense: None,
             model2vec: None,
@@ -484,6 +489,7 @@ impl ColumnClassifier {
             label_map: None,
             sibling_context: None,
             multi_branch: None,
+            skip_sharpen: false,
         }
     }
 
@@ -579,7 +585,15 @@ impl ColumnClassifier {
             label_map: None,
             sibling_context: None,
             multi_branch: Some(multi_branch),
+            skip_sharpen: false,
         }
+    }
+
+    /// Set the skip_sharpen diagnostic flag. When true, the multi-branch pipeline
+    /// returns raw model output without any Sharpen post-processing.
+    /// Used for ablation studies only — not part of the public API contract.
+    pub fn set_skip_sharpen(&mut self, skip: bool) {
+        self.skip_sharpen = skip;
     }
 
     /// Check whether the multi-branch classifier is active.
@@ -2001,27 +2015,27 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
-        // Step 3: Feature-based Sharpen rules (F1-F6)
-        // Runs before value rules: structural corrections (leading zeros,
-        // slash segments, digit ratios) set the baseline, then value rules
-        // refine based on actual content inspection.
-        feature_sharpen(&mut result, &column_features);
+        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
+        if !self.skip_sharpen {
+            // Step 3: Feature-based Sharpen rules (F1-F6)
+            feature_sharpen(&mut result, &column_features);
 
-        // Step 4: Value-based Sharpen rules (R1-R19)
-        if let Some((resolved_label, rule_name)) = value_sharpen(
-            &sample,
-            &result.label,
-            result.confidence,
-            self.taxonomy.as_ref(),
-        ) {
-            result.label = resolved_label;
-            result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(rule_name);
-        }
+            // Step 4: Value-based Sharpen rules (R1-R19)
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                &sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
 
-        // Step 5: Header hints (Model2Vec semantic matching)
-        if !header.is_empty() {
-            self.apply_header_sharpen(&mut result, header, &sample);
+            // Step 5: Header hints (Model2Vec semantic matching)
+            if !header.is_empty() {
+                self.apply_header_sharpen(&mut result, header, &sample);
+            }
         }
 
         // Step 6: Post-hoc locale detection
@@ -2101,27 +2115,27 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
-        // Step 3: Feature-based Sharpen rules (F1-F6)
-        // Runs before value rules: structural corrections (leading zeros,
-        // slash segments, digit ratios) set the baseline, then value rules
-        // refine based on actual content inspection.
-        feature_sharpen(&mut result, &column_features);
+        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
+        if !self.skip_sharpen {
+            // Step 3: Feature-based Sharpen rules (F1-F6)
+            feature_sharpen(&mut result, &column_features);
 
-        // Step 4: Value-based Sharpen rules (R1-R19)
-        if let Some((resolved_label, rule_name)) = value_sharpen(
-            &sample,
-            &result.label,
-            result.confidence,
-            self.taxonomy.as_ref(),
-        ) {
-            result.label = resolved_label;
-            result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(rule_name);
-        }
+            // Step 4: Value-based Sharpen rules (R1-R19)
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                &sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
 
-        // Step 5: Header hints (Model2Vec semantic matching)
-        if !header.is_empty() {
-            self.apply_header_sharpen(&mut result, header, &sample);
+            // Step 5: Header hints (Model2Vec semantic matching)
+            if !header.is_empty() {
+                self.apply_header_sharpen(&mut result, header, &sample);
+            }
         }
 
         // Step 6: Post-hoc locale detection
@@ -2661,16 +2675,6 @@ fn value_sharpen(
 
     // Rule 9: Boolean override
     if let Some((label, rule)) = disambiguate_boolean_override(values, &top_labels_single) {
-        return Some((label, rule));
-    }
-
-    // Rule 10: Small-integer ordinal detection
-    if let Some((label, rule)) = disambiguate_small_integer_ordinal(values, &top_labels_single) {
-        return Some((label, rule));
-    }
-
-    // Rule 11: Categorical detection
-    if let Some((label, rule)) = disambiguate_categorical(values, &top_labels_single, taxonomy) {
         return Some((label, rule));
     }
 
@@ -3360,17 +3364,6 @@ fn disambiguate(
         return Some((label, rule));
     }
 
-    // Rule 10: Small-integer ordinal detection — override day_of_month for
-    // columns where all values are small positive integers (e.g. Pclass: 1,2,3)
-    if let Some((label, rule)) = disambiguate_small_integer_ordinal(values, &top_labels) {
-        return Some((label, rule));
-    }
-
-    // Rule 11: Categorical detection — low cardinality string columns
-    if let Some((label, rule)) = disambiguate_categorical(values, &top_labels, taxonomy) {
-        return Some((label, rule));
-    }
-
     // Rule 12: Numeric type disambiguation
     if let Some((label, rule)) = disambiguate_numeric(values, results, &top_labels) {
         return Some((label, rule));
@@ -3832,180 +3825,13 @@ fn disambiguate_boolean_override(
     None
 }
 
-/// Override day_of_month or similar classifications for small-integer columns
-/// that look like ordinal/class labels (e.g. Pclass: 1, 2, 3).
-///
-/// Rule: If values are all small positive integers with ≤10 unique values,
-///       the range is small (max ≤ 20), and the top prediction is day_of_month
-///       or another misfit type, override to ordinal.
-fn disambiguate_small_integer_ordinal(
-    values: &[String],
-    top_labels: &[&str],
-) -> Option<(String, String)> {
-    // Only trigger when day_of_month or generic integer types lead the vote
-    let misfit_types = [
-        "datetime.component.day_of_month",
-        "representation.numeric.integer_number",
-        "representation.identifier.increment",
-    ];
-    let top_is_misfit = top_labels
-        .first()
-        .map(|l| misfit_types.contains(l))
-        .unwrap_or(false);
-    if !top_is_misfit {
-        return None;
-    }
+// disambiguate_small_integer_ordinal REMOVED — Sharpen rule audit (MADR 0069)
+// Ablation: net -2 (0 fixes, 2 regressions). v19-relu model handles these correctly.
 
-    let parsed: Vec<i64> = values
-        .iter()
-        .filter_map(|v| v.trim().parse::<i64>().ok())
-        .collect();
-
-    if parsed.len() < 3 {
-        return None;
-    }
-
-    let mut unique: Vec<i64> = parsed.clone();
-    unique.sort();
-    unique.dedup();
-    let n_unique = unique.len();
-    let min = *unique.first().unwrap();
-    let max = *unique.last().unwrap();
-
-    // Ordinal pattern: small set of small positive integers
-    // e.g. {1,2,3} for Pclass, {1,2,3,4,5} for ratings
-    if (2..=10).contains(&n_unique) && min >= 0 && max <= 20 {
-        // Exclude pure boolean (only {0,1})
-        if n_unique == 2 && min == 0 && max == 1 {
-            return None;
-        }
-        // Exclude sequential ranges that look like increments (1..N where N matches sample count)
-        // Only classify as ordinal if there's repetition (i.e. fewer unique than total samples)
-        if n_unique < parsed.len() {
-            return Some((
-                "representation.discrete.ordinal".to_string(),
-                "small_integer_ordinal".to_string(),
-            ));
-        }
-    }
-
-    None
-}
-
-/// Detect categorical columns based on cardinality and value characteristics.
-///
-/// Rules:
-/// - All values are single characters with > 2 unique → categorical
-/// - 3-20 unique string values → categorical
-///
-/// ## Validator-confirmed demotion guard (MADR 0059)
-///
-/// Before any demotion rule runs, the guard checks whether the current
-/// top label's validator precisely confirms every non-empty value. When
-/// `taxonomy` is supplied AND `taxonomy.get(current_label).validation`
-/// returns `true` from `is_precise()` AND every value passing
-/// `!s.trim().is_empty()` returns `true` from the compiled validator's
-/// `is_valid()`, the guard fires and `disambiguate_categorical`
-/// returns `None` — signalling "do not demote, the validator confirms
-/// the named type." This closes the `named_type → categorical` demotion
-/// path identified in the validator-signal-attribution discovery
-/// (specifically, the excel_format regression on
-/// `coverage_closure_phase_ab.csv`).
-///
-/// Spec: orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml (ac-02)
-fn disambiguate_categorical(
-    values: &[String],
-    top_labels: &[&str],
-    taxonomy: Option<&Taxonomy>,
-) -> Option<(String, String)> {
-    // ── Validator-confirmed demotion guard (MADR 0059, spec ac-02) ──
-    //
-    // Returns None (skip demotion) when the current top label has a
-    // precise validator AND every non-empty value passes it. The guard
-    // is the FIRST branch after the function preamble — it must run
-    // before any demotion decision.
-    if let (Some(tax), Some(current_label)) = (taxonomy, top_labels.first()) {
-        if let Some(def) = tax.get(current_label) {
-            if let Some(validation) = &def.validation {
-                if validation.is_precise() {
-                    if let Some(validator) = tax.get_validator(current_label) {
-                        let all_pass = values
-                            .iter()
-                            .filter(|s| !s.trim().is_empty())
-                            .all(|s| validator.is_valid(s));
-                        if all_pass {
-                            // Preserve the current label: return None
-                            // so the caller keeps (label, confidence)
-                            // unchanged.
-                            return None;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let non_empty: Vec<&str> = values
-        .iter()
-        .map(|v| v.trim())
-        .filter(|v| !v.is_empty())
-        .collect();
-
-    if non_empty.len() < 3 {
-        return None;
-    }
-
-    let mut unique_values: Vec<&str> = non_empty.clone();
-    unique_values.sort();
-    unique_values.dedup();
-    let n_unique = unique_values.len();
-
-    // All single-character values with > 2 unique → categorical
-    // But not if all values are numeric digits (handled by numeric rules)
-    if non_empty.iter().all(|v| v.chars().count() == 1) && n_unique > 2 {
-        let all_digits = non_empty
-            .iter()
-            .all(|v| v.chars().all(|c| c.is_ascii_digit()));
-        if !all_digits {
-            return Some((
-                "representation.discrete.categorical".to_string(),
-                "categorical_single_char".to_string(),
-            ));
-        }
-    }
-
-    // Low cardinality string column: 3-20 unique values, not already categorical
-    // Only override if the current top prediction is a generic type
-    let mut generic_types = vec![
-        "representation.text.word",
-        "representation.text.plain_text",
-        "representation.text.abbreviation",
-        "representation.numeric.integer_number",
-        "datetime.component.day_of_month",
-    ];
-    generic_types.extend_from_slice(BOOLEAN_LABELS);
-    let top_is_generic = top_labels
-        .first()
-        .map(|l| generic_types.contains(l))
-        .unwrap_or(false);
-
-    if (3..=20).contains(&n_unique) && top_is_generic {
-        // Check that values are short strings (not sentences)
-        let all_short = non_empty.iter().all(|v| v.len() <= 50);
-        // Check that values are not purely numeric (handled by numeric rules)
-        let all_numeric = non_empty.iter().all(|v| v.parse::<f64>().is_ok());
-
-        if all_short && !all_numeric {
-            return Some((
-                "representation.discrete.categorical".to_string(),
-                "categorical_low_cardinality".to_string(),
-            ));
-        }
-    }
-
-    let _ = top_labels; // suppress warning
-    None
-}
+// disambiguate_categorical REMOVED — Sharpen rule audit (MADR 0069)
+// Both branches ablated: categorical_single_char (net 0), categorical_low_cardinality (net -1).
+// The demotion guard (MADR 0059) is no longer needed since there are no demotion rules to guard against.
+// v19-relu model handles categorical detection without heuristic overrides.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HEADER NAME HINTS
@@ -6209,252 +6035,10 @@ mod tests {
         assert!(result.is_none());
     }
 
-    #[test]
-    fn test_categorical_single_char_detection() {
-        // Column of single characters with >2 unique values
-        let values: Vec<String> = vec!["A", "B", "C", "D", "A", "B", "C", "A", "B", "D"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec!["representation.text.word"];
-
-        let result = disambiguate_categorical(&values, &top_labels, None);
-        assert!(result.is_some());
-        let (label, rule) = result.unwrap();
-        assert_eq!(label, "representation.discrete.categorical");
-        assert_eq!(rule, "categorical_single_char");
-    }
-
-    #[test]
-    fn test_categorical_low_cardinality() {
-        // Column with 3-20 unique short string values
-        let values: Vec<String> = vec![
-            "red", "blue", "green", "red", "blue", "green", "red", "blue", "green", "red",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        let top_labels = vec!["representation.text.word"];
-
-        let result = disambiguate_categorical(&values, &top_labels, None);
-        assert!(result.is_some());
-        let (label, rule) = result.unwrap();
-        assert_eq!(label, "representation.discrete.categorical");
-        assert_eq!(rule, "categorical_low_cardinality");
-    }
-
-    #[test]
-    fn test_categorical_not_triggered_for_high_cardinality() {
-        // Column with >20 unique values → not categorical
-        let values: Vec<String> = (1..=25).map(|i| format!("value_{}", i)).collect();
-        let top_labels = vec!["representation.text.word"];
-
-        let result = disambiguate_categorical(&values, &top_labels, None);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_categorical_not_triggered_for_numeric_values() {
-        // Purely numeric column should not be overridden to categorical
-        let values: Vec<String> = vec!["1", "2", "3", "1", "2", "3", "1", "2", "3", "1"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec!["representation.numeric.integer_number"];
-
-        let result = disambiguate_categorical(&values, &top_labels, None);
-        // Should be None because values are all numeric
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_categorical_not_triggered_for_specific_types() {
-        // If top prediction is already a specific type (e.g., iata_code), don't override
-        let values: Vec<String> = vec!["SYD", "LAX", "JFK", "LHR", "SYD", "LAX"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec!["geography.transport.iata_code"];
-
-        let result = disambiguate_categorical(&values, &top_labels, None);
-        assert!(result.is_none());
-    }
-
-    // ── Demotion-guard tests (spec ac-03) ──────────────────────────────
-    //
-    // Four branches:
-    //   (a) precise validator + all values pass  → guard fires → None
-    //   (b) precise validator + some fail        → guard bypassed
-    //   (c) imprecise validator + all pass       → guard bypassed
-    //   (d) no validation for current label      → guard bypassed
-    //
-    // Spec: orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml (ac-03)
-    // MADR: orbit/decisions/0059-demotion-guard-over-promotion.md
-
-    /// Fixture: precise validator via enum. Values are letter tokens so
-    /// they trip the `categorical_low_cardinality` rule UNLESS the
-    /// guard fires.
-    fn ac03_precise_enum_taxonomy() -> Taxonomy {
-        let yaml = r#"
-representation.file.excel_format:
-  title: "Excel Format"
-  designation: universal
-  broad_type: VARCHAR
-  validation:
-    type: string
-    enum: [xls, xlsx, xlsm, xlsb, csv, tsv]
-  tier: [VARCHAR, file]
-  release_priority: 4
-  samples: ["xlsx"]
-"#;
-        let mut tax = Taxonomy::from_yaml(yaml).unwrap();
-        tax.compile_validators();
-        tax
-    }
-
-    /// Fixture: imprecise validator — anchored but with `^.+$` body.
-    fn ac03_imprecise_pattern_taxonomy() -> Taxonomy {
-        let yaml = r#"
-representation.text.word:
-  title: "Word"
-  designation: universal
-  broad_type: VARCHAR
-  validation:
-    type: string
-    pattern: "^.+$"
-  tier: [VARCHAR, text]
-  release_priority: 4
-  samples: ["hello"]
-"#;
-        let mut tax = Taxonomy::from_yaml(yaml).unwrap();
-        tax.compile_validators();
-        tax
-    }
-
-    /// Fixture: no validation block — only a title, no pattern/enum.
-    fn ac03_no_validation_taxonomy() -> Taxonomy {
-        let yaml = r#"
-representation.text.word:
-  title: "Word"
-  designation: universal
-  broad_type: VARCHAR
-  tier: [VARCHAR, text]
-  release_priority: 4
-  samples: ["hello"]
-"#;
-        let mut tax = Taxonomy::from_yaml(yaml).unwrap();
-        tax.compile_validators();
-        tax
-    }
-
-    #[test]
-    fn dgd_ac03_guard_fires_precise_and_all_pass() {
-        // Branch (a): every value is in the enum — guard returns None,
-        // so the low-cardinality-string demotion that WOULD fire on
-        // `text.word` top label is suppressed.
-        let values: Vec<String> = vec![
-            "xls", "xlsx", "xls", "xlsx", "csv", "xlsx", "xls", "csv", "xlsx", "xls",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        let top_labels = vec!["representation.file.excel_format"];
-        let tax = ac03_precise_enum_taxonomy();
-
-        let result = disambiguate_categorical(&values, &top_labels, Some(&tax));
-        assert!(
-            result.is_none(),
-            "guard must fire (precise enum + all pass) and return None, got {:?}",
-            result
-        );
-    }
-
-    #[test]
-    fn dgd_ac03_guard_bypassed_precise_and_some_fail() {
-        // Branch (b): one value ("docx") is NOT in the enum — guard
-        // does not fire; existing low-cardinality demotion then runs
-        // against the `text.word` label the model would have emitted.
-        // Here we assert the guard specifically doesn't fire by using
-        // a top label whose enum rejects one of the values AND whose
-        // top label is itself generic so the demotion triggers.
-        let values: Vec<String> = vec![
-            "xls", "xlsx", "docx", "xlsx", "csv", "xlsx", "xls", "csv", "xlsx", "xls",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        // Note: top label is `text.word` (generic). The enum lives on
-        // excel_format in the fixture, but the guard reads the CURRENT
-        // label's validation — here text.word has none, so branch (d)
-        // applies and the guard bypasses. To prove branch (b) directly,
-        // we flip the test: current label IS excel_format, values
-        // include one non-enum value → guard must bypass.
-        let top_labels_b = vec!["representation.file.excel_format"];
-        let tax = ac03_precise_enum_taxonomy();
-
-        let result = disambiguate_categorical(&values, &top_labels_b, Some(&tax));
-        // Guard bypassed. Because current label (excel_format) is NOT
-        // in the generic-types set, the low-cardinality branch of the
-        // original function also returns None. That still proves the
-        // guard didn't swallow the decision — we drop down past it.
-        // The important assertion is that no panic/error occurred and
-        // the function reached the generic-types check.
-        assert!(
-            result.is_none(),
-            "excel_format isn't in the generic-types set so bypass still yields None; \
-             key assertion: no panic and the function reached its tail, got {:?}",
-            result
-        );
-    }
-
-    #[test]
-    fn dgd_ac03_guard_bypassed_imprecise_and_all_pass() {
-        // Branch (c): every value passes the (imprecise) `^.+$`
-        // validator — guard must bypass because is_precise() is false.
-        // Current top label is `text.word` (generic) with 3-20 unique
-        // short non-numeric values → the existing demotion then runs
-        // and returns Some(("...categorical", "categorical_low_cardinality")).
-        let values: Vec<String> = vec![
-            "alpha", "beta", "gamma", "alpha", "beta", "gamma", "alpha", "beta", "gamma", "alpha",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        let top_labels = vec!["representation.text.word"];
-        let tax = ac03_imprecise_pattern_taxonomy();
-
-        let result = disambiguate_categorical(&values, &top_labels, Some(&tax));
-        assert!(
-            result.is_some(),
-            "guard must bypass when validator is imprecise; \
-             existing demotion should then fire on low-cardinality generic column"
-        );
-        let (label, _rule) = result.unwrap();
-        assert_eq!(label, "representation.discrete.categorical");
-    }
-
-    #[test]
-    fn dgd_ac03_guard_bypassed_no_validation_for_current_label() {
-        // Branch (d): current label has no validation block — guard
-        // must bypass. Identical column shape to branch (c); existing
-        // demotion fires.
-        let values: Vec<String> = vec![
-            "alpha", "beta", "gamma", "alpha", "beta", "gamma", "alpha", "beta", "gamma", "alpha",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        let top_labels = vec!["representation.text.word"];
-        let tax = ac03_no_validation_taxonomy();
-
-        let result = disambiguate_categorical(&values, &top_labels, Some(&tax));
-        assert!(
-            result.is_some(),
-            "guard must bypass when the current label has no validation block"
-        );
-        let (label, _rule) = result.unwrap();
-        assert_eq!(label, "representation.discrete.categorical");
-    }
+    // ── Categorical and ordinal tests REMOVED — Sharpen rule audit (MADR 0069) ──
+    // disambiguate_categorical and disambiguate_small_integer_ordinal removed.
+    // Demotion guard (MADR 0059) tests also removed — the guard protected
+    // categorical demotion logic that no longer exists.
 
     // ── Header hint tests ───────────────────────────────────────────────
 
@@ -6981,74 +6565,7 @@ representation.text.word:
         );
     }
 
-    #[test]
-    fn test_small_integer_ordinal_pclass() {
-        // Pclass: values {1, 2, 3} with repetitions, model says day_of_month
-        let values: Vec<String> = vec!["3", "1", "3", "1", "3", "2", "3", "1", "3", "3", "1", "2"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec![
-            "datetime.component.day_of_month",
-            "representation.numeric.integer_number",
-        ];
-
-        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
-        assert!(
-            result.is_some(),
-            "Small integer ordinal should fire for Pclass"
-        );
-        let (label, rule) = result.unwrap();
-        assert_eq!(label, "representation.discrete.ordinal");
-        assert_eq!(rule, "small_integer_ordinal");
-    }
-
-    #[test]
-    fn test_small_integer_ordinal_skips_boolean() {
-        // Pure {0, 1} column should not become ordinal
-        let values: Vec<String> = vec!["0", "1", "0", "1", "1", "0", "0", "1"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec!["datetime.component.day_of_month"];
-
-        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
-        assert!(result.is_none(), "Pure {{0,1}} should not be ordinal");
-    }
-
-    #[test]
-    fn test_small_integer_ordinal_skips_large_range() {
-        // Integers with max > 20 should not trigger ordinal
-        let values: Vec<String> = vec!["1", "5", "10", "25", "50", "1", "5", "25"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec!["datetime.component.day_of_month"];
-
-        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
-        assert!(
-            result.is_none(),
-            "Large-range integers should not be ordinal"
-        );
-    }
-
-    #[test]
-    fn test_small_integer_ordinal_ratings() {
-        // Star ratings: {1, 2, 3, 4, 5} with repetitions
-        let values: Vec<String> = vec!["5", "4", "3", "5", "2", "4", "5", "1", "3", "4", "5", "5"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let top_labels = vec![
-            "datetime.component.day_of_month",
-            "representation.numeric.integer_number",
-        ];
-
-        let result = disambiguate_small_integer_ordinal(&values, &top_labels);
-        assert!(result.is_some(), "Star ratings should be ordinal");
-        let (label, _) = result.unwrap();
-        assert_eq!(label, "representation.discrete.ordinal");
-    }
+    // disambiguate_small_integer_ordinal tests REMOVED — Sharpen rule audit (MADR 0069)
 
     // ── NNFT-076: New header hint tests ─────────────────────────────────
 

@@ -45,6 +45,7 @@ specs:
   - "orbit/specs/2026-04-24-amount-variant-generators/"
   - "orbit/specs/2026-04-24-remove-header-hints/"
   - "orbit/specs/2026-04-25-v19-paired-retrain/"
+  - "orbit/specs/2026-04-27-sharpen-rule-audit/"
 
 references:
   - "README.md"
