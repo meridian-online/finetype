@@ -86,9 +86,9 @@ score_model() {
             continue
         fi
 
-        # Profile with the candidate model (--model flag, not env var)
+        # Profile with the candidate model via FINETYPE_MODEL env var
         # Save raw CSV — DuckDB will parse it properly (handles quoting)
-        "$FINETYPE" profile --model "$model_dir" --file "$file_path" -o csv \
+        FINETYPE_MODEL="$model_dir" "$FINETYPE" profile --file "$file_path" -o csv \
             > "$raw_dir/${dataset}.csv" 2>/dev/null
         file_count=$((file_count + 1))
 

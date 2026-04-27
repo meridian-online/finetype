@@ -189,6 +189,7 @@ def profile_file(
         env.pop("RHH_DISABLE_HINTS", None)
     else:
         env["RHH_DISABLE_HINTS"] = disable
+    env["FINETYPE_MODEL"] = str(model)
     cmd = [
         str(binary),
         "profile",
@@ -196,8 +197,6 @@ def profile_file(
         str(file_path),
         "-o",
         "json",
-        "--model",
-        str(model),
     ]
     try:
         proc = subprocess.run(

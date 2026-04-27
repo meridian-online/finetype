@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
 import sys
 from collections import defaultdict
@@ -120,12 +121,11 @@ def profile_file(binary: Path, model: Path, file_path: Path) -> dict | None:
         str(file_path),
         "-o",
         "json",
-        "--model",
-        str(model),
     ]
+    env = {**os.environ, "FINETYPE_MODEL": str(model)}
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=300
+            cmd, capture_output=True, text=True, check=True, timeout=300, env=env
         )
     except subprocess.CalledProcessError as exc:
         print(

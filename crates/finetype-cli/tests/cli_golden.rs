@@ -620,16 +620,26 @@ fn golden_schema_email() {
         "email schema should have pattern"
     );
 
-    // FineType extension fields
-    assert_eq!(
-        schema["x-finetype-broad-type"].as_str(),
-        Some("VARCHAR"),
-        "email broad_type should be VARCHAR"
-    );
+    // FineType extension fields — v0.6.19 reduced schema surface keeps
+    // only x-finetype-label + x-finetype-pii. Derivable fields
+    // (broad-type, transform, format-string, transform-ext) were dropped
+    // per the schema verbosity reduction.
     assert_eq!(
         schema["x-finetype-pii"].as_bool(),
         Some(true),
         "email should be marked as PII"
+    );
+    assert!(
+        schema["x-finetype-broad-type"].is_null(),
+        "x-finetype-broad-type was dropped from schema export in v0.6.19"
+    );
+    assert!(
+        schema["x-finetype-transform"].is_null(),
+        "x-finetype-transform was dropped from schema export in v0.6.19"
+    );
+    assert!(
+        schema["x-finetype-format-string"].is_null(),
+        "x-finetype-format-string was dropped from schema export in v0.6.19"
     );
 
     // Should have examples
@@ -646,9 +656,16 @@ fn golden_schema_iso_date() {
 
     assert_eq!(schema["type"].as_str(), Some("string"));
     assert!(schema["pattern"].is_string());
+
+    // v0.6.19 reduced schema surface — broad-type dropped. PII flag
+    // (false here) is the only retained extension besides label.
     assert_eq!(
-        schema["x-finetype-broad-type"].as_str(),
-        Some("DATE"),
-        "iso date broad_type should be DATE"
+        schema["x-finetype-pii"].as_bool(),
+        Some(false),
+        "iso_date should not be marked as PII"
+    );
+    assert!(
+        schema["x-finetype-broad-type"].is_null(),
+        "x-finetype-broad-type was dropped from schema export in v0.6.19"
     );
 }

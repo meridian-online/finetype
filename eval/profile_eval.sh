@@ -106,13 +106,10 @@ while IFS=, read -r dataset file_path column_name gt_label source_url licence fe
 
     # Run finetype profile and parse JSON output
     # FINETYPE_MODEL_TYPE env var allows overriding the default model type (char-cnn)
-    # FINETYPE_MODEL env var allows overriding the model directory
+    # FINETYPE_MODEL env var (read directly by finetype) overrides the model directory
     MODEL_FLAGS=""
     if [ -n "${FINETYPE_MODEL_TYPE:-}" ]; then
         MODEL_FLAGS="$MODEL_FLAGS --model-type $FINETYPE_MODEL_TYPE"
-    fi
-    if [ -n "${FINETYPE_MODEL:-}" ]; then
-        MODEL_FLAGS="$MODEL_FLAGS --model $FINETYPE_MODEL"
     fi
     PROFILE_ERR=$(mktemp)
     PROFILE_JSON=$("$FINETYPE" profile -f "$file_path" -o json $MODEL_FLAGS 2>"$PROFILE_ERR") || {
