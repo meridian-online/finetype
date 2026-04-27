@@ -4036,224 +4036,226 @@ fn header_hint(header: &str) -> Option<&'static str> {
     // Exact or near-exact matches first (most specific)
     if !disable_table {
         match h {
-        "email" | "e mail" | "email address" | "emailaddress" => {
-            return Some("identity.person.email");
-        }
-        "url" | "uri" | "link" | "href" | "website" | "homepage" => {
-            return Some("technology.internet.url");
-        }
-        "ip" | "ip address" | "ipaddress" | "ip addr" | "source ip" | "destination ip"
-        | "src ip" | "dst ip" | "server ip" | "client ip" | "remote ip" | "local ip" => {
-            return Some("technology.internet.ip_v4");
-        }
-        "uuid" | "guid" => {
-            return Some("technology.identifier.uuid");
-        }
-        "gender" | "sex" => {
-            return Some("identity.person.gender");
-        }
-        // "age" — type REMOVED in v0.5.2 (NNFT-192); redirect to integer_number (NNFT-254)
-        "age" | "patient age" | "customer age" | "user age" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Epoch / Unix timestamps — 10-digit integers confused with NPI (NNFT-254)
-        "epoch" | "unix epoch" | "unix timestamp" | "epoch time" | "unix time"
-        | "epoch seconds" | "unix seconds" | "epoch s" | "posix time" | "unix epoch seconds" => {
-            return Some("datetime.epoch.unix_seconds");
-        }
-        "epoch ms" | "unix ms" | "epoch milliseconds" | "unix milliseconds" => {
-            return Some("datetime.epoch.unix_milliseconds");
-        }
-        // Altitude / elevation — numeric measurements confused with numeric_code (NNFT-254)
-        "altitude" | "elevation" | "alt" | "elev" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Duration in numeric units (NNFT-254)
-        // Note: bare "duration" excluded — could be ISO 8601 (PT1H30M).
-        // Only specific numeric-unit variants match.
-        "duration minutes" | "duration min" | "duration seconds" | "duration sec"
-        | "duration hours" | "duration hrs" | "duration ms" | "elapsed" | "elapsed time" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Attendance / headcount — large integers (NNFT-254)
-        "attendance" | "headcount" | "participants" | "crowd size" | "capacity" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Heart rate / vital signs — numeric measurements (NNFT-254)
-        "heart rate" | "heartrate" | "hr" | "bpm" | "pulse" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Pages — book/document page counts (NNFT-254)
-        "pages" | "page count" | "num pages" | "total pages" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Language — programming or natural language names (NNFT-254)
-        "language" | "lang" | "programming language" | "spoken language" => {
-            return Some("representation.discrete.categorical");
-        }
-        // Sport / athletic discipline (NNFT-254)
-        "sport" | "discipline" | "event type" | "game type" => {
-            return Some("representation.discrete.categorical");
-        }
-        // Species / taxonomy (NNFT-254)
-        "species" | "genus" | "taxon" | "breed" | "variety" => {
-            return Some("representation.discrete.categorical");
-        }
-        // Exchange — financial exchange names (NNFT-254)
-        "exchange" | "stock exchange" | "market" | "bourse" => {
-            return Some("representation.discrete.categorical");
-        }
-        "latitude" | "lat" => {
-            return Some("geography.coordinate.latitude");
-        }
-        "longitude" | "lng" | "lon" | "long" => {
-            return Some("geography.coordinate.longitude");
-        }
-        "country" | "country name" => {
-            return Some("geography.location.country");
-        }
-        "country code" | "alpha 2" | "alpha 3" | "iso country" | "iso alpha 2" | "iso alpha 3"
-        | "country iso" => {
-            return Some("geography.location.country_code");
-        }
-        "city" | "city name" => {
-            return Some("geography.location.city");
-        }
-        "state" | "province" => {
-            return Some("geography.location.state");
-        }
-        // "region" removed — model predicts region correctly; exact-matching it
-        // to state was wrong for datasets where subcountry values are regions
-        // (v15, Option C keyword audit).
-        "currency" | "currency code" => {
-            return Some("identity.financial.currency_code");
-        }
-        // "id" | "identifier" — REMOVED (decision 0034). ID columns are genuinely
-        // ambiguous (numeric, UUID, alphanumeric). Let the model decide from values.
-        // Count / frequency columns — small integers representing quantities
-        "sibsp" | "parch" | "siblings" | "parents" | "children" | "dependents" | "qty"
-        | "quantity" => {
-            return Some("representation.numeric.integer_number");
-        }
-        // Class / rank / tier columns — ordinal categories
-        "class" | "pclass" | "grade" | "rank" | "level" | "tier" | "rating" | "priority"
-        | "score" => {
-            return Some("representation.discrete.ordinal");
-        }
-        // Survival / binary outcome columns
-        "survived" | "alive" | "deceased" | "dead" | "active" | "enabled" | "disabled"
-        | "deleted" | "verified" | "approved" | "flagged" => {
-            return Some("representation.boolean.binary");
-        }
-        // UTC / timezone offset columns
-        "utc offset" | "gmt offset" | "timezone offset" | "tz offset" | "utcoffset"
-        | "gmtoffset" => {
-            return Some("datetime.offset.utc");
-        }
-        // IANA timezone columns (NNFT-188)
-        "timezone" | "tz" | "time zone" | "iana timezone" | "iana tz" | "olson timezone" => {
-            return Some("datetime.offset.iana");
-        }
-        // Publisher / publishing (NNFT-188)
-        // Company / venue / station — entity names confused with city (NNFT-235)
-        "publisher" | "publishing house" | "published by" | "company" | "employer"
-        | "organization" | "organisation" | "venue" | "stadium" | "arena" | "theater"
-        | "theatre" | "station" | "station name" | "facility" | "building" | "hotel"
-        | "restaurant" | "hospital" | "school" | "university" | "manufacturer" => {
-            return Some("representation.text.entity_name");
-        }
-        // Financial code columns (cvv removed in v0.5.1)
-        "swift" | "swift code" | "bic" | "bic code" | "swiftcode" | "biccode" => {
-            return Some("finance.banking.swift_bic");
-        }
-        "issn" => {
-            return Some("identity.commerce.issn");
-        }
-        // ICAO airport code — unambiguous (stopgap per decision 0042)
-        "icao" | "icao code" => {
-            return Some("geography.transportation.icao_code");
-        }
-        // Author — unambiguous person name (stopgap per decision 0042)
-        "author" | "authors" | "author name" => {
-            return Some("identity.person.full_name");
-        }
-        // Medical identifiers
-        "npi" | "npi number" => {
-            return Some("identity.medical.npi");
-        }
-        "ean" | "barcode" | "gtin" => {
-            return Some("identity.commerce.ean");
-        }
-        "upc" => {
-            return Some("identity.commerce.upc");
-        }
-        // Operating system
-        "os" | "operating system" | "platform" => {
-            return Some("technology.development.os");
-        }
-        // Occupation / job title — collapsed to categorical (NNFT-162)
-        "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role" | "position" => {
-            return Some("representation.discrete.categorical");
-        }
-        // Subcountry / subregion — removed (v15, Option C keyword audit).
-        // Model predicts region correctly for subcountry columns; these exact
-        // matches forced state, which was wrong for world_cities/subcountry.
-        // Let the model decide from values.
-        // Embarked / boarding columns — categorical
-        "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
-            return Some("representation.discrete.categorical");
-        }
-        // Ticket / cabin — alphanumeric identifiers
-        "ticket" | "ticket number" | "ticketno" => {
-            return Some("representation.alphanumeric.alphanumeric_id");
-        }
-        "cabin" | "room" | "compartment" | "berth" | "seat" => {
-            return Some("representation.alphanumeric.alphanumeric_id");
-        }
-        // Fare / fee columns (NNFT-270: → finance.currency.amount)
-        "fare" | "fee" | "toll" | "charge" => {
-            return Some("finance.currency.amount");
-        }
-        // Amount-variant exact matches (decision 0065).
-        // These MUST precede the generic `h.contains("amount")` substring
-        // matcher below — otherwise every variant header like `amount_comma`
-        // collapses to the plain `finance.currency.amount` label. See spec
-        // orbit/specs/2026-04-24-amount-variant-generators ac-01..04 for the
-        // diagnostic arc. Header normalisation replaces `_`/`-` with space.
-        "amount accounting" | "amount acc" => {
-            return Some("finance.currency.amount_accounting");
-        }
-        "amount apostrophe" => {
-            return Some("finance.currency.amount_apostrophe");
-        }
-        "amount code prefix" | "amount code" | "amount with code" => {
-            return Some("finance.currency.amount_code_prefix");
-        }
-        "amount comma" => {
-            return Some("finance.currency.amount_comma");
-        }
-        "amount comma suffix" => {
-            return Some("finance.currency.amount_comma_suffix");
-        }
-        "amount crypto" | "crypto amount" => {
-            return Some("finance.currency.amount_crypto");
-        }
-        "amount lakh" | "lakh amount" | "amount indian" => {
-            return Some("finance.currency.amount_lakh");
-        }
-        "amount multisym" | "amount multi sym" | "amount multiple symbols" => {
-            return Some("finance.currency.amount_multisym");
-        }
-        "amount neg trailing" | "amount negative trailing" => {
-            return Some("finance.currency.amount_neg_trailing");
-        }
-        "amount nodecimal" | "amount no decimal" => {
-            return Some("finance.currency.amount_nodecimal");
-        }
-        "amount space" => {
-            return Some("finance.currency.amount_space");
-        }
-        _ => {}
+            "email" | "e mail" | "email address" | "emailaddress" => {
+                return Some("identity.person.email");
+            }
+            "url" | "uri" | "link" | "href" | "website" | "homepage" => {
+                return Some("technology.internet.url");
+            }
+            "ip" | "ip address" | "ipaddress" | "ip addr" | "source ip" | "destination ip"
+            | "src ip" | "dst ip" | "server ip" | "client ip" | "remote ip" | "local ip" => {
+                return Some("technology.internet.ip_v4");
+            }
+            "uuid" | "guid" => {
+                return Some("technology.identifier.uuid");
+            }
+            "gender" | "sex" => {
+                return Some("identity.person.gender");
+            }
+            // "age" — type REMOVED in v0.5.2 (NNFT-192); redirect to integer_number (NNFT-254)
+            "age" | "patient age" | "customer age" | "user age" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Epoch / Unix timestamps — 10-digit integers confused with NPI (NNFT-254)
+            "epoch" | "unix epoch" | "unix timestamp" | "epoch time" | "unix time"
+            | "epoch seconds" | "unix seconds" | "epoch s" | "posix time"
+            | "unix epoch seconds" => {
+                return Some("datetime.epoch.unix_seconds");
+            }
+            "epoch ms" | "unix ms" | "epoch milliseconds" | "unix milliseconds" => {
+                return Some("datetime.epoch.unix_milliseconds");
+            }
+            // Altitude / elevation — numeric measurements confused with numeric_code (NNFT-254)
+            "altitude" | "elevation" | "alt" | "elev" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Duration in numeric units (NNFT-254)
+            // Note: bare "duration" excluded — could be ISO 8601 (PT1H30M).
+            // Only specific numeric-unit variants match.
+            "duration minutes" | "duration min" | "duration seconds" | "duration sec"
+            | "duration hours" | "duration hrs" | "duration ms" | "elapsed" | "elapsed time" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Attendance / headcount — large integers (NNFT-254)
+            "attendance" | "headcount" | "participants" | "crowd size" | "capacity" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Heart rate / vital signs — numeric measurements (NNFT-254)
+            "heart rate" | "heartrate" | "hr" | "bpm" | "pulse" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Pages — book/document page counts (NNFT-254)
+            "pages" | "page count" | "num pages" | "total pages" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Language — programming or natural language names (NNFT-254)
+            "language" | "lang" | "programming language" | "spoken language" => {
+                return Some("representation.discrete.categorical");
+            }
+            // Sport / athletic discipline (NNFT-254)
+            "sport" | "discipline" | "event type" | "game type" => {
+                return Some("representation.discrete.categorical");
+            }
+            // Species / taxonomy (NNFT-254)
+            "species" | "genus" | "taxon" | "breed" | "variety" => {
+                return Some("representation.discrete.categorical");
+            }
+            // Exchange — financial exchange names (NNFT-254)
+            "exchange" | "stock exchange" | "market" | "bourse" => {
+                return Some("representation.discrete.categorical");
+            }
+            "latitude" | "lat" => {
+                return Some("geography.coordinate.latitude");
+            }
+            "longitude" | "lng" | "lon" | "long" => {
+                return Some("geography.coordinate.longitude");
+            }
+            "country" | "country name" => {
+                return Some("geography.location.country");
+            }
+            "country code" | "alpha 2" | "alpha 3" | "iso country" | "iso alpha 2"
+            | "iso alpha 3" | "country iso" => {
+                return Some("geography.location.country_code");
+            }
+            "city" | "city name" => {
+                return Some("geography.location.city");
+            }
+            "state" | "province" => {
+                return Some("geography.location.state");
+            }
+            // "region" removed — model predicts region correctly; exact-matching it
+            // to state was wrong for datasets where subcountry values are regions
+            // (v15, Option C keyword audit).
+            "currency" | "currency code" => {
+                return Some("identity.financial.currency_code");
+            }
+            // "id" | "identifier" — REMOVED (decision 0034). ID columns are genuinely
+            // ambiguous (numeric, UUID, alphanumeric). Let the model decide from values.
+            // Count / frequency columns — small integers representing quantities
+            "sibsp" | "parch" | "siblings" | "parents" | "children" | "dependents" | "qty"
+            | "quantity" => {
+                return Some("representation.numeric.integer_number");
+            }
+            // Class / rank / tier columns — ordinal categories
+            "class" | "pclass" | "grade" | "rank" | "level" | "tier" | "rating" | "priority"
+            | "score" => {
+                return Some("representation.discrete.ordinal");
+            }
+            // Survival / binary outcome columns
+            "survived" | "alive" | "deceased" | "dead" | "active" | "enabled" | "disabled"
+            | "deleted" | "verified" | "approved" | "flagged" => {
+                return Some("representation.boolean.binary");
+            }
+            // UTC / timezone offset columns
+            "utc offset" | "gmt offset" | "timezone offset" | "tz offset" | "utcoffset"
+            | "gmtoffset" => {
+                return Some("datetime.offset.utc");
+            }
+            // IANA timezone columns (NNFT-188)
+            "timezone" | "tz" | "time zone" | "iana timezone" | "iana tz" | "olson timezone" => {
+                return Some("datetime.offset.iana");
+            }
+            // Publisher / publishing (NNFT-188)
+            // Company / venue / station — entity names confused with city (NNFT-235)
+            "publisher" | "publishing house" | "published by" | "company" | "employer"
+            | "organization" | "organisation" | "venue" | "stadium" | "arena" | "theater"
+            | "theatre" | "station" | "station name" | "facility" | "building" | "hotel"
+            | "restaurant" | "hospital" | "school" | "university" | "manufacturer" => {
+                return Some("representation.text.entity_name");
+            }
+            // Financial code columns (cvv removed in v0.5.1)
+            "swift" | "swift code" | "bic" | "bic code" | "swiftcode" | "biccode" => {
+                return Some("finance.banking.swift_bic");
+            }
+            "issn" => {
+                return Some("identity.commerce.issn");
+            }
+            // ICAO airport code — unambiguous (stopgap per decision 0042)
+            "icao" | "icao code" => {
+                return Some("geography.transportation.icao_code");
+            }
+            // Author — unambiguous person name (stopgap per decision 0042)
+            "author" | "authors" | "author name" => {
+                return Some("identity.person.full_name");
+            }
+            // Medical identifiers
+            "npi" | "npi number" => {
+                return Some("identity.medical.npi");
+            }
+            "ean" | "barcode" | "gtin" => {
+                return Some("identity.commerce.ean");
+            }
+            "upc" => {
+                return Some("identity.commerce.upc");
+            }
+            // Operating system
+            "os" | "operating system" | "platform" => {
+                return Some("technology.development.os");
+            }
+            // Occupation / job title — collapsed to categorical (NNFT-162)
+            "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role"
+            | "position" => {
+                return Some("representation.discrete.categorical");
+            }
+            // Subcountry / subregion — removed (v15, Option C keyword audit).
+            // Model predicts region correctly for subcountry columns; these exact
+            // matches forced state, which was wrong for world_cities/subcountry.
+            // Let the model decide from values.
+            // Embarked / boarding columns — categorical
+            "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
+                return Some("representation.discrete.categorical");
+            }
+            // Ticket / cabin — alphanumeric identifiers
+            "ticket" | "ticket number" | "ticketno" => {
+                return Some("representation.alphanumeric.alphanumeric_id");
+            }
+            "cabin" | "room" | "compartment" | "berth" | "seat" => {
+                return Some("representation.alphanumeric.alphanumeric_id");
+            }
+            // Fare / fee columns (NNFT-270: → finance.currency.amount)
+            "fare" | "fee" | "toll" | "charge" => {
+                return Some("finance.currency.amount");
+            }
+            // Amount-variant exact matches (decision 0065).
+            // These MUST precede the generic `h.contains("amount")` substring
+            // matcher below — otherwise every variant header like `amount_comma`
+            // collapses to the plain `finance.currency.amount` label. See spec
+            // orbit/specs/2026-04-24-amount-variant-generators ac-01..04 for the
+            // diagnostic arc. Header normalisation replaces `_`/`-` with space.
+            "amount accounting" | "amount acc" => {
+                return Some("finance.currency.amount_accounting");
+            }
+            "amount apostrophe" => {
+                return Some("finance.currency.amount_apostrophe");
+            }
+            "amount code prefix" | "amount code" | "amount with code" => {
+                return Some("finance.currency.amount_code_prefix");
+            }
+            "amount comma" => {
+                return Some("finance.currency.amount_comma");
+            }
+            "amount comma suffix" => {
+                return Some("finance.currency.amount_comma_suffix");
+            }
+            "amount crypto" | "crypto amount" => {
+                return Some("finance.currency.amount_crypto");
+            }
+            "amount lakh" | "lakh amount" | "amount indian" => {
+                return Some("finance.currency.amount_lakh");
+            }
+            "amount multisym" | "amount multi sym" | "amount multiple symbols" => {
+                return Some("finance.currency.amount_multisym");
+            }
+            "amount neg trailing" | "amount negative trailing" => {
+                return Some("finance.currency.amount_neg_trailing");
+            }
+            "amount nodecimal" | "amount no decimal" => {
+                return Some("finance.currency.amount_nodecimal");
+            }
+            "amount space" => {
+                return Some("finance.currency.amount_space");
+            }
+            _ => {}
         }
     }
 
@@ -4288,9 +4290,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("technology.internet.ip_v4");
     }
-    if !disable_geography
-        && (h.contains("zip") || h.contains("postal") || h.contains("postcode"))
-    {
+    if !disable_geography && (h.contains("zip") || h.contains("postal") || h.contains("postcode")) {
         return Some("geography.address.postal_code");
     }
     if !disable_identity && h.contains("name") && (h.contains("first") || h.contains("given")) {
@@ -4349,9 +4349,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     if !disable_datetime && (h.contains("rfc 3339") || h.contains("rfc3339")) {
         return Some("datetime.timestamp.rfc_3339");
     }
-    if !disable_datetime
-        && h.contains("sql")
-        && (h.contains("timestamp") || h.contains("datetime"))
+    if !disable_datetime && h.contains("sql") && (h.contains("timestamp") || h.contains("datetime"))
     {
         return Some("datetime.timestamp.sql_standard");
     }
@@ -4416,10 +4414,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         return Some("representation.discrete.ordinal");
     }
     if !disable_representation
-        && (h.contains("ticket")
-            || h.contains("cabin")
-            || h.contains("seat")
-            || h.contains("room"))
+        && (h.contains("ticket") || h.contains("cabin") || h.contains("seat") || h.contains("room"))
     {
         return Some("representation.alphanumeric.alphanumeric_id");
     }
@@ -5438,10 +5433,7 @@ mod tests {
 
         // Scenario 5: whitespace + empty entries are tolerated.
         unsafe {
-            std::env::set_var(
-                "RHH_DISABLE_HINTS",
-                "  substring_matcher_identity ,, ,",
-            );
+            std::env::set_var("RHH_DISABLE_HINTS", "  substring_matcher_identity ,, ,");
         }
         assert_eq!(
             header_hint("phone"),
