@@ -310,7 +310,7 @@ Three env vars exist — each is read by exactly one consumer. Do not conflate.
 | Env var              | Consumer                           | Purpose                                     |
 |----------------------|------------------------------------|---------------------------------------------|
 | FINETYPE_CI_MODEL    | .github/scripts/download-model.sh  | CI's authoritative model name for fetches   |
-| FINETYPE_MODEL       | CLI, eval scripts                  | Path passed to `finetype --model`           |
+| FINETYPE_MODEL       | CLI, eval scripts                  | Model directory path (default: `models/default`) |
 | FINETYPE_MODEL_DIR   | DuckDB extension                   | Local path override (bypasses HF download)  |
 ```
 
