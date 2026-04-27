@@ -44,8 +44,8 @@ maturity: "established"
 goal: "Four public verbs (infer | profile | validate | mcp + taxonomy with json-schema output) composing into pipelines; maintainer affordances hidden; surface mirrors MCP"
 
 specs:
-  - "orbit/specs/2026-04-27-cli-visibility-cleanup/"     # planned (v0.6.19)
-  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"       # planned (v0.6.19)
+  - "orbit/specs/2026-04-27-cli-visibility-cleanup/spec.yaml"  # planned (v0.6.19)
+  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"             # planned (v0.6.20)
 
 references:
   - "README.md"
