@@ -1,0 +1,73 @@
+rule_id	fixes	regressions	changed_both_wrong	net_delta	total_fires	affected_columns
+header_hint_cross_domain:street_name	0	1	0	-1	1	street_name
+header_hint_same_category:unix_microseconds	0	1	0	-1	1	unix_microseconds
+header_hint_hardcoded:epoch_nanoseconds	0	1	0	-1	1	epoch_nanoseconds
+header_hint_cross_domain:ethereum_address	0	1	0	-1	1	ethereum_address
+header_hint_cross_domain:cabin	0	1	0	-1	1	Cabin
+header_hint_cross_domain:street_number	0	1	0	-1	1	street_number
+header_hint_geo_override:state	0	1	0	-1	1	State
+upc_digit_count_gate:ean_rate=0.91	0	0	1	0	1	volume
+header_hint_cross_domain:password	0	0	1	0	1	password
+header_hint_cross_domain:high_price	0	0	1	0	1	high_price
+header_hint_cross_domain:low_price	0	0	1	0	1	low_price
+header_hint_cross_domain:open_price	0	0	1	0	1	open_price
+numeric_sequential_detection	0	0	1	0	1	PassengerId
+header_hint_cross_domain:ticket_price	0	0	1	0	1	ticket_price
+header_hint_cross_domain:street_suffix	0	0	1	0	1	street_suffix
+header_hint_cross_domain:os	0	0	1	0	1	os
+header_hint_generic:rating	0	0	1	0	1	rating
+header_hint_cross_domain:country-code	0	0	1	0	1	country-code
+date_slash_disambiguation	0	0	2	0	2	eu_date, date
+header_hint_generic:attendance	0	0	1	0	1	attendance
+header_hint_cross_domain:total_price	0	0	1	0	1	total_price
+header_hint_cross_domain:price_usd	0	0	1	0	1	price_usd
+header_hint_cross_domain:unit_price	0	0	1	0	1	unit_price
+header_hint_generic:payload_size_bytes	0	0	1	0	1	payload_size_bytes
+header_hint_cross_domain:salary	0	0	1	0	1	salary
+header_hint_cross_domain:ticket	0	0	1	0	1	Ticket
+header_hint_cross_domain:close_price	0	0	1	0	1	close_price
+year_compact_ym_gate:four_digit=1.00,year_range=1.00	1	0	0	1	1	year
+header_hint_hardcoded:amount_multisym	1	0	0	1	1	amount_multisym
+header_hint_cross_domain:amount_crypto	1	0	0	1	1	amount_crypto
+coordinate_plausibility_gate:out_of_range=12/100	1	0	0	1	1	depth
+header_hint_generic:exchange	1	0	0	1	1	exchange
+header_hint_cross_domain:address	1	0	0	1	1	address
+header_hint_cross_domain:url_path	1	0	0	1	1	url_path
+header_hint_cross_domain:weight_kg	1	0	0	1	1	weight_kg
+header_hint_cross_domain:url	1	0	0	1	1	url
+header_hint_generic:alpha-3	1	0	0	1	1	alpha-3
+header_hint_cross_domain:height_in	1	0	0	1	1	height_in
+header_hint_generic:pclass	1	0	0	1	1	Pclass
+header_hint_same_category:rfc_3339	1	0	0	1	1	rfc_3339
+header_hint_generic:species	1	0	0	1	1	species
+isin_format_gate:match_rate=0.88	1	0	0	1	1	isin
+numeric_postal_code_detection	1	0	1	1	2	shipping_postal_code, credit_card_last4
+header_hint_hardcoded:amount_accounting	1	0	0	1	1	amount_accounting
+header_hint_cross_domain:icao	1	0	0	1	1	icao
+header_hint_cross_domain:amount_lakh	1	0	0	1	1	amount_lakh
+header_hint_cross_domain:amount_neg_trailing	1	0	0	1	1	amount_neg_trailing
+header_hint_hardcoded:amount_nodecimal	1	0	0	1	1	amount_nodecimal
+header_hint_cross_domain:amount_space	1	0	0	1	1	amount_space
+header_hint_hardcoded:price	1	0	0	1	1	price
+header_hint_cross_domain:embarked	1	0	0	1	1	Embarked
+header_hint_hardcoded:alpha-2	1	0	0	1	1	alpha-2
+header_hint_cross_domain:job_title	1	0	0	1	1	job_title
+header_hint_cross_domain:height_cm	1	0	0	1	1	height_cm
+header_hint_cross_domain:weight_lbs	1	0	0	1	1	weight_lbs
+header_hint_cross_domain:amount_comma_suffix	1	0	0	1	1	amount_comma_suffix
+boolean_subtype_initials	1	0	0	1	1	initials
+gender_detection	1	0	0	1	1	gender
+header_hint_cross_domain:sport	1	0	0	1	1	sport
+header_hint_cross_domain:venue	1	0	0	1	1	venue
+header_hint_cross_domain:fare	1	0	0	1	1	Fare
+header_hint_cross_domain:timezone	1	0	0	1	1	timezone
+header_hint_hardcoded:amount_apostrophe	1	0	0	1	1	amount_apostrophe
+header_hint_cross_domain:utc_offset	1	0	0	1	1	utc_offset
+version_dmy_short_dot_gate:invalid_date=0.71	1	0	0	1	1	semantic_version
+header_hint_cross_domain:station_name	1	0	0	1	1	station_name
+header_hint_generic:language	2	0	0	2	2	language, language
+header_hint_cross_domain:phone	2	0	0	2	2	phone, phone
+coordinate_disambiguation	2	0	0	2	2	longitude, longitude
+boolean_override_integer_spread	2	0	0	2	2	duration_minutes, Parch
+header_hint_cross_domain:postal_code	2	0	0	2	2	address.postal_code, postal_code
+feature_no_leading_zero:0.00	10	0	2	10	12	altitude, pages, Confirmed, Deaths, magNst, nst, elevation_m, response_time_ms, status_code, Age, id, geonameid

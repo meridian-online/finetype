@@ -371,6 +371,11 @@ enum Commands {
         /// Show additional detail and enable pipeline tracing (Sense, mask, hint, feature rule decisions)
         #[arg(short, long)]
         verbose: bool,
+
+        /// Skip all Sharpen post-processing — return raw multi-branch model output.
+        /// Diagnostic flag for ablation studies. Not part of the stable CLI contract.
+        #[arg(long, hide = true)]
+        raw_model: bool,
     },
 
     /// Evaluate column-mode inference on GitTables benchmark
@@ -720,6 +725,7 @@ fn main() -> Result<()> {
             sharp_only,
             enum_threshold,
             verbose,
+            raw_model,
         } => cmd_profile(
             file,
             model,
@@ -731,6 +737,7 @@ fn main() -> Result<()> {
             sharp_only,
             enum_threshold,
             verbose,
+            raw_model,
         ),
 
         Commands::EvalGittables {
@@ -4135,6 +4142,7 @@ fn cmd_profile(
     sharp_only: bool,
     enum_threshold: usize,
     verbose: bool,
+    raw_model: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
 
@@ -4195,6 +4203,12 @@ fn cmd_profile(
     // Multi-branch path: wire Model2Vec + sibling context for header enrichment
     if column_classifier.has_multi_branch() {
         wire_model2vec_and_siblings(&mut column_classifier);
+    }
+
+    // Diagnostic: skip Sharpen post-processing for ablation studies
+    if raw_model {
+        column_classifier.set_skip_sharpen(true);
+        eprintln!("WARNING: --raw-model active — Sharpen post-processing disabled");
     }
 
     eprintln!("Reading {:?}", file);

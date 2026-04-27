@@ -11,7 +11,7 @@ env:
   RUSTFLAGS: "-D warnings"
   # CI's authoritative model name. Read only by .github/scripts/download-model.sh.
   # See specs/2026-04-20-ci-decouple-default-symlink/spec.yaml for the promotion flow.
-  FINETYPE_CI_MODEL: sherlock-v16
+  FINETYPE_CI_MODEL: sherlock-v19-relu-s42
 
 jobs:
   download-model-test:

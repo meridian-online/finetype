@@ -1,0 +1,21 @@
+v19 Cleaned Pipeline Profile Score
+===================================
+Model: sherlock-v19-relu-s42
+Pipeline: 3 rules removed (small_integer_ordinal, categorical_low_cardinality, categorical_single_char)
+Manifest: 448 rows (full, no coverage_closure exclusion)
+Date: 2026-04-27
+
+Raw model (no Sharpen):  317 / 448
+Sharpened (cleaned):     369 / 448
+Sharpen net effect:      +52
+
+v16 baseline:            371 / 448
+net_label_delta:         -2 (369 - 371)
+
+Gate check (MADR 0066 amended by 0069):
+  net_label_delta >= 0 with rule removal: FAIL (-2)
+  net_label_delta >= +1 (original gate): FAIL (-2)
+  Spec ac-06 threshold >= 365: PASS (369 >= 365)
+  Spec ac-06 threshold >= 371: FAIL (369 < 371)
+
+Result: PASS under spec ac-06 (threshold 365 met)
