@@ -622,13 +622,19 @@ impl Generator {
                     // Zero-padded month and day
                     Ok(format!(
                         "{}{}/{:02}/{:02}",
-                        era_letter, era_year, dt.month(), dt.day()
+                        era_letter,
+                        era_year,
+                        dt.month(),
+                        dt.day()
                     ))
                 } else {
                     // Unpadded month and day
                     Ok(format!(
                         "{}{}/{}/{}",
-                        era_letter, era_year, dt.month(), dt.day()
+                        era_letter,
+                        era_year,
+                        dt.month(),
+                        dt.day()
                     ))
                 }
             }
