@@ -63,11 +63,11 @@ while IFS=, read -r dataset file_path column_name gt_label _rest; do
     fi
 
     # Raw model (no Sharpen)
-    "$FINETYPE" profile --model "$MODEL_DIR" --file "$file_path" --raw-model -o csv \
+    FINETYPE_MODEL="$MODEL_DIR" "$FINETYPE" profile --file "$file_path" --raw-model -o csv \
         > "$RAW_DIR/csv/${dataset}.csv" 2>/dev/null
 
     # Sharpened (normal pipeline)
-    "$FINETYPE" profile --model "$MODEL_DIR" --file "$file_path" -o csv \
+    FINETYPE_MODEL="$MODEL_DIR" "$FINETYPE" profile --file "$file_path" -o csv \
         > "$SHARP_DIR/csv/${dataset}.csv" 2>/dev/null
 
     file_count=$((file_count + 1))

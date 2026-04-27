@@ -15,6 +15,7 @@ Spec v1.2 ac-03 assertions:
   (c) row sums == 1 (one prediction per eval column)
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -48,9 +49,10 @@ EXPECTED["amount"] = "finance.currency.amount"  # control row in predictions.tsv
 def run_profile() -> dict:
     cmd = [
         "cargo", "run", "--bin", "finetype", "--quiet", "--",
-        "profile", "--file", str(EVAL_CSV), "-o", "json", "--model", MODEL,
+        "profile", "--file", str(EVAL_CSV), "-o", "json",
     ]
-    out = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=REPO_ROOT)
+    env = {**os.environ, "FINETYPE_MODEL": MODEL}
+    out = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=REPO_ROOT, env=env)
     return json.loads(out.stdout)
 
 

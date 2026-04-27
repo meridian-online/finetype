@@ -1,26 +1,20 @@
 feature: "Schema-driven data validation"
 as_a: "data analyst"
-i_want: "to validate loaded data against a type schema directly inside DuckDB, using SQL I already know"
-so_that: "validation is part of my query workflow — not a separate CLI step that produces CSV files I then have to re-import"
+i_want: "one verb that takes a CSV plus a schema and gives me a typed DuckDB table with rejected rows in a sidecar — and the same validation engine inside DuckDB SQL when I want it there"
+so_that: "validation, transformation, and loading happen in one honest pass, and the schema is a durable contract I can inspect, edit, and reuse"
 
 scenarios:
-  - name: "Generate table-level schema from profiling"
-    given: "a CSV file"
-    when: "I run finetype schema data.csv"
-    then: "FineType profiles the file and emits a JSON Schema describing every column's expected type and validation pattern"
-    source_lines: "CLAUDE.md: finetype schema data.csv generates table-level JSON Schema"
+  - name: "Validate a CSV and get a typed DuckDB table"
+    given: "a CSV file and a JSON Schema with x-finetype-label per column"
+    when: "I run finetype validate -f data.csv --schema schema.json --db out.db --table orders"
+    then: "out.db contains 'orders' (valid rows only, with per-column transforms applied) and 'finetype_reject_errors' (rejected rows + reasons) — one session, one CTAS, no intermediate VARCHAR table"
+    source_lines: "memo 2026-04-27-load-folds-into-validate.md; MADR 0064; cmd_validate_table at main.rs:3820+"
 
-  - name: "Validate inside DuckDB"
-    given: "data loaded into a DuckDB table and a JSON Schema"
-    when: "I run SELECT finetype_validate(col, schema_json) FROM my_table"
-    then: "each row returns 'valid' or an error message, queryable and filterable with standard SQL"
-    source_lines: "CLAUDE.md: finetype_validate(value, schema_json) — Schema-driven validation (returns 'valid' or error message)"
-
-  - name: "Separate valid from invalid with SQL"
-    given: "a validated table"
-    when: "I filter with WHERE finetype_validate(col, schema) = 'valid'"
-    then: "I get clean rows in-query — and can COPY TO csv if I choose to export, on my terms"
-    source_lines: "user-requested during edit"
+  - name: "Read-only check without writing a database"
+    given: "a CSV and a schema"
+    when: "I run finetype validate -f data.csv --schema schema.json (no --db/--table)"
+    then: "validation runs in check mode, exit code reflects pass/fail, nothing is written; --db and --table are optional-but-mutually-required when I do want output"
+    source_lines: "memo 2026-04-27-validate-required-flags.md"
 
   - name: "Type-level schema export"
     given: "a known type key or glob pattern"
@@ -28,15 +22,39 @@ scenarios:
     then: "FineType exports JSON Schema fragments for matching types, composable into custom validation schemas"
     source_lines: "README.md: finetype schema 'datetime.date.*' --pretty — Export JSON Schema for a type (supports glob patterns)"
 
+  - name: "Schema exports keep only what isn't derivable"
+    given: "a generated JSON Schema"
+    when: "I inspect a column's x-finetype-* fields"
+    then: "only x-finetype-label and x-finetype-pii ship; broad-type, transform, format-string, confidence, and domain are derivable from the label and stay out of the wire format"
+    source_lines: "memo 2026-04-27-schema-export-verbosity.md"
+
+  - name: "Validate inside DuckDB SQL"
+    given: "data loaded into a DuckDB table and a JSON Schema"
+    when: "I run SELECT finetype_validate(col, schema_json) FROM my_table"
+    then: "each row returns 'valid' or an error message, queryable and filterable with standard SQL — same engine as the CLI verb"
+    source_lines: "CLAUDE.md: finetype_validate(value, schema_json) — Schema-driven validation"
+
+  - name: "Separate valid from invalid with SQL"
+    given: "a validated DuckDB database"
+    when: "I query the typed table and the reject sidecar"
+    then: "valid rows are typed and ready to use; rejects are queryable with row indices, constraint failures, and FineType-specific reasons (TRANSFORM_FAILED for cells that passed validation but failed the typed cast)"
+    source_lines: "memo 2026-04-27-load-folds-into-validate.md; MADR 0064 finetype_reject_errors schema"
+
 maturity: "emerging"
-goal: "Move validation into DuckDB-native workflow — analysts validate with SQL, not CLI sidecar files"
+goal: "Validate is the one verb for fit-for-use data — pass/fail engine + typed output table + reject sidecar — with the same engine reachable from DuckDB SQL"
 
 specs:
   - "orbit/specs/2026-03-12-validate-command/"
   - "orbit/specs/2026-04-22-duckdb-extension-ergonomics/spec.yaml"
+  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"  # planned (v0.6.19) — folds load into validate
 
 references:
   - "README.md"
   - "CLAUDE.md"
   - "orbit/decisions/0031-table-level-schema-via-finetype-schema.md"
   - "orbit/decisions/0032-replace-validate-with-schema-driven-quality-gate.md"
+  - "orbit/decisions/0064-validate-as-duckdb-reject-pipeline.md"
+  - "orbit/memos/2026-04-27-validate-required-flags.md"
+  - "orbit/memos/2026-04-27-schema-export-verbosity.md"
+  - "orbit/memos/2026-04-27-schema-cli-flag-collision.md"
+  - "orbit/memos/2026-04-27-load-folds-into-validate.md"

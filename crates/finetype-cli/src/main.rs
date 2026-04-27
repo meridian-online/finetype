@@ -20,6 +20,18 @@ mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded_models.rs"));
 }
 
+/// Resolve the model directory from the `FINETYPE_MODEL` env var.
+///
+/// The CLI no longer exposes a `--model` flag — every subcommand that
+/// loads a model reads this env var. The default is `models/default`,
+/// which mirrors the runtime default used by the DuckDB extension and
+/// MCP server.
+fn resolve_model_path() -> PathBuf {
+    std::env::var_os("FINETYPE_MODEL")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("models/default"))
+}
+
 #[derive(Parser)]
 #[command(name = "finetype")]
 #[command(author = "Hugh Cameron")]
@@ -41,10 +53,6 @@ enum Commands {
         /// File containing inputs (one per line)
         #[arg(short, long)]
         file: Option<PathBuf>,
-
-        /// Model directory
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
 
         /// Output format (plain, json, csv)
         #[arg(short, long, default_value = "plain")]
@@ -84,13 +92,10 @@ enum Commands {
         /// Requires --mode column.
         #[arg(long)]
         batch: bool,
-
-        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
-        #[arg(long)]
-        sharp_only: bool,
     },
 
     /// Generate synthetic training data
+    #[command(hide = true)]
     Generate {
         /// Number of samples per label
         #[arg(short, long, default_value = "100")]
@@ -211,10 +216,6 @@ enum Commands {
         #[arg(long)]
         stdout: bool,
 
-        /// Model directory — table mode only
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
-
         /// Cardinality threshold for ENUM columns (0 = disable) — table mode only
         #[arg(long, default_value = "50")]
         enum_threshold: usize,
@@ -229,10 +230,6 @@ enum Commands {
         /// Override table name (default: derived from filename)
         #[arg(long)]
         table_name: Option<String>,
-
-        /// Model directory
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
 
         /// Maximum values to sample per column (default 100)
         #[arg(long, default_value = "100")]
@@ -249,10 +246,6 @@ enum Commands {
         /// Model type (char-cnn, tiered, transformer)
         #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
-
-        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
-        #[arg(long)]
-        sharp_only: bool,
 
         /// Number of preview rows in trailing SELECT (0 = no preview)
         #[arg(long, default_value = "10")]
@@ -272,6 +265,7 @@ enum Commands {
     },
 
     /// Validate generator ↔ taxonomy alignment
+    #[command(hide = true)]
     Check {
         /// Taxonomy file or directory
         #[arg(short, long, default_value = "labels")]
@@ -298,7 +292,8 @@ enum Commands {
         output: OutputFormat,
     },
 
-    /// Validate CSV data against a JSON Schema — writes result to a DuckDB .db file
+    /// Validate CSV data against a JSON Schema — check-only by default,
+    /// or pass --db/--table to materialise valid rows + reject sidecar.
     Validate {
         /// Input CSV or Parquet file
         file: PathBuf,
@@ -306,18 +301,21 @@ enum Commands {
         /// JSON Schema file to validate against
         schema: PathBuf,
 
-        /// Output DuckDB database file (created if absent)
-        #[arg(long)]
-        db: PathBuf,
+        /// Output DuckDB database file (created if absent). Optional —
+        /// when omitted, validation runs in check-only mode (no .db
+        /// written). When supplied, --table is also required.
+        #[arg(long, requires = "table")]
+        db: Option<PathBuf>,
 
-        /// Table name to create in the output database for valid rows
-        #[arg(long)]
-        table: String,
+        /// Table name to create in the output database for valid rows.
+        /// Optional — required only when --db is supplied.
+        #[arg(long, requires = "db")]
+        table: Option<String>,
 
         /// Append to an existing database. Required when --db already
         /// contains the named table or a prior finetype_reject_errors
-        /// sidecar.
-        #[arg(long)]
+        /// sidecar. Requires --db.
+        #[arg(long, requires = "db")]
         append: bool,
 
         /// Force exit code 0 regardless of reject count (does not
@@ -335,10 +333,6 @@ enum Commands {
         /// Input CSV file
         #[arg(short, long)]
         file: PathBuf,
-
-        /// Model directory
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
 
         /// Output format (plain, json, csv, markdown, arrow)
         #[arg(short, long, default_value = "plain")]
@@ -360,10 +354,6 @@ enum Commands {
         #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
-        /// Disable Sense classifier (use Sharpen-only pipeline with header hints)
-        #[arg(long)]
-        sharp_only: bool,
-
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR)
         #[arg(long, default_value = "50")]
         enum_threshold: usize,
@@ -376,26 +366,6 @@ enum Commands {
         /// Diagnostic flag for ablation studies. Not part of the stable CLI contract.
         #[arg(long, hide = true)]
         raw_model: bool,
-    },
-
-    /// Evaluate column-mode inference on GitTables benchmark
-    #[command(hide = true)]
-    EvalGittables {
-        /// Directory containing GitTables benchmark data
-        #[arg(short, long, default_value = "eval/gittables")]
-        dir: PathBuf,
-
-        /// Model directory
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
-
-        /// Maximum values to sample per column (default 100)
-        #[arg(long, default_value = "100")]
-        sample_size: usize,
-
-        /// Output format (plain, json)
-        #[arg(short, long, default_value = "plain")]
-        output: OutputFormat,
     },
 
     /// Start MCP server for AI agent integration (stdio transport)
@@ -485,10 +455,6 @@ enum Commands {
         #[arg(short, long)]
         data: PathBuf,
 
-        /// Model directory
-        #[arg(short, long, default_value = "models/default")]
-        model: PathBuf,
-
         /// Taxonomy file or directory
         #[arg(short, long, default_value = "labels")]
         taxonomy: PathBuf,
@@ -561,7 +527,6 @@ fn main() -> Result<()> {
         Commands::Infer {
             input,
             file,
-            model,
             output,
             confidence,
             value,
@@ -571,11 +536,9 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
-            sharp_only,
         } => cmd_infer(
             input,
             file,
-            model,
             output,
             confidence,
             value,
@@ -585,7 +548,6 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
-            sharp_only,
         ),
 
         Commands::Generate {
@@ -636,7 +598,6 @@ fn main() -> Result<()> {
             pretty,
             stats,
             stdout,
-            model,
             enum_threshold,
         } => {
             // Detect if type_key is a file path (CSV/TSV/Parquet) or a type key
@@ -657,7 +618,6 @@ fn main() -> Result<()> {
                 cmd_schema_table(
                     input_path.to_path_buf(),
                     file,
-                    model,
                     pretty,
                     stats,
                     stdout,
@@ -671,12 +631,10 @@ fn main() -> Result<()> {
         Commands::Load {
             file,
             table_name,
-            model,
             sample_size,
             delimiter,
             no_header_hint,
             model_type,
-            sharp_only,
             limit,
             no_normalize_names,
             enum_threshold,
@@ -684,12 +642,10 @@ fn main() -> Result<()> {
         } => cmd_load(
             file,
             table_name,
-            model,
             sample_size,
             delimiter,
             no_header_hint,
             model_type,
-            sharp_only,
             limit,
             no_normalize_names,
             enum_threshold,
@@ -716,45 +672,33 @@ fn main() -> Result<()> {
 
         Commands::Profile {
             file,
-            model,
             output,
             sample_size,
             delimiter,
             no_header_hint,
             model_type,
-            sharp_only,
             enum_threshold,
             verbose,
             raw_model,
         } => cmd_profile(
             file,
-            model,
             output,
             sample_size,
             delimiter,
             no_header_hint,
             model_type,
-            sharp_only,
             enum_threshold,
             verbose,
             raw_model,
         ),
 
-        Commands::EvalGittables {
-            dir,
-            model,
-            sample_size,
-            output,
-        } => cmd_eval_gittables(dir, model, sample_size, output),
-
         Commands::Eval {
             data,
-            model,
             taxonomy,
             model_type,
             top_confusions,
             output,
-        } => cmd_eval(data, model, taxonomy, model_type, top_confusions, output),
+        } => cmd_eval(data, taxonomy, model_type, top_confusions, output),
 
         Commands::Mcp => cmd_mcp(),
 
@@ -1300,7 +1244,6 @@ fn cmd_extract_features(
 fn cmd_infer(
     input: Option<String>,
     file: Option<PathBuf>,
-    model: PathBuf,
     output: OutputFormat,
     show_confidence: bool,
     show_value: bool,
@@ -1310,17 +1253,18 @@ fn cmd_infer(
     bench: bool,
     header: Option<String>,
     batch: bool,
-    sharp_only: bool,
 ) -> Result<()> {
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
     use std::time::Instant;
+
+    let model = resolve_model_path();
 
     // Batch mode: read JSONL from stdin, classify each column group
     if batch {
         if !matches!(mode, InferenceMode::Column) {
             anyhow::bail!("--batch requires --mode column");
         }
-        return cmd_infer_batch(model, model_type, sample_size, sharp_only);
+        return cmd_infer_batch(model, model_type, sample_size);
     }
 
     // Collect inputs
@@ -1478,8 +1422,8 @@ fn cmd_infer(
             column_classifier.set_taxonomy(taxonomy);
         }
 
-        // Wire up Sense classifier (Sense → Sharpen pipeline)
-        if !sharp_only && !column_classifier.has_multi_branch() {
+        // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models
+        if !column_classifier.has_multi_branch() {
             wire_sense(&mut column_classifier);
             wire_sibling_context(&mut column_classifier);
         }
@@ -1706,12 +1650,7 @@ fn cmd_infer(
 ///
 /// Output JSONL format:
 ///   {"label": "identity.person.email", "confidence": 0.95, ...}
-fn cmd_infer_batch(
-    model: PathBuf,
-    model_type: ModelType,
-    sample_size: usize,
-    sharp_only: bool,
-) -> Result<()> {
+fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
     use std::time::Instant;
 
@@ -1768,8 +1707,8 @@ fn cmd_infer_batch(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier (Sense → Sharpen pipeline)
-    if !sharp_only && !column_classifier.has_multi_branch() {
+    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models
+    if !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -2738,25 +2677,14 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
         schema.insert("examples".into(), to_json_value(&def.samples));
     }
 
-    // FineType DDL extension fields (x-finetype-* prefix)
-    if let Some(broad_type) = &def.broad_type {
-        let duckdb_type = finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
-        schema.insert("x-finetype-broad-type".into(), json!(duckdb_type));
-    }
-    if let Some(transform) = &def.transform {
-        schema.insert("x-finetype-transform".into(), json!(transform));
-    }
-    if let Some(fmt) = &def.format_string {
-        schema.insert("x-finetype-format-string".into(), json!(fmt));
-    }
-
-    // Extension: alternative format string for type variants (kept without prefix for backwards compat)
-    if let Some(alt) = &def.format_string_alt {
-        schema.insert("x-format-string-alt".into(), json!(alt));
-    }
-    if let Some(transform_ext) = &def.transform_ext {
-        schema.insert("x-finetype-transform-ext".into(), json!(transform_ext));
-    }
+    // FineType extension fields (x-finetype-* prefix)
+    //
+    // Verbosity reduction (v0.6.19, MADR 0042 line of work): broad_type, transform,
+    // transform_ext, and format_string are derivable from `x-finetype-label` plus the
+    // bundled taxonomy and so are no longer emitted. Downstream consumers that need
+    // them should look up the label in the taxonomy directly. `x-finetype-label`
+    // and `x-finetype-pii` are retained because they are the contract between
+    // schema producers and validate/load consumers.
     schema.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
 
     serde_json::Value::Object(schema)
@@ -2771,7 +2699,6 @@ fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::
 fn cmd_schema_table(
     input: PathBuf,
     taxonomy_path: PathBuf,
-    model: PathBuf,
     pretty: bool,
     stats: bool,
     to_stdout: bool,
@@ -2779,6 +2706,8 @@ fn cmd_schema_table(
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
     use std::collections::BTreeSet;
+
+    let model = resolve_model_path();
 
     // Load model + taxonomy (same setup as cmd_profile)
     eprintln!("Loading model from {:?}", model);
@@ -2833,11 +2762,14 @@ fn cmd_schema_table(
     let (headers, columns, row_count) = read_csv_input(&input, None)?;
     eprintln!("Read {} rows, {} columns", row_count, headers.len());
 
-    // Classify columns with sibling context if available
+    // Classify columns with sibling context if available.
+    //
+    // Note: confidence is intentionally not retained on ColResult.
+    // v0.6.19 dropped `x-finetype-confidence` from the emitted schema
+    // (verbosity reduction); no other table-mode consumer reads it.
     struct ColResult {
         name: String,
         label: String,
-        confidence: f32,
         values: Vec<String>,
         null_count: usize,
     }
@@ -2859,7 +2791,6 @@ fn cmd_schema_table(
                 col_results.push(ColResult {
                     name,
                     label: "unknown".to_string(),
-                    confidence: 0.0,
                     values: vec![],
                     null_count,
                 });
@@ -2889,7 +2820,6 @@ fn cmd_schema_table(
                             .cloned()
                             .unwrap_or_else(|| format!("col_{}", i)),
                         label: "unknown".to_string(),
-                        confidence: 0.0,
                         values: vec![],
                         null_count: row_count,
                     },
@@ -2904,7 +2834,6 @@ fn cmd_schema_table(
                 ColResult {
                     name,
                     label: result.label,
-                    confidence: result.confidence,
                     values,
                     null_count,
                 },
@@ -2925,7 +2854,6 @@ fn cmd_schema_table(
                 col_results.push(ColResult {
                     name,
                     label: "unknown".to_string(),
-                    confidence: 0.0,
                     values: vec![],
                     null_count,
                 });
@@ -2937,7 +2865,6 @@ fn cmd_schema_table(
             col_results.push(ColResult {
                 name,
                 label: result.label,
-                confidence: result.confidence,
                 values: col_values.clone(),
                 null_count,
             });
@@ -2983,35 +2910,18 @@ fn cmd_schema_table(
                 prop.insert("type".into(), json!("string"));
             }
 
-            // x-finetype extension fields (AC-4)
+            // x-finetype extension fields — verbosity reduction (v0.6.19): only
+            // `x-finetype-label` and `x-finetype-pii` are emitted. Domain,
+            // confidence, broad-type, transform, transform-ext, and format-string
+            // are derivable from the label + bundled taxonomy and so are dropped
+            // to keep schema output focused on the contract: which type, and
+            // whether it is PII.
             prop.insert("x-finetype-label".into(), json!(col.label));
-            let domain = col.label.split('.').next().unwrap_or("");
-            prop.insert("x-finetype-domain".into(), json!(domain));
-            prop.insert(
-                "x-finetype-confidence".into(),
-                json!((col.confidence * 1000.0).round() / 1000.0),
-            );
-            if let Some(broad_type) = &def.broad_type {
-                let duckdb_type = finetype_core::DdlInfo::duckdb_type_from_broad_type(broad_type);
-                prop.insert("x-finetype-broad-type".into(), json!(duckdb_type));
-            }
-            if let Some(transform) = &def.transform {
-                prop.insert("x-finetype-transform".into(), json!(transform));
-            }
-            if let Some(fmt) = &def.format_string {
-                prop.insert("x-finetype-format-string".into(), json!(fmt));
-            }
             prop.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
         } else {
             // Label not found in taxonomy — basic string schema
             prop.insert("type".into(), json!("string"));
             prop.insert("x-finetype-label".into(), json!(col.label));
-            let domain = col.label.split('.').next().unwrap_or("");
-            prop.insert("x-finetype-domain".into(), json!(domain));
-            prop.insert(
-                "x-finetype-confidence".into(),
-                json!((col.confidence * 1000.0).round() / 1000.0),
-            );
             prop.insert("x-finetype-pii".into(), json!(false));
         }
 
@@ -3151,17 +3061,17 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
 fn cmd_load(
     file: PathBuf,
     table_name: Option<String>,
-    model: PathBuf,
     sample_size: usize,
     delimiter: Option<char>,
     no_header_hint: bool,
     model_type: ModelType,
-    sharp_only: bool,
     limit: usize,
     _no_normalize_names: bool, // deprecated: column names are now always quoted
     enum_threshold: usize,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+
+    let model = resolve_model_path();
 
     eprintln!("Loading model from {:?}", model);
     let config = ColumnConfig {
@@ -3209,8 +3119,8 @@ fn cmd_load(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier
-    if !sharp_only && !column_classifier.has_multi_branch() {
+    // Wire up Sense classifier for legacy non-multi-branch models
+    if !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -3327,8 +3237,8 @@ fn cmd_load(
 
     // Header comment
     let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
-    let pipeline = if sharp_only {
-        "Sharpen-only"
+    let pipeline = if column_classifier.has_multi_branch() {
+        "Multi-branch→Sharpen"
     } else {
         "Sense→Sharpen"
     };
@@ -3820,8 +3730,8 @@ CREATE TABLE IF NOT EXISTS finetype_reject_errors (
 fn cmd_validate_table(
     file: PathBuf,
     schema_path: PathBuf,
-    db: PathBuf,
-    table: String,
+    db: Option<PathBuf>,
+    table: Option<String>,
     append: bool,
     lenient: bool,
     output: OutputFormat,
@@ -3839,17 +3749,25 @@ fn cmd_validate_table(
         exit_with(2);
     }
 
-    // ── Pre-flight: staging-collision gate (ac-09) ───────────────────────────
+    // ── Mode selection: check-only when --db is absent, materialise when present ─
+    //    `clap`'s `requires` cross-references guarantee that `db` and
+    //    `table` are either both supplied or both omitted, and that
+    //    `--append` is only ever set with `--db` present. The conditional
+    //    `if let` blocks below are the runtime expression of that contract.
+
+    // ── Pre-flight: staging-collision gate (ac-09) — only when materialising ─
     //    If the user's target table exists and --append was not supplied,
     //    refuse with exit 2. `--append` implies explicit acceptance of an
     //    existing .db.
-    if !append && user_table_exists(&db, &table) {
-        eprintln!(
-            "error: table '{}' already exists in {} — pass --append to reuse",
-            table,
-            db.display()
-        );
-        exit_with(2);
+    if let (Some(db_path), Some(table_name)) = (db.as_ref(), table.as_ref()) {
+        if !append && user_table_exists(db_path, table_name) {
+            eprintln!(
+                "error: table '{}' already exists in {} — pass --append to reuse",
+                table_name,
+                db_path.display()
+            );
+            exit_with(2);
+        }
     }
 
     // ── Read input into memory (CSV path; Parquet deferred for this AC) ──────
@@ -3906,130 +3824,142 @@ fn cmd_validate_table(
         }
     };
 
-    // Compute scan_id now (before generating SQL).
-    let scan_id: i64 = if append { next_scan_id(&db) } else { 1 };
-
-    // ── Generate SQL script (steps 3–10 of ac-09) ────────────────────────────
-    //    TEMPORARY staging table is auto-dropped when the DuckDB session
-    //    ends, providing RAII-equivalent cleanup on success AND failure
-    //    paths (ac-09 step 10 + the constraint's staging-cleanup rule).
-    let uuid = uuid::Uuid::new_v4().simple().to_string();
-    let staging_ident = format!("__finetype_staging_{}", uuid);
-    let user_table_ident = sql_ident(&table);
-    let input_literal = sql_quote(&file.to_string_lossy());
-
-    // Build the staging projection: SELECT * from the input file, add a
-    // row-index column so we can filter to valid_row_indices later.
-    let read_fn = if file
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("parquet"))
-        .unwrap_or(false)
+    // ── Materialise path (only when --db/--table supplied) ──────────────────
+    //    Check-only mode skips this entire block — no DuckDB shell-out, no
+    //    .db file written. The pass/fail decision is the validation engine
+    //    output alone, governed by the exit-code grid below.
+    let scan_id: Option<i64> = if let (Some(db_path), Some(table_name)) =
+        (db.as_ref(), table.as_ref())
     {
-        format!("read_parquet({})", input_literal)
-    } else {
-        format!("read_csv({}, header=true, all_varchar=true)", input_literal)
-    };
+        // Compute scan_id now (before generating SQL).
+        let scan_id: i64 = if append { next_scan_id(db_path) } else { 1 };
 
-    // Valid-indices filter. Render as an IN list when non-empty, otherwise
-    // use `WHERE 0=1` to select nothing.
-    let valid_filter = if result.valid_row_indices.is_empty() {
-        "WHERE 0=1".to_string()
-    } else {
-        let idx_list: Vec<String> = result
-            .valid_row_indices
-            .iter()
-            .map(|i| i.to_string())
-            .collect();
-        format!("WHERE __row_idx IN ({})", idx_list.join(","))
-    };
+        // ── Generate SQL script (steps 3–10 of ac-09) ────────────────────────
+        //    TEMPORARY staging table is auto-dropped when the DuckDB session
+        //    ends, providing RAII-equivalent cleanup on success AND failure
+        //    paths (ac-09 step 10 + the constraint's staging-cleanup rule).
+        let uuid = uuid::Uuid::new_v4().simple().to_string();
+        let staging_ident = format!("__finetype_staging_{}", uuid);
+        let user_table_ident = sql_ident(table_name);
+        let input_literal = sql_quote(&file.to_string_lossy());
 
-    // If --append and the user's table already exists, INSERT INTO rather
-    // than CREATE TABLE AS. Otherwise CREATE TABLE AS from the staging.
-    let exists_before_run = user_table_exists(&db, &table);
-    let user_table_stmt = if append && exists_before_run {
-        format!(
-            "INSERT INTO {} SELECT * EXCLUDE(__row_idx) FROM {} {};",
-            user_table_ident,
+        // Build the staging projection: SELECT * from the input file, add a
+        // row-index column so we can filter to valid_row_indices later.
+        let read_fn = if file
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.eq_ignore_ascii_case("parquet"))
+            .unwrap_or(false)
+        {
+            format!("read_parquet({})", input_literal)
+        } else {
+            format!("read_csv({}, header=true, all_varchar=true)", input_literal)
+        };
+
+        // Valid-indices filter. Render as an IN list when non-empty, otherwise
+        // use `WHERE 0=1` to select nothing.
+        let valid_filter = if result.valid_row_indices.is_empty() {
+            "WHERE 0=1".to_string()
+        } else {
+            let idx_list: Vec<String> = result
+                .valid_row_indices
+                .iter()
+                .map(|i| i.to_string())
+                .collect();
+            format!("WHERE __row_idx IN ({})", idx_list.join(","))
+        };
+
+        // If --append and the user's table already exists, INSERT INTO rather
+        // than CREATE TABLE AS. Otherwise CREATE TABLE AS from the staging.
+        let exists_before_run = user_table_exists(db_path, table_name);
+        let user_table_stmt = if append && exists_before_run {
+            format!(
+                "INSERT INTO {} SELECT * EXCLUDE(__row_idx) FROM {} {};",
+                user_table_ident,
+                sql_ident(&staging_ident),
+                valid_filter
+            )
+        } else {
+            format!(
+                "CREATE TABLE {} AS SELECT * EXCLUDE(__row_idx) FROM {} {};",
+                user_table_ident,
+                sql_ident(&staging_ident),
+                valid_filter
+            )
+        };
+
+        // Build reject INSERTs. One row per RejectRecord. Authored-time
+        // (expected_type, type_confidence) comes from SchemaExtensions
+        // keyed by column name — NULL when the schema lacks x-finetype-*
+        // (ac-11 graceful degradation).
+        let mut reject_values: Vec<String> = Vec::with_capacity(result.rejects.len());
+        for r in &result.rejects {
+            let (expected_type, type_confidence) = extensions.get(&r.column_name);
+            let line = (r.row_index as i64) + 1;
+            let tuple = format!(
+                "({scan_id}, 0, {line}, {col_idx}, {col_name}, 'SEMANTIC_TYPE', NULL, NULL, {err_msg}, {type_conf}, {exp_type}, {c_failed}, {c_value})",
+                scan_id = scan_id,
+                line = line,
+                col_idx = r.column_index,
+                col_name = sql_quote(&r.column_name),
+                err_msg = sql_quote(&r.error_message),
+                type_conf = sql_opt_f64(&type_confidence),
+                exp_type = sql_opt_str(&expected_type),
+                c_failed = sql_quote(&r.constraint_failed),
+                c_value = sql_opt_str(&r.constraint_value),
+            );
+            reject_values.push(tuple);
+        }
+
+        let mut script = String::with_capacity(1024 + 128 * reject_values.len());
+        script.push_str("BEGIN TRANSACTION;\n");
+        script.push_str(&format!(
+            "CREATE TEMPORARY TABLE {} AS SELECT row_number() OVER () - 1 AS __row_idx, * FROM {};\n",
             sql_ident(&staging_ident),
-            valid_filter
-        )
-    } else {
-        format!(
-            "CREATE TABLE {} AS SELECT * EXCLUDE(__row_idx) FROM {} {};",
-            user_table_ident,
-            sql_ident(&staging_ident),
-            valid_filter
-        )
-    };
+            read_fn
+        ));
+        script.push_str(&user_table_stmt);
+        script.push('\n');
+        script.push_str(REJECT_SIDECAR_DDL);
+        script.push('\n');
+        if !reject_values.is_empty() {
+            script.push_str("INSERT INTO finetype_reject_errors VALUES\n");
+            script.push_str(&reject_values.join(",\n"));
+            script.push_str(";\n");
+        }
+        script.push_str("COMMIT;\n");
+        // TEMPORARY table is auto-dropped on session end — no explicit DROP
+        // needed; this is the RAII-equivalent cleanup on both success AND
+        // error paths (ac-09 step 10).
 
-    // Build reject INSERTs. One row per RejectRecord. Authored-time
-    // (expected_type, type_confidence) comes from SchemaExtensions
-    // keyed by column name — NULL when the schema lacks x-finetype-*
-    // (ac-11 graceful degradation).
-    let mut reject_values: Vec<String> = Vec::with_capacity(result.rejects.len());
-    for r in &result.rejects {
-        let (expected_type, type_confidence) = extensions.get(&r.column_name);
-        let line = (r.row_index as i64) + 1;
-        let tuple = format!(
-            "({scan_id}, 0, {line}, {col_idx}, {col_name}, 'SEMANTIC_TYPE', NULL, NULL, {err_msg}, {type_conf}, {exp_type}, {c_failed}, {c_value})",
-            scan_id = scan_id,
-            line = line,
-            col_idx = r.column_index,
-            col_name = sql_quote(&r.column_name),
-            err_msg = sql_quote(&r.error_message),
-            type_conf = sql_opt_f64(&type_confidence),
-            exp_type = sql_opt_str(&expected_type),
-            c_failed = sql_quote(&r.constraint_failed),
-            c_value = sql_opt_str(&r.constraint_value),
-        );
-        reject_values.push(tuple);
-    }
-
-    let mut script = String::with_capacity(1024 + 128 * reject_values.len());
-    script.push_str("BEGIN TRANSACTION;\n");
-    script.push_str(&format!(
-        "CREATE TEMPORARY TABLE {} AS SELECT row_number() OVER () - 1 AS __row_idx, * FROM {};\n",
-        sql_ident(&staging_ident),
-        read_fn
-    ));
-    script.push_str(&user_table_stmt);
-    script.push('\n');
-    script.push_str(REJECT_SIDECAR_DDL);
-    script.push('\n');
-    if !reject_values.is_empty() {
-        script.push_str("INSERT INTO finetype_reject_errors VALUES\n");
-        script.push_str(&reject_values.join(",\n"));
-        script.push_str(";\n");
-    }
-    script.push_str("COMMIT;\n");
-    // TEMPORARY table is auto-dropped on session end — no explicit DROP
-    // needed; this is the RAII-equivalent cleanup on both success AND
-    // error paths (ac-09 step 10).
-
-    // ── Execute the script against the output .db ────────────────────────────
-    let duckdb_out = std::process::Command::new("duckdb")
-        .arg(&db)
-        .arg("-c")
-        .arg(&script)
-        .output();
-    let duckdb_out = match duckdb_out {
-        Ok(o) => o,
-        Err(e) => {
+        // ── Execute the script against the output .db ────────────────────────
+        let duckdb_out = std::process::Command::new("duckdb")
+            .arg(db_path)
+            .arg("-c")
+            .arg(&script)
+            .output();
+        let duckdb_out = match duckdb_out {
+            Ok(o) => o,
+            Err(e) => {
+                eprintln!(
+                    "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
+                    e
+                );
+                exit_with(2);
+            }
+        };
+        if !duckdb_out.status.success() {
             eprintln!(
-                "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
-                e
+                "error: duckdb execution failed: {}",
+                String::from_utf8_lossy(&duckdb_out.stderr).trim()
             );
             exit_with(2);
         }
+
+        Some(scan_id)
+    } else {
+        None
     };
-    if !duckdb_out.status.success() {
-        eprintln!(
-            "error: duckdb execution failed: {}",
-            String::from_utf8_lossy(&duckdb_out.stderr).trim()
-        );
-        exit_with(2);
-    }
 
     // ── Summary report ───────────────────────────────────────────────────────
     let reject_count = result.rejects.len();
@@ -4039,9 +3969,15 @@ fn cmd_validate_table(
             println!("{}", "═".repeat(60));
             println!("  Input:        {}", file.display());
             println!("  Schema:       {}", schema_path.display());
-            println!("  Output DB:    {}", db.display());
-            println!("  Target table: {}", table);
-            println!("  Scan ID:      {}", scan_id);
+            if let (Some(db_path), Some(table_name), Some(sid)) =
+                (db.as_ref(), table.as_ref(), scan_id)
+            {
+                println!("  Output DB:    {}", db_path.display());
+                println!("  Target table: {}", table_name);
+                println!("  Scan ID:      {}", sid);
+            } else {
+                println!("  Mode:         check-only (no .db written)");
+            }
             println!();
             println!("  Total rows:   {:>6}", result.total_rows);
             println!("  Valid rows:   {:>6}", result.valid_rows);
@@ -4054,9 +3990,10 @@ fn cmd_validate_table(
             let report = json!({
                 "input": file.display().to_string(),
                 "schema": schema_path.display().to_string(),
-                "db": db.display().to_string(),
+                "db": db.as_ref().map(|p| p.display().to_string()),
                 "table": table,
                 "scan_id": scan_id,
+                "mode": if scan_id.is_some() { "materialise" } else { "check-only" },
                 "total_rows": result.total_rows,
                 "valid_rows": result.valid_rows,
                 "invalid_rows": result.invalid_rows,
@@ -4133,18 +4070,18 @@ fn resolve_broad_type_display<'a>(
 #[allow(clippy::too_many_arguments)]
 fn cmd_profile(
     file: PathBuf,
-    model: PathBuf,
     output: OutputFormat,
     sample_size: usize,
     delimiter: Option<char>,
     no_header_hint: bool,
     model_type: ModelType,
-    sharp_only: bool,
     enum_threshold: usize,
     verbose: bool,
     raw_model: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+
+    let model = resolve_model_path();
 
     eprintln!("Loading model from {:?}", model);
     let config = ColumnConfig {
@@ -4195,8 +4132,8 @@ fn cmd_profile(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier (Sense → Sharpen pipeline)
-    if !sharp_only && !column_classifier.has_multi_branch() {
+    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models
+    if !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -5026,580 +4963,11 @@ fn insert_path(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// EVAL-GITTABLES — Column-mode evaluation on GitTables benchmark
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn cmd_eval_gittables(
-    dir: PathBuf,
-    model: PathBuf,
-    sample_size: usize,
-    output: OutputFormat,
-) -> Result<()> {
-    use finetype_model::{CharClassifier, ColumnClassifier, ColumnConfig};
-    use std::collections::HashMap;
-    use std::time::Instant;
-
-    let start = Instant::now();
-
-    // ── 1. Load model once ──────────────────────────────────────────────────
-    eprintln!("Loading model from {:?}", model);
-    let classifier = CharClassifier::load(&model)?;
-    let config = ColumnConfig {
-        sample_size,
-        ..Default::default()
-    };
-    let column_classifier = ColumnClassifier::new(Box::new(classifier), config);
-
-    // ── 2. Load ground truth ────────────────────────────────────────────────
-    eprintln!("Loading ground truth from {:?}", dir);
-
-    #[derive(Debug)]
-    #[allow(dead_code)]
-    struct Annotation {
-        gt_label: String,
-        ontology: String,
-    }
-
-    // Read ground truth CSVs: (table_file, col_idx) -> Annotation
-    let mut ground_truth: HashMap<(String, usize), Annotation> = HashMap::new();
-
-    // Helper to load a GT csv file
-    fn load_gt(
-        path: &std::path::Path,
-        ontology: &str,
-        suffix: &str,
-        gt: &mut HashMap<(String, usize), Annotation>,
-    ) -> Result<usize> {
-        let mut count = 0;
-        let mut reader = csv::ReaderBuilder::new().from_path(path)?;
-        for result in reader.records() {
-            let record = result?;
-            // Columns: (row_number), table_id, target_column, annotation_id, annotation_label
-            let table_id = record.get(1).unwrap_or("");
-            let col_idx: usize = record.get(2).unwrap_or("0").parse().unwrap_or(0);
-            let gt_label = record.get(4).unwrap_or("").to_string();
-
-            // Strip suffix from table_id: GitTables_1501_schema -> GitTables_1501
-            let table_file = table_id.replace(suffix, "");
-
-            gt.entry((table_file, col_idx)).or_insert(Annotation {
-                gt_label,
-                ontology: ontology.to_string(),
-            });
-            count += 1;
-        }
-        Ok(count)
-    }
-
-    // Load schema.org first (preferred), then dbpedia (fills gaps)
-    let schema_path = dir.join("schema_gt.csv");
-    let dbpedia_path = dir.join("dbpedia_gt.csv");
-
-    if schema_path.exists() {
-        let n = load_gt(&schema_path, "schema.org", "_schema", &mut ground_truth)?;
-        eprintln!("  Schema.org: {} annotations", n);
-    }
-    if dbpedia_path.exists() {
-        let n = load_gt(&dbpedia_path, "dbpedia", "_dbpedia", &mut ground_truth)?;
-        eprintln!("  DBpedia: {} annotations (after merge)", n);
-    }
-    eprintln!("  Total unique: {} annotated columns", ground_truth.len());
-
-    // ── 3. Group annotations by table ───────────────────────────────────────
-    let mut tables_to_cols: HashMap<String, Vec<(usize, String)>> = HashMap::new();
-    for ((table_file, col_idx), ann) in &ground_truth {
-        tables_to_cols
-            .entry(table_file.clone())
-            .or_default()
-            .push((*col_idx, ann.gt_label.clone()));
-    }
-    eprintln!("  {} unique tables with annotations", tables_to_cols.len());
-
-    // ── 4. Domain mapping (same as eval.sql) ────────────────────────────────
-    let domain_map: HashMap<&str, &str> = [
-        ("email", "identity"),
-        ("url", "technology"),
-        ("date", "datetime"),
-        ("start date", "datetime"),
-        ("end date", "datetime"),
-        ("start time", "datetime"),
-        ("end time", "datetime"),
-        ("time", "datetime"),
-        ("created", "datetime"),
-        ("updated", "datetime"),
-        ("year", "datetime"),
-        ("postal code", "geography"),
-        ("zip code", "geography"),
-        ("country", "geography"),
-        ("state", "geography"),
-        ("city", "geography"),
-        ("id", "identity"),
-        ("name", "identity"),
-        ("percentage", "numeric"),
-        ("age", "numeric"),
-        ("price", "numeric"),
-        ("weight", "numeric"),
-        ("height", "numeric"),
-        ("depth", "numeric"),
-        ("width", "numeric"),
-        ("length", "numeric"),
-        ("duration", "numeric"),
-        ("gender", "identity"),
-        ("author", "identity"),
-        ("description", "representation"),
-        ("title", "representation"),
-        ("abstract", "representation"),
-        ("comment", "representation"),
-        ("status", "representation"),
-        ("category", "representation"),
-        ("type", "representation"),
-    ]
-    .iter()
-    .copied()
-    .collect();
-
-    // ── 5. Process each table ───────────────────────────────────────────────
-    eprintln!("\nProcessing tables...");
-
-    #[allow(dead_code)]
-    struct ColumnPrediction {
-        table_file: String,
-        col_idx: usize,
-        gt_label: String,
-        row_mode_label: String,
-        column_mode_label: String,
-        disambiguation_applied: bool,
-        disambiguation_rule: Option<String>,
-        n_values: usize,
-    }
-
-    let mut predictions: Vec<ColumnPrediction> = Vec::new();
-    let mut tables_processed = 0;
-    let mut tables_missing = 0;
-
-    let tables_dir = dir.join("tables/tables");
-    let mut table_names: Vec<String> = tables_to_cols.keys().cloned().collect();
-    table_names.sort();
-
-    for table_file in &table_names {
-        let csv_path = tables_dir.join(format!("{}.csv", table_file));
-        if !csv_path.exists() {
-            tables_missing += 1;
-            continue;
-        }
-
-        // Read the CSV
-        let mut reader = csv::ReaderBuilder::new()
-            .flexible(true)
-            .from_path(&csv_path)?;
-
-        let headers: Vec<String> = reader.headers()?.iter().map(|h| h.to_string()).collect();
-
-        // Build header index: "col0" -> 0, "col1" -> 1, etc.
-        // The first column is typically "column00" (row index) which we skip
-        let mut header_to_pos: HashMap<String, usize> = HashMap::new();
-        for (pos, name) in headers.iter().enumerate() {
-            header_to_pos.insert(name.clone(), pos);
-        }
-
-        // Collect all column values
-        let n_cols = headers.len();
-        let mut columns: Vec<Vec<String>> = vec![Vec::new(); n_cols];
-        for result in reader.records() {
-            let record = result?;
-            for (i, field) in record.iter().enumerate() {
-                if i < n_cols {
-                    let trimmed = field.trim();
-                    if !trimmed.is_empty()
-                        && trimmed != "NULL"
-                        && trimmed != "null"
-                        && trimmed != "NA"
-                        && trimmed != "N/A"
-                        && trimmed != "nan"
-                        && trimmed != "NaN"
-                        && trimmed != "None"
-                    {
-                        columns[i].push(trimmed.to_string());
-                    }
-                }
-            }
-        }
-
-        // Process each annotated column
-        let annotated_cols = tables_to_cols.get(table_file).unwrap();
-        for (col_idx, gt_label) in annotated_cols {
-            let col_name = format!("col{}", col_idx);
-            let pos = match header_to_pos.get(&col_name) {
-                Some(p) => *p,
-                None => continue, // Column doesn't exist in this table
-            };
-
-            let col_values = &columns[pos];
-            if col_values.is_empty() {
-                continue;
-            }
-
-            // Row-mode: classify each value independently, take majority vote
-            let batch_results = column_classifier.classifier().classify_batch(col_values)?;
-            let mut vote_counts: HashMap<String, usize> = HashMap::new();
-            for r in &batch_results {
-                *vote_counts.entry(r.label.clone()).or_default() += 1;
-            }
-            let row_mode_label = vote_counts
-                .iter()
-                .max_by_key(|(_, count)| *count)
-                .map(|(label, _)| label.clone())
-                .unwrap_or_else(|| "unknown".to_string());
-
-            // Column-mode: use ColumnClassifier with disambiguation rules
-            let col_result = column_classifier.classify_column(col_values)?;
-
-            predictions.push(ColumnPrediction {
-                table_file: table_file.clone(),
-                col_idx: *col_idx,
-                gt_label: gt_label.clone(),
-                row_mode_label,
-                column_mode_label: col_result.label,
-                disambiguation_applied: col_result.disambiguation_applied,
-                disambiguation_rule: col_result.disambiguation_rule,
-                n_values: col_values.len(),
-            });
-        }
-
-        tables_processed += 1;
-        if tables_processed % 100 == 0 {
-            eprint!(
-                "\r  Processed {}/{} tables...",
-                tables_processed,
-                table_names.len()
-            );
-        }
-    }
-    eprintln!(
-        "\r  Processed {} tables ({} missing CSVs)",
-        tables_processed, tables_missing
-    );
-
-    let elapsed = start.elapsed();
-    eprintln!(
-        "  {} columns evaluated in {:.1}s\n",
-        predictions.len(),
-        elapsed.as_secs_f64()
-    );
-
-    // ── 6. Compute accuracy metrics ─────────────────────────────────────────
-
-    // Domain-level accuracy for mapped types
-    struct DomainAccuracy {
-        total: usize,
-        row_correct: usize,
-        col_correct: usize,
-    }
-
-    let mut domain_acc: HashMap<String, DomainAccuracy> = HashMap::new();
-    let mut overall_row_correct = 0usize;
-    let mut overall_col_correct = 0usize;
-    let mut overall_mapped = 0usize;
-
-    // Year-specific tracking
-    let mut year_total = 0usize;
-    let mut year_row_correct = 0usize;
-    let mut year_col_correct = 0usize;
-    let mut year_row_predictions: HashMap<String, usize> = HashMap::new();
-    let mut year_col_predictions: HashMap<String, usize> = HashMap::new();
-
-    // Disambiguation tracking
-    let mut disambig_count = 0usize;
-    let mut disambig_rules: HashMap<String, usize> = HashMap::new();
-
-    for pred in &predictions {
-        // Check if disambiguation was applied
-        if pred.disambiguation_applied {
-            disambig_count += 1;
-            if let Some(rule) = &pred.disambiguation_rule {
-                *disambig_rules.entry(rule.clone()).or_default() += 1;
-            }
-        }
-
-        // Year-specific tracking
-        if pred.gt_label == "year" {
-            year_total += 1;
-            let row_domain = pred.row_mode_label.split('.').next().unwrap_or("");
-            let col_domain = pred.column_mode_label.split('.').next().unwrap_or("");
-            if row_domain == "datetime" {
-                year_row_correct += 1;
-            }
-            if col_domain == "datetime" {
-                year_col_correct += 1;
-            }
-            *year_row_predictions
-                .entry(pred.row_mode_label.clone())
-                .or_default() += 1;
-            *year_col_predictions
-                .entry(pred.column_mode_label.clone())
-                .or_default() += 1;
-        }
-
-        // Domain accuracy for mapped types
-        if let Some(&expected_domain) = domain_map.get(pred.gt_label.as_str()) {
-            let row_domain = pred.row_mode_label.split('.').next().unwrap_or("");
-            let col_domain = pred.column_mode_label.split('.').next().unwrap_or("");
-
-            let row_match = row_domain == expected_domain
-                || (expected_domain == "numeric" && row_domain == "representation");
-            let col_match = col_domain == expected_domain
-                || (expected_domain == "numeric" && col_domain == "representation");
-
-            let entry = domain_acc
-                .entry(expected_domain.to_string())
-                .or_insert(DomainAccuracy {
-                    total: 0,
-                    row_correct: 0,
-                    col_correct: 0,
-                });
-            entry.total += 1;
-            if row_match {
-                entry.row_correct += 1;
-                overall_row_correct += 1;
-            }
-            if col_match {
-                entry.col_correct += 1;
-                overall_col_correct += 1;
-            }
-            overall_mapped += 1;
-        }
-    }
-
-    // Where column-mode disagrees with row-mode
-    let mut improvements: Vec<&ColumnPrediction> = Vec::new();
-    let mut regressions: Vec<&ColumnPrediction> = Vec::new();
-    for pred in &predictions {
-        if pred.row_mode_label != pred.column_mode_label {
-            if let Some(&expected_domain) = domain_map.get(pred.gt_label.as_str()) {
-                let row_domain = pred.row_mode_label.split('.').next().unwrap_or("");
-                let col_domain = pred.column_mode_label.split('.').next().unwrap_or("");
-                let row_match = row_domain == expected_domain
-                    || (expected_domain == "numeric" && row_domain == "representation");
-                let col_match = col_domain == expected_domain
-                    || (expected_domain == "numeric" && col_domain == "representation");
-
-                if col_match && !row_match {
-                    improvements.push(pred);
-                } else if !col_match && row_match {
-                    regressions.push(pred);
-                }
-            }
-        }
-    }
-
-    // ── 7. Output results ───────────────────────────────────────────────────
-
-    match output {
-        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown | OutputFormat::Arrow => {
-            println!("GitTables Column-Mode Evaluation");
-            println!("{}", "═".repeat(70));
-            println!();
-            println!("SCALE");
-            println!("  Tables processed:     {}", tables_processed);
-            println!("  Columns evaluated:    {}", predictions.len());
-            println!("  Columns with mapping: {}", overall_mapped);
-            println!("  Evaluation time:      {:.1}s", elapsed.as_secs_f64());
-            println!();
-
-            // Domain-level accuracy comparison
-            println!("DOMAIN-LEVEL ACCURACY (Row-Mode vs Column-Mode)");
-            println!(
-                "  {:<18} {:>6} {:>12} {:>12} {:>8}",
-                "Domain", "Cols", "Row-Mode", "Col-Mode", "Delta"
-            );
-            println!("  {}", "─".repeat(60));
-
-            let mut sorted_domains: Vec<(String, &DomainAccuracy)> =
-                domain_acc.iter().map(|(k, v)| (k.clone(), v)).collect();
-            sorted_domains.sort_by_key(|b| std::cmp::Reverse(b.1.total));
-
-            for (domain, acc) in &sorted_domains {
-                let row_pct = acc.row_correct as f64 / acc.total as f64 * 100.0;
-                let col_pct = acc.col_correct as f64 / acc.total as f64 * 100.0;
-                let delta = col_pct - row_pct;
-                let delta_str = if delta > 0.0 {
-                    format!("+{:.1}%", delta)
-                } else if delta < 0.0 {
-                    format!("{:.1}%", delta)
-                } else {
-                    "  —".to_string()
-                };
-                println!(
-                    "  {:<18} {:>6} {:>10.1}% {:>10.1}% {:>8}",
-                    domain, acc.total, row_pct, col_pct, delta_str
-                );
-            }
-
-            // Overall
-            let overall_row_pct = overall_row_correct as f64 / overall_mapped as f64 * 100.0;
-            let overall_col_pct = overall_col_correct as f64 / overall_mapped as f64 * 100.0;
-            let overall_delta = overall_col_pct - overall_row_pct;
-            println!("  {}", "─".repeat(60));
-            println!(
-                "  {:<18} {:>6} {:>10.1}% {:>10.1}% {:>+7.1}%",
-                "OVERALL", overall_mapped, overall_row_pct, overall_col_pct, overall_delta
-            );
-
-            // Year-specific report
-            if year_total > 0 {
-                println!();
-                println!("YEAR COLUMN ANALYSIS (NNFT-026 Impact)");
-                println!("  Year columns found: {}", year_total);
-                println!(
-                    "  Row-mode accuracy:    {:.1}% ({}/{})",
-                    year_row_correct as f64 / year_total as f64 * 100.0,
-                    year_row_correct,
-                    year_total
-                );
-                println!(
-                    "  Column-mode accuracy: {:.1}% ({}/{})",
-                    year_col_correct as f64 / year_total as f64 * 100.0,
-                    year_col_correct,
-                    year_total
-                );
-
-                println!();
-                println!("  Row-mode predictions for 'year' columns:");
-                let mut row_sorted: Vec<_> = year_row_predictions.iter().collect();
-                row_sorted.sort_by(|a, b| b.1.cmp(a.1));
-                for (label, count) in &row_sorted {
-                    let pct = **count as f64 / year_total as f64 * 100.0;
-                    println!("    {:.1}%  {}", pct, label);
-                }
-
-                println!();
-                println!("  Column-mode predictions for 'year' columns:");
-                let mut col_sorted: Vec<_> = year_col_predictions.iter().collect();
-                col_sorted.sort_by(|a, b| b.1.cmp(a.1));
-                for (label, count) in &col_sorted {
-                    let pct = **count as f64 / year_total as f64 * 100.0;
-                    println!("    {:.1}%  {}", pct, label);
-                }
-            }
-
-            // Disambiguation summary
-            if disambig_count > 0 {
-                println!();
-                println!("DISAMBIGUATION RULES APPLIED");
-                println!(
-                    "  {} of {} columns had disambiguation applied",
-                    disambig_count,
-                    predictions.len()
-                );
-                let mut rule_sorted: Vec<_> = disambig_rules.iter().collect();
-                rule_sorted.sort_by(|a, b| b.1.cmp(a.1));
-                for (rule, count) in &rule_sorted {
-                    println!("    {:>4}x  {}", count, rule);
-                }
-            }
-
-            // Improvements and regressions
-            if !improvements.is_empty() || !regressions.is_empty() {
-                println!();
-                println!("COLUMN-MODE IMPACT (domain-level changes)");
-                println!(
-                    "  Improvements: {} columns (row wrong → column correct)",
-                    improvements.len()
-                );
-                println!(
-                    "  Regressions:  {} columns (row correct → column wrong)",
-                    regressions.len()
-                );
-
-                if !improvements.is_empty() {
-                    println!();
-                    println!("  Top improvements (showing up to 15):");
-                    for pred in improvements.iter().take(15) {
-                        println!(
-                            "    {}/col{} [{}]: {} → {}",
-                            pred.table_file,
-                            pred.col_idx,
-                            pred.gt_label,
-                            pred.row_mode_label,
-                            pred.column_mode_label
-                        );
-                    }
-                }
-
-                if !regressions.is_empty() {
-                    println!();
-                    println!("  Regressions (showing up to 15):");
-                    for pred in regressions.iter().take(15) {
-                        println!(
-                            "    {}/col{} [{}]: {} → {}",
-                            pred.table_file,
-                            pred.col_idx,
-                            pred.gt_label,
-                            pred.row_mode_label,
-                            pred.column_mode_label
-                        );
-                    }
-                }
-            }
-
-            println!();
-        }
-        OutputFormat::Json => {
-            let domain_results: Vec<serde_json::Value> = {
-                let mut sorted: Vec<(String, &DomainAccuracy)> =
-                    domain_acc.iter().map(|(k, v)| (k.clone(), v)).collect();
-                sorted.sort_by_key(|b| std::cmp::Reverse(b.1.total));
-                sorted
-                    .iter()
-                    .map(|(domain, acc)| {
-                        json!({
-                            "domain": domain,
-                            "total": acc.total,
-                            "row_correct": acc.row_correct,
-                            "col_correct": acc.col_correct,
-                            "row_accuracy": acc.row_correct as f64 / acc.total as f64,
-                            "col_accuracy": acc.col_correct as f64 / acc.total as f64,
-                        })
-                    })
-                    .collect()
-            };
-
-            let result = json!({
-                "tables_processed": tables_processed,
-                "columns_evaluated": predictions.len(),
-                "columns_mapped": overall_mapped,
-                "elapsed_seconds": elapsed.as_secs_f64(),
-                "overall": {
-                    "row_accuracy": overall_row_correct as f64 / overall_mapped as f64,
-                    "col_accuracy": overall_col_correct as f64 / overall_mapped as f64,
-                    "improvements": improvements.len(),
-                    "regressions": regressions.len(),
-                },
-                "year": {
-                    "total": year_total,
-                    "row_correct": year_row_correct,
-                    "col_correct": year_col_correct,
-                },
-                "disambiguation": {
-                    "columns_affected": disambig_count,
-                    "rules": disambig_rules,
-                },
-                "domains": domain_results,
-            });
-            println!("{}", serde_json::to_string_pretty(&result)?);
-        }
-    }
-
-    Ok(())
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // EVAL — Evaluate model accuracy on a test set
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn cmd_eval(
     data: PathBuf,
-    model: PathBuf,
     _taxonomy_path: PathBuf,
     model_type: ModelType,
     top_confusions: usize,
@@ -5607,6 +4975,8 @@ fn cmd_eval(
 ) -> Result<()> {
     use finetype_model::{CharClassifier, ClassificationResult};
     use std::collections::HashMap;
+
+    let model = resolve_model_path();
 
     eprintln!("Loading test data from {:?}", data);
     let file = std::fs::File::open(&data)?;

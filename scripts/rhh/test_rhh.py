@@ -327,6 +327,7 @@ class TestAc02DisableAll(unittest.TestCase):
         env = {
             **os.environ,
             "RHH_DISABLE_HINTS": disable,
+            "FINETYPE_MODEL": str(model_dir),
         }
         for dataset, file_path in pairs:
             if not file_path.is_file():
@@ -337,8 +338,6 @@ class TestAc02DisableAll(unittest.TestCase):
                     "profile",
                     "--file",
                     str(file_path),
-                    "--model",
-                    str(model_dir),
                     "-o",
                     "json",
                 ],

@@ -1,39 +1,64 @@
 feature: "Command-line interface"
 as_a: "data analyst"
-i_want: "a single CLI binary with a consistent set of commands for type detection, profiling, loading, validation, and taxonomy exploration"
-so_that: "I can work with data types from my terminal using predictable patterns that compose into pipelines"
+i_want: "a tight set of CLI verbs for type detection, profiling, validation, and taxonomy exploration"
+so_that: "I can work with data types from my terminal using predictable patterns that compose into pipelines, without tripping over maintainer-internal flags or vestigial subcommands"
 
 scenarios:
   - name: "Consistent input patterns"
     given: "any FineType command that accepts data"
     when: "I use -f for file input or -i for inline values"
     then: "every command follows the same input convention — no per-command flag memorisation"
-    source_lines: "README.md: finetype infer -i '192.168.1.1'; finetype profile -f data.csv; finetype load -f data.csv"
+    source_lines: "README.md: finetype infer -i '192.168.1.1'; finetype profile -f data.csv"
 
   - name: "Flexible output formats"
     given: "a command that produces structured output"
-    when: "I pass -o plain|json|csv|markdown|arrow"
+    when: "I pass -o plain|json|csv|markdown|arrow|json-schema"
     then: "results render in the requested format for human reading or downstream tooling"
     source_lines: "CLAUDE.md: finetype profile <file> (-o plain|json|csv|markdown|arrow)"
 
   - name: "Pipeline-friendly design"
     given: "a Unix pipeline"
-    when: "I run finetype load -f data.csv | duckdb"
-    then: "SQL output goes to stdout, composing cleanly with duckdb, jq, or any pipe target"
-    source_lines: "README.md: finetype load -f data.csv | duckdb"
+    when: "I run finetype profile -f data.csv -o json-schema | finetype validate -f data.csv --schema -"
+    then: "structured output goes to stdout, composing cleanly with downstream FineType verbs, duckdb, jq, or any pipe target"
+    source_lines: "README.md: pipeline composition examples"
 
-  - name: "Command repertoire"
+  - name: "Tight public verb surface"
     given: "the finetype binary"
-    when: "I explore available commands"
-    then: "9 commands cover the full workflow: infer, profile, load, schema, validate, taxonomy, generate, check, mcp"
-    source_lines: "CLAUDE.md: CLI commands table listing infer, profile, check, generate, taxonomy, schema, validate, load, mcp"
+    when: "I run finetype --help"
+    then: "four public verbs cover the workflow: infer, profile, validate, mcp — plus taxonomy for browsing (which absorbs type-mode JSON Schema export via -o json-schema)"
+    source_lines: "memo 2026-04-27-cli-generate-vs-faker.md (hide-it group); memo 2026-04-27-schema-profile-overlap.md (schema verb folds entirely — type-mode → taxonomy, table-mode → profile)"
+
+  - name: "Maintainer affordances stay hidden"
+    given: "subcommands and flags used only by the training pipeline or CI"
+    when: "a regular user reads --help"
+    then: "train, eval, eval-gittables, check, generate are hidden; --model, --model-type are hidden; --sharp-only is removed (no-op)"
+    source_lines: "memos 2026-04-27-cli-{model,sharp-only,model-type,check-internal,generate-vs-faker}.md"
+
+  - name: "Public surface mirrors the MCP server"
+    given: "the contract that MCP and CLI should evolve in lockstep"
+    when: "I compare finetype --help with the MCP tool list"
+    then: "every public CLI verb maps to an MCP tool (and vice versa); CLI exposes maintainer affordances on top, MCP does not"
+    source_lines: "memo 2026-04-27-mcp-surface-audit.md"
 
 maturity: "established"
-goal: "9 commands with consistent input/output patterns composing into Unix pipelines"
+goal: "Four public verbs (infer | profile | validate | mcp + taxonomy with json-schema output) composing into pipelines; maintainer affordances hidden; surface mirrors MCP"
 
-specs: []
+specs:
+  - "orbit/specs/2026-04-27-cli-visibility-cleanup/spec.yaml"  # planned (v0.6.19)
+  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"             # planned (v0.6.20)
 
 references:
   - "README.md"
   - "CLAUDE.md"
   - "crates/finetype-cli/src/main.rs"
+  - "orbit/memos/2026-04-27-cli-model-flag.md"
+  - "orbit/memos/2026-04-27-cli-sharp-only-flag.md"
+  - "orbit/memos/2026-04-27-cli-model-type-flag.md"
+  - "orbit/memos/2026-04-27-cli-check-internal.md"
+  - "orbit/memos/2026-04-27-cli-generate-vs-faker.md"
+  - "orbit/memos/2026-04-27-schema-cli-flag-collision.md"
+  - "orbit/memos/2026-04-27-schema-export-verbosity.md"
+  - "orbit/memos/2026-04-27-validate-required-flags.md"
+  - "orbit/memos/2026-04-27-schema-profile-overlap.md"
+  - "orbit/memos/2026-04-27-load-folds-into-validate.md"
+  - "orbit/memos/2026-04-27-mcp-surface-audit.md"
