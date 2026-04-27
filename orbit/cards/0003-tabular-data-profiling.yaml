@@ -1,7 +1,7 @@
 feature: "Tabular data profiling"
 as_a: "data analyst"
-i_want: "to profile a CSV or Parquet file and get the detected semantic type for every column in one command"
-so_that: "I can understand the structure of an unfamiliar dataset without manually inspecting each column"
+i_want: "to profile a CSV or Parquet file and get the detected semantic type for every column — and optionally export the result as a JSON Schema I can edit and feed back into validate"
+so_that: "I can understand the structure of an unfamiliar dataset without manually inspecting each column, and then promote the inferred shape into a durable schema contract"
 
 scenarios:
   - name: "Profile a CSV file"
@@ -12,9 +12,15 @@ scenarios:
 
   - name: "Multiple output formats"
     given: "a profiled dataset"
-    when: "I specify an output format with -o plain|json|csv|markdown|arrow"
-    then: "profile results are rendered in the requested format for downstream consumption"
-    source_lines: "CLAUDE.md: finetype profile <file> — Profile all columns in CSV/Parquet (-o plain|json|csv|markdown|arrow)"
+    when: "I specify an output format with -o plain|json|csv|markdown|arrow|json-schema"
+    then: "profile results are rendered in the requested format for downstream consumption — including JSON Schema, suitable as direct input to finetype validate"
+    source_lines: "CLAUDE.md: finetype profile <file> — Profile all columns in CSV/Parquet (-o plain|json|csv|markdown|arrow); memo 2026-04-27-schema-profile-overlap.md"
+
+  - name: "Profile is the source of table-level schemas"
+    given: "a CSV file"
+    when: "I run finetype profile -f data.csv -o json-schema --stdout"
+    then: "FineType emits a table-level JSON Schema with x-finetype-label per column — replacing the earlier table-mode invocation of finetype schema"
+    source_lines: "memo 2026-04-27-schema-profile-overlap.md"
 
   - name: "Null detection"
     given: "a CSV file with missing or null values in some columns"
@@ -29,11 +35,13 @@ scenarios:
     source_lines: "CLAUDE.md: finetype profile <file> (--enum-threshold N, --verbose)"
 
 maturity: "established"
-goal: "CSV and Parquet profiling with 5 output formats, null detection, and enum threshold"
+goal: "CSV and Parquet profiling with 6 output formats (plain, json, csv, markdown, arrow, json-schema), null detection, enum threshold — and json-schema output as the canonical bridge into validate"
 
-specs: []
+specs:
+  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"  # planned (v0.6.19) — adds json-schema output mode
 
 references:
   - "README.md"
   - "docs/ARCHITECTURE.md"
   - "CLAUDE.md"
+  - "orbit/memos/2026-04-27-schema-profile-overlap.md"
