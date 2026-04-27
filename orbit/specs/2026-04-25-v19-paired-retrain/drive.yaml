@@ -1,0 +1,14 @@
+card: orbit/cards/0002-semantic-type-detection.yaml
+autonomy: full
+budget: 3
+iteration: 1
+current_spec: orbit/specs/2026-04-25-v19-paired-retrain
+status: shipped
+history: []
+started: "2026-04-25T19:55:00+10:00"
+review_cycles:
+  review_spec: 1
+  review_pr: 0
+review_cycle_dates:
+  review_spec: "2026-04-25"
+  review_pr: null

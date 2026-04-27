@@ -191,7 +191,13 @@ impl Generator {
                 .format("%Y-%m-%dT%H:%M:%SZ")
                 .to_string()),
             ("timestamp", "iso_8601_compact") => {
-                Ok(self.random_datetime().format("%Y%m%dT%H%M%S").to_string())
+                // v19: Compact ISO 8601 without separators: 20240327T183105
+                // Must match validation pattern ^\d{8}T\d{6}$ exactly.
+                // The 'T' separator between date and time digits is the
+                // key structural signal that distinguishes this from
+                // isbn/alphanumeric_id. Wider year range for variety.
+                let dt = self.random_datetime();
+                Ok(dt.format("%Y%m%dT%H%M%S").to_string())
             }
             ("timestamp", "iso_8601_microseconds") => {
                 let dt = self.random_datetime();
@@ -249,8 +255,11 @@ impl Generator {
                 Ok(self.random_datetime().format("%d/%m/%Y %H:%M").to_string())
             }
             ("timestamp", "iso_microseconds") => {
+                // v19: exactly 6 fractional digits, no timezone suffix.
+                // Distinguished from iso_8601_milliseconds (3 digits + Z)
+                // and numeric_code (no datetime separators at all).
                 let dt = self.random_datetime();
-                let micros = self.rng.gen_range(0..1000000);
+                let micros = self.rng.gen_range(1..1000000u32);
                 Ok(format!("{}.{:06}", dt.format("%Y-%m-%dT%H:%M:%S"), micros))
             }
             ("timestamp", "sql_standard") => Ok(self
@@ -270,8 +279,17 @@ impl Generator {
                 Ok(format!("{}.{:03}", dt.format("%Y-%m-%d %H:%M:%S"), millis))
             }
             ("timestamp", "iso_8601_milliseconds") => {
+                // v19: always has exactly 3 fractional digits + Z suffix.
+                // Distinguished from iso_microseconds (6 digits) and
+                // numeric_code (no datetime separators).
                 let dt = self.random_datetime();
                 let millis = self.rng.gen_range(0..1000u32);
+                // Ensure non-zero millis for format distinctiveness
+                let millis = if millis == 0 {
+                    self.rng.gen_range(1..1000u32)
+                } else {
+                    millis
+                };
                 Ok(format!("{}.{:03}Z", dt.format("%Y-%m-%dT%H:%M:%S"), millis))
             }
             ("timestamp", "iso_8601_millis_offset") => {
@@ -337,10 +355,18 @@ impl Generator {
                 ))
             }
             ("timestamp", "pg_short_offset") => {
-                // PostgreSQL 2-digit offset: 2024-01-15 14:30:00.123456-05
+                // v19: PostgreSQL 2-digit offset: 2024-01-15 14:30:00.123456-05
+                // Distinguished from rfc_3339 (T separator + :00 colon offset)
+                // by using space separator + short offset without colon.
                 let dt = self.random_datetime();
-                let micros = self.rng.gen_range(0..1_000_000u32);
-                let offset_h = self.rng.gen_range(-12i32..=12);
+                let micros = self.rng.gen_range(1..1_000_000u32);
+                // Non-zero offsets help distinguish from sql_microseconds (no offset)
+                let offset_h = loop {
+                    let h = self.rng.gen_range(-12i32..=12);
+                    if h != 0 || self.rng.gen_bool(0.2) {
+                        break h;
+                    }
+                };
                 Ok(format!(
                     "{}.{:06}{:+03}",
                     dt.format("%Y-%m-%d %H:%M:%S"),
@@ -466,11 +492,16 @@ impl Generator {
                     format!("{}{}{}", date_part, wk_sep, weekday)
                 })
             }
-            ("date", "ordinal") => Ok(format!(
-                "{}-{:03}",
-                self.rng.gen_range(2020..2030),
-                self.rng.gen_range(1..366)
-            )),
+            ("date", "ordinal") => {
+                // v19: ISO 8601 ordinal date YYYY-DDD (e.g., 2024-075).
+                // Distinguished from abbreviated_month (has month names)
+                // and month_year_full (has full month + year text).
+                // The YYYY-DDD format with 3-digit zero-padded day-of-year
+                // is the key structural signal.
+                let year = self.rng.gen_range(2000..2030);
+                let day = self.rng.gen_range(1..=365);
+                Ok(format!("{}-{:03}", year, day))
+            }
             ("date", "julian") => Ok(format!(
                 "{:02}-{:03}",
                 self.rng.gen_range(20..30),
@@ -580,16 +611,32 @@ impl Generator {
                 Ok(format!("{}년 {}월 {}일", dt.year(), dt.month(), dt.day()))
             }
             ("date", "jp_era_short") => {
-                // R6/01/15 — Japanese era short format
+                // v19: Japanese era short format: R6/01/15, H31/04/30
+                // Must match validation pattern ^[RHSTM]\d{1,2}/\d{1,2}/\d{1,2}$
+                // Distinguished from alphanumeric_id by the era letter prefix
+                // (H, S, T, M, R) followed by slash-separated date components.
+                // Vary padding: sometimes zero-padded month/day, sometimes not.
                 let dt = self.random_datetime();
                 let (era_letter, era_year) = self.gregorian_to_jp_era(dt.year());
-                Ok(format!(
-                    "{}{}/{:02}/{:02}",
-                    era_letter,
-                    era_year,
-                    dt.month(),
-                    dt.day()
-                ))
+                if self.rng.gen_bool(0.5) {
+                    // Zero-padded month and day
+                    Ok(format!(
+                        "{}{}/{:02}/{:02}",
+                        era_letter,
+                        era_year,
+                        dt.month(),
+                        dt.day()
+                    ))
+                } else {
+                    // Unpadded month and day
+                    Ok(format!(
+                        "{}{}/{}/{}",
+                        era_letter,
+                        era_year,
+                        dt.month(),
+                        dt.day()
+                    ))
+                }
             }
             ("date", "jp_era_long") => {
                 // 令和6年1月15日 — Japanese era long format

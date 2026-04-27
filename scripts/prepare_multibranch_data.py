@@ -236,6 +236,51 @@ TABLE_TEMPLATES = {
         "representation.numeric.integer_number",
         "representation.file.mime_type",
     ],
+    # --- Container-type templates (v19) ---
+    # These ensure the model sees container types in realistic table contexts.
+    # All 8 failing container types covered across 3 templates.
+    "data_exchange": [
+        "container.object.csv", "container.object.json_array",
+        "container.object.xml", "container.object.yaml",
+        "representation.file.mime_type", "representation.text.entity_name",
+        "datetime.timestamp.iso_8601",
+    ],
+    "web_content": [
+        "container.object.html", "container.key_value.query_string",
+        "technology.internet.url", "technology.internet.hostname",
+        "representation.numeric.integer_number", "datetime.timestamp.iso_8601",
+    ],
+    "log_fields": [
+        "container.array.comma_separated", "container.array.pipe_separated",
+        "container.array.semicolon_separated",
+        "container.array.whitespace_separated",
+        "technology.internet.ip_v4", "representation.text.entity_name",
+        "datetime.timestamp.iso_8601",
+    ],
+    # --- Datetime precision templates (v19) ---
+    # Exposes the 6 failing datetime subtypes in realistic table contexts.
+    "timestamp_precision": [
+        "datetime.timestamp.iso_8601_compact",
+        "datetime.timestamp.iso_8601_milliseconds",
+        "datetime.timestamp.iso_microseconds",
+        "datetime.timestamp.pg_short_offset",
+        "representation.identifier.uuid", "technology.internet.ip_v4",
+    ],
+    "international_dates": [
+        "datetime.date.jp_era_short", "datetime.date.ordinal",
+        "datetime.date.iso", "geography.location.country",
+        "identity.person.full_name", "representation.text.entity_name",
+    ],
+    # --- Coverage closure (v19) ---
+    # Types with generators but no template placement.
+    "scientific_records": [
+        "representation.scientific.inchi",
+        "representation.scientific.smiles",
+        "representation.identifier.uuid",
+        "representation.text.entity_name",
+        "representation.numeric.decimal_number",
+        "datetime.date.iso",
+    ],
 }
 
 # All unique types referenced in templates (for noise injection)
@@ -1479,6 +1524,8 @@ def generate_synthetic_columns(finetype_bin, synthetic_columns_per_type, seed, m
                 str(values_per_type),
                 "--seed",
                 str(seed),
+                "--priority",
+                "0",  # Include all types (password is priority 0)
                 "--output",
                 tmp_path,
             ],
@@ -1765,8 +1812,17 @@ def assemble_synthetic_tables(synthetic_columns_by_type, rng, taxonomy_types,
     for type_key, cols in synthetic_columns_by_type.items():
         pool[type_key] = list(cols)  # copy so we can pop
 
-    # All available types for noise injection (excluding column-level types)
-    noise_candidates = [t for t in taxonomy_types if t not in COLUMN_LEVEL_TYPES]
+    # All available types for noise injection (excluding column-level types
+    # and types that only appear in one template — protect low-coverage types
+    # from being consumed as noise before their template runs)
+    _template_type_counts = {}
+    for _tpl_types in TABLE_TEMPLATES.values():
+        for _tt in _tpl_types:
+            _template_type_counts[_tt] = _template_type_counts.get(_tt, 0) + 1
+    _single_template_types = {t for t, c in _template_type_counts.items() if c == 1}
+    noise_candidates = [t for t in taxonomy_types
+                        if t not in COLUMN_LEVEL_TYPES
+                        and t not in _single_template_types]
 
     tables = []
     template_names = list(TABLE_TEMPLATES.keys())

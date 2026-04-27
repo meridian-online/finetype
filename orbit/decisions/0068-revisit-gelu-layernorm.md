@@ -1,0 +1,100 @@
+---
+status: accepted
+date-created: 2026-04-25
+date-modified: 2026-04-27
+supersedes: 0046
+---
+
+# 0068. Revisit GELU+LayerNorm architecture
+
+## Context and Problem Statement
+
+Decision 0046 (2026-04-12) closed the GELU+LayerNorm experiment with a
+measured -5 label regression vs ReLU+BatchNorm on profile eval (188/227
+vs 193/227). However, the Sharpen post-processing layer has changed
+substantially since that measurement:
+
+- **PR #44** (2026-04-21): Sharpen demotion guard — validator-confirmed
+  rescue for types demoted by categorical rules
+- **PR #47** (2026-04-24): Amount-variant collapse fix — 11-arm hint
+  table edit, +11 target lift, +10 non-target lift
+- **PR #48** (2026-04-25): Header-hint regex removal — removed harmful
+  regex-based header hints per decision 0042
+
+The v10 experiment (decision 0046) noted that "val_accuracy and profile
+eval measure different things — profile eval includes Sharpen
+post-processing, which the GELU+LN output distribution doesn't interact
+well with." Given that the Sharpen layer's behaviour has changed
+materially, the GELU+LN interaction may be different.
+
+Additionally, the eval corpus has expanded from 227 to 448 rows,
+providing a more representative measurement surface.
+
+## Considered Options
+
+- **Option A:** Keep decision 0046 — GELU+LN is closed, don't revisit
+- **Option B:** Re-run paired comparison on improved training data
+  through today's pipeline
+
+## Decision Outcome
+
+Chosen option: **Option B — re-run paired comparison**, because:
+
+1. The Sharpen layer has changed enough that the original measurement
+   is no longer representative of the GELU+LN interaction
+2. The training data is also improving (v4 corpus + container types +
+   datetime generator improvements) — the combined effect of better
+   data + different architecture may be different from either alone
+3. The GELU+LN infrastructure already exists in both train and
+   inference crates (backward compatible via `#[serde(default)]`)
+4. A 15-hour overnight sweep is acceptable compute cost to get a
+   definitive answer on today's pipeline
+
+### Measurement plan
+
+- 3-seed sweep (42, 43, 44) × 100 epochs for each architecture
+- Both architectures train on identical FTMB v5 data
+- Three-way diff: v16 baseline (297/352) vs ReLU-v19 vs GELU-v19
+- MADR 0066 hard gate applies independently to each architecture
+- Winner takes all — no margin requirement
+
+### Outcome (2026-04-27)
+
+**GELU+LN is definitively worse. ReLU+BN remains the architecture.**
+
+Sweep completed: 6 runs (3 seeds × 2 architectures) on FTMB v5 data.
+
+**Training accuracy (val_acc):**
+- ReLU+BN: s42=91.26%, s43=91.53%, s44=91.73% — all 3 pass ≥91.2%
+- GELU+LN: s42=85.99%, s43=85.76%, s44=85.99% — ~6 pts below ReLU
+
+**Profile eval (448-row expanded manifest):**
+- v16 baseline: 371/448 (82.8% label, 88.3% domain)
+- Best ReLU (s42): 365/448 (81.4% label, 88.3% domain) — net_label_delta = −6
+- Best GELU (s44): 327/448 (72.9% label, 84.1% domain) — net_label_delta = −44
+
+**MADR 0066 gate:** Both architectures FAIL. ReLU fails Gate 3 only
+(−6 label). GELU fails Gates 1, 3, and 4 (val_acc, label, domain).
+
+The ~6-point val_acc gap from training translates to a ~10-point profile
+eval gap. GELU+LN's output distribution interacts poorly with the Sharpen
+layer even after the post-processing improvements (PR #44, #47, #48).
+
+Neither v19 architecture is promoted. v16 remains shipped. The "what if"
+is answered: GELU+LN is not the path forward for FineType's multi-branch
+architecture.
+
+### Consequences
+
+- Good, because a definitive answer on today's pipeline removes the
+  "what if" from future model discussions
+- Good, because the GELU+LN code is already maintained — the experiment
+  costs compute, not engineering time
+- Bad, because the paired sweep doubles overnight compute (~15h vs ~7.5h)
+
+## Cross-references
+
+- **Decision 0046** — original GELU+LN not-adopted decision (superseded)
+- **Decision 0066** — v19 retrain hard gate (applies to both architectures)
+- **Decision 0038** — strength through simplification
+- Spec: orbit/specs/2026-04-25-v19-paired-retrain/

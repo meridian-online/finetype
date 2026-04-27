@@ -1,0 +1,15 @@
+cluster	column	gt_label	pipeline_prediction	match
+container	csv	container.object.csv		NO
+container	html	container.object.html		NO
+container	json_array	container.object.json_array		NO
+container	query_string	container.key_value.query_string		NO
+container	semicolon_separated	container.array.semicolon_separated		NO
+container	whitespace_separated	container.array.whitespace_separated		NO
+container	xml	container.object.xml		NO
+container	yaml	container.object.yaml		NO
+datetime	iso_8601_compact	datetime.timestamp.iso_8601_compact		NO
+datetime	iso_8601_milliseconds	datetime.timestamp.iso_8601_milliseconds		NO
+datetime	iso_microseconds	datetime.timestamp.iso_microseconds		NO
+datetime	jp_era_short	datetime.date.jp_era_short		NO
+datetime	pg_short_offset	datetime.timestamp.pg_short_offset		NO
+datetime	ordinal	datetime.date.ordinal		NO

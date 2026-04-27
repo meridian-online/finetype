@@ -84,7 +84,7 @@ mod tui_impl {
     use ratatui::symbols::Marker;
     use ratatui::text::{Line, Span};
     use ratatui::widgets::{
-        Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table,
+        Axis, Block, Borders, Cell, Chart, Dataset, Gauge, Paragraph, Row, Table, TableState,
     };
     use ratatui::Terminal;
 
@@ -118,6 +118,8 @@ mod tui_impl {
         batch_loss_history: Vec<f64>,
         train_start: Instant,
         finished: bool,
+        /// Scroll state for the epoch table (follows latest epoch).
+        epoch_table_state: TableState,
     }
 
     impl RenderState {
@@ -132,6 +134,7 @@ mod tui_impl {
                 batch_loss_history: Vec::new(),
                 train_start: Instant::now(),
                 finished: false,
+                epoch_table_state: TableState::default(),
             }
         }
 
@@ -296,6 +299,9 @@ mod tui_impl {
                         let _ = terminal.clear();
                         state.batch_loss_history.clear();
                         state.epoch_history.push(metrics);
+                        // Scroll epoch table to show the latest epoch
+                        let last_idx = state.epoch_history.len().saturating_sub(1);
+                        state.epoch_table_state.select(Some(last_idx));
                     }
                     Ok(RenderMsg::TrainEnd) => {
                         state.finished = true;
@@ -319,14 +325,14 @@ mod tui_impl {
             }
 
             // Draw frame
-            terminal.draw(|f| draw_frame(f, &state, &title))?;
+            terminal.draw(|f| draw_frame(f, &mut state, &title))?;
 
             thread::sleep(tick_rate);
         }
     }
 
     /// Draw the full dashboard frame.
-    fn draw_frame(f: &mut ratatui::Frame, state: &RenderState, title: &str) {
+    fn draw_frame(f: &mut ratatui::Frame, state: &mut RenderState, title: &str) {
         let area = f.area();
 
         // Vertical layout: title(1) | charts(12) | gap(1) | table(flex) | progress(3)
@@ -590,7 +596,7 @@ mod tui_impl {
         f.render_widget(chart, area);
     }
 
-    fn draw_epoch_table(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
+    fn draw_epoch_table(f: &mut ratatui::Frame, area: Rect, state: &mut RenderState) {
         let header_cells = [
             "Epoch",
             "Train Loss",
@@ -641,7 +647,7 @@ mod tui_impl {
         .header(header)
         .block(Block::default().title(" Epochs ").borders(Borders::ALL));
 
-        f.render_widget(table, area);
+        f.render_stateful_widget(table, area, &mut state.epoch_table_state);
     }
 
     fn draw_progress(f: &mut ratatui::Frame, area: Rect, state: &RenderState) {
@@ -825,7 +831,7 @@ mod tui_impl {
         let title = "sherlock-v4-sibling (demo)";
 
         // Draw one frame
-        terminal.draw(|f| draw_frame(f, &state, title))?;
+        terminal.draw(|f| draw_frame(f, &mut state, title))?;
 
         // Wait for user to see it, then exit
         eprintln!("\n  TUI Demo — press Enter to exit...");
