@@ -3825,12 +3825,6 @@ fn disambiguate_boolean_override(
     None
 }
 
-/// Override day_of_month or similar classifications for small-integer columns
-/// that look like ordinal/class labels (e.g. Pclass: 1, 2, 3).
-///
-/// Rule: If values are all small positive integers with ≤10 unique values,
-///       the range is small (max ≤ 20), and the top prediction is day_of_month
-///       or another misfit type, override to ordinal.
 // disambiguate_small_integer_ordinal REMOVED — Sharpen rule audit (MADR 0069)
 // Ablation: net -2 (0 fixes, 2 regressions). v19-relu model handles these correctly.
 
