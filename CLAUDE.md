@@ -29,7 +29,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Current State
 
-**Version:** 0.6.17
+**Version:** 0.6.18
 **Taxonomy:** 240 definitions across 7 domains (container: 11, datetime: 84, finance: 28, geography: 25, identity: 33, representation: 33, technology: 26) — all generators pass, 100% alignment
 **Default model:** Multi-branch→Sharpen pipeline with sherlock-v19-relu-s42 (5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, best val_acc 0.9173). Single forward pass per column replaces ~100 CharCNN value-level inferences. Profile eval: **369/448 (82.4% label)** on 36 datasets (448-row manifest). Legacy Sense→Sharpen path remains in code but multi-branch is the CLI/MCP/DuckDB default.
 **Features:** 36-dim deterministic feature extractor, column-level aggregation (mean, variance, min, max), 6 feature-based disambiguation rules (F1–F6), 20 value-based disambiguation rules (R1–R31, some gaps; R10 small_integer_ordinal and R11 categorical removed by Sharpen audit), Model2Vec semantic header hints, hardcoded header hints with domain-dependent thresholds (same-domain 0.95, cross-domain 0.85), datetime specificity guard (prevents iso_8601 catch-all from overriding specific datetime predictions).
