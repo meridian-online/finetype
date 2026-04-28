@@ -45,7 +45,7 @@ goal: "Four public verbs (infer | profile | validate | mcp + taxonomy with json-
 
 specs:
   - "orbit/specs/2026-04-27-cli-visibility-cleanup/spec.yaml"  # SHIPPED 2026-04-28 (v0.6.19, PR #51)
-  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"             # planned (v0.6.20)
+  - "orbit/specs/2026-04-27-cli-pipeline-reshape/"             # planned (v0.6.19)
 
 references:
   - "README.md"

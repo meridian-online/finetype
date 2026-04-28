@@ -1,0 +1,39 @@
+rally: "v0.6.19 CLI surface consolidation"
+autonomy: guided
+phase: approved
+started: 2026-04-28T01:12:33Z
+completed: null
+cards:
+  - path: orbit/cards/0003-tabular-data-profiling.yaml
+    status: proposed
+    spec_dir: orbit/specs/2026-04-28-profile-json-schema-output/
+    branch: rally/profile-json-schema-output
+    worktree: null
+    parked_constraint: null
+  - path: orbit/cards/0005-schema-driven-data-validation.yaml
+    status: proposed
+    spec_dir: orbit/specs/2026-04-28-validate-absorbs-load/
+    branch: rally/validate-absorbs-load
+    worktree: null
+    parked_constraint: null
+  - path: orbit/cards/0006-command-line-interface.yaml
+    status: proposed
+    spec_dir: orbit/specs/2026-04-28-schema-verb-fold/
+    branch: rally/schema-verb-fold
+    worktree: null
+    parked_constraint: null
+implementation_order: null
+order_rationale: null
+notes: |
+  Riding alongside the rally as separate specs (not card inputs):
+    - orbit/specs/<date>-legacy-classifier-cleanup/  (internal refactor;
+      retires --model-type and the Sense/Tiered/Flat dead branches in
+      crates/finetype-model — supports card 0006's "Maintainer
+      affordances stay hidden" scenario)
+    - orbit/specs/<date>-release-polish-v0619/  (docs refresh + repo
+      hygiene + drift-check CI gate per memos
+      2026-04-27-stale-documentation, repo-cleanliness,
+      sweep-script-graveyard)
+  These ship in the v0.6.19 release PR alongside the three rally cards
+  but are not orchestrated by the rally itself — they're release
+  engineering, not capability deliverables.
