@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+- **Retire the load verb (v0.6.19, MADR 0071)** — The standalone
+  `finetype load` verb is gone. The typed-DuckDB-table output path
+  migrates to `finetype validate` with `--db`/`--table`:
+
+  - `finetype load -f data.csv` → `finetype validate data.csv schema.json --db out.db --table data`
+
+  Generate the schema first via `finetype profile -f data.csv -o
+  json-schema > schema.json`. The new path adds a JSON-Schema-driven
+  quality gate, TRY-wrapped per-column transforms, and a queryable
+  reject sidecar in a single pass. `finetype load …` now errors via
+  clap's stock unknown-subcommand handler with exit code 2 — no shim,
+  no warning, no carve-out. `Commands::Load`, `cmd_load`,
+  `build_load_expr`, `build_load_expr_enum`, the orphan
+  `sanitise_identifier`, and 6 obsolete unit tests deleted (~270 LOC).
+  Public CLI surface drops to **5 verbs**: infer, profile, validate,
+  mcp, taxonomy. See MADR 0071 (refines MADR 0064).
+
 - **Retire the schema verb (v0.6.19, MADR 0070)** — The standalone
   `finetype schema` verb is gone. JSON Schema export migrates to its
   two natural homes:
@@ -26,6 +43,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   will mirror the CLI fold. See MADR 0070 (supersedes MADR 0031).
 
 ### Changed
+
+- **`finetype validate --db --table` now materialises typed columns
+  (v0.6.19, MADR 0071)** — Valid rows land in a typed DuckDB table
+  whose column types are driven by the schema's `x-finetype-label` per
+  column. Per-column transforms are applied via TRY-wrapped projection
+  built by the new `build_transform_projection` helper. Cells that
+  pass JSON-Schema validation but fail the typed cast (e.g.
+  `"2024-02-30"` matches a date pattern but `strptime` rejects it) are
+  detected pre-CTAS and routed to the reject sidecar instead of
+  crashing the CTAS or silently NULL-coercing. Staging-NULL → typed-NULL
+  is **not** a transform failure — the predicate is `col IS NOT NULL
+  AND TRY(transform) IS NULL`. SQL `CAST(col AS VARCHAR)` is the
+  documented escape hatch when typed columns aren't wanted; there is
+  no `--no-transform` flag. Unlabelled columns pass through as VARCHAR
+  (graceful-degradation contract, MADR 0064 ac-11).
+
+- **ENUM emission dropped from `validate --db --table` (v0.6.19,
+  MADR 0071)** — The retired `finetype load` verb optionally promoted
+  low-cardinality columns to `CREATE TYPE … AS ENUM` declarations
+  before the CTAS. `finetype validate --db --table` produces no
+  `CREATE TYPE` regardless of column cardinality. Low-cardinality
+  columns retain the schema's `duckdb_type` (typically VARCHAR). The
+  `--enum-threshold` flag is **not** carried over to `validate`. Users
+  who want enum semantics should declare them explicitly in the JSON
+  Schema's `enum` keyword and let DuckDB's `IN` constraints do the
+  work.
+
+- **Reject ontology gains TRANSFORM_FAILED + transform (v0.6.19,
+  MADR 0071)** — The 13-column `finetype_reject_errors` schema
+  (REJECT_SIDECAR_DDL) is unchanged. Two existing fields take new
+  enum values:
+
+  - `error_type` gains `'TRANSFORM_FAILED'` (existing
+    `'SEMANTIC_TYPE'` plus the 7-token DuckDB `reject_errors` enum
+    are byte-identical).
+  - `constraint_failed` gains `'transform'` (existing tokens like
+    `'pattern'`, `'enum'`, `'minLength'`, `'minimum'`, etc. are
+    byte-identical).
+
+  `error_message` carries a literal `transform_failed: <transform-expr>`
+  on TRANSFORM_FAILED rows, exposing the failing transform at query
+  time without joining back to the schema. SEMANTIC_TYPE rows
+  continue to carry the engine's free-form failure reason.
 
 - **`x-finetype-label` now emitted on type-mode JSON Schema** — The
   pre-existing `schema KEY` verb only emitted `x-finetype-pii` on
