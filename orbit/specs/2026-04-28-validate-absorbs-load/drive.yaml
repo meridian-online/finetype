@@ -3,7 +3,7 @@ autonomy: full
 budget: 3
 iteration: 1
 current_spec: orbit/specs/2026-04-28-validate-absorbs-load/
-status: ready-to-merge
+status: complete
 history: []
 started: 2026-04-28T15:30:00Z
 review_cycles:

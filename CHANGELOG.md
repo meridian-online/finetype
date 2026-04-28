@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.19] - 2026-04-28
+
 ### Removed
 
 - **Retire the load verb (v0.6.19, MADR 0071)** — The standalone
