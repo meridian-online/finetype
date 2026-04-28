@@ -3,8 +3,14 @@ autonomy: full
 budget: 3
 iteration: 1
 current_spec: orbit/specs/2026-04-28-profile-json-schema-output/
-status: pr
-history: []
+status: complete
+history:
+  - dir: orbit/specs/2026-04-28-profile-json-schema-output/
+    result: GO
+    review_spec: APPROVE
+    review_pr: APPROVE
+    pr: https://github.com/meridian-online/finetype/pull/53
+    completed: 2026-04-28T13:45:00Z
 started: 2026-04-28T11:35:00Z
 review_cycles:
   review_spec: 0
