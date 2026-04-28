@@ -41,6 +41,22 @@ fn run_validate(args: &[&str]) -> (i32, String, String) {
     (code, stdout, stderr)
 }
 
+/// Invoke `finetype` directly (no subcommand prefix) with raw args.
+/// Used to assert behaviour of the `load` subcommand removal (ac-06).
+fn run_finetype_raw(args: &[&str]) -> (i32, String, String) {
+    let mut all_args: Vec<&str> = vec!["run", "-q", "-p", "finetype-cli", "--"];
+    all_args.extend_from_slice(args);
+    let output = Command::new("cargo")
+        .args(&all_args)
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to spawn cargo run");
+    let code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    (code, stdout, stderr)
+}
+
 /// Query a .db file via the duckdb CLI and return trimmed stdout.
 /// Panics on CLI failure — tests assert success by presence of expected values.
 fn duckdb_query(db: &Path, sql: &str) -> String {
@@ -751,4 +767,30 @@ fn test_vrp_unknown_label_passes_as_varchar() {
          WHERE error_type = 'TRANSFORM_FAILED';",
     );
     assert_eq!(tf_count, "0");
+}
+
+/// ac-06: `finetype load …` no longer exists. Clap's unknown-subcommand
+/// handler must reject the verb with exit code 2 (clap convention) and
+/// emit a help-style error pointing at the available subcommands.
+/// No shim, no warning, no carve-out — hard removal posture (PR #51 lineage).
+#[test]
+#[ignore]
+fn test_vrp_load_subcommand_removed() {
+    let (code, _stdout, stderr) = run_finetype_raw(&["load", "--file", "any.csv"]);
+    assert_eq!(
+        code, 2,
+        "`finetype load` must exit 2 via clap unknown-subcommand handler; \
+         got code={code}, stderr={stderr}"
+    );
+    // Clap's stock message for an unrecognised subcommand mentions the
+    // offending verb. Either "unrecognized" or "unknown" wording is
+    // acceptable across clap versions.
+    let stderr_lower = stderr.to_lowercase();
+    assert!(
+        stderr_lower.contains("load")
+            && (stderr_lower.contains("unrecognized")
+                || stderr_lower.contains("unknown")
+                || stderr_lower.contains("invalid")),
+        "stderr should signal unknown subcommand mentioning 'load'; got: {stderr}"
+    );
 }
