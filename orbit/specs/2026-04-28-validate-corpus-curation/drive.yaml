@@ -3,7 +3,7 @@ autonomy: guided
 budget: 3
 iteration: 1
 current_spec: orbit/specs/2026-04-28-validate-corpus-curation/
-status: review
+status: shipped
 history:
   - dir: orbit/specs/2026-04-28-validate-corpus-curation/
     result: BUDGET_OVERRIDE
@@ -25,6 +25,37 @@ history:
       Spec advances to implement under explicit author override per the
       guided-autonomy decision-checkpoint pattern. Counter remains at 3;
       cycles 4-5 launched as overrides, not in-budget cycles.
+  - dir: orbit/specs/2026-04-28-validate-corpus-curation/
+    result: SHIPPED
+    pr: "https://github.com/meridian-online/finetype/pull/59"
+    merge_sha: cd3b55d
+    note: |
+      Iter-2 shipped via PR #59 (merged 2026-04-28). Two review-pr cycles:
+        Cycle 1 (commit 1d9977e): REQUEST_CHANGES (1 HIGH / 2 LOW) —
+          AC-06 prescreen deferral not surfaced in report. Fix at 5d47505.
+        Cycle 2 (commit 5d47505): APPROVE (0 HIGH / 1 MEDIUM advisory /
+          4 LOW). LOW housekeeping fixes pushed; PR description updated.
+      Final review_cycles.review_pr=1; budget unspent.
+
+      Mid-flight orbit-glossary refactor (commit 1d9977e): cards 0015 and
+      0016 were mis-categorised as cards but described work, not user-
+      observable capabilities. Cards 0015/0016 deleted; user-feature card
+      0014 (profile-validate-precision) takes ownership of both child
+      specs (this iter-2 spec + iter-3 stub at orbit/specs/2026-04-28-
+      validate-corpus-iter3/). interview.md, drive.yaml card pointer,
+      AC-08 verification (gap_card → gap_spec), and AC-11 verification
+      all updated; CLAUDE.md "What's next" rewritten.
+
+      Two AC gap-downgrades shipped honestly:
+        AC-06: 98 prescreen-floor failures (77 from iter-2) are structural
+          (SDMX flat-dimensions, CODE/LABEL pairs, "88+2" composites,
+          real 2-3-value categoricals) — not curation defects. Drop-and-
+          replace would forfeit mechanism coverage. Floor recalibration
+          is unfiled future work.
+        AC-08: format_diversity=0 + code_vs_canonical=0 attribute to the
+          misclassification catch-all because the iter-1 harness lacks
+          attribution rules for these patterns. Iter-3 stub spec at
+          orbit/specs/2026-04-28-validate-corpus-iter3/ tracks the work.
 started: 2026-04-28T13:30:00+01:00
 review_cycles:
   review_spec: 3
