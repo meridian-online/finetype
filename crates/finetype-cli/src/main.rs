@@ -2927,6 +2927,95 @@ fn build_load_expr_enum(original_name: &str, enum_type_name: &str) -> String {
     format!("CAST({} AS {}) AS {}", col_ref, enum_type_name, col_ref)
 }
 
+/// Build the comma-separated SELECT projection for the validate materialise CTAS
+/// (ac-01).
+///
+/// Lifts the per-column expression logic that used to live in `cmd_load`'s
+/// `build_load_expr` into a free function callable from `cmd_validate_table`.
+/// The 5-branch decision tree is:
+///
+/// 1. **Unlabelled** (`x-finetype-label` absent on the column schema) → emit a
+///    bare quoted identifier. Preserves MADR 0064 ac-11 graceful-degradation —
+///    columns without a label fall through as VARCHAR.
+/// 2. **Labelled but unknown to taxonomy** (label present but
+///    `Taxonomy::ddl_info()` returns `None`) → bare quoted identifier. Same
+///    graceful-degradation contract as branch 1 — an unknown label cannot drive
+///    a typed cast.
+/// 3. **VARCHAR-typed** (`ddl_info.duckdb_type == "VARCHAR"`) → bare quoted
+///    identifier. Mirrors `build_load_expr` branch 1 — no redundant CAST for
+///    VARCHAR.
+/// 4. **Has transform** → `<transform> AS "col"`. When `try_wrap` is true the
+///    full transform expression is wrapped in `TRY(...)` so DuckDB returns NULL
+///    on cast failures instead of aborting the CTAS. The transform string is
+///    expected to contain `{col}`, which is substituted with the quoted
+///    identifier.
+/// 5. **No transform, non-VARCHAR** → fallback `CAST("col" AS T) AS "col"` (or
+///    `TRY_CAST` when `try_wrap` is true). Mirrors `build_load_expr` branch 3.
+///
+/// `try_wrap=true` is the validate path's binding-choice contract (constraint
+/// in spec): every typed transform is wrapped in `TRY(...)` so the CTAS sees a
+/// NULL on transform failure rather than aborting. The pre-CTAS sweep then
+/// detects `staging IS NOT NULL AND TRY(transform) IS NULL` and emits a
+/// `TRANSFORM_FAILED` reject row, removing the `__row_idx` from the valid set
+/// before the user-table CTAS runs (ac-03 + ac-04).
+fn build_transform_projection(
+    headers: &[String],
+    extensions: &SchemaExtensions,
+    taxonomy: &Taxonomy,
+    try_wrap: bool,
+) -> String {
+    headers
+        .iter()
+        .map(|h| build_transform_projection_one(h, extensions, taxonomy, try_wrap))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Single-column branch for `build_transform_projection`. Pulled out so the
+/// 5-branch logic can be unit-tested independently of `headers` slicing.
+fn build_transform_projection_one(
+    header: &str,
+    extensions: &SchemaExtensions,
+    taxonomy: &Taxonomy,
+    try_wrap: bool,
+) -> String {
+    let col_ref = format_column_name(header);
+    let (label_opt, _confidence) = extensions.get(header);
+
+    // Branch 1 — unlabelled column (no x-finetype-label). Bare passthrough.
+    let label = match label_opt {
+        Some(s) => s,
+        None => return col_ref,
+    };
+
+    // Branch 2 — labelled but unknown to the taxonomy. Bare passthrough.
+    let info = match taxonomy.ddl_info(&label) {
+        Some(i) => i,
+        None => return col_ref,
+    };
+
+    // Branch 3 — VARCHAR-typed. Bare passthrough.
+    if info.duckdb_type == "VARCHAR" {
+        return col_ref;
+    }
+
+    // Branch 4 — has transform. Substitute {col}, optionally TRY-wrap.
+    if let Some(tf) = info.transform.as_ref() {
+        let cast_expr = tf.replace("{col}", &col_ref);
+        if try_wrap {
+            return format!("TRY({}) AS {}", cast_expr, col_ref);
+        }
+        return format!("{} AS {}", cast_expr, col_ref);
+    }
+
+    // Branch 5 — no transform, non-VARCHAR. CAST or TRY_CAST.
+    if try_wrap {
+        format!("TRY_CAST({} AS {}) AS {}", col_ref, info.duckdb_type, col_ref)
+    } else {
+        format!("CAST({} AS {}) AS {}", col_ref, info.duckdb_type, col_ref)
+    }
+}
+
 /// Sanitise a string for use as a SQL identifier.
 /// Replaces hyphens with underscores and strips non-alphanumeric characters.
 fn sanitise_identifier(s: &str) -> String {
@@ -3398,11 +3487,27 @@ fn cmd_validate_table(
     //    Check-only mode skips this entire block — no DuckDB shell-out, no
     //    .db file written. The pass/fail decision is the validation engine
     //    output alone, governed by the exit-code grid below.
-    let scan_id: Option<i64> = if let (Some(db_path), Some(table_name)) =
+    //
+    //    Returns `Some((scan_id, transform_failed_count))` on materialise,
+    //    `None` on check-only. `transform_failed_count` is the number of
+    //    TRANSFORM_FAILED reject rows the pre-CTAS sweep emitted for this
+    //    scan_id — counted post-script via a tiny duckdb query against the
+    //    output .db. Both reject classes (SEMANTIC_TYPE engine rejects and
+    //    TRANSFORM_FAILED sweep rejects) feed the exit-code decision.
+    let materialise: Option<(i64, usize)> = if let (Some(db_path), Some(table_name)) =
         (db.as_ref(), table.as_ref())
     {
         // Compute scan_id now (before generating SQL).
         let scan_id: i64 = if append { next_scan_id(db_path) } else { 1 };
+
+        // Load taxonomy for typed-column projection (ac-02). Graceful failure:
+        // if `labels/` is absent (release binary without embed), we fall back
+        // to a bare-passthrough projection — every column emits as VARCHAR,
+        // matching the prior behaviour exactly. The TRANSFORM_FAILED sweep
+        // becomes a no-op for the same reason (no typed columns → no
+        // candidates → no INSERTs into __finetype_transform_failures).
+        let taxonomy_path = std::path::PathBuf::from("labels");
+        let taxonomy = load_taxonomy(&taxonomy_path).ok();
 
         // ── Generate SQL script (steps 3–10 of ac-09) ────────────────────────
         //    TEMPORARY staging table is auto-dropped when the DuckDB session
@@ -3410,6 +3515,7 @@ fn cmd_validate_table(
         //    paths (ac-09 step 10 + the constraint's staging-cleanup rule).
         let uuid = uuid::Uuid::new_v4().simple().to_string();
         let staging_ident = format!("__finetype_staging_{}", uuid);
+        let failures_ident = format!("__finetype_transform_failures_{}", uuid);
         let user_table_ident = sql_ident(table_name);
         let input_literal = sql_quote(&file.to_string_lossy());
 
@@ -3427,41 +3533,131 @@ fn cmd_validate_table(
         };
 
         // Valid-indices filter. Render as an IN list when non-empty, otherwise
-        // use `WHERE 0=1` to select nothing.
-        let valid_filter = if result.valid_row_indices.is_empty() {
-            "WHERE 0=1".to_string()
+        // use `0=1` to select nothing. Used both by the per-column TRANSFORM
+        // failure sweep and the user-table CTAS — the engine-rejected rows
+        // are excluded from both.
+        let valid_filter_predicate = if result.valid_row_indices.is_empty() {
+            "0=1".to_string()
         } else {
             let idx_list: Vec<String> = result
                 .valid_row_indices
                 .iter()
                 .map(|i| i.to_string())
                 .collect();
-            format!("WHERE __row_idx IN ({})", idx_list.join(","))
+            format!("__row_idx IN ({})", idx_list.join(","))
         };
+
+        // ── Typed-column projection (ac-02) ───────────────────────────────
+        //    For each column, pick:
+        //      • bare quoted ident          (unlabelled / unknown / VARCHAR)
+        //      • TRY(transform) AS "col"    (typed with transform — try_wrap)
+        //      • TRY_CAST("col" AS T) AS "col" (typed without transform)
+        //    See `build_transform_projection` for the 5-branch decision tree.
+        let projection = match taxonomy.as_ref() {
+            Some(t) => build_transform_projection(&headers, &extensions, t, true),
+            None => "* EXCLUDE(__row_idx)".to_string(),
+        };
+
+        // ── Pre-CTAS transform-failure sweep (ac-03 + ac-04) ──────────────
+        //    For each typed column with a transform (or a non-VARCHAR
+        //    ddl_info), an INSERT detects rows where:
+        //      staging IS NOT NULL  AND  TRY(transform) IS NULL
+        //    NULL staging cells pass through (NULL-in-NULL-out is NOT a
+        //    transform failure — staging-NULL → typed-NULL is documented
+        //    NULL-flow, see ac-04 + spec constraint). The detected
+        //    `__row_idx`s are excluded from the user-table CTAS below; the
+        //    detection table feeds the TRANSFORM_FAILED reject INSERT later.
+        let mut failure_inserts: Vec<String> = Vec::new();
+        if let Some(t) = taxonomy.as_ref() {
+            for (col_idx, header) in headers.iter().enumerate() {
+                let (label_opt, type_confidence) = extensions.get(header);
+                let label = match label_opt {
+                    Some(l) => l,
+                    None => continue,
+                };
+                let info = match t.ddl_info(&label) {
+                    Some(i) => i,
+                    None => continue,
+                };
+                if info.duckdb_type == "VARCHAR" {
+                    continue;
+                }
+                let col_ref = format_column_name(header);
+                // Build the TRY(...) expression that matches the projection
+                // branch. Branch 4 (transform present) → TRY(transform);
+                // Branch 5 (no transform, non-VARCHAR) → TRY_CAST(col AS T).
+                let try_expr = if let Some(tf) = info.transform.as_ref() {
+                    format!("TRY({})", tf.replace("{col}", &col_ref))
+                } else {
+                    format!("TRY_CAST({} AS {})", col_ref, info.duckdb_type)
+                };
+                // error_message convention (ac-10 / MADR 0071):
+                //   • SEMANTIC_TYPE rows  — `error_message` carries the
+                //     engine's pass/fail diagnostic ("validation failed"
+                //     or a parse error from the JSON Schema engine).
+                //   • TRANSFORM_FAILED rows — `error_message` carries
+                //     `transform_failed: <transform-expression>` so the
+                //     reject sidecar names exactly which DuckDB cast or
+                //     strptime() refused the cell. The two conventions
+                //     are documented in MADR 0071.
+                let error_message = if let Some(tf) = info.transform.as_ref() {
+                    format!("transform_failed: {}", tf)
+                } else {
+                    format!("transform_failed: CAST AS {}", info.duckdb_type)
+                };
+                let insert = format!(
+                    "INSERT INTO {failures} SELECT __row_idx, {col_idx}, {col_name}, {err_msg}, {expected}, {type_conf}, CAST({col_ref} AS VARCHAR) FROM {staging} WHERE {valid_filter} AND {col_ref} IS NOT NULL AND {try_expr} IS NULL;",
+                    failures = sql_ident(&failures_ident),
+                    col_idx = col_idx,
+                    col_name = sql_quote(header),
+                    err_msg = sql_quote(&error_message),
+                    expected = sql_quote(&label),
+                    type_conf = sql_opt_f64(&type_confidence),
+                    col_ref = col_ref,
+                    staging = sql_ident(&staging_ident),
+                    valid_filter = valid_filter_predicate,
+                    try_expr = try_expr,
+                );
+                failure_inserts.push(insert);
+            }
+        }
+
+        // The user-table filter excludes engine-invalid rows AND any row that
+        // any TRANSFORM_FAILED sweep flagged. The `NOT IN (SELECT ...)` clause
+        // is always emitted so the temp-table relationship stays explicit
+        // (when `failure_inserts` is empty the subquery returns zero rows
+        // and the clause has no effect).
+        let user_table_where = format!(
+            "WHERE ({}) AND __row_idx NOT IN (SELECT row_idx FROM {})",
+            valid_filter_predicate,
+            sql_ident(&failures_ident),
+        );
 
         // If --append and the user's table already exists, INSERT INTO rather
         // than CREATE TABLE AS. Otherwise CREATE TABLE AS from the staging.
         let exists_before_run = user_table_exists(db_path, table_name);
         let user_table_stmt = if append && exists_before_run {
             format!(
-                "INSERT INTO {} SELECT * EXCLUDE(__row_idx) FROM {} {};",
+                "INSERT INTO {} SELECT {} FROM {} {};",
                 user_table_ident,
+                projection,
                 sql_ident(&staging_ident),
-                valid_filter
+                user_table_where
             )
         } else {
             format!(
-                "CREATE TABLE {} AS SELECT * EXCLUDE(__row_idx) FROM {} {};",
+                "CREATE TABLE {} AS SELECT {} FROM {} {};",
                 user_table_ident,
+                projection,
                 sql_ident(&staging_ident),
-                valid_filter
+                user_table_where
             )
         };
 
-        // Build reject INSERTs. One row per RejectRecord. Authored-time
-        // (expected_type, type_confidence) comes from SchemaExtensions
-        // keyed by column name — NULL when the schema lacks x-finetype-*
-        // (ac-11 graceful degradation).
+        // Build reject INSERTs. One row per engine RejectRecord (error_type
+        // SEMANTIC_TYPE). Authored-time (expected_type, type_confidence)
+        // comes from SchemaExtensions keyed by column name — NULL when the
+        // schema lacks x-finetype-* (ac-11 graceful degradation).
         let mut reject_values: Vec<String> = Vec::with_capacity(result.rejects.len());
         for r in &result.rejects {
             let (expected_type, type_confidence) = extensions.get(&r.column_name);
@@ -3488,6 +3684,17 @@ fn cmd_validate_table(
             sql_ident(&staging_ident),
             read_fn
         ));
+        // Transform-failure detection table is always emitted, even when
+        // there are no typed columns — keeps the user-table CTAS's
+        // `NOT IN (SELECT row_idx FROM …)` clause uniform.
+        script.push_str(&format!(
+            "CREATE TEMPORARY TABLE {} (row_idx BIGINT, column_idx INTEGER, column_name VARCHAR, error_message VARCHAR, expected_type VARCHAR, type_confidence DOUBLE, constraint_value VARCHAR);\n",
+            sql_ident(&failures_ident),
+        ));
+        for insert in &failure_inserts {
+            script.push_str(insert);
+            script.push('\n');
+        }
         script.push_str(&user_table_stmt);
         script.push('\n');
         script.push_str(REJECT_SIDECAR_DDL);
@@ -3497,10 +3704,21 @@ fn cmd_validate_table(
             script.push_str(&reject_values.join(",\n"));
             script.push_str(";\n");
         }
+        // TRANSFORM_FAILED reject rows from the pre-CTAS sweep. Pulls from
+        // the temp detection table (one row per (row, typed-column) failure).
+        // `csv_line` and `byte_position` stay NULL — the FineType engine
+        // doesn't surface those for transform-cast failures.
+        if !failure_inserts.is_empty() {
+            script.push_str(&format!(
+                "INSERT INTO finetype_reject_errors SELECT {scan_id}, 0, row_idx + 1, column_idx, column_name, 'TRANSFORM_FAILED', NULL, NULL, error_message, type_confidence, expected_type, 'transform', constraint_value FROM {failures};\n",
+                scan_id = scan_id,
+                failures = sql_ident(&failures_ident),
+            ));
+        }
         script.push_str("COMMIT;\n");
-        // TEMPORARY table is auto-dropped on session end — no explicit DROP
-        // needed; this is the RAII-equivalent cleanup on both success AND
-        // error paths (ac-09 step 10).
+        // TEMPORARY tables (staging + failures) are auto-dropped on session
+        // end — no explicit DROP needed; this is the RAII-equivalent cleanup
+        // on both success AND error paths (ac-09 step 10).
 
         // ── Execute the script against the output .db ────────────────────────
         let duckdb_out = std::process::Command::new("duckdb")
@@ -3526,13 +3744,40 @@ fn cmd_validate_table(
             exit_with(2);
         }
 
-        Some(scan_id)
+        // Count TRANSFORM_FAILED rows emitted by the pre-CTAS sweep for
+        // this scan_id. Feeds the exit-code grid below — a transform
+        // failure is a reject, so any non-zero count flips exit 0 → 1
+        // (with --lenient still able to force 0).
+        let transform_failed_count: usize = if failure_inserts.is_empty() {
+            0
+        } else {
+            duckdb_query_scalar(
+                db_path,
+                &format!(
+                    "SELECT COUNT(*) FROM finetype_reject_errors WHERE scan_id = {} AND error_type = 'TRANSFORM_FAILED';",
+                    scan_id
+                ),
+            )
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0)
+        };
+
+        Some((scan_id, transform_failed_count))
     } else {
         None
     };
 
     // ── Summary report ───────────────────────────────────────────────────────
-    let reject_count = result.rejects.len();
+    //    `engine_reject_count` covers the JSON Schema / FineType engine
+    //    rejects (error_type=SEMANTIC_TYPE). `transform_failed_count` covers
+    //    the pre-CTAS sweep's TRANSFORM_FAILED rows. The two are reported
+    //    separately so analysts can see the split, and both feed the
+    //    exit-code grid below — any reject (either kind) flips exit 0 → 1
+    //    unless --lenient is set.
+    let engine_reject_count = result.rejects.len();
+    let transform_failed_count = materialise.map(|(_, c)| c).unwrap_or(0);
+    let total_reject_count = engine_reject_count + transform_failed_count;
+    let scan_id = materialise.map(|(s, _)| s);
     match output {
         OutputFormat::Plain
         | OutputFormat::Arrow
@@ -3553,11 +3798,15 @@ fn cmd_validate_table(
                 println!("  Mode:         check-only (no .db written)");
             }
             println!();
-            println!("  Total rows:   {:>6}", result.total_rows);
-            println!("  Valid rows:   {:>6}", result.valid_rows);
-            println!("  Invalid rows: {:>6}", result.invalid_rows);
-            println!("  Rejects:      {:>6}", reject_count);
-            println!("  Grade:        {}", result.grade);
+            println!("  Total rows:        {:>6}", result.total_rows);
+            println!("  Valid rows:        {:>6}", result.valid_rows);
+            println!("  Invalid rows:      {:>6}", result.invalid_rows);
+            println!("  Rejects:           {:>6}", total_reject_count);
+            if scan_id.is_some() {
+                println!("    SEMANTIC_TYPE:   {:>6}", engine_reject_count);
+                println!("    TRANSFORM_FAILED:{:>6}", transform_failed_count);
+            }
+            println!("  Grade:             {}", result.grade);
             println!("{}", "═".repeat(60));
         }
         OutputFormat::Json => {
@@ -3571,7 +3820,11 @@ fn cmd_validate_table(
                 "total_rows": result.total_rows,
                 "valid_rows": result.valid_rows,
                 "invalid_rows": result.invalid_rows,
-                "rejects": reject_count,
+                "rejects": total_reject_count,
+                "rejects_by_type": {
+                    "SEMANTIC_TYPE": engine_reject_count,
+                    "TRANSFORM_FAILED": transform_failed_count,
+                },
                 "grade": result.grade,
             });
             println!("{}", serde_json::to_string_pretty(&report)?);
@@ -3579,7 +3832,7 @@ fn cmd_validate_table(
     }
 
     // ── Exit-code grid (ac-10) ───────────────────────────────────────────────
-    if reject_count > 0 {
+    if total_reject_count > 0 {
         if lenient {
             exit_with(0);
         } else {
@@ -5138,5 +5391,130 @@ mod tests {
         // Double-quotes in column names are escaped per SQL standard
         let name = format_column_name("col\"name");
         assert_eq!(name, "\"col\"\"name\"");
+    }
+
+    // ── build_transform_projection (ac-01) ───────────────────────────────────
+    //
+    // Lifted from `build_load_expr`; called by the validate materialise CTAS.
+    // The 5-branch logic is documented on the function. Each test pins one
+    // branch.
+
+    /// Helper — builds a SchemaExtensions with a single label for `col`.
+    fn ext_with_label(col: &str, label: Option<&str>) -> SchemaExtensions {
+        let mut ext = SchemaExtensions::default();
+        ext.by_column.insert(
+            col.to_string(),
+            (label.map(|s| s.to_string()), None),
+        );
+        ext
+    }
+
+    /// Helper — load taxonomy from `labels/` (or fall back to embedded).
+    fn test_taxonomy() -> Taxonomy {
+        let path = std::path::PathBuf::from("../../labels");
+        if path.is_dir() {
+            return Taxonomy::from_directory(&path).expect("taxonomy load");
+        }
+        let path = std::path::PathBuf::from("labels");
+        Taxonomy::from_directory(&path).expect("taxonomy load")
+    }
+
+    #[test]
+    fn build_transform_projection_emits_try_wrap_when_requested() {
+        // Branch 4 with try_wrap=true: typed column with a transform gets
+        // wrapped in TRY(...). datetime.date.iso has a strptime transform.
+        let tax = test_taxonomy();
+        let ext = ext_with_label("order_date", Some("datetime.date.iso"));
+        let headers = vec!["order_date".to_string()];
+        let proj = build_transform_projection(&headers, &ext, &tax, true);
+        assert!(
+            proj.starts_with("TRY("),
+            "expected TRY(...) wrap, got: {}",
+            proj
+        );
+        assert!(
+            proj.ends_with("AS \"order_date\""),
+            "expected AS alias, got: {}",
+            proj
+        );
+    }
+
+    #[test]
+    fn build_transform_projection_passes_through_unlabelled_as_varchar() {
+        // Branch 1: column with no x-finetype-label → bare quoted identifier.
+        let tax = test_taxonomy();
+        let ext = SchemaExtensions::default();
+        let headers = vec!["raw_col".to_string()];
+        let proj = build_transform_projection(&headers, &ext, &tax, true);
+        assert_eq!(proj, "\"raw_col\"");
+    }
+
+    #[test]
+    fn build_transform_projection_passes_through_unknown_label_as_varchar() {
+        // Branch 2: labelled but the label isn't in the taxonomy → bare
+        // passthrough. Preserves graceful-degradation (MADR 0064 ac-11) for
+        // CLI fixtures that author labels not yet (or no longer) in the
+        // taxonomy — e.g. today's `identity.code.id` test fixtures.
+        let tax = test_taxonomy();
+        let ext = ext_with_label("user_id", Some("identity.code.id"));
+        let headers = vec!["user_id".to_string()];
+        let proj = build_transform_projection(&headers, &ext, &tax, true);
+        assert_eq!(proj, "\"user_id\"");
+    }
+
+    #[test]
+    fn build_transform_projection_emits_bare_passthrough_for_varchar() {
+        // Branch 3: labelled with a VARCHAR-typed taxonomy entry → bare
+        // quoted identifier (no redundant CAST). identity.person.email is
+        // VARCHAR.
+        let tax = test_taxonomy();
+        let ext = ext_with_label("contact_email", Some("identity.person.email"));
+        let headers = vec!["contact_email".to_string()];
+        let proj = build_transform_projection(&headers, &ext, &tax, true);
+        assert_eq!(proj, "\"contact_email\"");
+    }
+
+    #[test]
+    fn build_transform_projection_matches_build_load_expr_when_try_wrap_false() {
+        // Equivalence pin: with try_wrap=false the projection's per-column
+        // shape matches `build_load_expr` exactly (the function it was lifted
+        // from). Tests each branch as a single-column projection so transform
+        // expressions containing commas don't trip a naive split.
+        let tax = test_taxonomy();
+
+        // VARCHAR (identity.person.email) — bare passthrough, matches
+        // build_load_expr("email", "VARCHAR", &None).
+        let ext_email = ext_with_label("email", Some("identity.person.email"));
+        let proj_email = build_transform_projection(
+            &["email".to_string()],
+            &ext_email,
+            &tax,
+            false,
+        );
+        assert_eq!(proj_email, build_load_expr("email", "VARCHAR", &None));
+
+        // DATE with strptime transform from the taxonomy.
+        let info = tax.ddl_info("datetime.date.iso").expect("known label");
+        let ext_date = ext_with_label("order_date", Some("datetime.date.iso"));
+        let proj_date = build_transform_projection(
+            &["order_date".to_string()],
+            &ext_date,
+            &tax,
+            false,
+        );
+        assert_eq!(
+            proj_date,
+            build_load_expr("order_date", &info.duckdb_type, &info.transform),
+        );
+
+        // Unlabelled — falls through as VARCHAR (bare passthrough).
+        let ext_raw = SchemaExtensions::default();
+        let proj_raw = build_transform_projection(
+            &["raw_col".to_string()],
+            &ext_raw,
+            &tax,
+            false,
+        );
+        assert_eq!(proj_raw, build_load_expr("raw_col", "VARCHAR", &None));
     }
 }
