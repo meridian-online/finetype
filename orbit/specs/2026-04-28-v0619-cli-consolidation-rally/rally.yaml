@@ -1,26 +1,36 @@
 rally: "v0.6.19 CLI surface consolidation"
 autonomy: auto
-phase: implementing
+phase: complete
 started: 2026-04-28T01:12:33Z
-completed: null
+completed: 2026-04-28T13:00:00Z
 cards:
   - path: orbit/cards/0003-tabular-data-profiling.yaml
     status: shipped
     spec_dir: orbit/specs/2026-04-28-profile-json-schema-output/
     branch: rally/profile-json-schema-output
-    pr: https://github.com/meridian-online/finetype/pull/53
+    pr: https://github.com/meridian-online/finetype/pull/54
     worktree: main
     parked_constraint: null
+    ship_note: |
+      Card 0003 work folded into PR #54's combined squash alongside
+      card 0006 (the "Schema verb fold" rally merge). PR #53 was closed
+      without merge — its branch had diverged from main after the rally
+      chose the combined-squash path. All card 0003 deliverables
+      (profile -o json-schema, --stats flag, emit_table_schema, MCP
+      ProfileFormat::JsonSchema branch, golden_profile_json_schema_*
+      tests) verified present on main.
   - path: orbit/cards/0005-schema-driven-data-validation.yaml
-    status: designed
+    status: shipped
     spec_dir: orbit/specs/2026-04-28-validate-absorbs-load/
     branch: rally/validate-absorbs-load
+    pr: https://github.com/meridian-online/finetype/pull/56
     worktree: null
     parked_constraint: null
   - path: orbit/cards/0006-command-line-interface.yaml
-    status: implementing
+    status: shipped
     spec_dir: orbit/specs/2026-04-28-schema-verb-fold/
     branch: rally/schema-verb-fold
+    pr: https://github.com/meridian-online/finetype/pull/54
     worktree: main
     parked_constraint: null
 implementation_order:
