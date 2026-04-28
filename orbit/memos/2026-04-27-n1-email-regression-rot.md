@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-27
 **Author:** Nightingale (with Hugh)
-**Status:** Observation — proposing a verify-and-close
+**Status:** Resolved — verify-and-close shipped 2026-04-28 (option A then B). See `orbit/specs/2026-04-20-v16-n1-email-regression/progress.md`. Process-change recommendation (close interview-state files within one promotion cycle) remains open.
 **Tags:** specs, regression, hygiene
 
 ## What the spec is

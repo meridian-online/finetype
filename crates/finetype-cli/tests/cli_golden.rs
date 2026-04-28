@@ -106,6 +106,39 @@ fn run_taxonomy_json() -> Value {
     })
 }
 
+/// Run `finetype infer -i <input> --mode <mode> --output json` and return
+/// parsed JSON.
+fn run_infer_json(input: &str, mode: &str) -> Value {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
+            "infer",
+            "-i",
+            input,
+            "--mode",
+            mode,
+            "--output",
+            "json",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to run finetype infer");
+
+    assert!(
+        output.status.success(),
+        "infer failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).expect("invalid utf8");
+    serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("failed to parse infer JSON: {e}\nOutput: {stdout}");
+    })
+}
+
 /// Run `finetype schema <key> --pretty` and return parsed JSON.
 fn run_schema_json(type_key: &str) -> Value {
     let output = Command::new("cargo")
@@ -646,6 +679,59 @@ fn golden_schema_email() {
     assert!(
         schema["examples"].is_array(),
         "email schema should have examples"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INFER REGRESSION GUARDS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Regression guard for the v16 N=1 email column case.
+///
+/// History: v14 classified `john@example.com` correctly under
+/// `--mode column` at N=1. v16 regressed — same input returned
+/// `representation.text.plain_text`. Severity was low (workaround:
+/// use N≥5 columns) and a fix direction was deferred to either a
+/// value-based sharpen rule (decision 0048) or a retraining change.
+///
+/// Verified fixed on `models/default → sherlock-v19-relu-s42`
+/// (2026-04-28) — the 5-branch ReLU model recovers the email
+/// signal at N=1. URL and IPv4 controls were never broken; we
+/// assert them too as belt-and-braces against future N=1
+/// regressions across the technology.internet domain.
+///
+/// Spec: `orbit/specs/2026-04-20-v16-n1-email-regression/`.
+#[test]
+#[ignore]
+fn golden_infer_n1_email_column() {
+    let result = run_infer_json("john@example.com", "column");
+    assert_eq!(
+        result["label"].as_str(),
+        Some("identity.person.email"),
+        "N=1 email column should classify as identity.person.email \
+         (regression guard from v16-era behaviour)"
+    );
+}
+
+#[test]
+#[ignore]
+fn golden_infer_n1_url_column() {
+    let result = run_infer_json("https://example.com/path", "column");
+    assert_eq!(
+        result["label"].as_str(),
+        Some("technology.internet.url"),
+        "N=1 URL column should classify as technology.internet.url"
+    );
+}
+
+#[test]
+#[ignore]
+fn golden_infer_n1_ipv4_column() {
+    let result = run_infer_json("192.168.1.1", "column");
+    assert_eq!(
+        result["label"].as_str(),
+        Some("technology.internet.ip_v4"),
+        "N=1 IPv4 column should classify as technology.internet.ip_v4"
     );
 }
 

@@ -1,10 +1,10 @@
 # v16 N=1 email regression — investigate (interview)
 
-**Status:** interview (investigation pending)
+**Status:** closed — see `progress.md` (resolved by v19 promotion, 2026-04-28)
 **Created:** 2026-04-20
 **Severity:** low (edge-case, not a user-common path)
-**Related:** decision 0049, v0.6.17 release PR
-**Next step:** `/orb:discovery` to reproduce + locate the cause, then `/orb:spec` once a fix direction is chosen (rule vs retrain)
+**Related:** decision 0049, v0.6.17 release PR, MADR 0069 (v19 promotion)
+**Resolution:** verified fixed on `models/default → sherlock-v19-relu-s42`; regression test added in `crates/finetype-cli/tests/cli_golden.rs::golden_infer_n1_email_column`. No spec.yaml, no rule, no retrain — the model improvement carried the fix.
 
 ## Context
 
