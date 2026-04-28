@@ -169,8 +169,13 @@ enum Commands {
         hierarchical: bool,
     },
 
-    /// Show taxonomy information
+    /// Show taxonomy information (optionally filtered to a single type or glob)
     Taxonomy {
+        /// Type key (e.g., "identity.person.email") or glob pattern
+        /// ("identity.person.*"). When supplied, --domain / --category /
+        /// --priority filters are ignored.
+        type_key: Option<String>,
+
         /// Taxonomy file or directory
         #[arg(short, long, default_value = "labels")]
         file: PathBuf,
@@ -187,39 +192,13 @@ enum Commands {
         #[arg(long)]
         priority: Option<u8>,
 
-        /// Output format (plain, json, csv)
+        /// Output format (plain, json, csv, json-schema)
         #[arg(short, long, default_value = "plain")]
         output: OutputFormat,
 
         /// Export all fields (description, validation, samples, etc.)
         #[arg(long)]
         full: bool,
-    },
-
-    /// Export JSON Schema for a type or table
-    Schema {
-        /// Type key (e.g., "identity.person.email"), glob pattern ("identity.person.*"), or CSV file path
-        type_key: String,
-
-        /// Taxonomy file or directory
-        #[arg(short, long, default_value = "labels")]
-        file: PathBuf,
-
-        /// Pretty-print JSON output
-        #[arg(long)]
-        pretty: bool,
-
-        /// Include observed data statistics (min, max, cardinality, null rate) — table mode only
-        #[arg(long)]
-        stats: bool,
-
-        /// Print to stdout instead of writing sidecar file — table mode only
-        #[arg(long)]
-        stdout: bool,
-
-        /// Cardinality threshold for ENUM columns (0 = disable) — table mode only
-        #[arg(long, default_value = "50")]
-        enum_threshold: usize,
     },
 
     /// Generate runnable DuckDB CTAS from file profiling
@@ -597,49 +576,14 @@ fn main() -> Result<()> {
         ),
 
         Commands::Taxonomy {
+            type_key,
             file,
             domain,
             category,
             priority,
             output,
             full,
-        } => cmd_taxonomy(file, domain, category, priority, output, full),
-
-        Commands::Schema {
-            type_key,
-            file,
-            pretty,
-            stats,
-            stdout,
-            enum_threshold,
-        } => {
-            // Detect if type_key is a file path (CSV/TSV/Parquet) or a type key
-            let input_path = Path::new(&type_key);
-            let is_file = input_path.exists()
-                && input_path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(|e| {
-                        matches!(
-                            e.to_lowercase().as_str(),
-                            "csv" | "tsv" | "parquet" | "json" | "ndjson" | "jsonl"
-                        )
-                    })
-                    .unwrap_or(false);
-
-            if is_file {
-                cmd_schema_table(
-                    input_path.to_path_buf(),
-                    file,
-                    pretty,
-                    stats,
-                    stdout,
-                    enum_threshold,
-                )
-            } else {
-                cmd_schema(type_key, file, pretty)
-            }
-        }
+        } => cmd_taxonomy(type_key, file, domain, category, priority, output, full),
 
         Commands::Load {
             file,
@@ -2431,6 +2375,7 @@ impl TrainingManifest<'_> {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn cmd_taxonomy(
+    type_key: Option<String>,
     file: PathBuf,
     domain: Option<String>,
     category: Option<String>,
@@ -2440,30 +2385,85 @@ fn cmd_taxonomy(
 ) -> Result<()> {
     let taxonomy = load_taxonomy(&file)?;
 
-    // Collect matching definitions
-    let mut defs: Vec<(&String, &finetype_core::Definition)> =
-        if let (Some(dom), Some(cat)) = (&domain, &category) {
-            taxonomy.by_category(dom, cat)
-        } else if let Some(dom) = &domain {
-            taxonomy.by_domain(dom)
-        } else if let Some(prio) = priority {
-            taxonomy.at_priority(prio)
+    // Collect matching definitions. A positional KEY takes precedence
+    // over --domain / --category / --priority filters and uses the same
+    // exact-match-or-glob predicate previously implemented in
+    // `cmd_schema` (card 0006 absorbs that path).
+    let mut defs: Vec<(&String, &finetype_core::Definition)> = if let Some(key) = &type_key {
+        if key.contains('*') {
+            // Glob: support "domain.*", "domain.category.*", "*", etc.
+            let prefix = key.trim_end_matches(".*").trim_end_matches('*');
+            taxonomy
+                .definitions()
+                .filter(|(k, _)| {
+                    if prefix.is_empty() {
+                        true
+                    } else {
+                        k.starts_with(prefix)
+                            && (k.len() == prefix.len()
+                                || k.as_bytes().get(prefix.len()) == Some(&b'.'))
+                    }
+                })
+                .collect()
         } else {
-            taxonomy.definitions().collect()
-        };
+            // Exact match — exit 1 with edit-distance suggestions on miss.
+            match taxonomy.get(key) {
+                Some(_) => taxonomy
+                    .definitions()
+                    .filter(|(k, _)| k.as_str() == key.as_str())
+                    .collect(),
+                None => {
+                    let mut suggestions: Vec<(&String, usize)> = taxonomy
+                        .definitions()
+                        .map(|(k, _)| (k, levenshtein_distance(key, k)))
+                        .collect();
+                    suggestions.sort_by_key(|(_, d)| *d);
+                    suggestions.truncate(5);
 
-    // Apply priority filter even when domain/category is set
-    if let Some(prio) = priority {
-        defs.retain(|(_, d)| d.release_priority >= prio);
+                    eprintln!("Error: unknown type '{}'", key);
+                    if !suggestions.is_empty() {
+                        eprintln!("\nDid you mean:");
+                        for (s, _) in &suggestions {
+                            eprintln!("  {}", s);
+                        }
+                    }
+                    std::process::exit(1);
+                }
+            }
+        }
+    } else if let (Some(dom), Some(cat)) = (&domain, &category) {
+        taxonomy.by_category(dom, cat)
+    } else if let Some(dom) = &domain {
+        taxonomy.by_domain(dom)
+    } else if let Some(prio) = priority {
+        taxonomy.at_priority(prio)
+    } else {
+        taxonomy.definitions().collect()
+    };
+
+    // Apply priority filter on top of domain/category. Skipped when a
+    // positional KEY is supplied (the KEY is authoritative — it pins to
+    // a single type or a glob and ignores priority).
+    if type_key.is_none() {
+        if let Some(prio) = priority {
+            defs.retain(|(_, d)| d.release_priority >= prio);
+        }
     }
 
     defs.sort_by_key(|(k, _)| (*k).clone());
 
+    // Glob-with-zero-matches under positional KEY gets the same exit-1
+    // contract as exact-key-with-zero-matches (already handled above).
+    if type_key.is_some() && defs.is_empty() {
+        eprintln!(
+            "Error: no types matching '{}'",
+            type_key.as_deref().unwrap_or("")
+        );
+        std::process::exit(1);
+    }
+
     match output {
-        OutputFormat::Plain
-        | OutputFormat::Markdown
-        | OutputFormat::Arrow
-        | OutputFormat::JsonSchema => {
+        OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
             println!("Domains: {:?}", taxonomy.domains());
             println!("Total labels: {}", taxonomy.len());
             if let Some(dom) = &domain {
@@ -2517,6 +2517,16 @@ fn cmd_taxonomy(
                     def.title.as_deref().unwrap_or("")
                 );
             }
+        }
+        OutputFormat::JsonSchema => {
+            // ac-03: per-type JSON Schema export, always-array shape
+            // (even single matches) — matches `taxonomy`'s other output
+            // formats. Pretty-print is unconditional, as with `Json`.
+            let schemas: Vec<serde_json::Value> = defs
+                .iter()
+                .map(|(key, def)| json_schema::emit_type_schema(key, def))
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&schemas)?);
         }
     }
 
@@ -2592,376 +2602,6 @@ fn definition_to_full_json(key: &str, d: &finetype_core::Definition) -> serde_js
     }
 
     serde_json::Value::Object(obj)
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SCHEMA — Export JSON Schema for types
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn cmd_schema(type_key: String, file: PathBuf, pretty: bool) -> Result<()> {
-    let taxonomy = load_taxonomy(&file)?;
-
-    // Collect matching definitions: exact match or glob
-    let matches: Vec<(&String, &finetype_core::Definition)> = if type_key.contains('*') {
-        // Glob pattern — support "domain.*", "domain.category.*", "*.category.*"
-        let prefix = type_key.trim_end_matches(".*").trim_end_matches('*');
-        let mut matched: Vec<_> = taxonomy
-            .definitions()
-            .filter(|(k, _)| {
-                if prefix.is_empty() {
-                    true // "*" matches all
-                } else {
-                    k.starts_with(prefix)
-                        && (k.len() == prefix.len()
-                            || k.as_bytes().get(prefix.len()) == Some(&b'.'))
-                }
-            })
-            .collect();
-        matched.sort_by_key(|(k, _)| (*k).clone());
-        matched
-    } else {
-        // Exact match
-        match taxonomy.get(&type_key) {
-            Some(_) => taxonomy
-                .definitions()
-                .filter(|(k, _)| k.as_str() == type_key)
-                .collect(),
-            None => {
-                // Suggest similar types by edit distance
-                let mut suggestions: Vec<(&String, usize)> = taxonomy
-                    .definitions()
-                    .map(|(k, _)| (k, levenshtein_distance(&type_key, k)))
-                    .collect();
-                suggestions.sort_by_key(|(_, d)| *d);
-                suggestions.truncate(5);
-
-                eprintln!("Error: unknown type '{}'", type_key);
-                if !suggestions.is_empty() {
-                    eprintln!("\nDid you mean:");
-                    for (s, _) in &suggestions {
-                        eprintln!("  {}", s);
-                    }
-                }
-                std::process::exit(1);
-            }
-        }
-    };
-
-    if matches.is_empty() {
-        eprintln!("No types matching '{}'", type_key);
-        std::process::exit(1);
-    }
-
-    let schemas: Vec<serde_json::Value> = matches
-        .iter()
-        .map(|(key, def)| build_json_schema(key, def))
-        .collect();
-
-    let output = if schemas.len() == 1 {
-        &schemas[0]
-    } else {
-        // Multiple results — wrap in array
-        &serde_json::Value::Array(schemas.clone())
-    };
-
-    let json_str = if pretty {
-        serde_json::to_string_pretty(output)?
-    } else {
-        serde_json::to_string(output)?
-    };
-    println!("{}", json_str);
-
-    Ok(())
-}
-
-/// Build an enriched JSON Schema document for a type definition.
-fn build_json_schema(key: &str, def: &finetype_core::Definition) -> serde_json::Value {
-    let mut schema = serde_json::Map::new();
-
-    // Standard JSON Schema metadata
-    schema.insert(
-        "$schema".into(),
-        json!("https://json-schema.org/draft/2020-12/schema"),
-    );
-    schema.insert(
-        "$id".into(),
-        json!(format!("https://meridian.online/schemas/{}", key)),
-    );
-
-    if let Some(title) = &def.title {
-        schema.insert("title".into(), json!(title));
-    }
-    if let Some(desc) = &def.description {
-        schema.insert("description".into(), json!(desc.trim()));
-    }
-
-    // Merge validation keywords from the type's validation schema
-    if let Some(validation) = &def.validation {
-        let val_schema = validation.to_json_schema();
-        if let serde_json::Value::Object(val_obj) = val_schema {
-            for (k, v) in val_obj {
-                schema.insert(k, v);
-            }
-        }
-    } else {
-        // No validation — default to string type
-        schema.insert("type".into(), json!("string"));
-    }
-
-    // Add examples from samples
-    if !def.samples.is_empty() {
-        schema.insert("examples".into(), to_json_value(&def.samples));
-    }
-
-    // FineType extension fields (x-finetype-* prefix)
-    //
-    // Verbosity reduction (v0.6.19, MADR 0042 line of work): broad_type, transform,
-    // transform_ext, and format_string are derivable from `x-finetype-label` plus the
-    // bundled taxonomy and so are no longer emitted. Downstream consumers that need
-    // them should look up the label in the taxonomy directly. `x-finetype-label`
-    // and `x-finetype-pii` are retained because they are the contract between
-    // schema producers and validate/load consumers.
-    schema.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
-
-    serde_json::Value::Object(schema)
-}
-
-/// Generate a table-level JSON Schema from a CSV file by profiling all columns.
-///
-/// Profiles the file using the same inference pipeline as `cmd_profile`, then
-/// builds a JSON Schema document with per-column properties derived from taxonomy
-/// definitions. Writes to `<input>.schema.json` by default, or stdout with `--stdout`.
-#[allow(clippy::too_many_arguments)]
-fn cmd_schema_table(
-    input: PathBuf,
-    taxonomy_path: PathBuf,
-    pretty: bool,
-    stats: bool,
-    to_stdout: bool,
-    enum_threshold: usize,
-) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
-
-    let model = resolve_model_path();
-
-    // Load model + taxonomy (same setup as cmd_profile)
-    eprintln!("Loading model from {:?}", model);
-    let config = ColumnConfig {
-        sample_size: 100,
-        ..Default::default()
-    };
-    let mut column_classifier = if let Ok(mb) = load_multi_branch_classifier(&model) {
-        eprintln!(
-            "Loaded multi-branch classifier ({} classes)",
-            mb.n_classes()
-        );
-        let mut cc = ColumnClassifier::with_multi_branch(mb, config);
-        wire_model2vec_and_siblings(&mut cc);
-        cc
-    } else {
-        eprintln!("No multi-branch model found, falling back to CharCNN");
-        let classifier: Box<dyn ValueClassifier> = Box::new(load_char_classifier(&model)?);
-        if let Some(semantic) = load_semantic_hint() {
-            eprintln!("Loaded semantic hint classifier (Model2Vec)");
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-            if let Some(entity) = entity {
-                eprintln!("Loaded entity classifier (full_name demotion gate)");
-                cc.set_entity_classifier(entity);
-            }
-            wire_sense(&mut cc);
-            wire_sibling_context(&mut cc);
-            cc
-        } else {
-            let mut cc = ColumnClassifier::new(classifier, config);
-            wire_sense(&mut cc);
-            wire_sibling_context(&mut cc);
-            cc
-        }
-    };
-
-    // Load taxonomy for validation-based attractor demotion + schema enrichment
-    let taxonomy_path_labels = std::path::PathBuf::from("labels");
-    let enrichment_taxonomy = if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path_labels) {
-        taxonomy.compile_validators();
-        taxonomy.compile_locale_validators();
-        eprintln!("Loaded taxonomy ({} types)", taxonomy.labels().len());
-        column_classifier.set_taxonomy(taxonomy.clone());
-        taxonomy
-    } else {
-        load_taxonomy(&taxonomy_path)?
-    };
-
-    // Read the input file
-    eprintln!("Reading {:?}", input);
-    let (headers, columns, row_count) = read_csv_input(&input, None)?;
-    eprintln!("Read {} rows, {} columns", row_count, headers.len());
-
-    // Classify columns with sibling context if available.
-    //
-    // Note: confidence is intentionally not retained on ColResult.
-    // v0.6.19 dropped `x-finetype-confidence` from the emitted schema
-    // (verbosity reduction); no other table-mode consumer reads it.
-    struct ColResult {
-        name: String,
-        label: String,
-        values: Vec<String>,
-        null_count: usize,
-    }
-
-    let mut col_results: Vec<ColResult> = Vec::new();
-
-    if column_classifier.has_sibling_context() {
-        // Build context inputs for all non-empty columns
-        let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new();
-
-        for (i, col_values) in columns.iter().enumerate() {
-            let name = headers
-                .get(i)
-                .cloned()
-                .unwrap_or_else(|| format!("col_{}", i));
-            let null_count = row_count - col_values.len();
-
-            if col_values.is_empty() {
-                col_results.push(ColResult {
-                    name,
-                    label: "unknown".to_string(),
-                    values: vec![],
-                    null_count,
-                });
-            } else {
-                col_inputs.push((i, col_values.clone(), name.clone(), name, null_count));
-            }
-        }
-
-        let context_columns: Vec<(Vec<String>, String)> = col_inputs
-            .iter()
-            .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
-            .collect();
-        let context_results = column_classifier.classify_columns_with_context(&context_columns)?;
-
-        // Merge back in order
-        let mut ordered: Vec<(usize, ColResult)> = Vec::new();
-        // Add empty columns at their original indices
-        let _empty_idx = 0;
-        for (i, col_values) in columns.iter().enumerate() {
-            if col_values.is_empty() {
-                // Already pushed to col_results above; track index
-                ordered.push((
-                    i,
-                    ColResult {
-                        name: headers
-                            .get(i)
-                            .cloned()
-                            .unwrap_or_else(|| format!("col_{}", i)),
-                        label: "unknown".to_string(),
-                        values: vec![],
-                        null_count: row_count,
-                    },
-                ));
-            }
-        }
-        for ((idx, values, _, name, null_count), result) in
-            col_inputs.into_iter().zip(context_results)
-        {
-            ordered.push((
-                idx,
-                ColResult {
-                    name,
-                    label: result.label,
-                    values,
-                    null_count,
-                },
-            ));
-        }
-        ordered.sort_by_key(|(idx, _)| *idx);
-        col_results = ordered.into_iter().map(|(_, r)| r).collect();
-    } else {
-        // Per-column classification
-        for (i, col_values) in columns.iter().enumerate() {
-            let name = headers
-                .get(i)
-                .cloned()
-                .unwrap_or_else(|| format!("col_{}", i));
-            let null_count = row_count - col_values.len();
-
-            if col_values.is_empty() {
-                col_results.push(ColResult {
-                    name,
-                    label: "unknown".to_string(),
-                    values: vec![],
-                    null_count,
-                });
-                continue;
-            }
-
-            let result = column_classifier.classify_column_with_header(col_values, &name)?;
-
-            col_results.push(ColResult {
-                name,
-                label: result.label,
-                values: col_values.clone(),
-                null_count,
-            });
-        }
-    }
-
-    // Build the table-level JSON Schema via the shared helper.
-    // (Card 0006 will delete cmd_schema_table; until then both the legacy
-    // schema verb and the new `profile -o json-schema` route through this
-    // single emitter so output stays byte-identical.)
-    let file_stem = input
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("table");
-    let file_name = input
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("data.csv");
-
-    let cols: Vec<json_schema::TableSchemaColumn<'_>> = col_results
-        .iter()
-        .map(|c| json_schema::TableSchemaColumn {
-            name: &c.name,
-            label: &c.label,
-            values: &c.values,
-            null_count: c.null_count,
-        })
-        .collect();
-
-    let schema_value = json_schema::emit_table_schema(
-        &cols,
-        file_stem,
-        file_name,
-        &enrichment_taxonomy,
-        stats,
-        enum_threshold,
-    );
-
-    let json_str = if pretty {
-        serde_json::to_string_pretty(&schema_value)?
-    } else {
-        serde_json::to_string(&schema_value)?
-    };
-
-    if to_stdout {
-        println!("{}", json_str);
-    } else {
-        // Write to sidecar file: <input>.schema.json
-        let output_path = input.with_extension("schema.json");
-        // Handle case where input already has an extension (e.g., data.csv → data.schema.json)
-        let output_path = if input.extension().is_some() {
-            let mut name = input.file_stem().unwrap().to_os_string();
-            name.push(".schema.json");
-            input.with_file_name(name)
-        } else {
-            output_path
-        };
-        std::fs::write(&output_path, &json_str)?;
-        eprintln!("Wrote table schema to {:?}", output_path);
-    }
-
-    Ok(())
 }
 
 /// Simple Levenshtein distance for type name suggestions.

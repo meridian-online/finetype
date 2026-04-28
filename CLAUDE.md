@@ -174,7 +174,7 @@ All tools return JSON primary content + markdown summary. File tools accept `pat
 
 #### Public vs internal CLI surface
 
-As of v0.6.19, `finetype --help` lists **only the 7 public commands**.
+As of v0.6.19, `finetype --help` lists **only the 6 public commands**.
 Hidden subcommands stay callable for internal use (CI, training data
 prep, sweep wrappers, eval scripts) but never appear in the help
 surface — they're not part of the stable contract and may move or
@@ -183,8 +183,7 @@ change shape between minor versions without a deprecation cycle.
 ```
 | Tier            | Commands                                                       |
 |-----------------|----------------------------------------------------------------|
-| Public (v0.6.19)| `infer`, `profile`, `schema`, `validate`, `load`, `mcp`,       |
-|                 | `taxonomy`                                                     |
+| Public (v0.6.19)| `infer`, `profile`, `validate`, `load`, `mcp`, `taxonomy`      |
 | Internal (hidden)| `check`, `generate`, `train`, `train-multi-branch`,           |
 |                  | `eval`, `infer-batch`                                         |
 ```
@@ -204,11 +203,10 @@ section below.
 |---|---|
 | `finetype infer` | Classify values (single/column/batch mode) |
 | `finetype profile <file>` | Profile all columns in CSV/Parquet (`-o plain\|json\|csv\|markdown\|arrow`, `--enum-threshold N`, `--verbose`) |
-| `finetype taxonomy` | Print taxonomy summary (`--full --output json` for all fields) |
-| `finetype schema <key\|file>` | Type-level JSON Schema (by key/glob) or table-level (by file path, `--stats`, `--stdout`). Schema export carries only `x-finetype-label` + `x-finetype-pii` extensions; derivable fields (broad-type, transform, format-string, transform-ext, domain, confidence) are dropped from emitted JSON Schema. |
+| `finetype taxonomy [KEY]` | Print taxonomy summary, or filter to a single type / glob (`KEY` = `identity.person.email` or `identity.person.*`). Output formats: `-o plain\|json\|csv\|json-schema`. Per-type JSON Schema export (formerly the `schema KEY` verb) lives here in v0.6.19+; output is always a JSON array even for single matches. Schema export carries only `x-finetype-label` + `x-finetype-pii` extensions. |
 | `finetype validate <file> <schema>` | Schema-driven quality gate. Defaults to **check-only mode** — runs the validation engine, prints a summary, exits 0/1/2 (no rejects / rejects / error). Pass `--db <out.db> --table <name>` to also materialise valid rows + `finetype_reject_errors` sidecar (13-col DuckDB `reject_errors` shape + FineType extensions `type_confidence`, `expected_type`, `constraint_failed`, `constraint_value`). Flags: `--append` (reuse db, scan_id++; requires `--db`), `--lenient` (force exit 0). Materialise mode requires `duckdb` on PATH. See MADR 0064. |
 | `finetype load <file>` | Profile → runnable DuckDB CTAS (`--table-name`, `--limit N`, `--no-normalize-names`, `--enum-threshold N`) |
-| `finetype mcp` | Start MCP server over stdio (8 tools: profile, infer, ddl, taxonomy, schema, validate, generate) |
+| `finetype mcp` | Start MCP server over stdio (8 tools: profile, infer, ddl, taxonomy, schema, validate, generate). MCP audit follow-up in v0.6.20 will mirror the CLI fold of `schema` from card 0006 / MADR 0070. |
 | `finetype check` *(hidden)* | Validate taxonomy ↔ generator alignment. Used by `make ci`. |
 | `finetype generate` *(hidden)* | Generate synthetic training data. Used by training data prep. |
 | `finetype train` *(hidden)* | Train CharCNN models (flat/tiered). `--seed N` for deterministic. Auto-snapshots. |

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- **Retire the schema verb (v0.6.19, MADR 0070)** — The standalone
+  `finetype schema` verb is gone. JSON Schema export migrates to its
+  two natural homes:
+
+  - `finetype schema KEY` → `finetype taxonomy KEY -o json-schema`
+  - `finetype schema FILE.csv` → `finetype profile -f FILE.csv -o json-schema`
+
+  `finetype taxonomy` gains a positional `KEY` argument with the same
+  exact-match-or-glob predicate the retired verb used, plus
+  edit-distance suggestions on unknown keys. The new `json-schema`
+  output format always emits a JSON array (even for single matches),
+  matching `taxonomy`'s other output formats. Pretty-printing is
+  unconditional — the old `--pretty` flag is gone. The MCP `schema`
+  tool's type-key branch is retained for v0.6.19; the v0.6.20 audit
+  will mirror the CLI fold. See MADR 0070 (supersedes MADR 0031).
+
+### Changed
+
+- **`x-finetype-label` now emitted on type-mode JSON Schema** — The
+  pre-existing `schema KEY` verb only emitted `x-finetype-pii` on
+  per-type schemas. The new `taxonomy KEY -o json-schema` emits BOTH
+  `x-finetype-label` and `x-finetype-pii`, matching the verbosity
+  contract from PR #51 / table-mode export. Both surfaces now carry
+  both extensions; downstream consumers reading type-mode schemas can
+  rely on the label being present.
+
 ## [0.6.15] - 2026-04-14
 
 ### Fixed

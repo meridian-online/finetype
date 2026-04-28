@@ -1,4 +1,12 @@
 //! `schema` tool — export JSON Schema for a type or a CSV file.
+//!
+//! MCP audit follow-up in v0.6.20: the CLI `schema` verb was retired in
+//! v0.6.19 (card 0006 / MADR 0070) — type-mode migrated to
+//! `taxonomy KEY -o json-schema`, table-mode to `profile -f FILE -o json-schema`.
+//! This MCP tool's type-key branch is RETAINED for v0.6.19 per the
+//! visibility-cleanup carve-out (memo 2026-04-27-mcp-surface-audit
+//! line 116). The v0.6.20 audit will mirror the CLI fold and surface
+//! the equivalent migration on the MCP side.
 
 use crate::FineTypeServer;
 use rmcp::model::{CallToolResult, ErrorData};

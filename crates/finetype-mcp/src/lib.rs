@@ -140,6 +140,13 @@ impl ServerHandler for FineTypeServer {
                 .build(),
         )
         .with_server_info(Implementation::from_build_env())
+        // MCP audit follow-up in v0.6.20: card 0006 retired the CLI
+        // `schema` verb (type-mode → `taxonomy KEY -o json-schema`,
+        // table-mode → `profile -f FILE -o json-schema`). The MCP
+        // `schema` tool's type-key branch is RETAINED for v0.6.19 per
+        // the visibility-cleanup carve-out (memo
+        // 2026-04-27-mcp-surface-audit). The v0.6.20 audit will mirror
+        // the CLI fold and remove the asymmetry surfaced here.
         .with_instructions(
             "FineType — semantic type inference engine for tabular data.\n\n\
              Tools: profile (file -> column types), infer (values -> type), ddl (file -> CREATE TABLE), \

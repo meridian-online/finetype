@@ -139,32 +139,47 @@ fn run_infer_json(input: &str, mode: &str) -> Value {
     })
 }
 
-/// Run `finetype schema <key> --pretty` and return parsed JSON.
-fn run_schema_json(type_key: &str) -> Value {
+/// Run `finetype taxonomy <key> -o json-schema` and return the first
+/// schema object from the always-array output.
+///
+/// The schema verb was retired in v0.6.19 (card 0006) — type-mode export
+/// now lives on `taxonomy KEY -o json-schema`. Output is always a JSON
+/// array; tests project to `[0]` to keep the per-schema assertion bodies
+/// unchanged.
+fn run_taxonomy_json_schema(type_key: &str) -> Value {
     let output = Command::new("cargo")
         .args([
             "run",
             "-p",
             "finetype-cli",
             "--",
-            "schema",
+            "taxonomy",
             type_key,
-            "--pretty",
+            "-o",
+            "json-schema",
         ])
         .current_dir(workspace_root())
         .output()
-        .expect("failed to run finetype schema");
+        .expect("failed to run finetype taxonomy");
 
     assert!(
         output.status.success(),
-        "schema failed: {}",
+        "taxonomy json-schema failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 
     let stdout = String::from_utf8(output.stdout).expect("invalid utf8");
-    serde_json::from_str(&stdout).unwrap_or_else(|e| {
-        panic!("failed to parse schema JSON: {e}\nOutput: {stdout}");
-    })
+    let array: Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("failed to parse taxonomy json-schema output: {e}\nOutput: {stdout}");
+    });
+    let arr = array
+        .as_array()
+        .expect("taxonomy -o json-schema should always emit an array");
+    assert!(
+        !arr.is_empty(),
+        "taxonomy {type_key} -o json-schema returned an empty array"
+    );
+    arr[0].clone()
 }
 
 /// Extract column profiles as a vec of (column_name, type_label, broad_type).
@@ -630,13 +645,17 @@ fn golden_taxonomy_domains() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SCHEMA GOLDEN TESTS
+// TAXONOMY JSON-SCHEMA GOLDEN TESTS — v0.6.19 (card 0006)
 // ═══════════════════════════════════════════════════════════════════════════════
+//
+// Type-mode JSON Schema export migrated from the retired `schema KEY` verb to
+// `taxonomy KEY -o json-schema`. Output is always a JSON array; tests project
+// to `[0]` via run_taxonomy_json_schema().
 
 #[test]
 #[ignore]
-fn golden_schema_email() {
-    let schema = run_schema_json("identity.person.email");
+fn golden_taxonomy_json_schema_email() {
+    let schema = run_taxonomy_json_schema("identity.person.email");
 
     // JSON Schema required fields
     assert!(
@@ -653,10 +672,18 @@ fn golden_schema_email() {
         "email schema should have pattern"
     );
 
-    // FineType extension fields — v0.6.19 reduced schema surface keeps
-    // only x-finetype-label + x-finetype-pii. Derivable fields
-    // (broad-type, transform, format-string, transform-ext) were dropped
-    // per the schema verbosity reduction.
+    // FineType extension fields — v0.6.19 type-mode now carries BOTH
+    // `x-finetype-label` and `x-finetype-pii` (matching table-mode's
+    // verbosity contract from PR #51). The pre-existing `schema KEY`
+    // verb only emitted `x-finetype-pii`; the migration to
+    // `taxonomy KEY -o json-schema` adds the label extension. Other
+    // derivable fields (broad-type, transform, format-string,
+    // transform-ext, domain, confidence) remain dropped per PR #51.
+    assert_eq!(
+        schema["x-finetype-label"].as_str(),
+        Some("identity.person.email"),
+        "x-finetype-label should equal the queried key (added in v0.6.19)"
+    );
     assert_eq!(
         schema["x-finetype-pii"].as_bool(),
         Some(true),
@@ -737,14 +764,20 @@ fn golden_infer_n1_ipv4_column() {
 
 #[test]
 #[ignore]
-fn golden_schema_iso_date() {
-    let schema = run_schema_json("datetime.date.iso");
+fn golden_taxonomy_json_schema_iso_date() {
+    let schema = run_taxonomy_json_schema("datetime.date.iso");
 
     assert_eq!(schema["type"].as_str(), Some("string"));
     assert!(schema["pattern"].is_string());
 
-    // v0.6.19 reduced schema surface — broad-type dropped. PII flag
-    // (false here) is the only retained extension besides label.
+    // v0.6.19 type-mode carries label + pii both. Derivable fields
+    // (broad-type, transform, format-string, transform-ext, domain,
+    // confidence) remain dropped.
+    assert_eq!(
+        schema["x-finetype-label"].as_str(),
+        Some("datetime.date.iso"),
+        "x-finetype-label should equal the queried key (added in v0.6.19)"
+    );
     assert_eq!(
         schema["x-finetype-pii"].as_bool(),
         Some(false),

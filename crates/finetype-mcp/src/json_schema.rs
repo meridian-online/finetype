@@ -1,17 +1,21 @@
-//! Shared helper for emitting table-level JSON Schema documents.
+//! Shared helpers for emitting JSON Schema documents.
 //!
-//! All three call sites route through `emit_table_schema()` so the output
-//! stays byte-identical across surfaces:
+//! Two emitters live here, one per shape:
 //!
-//! - CLI `profile -o json-schema` (card 0003)
-//! - CLI `cmd_schema_table` (legacy `finetype schema <file.csv>`, retained
-//!   through v0.6.19 only — card 0006 deletes it)
-//! - MCP `profile` tool's `format: "json-schema"` branch (card 0003)
+//! - `emit_table_schema()` — table-level, one schema per CSV/Parquet file.
+//!   Call sites: CLI `profile -o json-schema` (card 0003), MCP `profile`
+//!   tool's `format: "json-schema"` branch (card 0003).
+//! - `emit_type_schema()` — per-type, one schema per taxonomy definition.
+//!   Call sites: CLI `taxonomy KEY -o json-schema` (card 0006), MCP
+//!   `schema` tool's type-key branch.
 //!
-//! The helper lives in `finetype-mcp` because both `finetype-cli` (which
-//! depends on this crate) and the MCP tools need it, and the rally
-//! deliberately keeps it out of `finetype-core` for v0.6.19. Card 0006
-//! may revisit the home if type-mode export grows beyond CLI-only use.
+//! Both emitters share the verbosity contract below — exactly two
+//! `x-finetype-*` extensions on emitted schemas (`x-finetype-label` and
+//! `x-finetype-pii`).
+//!
+//! The helpers live in `finetype-mcp` because both `finetype-cli` (which
+//! depends on this crate) and the MCP tools need them, and the rally
+//! deliberately keeps them out of `finetype-core` for v0.6.19.
 //!
 //! ## Verbosity contract (PR #51)
 //!
@@ -29,7 +33,7 @@
 //! extensions. Stats are observed-from-the-input numbers, not part of
 //! the type contract, and live outside the verbosity contract above.
 
-use finetype_core::Taxonomy;
+use finetype_core::{Definition, Taxonomy};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
@@ -191,5 +195,128 @@ fn attach_stats(
         let mut enum_vals: Vec<&str> = unique.into_iter().collect();
         enum_vals.sort();
         prop.insert("enum".into(), json!(enum_vals));
+    }
+}
+
+/// Emit a per-type JSON Schema document for a single taxonomy definition.
+///
+/// Used by `taxonomy KEY -o json-schema` (CLI, card 0006) and the MCP
+/// `schema` tool's type-key branch. The emitter merges validation
+/// keywords from the taxonomy definition (pattern, type, minLength, etc.)
+/// alongside the `$schema` / `$id` / `title` / `description` envelope and
+/// surfaces sample values as JSON Schema `examples`.
+///
+/// Verbosity contract (PR #51, extended to type-mode in card 0006): the
+/// returned schema carries exactly two `x-finetype-*` extensions —
+/// `x-finetype-label` (the canonical type key) and `x-finetype-pii`
+/// (boolean from the taxonomy). The pre-existing CLI emitter only
+/// surfaced `x-finetype-pii`; card 0006 adds `x-finetype-label` so both
+/// emitter surfaces match. Other extensions (broad-type, transform,
+/// transform-ext, format-string, domain, confidence) are derivable from
+/// the label plus the bundled taxonomy and are deliberately omitted.
+pub fn emit_type_schema(label: &str, def: &Definition) -> Value {
+    let mut schema = serde_json::Map::new();
+
+    schema.insert(
+        "$schema".into(),
+        json!("https://json-schema.org/draft/2020-12/schema"),
+    );
+    schema.insert(
+        "$id".into(),
+        json!(format!("https://meridian.online/schemas/{}", label)),
+    );
+
+    if let Some(title) = &def.title {
+        schema.insert("title".into(), json!(title));
+    }
+    if let Some(desc) = &def.description {
+        schema.insert("description".into(), json!(desc.trim()));
+    }
+
+    // Merge validation keywords from the type's validation schema.
+    if let Some(validation) = &def.validation {
+        let val_schema = validation.to_json_schema();
+        if let Value::Object(val_obj) = val_schema {
+            for (k, v) in val_obj {
+                schema.insert(k, v);
+            }
+        }
+    } else {
+        // No validation — default to plain string.
+        schema.insert("type".into(), json!("string"));
+    }
+
+    // Examples from the definition's sample list (when present).
+    if !def.samples.is_empty() {
+        if let Ok(samples) = serde_json::to_value(&def.samples) {
+            schema.insert("examples".into(), samples);
+        }
+    }
+
+    // Verbosity contract: label + pii only.
+    schema.insert("x-finetype-label".into(), json!(label));
+    schema.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
+
+    Value::Object(schema)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn labels_path() -> PathBuf {
+        // Walk up from CARGO_MANIFEST_DIR (crates/finetype-mcp) to
+        // workspace root, then into `labels`.
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest.parent().unwrap().parent().unwrap().join("labels")
+    }
+
+    #[test]
+    fn emit_type_schema_email_carries_label_and_pii_only() {
+        let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
+        let def = taxonomy
+            .get("identity.person.email")
+            .expect("email definition present");
+
+        let schema = emit_type_schema("identity.person.email", def);
+
+        // Envelope present.
+        assert!(
+            schema.get("$schema").and_then(|v| v.as_str()).is_some(),
+            "$schema should be set"
+        );
+        assert!(
+            schema.get("$id").and_then(|v| v.as_str()).is_some(),
+            "$id should be set"
+        );
+
+        // Verbosity-contract extensions present.
+        assert_eq!(
+            schema.get("x-finetype-label").and_then(|v| v.as_str()),
+            Some("identity.person.email"),
+            "x-finetype-label should equal the queried key"
+        );
+        assert_eq!(
+            schema.get("x-finetype-pii").and_then(|v| v.as_bool()),
+            Some(true),
+            "email is PII"
+        );
+
+        // Dropped extensions absent (verbosity contract from PR #51).
+        for dropped in [
+            "x-finetype-broad-type",
+            "x-finetype-transform",
+            "x-finetype-transform-ext",
+            "x-finetype-format-string",
+            "x-finetype-domain",
+            "x-finetype-confidence",
+        ] {
+            assert!(
+                schema.get(dropped).is_none(),
+                "{} should not appear on emitted type schema",
+                dropped
+            );
+        }
     }
 }

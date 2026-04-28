@@ -37,32 +37,33 @@ finetype profile -f <FILE> [OPTIONS]
 
 ---
 
-### `finetype schema`
+### JSON Schema export — type-mode and table-mode
 
-Export JSON Schema for a type key or CSV file.
+**v0.6.19 surface change:** the standalone `schema` verb was retired
+(MADR 0070). JSON Schema export now splits across the two natural homes:
+
+- **Type-mode** lives on `taxonomy`: `finetype taxonomy KEY -o json-schema`
+- **Table-mode** lives on `profile`: `finetype profile -f FILE -o json-schema`
 
 ```bash
-# For a single type
-finetype schema <TYPE_KEY> [OPTIONS]
+# Per-type schema (always emits a JSON array, even for single matches)
+finetype taxonomy identity.person.email -o json-schema
 
-# For a CSV file (table mode)
-finetype schema <FILE.csv> [OPTIONS]
+# Glob — every identity.person.* type
+finetype taxonomy "identity.person.*" -o json-schema
+
+# Table-level schema for a CSV (profile pipeline; supports --stats)
+finetype profile -f data.csv -o json-schema > schema.json
+finetype profile -f data.csv -o json-schema --stats > schema.json
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-f, --file <DIR>` | `labels` | Taxonomy file or directory |
-| `--pretty` | — | Pretty-print JSON output |
-| `--stats` | — | Include observed data statistics (table mode only) |
-| `--stdout` | — | Print to stdout instead of writing sidecar file (table mode only) |
-| `-m, --model <DIR>` | `models/default` | Model directory (table mode only) |
-| `--enum-threshold <N>` | `50` | Cardinality threshold for ENUM columns (table mode only) |
+Both surfaces emit only `x-finetype-label` + `x-finetype-pii` on each
+schema property (verbosity contract from PR #51 / card 0006). The
+older `--pretty` flag is gone — `taxonomy -o json-schema` and
+`profile -o json-schema` both pretty-print unconditionally.
 
-**Type key mode:** `finetype schema identity.person.email` — returns the JSON Schema for that type.
-
-**Glob mode:** `finetype schema "identity.person.*"` — returns schemas for all matching types.
-
-**Table mode:** `finetype schema data.csv` — profiles the file and writes `data.schema.json` with per-column validation rules, `x-finetype-label`, `x-finetype-broad-type`, `x-finetype-transform`, and `x-finetype-confidence`.
+The MCP `schema` tool's type-key branch is retained for v0.6.19; the
+v0.6.20 audit will mirror the CLI fold (MADR 0070).
 
 ---
 
@@ -241,14 +242,14 @@ Example: `identity.person.email`, `datetime.timestamp.iso_8601`, `finance.curren
 finetype profile -f data.csv -o json | jq '.columns[] | {name, type, confidence}'
 
 # Schema for a specific type (not a file)
-finetype schema identity.person.email --pretty
+finetype taxonomy identity.person.email -o json-schema
 
 # Quick load without quality gate
 finetype load -f data.csv | duckdb mydb.db
 
 # Full pipeline with quality gate
 finetype profile -f data.csv
-finetype schema data.csv
+finetype profile -f data.csv -o json-schema > data.schema.json
 finetype validate data.csv data.schema.json
 finetype load -f data.csv.valid.csv > load.sql
 duckdb mydb.db < load.sql
