@@ -505,3 +505,250 @@ fn test_vrp_ac12_ecommerce_end_to_end() {
     let scan = duckdb_query(&db, "SELECT MAX(scan_id) FROM finetype_reject_errors;");
     assert_eq!(scan, "1");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ac-02 / ac-03 / ac-04 — typed CTAS + TRANSFORM_FAILED + NULL-in-NULL-out
+// (validate absorbs load — spec 2026-04-28-validate-absorbs-load)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Schema with a labelled DATE column. `datetime.date.iso` carries a
+/// strptime transform and a non-VARCHAR DuckDB type, so the materialise
+/// path emits `TRY(strptime(...)::DATE) AS "delivery_date"` (per
+/// `build_transform_projection` branch 4 + `try_wrap=true`).
+const SCHEMA_TYPED_DATE: &str = r#"{
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "x-finetype-label": "identity.code.id",
+      "x-finetype-confidence": 0.99
+    },
+    "delivery_date": {
+      "type": "string",
+      "x-finetype-label": "datetime.date.iso",
+      "x-finetype-confidence": 0.97
+    }
+  }
+}"#;
+
+/// ac-03: One row's `delivery_date` contains `2024-02-30` — well-formed
+/// against the schema's pattern (10 chars, `\d{4}-\d{2}-\d{2}` if any),
+/// but DuckDB's strptime refuses it (Feb has no 30th). The pre-CTAS
+/// sweep must record a TRANSFORM_FAILED reject and exclude the row from
+/// the user table.
+#[test]
+#[ignore]
+fn test_vrp_transform_failure_emits_reject_row() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_TYPED_DATE);
+    // 3 rows: one valid, one with the impossible date, one valid.
+    let csv = write_csv(
+        tmp.path(),
+        "in.csv",
+        "order_id,delivery_date\nORD-1,2024-01-15\nORD-2,2024-02-30\nORD-3,2024-03-20\n",
+    );
+    let db = tmp.path().join("out.db");
+
+    let (code, _, stderr) = run_validate(&[
+        csv.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "--table",
+        "orders",
+    ]);
+    assert_eq!(
+        code, 1,
+        "transform-failure should produce a reject row → exit 1; stderr={stderr}"
+    );
+
+    // One TRANSFORM_FAILED reject, on delivery_date, line 3 (1-indexed,
+    // 0-based row idx=1 + 1 = 2, but engine convention is row_idx+1=3
+    // because line 1 is the CSV header — see existing reject INSERT).
+    let tf_count = duckdb_query(
+        &db,
+        "SELECT COUNT(*) FROM finetype_reject_errors \
+         WHERE error_type = 'TRANSFORM_FAILED' AND column_name = 'delivery_date';",
+    );
+    assert_eq!(tf_count, "1", "expected exactly one TRANSFORM_FAILED row");
+
+    // constraint_failed = 'transform' (extends the reject ontology).
+    let cf = duckdb_query(
+        &db,
+        "SELECT DISTINCT constraint_failed FROM finetype_reject_errors \
+         WHERE error_type = 'TRANSFORM_FAILED';",
+    );
+    assert_eq!(cf, "transform");
+
+    // constraint_value carries the original staging cell text so analysts
+    // can see what DuckDB choked on without re-reading the CSV.
+    let cv = duckdb_query(
+        &db,
+        "SELECT constraint_value FROM finetype_reject_errors \
+         WHERE error_type = 'TRANSFORM_FAILED';",
+    );
+    assert_eq!(cv, "2024-02-30");
+
+    // expected_type is the x-finetype-label, type_confidence the authored 0.97.
+    let exp = duckdb_query(
+        &db,
+        "SELECT expected_type || '|' || type_confidence FROM finetype_reject_errors \
+         WHERE error_type = 'TRANSFORM_FAILED';",
+    );
+    assert_eq!(exp, "datetime.date.iso|0.97");
+
+    // The user table excludes the failed row — 2 rows survive.
+    let user_count = duckdb_query(&db, "SELECT COUNT(*) FROM orders;");
+    assert_eq!(user_count, "2");
+
+    // …and the surviving rows are typed DATE, not VARCHAR.
+    let col_type = duckdb_query(
+        &db,
+        "SELECT data_type FROM duckdb_columns \
+         WHERE table_name = 'orders' AND column_name = 'delivery_date';",
+    );
+    assert_eq!(col_type, "DATE");
+}
+
+/// ac-04: NULL staging cells must NOT trigger TRANSFORM_FAILED. The
+/// failure predicate is `staging IS NOT NULL AND TRY(transform) IS NULL`.
+/// An empty cell becomes a NULL → typed-NULL passthrough, no reject.
+#[test]
+#[ignore]
+fn test_vrp_null_staging_passes_to_typed_null() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_TYPED_DATE);
+    // Middle row has an empty delivery_date cell.
+    let csv = write_csv(
+        tmp.path(),
+        "in.csv",
+        "order_id,delivery_date\nORD-1,2024-01-15\nORD-2,\nORD-3,2024-03-20\n",
+    );
+    let db = tmp.path().join("out.db");
+
+    let (code, _, stderr) = run_validate(&[
+        csv.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "--table",
+        "orders",
+    ]);
+    assert_eq!(
+        code, 0,
+        "NULL staging cell must NOT register a reject; stderr={stderr}"
+    );
+
+    // No TRANSFORM_FAILED rows.
+    let tf_count = duckdb_query(
+        &db,
+        "SELECT COUNT(*) FROM finetype_reject_errors \
+         WHERE error_type = 'TRANSFORM_FAILED';",
+    );
+    assert_eq!(tf_count, "0");
+
+    // All 3 rows survive in the user table.
+    let user_count = duckdb_query(&db, "SELECT COUNT(*) FROM orders;");
+    assert_eq!(user_count, "3");
+
+    // The empty cell is a typed NULL.
+    let null_dates = duckdb_query(
+        &db,
+        "SELECT COUNT(*) FROM orders WHERE delivery_date IS NULL;",
+    );
+    assert_eq!(null_dates, "1");
+}
+
+/// ac-02: A clean run (no transform failures) round-trips through the
+/// typed projection — the user table's `delivery_date` is DATE, the
+/// `order_id` column passes through as VARCHAR (its label
+/// `identity.code.id` isn't in the taxonomy → bare passthrough).
+#[test]
+#[ignore]
+fn test_vrp_typed_ctas_round_trip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = write_schema(tmp.path(), SCHEMA_TYPED_DATE);
+    let csv = write_csv(
+        tmp.path(),
+        "in.csv",
+        "order_id,delivery_date\nORD-1,2024-01-15\nORD-2,2024-03-20\n",
+    );
+    let db = tmp.path().join("out.db");
+
+    let (code, _, stderr) = run_validate(&[
+        csv.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "--table",
+        "orders",
+    ]);
+    assert_eq!(code, 0, "clean fixture should exit 0; stderr={stderr}");
+
+    let date_type = duckdb_query(
+        &db,
+        "SELECT data_type FROM duckdb_columns \
+         WHERE table_name = 'orders' AND column_name = 'delivery_date';",
+    );
+    assert_eq!(date_type, "DATE");
+
+    let id_type = duckdb_query(
+        &db,
+        "SELECT data_type FROM duckdb_columns \
+         WHERE table_name = 'orders' AND column_name = 'order_id';",
+    );
+    assert_eq!(id_type, "VARCHAR");
+
+    // Date arithmetic confirms typed semantics.
+    let span = duckdb_query(
+        &db,
+        "SELECT date_diff('day', MIN(delivery_date), MAX(delivery_date)) FROM orders;",
+    );
+    assert_eq!(span, "65");
+}
+
+/// ac-02 + graceful-degradation: A column whose `x-finetype-label` is
+/// not in the taxonomy must pass through as a bare quoted identifier,
+/// the same as an unlabelled column. No CAST, no transform, no reject.
+#[test]
+#[ignore]
+fn test_vrp_unknown_label_passes_as_varchar() {
+    let tmp = tempfile::tempdir().unwrap();
+    // `identity.code.id` is the canonical fixture label that is NOT in
+    // the taxonomy — the existing 8 vrp_* tests rely on this exact
+    // label for their graceful-degradation contract (see
+    // SCHEMA_WITH_EXT).
+    let schema = write_schema(tmp.path(), SCHEMA_WITH_EXT);
+    let csv = write_csv(
+        tmp.path(),
+        "in.csv",
+        "order_id,status\nORD-11111,pending\nORD-22222,shipped\n",
+    );
+    let db = tmp.path().join("out.db");
+
+    let (code, _, stderr) = run_validate(&[
+        csv.to_str().unwrap(),
+        schema.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "--table",
+        "orders",
+    ]);
+    assert_eq!(code, 0, "clean fixture should exit 0; stderr={stderr}");
+
+    // Both columns are VARCHAR (no typed CAST emitted).
+    let id_type = duckdb_query(
+        &db,
+        "SELECT data_type FROM duckdb_columns \
+         WHERE table_name = 'orders' AND column_name = 'order_id';",
+    );
+    assert_eq!(id_type, "VARCHAR");
+
+    // No transform failures recorded for an all-VARCHAR projection.
+    let tf_count = duckdb_query(
+        &db,
+        "SELECT COUNT(*) FROM finetype_reject_errors \
+         WHERE error_type = 'TRANSFORM_FAILED';",
+    );
+    assert_eq!(tf_count, "0");
+}
