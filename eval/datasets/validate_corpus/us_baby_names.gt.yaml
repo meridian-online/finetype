@@ -1,0 +1,14 @@
+columns:
+  year: datetime.component.year
+  name: identity.person.first_name
+  percent: representation.numeric.decimal_number
+  sex: representation.discrete.categorical
+
+notes: |
+  Iter-1 corpus dataset. 5000-row cap from upstream 258k row file.
+  `percent` values are decimal fractions (e.g. 0.081541) not percent-
+  with-sign — decimal_number is the right label, not percentage.
+  `sex` carries "boy"/"girl" — these are NOT the canonical gender
+  values (Male/Female) so the taxonomy's identity.person.gender
+  validator would reject. Categorical is the honest GT here; profile
+  picking gender would be a misclassification.

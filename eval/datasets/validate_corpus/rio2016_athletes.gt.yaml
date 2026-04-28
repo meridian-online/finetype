@@ -1,0 +1,24 @@
+columns:
+  id: representation.identifier.numeric_code
+  name: identity.person.full_name
+  nationality: geography.location.country_code
+  sex: identity.person.gender
+  date_of_birth: datetime.date.iso
+  height: identity.person.height
+  weight: identity.person.weight
+  sport: representation.discrete.categorical
+  gold: representation.numeric.integer_number
+  silver: representation.numeric.integer_number
+  bronze: representation.numeric.integer_number
+  info: representation.text.plain_text
+
+notes: |
+  Iter-1 corpus dataset. 5000-row cap from upstream ~10k row file.
+  Code-vs-canonical seam at `nationality`: 3-letter NOC codes (e.g.
+  "ESP", "KOR", "USA") — Olympic NOCs differ from ISO 3166-1 alpha-3
+  in a handful of cases (e.g. SUI vs CHE for Switzerland). The
+  taxonomy's geography.location.country_code is the closest fit; the
+  attribution rule will surface this as code-vs-canonical for
+  validators that expect alpha-3 strict.
+  `sex` is "male"/"female" — identity.person.gender canonical values.
+  `info` is mostly empty/free-text — plain_text is the right floor label.

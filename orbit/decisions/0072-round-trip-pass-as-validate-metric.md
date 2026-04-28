@@ -1,0 +1,68 @@
+---
+status: accepted
+date-created: 2026-04-28
+date-modified: 2026-04-28
+---
+# 0072. Round-trip pass as the validate-precision metric
+
+## Context and Problem Statement
+
+The m-19 profile-eval scores label correctness on column samples — "did
+profile pick the right type for this column's first 100 values?". That
+metric is column-level, sample-level, and ignores the validator: a
+column can score 100% on profile-eval while emitting a JSON Schema that
+rejects 90% of the underlying CSV's rows. We need a complementary metric
+that closes the loop: take a whole CSV, profile it, validate every row
+against the emitted schema, and ask "did this CSV survive the round
+trip?". The metric must be (a) deterministic, (b) reproducible without
+network access, (c) coarse enough to drive sprint focus and (d) honest
+about partial wins.
+
+## Considered Options
+
+- **Round-trip pass at P=99% per-dataset, headlined as `N of M datasets pass`.**
+  Each CSV is a single test case. Pass means ≥99% of rows validate
+  against the emitted schema. The headline counts datasets, not rows or
+  columns — a CSV with one rejecting column drags the whole dataset to
+  fail, surfacing the "narrowest validator wins" effect that pure
+  averaging hides.
+- **Mean validity rate across all CSVs (rows valid / rows total).**
+  A single percentage. Easier to summarise but masks dataset-level
+  collapse — a 95% mean could be 95% of every CSV (good) or three CSVs
+  at 100% and one at 80% (bad). The unhelpful average problem.
+- **Pure quality gate (any reject = fail).**
+  Strictest — but every real-world CSV has at least one weird row, so
+  this gates on noise rather than signal. Drives implementers to
+  permissive validators (precision principle violation, MADR 0001).
+- **Per-mechanism failure count, no headline.**
+  Just enumerate the failure surface. Honest but not sprintable —
+  no single number to track drift, no "N of M moving" signal.
+
+## Decision Outcome
+
+Chosen option: **"Round-trip pass at P=99% per-dataset"**, because it
+is deterministic, names a single comparable number per release, and
+forces the implementer to confront the narrowest validator on every
+CSV (rather than letting aggregation mask localised collapse).
+
+### Consequences
+
+- Good, because the headline `N of M datasets pass at P=99%` is one
+  integer that drift-checks across releases. Movement is unambiguous.
+- Good, because the 1% slack on row-validity acknowledges real-world
+  CSVs always have a few bad rows, without rewarding permissive
+  validators (each rejecting row still appears in the per-mechanism
+  table).
+- Good, because dataset-level pass is interpretable to non-experts —
+  "9 of 10 CSVs pass validation" is the kind of signal that survives
+  PR descriptions and changelog entries.
+- Bad, because a CSV with 1 broken row out of 100 fails (1% > 1%
+  threshold) the same as one with 50 broken rows. The per-mechanism
+  table compensates by showing failing-column counts.
+- Bad, because the metric is corpus-relative — adding an easy CSV
+  bumps `N` without any code change. MADR 0073's curation card
+  explicitly tracks corpus growth so movement can be attributed to
+  fixes vs additions.
+- Neutral, because P=99% is a sprint anchor, not a forever number.
+  Future iterations may add P=95% / P=90% supplementary lines once
+  the headline stabilises.

@@ -294,8 +294,11 @@ enum Commands {
         #[arg(long, default_value = "multi-branch")]
         model_type: ModelType,
 
-        /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR)
-        #[arg(long, default_value = "50")]
+        /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR).
+        /// Default 32 — lowered from 50 in v0.6.20 (spec
+        /// 2026-04-28-validate-precision-corpus, ac-09 sub-fix (a)) to
+        /// reduce enum-overfit attribution in profile→validate round-trip.
+        #[arg(long, default_value = "32")]
         enum_threshold: usize,
 
         /// Attach observed-data constraints to JSON Schema output
@@ -3207,11 +3210,24 @@ fn cmd_validate_table(
         // on both success AND error paths (ac-09 step 10).
 
         // ── Execute the script against the output .db ────────────────────────
-        let duckdb_out = std::process::Command::new("duckdb")
-            .arg(db_path)
-            .arg("-c")
-            .arg(&script)
-            .output();
+        // Pipe SQL via stdin instead of `-c <script>` so large schemas
+        // (many enum literals → multi-megabyte INSERT scripts) don't trip
+        // the OS argv limit (E2BIG / "Argument list too long" on macOS at
+        // ~256KB). See orbit/specs/2026-04-28-validate-precision-corpus/
+        // (un_locode / rio2016_athletes baseline runs hit ARG_MAX).
+        use std::io::Write as _;
+        let duckdb_out = (|| -> std::io::Result<std::process::Output> {
+            let mut child = std::process::Command::new("duckdb")
+                .arg(db_path)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()?;
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(script.as_bytes())?;
+            }
+            child.wait_with_output()
+        })();
         let duckdb_out = match duckdb_out {
             Ok(o) => o,
             Err(e) => {
@@ -3333,31 +3349,9 @@ fn cmd_validate_table(
 // PROFILE — Detect column types in a CSV file
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Collect sorted unique values for categorical columns when under the enum threshold.
-///
-/// Returns `Some(sorted_values)` when the label is `representation.discrete.categorical`
-/// and the cardinality is ≤ `enum_threshold`. Returns `None` otherwise.
-fn collect_unique_values_if_categorical(
-    label: &str,
-    values: &[String],
-    enum_threshold: usize,
-) -> Option<Vec<String>> {
-    if label != "representation.discrete.categorical" || enum_threshold == 0 {
-        return None;
-    }
-    let mut unique: Vec<String> = values
-        .iter()
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .cloned()
-        .collect();
-    unique.sort();
-    if unique.len() <= enum_threshold {
-        Some(unique)
-    } else {
-        None
-    }
-}
+/// Re-export the shared enum-emission gate so the JSON Schema emitter
+/// uses the same primitive that integration tests verify.
+use finetype_cli::enum_emission::collect_unique_values_if_categorical;
 
 /// Resolve the display broad_type for a profile column, accounting for ENUM threshold.
 ///

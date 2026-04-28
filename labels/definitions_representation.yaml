@@ -56,9 +56,9 @@ representation.numeric.integer_number:
 representation.numeric.decimal_number:
   title: "Decimal Number"
   description: >
-    Number with decimal point (e.g., 3.14, -0.5, 1000.001).
-    String representation of a floating-point number.
-    Transforms to DOUBLE.
+    Number with decimal point (e.g., 3.14, -0.5, 1000.001), optionally with
+    scientific-notation suffix (e.g., 6e-04, 1.5E+10). String representation
+    of a floating-point number. Transforms to DOUBLE.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
@@ -70,7 +70,13 @@ representation.numeric.decimal_number:
     fractional_part: "CAST((CAST({col} AS DOUBLE) - FLOOR(CAST({col} AS DOUBLE))) * 1000000 AS BIGINT)"
   validation:
     type: string
-    pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+    # Accepts plain decimals (3.14, -0.5) and scientific-notation variants
+    # (6e-04, 1.5E+10). The `[eE][+-]?[0-9]+` suffix is optional so plain
+    # decimals are unaffected. Widened in v0.6.20 under spec
+    # 2026-04-28-validate-precision-corpus ac-10 to absorb the format-diversity
+    # gap surfaced by us_baby_names.percent without sacrificing precision —
+    # tokens like "abc", "1.2.3", "12px", "1e", "e5" still reject.
+    pattern: "^-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$"
   tier: [DOUBLE, numeric]
   release_priority: 5
   aliases: [decimal, float, floating_point]
@@ -79,10 +85,19 @@ representation.numeric.decimal_number:
     - "-0.5"
     - "1000.001"
     - "0.0001"
+    - "6e-04"
+    - "1.5E+10"
   references: null
   notes: >
     v1 migration: Was numeric.decimal_number. Transforms to DOUBLE.
     Decompose extracts integer and fractional parts.
+    v0.6.20: Validator widened to accept scientific-notation suffix
+    (precision corpus iter 1, ac-10). The dedicated
+    representation.numeric.scientific_notation type still exists and
+    remains the preferred classification when a whole column is in
+    scientific form; this widening only ensures a mostly-decimal column
+    with some scientific-notation values doesn't get misclassified out of
+    decimal_number on a single failing row.
 
 representation.numeric.decimal_number_comma:
   title: "Decimal Number (Comma Separator)"

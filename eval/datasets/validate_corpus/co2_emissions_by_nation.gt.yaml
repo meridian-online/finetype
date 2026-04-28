@@ -1,0 +1,20 @@
+columns:
+  Year: datetime.component.year
+  Country: geography.location.country
+  Total: representation.numeric.integer_number
+  Solid Fuel: representation.numeric.integer_number
+  Liquid Fuel: representation.numeric.integer_number
+  Gas Fuel: representation.numeric.integer_number
+  Cement: representation.numeric.integer_number
+  Gas Flaring: representation.numeric.integer_number
+  Per Capita: representation.numeric.decimal_number
+  Bunker fuels (Not in Total): representation.numeric.integer_number
+
+notes: |
+  Iter-1 corpus dataset. 5000-row cap from upstream ~18k row file.
+  Code-vs-canonical seam at `Country`: values are uppercase short-form
+  ("UNITED KINGDOM", "USA", "REPUBLIC OF VIET NAM") that disagree with
+  the geography.location.country validator's canonical-form expectation
+  (mixed case, ISO short form). Sparse cells in fuel breakdown columns
+  are NULL not zero — the validator must accept empty/NULL without
+  rejecting (DuckDB handles this at the staging level).

@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`make validate-corpus` round-trip precision harness (spec
+  `2026-04-28-validate-precision-corpus`, card 0014)** — A new
+  `make validate-corpus` target shells `finetype profile -o json-schema`
+  and `finetype validate --db --table` over every CSV in
+  `eval/datasets/validate_manifest.csv`, computes per-dataset round-trip
+  pass rate at P=99%, and writes
+  `eval/eval_output/validate_corpus.md` with a corpus headline
+  (`N of M datasets pass at P=99%`), per-mechanism breakdown
+  (`enum_overfit | format_diversity | misclassification | code_vs_canonical
+  | unknown | no_gt`), and per-dataset / per-column attributions. Iter-1
+  ships 7 fresh datasets sourced from public open-data URLs (pokemon,
+  rio2016_athletes, us_baby_names, co2_emissions_by_nation,
+  world_population, un_locode, global_temp_annual) under
+  `eval/datasets/validate_corpus/csv/`, all with full per-column GT
+  sidecars. The harness is local-run-only (no CI gate this iteration);
+  `make eval-report` surfaces the headline alongside profile-eval and
+  actionability-eval. See MADRs 0072, 0073, 0074.
+
+- **Validate-corpus integration with the m-19 leakage firewall** —
+  `eval/datasets/sources.yaml` `role` enum extended from
+  `{eval, train, both-forbidden}` to include `validate`;
+  `scripts/compute_row_hashes.py` aggregates row hashes from BOTH
+  `eval/datasets/manifest.csv` AND
+  `eval/datasets/validate_manifest.csv` so validate-corpus rows are
+  forbidden in training data via the same MADR 0056 mechanism. New
+  flags `--validate-manifest`, `--no-validate`, `--dry-run` on
+  `compute_row_hashes.py`. Test coverage at
+  `scripts/eval_leakage/test_validate_corpus_firewall.py`.
+
+### Changed
+
+- **`finetype profile --enum-threshold` default lowered 50 → 32**
+  (`crates/finetype-cli/src/main.rs`, ac-09 sub-fix a). More
+  conservative enum emission across all profile output formats
+  (json-schema, json, csv, markdown). Users who pass
+  `--enum-threshold N` explicitly are unaffected. The label-family
+  gate (label must be enum-eligible) is unchanged.
+- **JSON Schema enum-emission gate extended for boolean labels**
+  (ac-09 sub-fix b) — `representation.boolean.terms`,
+  `representation.boolean.binary`, and `representation.boolean.initials`
+  now receive enum emission alongside the pre-existing
+  `representation.discrete.categorical` gate, since they are
+  taxonomically finite-domain. The shared library primitive lives at
+  `crates/finetype-cli/src/enum_emission.rs` so the binary and the
+  integration tests exercise the same gate (no drift).
+- **Taxonomy validator widening — `representation.numeric.decimal_number`
+  accepts scientific notation** (ac-10) — Pattern widened from
+  `^-?[0-9]+(\.[0-9]+)?$` to
+  `^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$` so values like `6e-04` and
+  `1.5E+10` validate alongside plain decimals. Surfaced by
+  `us_baby_names.percent` in the iter-1 baseline. The widening still
+  rejects clearly-invalid input (`abc`, `1.2.3`, `12px`, `1e`, `e5`) —
+  precision principle (MADR 0001) preserved. Regression tests at
+  `crates/finetype-core/tests/precision_widenings.rs`.
+
 ## [0.6.19] - 2026-04-28
 
 ### Removed

@@ -1,0 +1,11 @@
+columns:
+  Source: representation.discrete.categorical
+  Year: datetime.component.year
+  Mean: representation.numeric.decimal_number
+
+notes: |
+  Iter-1 corpus dataset. 320 rows (no cap — full file commits).
+  Clean control: 2-value categorical (Source: gcag/gistemp), integer
+  Year, signed decimal Mean (e.g. "-0.4177"). Should round-trip-pass
+  cleanly under default validators — useful as a baseline-stable row
+  in the harness.

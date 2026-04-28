@@ -214,7 +214,7 @@ eval-actionability:
 
 .PHONY: eval-report
 
-eval-report: eval-profile eval-actionability
+eval-report: eval-profile eval-actionability validate-corpus
 	@echo "═══ Generating evaluation report ═══"
 	$(EVAL_RUN) eval-report -- \
 		--profile-results eval/eval_output/profile_results.csv \
@@ -222,6 +222,43 @@ eval-report: eval-profile eval-actionability
 		--labels-dir labels \
 		--output eval/eval_output/report.md
 	@echo "✓ Report written to eval/eval_output/report.md"
+	@# ── Surface validate-corpus headline alongside profile-eval ──
+	@# `validate-corpus` (above) writes its own report; we append the
+	@# headline here so a single `make eval-report` run shows all three
+	@# numbers (profile-eval, actionability-eval, validate-corpus) in
+	@# eval/eval_output/report.md. The grep is robust to the report
+	@# layout — it pulls only the bolded headline line.
+	@if [ -f eval/eval_output/validate_corpus.md ]; then \
+		echo "" >> eval/eval_output/report.md; \
+		echo "## Validate-Corpus Headline" >> eval/eval_output/report.md; \
+		grep -E '^\*\*[0-9]+ of [0-9]+ datasets pass' eval/eval_output/validate_corpus.md \
+			>> eval/eval_output/report.md || true; \
+	fi
+
+# ─── Validate-Corpus Harness (spec 2026-04-28-validate-precision-corpus) ──
+# Profile→validate round-trip over real-world CSVs in
+# eval/datasets/validate_corpus/. Reports `N of M datasets pass at P=99%`
+# and attributes each failing column to a deterministic mechanism.
+#
+# Output: eval/eval_output/validate_corpus.md (delta vs the committed
+# eval/eval_output/validate_corpus.baseline.md if present).
+#
+# The target builds release binaries first so a fresh checkout's
+# `make validate-corpus` succeeds without a prior `cargo build`.
+
+.PHONY: validate-corpus
+
+validate-corpus:
+	@echo "═══ Building validate-corpus prerequisites (finetype + validate-corpus) ═══"
+	cargo build --release --bin finetype
+	cargo build --release -p finetype-eval --bin validate-corpus
+	@echo "═══ Running validate-corpus harness ═══"
+	./target/release/validate-corpus \
+		--manifest eval/datasets/validate_manifest.csv \
+		--output eval/eval_output/validate_corpus.md \
+		--baseline eval/eval_output/validate_corpus.baseline.md \
+		--finetype-bin ./target/release/finetype
+	@echo "✓ Report written to eval/eval_output/validate_corpus.md"
 
 # ─── Profile Evaluation ─────────────────────
 # Evaluate finetype profile against annotated CSVs.

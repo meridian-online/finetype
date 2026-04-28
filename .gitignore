@@ -47,8 +47,18 @@ extension/build/
 __pycache__/
 *.pyc
 
-# Eval outputs (generated data, not source)
-eval/eval_output/
+# Eval outputs (generated data, not source).
+# Excluded as a glob (NOT the whole directory) so individual files like
+# the validate-corpus baseline + post-fix reports can be tracked
+# explicitly per spec 2026-04-28-validate-precision-corpus ac-14.
+eval/eval_output/*.csv
+eval/eval_output/*.json
+eval/eval_output/*.parquet
+eval/eval_output/*.db
+eval/eval_output/*.tsv
+eval/eval_output/*.log
+eval/eval_output/profile_results.csv
+eval/eval_output/actionability_results.csv
 
 # Legacy CSV-sidecar outputs from the pre-MADR-0064 `finetype validate`
 # flow. The new flow writes a single `.db` file via --db <path>; these

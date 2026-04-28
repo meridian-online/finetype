@@ -196,7 +196,7 @@ representation.identifier.alphanumeric_id	false	^[A-Za-z][A-Za-z0-9 /_.#-]*[0-9]
 representation.identifier.increment	false	^[0-9]+$	true
 representation.identifier.numeric_code	false	^[0-9]+$	true
 representation.identifier.uuid	false	^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$	true
-representation.numeric.decimal_number	false	^-?[0-9]+(\.[0-9]+)?$	true
+representation.numeric.decimal_number	false	^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$	true
 representation.numeric.decimal_number_comma	false	^-?[0-9]{1,3}(\.[0-9]{3})*(,[0-9]+)?$|^-?[0-9]+,[0-9]+$	true
 representation.numeric.integer_number	false	^-?[0-9]+$	true
 representation.numeric.percentage	false	^-?[0-9]+(\.[0-9]+)?%?$	true
