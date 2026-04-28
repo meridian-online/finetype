@@ -1,23 +1,23 @@
 rally: "v0.6.19 CLI surface consolidation"
 autonomy: guided
-phase: approved
+phase: designing
 started: 2026-04-28T01:12:33Z
 completed: null
 cards:
   - path: orbit/cards/0003-tabular-data-profiling.yaml
-    status: proposed
+    status: designing
     spec_dir: orbit/specs/2026-04-28-profile-json-schema-output/
     branch: rally/profile-json-schema-output
     worktree: null
     parked_constraint: null
   - path: orbit/cards/0005-schema-driven-data-validation.yaml
-    status: proposed
+    status: designing
     spec_dir: orbit/specs/2026-04-28-validate-absorbs-load/
     branch: rally/validate-absorbs-load
     worktree: null
     parked_constraint: null
   - path: orbit/cards/0006-command-line-interface.yaml
-    status: proposed
+    status: designing
     spec_dir: orbit/specs/2026-04-28-schema-verb-fold/
     branch: rally/schema-verb-fold
     worktree: null
