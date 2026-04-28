@@ -1,7 +1,7 @@
 ---
-status: accepted
+status: superseded by 0070
 date-created: 2026-03-12
-date-modified: 2026-03-12
+date-modified: 2026-04-28
 ---
 # 0031. Table-level schema via finetype schema <file>
 

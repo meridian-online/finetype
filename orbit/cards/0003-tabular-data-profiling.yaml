@@ -39,6 +39,7 @@ goal: "CSV and Parquet profiling with 6 output formats (plain, json, csv, markdo
 
 specs:
   - "orbit/specs/2026-04-27-cli-pipeline-reshape/"  # planned (v0.6.19) — adds json-schema output mode
+  - "orbit/specs/2026-04-28-profile-json-schema-output/spec.yaml"  # v0.6.19 rally — profile gains -o json-schema
 
 references:
   - "README.md"

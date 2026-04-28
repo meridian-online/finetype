@@ -51,10 +51,12 @@ finetype profile -f data.csv
 
 ## Step 2: Generate a Schema
 
-Capture the profile results as a JSON Schema with validation rules:
+Capture the profile results as a JSON Schema with validation rules
+(table-mode export migrated from the retired `schema` verb to
+`profile -o json-schema` in v0.6.19 — MADR 0070):
 
 ```bash
-finetype schema data.csv
+finetype profile -f data.csv -o json-schema > data.schema.json
 ```
 
 This writes a sidecar file `data.schema.json` containing:
@@ -137,7 +139,7 @@ The generated SQL:
 finetype profile -f contacts.csv
 
 # 2. Schema — capture as a contract
-finetype schema contacts.csv
+finetype profile -f contacts.csv -o json-schema > contacts.schema.json
 
 # 3. Validate — quality gate (exit code 1 = invalid rows found, not a failure)
 finetype validate contacts.csv contacts.schema.json
