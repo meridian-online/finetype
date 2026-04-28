@@ -1,6 +1,6 @@
 rally: "v0.6.19 CLI surface consolidation"
 autonomy: guided
-phase: design-review
+phase: implementing
 started: 2026-04-28T01:12:33Z
 completed: null
 cards:
@@ -22,8 +22,17 @@ cards:
     branch: rally/schema-verb-fold
     worktree: null
     parked_constraint: null
-implementation_order: null
-order_rationale: null
+implementation_order:
+  - orbit/cards/0003-tabular-data-profiling.yaml
+  - orbit/cards/0006-command-line-interface.yaml
+  - orbit/cards/0005-schema-driven-data-validation.yaml
+order_rationale: |
+  Serial 0003 → 0006 → 0005. Cards 0003 and 0006 share OutputFormat::JsonSchema
+  enum variant and crates/finetype-cli/src/json_schema.rs helper module; 0003
+  lands the helper and the variant first, then 0006 extends the helper for
+  type-mode and deletes the schema verb. 0005 (validate absorbs load) is
+  logically independent but ordered last to avoid main.rs merge conflicts and
+  keep the PR stack linear.
 notes: |
   Riding alongside the rally as separate specs (not card inputs):
     - orbit/specs/<date>-legacy-classifier-cleanup/  (internal refactor;
