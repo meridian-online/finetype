@@ -1,9 +1,27 @@
 //! `profile` tool — profile all columns in a CSV/JSON file.
 
+use crate::json_schema;
 use crate::FineTypeServer;
 use rmcp::model::{CallToolResult, Content, ErrorData};
 use serde::Deserialize;
 use serde_json::json;
+
+/// Output format for the `profile` tool.
+///
+/// Mirrors the CLI's `-o json | json-schema` switch (subset; the other
+/// CLI formats — plain/csv/markdown/arrow — are CLI-only display modes
+/// without an MCP-meaningful counterpart).
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProfileFormat {
+    /// Default profile JSON shape — one object per column with type,
+    /// confidence, domain, locale.
+    #[default]
+    Json,
+    /// Table-level JSON Schema document (Draft 2020-12). Replaces the
+    /// `path`/`data` branch of the legacy `schema` tool.
+    JsonSchema,
+}
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ProfileRequest {
@@ -15,12 +33,44 @@ pub struct ProfileRequest {
     #[schemars(description = "Inline CSV content as a string (alternative to path)")]
     pub data: Option<String>,
 
+    /// Output format. Default `json` returns one object per column. Set
+    /// to `json-schema` to receive a table-level JSON Schema document
+    /// suitable for direct input to `validate`.
+    #[schemars(
+        description = "Output format: \"json\" (default, profile object per column) or \"json-schema\" (table-level JSON Schema)"
+    )]
+    #[serde(default)]
+    pub format: ProfileFormat,
+
+    /// Attach observed-data constraints to JSON Schema output
+    /// (`minLength`/`maxLength`, `minimum`/`maximum`, `enum`,
+    /// `x-finetype-null-rate`, `x-finetype-cardinality`). Only meaningful
+    /// when `format == "json-schema"`.
+    #[schemars(
+        description = "When format is \"json-schema\", attach observed-data constraints (minLength/maxLength, minimum/maximum, enum, null-rate, cardinality)"
+    )]
+    #[serde(default)]
+    pub stats: bool,
+
+    /// Cardinality threshold for the JSON Schema `enum` keyword. Only
+    /// meaningful when `format == "json-schema"` AND `stats: true`. 0
+    /// disables `enum` emission. Default 50, matching the CLI.
+    #[schemars(
+        description = "Cardinality threshold for ENUM emission in JSON Schema output (0 disables; default 50)"
+    )]
+    #[serde(default = "default_enum_threshold")]
+    pub enum_threshold: usize,
+
     /// Run JSON Schema validation on classified columns for data quality metrics.
     #[schemars(
         description = "Enable validation for data quality report (% valid, failing values)"
     )]
     #[serde(default)]
     pub validate: bool,
+}
+
+fn default_enum_threshold() -> usize {
+    50
 }
 
 /// Parse CSV data from a string, returning (headers, columns_of_values).
@@ -55,6 +105,11 @@ pub async fn handle(
     server: &FineTypeServer,
     request: ProfileRequest,
 ) -> Result<CallToolResult, ErrorData> {
+    // ac-04 mirror: --stats / enum-threshold are only meaningful with
+    // json-schema output. Don't error here — the CLI gates on conflict via
+    // clap, and MCP callers can pass these defensively. Just ignore them
+    // when format is Json.
+
     // Read CSV data from path or inline
     let csv_data = match (&request.path, &request.data) {
         (Some(path), _) => std::fs::read_to_string(path)
@@ -69,8 +124,85 @@ pub async fn handle(
     };
 
     let (headers, columns) = parse_csv(&csv_data)?;
+    let row_count = columns.iter().map(|c| c.len()).max().unwrap_or(0);
     let classifier = server.classifier().read().await;
 
+    // ── json-schema branch ───────────────────────────────────────────────
+    // Routes through the same `emit_table_schema` helper as the CLI's
+    // `profile -o json-schema` so output is byte-identical across surfaces.
+    if request.format == ProfileFormat::JsonSchema {
+        let taxonomy = server.taxonomy();
+
+        // Classify each column once; reuse the result for the schema input.
+        let mut labels: Vec<String> = Vec::with_capacity(headers.len());
+        for (col_idx, header) in headers.iter().enumerate() {
+            let values = &columns[col_idx];
+            if values.is_empty() {
+                labels.push("unknown".to_string());
+                continue;
+            }
+            let result = classifier
+                .classify_column_with_header(values, header)
+                .map_err(|e| {
+                    ErrorData::internal_error(format!("Classification error: {e}"), None)
+                })?;
+            labels.push(result.label);
+        }
+
+        // Project into the helper's borrowed-input shape.
+        let cols: Vec<json_schema::TableSchemaColumn<'_>> = headers
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+                let null_count = row_count.saturating_sub(values.len());
+                json_schema::TableSchemaColumn {
+                    name,
+                    label: &labels[i],
+                    values,
+                    null_count,
+                }
+            })
+            .collect();
+
+        // Title / id are derived from the path when available.
+        let (file_stem, file_id) = match &request.path {
+            Some(p) => {
+                let path = std::path::Path::new(p);
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("table")
+                    .to_string();
+                let id = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("data.csv")
+                    .to_string();
+                (stem, id)
+            }
+            None => ("table".to_string(), "data.csv".to_string()),
+        };
+
+        let schema = json_schema::emit_table_schema(
+            &cols,
+            &file_stem,
+            &file_id,
+            taxonomy,
+            request.stats,
+            request.enum_threshold,
+        );
+
+        let md = format!(
+            "## Table Schema\n\n**{}** ({} columns, {} rows)\n",
+            file_stem,
+            headers.len(),
+            row_count
+        );
+        return Ok(super::success_with_summary(&schema, &md));
+    }
+
+    // ── default json branch — unchanged from prior behaviour ─────────────
     let mut profiles = Vec::new();
 
     for (col_idx, header) in headers.iter().enumerate() {

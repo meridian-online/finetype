@@ -755,3 +755,213 @@ fn golden_schema_iso_date() {
         "x-finetype-broad-type was dropped from schema export in v0.6.19"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROFILE JSON SCHEMA OUTPUT — v0.6.19 (card 0003)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// `finetype profile -f <file> -o json-schema [--stats] [--enum-threshold N]`
+// emits a table-level JSON Schema document to stdout. The output replaces
+// the table-mode of the legacy `finetype schema <file.csv>` invocation
+// (deletion ships with card 0006). Helper module:
+// `crates/finetype-mcp/src/json_schema.rs`.
+
+/// Run `finetype profile -f <path> -o json-schema [extra args]` and return parsed JSON.
+fn run_profile_json_schema(csv_path: &Path, extra_args: &[&str]) -> Value {
+    let mut args: Vec<&str> = vec![
+        "run",
+        "-p",
+        "finetype-cli",
+        "--",
+        "profile",
+        "-f",
+        csv_path.to_str().unwrap(),
+        "-o",
+        "json-schema",
+    ];
+    args.extend_from_slice(extra_args);
+
+    let output = Command::new("cargo")
+        .args(&args)
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to run finetype profile -o json-schema");
+
+    assert!(
+        output.status.success(),
+        "profile -o json-schema failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).expect("invalid utf8");
+    serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("failed to parse profile json-schema output: {e}\nOutput: {stdout}");
+    })
+}
+
+/// Round-trip parity stand-in (ac-10 degraded path): the helper output
+/// must parse as JSON and satisfy the structural-shape contract — top-level
+/// `$schema`, `type: object`, populated `properties`, plus the trimmed
+/// `x-finetype-label` / `x-finetype-pii` extensions on at least one column.
+///
+/// When card 0005's `validate --schema -` (stdin) lands, this test can be
+/// promoted to actual round-trip via piping. For v0.6.19 (cards 0003 →
+/// 0006 → 0005), the structural assertion is the gate.
+#[test]
+#[ignore]
+fn golden_profile_json_schema_people_directory() {
+    let path = workspace_root().join("eval/datasets/csv/people_directory.csv");
+    let schema = run_profile_json_schema(&path, &[]);
+
+    assert!(
+        schema["$schema"].is_string(),
+        "json-schema output must declare $schema URI"
+    );
+    assert_eq!(
+        schema["type"].as_str(),
+        Some("object"),
+        "json-schema output must be a JSON Schema object type"
+    );
+    assert!(
+        schema["$id"].is_string(),
+        "json-schema output must declare $id"
+    );
+
+    let properties = schema["properties"]
+        .as_object()
+        .expect("properties must be a JSON object");
+    assert!(
+        !properties.is_empty(),
+        "people_directory should produce non-empty properties"
+    );
+
+    // At least one column property must carry both extensions from the
+    // PR #51 verbosity contract.
+    let has_label = properties
+        .values()
+        .any(|p| p.get("x-finetype-label").is_some());
+    assert!(
+        has_label,
+        "at least one property must carry x-finetype-label"
+    );
+    let has_pii = properties
+        .values()
+        .any(|p| p.get("x-finetype-pii").is_some());
+    assert!(has_pii, "at least one property must carry x-finetype-pii");
+
+    // Negative assertion: the dropped extensions must NOT re-appear.
+    for (col, prop) in properties.iter() {
+        for dropped in [
+            "x-finetype-broad-type",
+            "x-finetype-transform",
+            "x-finetype-transform-ext",
+            "x-finetype-format-string",
+            "x-finetype-domain",
+            "x-finetype-confidence",
+        ] {
+            assert!(
+                prop.get(dropped).is_none(),
+                "{dropped} was dropped in v0.6.19 (column {col})"
+            );
+        }
+    }
+
+    // Without --stats, the diagnostic extensions must NOT appear. The
+    // observed-data constraints `minLength`/`maxLength`/`minimum`/`maximum`/
+    // `enum` are NOT in this list because validation contracts on the type
+    // definition (e.g. `representation.discrete.categorical` carries
+    // `minLength: 1, maxLength: 50`; `identity.person.gender` carries an
+    // `enum`) inject those keywords from the type, not from observed data.
+    for (col, prop) in properties.iter() {
+        for stats_diagnostic in ["x-finetype-null-rate", "x-finetype-cardinality"] {
+            assert!(
+                prop.get(stats_diagnostic).is_none(),
+                "{stats_diagnostic} should only appear with --stats (column {col})"
+            );
+        }
+    }
+}
+
+/// `--stats` attaches observed-data constraints + diagnostic extensions.
+#[test]
+#[ignore]
+fn golden_profile_json_schema_stats_ecommerce_orders() {
+    let path = workspace_root().join("eval/datasets/csv/ecommerce_orders.csv");
+    let schema = run_profile_json_schema(&path, &["--stats", "--enum-threshold", "50"]);
+
+    let properties = schema["properties"]
+        .as_object()
+        .expect("properties must be a JSON object");
+    assert!(!properties.is_empty(), "expected non-empty properties");
+
+    // Every column property under --stats should carry the diagnostic
+    // extensions, even when no string-length / numeric range applies.
+    for (col, prop) in properties.iter() {
+        assert!(
+            prop.get("x-finetype-null-rate").is_some(),
+            "{col} should carry x-finetype-null-rate under --stats"
+        );
+        assert!(
+            prop.get("x-finetype-cardinality").is_some(),
+            "{col} should carry x-finetype-cardinality under --stats"
+        );
+    }
+
+    // At least one column should produce a string length range — the
+    // ecommerce fixture has VARCHAR-shaped columns guaranteed to land
+    // in the string branch.
+    let any_min_length = properties
+        .values()
+        .any(|p| p.get("minLength").is_some() && p.get("maxLength").is_some());
+    assert!(
+        any_min_length,
+        "at least one string column should produce minLength/maxLength under --stats"
+    );
+}
+
+/// `--enum-threshold` controls whether the `enum` keyword is added by
+/// `attach_stats` for low-cardinality columns. Validation contracts on
+/// the type definition (e.g. `identity.person.gender`) may inject `enum`
+/// independently — so the gate test verifies that increasing the
+/// threshold can only ADD enum-bearing columns, never remove them, and
+/// that threshold=50 produces at least one enum.
+#[test]
+#[ignore]
+fn golden_profile_json_schema_enum_threshold_titanic() {
+    let path = workspace_root().join("eval/datasets/csv/titanic.csv");
+
+    // Threshold 0: only enums injected by type validation appear.
+    let schema_off = run_profile_json_schema(&path, &["--stats", "--enum-threshold", "0"]);
+    let props_off = schema_off["properties"]
+        .as_object()
+        .expect("properties object");
+    let enums_off: std::collections::BTreeSet<String> = props_off
+        .iter()
+        .filter(|(_, p)| p.get("enum").is_some())
+        .map(|(k, _)| k.clone())
+        .collect();
+
+    // Threshold 50: validation enums + stats-derived enums for any
+    // low-cardinality column.
+    let schema_on = run_profile_json_schema(&path, &["--stats", "--enum-threshold", "50"]);
+    let props_on = schema_on["properties"]
+        .as_object()
+        .expect("properties object");
+    let enums_on: std::collections::BTreeSet<String> = props_on
+        .iter()
+        .filter(|(_, p)| p.get("enum").is_some())
+        .map(|(k, _)| k.clone())
+        .collect();
+
+    // Monotonicity: threshold=50 must contain every enum from threshold=0.
+    assert!(
+        enums_off.is_subset(&enums_on),
+        "enum-bearing columns at threshold=0 must be a subset of those at threshold=50 \
+         (off={enums_off:?}, on={enums_on:?})"
+    );
+    // Existence: at least one enum must appear at threshold=50.
+    assert!(
+        !enums_on.is_empty(),
+        "at least one low-cardinality column should carry enum under --enum-threshold=50"
+    );
+}

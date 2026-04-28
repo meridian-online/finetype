@@ -79,7 +79,7 @@ finetype schema "datetime.date.*" --pretty
 # Validate a CSV against a JSON Schema — writes a DuckDB .db file
 # with the user's table (valid rows) + `finetype_reject_errors` sidecar.
 # Exit codes: 0 no rejects / 1 rejects / 2 error. Requires `duckdb` on PATH.
-finetype schema data.csv --stdout > schema.json
+finetype profile -f data.csv -o json-schema > schema.json
 finetype validate data.csv schema.json --db out.db --table orders
 duckdb out.db -c "SELECT column_name, constraint_failed, expected_type, type_confidence FROM finetype_reject_errors;"
 ```

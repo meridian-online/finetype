@@ -5,6 +5,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
+use finetype_mcp::json_schema;
 use finetype_model::Classifier;
 use serde_json::json;
 use std::io::{self, BufRead, Read, Write};
@@ -334,7 +335,7 @@ enum Commands {
         #[arg(short, long)]
         file: PathBuf,
 
-        /// Output format (plain, json, csv, markdown, arrow)
+        /// Output format (plain, json, csv, markdown, arrow, json-schema)
         #[arg(short, long, default_value = "plain")]
         output: OutputFormat,
 
@@ -357,6 +358,12 @@ enum Commands {
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR)
         #[arg(long, default_value = "50")]
         enum_threshold: usize,
+
+        /// Attach observed-data constraints to JSON Schema output
+        /// (minLength/maxLength, minimum/maximum, enum, x-finetype-null-rate,
+        /// x-finetype-cardinality). Requires `-o json-schema`.
+        #[arg(long)]
+        stats: bool,
 
         /// Show additional detail and enable pipeline tracing (Sense, mask, hint, feature rule decisions)
         #[arg(short, long)]
@@ -473,13 +480,19 @@ enum Commands {
     },
 }
 
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 enum OutputFormat {
     Plain,
     Json,
     Csv,
     Markdown,
     Arrow,
+    /// Table-level JSON Schema. Replaces the table-mode of the legacy
+    /// `finetype schema <file.csv>` invocation. With `--stats`, attaches
+    /// observed-data constraints (minLength/maxLength, minimum/maximum,
+    /// enum) and the `x-finetype-null-rate` / `x-finetype-cardinality`
+    /// extensions.
+    JsonSchema,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -678,19 +691,33 @@ fn main() -> Result<()> {
             no_header_hint,
             model_type,
             enum_threshold,
+            stats,
             verbose,
             raw_model,
-        } => cmd_profile(
-            file,
-            output,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            enum_threshold,
-            verbose,
-            raw_model,
-        ),
+        } => {
+            // ac-04: --stats is gated to -o json-schema. Refuse early with a
+            // clap-style error rather than silently dropping the flag.
+            if stats && !matches!(output, OutputFormat::JsonSchema) {
+                let mut cmd = <Cli as clap::CommandFactory>::command();
+                let err = cmd.error(
+                    clap::error::ErrorKind::ArgumentConflict,
+                    "--stats requires -o json-schema",
+                );
+                err.exit();
+            }
+            cmd_profile(
+                file,
+                output,
+                sample_size,
+                delimiter,
+                no_header_hint,
+                model_type,
+                enum_threshold,
+                stats,
+                verbose,
+                raw_model,
+            )
+        }
 
         Commands::Eval {
             data,
@@ -1334,7 +1361,10 @@ fn cmd_infer(
         };
 
         match output {
-            OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
+            OutputFormat::Plain
+            | OutputFormat::Markdown
+            | OutputFormat::Arrow
+            | OutputFormat::JsonSchema => {
                 if show_value && show_confidence {
                     println!("{}\t{}\t{:.4}", text, display_label, result.confidence);
                 } else if show_value {
@@ -1439,7 +1469,10 @@ fn cmd_infer(
         };
 
         match output {
-            OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
+            OutputFormat::Plain
+            | OutputFormat::Markdown
+            | OutputFormat::Arrow
+            | OutputFormat::JsonSchema => {
                 println!("{}", result.label);
                 if show_confidence {
                     println!(
@@ -2427,7 +2460,10 @@ fn cmd_taxonomy(
     defs.sort_by_key(|(k, _)| (*k).clone());
 
     match output {
-        OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
+        OutputFormat::Plain
+        | OutputFormat::Markdown
+        | OutputFormat::Arrow
+        | OutputFormat::JsonSchema => {
             println!("Domains: {:?}", taxonomy.domains());
             println!("Total labels: {}", taxonomy.len());
             if let Some(dom) = &domain {
@@ -2705,7 +2741,6 @@ fn cmd_schema_table(
     enum_threshold: usize,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
-    use std::collections::BTreeSet;
 
     let model = resolve_model_path();
 
@@ -2871,7 +2906,10 @@ fn cmd_schema_table(
         }
     }
 
-    // Build the table-level JSON Schema
+    // Build the table-level JSON Schema via the shared helper.
+    // (Card 0006 will delete cmd_schema_table; until then both the legacy
+    // schema verb and the new `profile -o json-schema` route through this
+    // single emitter so output stays byte-identical.)
     let file_stem = input
         .file_stem()
         .and_then(|s| s.to_str())
@@ -2881,135 +2919,24 @@ fn cmd_schema_table(
         .and_then(|s| s.to_str())
         .unwrap_or("data.csv");
 
-    let mut properties = serde_json::Map::new();
-    let mut required: Vec<String> = Vec::new();
+    let cols: Vec<json_schema::TableSchemaColumn<'_>> = col_results
+        .iter()
+        .map(|c| json_schema::TableSchemaColumn {
+            name: &c.name,
+            label: &c.label,
+            values: &c.values,
+            null_count: c.null_count,
+        })
+        .collect();
 
-    for col in &col_results {
-        if col.label == "unknown" {
-            // Still include unknown columns as plain string
-            let mut prop = serde_json::Map::new();
-            prop.insert("type".into(), json!("string"));
-            prop.insert("x-finetype-label".into(), json!("unknown"));
-            properties.insert(col.name.clone(), serde_json::Value::Object(prop));
-            continue;
-        }
-
-        // Build per-column schema from taxonomy definition
-        let mut prop = serde_json::Map::new();
-
-        if let Some(def) = enrichment_taxonomy.get(&col.label) {
-            // Merge validation keywords from the type definition
-            if let Some(validation) = &def.validation {
-                let val_schema = validation.to_json_schema();
-                if let serde_json::Value::Object(val_obj) = val_schema {
-                    for (k, v) in val_obj {
-                        prop.insert(k, v);
-                    }
-                }
-            } else {
-                prop.insert("type".into(), json!("string"));
-            }
-
-            // x-finetype extension fields — verbosity reduction (v0.6.19): only
-            // `x-finetype-label` and `x-finetype-pii` are emitted. Domain,
-            // confidence, broad-type, transform, transform-ext, and format-string
-            // are derivable from the label + bundled taxonomy and so are dropped
-            // to keep schema output focused on the contract: which type, and
-            // whether it is PII.
-            prop.insert("x-finetype-label".into(), json!(col.label));
-            prop.insert("x-finetype-pii".into(), json!(def.pii.unwrap_or(false)));
-        } else {
-            // Label not found in taxonomy — basic string schema
-            prop.insert("type".into(), json!("string"));
-            prop.insert("x-finetype-label".into(), json!(col.label));
-            prop.insert("x-finetype-pii".into(), json!(false));
-        }
-
-        // --stats: observed data constraints (AC-2)
-        if stats && !col.values.is_empty() {
-            let total = col.values.len() + col.null_count;
-            let null_rate = if total > 0 {
-                col.null_count as f64 / total as f64
-            } else {
-                0.0
-            };
-            prop.insert(
-                "x-finetype-null-rate".into(),
-                json!((null_rate * 10000.0).round() / 10000.0),
-            );
-
-            let unique: BTreeSet<&str> = col.values.iter().map(|s| s.as_str()).collect();
-            let cardinality = unique.len();
-            prop.insert("x-finetype-cardinality".into(), json!(cardinality));
-
-            // Check if numeric column (broad_type contains INT or DOUBLE or DECIMAL)
-            let is_numeric = enrichment_taxonomy
-                .get(&col.label)
-                .and_then(|d| d.broad_type.as_ref())
-                .map(|bt| {
-                    let bt_upper = bt.to_uppercase();
-                    bt_upper.contains("INT")
-                        || bt_upper.contains("DOUBLE")
-                        || bt_upper.contains("FLOAT")
-                        || bt_upper.contains("DECIMAL")
-                        || bt_upper.contains("NUMERIC")
-                })
-                .unwrap_or(false);
-
-            if is_numeric {
-                // Try to parse as f64 for min/max
-                let mut nums: Vec<f64> = col
-                    .values
-                    .iter()
-                    .filter_map(|v| v.replace(',', "").parse::<f64>().ok())
-                    .collect();
-                if !nums.is_empty() {
-                    nums.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-                    prop.insert("minimum".into(), json!(nums[0]));
-                    prop.insert("maximum".into(), json!(nums[nums.len() - 1]));
-                }
-            } else {
-                // String columns: minLength, maxLength from observed data
-                let lengths: Vec<usize> = col.values.iter().map(|v| v.len()).collect();
-                if let (Some(&min_len), Some(&max_len)) =
-                    (lengths.iter().min(), lengths.iter().max())
-                {
-                    prop.insert("minLength".into(), json!(min_len));
-                    prop.insert("maxLength".into(), json!(max_len));
-                }
-            }
-
-            // Enum values if cardinality is low
-            if enum_threshold > 0 && cardinality <= enum_threshold {
-                let mut enum_vals: Vec<&str> = unique.into_iter().collect();
-                enum_vals.sort();
-                prop.insert("enum".into(), json!(enum_vals));
-            }
-        }
-
-        // All non-null columns are required
-        if col.null_count == 0 {
-            required.push(col.name.clone());
-        }
-
-        properties.insert(col.name.clone(), serde_json::Value::Object(prop));
-    }
-
-    let mut schema = serde_json::Map::new();
-    schema.insert(
-        "$schema".into(),
-        json!("https://json-schema.org/draft/2020-12/schema"),
+    let schema_value = json_schema::emit_table_schema(
+        &cols,
+        file_stem,
+        file_name,
+        &enrichment_taxonomy,
+        stats,
+        enum_threshold,
     );
-    schema.insert("$id".into(), json!(format!("finetype://{}", file_name)));
-    schema.insert("title".into(), json!(file_stem));
-    schema.insert("type".into(), json!("object"));
-    schema.insert("properties".into(), serde_json::Value::Object(properties));
-    if !required.is_empty() {
-        required.sort();
-        schema.insert("required".into(), json!(required));
-    }
-
-    let schema_value = serde_json::Value::Object(schema);
 
     let json_str = if pretty {
         serde_json::to_string_pretty(&schema_value)?
@@ -3423,7 +3350,10 @@ fn cmd_check(
     let report = checker.run(&taxonomy);
 
     match output {
-        OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
+        OutputFormat::Plain
+        | OutputFormat::Markdown
+        | OutputFormat::Arrow
+        | OutputFormat::JsonSchema => {
             print!("{}", format_report(&report, verbose));
         }
         OutputFormat::Json => {
@@ -3964,7 +3894,11 @@ fn cmd_validate_table(
     // ── Summary report ───────────────────────────────────────────────────────
     let reject_count = result.rejects.len();
     match output {
-        OutputFormat::Plain | OutputFormat::Arrow | OutputFormat::Csv | OutputFormat::Markdown => {
+        OutputFormat::Plain
+        | OutputFormat::Arrow
+        | OutputFormat::Csv
+        | OutputFormat::Markdown
+        | OutputFormat::JsonSchema => {
             println!("Validation Report");
             println!("{}", "═".repeat(60));
             println!("  Input:        {}", file.display());
@@ -4076,6 +4010,7 @@ fn cmd_profile(
     no_header_hint: bool,
     model_type: ModelType,
     enum_threshold: usize,
+    stats: bool,
     verbose: bool,
     raw_model: bool,
 ) -> Result<()> {
@@ -4707,6 +4642,50 @@ fn cmd_profile(
 
             println!("{}", serde_json::to_string_pretty(&schema)?);
         }
+        OutputFormat::JsonSchema => {
+            // ac-03 / ac-05: emit table-level JSON Schema via the shared
+            // helper. Taxonomy enrichment is required for label → property
+            // shape; without it, we cannot produce a meaningful schema.
+            let taxonomy = enrichment_taxonomy.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "JSON Schema output requires the bundled taxonomy at `labels/`; \
+                     run from the FineType source tree or ship with embedded taxonomy."
+                )
+            })?;
+
+            let file_stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
+            let file_id = file
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("data.csv");
+
+            // Project profile rows + raw column values into the helper's
+            // borrowed-input shape. `columns` parallels `profiles` by index.
+            let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+                    json_schema::TableSchemaColumn {
+                        name: &p.name,
+                        label: &p.label,
+                        values,
+                        null_count: p.null_count,
+                    }
+                })
+                .collect();
+
+            let schema = json_schema::emit_table_schema(
+                &cols,
+                file_stem,
+                file_id,
+                taxonomy,
+                stats,
+                enum_threshold,
+            );
+
+            println!("{}", serde_json::to_string_pretty(&schema)?);
+        }
     }
 
     Ok(())
@@ -5121,7 +5100,11 @@ fn cmd_eval(
     confusion_vec.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     match output {
-        OutputFormat::Plain | OutputFormat::Csv | OutputFormat::Markdown | OutputFormat::Arrow => {
+        OutputFormat::Plain
+        | OutputFormat::Csv
+        | OutputFormat::Markdown
+        | OutputFormat::Arrow
+        | OutputFormat::JsonSchema => {
             println!("FineType Model Evaluation");
             println!("{}", "=".repeat(60));
             println!();
