@@ -5,9 +5,10 @@ started: 2026-04-28T01:12:33Z
 completed: null
 cards:
   - path: orbit/cards/0003-tabular-data-profiling.yaml
-    status: implementing
+    status: shipped
     spec_dir: orbit/specs/2026-04-28-profile-json-schema-output/
     branch: rally/profile-json-schema-output
+    pr: https://github.com/meridian-online/finetype/pull/53
     worktree: main
     parked_constraint: null
   - path: orbit/cards/0005-schema-driven-data-validation.yaml
@@ -17,10 +18,10 @@ cards:
     worktree: null
     parked_constraint: null
   - path: orbit/cards/0006-command-line-interface.yaml
-    status: designed
+    status: implementing
     spec_dir: orbit/specs/2026-04-28-schema-verb-fold/
     branch: rally/schema-verb-fold
-    worktree: null
+    worktree: main
     parked_constraint: null
 implementation_order:
   - orbit/cards/0003-tabular-data-profiling.yaml
