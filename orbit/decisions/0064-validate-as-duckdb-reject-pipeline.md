@@ -1,7 +1,7 @@
 ---
 status: accepted
 date-created: 2026-04-24
-date-modified: 2026-04-24
+date-modified: 2026-04-28
 ---
 # 0064. `finetype validate` as a DuckDB-native reject pipeline
 
