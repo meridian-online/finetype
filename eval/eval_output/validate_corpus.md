@@ -121,7 +121,7 @@ This table records the iter-2 curation thesis (per dataset, the load-bearing
 target mechanism the GT sidecar was authored to exercise) against the
 mechanism the harness actually attributed in this run. Mismatches indicate
 a harness mechanism-attribution gap, not a curation defect — the iter-3
-follow-up card at `orbit/cards/0016-validate-corpus-iter3.yaml` tracks the
+follow-up spec at `orbit/specs/2026-04-28-validate-corpus-iter3/` tracks the
 attribution rules that need to land before iter-2's curation surfaces in
 the per-mechanism breakdown.
 
@@ -138,7 +138,7 @@ Spec: `orbit/specs/2026-04-28-validate-corpus-curation/`.
 Curation outcome: **5 of 5 iter-2 datasets attribute to misclassification
 rather than the targeted mechanism**. AC-08 (format_diversity ≥1 AND
 code_vs_canonical ≥1) is satisfied via the constraint #10 gap-downgrade
-path: iter-3 follow-up card (`0016-validate-corpus-iter3.yaml`) is filed
+path: iter-3 follow-up spec (`orbit/specs/2026-04-28-validate-corpus-iter3/`) is filed
 to extend the harness's mechanism-attribution rules. Iter-2's GT sidecars
 stay byte-unchanged — they're already the test surface iter-3 will need.
 

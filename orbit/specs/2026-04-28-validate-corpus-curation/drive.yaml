@@ -1,4 +1,4 @@
-card: orbit/cards/0015-validate-corpus-curation.yaml
+card: orbit/cards/0014-profile-validate-precision.yaml
 autonomy: guided
 budget: 3
 iteration: 1
@@ -31,4 +31,4 @@ review_cycles:
   review_pr: 0
 review_cycle_dates:
   review_spec: 2026-04-28
-  review_pr: null
+  review_pr: 2026-04-28

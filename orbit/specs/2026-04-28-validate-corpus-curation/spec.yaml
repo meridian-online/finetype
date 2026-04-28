@@ -273,19 +273,19 @@ acceptance_criteria:
       satisfied when **either** both mechanisms attribute ≥1 column
       **or** the constraint #10 gap-downgrade path fired (escape-hatch
       6th dataset added but a target mechanism still shows 0; iter-3
-      follow-up card filed). Pinned shell:
+      follow-up spec filed). Pinned shell:
       ```bash
       fd_hit=$(grep -cE '^\| format_diversity\s+\|\s+[1-9]' \
         eval/eval_output/validate_corpus.md)
       cvc_hit=$(grep -cE '^\| code_vs_canonical\s+\|\s+[1-9]' \
         eval/eval_output/validate_corpus.md)
-      gap_card=$(ls orbit/cards/*validate-corpus-iter3* 2>/dev/null | wc -l)
+      gap_spec=$(ls -d orbit/specs/*validate-corpus-iter3* 2>/dev/null | wc -l)
       if [ "$fd_hit" -ge 1 ] && [ "$cvc_hit" -ge 1 ]; then
         echo "AC-08 satisfied: both mechanisms ≥1"
-      elif [ "$gap_card" -ge 1 ]; then
-        echo "AC-08 satisfied via gap-downgrade: iter-3 follow-up card filed"
+      elif [ "$gap_spec" -ge 1 ]; then
+        echo "AC-08 satisfied via gap-downgrade: iter-3 follow-up spec filed"
       else
-        echo "AC-08 FAIL: neither both ≥1 nor gap-card present"; exit 1
+        echo "AC-08 FAIL: neither both ≥1 nor gap-spec present"; exit 1
       fi
       ```
       (The naive `awk '{print $4}'` parse gets `|` because pipes count
@@ -336,14 +336,20 @@ acceptance_criteria:
   - id: ac-11
     ac_type: doc
     description: |
-      Card 0015 (orbit/cards/0015-validate-corpus-curation.yaml) updated to
+      Card 0014 (orbit/cards/0014-profile-validate-precision.yaml) updated to
       include this spec path in the `specs:` array. The card stays
       `maturity: emerging` per its own goal statement (only flips to
-      established when corpus reaches ≥20 datasets — this iter-2 ships at
-      12). Scenarios are unchanged (they're stage-agnostic).
+      established when the corpus reaches ≥20 datasets — this iter-2 ships
+      at 12). Scenarios are unchanged (they're stage-agnostic).
+
+      Note: an earlier draft of this AC referenced a stub card
+      `orbit/cards/0015-validate-corpus-curation.yaml`, which was deleted
+      during iter-2 wrap as a corrected-orbit-glossary refactor — corpus
+      curation is *work*, not a user-observable capability, and belongs
+      under `orbit/specs/`. The user-feature card stays at 0014.
     verification: |
-      `grep "2026-04-28-validate-corpus-curation" orbit/cards/0015-validate-corpus-curation.yaml`
-      returns 1 hit. `grep "maturity:" orbit/cards/0015-validate-corpus-curation.yaml`
+      `grep "2026-04-28-validate-corpus-curation" orbit/cards/0014-profile-validate-precision.yaml`
+      returns 1 hit. `grep "maturity:" orbit/cards/0014-profile-validate-precision.yaml`
       shows "emerging".
 
 implementation_notes:

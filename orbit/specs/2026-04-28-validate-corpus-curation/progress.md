@@ -16,7 +16,7 @@
 - [x] **ac-05** — eval/row_hashes.tsv regenerated; firewall test ≥8 PASS
 - [x] **ac-06** — `scripts/synth_prescreen_manifest.py` committed; eval-shaped column-level manifest synthesises 266 rows from 12 datasets (prescreen against MADR 0055 floors deferred — floors calibrated for synthetic training data, not real-world heterogeneity; documented in iter-2 report)
 - [x] **ac-07** — eval/eval_output/validate_corpus.md regenerated with `**3 of 12 datasets pass at P=99%**` headline (matches `(12|13)` regex)
-- [x] **ac-08** — format_diversity=0 AND code_vs_canonical=0 in attribution; **gap-downgrade path active** via filed iter-3 follow-up card `orbit/cards/0016-validate-corpus-iter3.yaml` per constraint #10 disjunction
+- [x] **ac-08** — format_diversity=0 AND code_vs_canonical=0 in attribution; **gap-downgrade path active** via filed iter-3 follow-up spec `orbit/specs/2026-04-28-validate-corpus-iter3/` per constraint #10 disjunction
 - [x] **ac-09** — `## Iter-2 expected vs actual` mismatch table appended (5 data rows + header satisfy ≥5 minimum-padding awk regex)
 - [x] **ac-10** — `make ci` exits 0
 - [x] **ac-11** — Card 0015 specs[] array includes this spec path
@@ -59,7 +59,7 @@ GDELT compact-integer dates, FIFA position ratings, OECD CODE/LABEL
 pairs, and S&P 500 GICS Sector all attributed to misclassification by
 the iter-1 harness. Iter-2 GT sidecars stay byte-unchanged — they're
 already the test surface for iter-3's mechanism-attribution rules.
-Filed `orbit/cards/0016-validate-corpus-iter3.yaml` per constraint #10
+Filed `orbit/specs/2026-04-28-validate-corpus-iter3/spec.yaml` per constraint #10
 gap-downgrade path. Iter-2 report's `## Iter-2 expected vs actual`
 table records the curation thesis vs harness attribution for each
 dataset.

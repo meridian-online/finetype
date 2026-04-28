@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-28
 **Interviewer:** Nightingale (guided)
-**Card:** orbit/cards/0015-validate-corpus-curation.yaml
+**Card:** orbit/cards/0014-profile-validate-precision.yaml
 **Mode:** design
 
 ---
