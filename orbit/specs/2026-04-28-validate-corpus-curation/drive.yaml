@@ -28,7 +28,7 @@ history:
 started: 2026-04-28T13:30:00+01:00
 review_cycles:
   review_spec: 3
-  review_pr: 0
+  review_pr: 1
 review_cycle_dates:
   review_spec: 2026-04-28
   review_pr: 2026-04-28

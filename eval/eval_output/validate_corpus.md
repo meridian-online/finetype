@@ -145,5 +145,39 @@ stay byte-unchanged — they're already the test surface iter-3 will need.
 **Headline delta context.** Pass count holds at 3/12 (3/7 iter-1 + 0/5
 iter-2), delta +0 vs iter-1 baseline. The 5 iter-2 datasets are
 deliberately failure-rich (mechanism-coverage curation per scenario 2 of
-card 0015) — a delta of 0 is the expected outcome. The signal of interest
-is the per-mechanism distribution above, not the headline count.
+the iter-2 spec) — a delta of 0 is the expected outcome. The signal of
+interest is the per-mechanism distribution above, not the headline count.
+
+## Pre-screen floor deferral (AC-06 gap-downgrade)
+
+The MADR 0055 realism floors at `eval/pre-screen_floors.yaml` were
+calibrated against synthetic generator output (uniform draw, balanced
+cardinalities, predictable null shape). Real-world validate-corpus
+data violates those floors structurally, not pathologically:
+
+| Dataset | Columns failing floors | Dominant cause |
+|---|---:|---|
+| gdelt_events | 33 | SDMX-style flat-dimension columns (e.g. CAMEO event codes carry single-value sub-dimensions across long row blocks) |
+| oecd_employment | 24 | CODE/LABEL pair design — each pair has 1 unique code per row block (`STRUCTURE` has 1 unique value across 5000 rows by SDMX design) |
+| nyc_taxi | 11 | Categorical `VendorID` / `payment_type` with 2-3 unique values across 5000 rows (real, not synthetic) |
+| fifa_players | 9 | Position-rating columns (`LS`..`RB`) carry "88+2" composite ratings, dropping unique_ratio under floor |
+
+**77 of the 98 total floor failures originate from iter-2 datasets.**
+The drop-and-replace path called for in constraint #5 of the iter-2 spec
+("Datasets that fail the floor are dropped and replaced within the same
+mechanism bucket") is not satisfiable for these patterns — the failures
+are intrinsic to the real-world dimension models the datasets were
+chosen for, not curation defects. Replacing them with floor-compliant
+alternatives would forfeit the mechanism coverage (format_diversity,
+code_vs_canonical) that motivated their selection in the first place.
+
+**AC-06 is therefore gap-downgraded.** Iter-2 ships with the floor
+violations documented here; floor recalibration (or a real-world floor
+profile distinct from the synthetic-generator floor profile) is unfiled
+future work. The recalibration is mechanism-orthogonal to iter-3's
+attribution-rule spec — when scheduled, it lands as a separate spec
+under card 0014.
+
+The deferral is parallel to AC-08's gap-downgrade (mechanism attribution
+deferred to iter-3): both surface real-world friction that iter-1's
+synthetic-corpus assumptions papered over.
