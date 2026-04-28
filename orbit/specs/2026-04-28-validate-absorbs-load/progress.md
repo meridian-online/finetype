@@ -8,7 +8,7 @@ Spec: `orbit/specs/2026-04-28-validate-absorbs-load/spec.yaml` (v1.1, 13 ACs)
 - [x] ac-02 — `cmd_validate_table` materialise path uses projection (DATE/DECIMAL/VARCHAR)
 - [x] ac-03 — TRY-wrap transforms; `TRANSFORM_FAILED` reject row (`2024-02-30` case)
 - [x] ac-04 — NULL-in-NULL-out NOT a transform failure (empty cell, exit 0, count=3)
-- [x] ac-05 — `Commands::Load` / dispatch arm / `cmd_load` deleted; LOC delta -420 (well under -250 target)
+- [x] ac-05 — `Commands::Load` / dispatch arm / `cmd_load` deleted; net main.rs delta **-309 LOC** (197 ins / 506 del; well under -250 target). Achieved by relocating projection helper + 5 unit tests out of main.rs in cycle-2 (see Hand-off addendum).
 - [x] ac-06 — `finetype load` → clap unknown-subcommand error, exit 2 (`test_vrp_load_subcommand_removed`)
 - [x] ac-07 — MCP `lib.rs:113` description addendum; `tools/validate.rs` doc-comment-only edit (ValidateRequest unchanged)
 - [x] ac-08 — 13 vrp_* CLI tests green (8 prior + 4 new typed-CTAS + 1 unknown-subcommand verification); 7 engine-side untouched
@@ -36,4 +36,45 @@ Spec: `orbit/specs/2026-04-28-validate-absorbs-load/spec.yaml` (v1.1, 13 ACs)
 ## Hand-off — review-pr
 
 Branch: `rally/validate-absorbs-load` (stacked on `rally/schema-verb-fold` → `main`).
-8 commits since branch point. Ready for forked review per drive §7.
+Ready for forked review per drive §7.
+
+### Cycle-2 addendum (2026-04-28)
+
+Cycle-1 review-pr returned REQUEST_CHANGES on ac-05: net main.rs LOC
+delta was -55, missing the spec's `≤ -250` numeric contract by 195
+LOC. Reviewer's recommended Path 1 ("relocate the 5 unit tests +
+helpers out of main.rs's tests module into a new integration test
+file; optionally relocate the projection helper into a sibling
+module") was taken.
+
+Changes:
+
+- Created `crates/finetype-cli/src/lib.rs` (8-line library surface
+  declaring `pub mod transform_projection;`).
+- Created `crates/finetype-cli/src/transform_projection.rs` containing
+  the `pub` versions of `SchemaExtensions`, `format_column_name`,
+  `build_transform_projection`, `build_transform_projection_one`.
+- Deleted those 4 items + the doc-comment block + the 5
+  `build_transform_projection_*` unit tests + the
+  `test_format_column_name_with_embedded_quotes` unit test + the 2
+  helpers (`ext_with_label`, `test_taxonomy`) from `main.rs`.
+- Added `use finetype_cli::transform_projection::{...};` to main.rs's
+  imports — `cmd_validate_table`'s materialise path now calls the
+  helper through the lib, byte-identical contract.
+- Created `crates/finetype-cli/tests/build_transform_projection.rs`
+  with all 6 tests (5 projection + 1 format_column_name) + helpers,
+  importing the public surface via the lib.
+
+Verification:
+
+- `git diff --shortstat rally/schema-verb-fold -- crates/finetype-cli/src/main.rs`
+  → `197 insertions, 506 deletions` = **net -309 LOC** (target ≤ -250
+  cleared with 59 LOC margin).
+- `cargo test -p finetype-cli --test build_transform_projection`
+  → 6/6 PASS.
+- `cargo test -p finetype-cli --test validate_cli -- --ignored`
+  → 13/13 PASS (no behaviour regression).
+- `make ci` → fmt + clippy + test + check (240/240 taxonomy, 12000/12000 samples) all green.
+
+CHANGELOG migration map tightened to the spec's literal two-line
+format inside a fenced code block (cycle-1 INFO finding addressed).

@@ -11,20 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Retire the load verb (v0.6.19, MADR 0071)** — The standalone
   `finetype load` verb is gone. The typed-DuckDB-table output path
-  migrates to `finetype validate` with `--db`/`--table`:
+  migrates to `finetype validate` with `--db`/`--table`. Migration
+  map (verbatim from the spec):
 
-  - `finetype load -f data.csv` → `finetype validate data.csv schema.json --db out.db --table data`
+  ```
+  finetype load FILE.csv -t TABLE  →
+    finetype profile -f FILE.csv -o json-schema > schema.json
+    finetype validate FILE.csv schema.json --db out.db --table TABLE
+  ```
 
-  Generate the schema first via `finetype profile -f data.csv -o
-  json-schema > schema.json`. The new path adds a JSON-Schema-driven
-  quality gate, TRY-wrapped per-column transforms, and a queryable
-  reject sidecar in a single pass. `finetype load …` now errors via
-  clap's stock unknown-subcommand handler with exit code 2 — no shim,
-  no warning, no carve-out. `Commands::Load`, `cmd_load`,
-  `build_load_expr`, `build_load_expr_enum`, the orphan
-  `sanitise_identifier`, and 6 obsolete unit tests deleted (~270 LOC).
-  Public CLI surface drops to **5 verbs**: infer, profile, validate,
-  mcp, taxonomy. See MADR 0071 (refines MADR 0064).
+  The new path adds a JSON-Schema-driven quality gate, TRY-wrapped
+  per-column transforms, and a queryable reject sidecar in a single
+  pass. `finetype load …` now errors via clap's stock
+  unknown-subcommand handler with exit code 2 — no shim, no warning,
+  no carve-out. `Commands::Load`, `cmd_load`, `build_load_expr`,
+  `build_load_expr_enum`, the orphan `sanitise_identifier`, and 6
+  obsolete unit tests deleted. Public CLI surface drops to **5
+  verbs**: infer, profile, validate, mcp, taxonomy. See MADR 0071
+  (refines MADR 0064).
 
 - **Retire the schema verb (v0.6.19, MADR 0070)** — The standalone
   `finetype schema` verb is gone. JSON Schema export migrates to its

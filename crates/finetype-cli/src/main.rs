@@ -4,6 +4,9 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use finetype_cli::transform_projection::{
+    build_transform_projection, format_column_name, SchemaExtensions,
+};
 use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
 use finetype_mcp::json_schema;
 use finetype_model::Classifier;
@@ -2553,98 +2556,6 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     prev[b_len]
 }
 
-/// Build the comma-separated SELECT projection for the validate materialise CTAS
-/// (ac-01).
-///
-/// Lifts the per-column expression logic that used to live in `cmd_load`'s
-/// `build_load_expr` into a free function callable from `cmd_validate_table`.
-/// The 5-branch decision tree is:
-///
-/// 1. **Unlabelled** (`x-finetype-label` absent on the column schema) → emit a
-///    bare quoted identifier. Preserves MADR 0064 ac-11 graceful-degradation —
-///    columns without a label fall through as VARCHAR.
-/// 2. **Labelled but unknown to taxonomy** (label present but
-///    `Taxonomy::ddl_info()` returns `None`) → bare quoted identifier. Same
-///    graceful-degradation contract as branch 1 — an unknown label cannot drive
-///    a typed cast.
-/// 3. **VARCHAR-typed** (`ddl_info.duckdb_type == "VARCHAR"`) → bare quoted
-///    identifier. Mirrors `build_load_expr` branch 1 — no redundant CAST for
-///    VARCHAR.
-/// 4. **Has transform** → `<transform> AS "col"`. When `try_wrap` is true the
-///    full transform expression is wrapped in `TRY(...)` so DuckDB returns NULL
-///    on cast failures instead of aborting the CTAS. The transform string is
-///    expected to contain `{col}`, which is substituted with the quoted
-///    identifier.
-/// 5. **No transform, non-VARCHAR** → fallback `CAST("col" AS T) AS "col"` (or
-///    `TRY_CAST` when `try_wrap` is true). Mirrors `build_load_expr` branch 3.
-///
-/// `try_wrap=true` is the validate path's binding-choice contract (constraint
-/// in spec): every typed transform is wrapped in `TRY(...)` so the CTAS sees a
-/// NULL on transform failure rather than aborting. The pre-CTAS sweep then
-/// detects `staging IS NOT NULL AND TRY(transform) IS NULL` and emits a
-/// `TRANSFORM_FAILED` reject row, removing the `__row_idx` from the valid set
-/// before the user-table CTAS runs (ac-03 + ac-04).
-fn build_transform_projection(
-    headers: &[String],
-    extensions: &SchemaExtensions,
-    taxonomy: &Taxonomy,
-    try_wrap: bool,
-) -> String {
-    headers
-        .iter()
-        .map(|h| build_transform_projection_one(h, extensions, taxonomy, try_wrap))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-/// Single-column branch for `build_transform_projection`. Pulled out so the
-/// 5-branch logic can be unit-tested independently of `headers` slicing.
-fn build_transform_projection_one(
-    header: &str,
-    extensions: &SchemaExtensions,
-    taxonomy: &Taxonomy,
-    try_wrap: bool,
-) -> String {
-    let col_ref = format_column_name(header);
-    let (label_opt, _confidence) = extensions.get(header);
-
-    // Branch 1 — unlabelled column (no x-finetype-label). Bare passthrough.
-    let label = match label_opt {
-        Some(s) => s,
-        None => return col_ref,
-    };
-
-    // Branch 2 — labelled but unknown to the taxonomy. Bare passthrough.
-    let info = match taxonomy.ddl_info(&label) {
-        Some(i) => i,
-        None => return col_ref,
-    };
-
-    // Branch 3 — VARCHAR-typed. Bare passthrough.
-    if info.duckdb_type == "VARCHAR" {
-        return col_ref;
-    }
-
-    // Branch 4 — has transform. Substitute {col}, optionally TRY-wrap.
-    if let Some(tf) = info.transform.as_ref() {
-        let cast_expr = tf.replace("{col}", &col_ref);
-        if try_wrap {
-            return format!("TRY({}) AS {}", cast_expr, col_ref);
-        }
-        return format!("{} AS {}", cast_expr, col_ref);
-    }
-
-    // Branch 5 — no transform, non-VARCHAR. CAST or TRY_CAST.
-    if try_wrap {
-        format!(
-            "TRY_CAST({} AS {}) AS {}",
-            col_ref, info.duckdb_type, col_ref
-        )
-    } else {
-        format!("CAST({} AS {}) AS {}", col_ref, info.duckdb_type, col_ref)
-    }
-}
-
 /// Map DuckDB SQL type to Arrow DataType JSON representation.
 ///
 /// Uses the Arrow IPC JSON schema format compatible with arrow-rs and pyarrow.
@@ -2663,15 +2574,6 @@ fn duckdb_to_arrow_type(duckdb_type: &str) -> serde_json::Value {
         "LIST" => json!({"name": "list"}),
         _ => json!({"name": "utf8"}),
     }
-}
-
-/// Format a column name for SQL.
-///
-/// Always quotes with double-quotes for safety — this prevents breakage from
-/// DuckDB reserved words (name, type, source, etc.), spaces, special chars,
-/// and digit-leading names. Standard SQL-compliant.
-fn format_column_name(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2869,42 +2771,6 @@ fn load_schema_or_exit(schema_path: &PathBuf) -> serde_json::Value {
     }
 
     schema
-}
-
-/// Per-column extensions carried from schema authoring time (ac-11).
-///
-/// Populated from `x-finetype-label` and `x-finetype-confidence` on each
-/// column-level schema. Missing entries are allowed — the corresponding
-/// reject columns render as NULL (graceful degradation).
-#[derive(Default)]
-struct SchemaExtensions {
-    by_column: std::collections::HashMap<String, (Option<String>, Option<f64>)>,
-}
-
-impl SchemaExtensions {
-    fn extract(schema: &serde_json::Value) -> Self {
-        let mut ext = SchemaExtensions::default();
-        if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
-            for (col_name, col_schema) in props {
-                let label = col_schema
-                    .get("x-finetype-label")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let confidence = col_schema
-                    .get("x-finetype-confidence")
-                    .and_then(|v| v.as_f64());
-                ext.by_column.insert(col_name.clone(), (label, confidence));
-            }
-        }
-        ext
-    }
-
-    fn get(&self, col_name: &str) -> (Option<String>, Option<f64>) {
-        self.by_column
-            .get(col_name)
-            .cloned()
-            .unwrap_or((None, None))
-    }
 }
 
 /// Quote a string for safe embedding as a DuckDB single-quoted literal.
@@ -4959,129 +4825,9 @@ mod tests {
         assert_eq!(content["model_type"], "charcnn");
     }
 
-    #[test]
-    fn test_format_column_name_with_embedded_quotes() {
-        // Double-quotes in column names are escaped per SQL standard
-        let name = format_column_name("col\"name");
-        assert_eq!(name, "\"col\"\"name\"");
-    }
-
-    // ── build_transform_projection (ac-01) ───────────────────────────────────
-    //
-    // Lifted from cmd_load's per-column expression builder (deleted in
-    // v0.6.19) and called by the validate materialise CTAS. The 5-branch
-    // logic is documented on the function. Each test pins one branch.
-
-    /// Helper — builds a SchemaExtensions with a single label for `col`.
-    fn ext_with_label(col: &str, label: Option<&str>) -> SchemaExtensions {
-        let mut ext = SchemaExtensions::default();
-        ext.by_column
-            .insert(col.to_string(), (label.map(|s| s.to_string()), None));
-        ext
-    }
-
-    /// Helper — load taxonomy from `labels/` (or fall back to embedded).
-    fn test_taxonomy() -> Taxonomy {
-        let path = std::path::PathBuf::from("../../labels");
-        if path.is_dir() {
-            return Taxonomy::from_directory(&path).expect("taxonomy load");
-        }
-        let path = std::path::PathBuf::from("labels");
-        Taxonomy::from_directory(&path).expect("taxonomy load")
-    }
-
-    #[test]
-    fn build_transform_projection_emits_try_wrap_when_requested() {
-        // Branch 4 with try_wrap=true: typed column with a transform gets
-        // wrapped in TRY(...). datetime.date.iso has a strptime transform.
-        let tax = test_taxonomy();
-        let ext = ext_with_label("order_date", Some("datetime.date.iso"));
-        let headers = vec!["order_date".to_string()];
-        let proj = build_transform_projection(&headers, &ext, &tax, true);
-        assert!(
-            proj.starts_with("TRY("),
-            "expected TRY(...) wrap, got: {}",
-            proj
-        );
-        assert!(
-            proj.ends_with("AS \"order_date\""),
-            "expected AS alias, got: {}",
-            proj
-        );
-    }
-
-    #[test]
-    fn build_transform_projection_passes_through_unlabelled_as_varchar() {
-        // Branch 1: column with no x-finetype-label → bare quoted identifier.
-        let tax = test_taxonomy();
-        let ext = SchemaExtensions::default();
-        let headers = vec!["raw_col".to_string()];
-        let proj = build_transform_projection(&headers, &ext, &tax, true);
-        assert_eq!(proj, "\"raw_col\"");
-    }
-
-    #[test]
-    fn build_transform_projection_passes_through_unknown_label_as_varchar() {
-        // Branch 2: labelled but the label isn't in the taxonomy → bare
-        // passthrough. Preserves graceful-degradation (MADR 0064 ac-11) for
-        // CLI fixtures that author labels not yet (or no longer) in the
-        // taxonomy — e.g. today's `identity.code.id` test fixtures.
-        let tax = test_taxonomy();
-        let ext = ext_with_label("user_id", Some("identity.code.id"));
-        let headers = vec!["user_id".to_string()];
-        let proj = build_transform_projection(&headers, &ext, &tax, true);
-        assert_eq!(proj, "\"user_id\"");
-    }
-
-    #[test]
-    fn build_transform_projection_emits_bare_passthrough_for_varchar() {
-        // Branch 3: labelled with a VARCHAR-typed taxonomy entry → bare
-        // quoted identifier (no redundant CAST). identity.person.email is
-        // VARCHAR.
-        let tax = test_taxonomy();
-        let ext = ext_with_label("contact_email", Some("identity.person.email"));
-        let headers = vec!["contact_email".to_string()];
-        let proj = build_transform_projection(&headers, &ext, &tax, true);
-        assert_eq!(proj, "\"contact_email\"");
-    }
-
-    #[test]
-    fn build_transform_projection_no_try_wrap_matches_legacy_load_shape() {
-        // Equivalence pin: with try_wrap=false the projection's per-column
-        // shape exactly matches the legacy cmd_load expression shape that
-        // was retired in v0.6.19 — bare quoted ident for VARCHAR, transform
-        // substituted with `AS "col"` for typed-with-transform, bare ident
-        // for unlabelled (graceful degradation per MADR 0064 ac-11).
-        // Each branch is tested as a single-column projection so transform
-        // expressions containing commas don't trip a naive split.
-        let tax = test_taxonomy();
-
-        // VARCHAR (identity.person.email) — bare quoted ident, no CAST.
-        let ext_email = ext_with_label("email", Some("identity.person.email"));
-        let proj_email =
-            build_transform_projection(&["email".to_string()], &ext_email, &tax, false);
-        assert_eq!(proj_email, "\"email\"");
-
-        // DATE with strptime transform — `<transform> AS "col"`. The exact
-        // transform string comes from the taxonomy so this stays in sync if
-        // the strptime format ever shifts.
-        let info = tax.ddl_info("datetime.date.iso").expect("known label");
-        let ext_date = ext_with_label("order_date", Some("datetime.date.iso"));
-        let proj_date =
-            build_transform_projection(&["order_date".to_string()], &ext_date, &tax, false);
-        let expected_transform = info
-            .transform
-            .as_ref()
-            .expect("datetime.date.iso has a transform")
-            .replace("{col}", "\"order_date\"");
-        assert_eq!(
-            proj_date,
-            format!("{} AS \"order_date\"", expected_transform),
-        );
-
-        // Unlabelled — bare quoted ident.
-        let ext_raw = SchemaExtensions::default();
-        let proj_raw = build_transform_projection(&["raw_col".to_string()], &ext_raw, &tax, false);
-        assert_eq!(proj_raw, "\"raw_col\"");
-    }
+    // build_transform_projection unit tests + format_column_name unit test
+    // moved to crates/finetype-cli/tests/build_transform_projection.rs in
+    // v0.6.19 (MADR 0071, ac-05) — they exercise the public surface in
+    // `crates/finetype-cli/src/transform_projection.rs` via the lib, no
+    // private state remained.
 }
