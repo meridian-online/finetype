@@ -2553,7 +2553,6 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     prev[b_len]
 }
 
-
 /// Build the comma-separated SELECT projection for the validate materialise CTAS
 /// (ac-01).
 ///
@@ -2637,7 +2636,10 @@ fn build_transform_projection_one(
 
     // Branch 5 — no transform, non-VARCHAR. CAST or TRY_CAST.
     if try_wrap {
-        format!("TRY_CAST({} AS {}) AS {}", col_ref, info.duckdb_type, col_ref)
+        format!(
+            "TRY_CAST({} AS {}) AS {}",
+            col_ref, info.duckdb_type, col_ref
+        )
     } else {
         format!("CAST({} AS {}) AS {}", col_ref, info.duckdb_type, col_ref)
     }
@@ -4973,10 +4975,8 @@ mod tests {
     /// Helper — builds a SchemaExtensions with a single label for `col`.
     fn ext_with_label(col: &str, label: Option<&str>) -> SchemaExtensions {
         let mut ext = SchemaExtensions::default();
-        ext.by_column.insert(
-            col.to_string(),
-            (label.map(|s| s.to_string()), None),
-        );
+        ext.by_column
+            .insert(col.to_string(), (label.map(|s| s.to_string()), None));
         ext
     }
 
@@ -5058,12 +5058,8 @@ mod tests {
 
         // VARCHAR (identity.person.email) — bare quoted ident, no CAST.
         let ext_email = ext_with_label("email", Some("identity.person.email"));
-        let proj_email = build_transform_projection(
-            &["email".to_string()],
-            &ext_email,
-            &tax,
-            false,
-        );
+        let proj_email =
+            build_transform_projection(&["email".to_string()], &ext_email, &tax, false);
         assert_eq!(proj_email, "\"email\"");
 
         // DATE with strptime transform — `<transform> AS "col"`. The exact
@@ -5071,12 +5067,8 @@ mod tests {
         // the strptime format ever shifts.
         let info = tax.ddl_info("datetime.date.iso").expect("known label");
         let ext_date = ext_with_label("order_date", Some("datetime.date.iso"));
-        let proj_date = build_transform_projection(
-            &["order_date".to_string()],
-            &ext_date,
-            &tax,
-            false,
-        );
+        let proj_date =
+            build_transform_projection(&["order_date".to_string()], &ext_date, &tax, false);
         let expected_transform = info
             .transform
             .as_ref()
@@ -5089,12 +5081,7 @@ mod tests {
 
         // Unlabelled — bare quoted ident.
         let ext_raw = SchemaExtensions::default();
-        let proj_raw = build_transform_projection(
-            &["raw_col".to_string()],
-            &ext_raw,
-            &tax,
-            false,
-        );
+        let proj_raw = build_transform_projection(&["raw_col".to_string()], &ext_raw, &tax, false);
         assert_eq!(proj_raw, "\"raw_col\"");
     }
 }
