@@ -44,7 +44,7 @@
 5. ✓ Regenerate row_hashes.tsv (351,503 distinct hashes from 1,066,109 values)
 6. ✓ Run make validate-corpus → 12-dataset report committed
 7. ✓ Append ac-09 mismatch table (5 datasets × 1 expected/actual row each)
-8. ✓ Verify card 0015 specs[] includes this spec path
+8. ✓ Verify card 0014 specs[] includes this spec path
 9. ✓ Run make ci → exit 0
 10. → Commit, push branch, open PR (Task 11 — in flight)
 
@@ -66,5 +66,5 @@ dataset.
 
 **Headline holds at 3 of 12** (3/7 iter-1 + 0/5 iter-2; delta +0).
 Expected outcome — the 5 iter-2 datasets are deliberately failure-rich
-per scenario 2 of card 0015. The signal of interest is the
+per scenario 2 of card 0014. The signal of interest is the
 per-mechanism distribution, not the headline count.

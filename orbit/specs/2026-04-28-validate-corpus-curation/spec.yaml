@@ -458,7 +458,7 @@ implementation_notes:
     7. Append ac-09 `## Iter-2 expected vs actual` mismatch table to the
        report (manual append after the harness completes — the harness
        does not emit this section)
-    8. Update card 0015 `specs:` array (already done at spec stage; verify)
+    8. Update card 0014 `specs:` array (already done at spec stage; verify)
     9. Run `make ci` → must exit 0
     10. Open PR with the iter-2 changeset
 
