@@ -1,0 +1,13 @@
+columns:
+  Country Name: geography.location.country
+  Country Code: geography.location.country_code
+  Year: datetime.component.year
+  Value: representation.numeric.integer_number
+
+notes: |
+  Iter-1 corpus dataset. 5000-row cap from upstream ~17k row file.
+  Clean control dataset — World Bank canonical country names AND
+  ISO 3166-1 alpha-3 codes. Both columns should validate without
+  drama under the geography.location.country and country_code
+  patterns. The Country Code column is the canonical-side counterpart
+  to rio2016_athletes.nationality and un_locode.Country.

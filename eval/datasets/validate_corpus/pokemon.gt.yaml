@@ -1,0 +1,21 @@
+columns:
+  "#": representation.identifier.increment
+  Name: representation.text.entity_name
+  Type 1: representation.discrete.categorical
+  Type 2: representation.discrete.categorical
+  Total: representation.numeric.integer_number
+  HP: representation.numeric.integer_number
+  Attack: representation.numeric.integer_number
+  Defense: representation.numeric.integer_number
+  Sp. Atk: representation.numeric.integer_number
+  Sp. Def: representation.numeric.integer_number
+  Speed: representation.numeric.integer_number
+  Generation: representation.discrete.ordinal
+  Legendary: representation.boolean.terms
+
+notes: |
+  Iter-1 corpus dataset. 801 rows. Pokémon stat table from a Kaggle gist.
+  Type 2 has empty cells for single-typed Pokémon — the validator must
+  accept NULL/empty without rejecting. Generation is ordinal (1..7) not
+  free categorical. Legendary is "True"/"False" — boolean.terms covers
+  these along with "true"/"false" lowercase variants.

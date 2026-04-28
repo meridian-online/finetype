@@ -1,0 +1,31 @@
+columns:
+  Change: representation.discrete.categorical
+  Country: geography.location.country_code
+  Location: representation.identifier.alphanumeric_id
+  Name: geography.location.city
+  NameWoDiacritics: geography.location.city
+  Subdivision: representation.identifier.alphanumeric_id
+  Status: representation.discrete.categorical
+  Function: representation.identifier.alphanumeric_id
+  Date: datetime.date.compact_ym
+  IATA: geography.transportation.iata_code
+  Coordinates: geography.coordinate.coordinates
+  Remarks: representation.text.plain_text
+
+notes: |
+  Iter-1 corpus dataset. 5000-row cap from upstream ~116k row file.
+  Format-diversity playground:
+    - `Date` is yyMM 4-digit short form (e.g. "0601" = 2006-Jan).
+      datetime.date.compact_ym is the closest taxonomy fit but the
+      live universal validator may reject 4-digit forms; ac-10 candidate.
+    - `Coordinates` is packed lat/lon "DDMMNS DDDMMEW" (e.g.
+      "4230N 00131E"). geography.coordinate.coordinates is the
+      taxonomic anchor; widening may be required.
+    - `Function` is a function-bitmap "12345---" (8-char string,
+      digit-or-dash). alphanumeric_id is the honest floor;
+      no precise taxonomy label exists yet.
+  Sparse cells in `Change`, `Subdivision`, `IATA`, `Remarks` are
+  NULL; validator must accept empty.
+  Code-vs-canonical seam at `Country`: ISO 3166-1 alpha-2 codes
+  (mostly canonical) — should validate clean unless the validator
+  is alpha-3 only.

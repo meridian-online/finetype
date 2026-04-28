@@ -1,16 +1,23 @@
 # eval/datasets/sources.yaml — role manifest for train↔eval leakage firewall
 #
 # Each entry records a unique source_url and its role:
-#   eval            — used ONLY for evaluation, NEVER for training
-#   train           — used ONLY for training, NEVER for evaluation
+#   eval            — used ONLY for label-eval (m-19 column-level eval corpus),
+#                     NEVER for training
+#   validate        — used ONLY for round-trip validate-precision corpus
+#                     (spec 2026-04-28-validate-precision-corpus), NEVER for
+#                     training. Disjoint from `eval` data; shares the
+#                     leakage-firewall semantics.
+#   train           — used ONLY for training, NEVER for evaluation or validation
 #   both-forbidden  — contaminated source; excluded from both sides
 #
 # Resolution rule (MADR 0056 §Layer 1):
-#   When a source appears on both sides, eval keeps the source and training
-#   must relocate to an alternative. Any source that cannot be safely relocated
-#   is tracked in progress.md under `un-relocatable training sources`.
+#   When a source appears on both sides, eval/validate keeps the source and
+#   training must relocate to an alternative. Any source that cannot be safely
+#   relocated is tracked in progress.md under `un-relocatable training sources`.
 #
-# Populated from eval/datasets/manifest.csv (ac-02). Regenerate with:
+# Populated from eval/datasets/manifest.csv (role: eval, ac-02 of 2026-04-21
+# spec) and eval/datasets/validate_manifest.csv (role: validate, ac-02 of
+# 2026-04-28-validate-precision-corpus spec). Regenerate with:
 #   python scripts/build_sources_yaml.py  (future helper)
 
 version: 1
@@ -274,3 +281,58 @@ sources:
     fetched_date: 2026-04-21
     attribution: "Hand-curated representative format examples added during eval-expansion Phase A+B (spec 2026-04-21-eval-expansion, ac-05). Author-attested."
     datasets: [coverage_closure_phase_ab]
+
+  # validate-precision corpus iteration 1 — 7 whole-CSV datasets sourced
+  # from public open-data URLs, capped to ≤5000 rows via deterministic
+  # head-sampling. Disjoint from m-19's eval CSVs (verified by author at
+  # spec time). Used only for round-trip validate-precision measurement
+  # (spec 2026-04-28-validate-precision-corpus). MADR 0073 documents the
+  # validate-corpus reuses-m-19-infrastructure decision.
+  - source_url: https://gist.githubusercontent.com/armgilles/194bcff35001e7eb53a2a8b441e8b2c6/raw/92200bc0a673d5ce2110aaad4544ed6c4010f687/pokemon.csv
+    role: validate
+    licence: public-domain
+    fetched_date: 2026-04-28
+    attribution: "Pokemon dataset (Generations 1–6) — public-domain gist by armgilles. 800 rows × 13 columns; categorical-heavy (Type 1, Type 2, Generation, Legendary)."
+    datasets: [pokemon]
+
+  - source_url: https://raw.githubusercontent.com/flother/rio2016/master/athletes.csv
+    role: validate
+    licence: public-domain
+    fetched_date: 2026-04-28
+    attribution: "Rio 2016 Olympic athletes — public-domain dataset by flother. ~10k rows capped at 5000; nationality column is 3-letter NOC code (code-vs-canonical seam)."
+    datasets: [rio2016_athletes]
+
+  - source_url: https://raw.githubusercontent.com/hadley/data-baby-names/master/baby-names.csv
+    role: validate
+    licence: public-domain
+    fetched_date: 2026-04-28
+    attribution: "US baby names by year and sex — Hadley Wickham's public-domain dataset. ~258k rows capped at 5000."
+    datasets: [us_baby_names]
+
+  - source_url: https://raw.githubusercontent.com/datasets/co2-fossil-by-nation/main/data/fossil-fuel-co2-emissions-by-nation.csv
+    role: validate
+    licence: PDDL-1.0
+    fetched_date: 2026-04-28
+    attribution: "CO2 emissions by nation, fossil fuels — github.com/datasets curated CSV under PDDL-1.0. ~18k rows capped at 5000; Country uppercase non-canonical (code-vs-canonical seam)."
+    datasets: [co2_emissions_by_nation]
+
+  - source_url: https://raw.githubusercontent.com/datasets/population/master/data/population.csv
+    role: validate
+    licence: PDDL-1.0
+    fetched_date: 2026-04-28
+    attribution: "World population by country and year — github.com/datasets curated CSV under PDDL-1.0. ~17k rows capped at 5000; Country Code is canonical ISO 3166-1 alpha-3 (control)."
+    datasets: [world_population]
+
+  - source_url: https://raw.githubusercontent.com/datasets/un-locode/master/data/code-list.csv
+    role: validate
+    licence: PDDL-1.0
+    fetched_date: 2026-04-28
+    attribution: "UN/LOCODE location codes — github.com/datasets curated CSV under PDDL-1.0. ~116k rows capped at 5000; Date yyMM short-form, Coordinates DDMMNS DDDMMEW packed format (format-diversity playground)."
+    datasets: [un_locode]
+
+  - source_url: https://raw.githubusercontent.com/datasets/global-temp/master/data/annual.csv
+    role: validate
+    licence: PDDL-1.0
+    fetched_date: 2026-04-28
+    attribution: "Global annual mean temperature anomaly (GISTEMP and GCAG) — github.com/datasets curated CSV under PDDL-1.0. 319 rows; clean control with 2-value categorical Source."
+    datasets: [global_temp_annual]

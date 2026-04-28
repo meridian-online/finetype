@@ -6,4 +6,5 @@
 //! library, not its binary. Anything declared here MUST stay in lockstep with
 //! its caller in `main.rs`.
 
+pub mod enum_emission;
 pub mod transform_projection;

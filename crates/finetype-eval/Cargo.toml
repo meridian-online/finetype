@@ -39,6 +39,10 @@ path = "src/bin/eval_sotab_prepare.rs"
 name = "eval-sotab-cli"
 path = "src/bin/eval_sotab_cli.rs"
 
+[[bin]]
+name = "validate-corpus"
+path = "src/bin/validate_corpus.rs"
+
 [dependencies]
 csv = { workspace = true }
 serde = { workspace = true }
