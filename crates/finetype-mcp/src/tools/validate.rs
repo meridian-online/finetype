@@ -1,4 +1,19 @@
 //! `validate` tool — validate CSV data against a JSON Schema.
+//!
+//! The MCP `validate` tool returns engine-level pass/fail results (per-row
+//! and per-column) plus a quality grade. The corresponding CLI verb
+//! `finetype validate` adds a typed-materialisation path when invoked with
+//! `--db <path> --table <name>`: valid rows land in a typed DuckDB table
+//! (per-column transforms applied via TRY-wrapped projection) and rejects
+//! flow into `finetype_reject_errors`, with `error_type` discriminated as
+//! `SEMANTIC_TYPE` (engine validation failure) or `TRANSFORM_FAILED`
+//! (cell passed validation but failed the typed cast — `constraint_failed`
+//! is `'transform'`). Staging-NULL → typed-NULL is not a transform failure.
+//! See MADR 0064 (validate as DuckDB reject pipeline) and MADR 0071
+//! (validate absorbs load).
+//!
+//! `ValidateRequest` is unchanged — the typed-materialisation path is a
+//! CLI-only surface; the MCP tool remains a pure pass/fail validator.
 
 use crate::FineTypeServer;
 use finetype_core::validate_table;

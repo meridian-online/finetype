@@ -207,46 +207,18 @@ else
 fi
 rm -f "$TMPBIN3"
 
-# ── Load — DuckDB Integration ────────────────────────────────────────────────
+# ── Load subcommand removed — should error via clap unknown-subcommand ──────
 
-section "8. Load — DuckDB Round-Trip"
+section "8. finetype load — removed in v0.6.19 (MADR 0071)"
 
-if command -v duckdb &>/dev/null; then
-    # Create CSV with reserved-word column names (name, type, source)
-    # These trigger DuckDB's normalize_names renaming (name→_name) which
-    # previously broke the generated SQL.
-    LOAD_CSV=$(mktemp /tmp/finetype-smoke-load-XXXXXX.csv)
-    cat > "$LOAD_CSV" <<'CSVEOF'
-name,type,source,city
-John Doe,person,manual,Auckland
-Jane Smith,person,import,Wellington
-Bob Wilson,business,api,Christchurch
-Alice Brown,person,manual,Dunedin
-Charlie Lee,person,import,Hamilton
-CSVEOF
-
-    # finetype load output should be valid SQL that DuckDB can execute
-    LOAD_SQL=$("$FINETYPE" load -f "$LOAD_CSV" --limit 0 2>/dev/null)
-    if echo "$LOAD_SQL" | duckdb 2>/dev/null; then
-        pass "load | duckdb with reserved-word columns (name, type, source)"
-    else
-        LOAD_ERR=$(echo "$LOAD_SQL" | duckdb 2>&1 | grep -i "error" | head -3)
-        fail "load | duckdb with reserved-word columns" "$LOAD_ERR"
-    fi
-
-    # Also test with the preview SELECT (default --limit 10)
-    LOAD_SQL_PREVIEW=$("$FINETYPE" load -f "$LOAD_CSV" 2>/dev/null)
-    if echo "$LOAD_SQL_PREVIEW" | duckdb 2>/dev/null; then
-        pass "load | duckdb with preview SELECT"
-    else
-        LOAD_ERR=$(echo "$LOAD_SQL_PREVIEW" | duckdb 2>&1 | grep -i "error" | head -3)
-        fail "load | duckdb with preview SELECT" "$LOAD_ERR"
-    fi
-
-    rm -f "$LOAD_CSV"
+# `finetype load …` must error with exit 2 via clap's unknown-subcommand
+# handler. No shim, no warning, no carve-out. The typed-CTAS path now
+# lives on `finetype validate --db --table` (covered by validate_cli.rs).
+LOAD_OUT=$("$FINETYPE" load -f /tmp/anything.csv 2>&1) || LOAD_EXIT=$?
+if [ "${LOAD_EXIT:-0}" -eq 2 ]; then
+    pass "finetype load exits 2 via clap unknown-subcommand"
 else
-    skip "load | duckdb round-trip (duckdb not installed)"
-    skip "load | duckdb with preview SELECT (duckdb not installed)"
+    fail "finetype load exits 2 via clap unknown-subcommand" "got exit ${LOAD_EXIT:-0}: $LOAD_OUT"
 fi
 
 # ── Error Handling ────────────────────────────────────────────────────────────

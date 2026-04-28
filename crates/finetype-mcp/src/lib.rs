@@ -110,7 +110,7 @@ impl FineTypeServer {
     }
 
     #[tool(
-        description = "Validate CSV data against a JSON Schema. Returns per-row and per-column validation results with a quality grade."
+        description = "Validate CSV data against a JSON Schema. Returns per-row and per-column validation results with a quality grade. When the corresponding CLI is run with --db/--table, valid rows are materialised into a typed DuckDB table (per-column transforms applied via TRY-wrapped projection) and rejects land in the finetype_reject_errors sidecar — error_type='SEMANTIC_TYPE' for engine-level rejects, error_type='TRANSFORM_FAILED' (constraint_failed='transform') for cells that passed validation but failed the typed cast. Staging-NULL → typed-NULL is not a transform failure."
     )]
     async fn validate(
         &self,

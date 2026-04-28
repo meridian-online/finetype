@@ -53,31 +53,6 @@ fn run_profile_json(csv_path: &Path) -> Value {
     })
 }
 
-/// Run `finetype load -f <path>` and return the DDL string.
-fn run_load(csv_path: &Path) -> String {
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "finetype-cli",
-            "--",
-            "load",
-            "-f",
-            csv_path.to_str().unwrap(),
-        ])
-        .current_dir(workspace_root())
-        .output()
-        .expect("failed to run finetype load");
-
-    assert!(
-        output.status.success(),
-        "load failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    String::from_utf8(output.stdout).expect("invalid utf8")
-}
-
 /// Run `finetype taxonomy --output json` and return parsed JSON array.
 fn run_taxonomy_json() -> Value {
     let output = Command::new("cargo")
@@ -491,83 +466,17 @@ fn golden_profile_categoricals() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LOAD GOLDEN TESTS
+// LOAD GOLDEN TESTS — removed in v0.6.19 alongside `finetype load`.
+//
+// `cmd_load`'s standalone DDL emission is gone. The typed-CTAS shape it
+// previously produced now lives inside `cmd_validate_table`'s materialise
+// path (driven by `build_transform_projection`). End-to-end coverage for
+// the typed-CTAS round trip lives at
+// `crates/finetype-cli/tests/validate_cli.rs::test_vrp_typed_ctas_round_trip`,
+// and the projection builder itself is unit-tested in `main.rs` (5 cases:
+// VARCHAR pass-through, transform with TRY-wrap, transform without TRY-wrap,
+// fallback CAST, unknown-label pass-through).
 // ═══════════════════════════════════════════════════════════════════════════════
-
-#[test]
-#[ignore]
-fn golden_load_datetime_formats() {
-    let ddl = run_load(&dataset_path("datetime_formats.csv"));
-
-    // Should contain CREATE TABLE
-    assert!(
-        ddl.contains("CREATE TABLE"),
-        "load output should contain CREATE TABLE"
-    );
-
-    // Key columns should have correct DuckDB types (not VARCHAR).
-    // All column names are double-quoted (decision 0047).
-    assert!(
-        ddl.contains("::DATE AS \"iso_date\""),
-        "iso_date should be DATE, got:\n{ddl}"
-    );
-    assert!(
-        ddl.contains("strptime(\"iso_timestamp\""),
-        "iso_timestamp should use strptime"
-    );
-    assert!(
-        ddl.contains("to_timestamp(\"unix_epoch\""),
-        "unix_epoch should use to_timestamp"
-    );
-    assert!(
-        ddl.contains("to_timestamp(\"unix_ms\""),
-        "unix_ms should use to_timestamp"
-    );
-    assert!(
-        ddl.contains("::TIME AS \"time_24h\""),
-        "time_24h should be TIME"
-    );
-    // duration_iso is passed through (VARCHAR) — no ::INTERVAL cast in load
-    assert!(
-        ddl.contains("\"duration_iso\""),
-        "duration_iso column should be present"
-    );
-
-    // Source comment
-    assert!(
-        ddl.contains("datetime_formats.csv"),
-        "DDL should reference source file"
-    );
-}
-
-#[test]
-#[ignore]
-fn golden_load_ecommerce_orders() {
-    let ddl = run_load(&dataset_path("ecommerce_orders.csv"));
-
-    assert!(ddl.contains("CREATE TABLE"), "should contain CREATE TABLE");
-
-    // Typed columns should not be plain VARCHAR.
-    // All column names are double-quoted (decision 0047).
-    assert!(
-        ddl.contains("::DATE AS \"order_date\""),
-        "order_date should be DATE"
-    );
-    assert!(
-        ddl.contains("AS DECIMAL") && ddl.contains("\"total_price\""),
-        "total_price should be DECIMAL"
-    );
-    assert!(
-        ddl.contains("AS BOOLEAN) AS \"is_gift\""),
-        "is_gift should be BOOLEAN"
-    );
-
-    // all_varchar=true should be in the read_csv call
-    assert!(
-        ddl.contains("all_varchar=true"),
-        "should use all_varchar=true"
-    );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAXONOMY GOLDEN TESTS

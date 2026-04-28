@@ -47,6 +47,7 @@ specs:
   - "orbit/specs/2026-03-12-validate-command/"
   - "orbit/specs/2026-04-22-duckdb-extension-ergonomics/spec.yaml"
   - "orbit/specs/2026-04-27-cli-pipeline-reshape/"  # planned (v0.6.19) — folds load into validate
+  - "orbit/specs/2026-04-28-validate-absorbs-load/spec.yaml"
 
 references:
   - "README.md"

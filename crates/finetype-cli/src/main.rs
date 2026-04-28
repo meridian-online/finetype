@@ -4,6 +4,9 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use finetype_cli::transform_projection::{
+    build_transform_projection, format_column_name, SchemaExtensions,
+};
 use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
 use finetype_mcp::json_schema;
 use finetype_model::Classifier;
@@ -199,49 +202,6 @@ enum Commands {
         /// Export all fields (description, validation, samples, etc.)
         #[arg(long)]
         full: bool,
-    },
-
-    /// Generate runnable DuckDB CTAS from file profiling
-    Load {
-        /// Input CSV file
-        #[arg(short, long)]
-        file: PathBuf,
-
-        /// Override table name (default: derived from filename)
-        #[arg(long)]
-        table_name: Option<String>,
-
-        /// Maximum values to sample per column (default 100)
-        #[arg(long, default_value = "100")]
-        sample_size: usize,
-
-        /// CSV delimiter character (default: auto-detect)
-        #[arg(long)]
-        delimiter: Option<char>,
-
-        /// Disable column name header hints
-        #[arg(long)]
-        no_header_hint: bool,
-
-        /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "multi-branch")]
-        model_type: ModelType,
-
-        /// Number of preview rows in trailing SELECT (0 = no preview)
-        #[arg(long, default_value = "10")]
-        limit: usize,
-
-        /// Deprecated: column names are now always quoted (normalize_names removed)
-        #[arg(long, hide = true)]
-        no_normalize_names: bool,
-
-        /// Cardinality threshold for ENUM columns (0 = disable ENUM, use VARCHAR)
-        #[arg(long, default_value = "50")]
-        enum_threshold: usize,
-
-        /// Enable pipeline tracing (shows Sense, mask, hint, and feature rule decisions)
-        #[arg(short, long)]
-        verbose: bool,
     },
 
     /// Validate generator ↔ taxonomy alignment
@@ -497,7 +457,6 @@ fn main() -> Result<()> {
     // debug-level tracing for the inference pipeline, otherwise use defaults.
     let verbose_tracing = match &cli.command {
         Commands::Profile { verbose, .. } => *verbose,
-        Commands::Load { verbose, .. } => *verbose,
         _ => false,
     };
     if std::env::var("RUST_LOG").is_ok() {
@@ -584,29 +543,6 @@ fn main() -> Result<()> {
             output,
             full,
         } => cmd_taxonomy(type_key, file, domain, category, priority, output, full),
-
-        Commands::Load {
-            file,
-            table_name,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            limit,
-            no_normalize_names,
-            enum_threshold,
-            verbose: _,
-        } => cmd_load(
-            file,
-            table_name,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            limit,
-            no_normalize_names,
-            enum_threshold,
-        ),
 
         Commands::Check {
             taxonomy,
@@ -2620,322 +2556,6 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     prev[b_len]
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOAD — Profile file → runnable DuckDB CTAS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
-fn cmd_load(
-    file: PathBuf,
-    table_name: Option<String>,
-    sample_size: usize,
-    delimiter: Option<char>,
-    no_header_hint: bool,
-    model_type: ModelType,
-    limit: usize,
-    _no_normalize_names: bool, // deprecated: column names are now always quoted
-    enum_threshold: usize,
-) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
-
-    let model = resolve_model_path();
-
-    eprintln!("Loading model from {:?}", model);
-    let config = ColumnConfig {
-        sample_size,
-        ..Default::default()
-    };
-    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = load_multi_branch_classifier(&model)?;
-        eprintln!(
-            "Loaded multi-branch classifier ({} classes)",
-            mb.n_classes()
-        );
-        ColumnClassifier::with_multi_branch(mb, config)
-    } else {
-        let classifier: Box<dyn ValueClassifier> = match model_type {
-            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch => unreachable!(),
-        };
-        if let Some(semantic) = load_semantic_hint() {
-            eprintln!("Loaded semantic hint classifier (Model2Vec)");
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-            if let Some(entity) = entity {
-                eprintln!("Loaded entity classifier (full_name demotion gate)");
-                cc.set_entity_classifier(entity);
-            }
-            cc
-        } else {
-            ColumnClassifier::new(classifier, config)
-        }
-    };
-
-    // Load taxonomy for validation-based attractor demotion
-    let taxonomy_path = std::path::PathBuf::from("labels");
-    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
-        taxonomy.compile_validators();
-        taxonomy.compile_locale_validators();
-        eprintln!(
-            "Loaded taxonomy ({} types, {} validators cached)",
-            taxonomy.labels().len(),
-            taxonomy.validator_count()
-        );
-        column_classifier.set_taxonomy(taxonomy);
-    }
-
-    // Wire up Sense classifier for legacy non-multi-branch models
-    if !column_classifier.has_multi_branch() {
-        wire_sense(&mut column_classifier);
-        wire_sibling_context(&mut column_classifier);
-    }
-    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
-    if column_classifier.has_multi_branch() {
-        wire_model2vec_and_siblings(&mut column_classifier);
-    }
-
-    eprintln!("Reading {:?}", file);
-
-    let (headers, columns, row_count) = read_csv_input(&file, delimiter)?;
-
-    let n_cols = headers.len();
-    eprintln!("Read {} rows, {} columns", row_count, n_cols);
-
-    // Load taxonomy for DDL info lookup
-    let taxonomy = load_taxonomy(&taxonomy_path).ok();
-
-    // Derive table name from filename stem
-    let table = table_name.unwrap_or_else(|| {
-        let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("data");
-        sanitise_identifier(stem)
-    });
-
-    // Profile each column and collect type info
-    struct LoadColumn {
-        /// Original column name from the CSV header
-        original_name: String,
-        label: String,
-        duckdb_type: String,
-        transform: Option<String>,
-        /// Sorted unique values for ENUM columns (None if not ENUM or above threshold)
-        enum_values: Option<Vec<String>>,
-    }
-
-    let mut load_cols: Vec<LoadColumn> = Vec::new();
-
-    for (i, col_values) in columns.iter().enumerate() {
-        let original_name = headers
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("col_{}", i));
-
-        if col_values.is_empty() {
-            load_cols.push(LoadColumn {
-                original_name,
-                label: "unknown".to_string(),
-                duckdb_type: "VARCHAR".to_string(),
-                transform: None,
-                enum_values: None,
-            });
-            continue;
-        }
-
-        // Use original name for header hints (pre-normalization)
-        let result = if no_header_hint {
-            column_classifier.classify_column(col_values)?
-        } else {
-            column_classifier.classify_column_with_header(col_values, &original_name)?
-        };
-
-        // Look up DDL info from taxonomy
-        let (duckdb_type, transform, raw_broad_type) = if let Some(ref tax) = taxonomy {
-            if let Some(def) = tax.get(&result.label) {
-                let ddl = tax.ddl_info(&result.label).unwrap();
-                let raw_bt = def.broad_type.clone().unwrap_or_default();
-                (ddl.duckdb_type, ddl.transform, raw_bt)
-            } else {
-                ("VARCHAR".to_string(), None, String::new())
-            }
-        } else {
-            ("VARCHAR".to_string(), None, String::new())
-        };
-
-        // Use the taxonomy broad_type directly — is_generic controls classification
-        // behaviour (header hint yielding), not cast safety. Types like decimal_number
-        // and integer_number are generic but have meaningful non-VARCHAR casts. (NNFT-252)
-
-        // NNFT-273: Collect ENUM values for categorical columns
-        let enum_values = if raw_broad_type == "ENUM" {
-            collect_unique_values_if_categorical(&result.label, col_values, enum_threshold)
-        } else {
-            None
-        };
-
-        // If ENUM with values, override duckdb_type to the enum type name
-        let final_type = if enum_values.is_some() {
-            // Will be resolved to the CREATE TYPE name during DDL generation
-            "ENUM".to_string()
-        } else {
-            duckdb_type
-        };
-
-        load_cols.push(LoadColumn {
-            original_name,
-            label: result.label,
-            duckdb_type: final_type,
-            transform,
-            enum_values,
-        });
-    }
-
-    // File path as provided by user
-    let file_str = file.to_string_lossy();
-
-    // all_varchar=true ensures FineType controls all type casting via transforms.
-    // Without it, DuckDB auto_detect may cast columns (e.g., dates) before our
-    // transform expressions can operate on them.
-    //
-    // normalize_names is NOT used — it renames reserved-word columns (name→_name,
-    // type→_type) before the SELECT sees them, breaking our column references.
-    // Instead, all column names are double-quoted for safety. Supersedes decision 0036.
-    let read_csv_params = format!("read_csv('{}', all_varchar=true)", file_str);
-
-    // Header comment
-    let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
-    let pipeline = if column_classifier.has_multi_branch() {
-        "Multi-branch→Sharpen"
-    } else {
-        "Sense→Sharpen"
-    };
-    println!(
-        "-- Generated by FineType ({} types, {} pipeline)",
-        type_count, pipeline
-    );
-    println!(
-        "-- Source: {} ({} rows, {} columns)",
-        file.file_name()
-            .and_then(|f| f.to_str())
-            .unwrap_or("unknown"),
-        row_count,
-        n_cols
-    );
-
-    // NNFT-273: Emit CREATE TYPE statements for ENUM columns
-    let mut enum_type_names: std::collections::HashMap<usize, String> =
-        std::collections::HashMap::new();
-    for (i, col) in load_cols.iter().enumerate() {
-        if let Some(ref values) = col.enum_values {
-            let type_name = format!("{}_t", sanitise_identifier(&col.original_name));
-            let escaped_values: Vec<String> = values
-                .iter()
-                .map(|v| format!("'{}'", v.replace('\'', "''")))
-                .collect();
-            println!(
-                "CREATE TYPE {} AS ENUM ({});",
-                type_name,
-                escaped_values.join(", ")
-            );
-            enum_type_names.insert(i, type_name);
-        }
-    }
-    if !enum_type_names.is_empty() {
-        println!();
-    }
-
-    // CTAS statement
-    println!("CREATE TABLE {} AS", table);
-    println!("SELECT");
-
-    // Build all expressions first to calculate alignment
-    let exprs: Vec<String> = load_cols
-        .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            if let Some(type_name) = enum_type_names.get(&i) {
-                // ENUM column: cast to the CREATE TYPE name
-                build_load_expr_enum(&c.original_name, type_name)
-            } else {
-                build_load_expr(&c.original_name, &c.duckdb_type, &c.transform)
-            }
-        })
-        .collect();
-
-    let max_expr_len = exprs.iter().map(|e| e.len()).max().unwrap_or(0);
-
-    for (i, col) in load_cols.iter().enumerate() {
-        let expr = &exprs[i];
-        let is_last = i == load_cols.len() - 1;
-        let comma = if is_last { "" } else { "," };
-
-        let comment = format!("-- {}", col.label);
-
-        // Align comments
-        let padding = max_expr_len.saturating_sub(expr.len()) + 1;
-        println!(
-            "    {}{}{:>pad$}{}",
-            expr,
-            comma,
-            " ",
-            comment,
-            pad = padding
-        );
-    }
-
-    println!("FROM {};", read_csv_params);
-
-    // Preview SELECT
-    if limit > 0 {
-        println!();
-        println!("SELECT * FROM {} LIMIT {};", table, limit);
-    }
-
-    Ok(())
-}
-
-/// Build a SELECT expression for a column in the CTAS.
-///
-/// All column names are double-quoted for safety — handles reserved words
-/// (name, type, source), spaces, and special characters without relying on
-/// DuckDB's normalize_names (which renames columns before SELECT sees them).
-/// VARCHAR/generic columns use bare column ref; typed columns use the transform.
-fn build_load_expr(original_name: &str, duckdb_type: &str, transform: &Option<String>) -> String {
-    let col_ref = format_column_name(original_name);
-
-    if duckdb_type == "VARCHAR" {
-        // Bare column reference — no redundant CAST for VARCHAR types.
-        // Note: is_generic is intentionally NOT checked here. Generic types like
-        // decimal_number/integer_number have non-VARCHAR broad_types (DOUBLE/BIGINT)
-        // and should still get their CAST applied. (NNFT-252)
-        col_ref
-    } else if let Some(tf) = transform {
-        // Substitute {col} in transform expression
-        let cast_expr = tf.replace("{col}", &col_ref);
-        format!("{} AS {}", cast_expr, col_ref)
-    } else {
-        // No transform but non-VARCHAR — simple CAST
-        format!("CAST({} AS {}) AS {}", col_ref, duckdb_type, col_ref)
-    }
-}
-
-/// Build a SELECT expression for an ENUM column in the CTAS.
-///
-/// Casts the source column to the named ENUM type created by CREATE TYPE.
-fn build_load_expr_enum(original_name: &str, enum_type_name: &str) -> String {
-    let col_ref = format_column_name(original_name);
-    format!("CAST({} AS {}) AS {}", col_ref, enum_type_name, col_ref)
-}
-
-/// Sanitise a string for use as a SQL identifier.
-/// Replaces hyphens with underscores and strips non-alphanumeric characters.
-fn sanitise_identifier(s: &str) -> String {
-    s.replace(['-', '.'], "_")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect()
-}
-
 /// Map DuckDB SQL type to Arrow DataType JSON representation.
 ///
 /// Uses the Arrow IPC JSON schema format compatible with arrow-rs and pyarrow.
@@ -2954,15 +2574,6 @@ fn duckdb_to_arrow_type(duckdb_type: &str) -> serde_json::Value {
         "LIST" => json!({"name": "list"}),
         _ => json!({"name": "utf8"}),
     }
-}
-
-/// Format a column name for SQL.
-///
-/// Always quotes with double-quotes for safety — this prevents breakage from
-/// DuckDB reserved words (name, type, source, etc.), spaces, special chars,
-/// and digit-leading names. Standard SQL-compliant.
-fn format_column_name(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3160,42 +2771,6 @@ fn load_schema_or_exit(schema_path: &PathBuf) -> serde_json::Value {
     }
 
     schema
-}
-
-/// Per-column extensions carried from schema authoring time (ac-11).
-///
-/// Populated from `x-finetype-label` and `x-finetype-confidence` on each
-/// column-level schema. Missing entries are allowed — the corresponding
-/// reject columns render as NULL (graceful degradation).
-#[derive(Default)]
-struct SchemaExtensions {
-    by_column: std::collections::HashMap<String, (Option<String>, Option<f64>)>,
-}
-
-impl SchemaExtensions {
-    fn extract(schema: &serde_json::Value) -> Self {
-        let mut ext = SchemaExtensions::default();
-        if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
-            for (col_name, col_schema) in props {
-                let label = col_schema
-                    .get("x-finetype-label")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let confidence = col_schema
-                    .get("x-finetype-confidence")
-                    .and_then(|v| v.as_f64());
-                ext.by_column.insert(col_name.clone(), (label, confidence));
-            }
-        }
-        ext
-    }
-
-    fn get(&self, col_name: &str) -> (Option<String>, Option<f64>) {
-        self.by_column
-            .get(col_name)
-            .cloned()
-            .unwrap_or((None, None))
-    }
 }
 
 /// Quote a string for safe embedding as a DuckDB single-quoted literal.
@@ -3398,11 +2973,27 @@ fn cmd_validate_table(
     //    Check-only mode skips this entire block — no DuckDB shell-out, no
     //    .db file written. The pass/fail decision is the validation engine
     //    output alone, governed by the exit-code grid below.
-    let scan_id: Option<i64> = if let (Some(db_path), Some(table_name)) =
+    //
+    //    Returns `Some((scan_id, transform_failed_count))` on materialise,
+    //    `None` on check-only. `transform_failed_count` is the number of
+    //    TRANSFORM_FAILED reject rows the pre-CTAS sweep emitted for this
+    //    scan_id — counted post-script via a tiny duckdb query against the
+    //    output .db. Both reject classes (SEMANTIC_TYPE engine rejects and
+    //    TRANSFORM_FAILED sweep rejects) feed the exit-code decision.
+    let materialise: Option<(i64, usize)> = if let (Some(db_path), Some(table_name)) =
         (db.as_ref(), table.as_ref())
     {
         // Compute scan_id now (before generating SQL).
         let scan_id: i64 = if append { next_scan_id(db_path) } else { 1 };
+
+        // Load taxonomy for typed-column projection (ac-02). Graceful failure:
+        // if `labels/` is absent (release binary without embed), we fall back
+        // to a bare-passthrough projection — every column emits as VARCHAR,
+        // matching the prior behaviour exactly. The TRANSFORM_FAILED sweep
+        // becomes a no-op for the same reason (no typed columns → no
+        // candidates → no INSERTs into __finetype_transform_failures).
+        let taxonomy_path = std::path::PathBuf::from("labels");
+        let taxonomy = load_taxonomy(&taxonomy_path).ok();
 
         // ── Generate SQL script (steps 3–10 of ac-09) ────────────────────────
         //    TEMPORARY staging table is auto-dropped when the DuckDB session
@@ -3410,6 +3001,7 @@ fn cmd_validate_table(
         //    paths (ac-09 step 10 + the constraint's staging-cleanup rule).
         let uuid = uuid::Uuid::new_v4().simple().to_string();
         let staging_ident = format!("__finetype_staging_{}", uuid);
+        let failures_ident = format!("__finetype_transform_failures_{}", uuid);
         let user_table_ident = sql_ident(table_name);
         let input_literal = sql_quote(&file.to_string_lossy());
 
@@ -3427,41 +3019,131 @@ fn cmd_validate_table(
         };
 
         // Valid-indices filter. Render as an IN list when non-empty, otherwise
-        // use `WHERE 0=1` to select nothing.
-        let valid_filter = if result.valid_row_indices.is_empty() {
-            "WHERE 0=1".to_string()
+        // use `0=1` to select nothing. Used both by the per-column TRANSFORM
+        // failure sweep and the user-table CTAS — the engine-rejected rows
+        // are excluded from both.
+        let valid_filter_predicate = if result.valid_row_indices.is_empty() {
+            "0=1".to_string()
         } else {
             let idx_list: Vec<String> = result
                 .valid_row_indices
                 .iter()
                 .map(|i| i.to_string())
                 .collect();
-            format!("WHERE __row_idx IN ({})", idx_list.join(","))
+            format!("__row_idx IN ({})", idx_list.join(","))
         };
+
+        // ── Typed-column projection (ac-02) ───────────────────────────────
+        //    For each column, pick:
+        //      • bare quoted ident          (unlabelled / unknown / VARCHAR)
+        //      • TRY(transform) AS "col"    (typed with transform — try_wrap)
+        //      • TRY_CAST("col" AS T) AS "col" (typed without transform)
+        //    See `build_transform_projection` for the 5-branch decision tree.
+        let projection = match taxonomy.as_ref() {
+            Some(t) => build_transform_projection(&headers, &extensions, t, true),
+            None => "* EXCLUDE(__row_idx)".to_string(),
+        };
+
+        // ── Pre-CTAS transform-failure sweep (ac-03 + ac-04) ──────────────
+        //    For each typed column with a transform (or a non-VARCHAR
+        //    ddl_info), an INSERT detects rows where:
+        //      staging IS NOT NULL  AND  TRY(transform) IS NULL
+        //    NULL staging cells pass through (NULL-in-NULL-out is NOT a
+        //    transform failure — staging-NULL → typed-NULL is documented
+        //    NULL-flow, see ac-04 + spec constraint). The detected
+        //    `__row_idx`s are excluded from the user-table CTAS below; the
+        //    detection table feeds the TRANSFORM_FAILED reject INSERT later.
+        let mut failure_inserts: Vec<String> = Vec::new();
+        if let Some(t) = taxonomy.as_ref() {
+            for (col_idx, header) in headers.iter().enumerate() {
+                let (label_opt, type_confidence) = extensions.get(header);
+                let label = match label_opt {
+                    Some(l) => l,
+                    None => continue,
+                };
+                let info = match t.ddl_info(&label) {
+                    Some(i) => i,
+                    None => continue,
+                };
+                if info.duckdb_type == "VARCHAR" {
+                    continue;
+                }
+                let col_ref = format_column_name(header);
+                // Build the TRY(...) expression that matches the projection
+                // branch. Branch 4 (transform present) → TRY(transform);
+                // Branch 5 (no transform, non-VARCHAR) → TRY_CAST(col AS T).
+                let try_expr = if let Some(tf) = info.transform.as_ref() {
+                    format!("TRY({})", tf.replace("{col}", &col_ref))
+                } else {
+                    format!("TRY_CAST({} AS {})", col_ref, info.duckdb_type)
+                };
+                // error_message convention (ac-10 / MADR 0071):
+                //   • SEMANTIC_TYPE rows  — `error_message` carries the
+                //     engine's pass/fail diagnostic ("validation failed"
+                //     or a parse error from the JSON Schema engine).
+                //   • TRANSFORM_FAILED rows — `error_message` carries
+                //     `transform_failed: <transform-expression>` so the
+                //     reject sidecar names exactly which DuckDB cast or
+                //     strptime() refused the cell. The two conventions
+                //     are documented in MADR 0071.
+                let error_message = if let Some(tf) = info.transform.as_ref() {
+                    format!("transform_failed: {}", tf)
+                } else {
+                    format!("transform_failed: CAST AS {}", info.duckdb_type)
+                };
+                let insert = format!(
+                    "INSERT INTO {failures} SELECT __row_idx, {col_idx}, {col_name}, {err_msg}, {expected}, {type_conf}, CAST({col_ref} AS VARCHAR) FROM {staging} WHERE {valid_filter} AND {col_ref} IS NOT NULL AND {try_expr} IS NULL;",
+                    failures = sql_ident(&failures_ident),
+                    col_idx = col_idx,
+                    col_name = sql_quote(header),
+                    err_msg = sql_quote(&error_message),
+                    expected = sql_quote(&label),
+                    type_conf = sql_opt_f64(&type_confidence),
+                    col_ref = col_ref,
+                    staging = sql_ident(&staging_ident),
+                    valid_filter = valid_filter_predicate,
+                    try_expr = try_expr,
+                );
+                failure_inserts.push(insert);
+            }
+        }
+
+        // The user-table filter excludes engine-invalid rows AND any row that
+        // any TRANSFORM_FAILED sweep flagged. The `NOT IN (SELECT ...)` clause
+        // is always emitted so the temp-table relationship stays explicit
+        // (when `failure_inserts` is empty the subquery returns zero rows
+        // and the clause has no effect).
+        let user_table_where = format!(
+            "WHERE ({}) AND __row_idx NOT IN (SELECT row_idx FROM {})",
+            valid_filter_predicate,
+            sql_ident(&failures_ident),
+        );
 
         // If --append and the user's table already exists, INSERT INTO rather
         // than CREATE TABLE AS. Otherwise CREATE TABLE AS from the staging.
         let exists_before_run = user_table_exists(db_path, table_name);
         let user_table_stmt = if append && exists_before_run {
             format!(
-                "INSERT INTO {} SELECT * EXCLUDE(__row_idx) FROM {} {};",
+                "INSERT INTO {} SELECT {} FROM {} {};",
                 user_table_ident,
+                projection,
                 sql_ident(&staging_ident),
-                valid_filter
+                user_table_where
             )
         } else {
             format!(
-                "CREATE TABLE {} AS SELECT * EXCLUDE(__row_idx) FROM {} {};",
+                "CREATE TABLE {} AS SELECT {} FROM {} {};",
                 user_table_ident,
+                projection,
                 sql_ident(&staging_ident),
-                valid_filter
+                user_table_where
             )
         };
 
-        // Build reject INSERTs. One row per RejectRecord. Authored-time
-        // (expected_type, type_confidence) comes from SchemaExtensions
-        // keyed by column name — NULL when the schema lacks x-finetype-*
-        // (ac-11 graceful degradation).
+        // Build reject INSERTs. One row per engine RejectRecord (error_type
+        // SEMANTIC_TYPE). Authored-time (expected_type, type_confidence)
+        // comes from SchemaExtensions keyed by column name — NULL when the
+        // schema lacks x-finetype-* (ac-11 graceful degradation).
         let mut reject_values: Vec<String> = Vec::with_capacity(result.rejects.len());
         for r in &result.rejects {
             let (expected_type, type_confidence) = extensions.get(&r.column_name);
@@ -3488,6 +3170,17 @@ fn cmd_validate_table(
             sql_ident(&staging_ident),
             read_fn
         ));
+        // Transform-failure detection table is always emitted, even when
+        // there are no typed columns — keeps the user-table CTAS's
+        // `NOT IN (SELECT row_idx FROM …)` clause uniform.
+        script.push_str(&format!(
+            "CREATE TEMPORARY TABLE {} (row_idx BIGINT, column_idx INTEGER, column_name VARCHAR, error_message VARCHAR, expected_type VARCHAR, type_confidence DOUBLE, constraint_value VARCHAR);\n",
+            sql_ident(&failures_ident),
+        ));
+        for insert in &failure_inserts {
+            script.push_str(insert);
+            script.push('\n');
+        }
         script.push_str(&user_table_stmt);
         script.push('\n');
         script.push_str(REJECT_SIDECAR_DDL);
@@ -3497,10 +3190,21 @@ fn cmd_validate_table(
             script.push_str(&reject_values.join(",\n"));
             script.push_str(";\n");
         }
+        // TRANSFORM_FAILED reject rows from the pre-CTAS sweep. Pulls from
+        // the temp detection table (one row per (row, typed-column) failure).
+        // `csv_line` and `byte_position` stay NULL — the FineType engine
+        // doesn't surface those for transform-cast failures.
+        if !failure_inserts.is_empty() {
+            script.push_str(&format!(
+                "INSERT INTO finetype_reject_errors SELECT {scan_id}, 0, row_idx + 1, column_idx, column_name, 'TRANSFORM_FAILED', NULL, NULL, error_message, type_confidence, expected_type, 'transform', constraint_value FROM {failures};\n",
+                scan_id = scan_id,
+                failures = sql_ident(&failures_ident),
+            ));
+        }
         script.push_str("COMMIT;\n");
-        // TEMPORARY table is auto-dropped on session end — no explicit DROP
-        // needed; this is the RAII-equivalent cleanup on both success AND
-        // error paths (ac-09 step 10).
+        // TEMPORARY tables (staging + failures) are auto-dropped on session
+        // end — no explicit DROP needed; this is the RAII-equivalent cleanup
+        // on both success AND error paths (ac-09 step 10).
 
         // ── Execute the script against the output .db ────────────────────────
         let duckdb_out = std::process::Command::new("duckdb")
@@ -3526,13 +3230,40 @@ fn cmd_validate_table(
             exit_with(2);
         }
 
-        Some(scan_id)
+        // Count TRANSFORM_FAILED rows emitted by the pre-CTAS sweep for
+        // this scan_id. Feeds the exit-code grid below — a transform
+        // failure is a reject, so any non-zero count flips exit 0 → 1
+        // (with --lenient still able to force 0).
+        let transform_failed_count: usize = if failure_inserts.is_empty() {
+            0
+        } else {
+            duckdb_query_scalar(
+                db_path,
+                &format!(
+                    "SELECT COUNT(*) FROM finetype_reject_errors WHERE scan_id = {} AND error_type = 'TRANSFORM_FAILED';",
+                    scan_id
+                ),
+            )
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0)
+        };
+
+        Some((scan_id, transform_failed_count))
     } else {
         None
     };
 
     // ── Summary report ───────────────────────────────────────────────────────
-    let reject_count = result.rejects.len();
+    //    `engine_reject_count` covers the JSON Schema / FineType engine
+    //    rejects (error_type=SEMANTIC_TYPE). `transform_failed_count` covers
+    //    the pre-CTAS sweep's TRANSFORM_FAILED rows. The two are reported
+    //    separately so analysts can see the split, and both feed the
+    //    exit-code grid below — any reject (either kind) flips exit 0 → 1
+    //    unless --lenient is set.
+    let engine_reject_count = result.rejects.len();
+    let transform_failed_count = materialise.map(|(_, c)| c).unwrap_or(0);
+    let total_reject_count = engine_reject_count + transform_failed_count;
+    let scan_id = materialise.map(|(s, _)| s);
     match output {
         OutputFormat::Plain
         | OutputFormat::Arrow
@@ -3553,11 +3284,15 @@ fn cmd_validate_table(
                 println!("  Mode:         check-only (no .db written)");
             }
             println!();
-            println!("  Total rows:   {:>6}", result.total_rows);
-            println!("  Valid rows:   {:>6}", result.valid_rows);
-            println!("  Invalid rows: {:>6}", result.invalid_rows);
-            println!("  Rejects:      {:>6}", reject_count);
-            println!("  Grade:        {}", result.grade);
+            println!("  Total rows:        {:>6}", result.total_rows);
+            println!("  Valid rows:        {:>6}", result.valid_rows);
+            println!("  Invalid rows:      {:>6}", result.invalid_rows);
+            println!("  Rejects:           {:>6}", total_reject_count);
+            if scan_id.is_some() {
+                println!("    SEMANTIC_TYPE:   {:>6}", engine_reject_count);
+                println!("    TRANSFORM_FAILED:{:>6}", transform_failed_count);
+            }
+            println!("  Grade:             {}", result.grade);
             println!("{}", "═".repeat(60));
         }
         OutputFormat::Json => {
@@ -3571,7 +3306,11 @@ fn cmd_validate_table(
                 "total_rows": result.total_rows,
                 "valid_rows": result.valid_rows,
                 "invalid_rows": result.invalid_rows,
-                "rejects": reject_count,
+                "rejects": total_reject_count,
+                "rejects_by_type": {
+                    "SEMANTIC_TYPE": engine_reject_count,
+                    "TRANSFORM_FAILED": transform_failed_count,
+                },
                 "grade": result.grade,
             });
             println!("{}", serde_json::to_string_pretty(&report)?);
@@ -3579,7 +3318,7 @@ fn cmd_validate_table(
     }
 
     // ── Exit-code grid (ac-10) ───────────────────────────────────────────────
-    if reject_count > 0 {
+    if total_reject_count > 0 {
         if lenient {
             exit_with(0);
         } else {
@@ -5086,57 +4825,9 @@ mod tests {
         assert_eq!(content["model_type"], "charcnn");
     }
 
-    // Load command expression tests — all column names are double-quoted for safety
-    // (supersedes decision 0036, which used normalize_names=true and broke on
-    // reserved words like name→_name).
-    #[test]
-    fn test_build_load_expr_varchar_no_cast() {
-        // VARCHAR types should be bare (quoted) column references
-        let expr = build_load_expr("name", "VARCHAR", &None);
-        assert_eq!(expr, "\"name\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_varchar_quoted() {
-        // Column names with spaces are safely quoted
-        let expr = build_load_expr("First Name", "VARCHAR", &None);
-        assert_eq!(expr, "\"First Name\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_reserved_word() {
-        // Reserved words (type, source, name) must be quoted to avoid DuckDB errors
-        let expr = build_load_expr("type", "VARCHAR", &None);
-        assert_eq!(expr, "\"type\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_double_with_transform() {
-        // decimal_number should get CAST even though it's a generic type
-        let transform = Some("CAST({col} AS DOUBLE)".to_string());
-        let expr = build_load_expr("ticket_price", "DOUBLE", &transform);
-        assert_eq!(expr, "CAST(\"ticket_price\" AS DOUBLE) AS \"ticket_price\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_bigint_with_transform() {
-        // integer_number should get CAST even though it's a generic type
-        let transform = Some("CAST({col} AS BIGINT)".to_string());
-        let expr = build_load_expr("count", "BIGINT", &transform);
-        assert_eq!(expr, "CAST(\"count\" AS BIGINT) AS \"count\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_no_transform_non_varchar() {
-        // Non-VARCHAR without explicit transform falls back to simple CAST
-        let expr = build_load_expr("flag", "BOOLEAN", &None);
-        assert_eq!(expr, "CAST(\"flag\" AS BOOLEAN) AS \"flag\"");
-    }
-
-    #[test]
-    fn test_format_column_name_with_embedded_quotes() {
-        // Double-quotes in column names are escaped per SQL standard
-        let name = format_column_name("col\"name");
-        assert_eq!(name, "\"col\"\"name\"");
-    }
+    // build_transform_projection unit tests + format_column_name unit test
+    // moved to crates/finetype-cli/tests/build_transform_projection.rs in
+    // v0.6.19 (MADR 0071, ac-05) — they exercise the public surface in
+    // `crates/finetype-cli/src/transform_projection.rs` via the lib, no
+    // private state remained.
 }
