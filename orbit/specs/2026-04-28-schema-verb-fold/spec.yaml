@@ -41,38 +41,72 @@ acceptance_criteria:
   - id: ac-02
     ac_type: code
     description: |
-      `cmd_taxonomy` at `crates/finetype-cli/src/main.rs:2400+` gains an
-      `OutputFormat::JsonSchema` match arm. The arm iterates the matched
-      `defs: Vec<(&String, &Definition)>` (already filtered/sorted by
+      `Commands::Taxonomy` clap variant gains an optional positional
+      argument `type_key: Option<String>`. When present, `cmd_taxonomy`
+      filters the definitions using the same exact-match-or-glob
+      predicate as the current `cmd_schema` (exact key OR
+      `prefix.*` / `prefix*` glob). When absent, the existing
+      `--domain` / `--category` / `--priority` filtering is preserved
+      and unchanged. Edit-distance suggestions on unknown KEY are
+      ported from `cmd_schema` (main.rs:2629-2647) into `cmd_taxonomy`
+      and remain identical in behaviour: stderr suggestions, exit code
+      1, no stdout output.
+    verification: |
+      `cargo run -p finetype-cli -- taxonomy email` succeeds (exits 0)
+      with the existing Plain-output behaviour applied to the
+      single-match `identity.person.email`. `cargo run -p finetype-cli --
+      taxonomy "identity.person.*"` succeeds, matching all
+      identity.person types. `cargo run -p finetype-cli -- taxonomy
+      not_a_real_type` exits 1 with edit-distance suggestions on stderr
+      and nothing on stdout.
+
+  - id: ac-03
+    ac_type: code
+    description: |
+      `cmd_taxonomy` gains an `OutputFormat::JsonSchema` match arm. The
+      arm iterates the matched `defs: Vec<(&String, &Definition)>`
+      (filtered by either positional KEY per ac-02 or by
       domain/category/priority), calls `json_schema::emit_type_schema`
       per match, collects into `Vec<Value>`, and writes the JSON array
-      to stdout pretty-printed. Even single-match input emits a single-
-      element array — never a bare object.
+      to stdout pretty-printed (always pretty — `OutputFormat::Json`
+      already pretty-prints unconditionally; `JsonSchema` matches that
+      pattern). Even single-match input emits a single-element array —
+      never a bare object. Unknown-KEY behaviour under JsonSchema mode
+      matches ac-02: exit 1, suggestions on stderr, nothing on stdout
+      (NOT `[]`).
     verification: |
       `finetype taxonomy email -o json-schema` emits a JSON array with
       one object whose `x-finetype-label` is `identity.person.email`.
       `finetype taxonomy --domain identity -o json-schema` emits a
       JSON array of N objects (one per identity-domain type). Both
       runs `serde_json::from_str` cleanly into `Vec<Value>`.
+      `finetype taxonomy not_a_real_type -o json-schema` exits 1 with
+      stderr suggestions and empty stdout.
 
-  - id: ac-03
+  - id: ac-04
     ac_type: code
     description: |
       `Commands::Schema` clap variant, `cmd_schema` function (main.rs:2565+),
-      `cmd_schema_table` function (main.rs:2699+), the path-sniffer
-      dispatch arm (main.rs:595+), and the dedicated `-f, --file`
-      `PathBuf` flag bound to schema's `file` arg are all deleted. The
-      private `build_json_schema` function in `main.rs:2642` is also
-      deleted (replaced by `json_schema::emit_type_schema`). The
-      `cmd_schema_table` body that already routes through
-      `json_schema::emit_table_schema` is removed entirely (no caller).
+      `cmd_schema_table` function (main.rs:2699+, ~200 LOC of model
+      load + sibling-context wiring + per-column classification + emit
+      call), the path-sniffer dispatch arm (main.rs:595+), and the
+      dedicated `-f, --file` `PathBuf` flag bound to schema's `file`
+      arg are all deleted. The private `build_json_schema` function in
+      `main.rs:2642` is also deleted (its body moves into
+      `json_schema::emit_type_schema`). After deletion, no profile /
+      load / validate code path becomes orphaned — every helper used
+      by `cmd_schema_table` (`load_multi_branch_classifier`, sibling-
+      context wiring, etc.) must remain reachable from `cmd_profile`
+      OR be removed alongside `cmd_schema_table`.
     verification: |
-      `grep -n "Commands::Schema\|cmd_schema\b\|cmd_schema_table\|build_json_schema" crates/finetype-cli/src/main.rs`
+      `grep -n "Commands::Schema\|fn cmd_schema\b\|fn cmd_schema_table\|fn build_json_schema" crates/finetype-cli/src/main.rs`
       returns no hits. `cargo build -p finetype-cli` succeeds. `finetype --help`
       no longer lists `schema`. `finetype schema email` exits with clap's
-      "unrecognized subcommand" error (exit 2).
+      "unrecognized subcommand" error (exit 2). `cargo clippy -p finetype-cli
+      --all-targets -- -D warnings -D dead_code` succeeds (catches orphaned
+      helpers from cmd_schema_table deletion).
 
-  - id: ac-04
+  - id: ac-05
     ac_type: code
     description: |
       Two existing golden tests in `crates/finetype-cli/tests/cli_golden.rs`
@@ -83,28 +117,39 @@ acceptance_criteria:
       `run_taxonomy_json_schema` (or equivalent) and shells out to
       `cargo run -p finetype-cli -- taxonomy <KEY> -o json-schema`.
       Each test gains a `.as_array().unwrap()[0]` projection at the top
-      of the assertion block (per ac-02's always-array shape). Existing
-      assertion bodies (`pattern`, `x-finetype-pii`, dropped extensions)
-      stay unchanged.
+      of the assertion block (per ac-03's always-array shape). Each
+      test gains a NEW assertion checking that
+      `x-finetype-label` is present and equal to the queried key
+      (verifies the in-passing addition called out in
+      implementation_notes; pairs with the CHANGELOG bullet under
+      ac-07). Other existing assertion bodies (`pattern`,
+      `x-finetype-pii`, dropped extensions) stay unchanged.
     verification: |
       `cargo test -p finetype-cli --test cli_golden -- --ignored
       golden_taxonomy_json_schema_email golden_taxonomy_json_schema_iso_date`
       passes both tests. `grep "golden_schema_email\|golden_schema_iso_date\|run_schema_json"`
-      on the test file returns no hits.
+      on the test file returns no hits. Both tests assert
+      `x-finetype-label` presence + value match.
 
-  - id: ac-05
+  - id: ac-06
     ac_type: doc
     description: |
       README.md migrated:
       - L77: `finetype schema "datetime.date.*" --pretty` →
-        `finetype taxonomy "datetime.date.*" -o json-schema --pretty`
+        `finetype taxonomy "datetime.date.*" -o json-schema`
+        (drop `--pretty` — `taxonomy -o json-schema` pretty-prints
+        unconditionally per ac-03).
       - L82 was already migrated in card 0003 (table-mode) — verify it
         stays as `finetype profile -f data.csv -o json-schema > schema.json`.
 
       CLAUDE.md migrated:
       - "Public vs internal CLI surface" table row for `schema` is
-        deleted. The public surface is now: `infer`, `profile`,
-        `validate`, `load`, `mcp`, `taxonomy`. Hidden surface unchanged.
+        deleted. The public surface drops from 7 to 6 commands:
+        `infer`, `profile`, `validate`, `load`, `mcp`, `taxonomy`.
+        CLAUDE.md:177 sentence updated from "only the 7 public
+        commands" → "only the 6 public commands". The "Public
+        (v0.6.19)" table row at CLAUDE.md:186 is updated to drop
+        `schema` from the comma-separated list.
       - The MCP tools table row for `schema` is RETAINED for v0.6.19
         (per constraint #4) with an inline note: "MCP audit follow-up
         in v0.6.20 will mirror the CLI fold."
@@ -117,14 +162,20 @@ acceptance_criteria:
 
       `.claude/skills/finetype-pipeline/SKILL.md`:
       - Lines 57, 140: same migration as above.
+
+      Out of scope (not user-facing): orbit/ historical references,
+      CLAUDE.md "Recent work" historical entries (the only
+      `finetype schema` invocation in CLAUDE.md is the line-208
+      command-table row that is deleted by this AC).
     verification: |
       `grep -RE "finetype schema" README.md CLAUDE.md .claude/skills/`
-      returns zero hits (excluding orbit/ and CHANGELOG historical
-      entries). `grep "Public vs internal" CLAUDE.md` shows the
-      6-command public table. The MCP tools table still mentions
-      `schema` with the audit-follow-up note.
+      returns zero hits. `grep -E "^\| .schema. \|" CLAUDE.md` returns
+      exactly one hit (the MCP tools row, retained per constraint #4).
+      `grep -E "finetype taxonomy.*json-schema|finetype profile.*json-schema" README.md`
+      returns at least 2 hits. `grep -E "6 public commands" CLAUDE.md`
+      returns one hit.
 
-  - id: ac-06
+  - id: ac-07
     ac_type: doc
     description: |
       `CHANGELOG.md` gains a v0.6.19 entry under "Removed" naming the
@@ -133,12 +184,18 @@ acceptance_criteria:
         - `finetype schema KEY` → `finetype taxonomy KEY -o json-schema`
         - `finetype schema FILE.csv` → `finetype profile -f FILE.csv -o json-schema`
 
-      The entry references MADR 0070 and PR #51's verbosity contract.
+      A "Changed" sub-bullet records the in-passing addition:
+      `x-finetype-label` is now emitted on type-mode JSON Schema
+      output (was only emitted on table-mode prior to v0.6.19;
+      type-mode only emitted `x-finetype-pii`). Both surfaces now
+      carry both extensions, matching the verbosity contract from
+      PR #51. The entry references MADR 0070.
     verification: |
-      `grep -A 4 "schema verb" CHANGELOG.md` shows the migration map
-      in the v0.6.19 section.
+      `grep -A 6 "schema verb" CHANGELOG.md` shows the migration map.
+      `grep -A 2 "x-finetype-label" CHANGELOG.md` shows the Changed
+      sub-bullet.
 
-  - id: ac-07
+  - id: ac-08
     ac_type: doc
     description: |
       MADR 0070 created at
@@ -155,7 +212,7 @@ acceptance_criteria:
       includes "Considered Options", "Decision Outcome", "Consequences"
       sections. References to 0031 and PR #51 are present.
 
-  - id: ac-08
+  - id: ac-09
     ac_type: doc
     description: |
       MADR 0031 frontmatter updated to `status: superseded by 0070`.
@@ -163,18 +220,6 @@ acceptance_criteria:
     verification: |
       `head -10 orbit/decisions/0031-table-level-schema-via-finetype-schema.md`
       shows `status: superseded by 0070` and the updated `date-modified`.
-
-  - id: ac-09
-    ac_type: gate
-    description: |
-      `make ci` passes (fmt, clippy, test, taxonomy check). Zero new
-      clippy warnings introduced by this card. The pre-existing
-      finetype-eval rust-1.95 clippy lints (out of scope, pre-existing
-      on main) are not regressed.
-    verification: |
-      `make ci` exits 0. The new `golden_taxonomy_json_schema_*` tests
-      pass under `--ignored`. The legacy `golden_schema_*` tests no
-      longer exist (per ac-04).
 
   - id: ac-10
     ac_type: code
@@ -190,46 +235,84 @@ acceptance_criteria:
       tool's `path`/`data` branches still error per card 0003's
       migration string; the `type_key` branch still works.
 
+  - id: ac-11
+    ac_type: gate
+    description: |
+      `make ci` passes (fmt, clippy, test, taxonomy check). Zero new
+      clippy warnings introduced by this card relative to the baseline
+      established by `make ci` on `main` immediately before card
+      0003's branch was rebased (PR #53 baseline). The pre-existing
+      finetype-eval rust-1.95 clippy lints are pre-existing baseline
+      and out of scope.
+    verification: |
+      `make ci` exits 0. New `golden_taxonomy_json_schema_*` tests
+      pass under `--ignored`. Legacy `golden_schema_*` tests no
+      longer exist (per ac-05). `cargo clippy -p finetype-cli -p
+      finetype-mcp --all-targets -- -D warnings` exits 0
+      (touched-crates-only baseline, identical to PR #53's gate).
+
 implementation_notes:
   - |
-    Helper module home was settled in card 0003: the helper lives at
-    `crates/finetype-mcp/src/json_schema.rs` (NOT in finetype-cli or
-    finetype-core). The interview's recommendation B
-    ("CLI-internal helper module") was satisfied by placing the helper
-    in finetype-mcp because finetype-cli depends on finetype-mcp; the
-    helper is reachable from both surfaces without expanding
-    finetype-core's public API. Card 0006 extends the same module
-    with `emit_type_schema(...)`.
+    **Helper-module home — drift between interview/decisions and as-shipped state.**
+    Interview Q3 (line 82-85) and decisions D3 (line 78) both
+    recommend a CLI-internal helper module at
+    `crates/finetype-cli/src/json_schema.rs`. Both pre-date card 0003's
+    PR #53. Card 0003 placed the helper at
+    `crates/finetype-mcp/src/json_schema.rs` instead — the recommendation
+    B intent ("don't expand finetype-core API") was satisfied by
+    placing the helper in finetype-mcp because finetype-cli already
+    depends on finetype-mcp; the helper is reachable from both
+    surfaces without expanding finetype-core. Card 0006 extends the
+    same module with `emit_type_schema(...)`. **No module relocation
+    is in scope for this card.** The companion spec
+    (`2026-04-28-profile-json-schema-output/spec.yaml` ac-02) carries
+    the same drift; future archaeologists should read constraint #3
+    here as the authoritative location and treat interview/decisions
+    as design-phase sketches superseded by PR #53.
   - |
+    **In-passing extension addition** (HIGH visibility, not a "fix").
     The pre-existing `build_json_schema` in `main.rs:2642` does NOT
-    emit `x-finetype-label` (only `x-finetype-pii`). The new
-    `emit_type_schema` MUST emit BOTH per the verbosity contract,
-    matching `emit_table_schema`'s behaviour. This is a fix-in-passing
-    consistent with the contract; the existing `cmd_schema` is being
-    deleted anyway.
+    emit `x-finetype-label` (only `x-finetype-pii`, line 2724). The new
+    `emit_type_schema` emits BOTH per the verbosity contract,
+    matching `emit_table_schema`'s behaviour. This IS a behaviour
+    change in the type-mode JSON Schema export contract — v0.6.18
+    `schema KEY` output did not carry `x-finetype-label`, v0.6.19
+    `taxonomy KEY -o json-schema` does. Symmetry with table-mode
+    wins; the CHANGELOG entry under ac-07 records this explicitly,
+    and the renamed golden tests under ac-05 add a label-presence
+    assertion to the body.
   - |
     `cmd_taxonomy`'s output match has explicit arms (no catch-all)
     for `Plain | Markdown | Arrow`, `Json`, `Csv`. Card 0003 added a
     catch-all for `JsonSchema` at line 2466 that degrades to the
     Plain output. This card replaces the catch-all with a dedicated
-    `OutputFormat::JsonSchema` arm.
+    `OutputFormat::JsonSchema` arm. Pretty-printing is unconditional
+    (no `--pretty` flag added to taxonomy — `OutputFormat::Json`
+    already pretty-prints unconditionally; this matches that
+    pattern).
   - |
-    The `cmd_schema_table` function still exists in main.rs as a
-    thin caller into `json_schema::emit_table_schema`. Card 0003 left
-    it in place so the legacy `schema FILE.csv` invocation kept
-    working through v0.6.19. With the verb gone, the function is
-    dead code and gets deleted with the dispatch arm.
+    `cmd_schema_table` is **NOT a thin caller** — it is ~200 LOC of
+    model load + sibling-context wiring + per-column classification
+    that ends with a call to `json_schema::emit_table_schema`. Deleting
+    it cleanly requires confirming via dead-code clippy that no
+    helper used only by `cmd_schema_table` becomes orphaned. Most
+    helpers (`load_multi_branch_classifier`, sibling-context wiring)
+    are also used by `cmd_profile` and stay; any that become
+    dead-code-only get removed alongside the deletion. ac-04's
+    verification gates this with `clippy -D dead_code`.
   - |
-    `cmd_schema` itself is the larger deletion (~75 LOC) — its body
-    moves into `emit_type_schema`. The KEY-not-found branch with edit-
-    distance suggestions stays in `cmd_taxonomy` if not already there
-    (verify during implementation; if absent, port the suggestion
-    logic to `cmd_taxonomy` as a `Display`-time fallback).
+    `cmd_schema` itself is ~75 LOC (`main.rs:2565-2639`). Its body
+    moves into `emit_type_schema` (the schema-building part) and the
+    edit-distance suggestion logic moves into `cmd_taxonomy`'s KEY-
+    not-found branch (per ac-02). The unknown-key contract is pinned
+    in ac-02 and ac-03: exit 1, suggestions on stderr, empty stdout
+    (NOT `[]` — match v0.6.18 byte-for-byte on the error path).
   - |
-    Tests get renamed not rewritten — assertion bodies stay
-    unchanged. The shape change is `obj` → `[obj]`, so the projection
-    is `parsed.as_array().unwrap()[0]` at the top of the assertion
-    block.
+    Tests get renamed not rewritten — most of the assertion body
+    stays unchanged. Two changes per test: (a) `.as_array().unwrap()[0]`
+    projection at the top to handle the always-array shape; (b) one
+    new assertion checking `x-finetype-label` presence + value match
+    (ac-05 calls this out explicitly).
 
 ontology_schema:
   name: "SchemaVerbFold"
@@ -270,17 +353,37 @@ evaluation_principles:
     weight: 0.15
 
 exit_conditions:
-  - "All 10 acceptance criteria pass."
-  - "`make ci` exits 0 with zero new clippy warnings."
+  - "All 11 acceptance criteria pass."
+  - "`make ci` exits 0 with zero new clippy warnings (PR #53 baseline)."
   - "PR opened and review-pr verdict is APPROVE."
   - "Rally manifest updated: card 0006 status → shipped."
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   test_prefix: "svf"
-  timestamp: "2026-04-28T14:00:00Z"
-  ambiguity_score: 0.10
+  timestamp: "2026-04-28T14:30:00Z"
+  ambiguity_score: 0.08
   interview_ref: "orbit/specs/2026-04-28-schema-verb-fold/interview.md"
   decisions_ref: "orbit/specs/2026-04-28-schema-verb-fold/decisions.md"
   card: "orbit/cards/0006-command-line-interface.yaml"
   rally: "orbit/specs/2026-04-28-v0619-cli-consolidation-rally/rally.yaml"
+  revision_history:
+    - version: "1.1"
+      date: "2026-04-28T14:30:00Z"
+      summary: |
+        Cycle-2 revision addressing review-spec REQUEST_CHANGES (10
+        findings, all 10 addressed). Inserted ac-02 (positional
+        type_key + glob + edit-distance suggestions on
+        Commands::Taxonomy); ac-03 dedicated JsonSchema arm now
+        explicit re unconditional pretty-print and unknown-key
+        contract; ac-04 expanded to gate dead-code from
+        cmd_schema_table deletion; ac-05 adds label-presence
+        assertion to renamed tests; ac-06 adds public-surface count
+        update + tightened verification greps; ac-07 adds Changed
+        sub-bullet for the in-passing label addition; ac-11 pins
+        clippy baseline. Implementation_notes expanded on helper-
+        module drift, label-addition behaviour change, and
+        cmd_schema_table size.
+    - version: "1.0"
+      date: "2026-04-28T14:00:00Z"
+      summary: "Initial spec from interview + decisions."
