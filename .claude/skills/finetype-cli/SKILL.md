@@ -89,30 +89,26 @@ finetype validate <FILE> <SCHEMA> [OPTIONS]
 
 ---
 
-### `finetype load`
+### `finetype load` *(removed in v0.6.19)*
 
-Generate runnable DuckDB `CREATE TABLE AS SELECT` from file profiling.
+Removed. The typed-output path now lives on `finetype validate
+--db <out.db> --table <name>` — see the validate section above for the
+typed CTAS, TRY-wrapped projection, and `finetype_reject_errors` sidecar
+behaviour.
+
+Migration:
 
 ```bash
-finetype load -f <FILE> [OPTIONS]
+# Before (v0.6.18 and earlier):
+finetype load -f data.csv | duckdb mydb.db
+
+# After (v0.6.19+):
+finetype profile -f data.csv -o json-schema > schema.json
+finetype validate data.csv schema.json --db mydb.db --table data
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-f, --file <FILE>` | *required* | Input CSV file |
-| `--table-name <NAME>` | from filename | Override table name |
-| `-m, --model <DIR>` | `models/default` | Model directory |
-| `--sample-size <N>` | `100` | Max values to sample per column |
-| `--delimiter <CHAR>` | auto-detect | CSV delimiter character |
-| `--no-header-hint` | — | Disable column name header hints |
-| `--model-type <TYPE>` | `char-cnn` | Model type |
-| `--sharp-only` | — | Disable Sense classifier |
-| `--limit <N>` | `10` | Preview rows in trailing SELECT (0 = none) |
-| `--no-normalize-names` | — | Preserve original column names |
-| `--enum-threshold <N>` | `50` | Cardinality threshold for ENUM columns (0 = disable) |
-| `-v, --verbose` | — | Enable pipeline tracing |
-
-**Output:** SQL to stdout. Pipe to DuckDB: `finetype load -f data.csv | duckdb mydb.db`
+`finetype load …` now errors via clap's unknown-subcommand handler with
+exit code 2. There is no shim or warning. See MADR 0071.
 
 ---
 
@@ -244,15 +240,13 @@ finetype profile -f data.csv -o json | jq '.columns[] | {name, type, confidence}
 # Schema for a specific type (not a file)
 finetype taxonomy identity.person.email -o json-schema
 
-# Quick load without quality gate
-finetype load -f data.csv | duckdb mydb.db
-
-# Full pipeline with quality gate
-finetype profile -f data.csv
+# Schema-driven load with typed columns + reject sidecar (single pass)
 finetype profile -f data.csv -o json-schema > data.schema.json
+finetype validate data.csv data.schema.json --db mydb.db --table data
+
+# Quality gate first (check-only), then materialise on PASS
 finetype validate data.csv data.schema.json
-finetype load -f data.csv.valid.csv > load.sql
-duckdb mydb.db < load.sql
+finetype validate data.csv data.schema.json --db mydb.db --table data
 
 # Classify values in column mode (better accuracy for ambiguous data)
 finetype infer -f values.txt --mode column --header "amount"

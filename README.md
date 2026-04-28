@@ -23,8 +23,8 @@ identity.person.email
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 32+ for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **DuckDB extension** — `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()` scalar functions
-- **DuckDB load** — `finetype load -f data.csv | duckdb` generates runnable CREATE TABLE statements
+- **DuckDB extension** — `finetype()`, `finetype_detail()`, `finetype_cast()`, `finetype_unpack()`, `finetype_validate()` scalar functions
+- **Schema-driven validation** — `finetype validate data.csv schema.json --db out.db --table orders` materialises typed DuckDB tables (per-column transforms applied) plus a `finetype_reject_errors` sidecar in a single pass
 - **Pure Rust** — no Python runtime or dependencies
 
 ## Installation
@@ -61,9 +61,6 @@ finetype infer -i "bc89:60a9:23b8:c1e9:3924:56de:3eb1:3b90"
 # Profile a CSV file — detect all column types
 finetype profile -f data.csv
 
-# Generate a runnable DuckDB CREATE TABLE from file profiling
-finetype load -f data.csv | duckdb
-
 # Column-mode inference (distribution-based disambiguation)
 finetype infer -f column_values.txt --mode column
 
@@ -76,12 +73,15 @@ finetype taxonomy --domain datetime
 # Export JSON Schema for a type (supports glob patterns)
 finetype taxonomy "datetime.date.*" -o json-schema
 
-# Validate a CSV against a JSON Schema — writes a DuckDB .db file
-# with the user's table (valid rows) + `finetype_reject_errors` sidecar.
+# Validate a CSV against a JSON Schema — writes a DuckDB .db file with
+# the user's typed table (valid rows, per-column transforms applied via
+# TRY-wrapped projection) + `finetype_reject_errors` sidecar (engine
+# rejects as error_type='SEMANTIC_TYPE'; cells that passed validation but
+# failed the typed cast as error_type='TRANSFORM_FAILED').
 # Exit codes: 0 no rejects / 1 rejects / 2 error. Requires `duckdb` on PATH.
 finetype profile -f data.csv -o json-schema > schema.json
 finetype validate data.csv schema.json --db out.db --table orders
-duckdb out.db -c "SELECT column_name, constraint_failed, expected_type, type_confidence FROM finetype_reject_errors;"
+duckdb out.db -c "SELECT column_name, error_type, constraint_failed, expected_type, type_confidence FROM finetype_reject_errors;"
 ```
 
 ### DuckDB Extension
