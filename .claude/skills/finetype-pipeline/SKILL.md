@@ -1,9 +1,9 @@
 ---
 name: finetype-pipeline
 description: >
-  Use when profiling, typing, or loading CSV/TSV data. Guides the full FineType
-  pipeline: profile → schema → validate → load. Ensures agents complete all steps
-  rather than stopping after profile.
+  Use when profiling, typing, or materialising CSV/TSV data. Guides the full FineType
+  pipeline: profile → schema → validate (typed materialisation built in). Ensures
+  agents complete all steps rather than stopping after profile.
 ---
 
 # FineType Pipeline — Profile to Typed Table
@@ -15,13 +15,11 @@ stop after profiling.
 ## Pipeline Overview
 
 ```
-profile → schema → validate → load
-   ↓         ↓         ↓         ↓
-  What    Capture   Quality    Typed
-  types   as JSON   gate       DuckDB
-  exist   Schema    (split     table
-                    valid/
-                    invalid)
+profile → schema → validate (--db --table)
+   ↓         ↓         ↓
+  What    Capture   Quality gate AND typed
+  types   as JSON   DuckDB table + reject
+  exist   Schema    sidecar — single pass
 ```
 
 **Every step matters.** Profiling alone tells you what types exist but does not catch
@@ -73,21 +71,22 @@ This writes a sidecar file `data.schema.json` containing:
 
 **Save the schema** — it becomes the contract between raw data and typed tables.
 
-## Step 3: Validate the Data
+## Step 3: Validate the Data (Quality Gate)
 
-Run every row through the schema as a quality gate:
+Run every row through the schema as a quality gate. Default mode is
+**check-only** — no files written, exit code communicates pass/fail:
 
 ```bash
 finetype validate data.csv data.schema.json
 ```
 
-This produces three sidecar files (named after the input file):
-- `data.csv.valid.csv` — rows that pass all validation rules (ready to load)
-- `data.csv.invalid.csv` — rows that fail one or more rules (need attention)
-- `data.csv.errors.jsonl` — machine-readable error records (row, column, rule, value)
+Exit codes:
+- `0` — no rejects (all rows pass)
+- `1` — rejects present (engine SEMANTIC_TYPE or transform-failed)
+- `2` — error (malformed schema, file unreadable, missing `duckdb`, etc.)
 
-**Note:** `finetype validate` exits with code 1 when any rows are invalid. This is a
-data quality signal, not a command failure — check the report before deciding what to do.
+`--lenient` forces exit 0 regardless of rejects (useful in inspection
+contexts where you want the report but not a non-zero exit).
 
 **Read the validation report:**
 - **Grade** (A–F) based on overall pass rate
@@ -98,39 +97,40 @@ data quality signal, not a command failure — check the report before deciding 
 
 | Situation | Action |
 |-----------|--------|
-| Grade A/B (>80% valid) | Load `data.csv.valid.csv`, review invalids separately |
-| Grade C/D (50–80%) | Investigate `data.csv.errors.jsonl` — the schema may be too strict or the data needs cleaning |
-| Grade F (<50%) | Do not load. Check if the delimiter or encoding is wrong, or if the data needs preprocessing |
+| Grade A/B (>80% valid) | Materialise (Step 4) — invalid rows land in the reject sidecar, not the user table |
+| Grade C/D (50–80%) | Investigate the reject sidecar — schema may be too strict or data needs cleaning |
+| Grade F (<50%) | Do not materialise. Check if the delimiter or encoding is wrong, or if the data needs preprocessing |
 
-**Options:**
-- `--summary-only` to skip writing sidecar files (just print the report)
-- `-o json` for machine-readable summary
+## Step 4: Materialise into DuckDB
 
-## Step 4: Load into DuckDB
-
-Generate a `CREATE TABLE AS SELECT` with correct casts for every column:
-
-```bash
-finetype load -f data.csv.valid.csv
-```
-
-This prints runnable SQL to stdout. Pipe it to DuckDB:
+Pass `--db <out.db> --table <name>` to `validate` to materialise valid rows
+into a typed DuckDB table — per-column transforms applied via TRY-wrapped
+projection — alongside the `finetype_reject_errors` sidecar. Single pass,
+single CTAS, single validation engine.
 
 ```bash
-finetype load -f data.csv.valid.csv > load.sql
-duckdb mydb.db < load.sql
+finetype validate data.csv data.schema.json --db mydb.db --table data
+duckdb mydb.db -c "SELECT * FROM data LIMIT 10;"
+duckdb mydb.db -c "SELECT column_name, error_type, constraint_failed, expected_type FROM finetype_reject_errors;"
 ```
 
-The generated SQL:
-- Uses `read_csv('file.csv', all_varchar=true)` to read everything as strings first
-- Applies the correct cast/transform per column (BIGINT, TIMESTAMP via strptime, DECIMAL with currency cleanup, etc.)
-- Includes a trailing `SELECT * FROM table LIMIT 10` preview
+Reject ontology:
+- `error_type='SEMANTIC_TYPE'` — engine validation failure (pattern, enum, range, …)
+- `error_type='TRANSFORM_FAILED'` (`constraint_failed='transform'`) — cell
+  passed validation but failed the typed cast (e.g. `2024-02-30` matches a
+  date pattern but `strptime` rejects it). `error_message` carries the
+  literal `transform_failed: <transform-expr>`.
 
-**Options:**
-- `--table-name my_table` to override the table name (default: filename)
-- `--limit 0` to skip the preview SELECT
-- `--no-normalize-names` to preserve original column names (DuckDB normalises by default)
-- `--enum-threshold 50` to control when low-cardinality columns become ENUMs (0 = disable)
+Staging-NULL → typed-NULL is **not** a transform failure. Empty cells
+surface as DuckDB NULL with no reject row.
+
+ENUM emission is dropped — low-cardinality columns retain the schema's
+`duckdb_type` (typically VARCHAR). If you need enum semantics, declare
+them explicitly in the JSON Schema's `enum` keyword.
+
+`finetype validate --db --table` requires `duckdb` on PATH. Exit codes:
+0 no rejects / 1 rejects (engine + transform) / 2 error. `--lenient`
+forces 0. `--append` reuses an existing `.db` and increments `scan_id`.
 
 ## Complete Pipeline Example
 
@@ -141,25 +141,23 @@ finetype profile -f contacts.csv
 # 2. Schema — capture as a contract
 finetype profile -f contacts.csv -o json-schema > contacts.schema.json
 
-# 3. Validate — quality gate (exit code 1 = invalid rows found, not a failure)
-finetype validate contacts.csv contacts.schema.json
-
-# 4. Load the clean rows
-finetype load -f contacts.csv.valid.csv > load.sql
-duckdb contacts.db < load.sql
+# 3. Validate + materialise — quality gate AND typed table in one pass
+finetype validate contacts.csv contacts.schema.json --db contacts.db --table contacts
 ```
 
-## Quick Path (Skip Schema + Validate)
+## Quick Path (Skip Schema)
 
-If you trust the data quality and just need typed SQL fast:
+If you trust the data quality and just need typed columns fast, run the
+schema and validate steps back-to-back. There's no separate "load"
+verb — `validate --db --table` is the single typed-output path:
 
 ```bash
-finetype load -f data.csv > load.sql
-duckdb mydb.db < load.sql
+finetype profile -f data.csv -o json-schema > schema.json
+finetype validate data.csv schema.json --db mydb.db --table data
 ```
 
-`load` runs profile internally and generates SQL directly. Use this for exploratory work,
-but prefer the full pipeline for production data where quality matters.
+`finetype load …` was removed in v0.6.19 (MADR 0071) — it now errors
+via clap's unknown-subcommand handler with exit 2.
 
 ## Exploring Individual Values
 
