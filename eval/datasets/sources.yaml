@@ -336,3 +336,44 @@ sources:
     fetched_date: 2026-04-28
     attribution: "Global annual mean temperature anomaly (GISTEMP and GCAG) — github.com/datasets curated CSV under PDDL-1.0. 319 rows; clean control with 2-value categorical Source."
     datasets: [global_temp_annual]
+
+  # validate-precision corpus iteration 2 — 5 datasets prioritised for
+  # format_diversity (NYC Taxi, GDELT) and code_vs_canonical (S&P 500,
+  # FIFA, OECD) mechanism coverage, closing the 0/0 zero-coverage gap
+  # surfaced by iter-1's expected-vs-actual mismatch table. All sourced
+  # from public open-data portals at SPDX-strict licences. Spec:
+  # orbit/specs/2026-04-28-validate-corpus-curation/.
+  - source_url: https://datahub.io/core/s-and-p-500-companies/r/constituents.csv
+    role: validate
+    licence: PDDL-1.0
+    fetched_date: 2026-04-28
+    attribution: "S&P 500 constituents — datahub.io curated CSV under PDDL-1.0. 503 rows × 8 cols; GICS Sector is the load-bearing code-vs-canonical slot (categorical industry-classification scheme)."
+    datasets: [sp500_constituents]
+
+  - source_url: https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet
+    role: validate
+    licence: public-domain
+    fetched_date: 2026-04-28
+    attribution: "NYC TLC yellow taxi trips January 2024 — NYC Taxi & Limousine Commission, public domain. ~2.9M rows capped at 5000; SQL-standard timestamp variant exercises format_diversity vs iter-1's ISO-only datetime samples."
+    datasets: [nyc_taxi]
+
+  - source_url: http://data.gdeltproject.org/events/20240115.export.CSV.zip
+    role: validate
+    licence: CC0-1.0
+    fetched_date: 2026-04-28
+    attribution: "GDELT Event 1.0 daily export 2024-01-15 — gdeltproject.org under CC0-1.0. ~122k rows capped at 5000, 58 cols; SQLDATE/MonthYear/Year/DATEADDED carry compact-integer date formats (format_diversity); 32 categorical CAMEO actor/event-code columns (code-vs-canonical surface)."
+    datasets: [gdelt_events]
+
+  - source_url: https://raw.githubusercontent.com/sharmaroshan/FIFA-2019-Analysis/master/Footballer.csv
+    role: validate
+    licence: CC-BY-SA-4.0
+    fetched_date: 2026-04-28
+    attribution: "FIFA 2019 player attributes — github.com/sharmaroshan/FIFA-2019-Analysis mirror, original Kaggle dataset under EA Sports community licence (CC-BY-SA-4.0 fallback for SPDX allowlist). ~18k rows capped at 5000, 89 cols; 26 position-rating columns carry '88+2'-style code-vs-canonical formats; Value/Wage use M/K-suffixed currency."
+    datasets: [fifa_players]
+
+  - source_url: https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_LFS@DF_IALFS_INDIC,/........?format=csvfilewithlabels&startPeriod=2023&endPeriod=2024
+    role: validate
+    licence: CC-BY-4.0
+    fetched_date: 2026-04-28
+    attribution: "OECD Infra-Annual Labour Statistics 2023-2024 — sdmx.oecd.org SDMX REST API under CC-BY-4.0. ~270k rows capped at 5000, 34 cols; broad code-vs-canonical surface — 9 dimensions emit CODE/LABEL pairs (REF_AREA/Reference area, MEASURE/Measure, etc.) plus heterogeneous TIME_PERIOD column."
+    datasets: [oecd_employment]

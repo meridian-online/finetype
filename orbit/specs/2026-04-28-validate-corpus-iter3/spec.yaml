@@ -1,0 +1,139 @@
+goal: |
+  Extend the validate-corpus harness's per-mechanism attribution logic so
+  format_diversity and code_vs_canonical surface as designed in iter-2's
+  curated datasets. Iter-2 shipped 5 datasets curated specifically to
+  exercise these mechanisms (NYC Taxi SQL timestamps, GDELT compact-integer
+  dates, FIFA "88+2" position ratings, OECD CODE/LABEL pairs, S&P 500 GICS
+  Sector), but every one attributed to the catch-all `misclassification`
+  bucket because the iter-1 harness's attribution rules don't cover those
+  patterns. This is a code change to the mechanism-attribution rules in
+  the harness (not corpus growth), pinned by the iter-2 finding. Iter-2's
+  GT sidecars stay byte-unchanged — they're already the test surface for
+  the new attribution rules.
+
+constraints:
+  - "Pure attribution-logic change. Iter-2 GT sidecars and validate-corpus
+    CSVs stay byte-unchanged. The harness binary at
+    crates/finetype-eval/src/bin/validate_corpus.rs gains attribution rules;
+    the manifest, sources.yaml, and row_hashes.tsv are untouched."
+  - "Each mechanism (enum_overfit, format_diversity, misclassification,
+    code_vs_canonical) gains a documented attribution rule and at least
+    one regression test. No silent re-classification — future re-attribution
+    is intentional, not incidental."
+  - "Attribution stays deterministic per-column. No probabilistic ranking;
+    no model calls inside the harness. Rules consume the per-column
+    artefacts already on hand: GT label, predicted label, validator-failure
+    reason from the MADR 0071 reject ontology, and column header."
+  - "Iter-2 baseline preserved as a regression. The post-iter-3 report
+    against the same 12-dataset manifest must show ≥1 column attributing
+    to format_diversity AND ≥1 column attributing to code_vs_canonical
+    (the iter-2 AC-08 target, no longer downgraded)."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: |
+      Datetime-format failure attributes to format_diversity. Given a column
+      whose GT label is a `datetime.*` type and whose actual prediction is a
+      different `datetime.*` type with the same broad family but a different
+      format string (e.g. GT=datetime.timestamp.sql_standard,
+      predicted=datetime.timestamp.iso_8601), the per-mechanism breakdown
+      records the failure under format_diversity, not misclassification.
+    verification: |
+      Run `make validate-corpus` against the iter-2 manifest. NYC Taxi's
+      tpep_pickup_datetime and GDELT's SQLDATE / MonthYear / Year / DATEADDED
+      attribute to format_diversity. The per-mechanism row for
+      format_diversity has Failing-columns ≥1 and Datasets-affected ≥2.
+
+  - id: ac-02
+    ac_type: code
+    description: |
+      CODE/LABEL pair mismatch attributes to code_vs_canonical. Given a
+      column whose values are short-form codes (e.g. ISO country code, CAMEO
+      event code, GICS sector code) but whose GT label is a canonical/text
+      type — OR conversely values are long-form names and GT is a code-typed
+      field — the failure attributes to code_vs_canonical, surfacing the
+      disagreement between value shape and the canonical-form expectation.
+    verification: |
+      Run `make validate-corpus` against the iter-2 manifest. OECD's 9
+      REF_AREA/Reference area dimension pairs, GDELT's Actor*CountryCode,
+      FIFA's position rating columns, and S&P 500's GICS Sector attribute
+      to code_vs_canonical. The per-mechanism row for code_vs_canonical
+      has Failing-columns ≥1 and Datasets-affected ≥1.
+
+  - id: ac-03
+    ac_type: doc
+    description: |
+      Mechanism-attribution rules are documented and tested. Each of the 4
+      mechanism buckets (enum_overfit, format_diversity, misclassification,
+      code_vs_canonical) has a rule documented in the harness source (rustdoc
+      on the rule function) and at least one unit test exercising the rule
+      in isolation. The attribution logic is no longer opaque — re-attribution
+      becomes a deliberate code change, not a silent shift.
+    verification: |
+      `cargo test -p finetype-eval mechanism_attribution` reports ≥4 tests
+      passing (one per mechanism). `cargo doc -p finetype-eval --no-deps`
+      shows rustdoc for the attribution module.
+
+implementation_notes:
+  - |
+    The iter-2 expected-vs-actual table at the bottom of
+    `eval/eval_output/validate_corpus.md` records the curation thesis per
+    dataset versus what the iter-1 harness actually attributed. Each row
+    is a target for ac-01 / ac-02:
+
+    | dataset | expected | iter-1 actual | iter-3 target |
+    |---|---|---|---|
+    | nyc_taxi           | format_diversity   | misclassification | format_diversity   |
+    | gdelt_events       | format_diversity   | misclassification | format_diversity   |
+    | sp500_constituents | code_vs_canonical  | misclassification | code_vs_canonical  |
+    | fifa_players       | code_vs_canonical  | misclassification | code_vs_canonical  |
+    | oecd_employment    | code_vs_canonical  | misclassification | code_vs_canonical  |
+
+  - |
+    Likely rule shape (subject to design):
+
+    - **format_diversity:** GT and prediction share the broad-type prefix
+      (e.g. both `datetime.*`) but disagree on subtype/format-string. The
+      MADR 0071 reject ontology already exposes the failure reason — for
+      these cases it's a transform_failed on a TRY_CAST that succeeded
+      under the other format. Trigger when prefix-match AND subtype-mismatch.
+
+    - **code_vs_canonical:** GT and prediction disagree on broad-type but
+      the column-mode is short-token (length ≤ 4 chars, all upper) on one
+      side and word/text on the other. Trigger when value-shape (codey vs
+      texty) implies a CODE/LABEL disagreement.
+
+    - **misclassification** stays as the catch-all when neither
+      format_diversity nor code_vs_canonical fires.
+
+    - **enum_overfit** rule is already in place from iter-1; document it
+      in rustdoc as part of ac-03.
+
+evaluation_principles:
+  - principle: "Rules surface what iter-2 curated, no more"
+    weight: 0.5
+  - principle: "Deterministic + tested, not probabilistic"
+    weight: 0.3
+  - principle: "Iter-2 GT sidecars unchanged"
+    weight: 0.2
+
+exit_conditions:
+  - "format_diversity ≥1 AND code_vs_canonical ≥1 in the iter-3 report"
+  - "All 4 mechanisms have rustdoc + a regression test"
+  - "make ci exits 0"
+
+metadata:
+  version: "0.1"
+  test_prefix: "vci3"
+  status: "stub"
+  ambiguity_score: 0.18
+  card_ref: "orbit/cards/0014-profile-validate-precision.yaml"
+  parent_spec_ref: "orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml"
+  notes: |
+    Stub spec — not yet driven through /orb:design. Created in 2026-04-28
+    iter-2 wrap as the gap-downgrade landing spot for AC-08, replacing the
+    earlier mis-categorised `orbit/cards/0016-validate-corpus-iter3.yaml`
+    which was incorrectly placed in cards/ during iter-2 implementation
+    (see refactor commit). Convert to a full spec via /orb:design + /orb:spec
+    when iter-3 is scheduled.

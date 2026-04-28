@@ -57,6 +57,8 @@ goal: "Profile→validate is a self-consistent pair: round-trip pass at P=99% is
 
 specs:
   - "orbit/specs/2026-04-28-validate-precision-corpus/"
+  - "orbit/specs/2026-04-28-validate-corpus-curation/"
+  - "orbit/specs/2026-04-28-validate-corpus-iter3/"
 
 references:
   - "orbit/specs/2026-04-28-validate-precision-corpus/interview.md"
