@@ -3,7 +3,7 @@ autonomy: full
 budget: 3
 iteration: 1
 current_spec: orbit/specs/2026-04-28-schema-verb-fold/
-status: review-spec
+status: implement
 history: []
 started: 2026-04-28T14:00:00Z
 review_cycles:
