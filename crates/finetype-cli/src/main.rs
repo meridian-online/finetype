@@ -201,49 +201,6 @@ enum Commands {
         full: bool,
     },
 
-    /// Generate runnable DuckDB CTAS from file profiling
-    Load {
-        /// Input CSV file
-        #[arg(short, long)]
-        file: PathBuf,
-
-        /// Override table name (default: derived from filename)
-        #[arg(long)]
-        table_name: Option<String>,
-
-        /// Maximum values to sample per column (default 100)
-        #[arg(long, default_value = "100")]
-        sample_size: usize,
-
-        /// CSV delimiter character (default: auto-detect)
-        #[arg(long)]
-        delimiter: Option<char>,
-
-        /// Disable column name header hints
-        #[arg(long)]
-        no_header_hint: bool,
-
-        /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "multi-branch")]
-        model_type: ModelType,
-
-        /// Number of preview rows in trailing SELECT (0 = no preview)
-        #[arg(long, default_value = "10")]
-        limit: usize,
-
-        /// Deprecated: column names are now always quoted (normalize_names removed)
-        #[arg(long, hide = true)]
-        no_normalize_names: bool,
-
-        /// Cardinality threshold for ENUM columns (0 = disable ENUM, use VARCHAR)
-        #[arg(long, default_value = "50")]
-        enum_threshold: usize,
-
-        /// Enable pipeline tracing (shows Sense, mask, hint, and feature rule decisions)
-        #[arg(short, long)]
-        verbose: bool,
-    },
-
     /// Validate generator ↔ taxonomy alignment
     #[command(hide = true)]
     Check {
@@ -497,7 +454,6 @@ fn main() -> Result<()> {
     // debug-level tracing for the inference pipeline, otherwise use defaults.
     let verbose_tracing = match &cli.command {
         Commands::Profile { verbose, .. } => *verbose,
-        Commands::Load { verbose, .. } => *verbose,
         _ => false,
     };
     if std::env::var("RUST_LOG").is_ok() {
@@ -584,29 +540,6 @@ fn main() -> Result<()> {
             output,
             full,
         } => cmd_taxonomy(type_key, file, domain, category, priority, output, full),
-
-        Commands::Load {
-            file,
-            table_name,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            limit,
-            no_normalize_names,
-            enum_threshold,
-            verbose: _,
-        } => cmd_load(
-            file,
-            table_name,
-            sample_size,
-            delimiter,
-            no_header_hint,
-            model_type,
-            limit,
-            no_normalize_names,
-            enum_threshold,
-        ),
 
         Commands::Check {
             taxonomy,
@@ -2620,312 +2553,6 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     prev[b_len]
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOAD — Profile file → runnable DuckDB CTAS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
-fn cmd_load(
-    file: PathBuf,
-    table_name: Option<String>,
-    sample_size: usize,
-    delimiter: Option<char>,
-    no_header_hint: bool,
-    model_type: ModelType,
-    limit: usize,
-    _no_normalize_names: bool, // deprecated: column names are now always quoted
-    enum_threshold: usize,
-) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
-
-    let model = resolve_model_path();
-
-    eprintln!("Loading model from {:?}", model);
-    let config = ColumnConfig {
-        sample_size,
-        ..Default::default()
-    };
-    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = load_multi_branch_classifier(&model)?;
-        eprintln!(
-            "Loaded multi-branch classifier ({} classes)",
-            mb.n_classes()
-        );
-        ColumnClassifier::with_multi_branch(mb, config)
-    } else {
-        let classifier: Box<dyn ValueClassifier> = match model_type {
-            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch => unreachable!(),
-        };
-        if let Some(semantic) = load_semantic_hint() {
-            eprintln!("Loaded semantic hint classifier (Model2Vec)");
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-            if let Some(entity) = entity {
-                eprintln!("Loaded entity classifier (full_name demotion gate)");
-                cc.set_entity_classifier(entity);
-            }
-            cc
-        } else {
-            ColumnClassifier::new(classifier, config)
-        }
-    };
-
-    // Load taxonomy for validation-based attractor demotion
-    let taxonomy_path = std::path::PathBuf::from("labels");
-    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
-        taxonomy.compile_validators();
-        taxonomy.compile_locale_validators();
-        eprintln!(
-            "Loaded taxonomy ({} types, {} validators cached)",
-            taxonomy.labels().len(),
-            taxonomy.validator_count()
-        );
-        column_classifier.set_taxonomy(taxonomy);
-    }
-
-    // Wire up Sense classifier for legacy non-multi-branch models
-    if !column_classifier.has_multi_branch() {
-        wire_sense(&mut column_classifier);
-        wire_sibling_context(&mut column_classifier);
-    }
-    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
-    if column_classifier.has_multi_branch() {
-        wire_model2vec_and_siblings(&mut column_classifier);
-    }
-
-    eprintln!("Reading {:?}", file);
-
-    let (headers, columns, row_count) = read_csv_input(&file, delimiter)?;
-
-    let n_cols = headers.len();
-    eprintln!("Read {} rows, {} columns", row_count, n_cols);
-
-    // Load taxonomy for DDL info lookup
-    let taxonomy = load_taxonomy(&taxonomy_path).ok();
-
-    // Derive table name from filename stem
-    let table = table_name.unwrap_or_else(|| {
-        let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("data");
-        sanitise_identifier(stem)
-    });
-
-    // Profile each column and collect type info
-    struct LoadColumn {
-        /// Original column name from the CSV header
-        original_name: String,
-        label: String,
-        duckdb_type: String,
-        transform: Option<String>,
-        /// Sorted unique values for ENUM columns (None if not ENUM or above threshold)
-        enum_values: Option<Vec<String>>,
-    }
-
-    let mut load_cols: Vec<LoadColumn> = Vec::new();
-
-    for (i, col_values) in columns.iter().enumerate() {
-        let original_name = headers
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("col_{}", i));
-
-        if col_values.is_empty() {
-            load_cols.push(LoadColumn {
-                original_name,
-                label: "unknown".to_string(),
-                duckdb_type: "VARCHAR".to_string(),
-                transform: None,
-                enum_values: None,
-            });
-            continue;
-        }
-
-        // Use original name for header hints (pre-normalization)
-        let result = if no_header_hint {
-            column_classifier.classify_column(col_values)?
-        } else {
-            column_classifier.classify_column_with_header(col_values, &original_name)?
-        };
-
-        // Look up DDL info from taxonomy
-        let (duckdb_type, transform, raw_broad_type) = if let Some(ref tax) = taxonomy {
-            if let Some(def) = tax.get(&result.label) {
-                let ddl = tax.ddl_info(&result.label).unwrap();
-                let raw_bt = def.broad_type.clone().unwrap_or_default();
-                (ddl.duckdb_type, ddl.transform, raw_bt)
-            } else {
-                ("VARCHAR".to_string(), None, String::new())
-            }
-        } else {
-            ("VARCHAR".to_string(), None, String::new())
-        };
-
-        // Use the taxonomy broad_type directly — is_generic controls classification
-        // behaviour (header hint yielding), not cast safety. Types like decimal_number
-        // and integer_number are generic but have meaningful non-VARCHAR casts. (NNFT-252)
-
-        // NNFT-273: Collect ENUM values for categorical columns
-        let enum_values = if raw_broad_type == "ENUM" {
-            collect_unique_values_if_categorical(&result.label, col_values, enum_threshold)
-        } else {
-            None
-        };
-
-        // If ENUM with values, override duckdb_type to the enum type name
-        let final_type = if enum_values.is_some() {
-            // Will be resolved to the CREATE TYPE name during DDL generation
-            "ENUM".to_string()
-        } else {
-            duckdb_type
-        };
-
-        load_cols.push(LoadColumn {
-            original_name,
-            label: result.label,
-            duckdb_type: final_type,
-            transform,
-            enum_values,
-        });
-    }
-
-    // File path as provided by user
-    let file_str = file.to_string_lossy();
-
-    // all_varchar=true ensures FineType controls all type casting via transforms.
-    // Without it, DuckDB auto_detect may cast columns (e.g., dates) before our
-    // transform expressions can operate on them.
-    //
-    // normalize_names is NOT used — it renames reserved-word columns (name→_name,
-    // type→_type) before the SELECT sees them, breaking our column references.
-    // Instead, all column names are double-quoted for safety. Supersedes decision 0036.
-    let read_csv_params = format!("read_csv('{}', all_varchar=true)", file_str);
-
-    // Header comment
-    let type_count = taxonomy.as_ref().map(|t| t.len()).unwrap_or(0);
-    let pipeline = if column_classifier.has_multi_branch() {
-        "Multi-branch→Sharpen"
-    } else {
-        "Sense→Sharpen"
-    };
-    println!(
-        "-- Generated by FineType ({} types, {} pipeline)",
-        type_count, pipeline
-    );
-    println!(
-        "-- Source: {} ({} rows, {} columns)",
-        file.file_name()
-            .and_then(|f| f.to_str())
-            .unwrap_or("unknown"),
-        row_count,
-        n_cols
-    );
-
-    // NNFT-273: Emit CREATE TYPE statements for ENUM columns
-    let mut enum_type_names: std::collections::HashMap<usize, String> =
-        std::collections::HashMap::new();
-    for (i, col) in load_cols.iter().enumerate() {
-        if let Some(ref values) = col.enum_values {
-            let type_name = format!("{}_t", sanitise_identifier(&col.original_name));
-            let escaped_values: Vec<String> = values
-                .iter()
-                .map(|v| format!("'{}'", v.replace('\'', "''")))
-                .collect();
-            println!(
-                "CREATE TYPE {} AS ENUM ({});",
-                type_name,
-                escaped_values.join(", ")
-            );
-            enum_type_names.insert(i, type_name);
-        }
-    }
-    if !enum_type_names.is_empty() {
-        println!();
-    }
-
-    // CTAS statement
-    println!("CREATE TABLE {} AS", table);
-    println!("SELECT");
-
-    // Build all expressions first to calculate alignment
-    let exprs: Vec<String> = load_cols
-        .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            if let Some(type_name) = enum_type_names.get(&i) {
-                // ENUM column: cast to the CREATE TYPE name
-                build_load_expr_enum(&c.original_name, type_name)
-            } else {
-                build_load_expr(&c.original_name, &c.duckdb_type, &c.transform)
-            }
-        })
-        .collect();
-
-    let max_expr_len = exprs.iter().map(|e| e.len()).max().unwrap_or(0);
-
-    for (i, col) in load_cols.iter().enumerate() {
-        let expr = &exprs[i];
-        let is_last = i == load_cols.len() - 1;
-        let comma = if is_last { "" } else { "," };
-
-        let comment = format!("-- {}", col.label);
-
-        // Align comments
-        let padding = max_expr_len.saturating_sub(expr.len()) + 1;
-        println!(
-            "    {}{}{:>pad$}{}",
-            expr,
-            comma,
-            " ",
-            comment,
-            pad = padding
-        );
-    }
-
-    println!("FROM {};", read_csv_params);
-
-    // Preview SELECT
-    if limit > 0 {
-        println!();
-        println!("SELECT * FROM {} LIMIT {};", table, limit);
-    }
-
-    Ok(())
-}
-
-/// Build a SELECT expression for a column in the CTAS.
-///
-/// All column names are double-quoted for safety — handles reserved words
-/// (name, type, source), spaces, and special characters without relying on
-/// DuckDB's normalize_names (which renames columns before SELECT sees them).
-/// VARCHAR/generic columns use bare column ref; typed columns use the transform.
-fn build_load_expr(original_name: &str, duckdb_type: &str, transform: &Option<String>) -> String {
-    let col_ref = format_column_name(original_name);
-
-    if duckdb_type == "VARCHAR" {
-        // Bare column reference — no redundant CAST for VARCHAR types.
-        // Note: is_generic is intentionally NOT checked here. Generic types like
-        // decimal_number/integer_number have non-VARCHAR broad_types (DOUBLE/BIGINT)
-        // and should still get their CAST applied. (NNFT-252)
-        col_ref
-    } else if let Some(tf) = transform {
-        // Substitute {col} in transform expression
-        let cast_expr = tf.replace("{col}", &col_ref);
-        format!("{} AS {}", cast_expr, col_ref)
-    } else {
-        // No transform but non-VARCHAR — simple CAST
-        format!("CAST({} AS {}) AS {}", col_ref, duckdb_type, col_ref)
-    }
-}
-
-/// Build a SELECT expression for an ENUM column in the CTAS.
-///
-/// Casts the source column to the named ENUM type created by CREATE TYPE.
-fn build_load_expr_enum(original_name: &str, enum_type_name: &str) -> String {
-    let col_ref = format_column_name(original_name);
-    format!("CAST({} AS {}) AS {}", col_ref, enum_type_name, col_ref)
-}
 
 /// Build the comma-separated SELECT projection for the validate materialise CTAS
 /// (ac-01).
@@ -3014,15 +2641,6 @@ fn build_transform_projection_one(
     } else {
         format!("CAST({} AS {}) AS {}", col_ref, info.duckdb_type, col_ref)
     }
-}
-
-/// Sanitise a string for use as a SQL identifier.
-/// Replaces hyphens with underscores and strips non-alphanumeric characters.
-fn sanitise_identifier(s: &str) -> String {
-    s.replace(['-', '.'], "_")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect()
 }
 
 /// Map DuckDB SQL type to Arrow DataType JSON representation.
@@ -5339,53 +4957,6 @@ mod tests {
         assert_eq!(content["model_type"], "charcnn");
     }
 
-    // Load command expression tests — all column names are double-quoted for safety
-    // (supersedes decision 0036, which used normalize_names=true and broke on
-    // reserved words like name→_name).
-    #[test]
-    fn test_build_load_expr_varchar_no_cast() {
-        // VARCHAR types should be bare (quoted) column references
-        let expr = build_load_expr("name", "VARCHAR", &None);
-        assert_eq!(expr, "\"name\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_varchar_quoted() {
-        // Column names with spaces are safely quoted
-        let expr = build_load_expr("First Name", "VARCHAR", &None);
-        assert_eq!(expr, "\"First Name\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_reserved_word() {
-        // Reserved words (type, source, name) must be quoted to avoid DuckDB errors
-        let expr = build_load_expr("type", "VARCHAR", &None);
-        assert_eq!(expr, "\"type\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_double_with_transform() {
-        // decimal_number should get CAST even though it's a generic type
-        let transform = Some("CAST({col} AS DOUBLE)".to_string());
-        let expr = build_load_expr("ticket_price", "DOUBLE", &transform);
-        assert_eq!(expr, "CAST(\"ticket_price\" AS DOUBLE) AS \"ticket_price\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_bigint_with_transform() {
-        // integer_number should get CAST even though it's a generic type
-        let transform = Some("CAST({col} AS BIGINT)".to_string());
-        let expr = build_load_expr("count", "BIGINT", &transform);
-        assert_eq!(expr, "CAST(\"count\" AS BIGINT) AS \"count\"");
-    }
-
-    #[test]
-    fn test_build_load_expr_no_transform_non_varchar() {
-        // Non-VARCHAR without explicit transform falls back to simple CAST
-        let expr = build_load_expr("flag", "BOOLEAN", &None);
-        assert_eq!(expr, "CAST(\"flag\" AS BOOLEAN) AS \"flag\"");
-    }
-
     #[test]
     fn test_format_column_name_with_embedded_quotes() {
         // Double-quotes in column names are escaped per SQL standard
@@ -5395,9 +4966,9 @@ mod tests {
 
     // ── build_transform_projection (ac-01) ───────────────────────────────────
     //
-    // Lifted from `build_load_expr`; called by the validate materialise CTAS.
-    // The 5-branch logic is documented on the function. Each test pins one
-    // branch.
+    // Lifted from cmd_load's per-column expression builder (deleted in
+    // v0.6.19) and called by the validate materialise CTAS. The 5-branch
+    // logic is documented on the function. Each test pins one branch.
 
     /// Helper — builds a SchemaExtensions with a single label for `col`.
     fn ext_with_label(col: &str, label: Option<&str>) -> SchemaExtensions {
@@ -5475,15 +5046,17 @@ mod tests {
     }
 
     #[test]
-    fn build_transform_projection_matches_build_load_expr_when_try_wrap_false() {
+    fn build_transform_projection_no_try_wrap_matches_legacy_load_shape() {
         // Equivalence pin: with try_wrap=false the projection's per-column
-        // shape matches `build_load_expr` exactly (the function it was lifted
-        // from). Tests each branch as a single-column projection so transform
+        // shape exactly matches the legacy cmd_load expression shape that
+        // was retired in v0.6.19 — bare quoted ident for VARCHAR, transform
+        // substituted with `AS "col"` for typed-with-transform, bare ident
+        // for unlabelled (graceful degradation per MADR 0064 ac-11).
+        // Each branch is tested as a single-column projection so transform
         // expressions containing commas don't trip a naive split.
         let tax = test_taxonomy();
 
-        // VARCHAR (identity.person.email) — bare passthrough, matches
-        // build_load_expr("email", "VARCHAR", &None).
+        // VARCHAR (identity.person.email) — bare quoted ident, no CAST.
         let ext_email = ext_with_label("email", Some("identity.person.email"));
         let proj_email = build_transform_projection(
             &["email".to_string()],
@@ -5491,9 +5064,11 @@ mod tests {
             &tax,
             false,
         );
-        assert_eq!(proj_email, build_load_expr("email", "VARCHAR", &None));
+        assert_eq!(proj_email, "\"email\"");
 
-        // DATE with strptime transform from the taxonomy.
+        // DATE with strptime transform — `<transform> AS "col"`. The exact
+        // transform string comes from the taxonomy so this stays in sync if
+        // the strptime format ever shifts.
         let info = tax.ddl_info("datetime.date.iso").expect("known label");
         let ext_date = ext_with_label("order_date", Some("datetime.date.iso"));
         let proj_date = build_transform_projection(
@@ -5502,12 +5077,17 @@ mod tests {
             &tax,
             false,
         );
+        let expected_transform = info
+            .transform
+            .as_ref()
+            .expect("datetime.date.iso has a transform")
+            .replace("{col}", "\"order_date\"");
         assert_eq!(
             proj_date,
-            build_load_expr("order_date", &info.duckdb_type, &info.transform),
+            format!("{} AS \"order_date\"", expected_transform),
         );
 
-        // Unlabelled — falls through as VARCHAR (bare passthrough).
+        // Unlabelled — bare quoted ident.
         let ext_raw = SchemaExtensions::default();
         let proj_raw = build_transform_projection(
             &["raw_col".to_string()],
@@ -5515,6 +5095,6 @@ mod tests {
             &tax,
             false,
         );
-        assert_eq!(proj_raw, build_load_expr("raw_col", "VARCHAR", &None));
+        assert_eq!(proj_raw, "\"raw_col\"");
     }
 }
