@@ -1,0 +1,51 @@
+columns:
+  VendorID: representation.discrete.categorical
+  tpep_pickup_datetime: datetime.timestamp.sql_standard
+  tpep_dropoff_datetime: datetime.timestamp.sql_standard
+  passenger_count: representation.numeric.integer_number
+  trip_distance: representation.numeric.decimal_number
+  RatecodeID: representation.discrete.categorical
+  store_and_fwd_flag: representation.boolean.initials
+  PULocationID: representation.numeric.integer_number
+  DOLocationID: representation.numeric.integer_number
+  payment_type: representation.discrete.categorical
+  fare_amount: representation.numeric.decimal_number
+  extra: representation.numeric.decimal_number
+  mta_tax: representation.numeric.decimal_number
+  tip_amount: representation.numeric.decimal_number
+  tolls_amount: representation.numeric.decimal_number
+  improvement_surcharge: representation.numeric.decimal_number
+  total_amount: representation.numeric.decimal_number
+  congestion_surcharge: representation.numeric.decimal_number
+  Airport_fee: representation.numeric.decimal_number
+
+notes: |
+  Iter-2 corpus dataset. 5000-row head sample from NYC TLC yellow trip
+  data Jan 2024 (~2.9M rows upstream). Source: NYC Taxi & Limousine
+  Commission, public domain.
+
+  Format-diversity commitment lives at tpep_pickup_datetime and
+  tpep_dropoff_datetime — they use SQL-standard "YYYY-MM-DD HH:MM:SS"
+  format, distinct from the iter-1 corpus's ISO-only datetime samples
+  (us_baby_names has no datetime; co2_emissions_by_nation uses pure year
+  integers via datetime.component.year). This forces the model to
+  recognise the SQL timestamp variant rather than collapsing to a
+  generic datetime.timestamp.iso_8601.
+
+  Currency-shaped columns (fare_amount, extra, mta_tax, tip_amount,
+  tolls_amount, improvement_surcharge, total_amount, congestion_surcharge,
+  Airport_fee) are mapped to representation.numeric.decimal_number
+  rather than finance.currency.amount because the values are bare
+  decimals without a currency symbol. The amount-variant collapse work
+  in v0.6.18 (MADR 0065) confirmed that header_hint() over-generalises
+  on the "amount" substring; the honest mapping for unprefixed currency
+  numerics is decimal_number. This intentionally surfaces the mismatch
+  if the validate harness re-promotes via header hints.
+
+  store_and_fwd_flag carries N/Y values — single-char boolean,
+  representation.boolean.initials.
+
+  RatecodeID, payment_type, VendorID are small integer codes (1-6) used
+  as look-up codes against the TLC data dictionary — categorical by
+  semantic, not integer_number. This is a code_vs_canonical seam in
+  addition to NYC Taxi's primary format_diversity role.

@@ -1,0 +1,131 @@
+columns:
+  row_index: representation.identifier.increment
+  ID: representation.identifier.increment
+  Name: representation.text.entity_name
+  Age: representation.numeric.integer_number
+  Photo: technology.internet.url
+  Nationality: geography.location.country
+  Flag: technology.internet.url
+  Overall: representation.numeric.integer_number
+  Potential: representation.numeric.integer_number
+  Club: representation.text.entity_name
+  Club Logo: technology.internet.url
+  Value: representation.text.plain_text
+  Wage: representation.text.plain_text
+  Special: representation.numeric.integer_number
+  Preferred Foot: representation.discrete.categorical
+  International Reputation: representation.discrete.ordinal
+  Weak Foot: representation.discrete.ordinal
+  Skill Moves: representation.discrete.ordinal
+  Work Rate: representation.discrete.categorical
+  Body Type: representation.discrete.categorical
+  Real Face: representation.boolean.terms
+  Position: representation.discrete.categorical
+  Jersey Number: representation.numeric.integer_number
+  Joined: datetime.date.abbreviated_month
+  Loaned From: representation.text.entity_name
+  Contract Valid Until: datetime.component.year
+  Height: representation.text.word
+  Weight: representation.text.plain_text
+  LS: representation.text.word
+  ST: representation.text.word
+  RS: representation.text.word
+  LW: representation.text.word
+  LF: representation.text.word
+  CF: representation.text.word
+  RF: representation.text.word
+  RW: representation.text.word
+  LAM: representation.text.word
+  CAM: representation.text.word
+  RAM: representation.text.word
+  LM: representation.text.word
+  LCM: representation.text.word
+  CM: representation.text.word
+  RCM: representation.text.word
+  RM: representation.text.word
+  LWB: representation.text.word
+  LDM: representation.text.word
+  CDM: representation.text.word
+  RDM: representation.text.word
+  RWB: representation.text.word
+  LB: representation.text.word
+  LCB: representation.text.word
+  CB: representation.text.word
+  RCB: representation.text.word
+  RB: representation.text.word
+  Crossing: representation.numeric.integer_number
+  Finishing: representation.numeric.integer_number
+  HeadingAccuracy: representation.numeric.integer_number
+  ShortPassing: representation.numeric.integer_number
+  Volleys: representation.numeric.integer_number
+  Dribbling: representation.numeric.integer_number
+  Curve: representation.numeric.integer_number
+  FKAccuracy: representation.numeric.integer_number
+  LongPassing: representation.numeric.integer_number
+  BallControl: representation.numeric.integer_number
+  Acceleration: representation.numeric.integer_number
+  SprintSpeed: representation.numeric.integer_number
+  Agility: representation.numeric.integer_number
+  Reactions: representation.numeric.integer_number
+  Balance: representation.numeric.integer_number
+  ShotPower: representation.numeric.integer_number
+  Jumping: representation.numeric.integer_number
+  Stamina: representation.numeric.integer_number
+  Strength: representation.numeric.integer_number
+  LongShots: representation.numeric.integer_number
+  Aggression: representation.numeric.integer_number
+  Interceptions: representation.numeric.integer_number
+  Positioning: representation.numeric.integer_number
+  Vision: representation.numeric.integer_number
+  Penalties: representation.numeric.integer_number
+  Composure: representation.numeric.integer_number
+  Marking: representation.numeric.integer_number
+  StandingTackle: representation.numeric.integer_number
+  SlidingTackle: representation.numeric.integer_number
+  GKDiving: representation.numeric.integer_number
+  GKHandling: representation.numeric.integer_number
+  GKKicking: representation.numeric.integer_number
+  GKPositioning: representation.numeric.integer_number
+  GKReflexes: representation.numeric.integer_number
+  Release Clause: representation.text.plain_text
+
+notes: |
+  Iter-2 corpus dataset. 5000-row head sample from FIFA 2019 player
+  attributes (~18k rows upstream, 89 columns). Source:
+  github.com/sharmaroshan/FIFA-2019-Analysis (Footballer.csv). Licence
+  pinned to CC-BY-SA-4.0 in manifest — the upstream Kaggle dataset
+  carries the EA Sports "Sofifa" community licence which is not SPDX,
+  so SA fallback is used for the allowlist match.
+
+  Code_vs_canonical commitment is broad and explicit:
+
+  1. Position rating columns (LS, ST, RS, LW … RB — 26 columns) carry
+     values like "88+2" — overall rating with positional bonus. They
+     LOOK like integers (mostly two-digit) but the "+2" suffix breaks
+     numeric parsing. Mapped to representation.text.word to be honest
+     about the format. The validator must reject if it tries to coerce
+     these to integer_number; this is the load-bearing CvC seam.
+
+  2. Value, Wage, Release Clause use formatted currency with M/K
+     abbreviation ("€110.5M", "€565K"). They look currency-shaped but
+     finance.currency.amount validation accepts plain numerics with at
+     most a single currency symbol; the M/K suffix breaks the validator.
+     Mapped to plain_text to be honest about non-canonical formatting.
+
+  3. Height ("5'7") and Weight ("159lbs") use imperial/Anglo notation
+     not present in any FineType taxonomy type. Height is short-form
+     (always 1-2 chars before apostrophe + 1-2 chars after) — word.
+     Weight has the "lbs" suffix — plain_text.
+
+  4. Joined ("Jul 1, 2004") uses abbreviated-month-comma format —
+     datetime.date.abbreviated_month. Contract Valid Until ("2021") is
+     bare year — datetime.component.year. Two date columns, two formats.
+
+  5. Real Face ("Yes"/"No") is boolean.terms. Preferred Foot
+     ("Left"/"Right") is categorical (only 2 values but not boolean —
+     these are categorical preferences, not truth-values).
+
+  Photo, Flag, Club Logo are full URLs to sofifa.com images — url.
+
+  Skill Moves and International Reputation values are 1-5 small-integer
+  rankings — ordinal not integer_number.

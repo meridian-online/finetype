@@ -1,0 +1,78 @@
+columns:
+  STRUCTURE: representation.discrete.categorical
+  STRUCTURE_ID: representation.text.word
+  STRUCTURE_NAME: representation.text.plain_text
+  ACTION: representation.discrete.categorical
+  REF_AREA: geography.location.country_code
+  Reference area: geography.location.country
+  MEASURE: representation.discrete.categorical
+  Measure: representation.text.plain_text
+  UNIT_MEASURE: representation.discrete.categorical
+  Unit of measure: representation.text.plain_text
+  TRANSFORMATION: representation.discrete.categorical
+  Transformation: representation.text.plain_text
+  ADJUSTMENT: representation.discrete.categorical
+  Adjustment: representation.text.plain_text
+  SEX: representation.discrete.categorical
+  Sex: representation.discrete.categorical
+  AGE: representation.discrete.categorical
+  Age: representation.text.plain_text
+  ACTIVITY: representation.discrete.categorical
+  Economic activity: representation.text.plain_text
+  FREQ: representation.discrete.categorical
+  Frequency of observation: representation.discrete.categorical
+  TIME_PERIOD: representation.text.word
+  Time period: representation.text.plain_text
+  OBS_VALUE: representation.numeric.decimal_number
+  Observation value: representation.text.plain_text
+  BASE_PER: representation.text.word
+  Base period: representation.text.plain_text
+  OBS_STATUS: representation.discrete.categorical
+  Observation status: representation.text.plain_text
+  UNIT_MULT: representation.numeric.integer_number
+  Unit multiplier: representation.text.plain_text
+  DECIMALS: representation.numeric.integer_number
+  Decimals: representation.text.plain_text
+
+notes: |
+  Iter-2 corpus dataset. 5000-row head sample from OECD Infra-Annual
+  Labour Statistics (DSD_LFS@DF_IALFS_INDIC, 2023-2024 period). Source:
+  sdmx.oecd.org REST API, SPDX CC-BY-4.0.
+
+  Code_vs_canonical commitment is the dominant property of this dataset
+  — the SDMX "csvfilewithlabels" format emits CODE | LABEL pairs across
+  9 dimensions (REF_AREA/Reference area, MEASURE/Measure,
+  UNIT_MEASURE/Unit of measure, TRANSFORMATION/Transformation,
+  ADJUSTMENT/Adjustment, SEX/Sex, AGE/Age, ACTIVITY/Economic activity,
+  FREQ/Frequency of observation). The CODE column is short-form (3-char
+  ISO country codes, 1-3 char measure codes, single-letter F/M/Q/A);
+  the LABEL column is the human-readable expansion. Pair patterns:
+
+   - REF_AREA "NOR" / Reference area "Norway" — ISO 3166-1 alpha-3
+     country codes vs full country names. Iter-1's
+     co2_emissions_by_nation already used uppercase short-form country
+     names (UNITED KINGDOM); this dataset uses both proper canonical
+     ISO codes AND full mixed-case canonical names side-by-side.
+
+   - MEASURE "WAP" / Measure "Working-age population" — agency-internal
+     code vs descriptive label.
+
+   - SEX "F"/"M"/"_T" / Sex "Female"/"Male"/"Total" — code uses
+     underscore-prefix sentinel for total aggregate.
+
+  TIME_PERIOD is a heterogeneous mixed-format column carrying values
+  like "2023", "2024-Q1", "2024-01" within the same column — there is
+  no FineType type that admits this union, so it's mapped to text.word
+  honestly. The validator must reject if it tries to coerce these to a
+  single datetime format.
+
+  Time period (label-side) and several other label columns are 0% fill
+  in this row range (the OECD service emits the code-side and leaves
+  the label sometimes empty for time/base-period). They're still
+  type-mapped — the validator must accept fully-empty columns under the
+  iter-1 NULL handling contract.
+
+  Mixed CvC seam: the ratio of code:label columns and the variety of
+  short-form codes (1-letter, 3-letter, alphanumeric Y15T74-style age
+  ranges) makes this the broadest CvC test surface in the iter-2
+  corpus. Format diversity is also exercised secondarily via TIME_PERIOD.

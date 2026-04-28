@@ -1,0 +1,28 @@
+columns:
+  Symbol: representation.text.word
+  Security: representation.text.entity_name
+  GICS Sector: representation.discrete.categorical
+  GICS Sub-Industry: representation.discrete.categorical
+  Headquarters Location: representation.text.plain_text
+  Date added: datetime.date.iso
+  CIK: representation.numeric.integer_number
+  Founded: representation.text.plain_text
+
+notes: |
+  Iter-2 corpus dataset. 503 rows (1 header + 503 data, under 5000 cap).
+  Source: datahub.io/core/s-and-p-500-companies (PDDL-1.0).
+
+  CvC commitment is narrow: GICS Sector is the sole code_vs_canonical slot.
+  Sub-Industry is also categorical-by-shape but not the load-bearing CvC
+  attribution — it's there so the dataset has multiple categorical columns
+  rather than one in isolation.
+
+  Symbol is mapped to representation.text.word (1-5 letter ticker) rather
+  than a finance.market.* type because the latter does not exist in the
+  240-type taxonomy as of v0.6.19. Founded is mapped to plain_text rather
+  than integer because 8% of rows (40/503) carry parenthetical text e.g.
+  "2013 (1888)" or "2005 (Molson 1786, Coors 1873)" — honest mapping over
+  a numeric label that would force either coercion or rejection.
+
+  Date added uses ISO 8601 (YYYY-MM-DD). CIK is a 1-7 digit SEC central
+  index key — non-padded integer, mapped to integer_number.

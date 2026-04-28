@@ -1,0 +1,34 @@
+card: orbit/cards/0015-validate-corpus-curation.yaml
+autonomy: guided
+budget: 3
+iteration: 1
+current_spec: orbit/specs/2026-04-28-validate-corpus-curation/
+status: review
+history:
+  - dir: orbit/specs/2026-04-28-validate-corpus-curation/
+    result: BUDGET_OVERRIDE
+    note: |
+      §5a synthetic BLOCK fired at review_cycles.review_spec == 3 with
+      only mechanical findings (no design rework). Hugh authorised
+      cycles 4 and 5 as explicit budget overrides to converge through
+      verification-command bugs surfaced by the reviewer (each cycle
+      finding fewer/narrower defects).
+
+      Cycle convergence pattern:
+        Cycle 1: 9 findings  (3 HIGH / 4 MEDIUM / 2 LOW)
+        Cycle 2: 6 findings  (2 HIGH / 2 MEDIUM / 2 LOW)
+        Cycle 3: 5 findings  (0 HIGH / 2 MEDIUM / 3 LOW)
+        Cycle 4: 4 findings  (0 HIGH / 1 MEDIUM / 3 LOW)
+        Cycle 5: 3 findings  (0 HIGH / 1 MEDIUM / 2 LOW)
+
+      After cycle 5, all 27 findings across 5 cycles applied to spec.yaml.
+      Spec advances to implement under explicit author override per the
+      guided-autonomy decision-checkpoint pattern. Counter remains at 3;
+      cycles 4-5 launched as overrides, not in-budget cycles.
+started: 2026-04-28T13:30:00+01:00
+review_cycles:
+  review_spec: 3
+  review_pr: 0
+review_cycle_dates:
+  review_spec: 2026-04-28
+  review_pr: null

@@ -36,3 +36,6 @@ references:
   - "orbit/decisions/0072-round-trip-pass-as-validate-metric.md"
   - "orbit/decisions/0073-validate-corpus-reuses-m19-infrastructure.md"
   - "orbit/decisions/0074-validate-corpus-in-scope-fix-mechanisms.md"
+
+specs:
+  - "orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml"

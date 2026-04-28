@@ -1,0 +1,92 @@
+columns:
+  GLOBALEVENTID: representation.identifier.increment
+  SQLDATE: datetime.date.compact_ymd
+  MonthYear: datetime.date.compact_ym
+  Year: datetime.component.year
+  FractionDate: representation.numeric.decimal_number
+  Actor1Code: representation.discrete.categorical
+  Actor1Name: representation.text.entity_name
+  Actor1CountryCode: representation.discrete.categorical
+  Actor1KnownGroupCode: representation.discrete.categorical
+  Actor1EthnicCode: representation.discrete.categorical
+  Actor1Religion1Code: representation.discrete.categorical
+  Actor1Religion2Code: representation.discrete.categorical
+  Actor1Type1Code: representation.discrete.categorical
+  Actor1Type2Code: representation.discrete.categorical
+  Actor1Type3Code: representation.discrete.categorical
+  Actor2Code: representation.discrete.categorical
+  Actor2Name: representation.text.entity_name
+  Actor2CountryCode: representation.discrete.categorical
+  Actor2KnownGroupCode: representation.discrete.categorical
+  Actor2EthnicCode: representation.discrete.categorical
+  Actor2Religion1Code: representation.discrete.categorical
+  Actor2Religion2Code: representation.discrete.categorical
+  Actor2Type1Code: representation.discrete.categorical
+  Actor2Type2Code: representation.discrete.categorical
+  Actor2Type3Code: representation.discrete.categorical
+  IsRootEvent: representation.boolean.binary
+  EventCode: representation.discrete.categorical
+  EventBaseCode: representation.discrete.categorical
+  EventRootCode: representation.discrete.categorical
+  QuadClass: representation.discrete.categorical
+  GoldsteinScale: representation.numeric.decimal_number
+  NumMentions: representation.numeric.integer_number
+  NumSources: representation.numeric.integer_number
+  NumArticles: representation.numeric.integer_number
+  AvgTone: representation.numeric.decimal_number
+  Actor1Geo_Type: representation.discrete.categorical
+  Actor1Geo_FullName: representation.text.plain_text
+  Actor1Geo_CountryCode: geography.location.country_code
+  Actor1Geo_ADM1Code: representation.discrete.categorical
+  Actor1Geo_Lat: representation.numeric.decimal_number
+  Actor1Geo_Long: representation.numeric.decimal_number
+  Actor1Geo_FeatureID: representation.text.word
+  Actor2Geo_Type: representation.discrete.categorical
+  Actor2Geo_FullName: representation.text.plain_text
+  Actor2Geo_CountryCode: geography.location.country_code
+  Actor2Geo_ADM1Code: representation.discrete.categorical
+  Actor2Geo_Lat: representation.numeric.decimal_number
+  Actor2Geo_Long: representation.numeric.decimal_number
+  Actor2Geo_FeatureID: representation.text.word
+  ActionGeo_Type: representation.discrete.categorical
+  ActionGeo_FullName: representation.text.plain_text
+  ActionGeo_CountryCode: geography.location.country_code
+  ActionGeo_ADM1Code: representation.discrete.categorical
+  ActionGeo_Lat: representation.numeric.decimal_number
+  ActionGeo_Long: representation.numeric.decimal_number
+  ActionGeo_FeatureID: representation.text.word
+  DATEADDED: datetime.date.compact_ymd
+  SOURCEURL: technology.internet.url
+
+notes: |
+  Iter-2 corpus dataset. 5000-row head sample from GDELT Event 1.0 daily
+  export 2024-01-15 (~122k rows upstream, 58 columns). Source:
+  data.gdeltproject.org, SPDX CC0-1.0.
+
+  Format-diversity commitment lives at four datetime columns:
+   - SQLDATE  → datetime.date.compact_ymd  (YYYYMMDD, 8-digit unsigned)
+   - MonthYear → datetime.date.compact_ym  (YYYYMM, 6-digit unsigned)
+   - Year     → datetime.component.year   (YYYY, 4-digit unsigned)
+   - DATEADDED → datetime.date.compact_ymd (YYYYMMDD)
+  These are integer-shaped dates without separators. The validator must
+  recognise them as dates rather than collapsing to integer_number — the
+  exact failure mode iter-1 saw with co2_emissions_by_nation's Year column
+  before MADR 0072's round-trip lens caught it.
+
+  Code_vs_canonical surface area is huge (32 categorical columns —
+  CAMEO actor codes, event codes, 2-letter ADM1 codes, 3-letter actor
+  country codes, religion/ethnic/type codes from the CAMEO 1.1b
+  taxonomy). All mapped to representation.discrete.categorical because
+  there's no FineType taxonomy entry for CAMEO codes specifically. The
+  Geo_CountryCode columns use ISO 3166-1 alpha-2 and ARE in the taxonomy
+  (geography.location.country_code) — so the iter-1 country-code seam
+  carries forward.
+
+  Most categorical Actor* fields are sparse (>90% NULL) — the validator
+  must accept empty/NULL without rejecting. Empty cells are not a code
+  vs canonical mismatch.
+
+  IsRootEvent is 1/0 → representation.boolean.binary.
+  GLOBALEVENTID is a strictly increasing event-counter integer →
+  representation.identifier.increment.
+  SOURCEURL is a full URL → technology.internet.url.
