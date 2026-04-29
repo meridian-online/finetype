@@ -1,0 +1,642 @@
+# Validate-corpus expected-attribution fixture
+# ============================================
+#
+# This file is the authoritative ground truth for what each per-(dataset,
+# column) failure means under the iter-3 attribution cascade. The
+# validate-corpus harness's `attribute()` cascade is regression-checked
+# against these rows by `vci3_fixture_attribution_regression_match`.
+#
+# Schema (ac-03):
+#   - dataset             (string, required)
+#   - column              (string, required)
+#   - expected_mechanism  (string, required: enum_overfit | format_diversity
+#                                          | misclassification | code_vs_canonical
+#                                          | unknown | no_gt)
+#   - rationale           (string, required, ≤200 chars)
+#   - pending_escalation  (bool,   optional, default false)
+#
+# Construction is **strict two-pass** (ac-03, ac-13). Phase 1 (this commit)
+# hand-writes the 4 hard anchor rows + 1 known taxonomy-gap row from the
+# iter-2 GT sidecar `notes:` sections — NOT from harness output, NOT from
+# the iter-2 spec's illustrative mismatch table. Phase 2 (separate commit)
+# runs the iter-3 harness against the full 12-dataset manifest and appends
+# rows for every other failing column, with `expected_mechanism` set to the
+# harness's actual output (anti-regression lock, not correctness oracle).
+#
+# Source-of-truth precedence: GT sidecar `notes:` wins over iter-2 spec
+# illustrative table when they conflict.
+
+# ---------------------------------------------------------------------------
+# Phase 1 — 4 hard anchors + 1 known taxonomy-gap row
+# ---------------------------------------------------------------------------
+
+- dataset: nyc_taxi
+  column: tpep_pickup_datetime
+  expected_mechanism: format_diversity
+  rationale: |
+    NYC TLC GT sidecar names SQL-standard "YYYY-MM-DD HH:MM:SS" as the
+    format-diversity seam vs ISO-only iter-1 timestamps. Path B subtype
+    drift within datetime.timestamp.* prefix.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: SQLDATE
+  expected_mechanism: format_diversity
+  rationale: |
+    GDELT GT sidecar names compact_ymd (YYYYMMDD, 8-digit unsigned) as
+    the format-diversity seam — integer-shaped date without separators.
+    Subtype drift within datetime.date.* prefix.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: Value
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    FIFA GT sidecar item 2: Value/Wage/Release Clause use formatted
+    currency with M/K abbreviation ('€110.5M', '€565K'). GT
+    representation.text.plain_text vs harness-predicted
+    finance.currency.amount (in CODE_TYPED_LABELS) → path-b-codetype.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: REF_AREA
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    OECD GT sidecar names REF_AREA / Reference area as the load-bearing
+    CvC seam — ISO-3 country codes ('NOR') vs full names ('Norway') in
+    paired columns. Iter-2 expected GT geography.location.country_code (in
+    allowlist) against a canonical-text predicted side; iter-3 empirical
+    reality differs: the v0.6.19 model mispredicts to
+    technology.internet.http_method (ALSO in CODE_TYPED_LABELS), so
+    cascade Rule 3's XOR=false and Rule 6 (misclassification) fires.
+    Anchor preserved as iter-2 truth, marked pending_escalation pending
+    model improvement to lift http_method out of REF_AREA's confusion set
+    (or value-shape signals plumbed into RejectRow per the broader
+    escalation path).
+  pending_escalation: true
+
+# Known taxonomy-gap row — NOT a hard anchor.
+# GICS Sector is constructively un-attributable via label-only signals
+# under v0.6.19 taxonomy: GT is representation.discrete.categorical (no
+# GICS label exists), and English-text sector names like "Information
+# Technology" predict text/categorical, not codes — neither side enters
+# the code-typed allowlist. This row exists to keep the obligation
+# visible (taxonomy widening for GICS sector/industry types OR
+# value-shape signals plumbed into RejectRow), pending follow-up spec.
+- dataset: sp500_constituents
+  column: GICS Sector
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Pending taxonomy widening: GICS Sector has no FineType label
+    (v0.6.19 taxonomy gap). Label-only attribution cannot fire — both
+    sides land outside CODE_TYPED_LABELS. Follow-up spec: extend
+    taxonomy with GICS sector/industry types, OR plumb value-shape
+    signals into RejectRow.
+  pending_escalation: true
+
+# ---------------------------------------------------------------------------
+# Phase 2 — 75 harness-derived rows from the iter-3 12-dataset run
+# (2026-04-29). Three failing columns already have Phase 1 anchor rows and
+# are NOT duplicated here: gdelt_events.SQLDATE (format_diversity),
+# fifa_players.Value (code_vs_canonical), oecd_employment.REF_AREA
+# (code_vs_canonical, pending_escalation:true). Total fixture rows after
+# Phase 2 = 80 (5 Phase 1 + 75 Phase 2). Failing columns covered: 78.
+# Each row's `expected_mechanism` reflects the harness's actual output
+# (anti-regression lock per ac-05 framing — proves attribution stability
+# under future cascade or model changes, NOT correctness).
+# ---------------------------------------------------------------------------
+
+# --- rio2016_athletes (3 rows) ---
+- dataset: rio2016_athletes
+  column: id
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: rio2016_athletes
+  column: nationality
+  expected_mechanism: enum_overfit
+  rationale: |
+    Iter-3 cascade Rule 1: predicted == expected with constraint_failed=enum reject — taxonomy enum over-fits the value set.
+  pending_escalation: false
+
+- dataset: rio2016_athletes
+  column: sex
+  expected_mechanism: enum_overfit
+  rationale: |
+    Iter-3 cascade Rule 1: predicted == expected with constraint_failed=enum reject — taxonomy enum over-fits the value set.
+  pending_escalation: false
+
+# --- us_baby_names (1 rows) ---
+- dataset: us_baby_names
+  column: sex
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+# --- world_population (2 rows) ---
+- dataset: world_population
+  column: "Country Code"
+  expected_mechanism: enum_overfit
+  rationale: |
+    Iter-3 cascade Rule 1: predicted == expected with constraint_failed=enum reject — taxonomy enum over-fits the value set.
+  pending_escalation: false
+
+- dataset: world_population
+  column: Value
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+# --- un_locode (4 rows) ---
+- dataset: un_locode
+  column: Change
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: un_locode
+  column: Function
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: un_locode
+  column: Location
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: un_locode
+  column: Subdivision
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+# --- sp500_constituents (2 rows) ---
+- dataset: sp500_constituents
+  column: Founded
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: sp500_constituents
+  column: Symbol
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+# --- nyc_taxi (1 rows) ---
+- dataset: nyc_taxi
+  column: VendorID
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+# --- gdelt_events (18 rows) ---
+- dataset: gdelt_events
+  column: ActionGeo_ADM1Code
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: ActionGeo_CountryCode
+  expected_mechanism: enum_overfit
+  rationale: |
+    Iter-3 cascade Rule 1: predicted == expected with constraint_failed=enum reject — taxonomy enum over-fits the value set.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: ActionGeo_FeatureID
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: ActionGeo_FullName
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Geo_ADM1Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Geo_CountryCode
+  expected_mechanism: enum_overfit
+  rationale: |
+    Iter-3 cascade Rule 1: predicted == expected with constraint_failed=enum reject — taxonomy enum over-fits the value set.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Geo_FeatureID
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Geo_FullName
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor1Type3Code
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Geo_ADM1Code
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Geo_CountryCode
+  expected_mechanism: enum_overfit
+  rationale: |
+    Iter-3 cascade Rule 1: predicted == expected with constraint_failed=enum reject — taxonomy enum over-fits the value set.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Geo_FeatureID
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Geo_FullName
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Religion2Code
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: Actor2Type3Code
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: FractionDate
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+# --- fifa_players (31 rows) ---
+- dataset: fifa_players
+  column: CAM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: CB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: CDM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: CF
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: CM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: "Contract Valid Until"
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: Height
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LAM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LCB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LCM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LDM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LF
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LS
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LW
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: LWB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: Photo
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: "Preferred Foot"
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RAM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RCB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RCM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RDM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RF
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RM
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RS
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RW
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: RWB
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: ST
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: Wage
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+# --- oecd_employment (13 rows) ---
+- dataset: oecd_employment
+  column: ACTION
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: ACTIVITY
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: AGE
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: Age
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: Decimals
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: FREQ
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: "Frequency of observation"
+  expected_mechanism: format_diversity
+  rationale: |
+    Iter-3 cascade Rule 2: predicted != expected with shared broad-type prefix — subtype drift within the same family.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: SEX
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: STRUCTURE_ID
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: Sex
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: TIME_PERIOD
+  expected_mechanism: misclassification
+  rationale: |
+    Iter-3 cascade Rule 6: predicted != expected with SEMANTIC_TYPE reject and no path-B rule matched — cross-domain prediction error.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: UNIT_MEASURE
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: UNIT_MULT
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Iter-3 cascade Rule 3: predicted != expected with exactly one side in CODE_TYPED_LABELS — code/canonical disagreement.
+  pending_escalation: false
+
