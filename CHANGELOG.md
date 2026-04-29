@@ -64,6 +64,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   precision principle (MADR 0001) preserved. Regression tests at
   `crates/finetype-core/tests/precision_widenings.rs`.
 
+- **Validate-corpus iter-3 — mechanism-attribution refactor (spec
+  `2026-04-28-validate-corpus-iter3`, card 0014)** — The harness's
+  attribution cascade is rewritten as 7 explicit rules emitting
+  `(Mechanism, &'static str)` tuples (mechanism + 6 trigger labels:
+  `path-a-pattern`, `path-b-prefix`, `path-b-codetype`,
+  `enum-constraint`, `prediction-error`, `fallthrough`). Per-column
+  table in `eval/eval_output/validate_corpus.md` gains a `Trigger`
+  column. New analyst-facing doc at `docs/mechanism-attribution.md`
+  explains the four buckets, their triggers, examples, and fix paths.
+  Code-typed allowlist (`CODE_TYPED_LABELS`, 38 entries) tested for
+  taxonomy validity. Per-`(dataset, column)` fixture at
+  `eval/datasets/validate_corpus_expected_attributions.yaml` (80 rows:
+  5 Phase 1 hand-authored anchors + 75 Phase 2 harness-derived) is the
+  anti-regression lock; `pending_escalation` flag documents
+  known-pending rows (REF_AREA model collision, GICS Sector taxonomy
+  gap). 21 `vci3_*` tests cover positive/negative attribution,
+  cascade order, allowlist validity, fixture parity, and anchor
+  shape. MADRs 0075 (bucket coalesce), 0076 (fixture lock), 0077
+  (label-only attribution).
+
 ## [0.6.19] - 2026-04-28
 
 ### Removed
