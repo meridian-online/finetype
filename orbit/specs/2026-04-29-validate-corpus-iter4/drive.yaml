@@ -3,15 +3,19 @@ autonomy: full
 budget: 3
 iteration: 1
 current_spec: orbit/specs/2026-04-29-validate-corpus-iter4/
-status: implement
-history: []
+status: shipped
+history:
+  - dir: orbit/specs/2026-04-29-validate-corpus-iter4/
+    result: GO
+    pr: https://github.com/meridian-online/finetype/pull/61
+    review_pr_verdict: APPROVE
 started: 2026-04-29T00:00:00Z
 review_cycles:
   review_spec: 0
   review_pr: 0
 review_cycle_dates:
   review_spec: 2026-04-29
-  review_pr: null
+  review_pr: 2026-04-29
 notes: |
   Design and spec stages completed inline (guided) before drive was kicked off:
   interview.md and spec.yaml saved on disk. drive.yaml initialised at
