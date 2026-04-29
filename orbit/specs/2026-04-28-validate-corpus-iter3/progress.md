@@ -6,20 +6,22 @@
 
 ## Acceptance criteria
 
-- [ ] ac-01 — Cascade refactor in `validate_corpus.rs` (5-rule → 7-rule with explicit ordering, rule-per-fn with rustdoc)
-- [ ] ac-02 — Code-typed taxonomy allowlist (≥20 verified entries, taxonomy-existence test)
+- [x] ac-01 — Cascade refactor in `validate_corpus.rs` (5-rule → 7-rule with explicit ordering, rule-per-fn with rustdoc) — DONE: 7 rule fns + dispatcher + rustdoc; call sites threaded through DatasetResult tuple `(Mechanism, &'static str)`.
+- [x] ac-02 — Code-typed taxonomy allowlist (≥20 verified entries, taxonomy-existence test) — DONE: 36 entries; `vci3_code_typed_allowlist_taxonomy_valid` loads `labels/` via `finetype_core::Taxonomy::from_directory` and asserts `.get(label).is_some()` for each entry. `vci3_code_typed_allowlist_size` enforces the ≥20 floor.
 - [ ] ac-03 — Per-(dataset, column) fixture YAML, two-pass commit (Phase 1 anchors → Phase 2 harness-derived)
-- [ ] ac-04 — Per-mechanism positive + negative tests (≥12: 6 positive + 6 negative)
+- [x] ac-04 — Per-mechanism positive + negative tests (≥12: 6 positive + 6 negative) — DONE: 6 positive (`vci3_attribute_<mech>_fires`) + 6 negative (`vci3_attribute_<mech>_negative_*`).
 - [ ] ac-05 — Fixture-iteration regression test `vci3_fixture_attribution_regression_match`
-- [ ] ac-06 — Cascade-order test `vci3_attribute_cascade_order` with ≥4 cases including Rule 5 vs Rule 4 seam-table
-- [ ] ac-07 — Test naming reconciliation (drop `pvc_attribute_rule_*` and `mechanism_attribution_*`)
+- [x] ac-06 — Cascade-order test `vci3_attribute_cascade_order` with ≥4 cases including Rule 5 vs Rule 4 seam-table — DONE: 6 cases including the Country (Rule 5 wins) and Date (Rule 4 wins) seam-table seam.
+- [x] ac-07 — Test naming reconciliation (drop `pvc_attribute_rule_*` and `mechanism_attribution_*`) — DONE: legacy names dropped; replaced by `vci3_attribute_*`, `vci3_code_typed_*`, `vci3_attribute_cascade_*`.
 - [ ] ac-08 — Analyst-facing `docs/mechanism-attribution.md` (4 mechanism sections, linked from validate_corpus.md)
-- [ ] ac-09 — Per-column report `trigger:` column with 6 distinct labels (path-a-pattern, path-b-prefix, path-b-codetype, enum-constraint, prediction-error, fallthrough)
+- [x] ac-09 — Per-column report `trigger:` column with 6 distinct labels (path-a-pattern, path-b-prefix, path-b-codetype, enum-constraint, prediction-error, fallthrough) — code change DONE: `DatasetResult.failing_columns` carries `(Mechanism, &'static str)`; report renders `Trigger` column. Verification at ac-10.
 - [ ] ac-10 — `make validate-corpus` regenerates report; format_diversity ≥1, code_vs_canonical ≥1 (both fixture-blessed, pending_escalation: false); misclassification < iter-2 baseline; per-dataset attribution matches fixture for non-pending-escalation rows
 - [ ] ac-11 — 3 MADRs accepted, dated 2026-04-29 (bucket-coalesce, fixture-anti-regression-lock, label-only-code-canonical-attribution)
 - [ ] ac-12 — Doc updates (CHANGELOG.md [Unreleased], CLAUDE.md "Recent work"/"What's next", card 0014 specs[] verification)
 - [ ] ac-13 — 4 hard anchors + 1 known taxonomy-gap row (FIFA Value not Nationality; GICS pending_escalation); 2 anchor tests
 - [ ] ac-14 — `make ci` exits 0; ≥19 net new vci3_* tests pass; clippy clean; taxonomy check clean
+
+**Test count toward ac-14:** 17 vci3_* tests in place (6 positive + 6 negative + 1 cascade-order + 3 allowlist + 1 seam-table). Need ≥19; ac-05 + ac-13 add 4 more (regression match + anchor count + 2 anchor tests) → 21 total at completion.
 
 ## Implementation order
 

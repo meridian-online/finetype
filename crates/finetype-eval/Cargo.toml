@@ -58,6 +58,9 @@ arrow = { version = "54", default-features = false, features = ["csv", "json"] }
 flate2 = "1"
 duckdb = { version = "=1.4.4", default-features = true, features = ["bundled"] }
 
+[dev-dependencies]
+finetype-core = { path = "../finetype-core" }
+
 [lib]
 name = "finetype_eval"
 path = "src/lib.rs"
