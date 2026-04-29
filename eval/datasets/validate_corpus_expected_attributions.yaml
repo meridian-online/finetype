@@ -1,0 +1,88 @@
+# Validate-corpus expected-attribution fixture
+# ============================================
+#
+# This file is the authoritative ground truth for what each per-(dataset,
+# column) failure means under the iter-3 attribution cascade. The
+# validate-corpus harness's `attribute()` cascade is regression-checked
+# against these rows by `vci3_fixture_attribution_regression_match`.
+#
+# Schema (ac-03):
+#   - dataset             (string, required)
+#   - column              (string, required)
+#   - expected_mechanism  (string, required: enum_overfit | format_diversity
+#                                          | misclassification | code_vs_canonical
+#                                          | unknown | no_gt)
+#   - rationale           (string, required, ≤200 chars)
+#   - pending_escalation  (bool,   optional, default false)
+#
+# Construction is **strict two-pass** (ac-03, ac-13). Phase 1 (this commit)
+# hand-writes the 4 hard anchor rows + 1 known taxonomy-gap row from the
+# iter-2 GT sidecar `notes:` sections — NOT from harness output, NOT from
+# the iter-2 spec's illustrative mismatch table. Phase 2 (separate commit)
+# runs the iter-3 harness against the full 12-dataset manifest and appends
+# rows for every other failing column, with `expected_mechanism` set to the
+# harness's actual output (anti-regression lock, not correctness oracle).
+#
+# Source-of-truth precedence: GT sidecar `notes:` wins over iter-2 spec
+# illustrative table when they conflict.
+
+# ---------------------------------------------------------------------------
+# Phase 1 — 4 hard anchors + 1 known taxonomy-gap row
+# ---------------------------------------------------------------------------
+
+- dataset: nyc_taxi
+  column: tpep_pickup_datetime
+  expected_mechanism: format_diversity
+  rationale: |
+    NYC TLC GT sidecar names SQL-standard "YYYY-MM-DD HH:MM:SS" as the
+    format-diversity seam vs ISO-only iter-1 timestamps. Path B subtype
+    drift within datetime.timestamp.* prefix.
+  pending_escalation: false
+
+- dataset: gdelt_events
+  column: SQLDATE
+  expected_mechanism: format_diversity
+  rationale: |
+    GDELT GT sidecar names compact_ymd (YYYYMMDD, 8-digit unsigned) as
+    the format-diversity seam — integer-shaped date without separators.
+    Subtype drift within datetime.date.* prefix.
+  pending_escalation: false
+
+- dataset: fifa_players
+  column: Value
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    FIFA GT sidecar item 2: Value/Wage/Release Clause use formatted
+    currency with M/K abbreviation ('€110.5M', '€565K'). GT
+    representation.text.plain_text vs harness-predicted
+    finance.currency.amount (in CODE_TYPED_LABELS) → path-b-codetype.
+  pending_escalation: false
+
+- dataset: oecd_employment
+  column: REF_AREA
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    OECD GT sidecar names REF_AREA / Reference area as the load-bearing
+    CvC seam — ISO-3 country codes ('NOR') vs full names ('Norway') in
+    paired columns. GT geography.location.country_code (in allowlist)
+    against canonical-text predicted side.
+  pending_escalation: false
+
+# Known taxonomy-gap row — NOT a hard anchor.
+# GICS Sector is constructively un-attributable via label-only signals
+# under v0.6.19 taxonomy: GT is representation.discrete.categorical (no
+# GICS label exists), and English-text sector names like "Information
+# Technology" predict text/categorical, not codes — neither side enters
+# the code-typed allowlist. This row exists to keep the obligation
+# visible (taxonomy widening for GICS sector/industry types OR
+# value-shape signals plumbed into RejectRow), pending follow-up spec.
+- dataset: sp500_constituents
+  column: GICS Sector
+  expected_mechanism: code_vs_canonical
+  rationale: |
+    Pending taxonomy widening: GICS Sector has no FineType label
+    (v0.6.19 taxonomy gap). Label-only attribution cannot fire — both
+    sides land outside CODE_TYPED_LABELS. Follow-up spec: extend
+    taxonomy with GICS sector/industry types, OR plumb value-shape
+    signals into RejectRow.
+  pending_escalation: true
