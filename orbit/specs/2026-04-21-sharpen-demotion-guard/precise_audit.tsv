@@ -100,7 +100,7 @@ finance.banking.iban	false	^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$	true
 finance.banking.swift_bic	false	^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$	true
 finance.crypto.bitcoin_address	false	^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$	true
 finance.crypto.ethereum_address	false	^0x[a-fA-F0-9]{40}$	true
-finance.currency.amount	false	^[\$£¥₹₩₿\p{Sc}]?\s?-?\s?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?$|^-?[\$£¥₹₩₿\p{Sc}]\s?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?$|^\([\$£¥₹₩₿\p{Sc}]?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?\)$	true
+finance.currency.amount	false	^[\$£¥₹₩₿\p{Sc}]?\s?-?\s?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?$|^-?[\$£¥₹₩₿\p{Sc}]\s?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?$|^\([\$£¥₹₩₿\p{Sc}]?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?\)$|^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$	true
 finance.currency.amount_accounting	false	^\(?\$?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?\)?$	true
 finance.currency.amount_apostrophe	false	^(CHF\s?)?-?[0-9]{1,3}(['\x{2019}][0-9]{3})*(\.[0-9]{1,2})?(\s?CHF)?$	true
 finance.currency.amount_code_prefix	false	^[A-Z]{3}\s?-?[0-9]{1,3}([,.]?[0-9]{3})*(\.[0-9]{1,2})?$	true

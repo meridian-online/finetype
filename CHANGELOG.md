@@ -84,6 +84,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   shape. MADRs 0075 (bucket coalesce), 0076 (fixture lock), 0077
   (label-only attribution).
 
+- **Validate-corpus iter-4 — `finance.currency.amount` bare-decimal
+  widening (spec `2026-04-29-validate-corpus-iter4`, card 0014)** —
+  `finance.currency.amount`'s `validation.pattern` at
+  `labels/definitions_finance.yaml:131` gains a 4th alternation
+  borrowed verbatim from `representation.numeric.decimal_number`'s
+  canonical pattern at `definitions_representation.yaml:79`:
+  `^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$`. Closes the
+  format-diversity gap surfaced by the discovery vehicle
+  `eval/datasets/csv/ecommerce_orders.csv` — `total_price` reject
+  count drops from 63 → 0 (4-digit unsymboled values like
+  `1914.96` previously failed the comma-required alternations 1–3).
+  iter-3's `vci3_fixture_attribution_regression_match` test continues
+  to pass; zero substantive row-level drift on the 12-dataset corpus
+  (the regenerated `validate_corpus.md` differs only in the
+  `Generated:` timestamp). Three new `vci4_*` regression tests in
+  `crates/finetype-eval/src/bin/validate_corpus.rs` cover
+  bare-decimal acceptance, format-preservation, and non-money
+  rejection. The two misclassification findings surfaced alongside
+  (`status` → `datetime.component.periodicity`, `order_id` →
+  `finance.securities.sedol`) are recorded as deferred-to-retrain in
+  the iter-4 progress.md and tracked on follow-up card 0015. MADR
+  0078 records the precedent: validator alternations may compose
+  canonical sibling-type patterns (composition over invention),
+  with a comment-annotation contract for traceability.
+
 ## [0.6.19] - 2026-04-28
 
 ### Removed

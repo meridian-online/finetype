@@ -59,6 +59,7 @@ specs:
   - "orbit/specs/2026-04-28-validate-precision-corpus/"
   - "orbit/specs/2026-04-28-validate-corpus-curation/"
   - "orbit/specs/2026-04-28-validate-corpus-iter3/"
+  - "orbit/specs/2026-04-29-validate-corpus-iter4/"
 
 references:
   - "orbit/specs/2026-04-28-validate-precision-corpus/interview.md"
