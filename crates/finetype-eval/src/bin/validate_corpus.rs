@@ -1784,3 +1784,122 @@ mod fixture_tests {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Amount widening tests (spec 2026-04-29-validate-corpus-iter4 ac-02..ac-04)
+//
+// These tests load the real `labels/` taxonomy, compile validators, and assert
+// that `finance.currency.amount`'s widened pattern (per ac-01) accepts plain
+// bare-decimal money values, preserves the existing US/international,
+// currency-prefix, and accounting-paren formats, and continues to reject
+// clearly-non-amount tokens. The 4th alternation is borrowed verbatim from
+// `representation.numeric.decimal_number`'s pattern at
+// `labels/definitions_representation.yaml:79`. See MADR 0078.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod amount_widening_tests {
+    use finetype_core::taxonomy::Taxonomy;
+    use std::path::PathBuf;
+
+    /// Resolve the workspace `labels/` directory from CARGO_MANIFEST_DIR
+    /// (which points at `crates/finetype-eval` during `cargo test`).
+    fn labels_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("labels")
+    }
+
+    fn load_amount_taxonomy() -> Taxonomy {
+        let mut taxonomy =
+            Taxonomy::from_directory(&labels_dir()).expect("taxonomy loads from labels/");
+        taxonomy.compile_validators();
+        taxonomy
+    }
+
+    fn assert_amount(taxonomy: &Taxonomy, value: &str, want_valid: bool, label: &str) {
+        let validator = taxonomy
+            .get_validator("finance.currency.amount")
+            .expect("finance.currency.amount has a compiled validator");
+        let got = validator.is_valid(value);
+        assert_eq!(
+            got, want_valid,
+            "finance.currency.amount.is_valid({:?}) = {}, want {} ({})",
+            value, got, want_valid, label
+        );
+    }
+
+    /// ac-02 — bare-decimal values match the widened amount regex.
+    ///
+    /// These are the values that surfaced the format-diversity gap in the
+    /// discovery vehicle `eval/datasets/csv/ecommerce_orders.csv` (column
+    /// `total_price`): plain unsymboled decimals with 1–4 integer digits, no
+    /// comma grouping. Pre-widening these rejected against the comma-required
+    /// alternations 1–3; post-widening they match alternation 4 (borrowed
+    /// verbatim from `representation.numeric.decimal_number`).
+    #[test]
+    fn vci4_amount_accepts_bare_decimal() {
+        let t = load_amount_taxonomy();
+        // Discovery vehicle samples (1914.96 was the canonical failing value).
+        assert_amount(&t, "1914.96", true, "1914.96 (4-digit decimal, no comma)");
+        assert_amount(&t, "19.95", true, "19.95 (typical price)");
+        assert_amount(&t, "100", true, "100 (integer-only)");
+        assert_amount(&t, "0.50", true, "0.50 (sub-dollar decimal)");
+        assert_amount(&t, "1234.56", true, "1234.56 (4-digit decimal)");
+        // Negative bare decimal.
+        assert_amount(&t, "-50.5", true, "-50.5 (negative decimal)");
+        assert_amount(&t, "-99.99", true, "-99.99 (negative two-decimal)");
+        // Sci-notation tail (carried verbatim from decimal_number).
+        assert_amount(&t, "1e6", true, "1e6 (scientific notation)");
+        assert_amount(&t, "1.5E+10", true, "1.5E+10 (uppercase + signed exp)");
+        assert_amount(&t, "6e-04", true, "6e-04 (negative exponent)");
+    }
+
+    /// ac-03 — the pre-existing US/international, currency-prefix, and
+    /// accounting-paren alternations continue to match unchanged. Drift here
+    /// would mean the widening damaged the original three alternations.
+    #[test]
+    fn vci4_amount_preserves_existing_formats() {
+        let t = load_amount_taxonomy();
+        // Alternation 1 — US/international, optional symbol prefix, comma
+        // thousands, period decimal.
+        assert_amount(&t, "$1,234.56", true, "$1,234.56");
+        assert_amount(&t, "£10,000.00", true, "£10,000.00");
+        assert_amount(&t, "¥1,000", true, "¥1,000");
+        assert_amount(&t, "$0.50", true, "$0.50");
+        assert_amount(&t, "$42.00", true, "$42.00");
+        assert_amount(&t, "$1,000,000.00", true, "$1,000,000.00");
+        // Alternation 2 — leading negative outside currency symbol.
+        assert_amount(&t, "-$999.99", true, "-$999.99");
+        assert_amount(&t, "-£250.75", true, "-£250.75");
+        // Alternation 3 — accounting parens for negative.
+        assert_amount(&t, "($1,234.56)", true, "($1,234.56)");
+        assert_amount(&t, "($999.99)", true, "($999.99)");
+    }
+
+    /// ac-04 — clearly-non-amount tokens still reject. The widening borrows
+    /// `decimal_number`'s pattern verbatim, which already rejects malformed
+    /// numerics like "1.2.3", "12px", "1e", "e5", and free text like "abc".
+    /// This test is the precision floor: the widening must not turn the
+    /// validator into a permissive catch-all.
+    #[test]
+    fn vci4_amount_rejects_non_money() {
+        let t = load_amount_taxonomy();
+        // Free text.
+        assert_amount(&t, "abc", false, "abc");
+        assert_amount(&t, "hello world", false, "hello world");
+        assert_amount(&t, "", false, "empty string");
+        // Malformed numerics (covered by decimal_number's tight pattern).
+        assert_amount(&t, "1.2.3", false, "1.2.3 (multi-dot)");
+        assert_amount(&t, "12px", false, "12px (unit suffix)");
+        assert_amount(&t, "1e", false, "1e (incomplete sci)");
+        assert_amount(&t, "e5", false, "e5 (no mantissa)");
+        assert_amount(&t, ".5", false, ".5 (leading dot)");
+        assert_amount(&t, "5.", false, "5. (trailing dot)");
+        // Mismatched currency formatting.
+        assert_amount(&t, "$1,234.567", false, "$1,234.567 (3 decimal digits)");
+    }
+}
