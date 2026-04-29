@@ -836,7 +836,7 @@ metadata:
   prior_review_ref: "orbit/specs/2026-04-28-validate-corpus-iter3/review-spec-2026-04-29-stub.md"
   cycle1_review_ref: "orbit/specs/2026-04-28-validate-corpus-iter3/review-spec-2026-04-29.md"
   cycle2_review_ref: "orbit/specs/2026-04-28-validate-corpus-iter3/review-spec-2026-04-29-v2.md"
-  fixture_baseline_rows: null  # set after Phase 2 commit; wired into vci3_fixture_row_count_baseline
+  fixture_baseline_rows: 80  # 5 Phase 1 + 75 Phase 2 (78 failing columns; 3 already in Phase 1). Wired into vci3_fixture_row_count_baseline.
   notes: |
     Promoted from stub (v0.1) to full spec (v1.0) on 2026-04-29 via
     /orb:design + /orb:spec. v1.1 (2026-04-29) addresses the 8 findings

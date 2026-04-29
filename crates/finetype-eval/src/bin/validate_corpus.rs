@@ -349,6 +349,8 @@ mod attribute {
         "finance.banking.aba_routing",
         "finance.banking.bsb",
         "finance.currency.currency_code",
+        "finance.currency.currency_symbol",
+        "finance.currency.amount",
         "finance.securities.cusip",
         "finance.securities.figi",
         "finance.securities.isin",
@@ -825,8 +827,14 @@ fn render_report(
     out.push_str(&format!("Generated: {now}\n"));
     out.push_str(&format!("Threshold: P={threshold:.2}\n"));
     out.push_str(&format!(
-        "Corpus: {m} datasets, {total_rows} rows total\n\n"
+        "Corpus: {m} datasets, {total_rows} rows total\n"
     ));
+    // ac-08: link to analyst-facing mechanism docs from the report
+    // header. Relative path: from eval/eval_output/validate_corpus.md
+    // up to docs/mechanism-attribution.md.
+    out.push_str(
+        "Mechanism reference: [docs/mechanism-attribution.md](../../docs/mechanism-attribution.md)\n\n",
+    );
 
     out.push_str("## Headline\n");
     out.push_str(&format!(
