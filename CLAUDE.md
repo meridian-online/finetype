@@ -20,7 +20,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 ## Architectural direction (settled — do not re-ask)
 
-- **Multi-branch as classifier role** (decision 0041): The multi-branch model is the default classifier. Sense and multi-branch both feed the same Sharpen post-processing.
+- **Multi-branch implements the Sense stage** (decision 0041): The Sense→Sharpen pipeline has two stages — Sense (broad classification) and Sharpen (rule-based post-processing). The Sense stage is currently implemented by the multi-branch model; historically it was implemented by the original Sense model. Both remain in code; multi-branch is the v0.6.19 default.
 - **Regex header hints deprecated** (decision 0042): Hardcoded regex `header_hint()` rules are deprecated in favour of learned approaches — multi-branch header branch (Model2Vec), sibling-context attention, semantic matching.
 - **Value-based rules only** (decision 0048): New disambiguation rules check actual column values, not header metadata.
 - **Strength through simplification** (decision 0038): Prefer retraining over adding disambiguation rules. Rules are a last resort.
@@ -29,7 +29,7 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 
 **Version:** 0.6.19
 **Taxonomy:** 240 definitions across 7 domains (container 11, datetime 84, finance 28, geography 25, identity 33, representation 33, technology 26) — all generators pass, 100% alignment.
-**Default classifier:** Multi-branch→Sharpen with sherlock-v19-relu-s42 (5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9173). Single forward pass per column. Profile eval **369/448 (82.4% label)** on 36 datasets. Sense→Sharpen path remains in code.
+**Default Sense-stage model:** Multi-branch (sherlock-v19-relu-s42) inside the Sense→Sharpen pipeline. 5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9173. Single forward pass per column. Profile eval **369/448 (82.4% label)** on 36 datasets. Original Sense implementation remains in code as an alternative.
 **Codebase:** ~20k lines of Rust across 9 crates. Zero Python dependencies (build + runtime).
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server.
 

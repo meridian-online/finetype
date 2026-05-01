@@ -158,13 +158,15 @@ Key fields: `broad_type` (target DuckDB type), `transform` (DuckDB SQL expressio
 
 ---
 
-## Multi-Branch Classifier (v0.6.19 default for CLI / MCP / DuckDB)
+## Sense Stage Implementation — Multi-Branch (v0.6.19)
 
-FineType's classifier role is filled by the **multi-branch model** (sherlock-v19-relu-s42) as of v0.6.19. The Sense→Sharpen pipeline (described above) and the multi-branch pipeline both feed into the same Sharpen post-processing layer — Sharpen is shared infrastructure, not specific to either classifier. Multi-branch replaces Sense's *classification step* with a single forward pass per column; the Sharpen rules, header hints, and disambiguation logic that follow are unchanged.
+The Sense→Sharpen architecture has two stages: **Sense** (broad classification) and **Sharpen** (rule-based post-processing on top of the Sense output). The Sense stage is currently implemented by the **multi-branch model** (sherlock-v19-relu-s42) as of v0.6.19; historically it was implemented by the original Sense model (Model2Vec cross-attention). Multi-branch is the default at the CLI / MCP / DuckDB call sites — the original Sense implementation remains in code but is not the default.
 
-Decisions: 0041 (multi-branch as the classifier role), 0042 (regex header hints deprecated in favour of learned approaches), 0048 (value-based rules only), 0038 (strength through simplification — prefer retraining over adding disambiguation rules). The Sense classifier remains in code and is conceptually preserved as the model architecture that can be selected when multi-branch artefacts aren't present.
+The Sharpen stage is unchanged across implementations: the rules, header hints, and disambiguation logic that follow Sense are shared infrastructure.
 
-### Column-level inference (multi-branch path)
+Decisions: 0041 (multi-branch implementing the Sense stage), 0042 (regex header hints deprecated in favour of learned approaches), 0048 (value-based rules only), 0038 (strength through simplification — prefer retraining over adding disambiguation rules).
+
+### Column-level inference (multi-branch in the Sense stage)
 
 Vector of strings + header → single column type:
 1. Optional sibling-context attention enriches headers with cross-column context
