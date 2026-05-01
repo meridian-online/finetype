@@ -193,8 +193,8 @@ finetype taxonomy --full -o json
 
 ## Key Principles
 
-1. **Profile is step 1, not the destination.** Always continue to schema → validate → load.
+1. **Profile is step 1, not the destination.** Always continue through `profile -o json-schema` → `validate --db --table`. There is no separate `load` verb — typed materialisation is folded into `validate` (MADR 0071).
 2. **Confidence below 90% is a signal.** Investigate the outlier values with `finetype infer -i "suspect_value" --confidence`. If the *type itself* is wrong (not just dirty values), edit the schema manually before validating.
-3. **Validate before loading.** The quality gate catches issues that will cause silent failures in DuckDB.
-4. **Use the valid CSV for loading.** `data.csv.valid.csv` is guaranteed to cast cleanly.
+3. **Validate before materialising.** Run `validate` without `--db --table` first as a check-only quality gate; pass `--db --table` to materialise once the grade is acceptable.
+4. **The reject sidecar is the audit trail.** When `validate --db --table` runs, valid rows land in the typed DuckDB table and rejects land in `finetype_reject_errors` — both in the same `.db` file. Inspect rejects there, not in a separate CSV.
 5. **Schema is the contract.** Save it alongside your data — it documents what the data should look like.
