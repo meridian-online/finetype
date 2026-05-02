@@ -1,13 +1,13 @@
 feature: "Agent-ready skills"
 as_a: "developer using AI coding agents"
 i_want: "my agent to know the complete FineType pipeline — when to investigate, what to do with invalid rows, how to interpret schemas — without configuring an MCP server"
-so_that: "agents complete the full profile → schema → validate → load workflow instead of stopping after the first command"
+so_that: "agents complete the full profile → schema → validate (with --db --table for typed materialisation) workflow instead of stopping after the first command"
 
 scenarios:
   - name: "Pipeline skill guides full workflow"
     given: "an AI agent with the /finetype-pipeline skill installed"
     when: "the agent is asked to load a CSV into DuckDB"
-    then: "the skill guides it through all steps: profile, schema, validate, load — not just profile and stop"
+    then: "the skill guides it through all steps: profile → profile -o json-schema → validate --db --table (the post-MADR-0070/0071 three-step pipeline) — not just profile and stop, and with no reference to the removed `load` verb"
     source_lines: "agent-ready.mdx: Agents using skills complete full pipeline, not just profile"
 
   - name: "CLI reference as agent knowledge"
@@ -22,10 +22,11 @@ scenarios:
     then: "no MCP server, no API keys, no configuration — just markdown that teaches the agent what to do"
     source_lines: "agent-ready.mdx: Zero setup required: No MCP server, no API keys, just markdown files"
 
-maturity: "emerging"
-goal: "Two skills shipped (/finetype-pipeline, /finetype-cli) — agents complete full pipeline, not just profile"
+maturity: "established"
+goal: "Two skills aligned with the live FineType binary surface — drift-protected via scripts/verify-cli-skill-coverage.sh, behaviourally verified via .claude/skills/finetype-pipeline/CHECKLIST.md — so agents complete profile → schema → validate without prompting"
 
-specs: []
+specs:
+  - "bead:finetype-u6a"
 
 references:
   - "web: docs/projects/finetype/agent-ready.mdx"
