@@ -8,7 +8,7 @@ user-invocable: false
 
 # FineType CLI Reference
 
-FineType v0.6.12 — Precision format detection for text data.
+FineType v0.6.19 — Precision format detection for text data.
 
 ## Commands
 
@@ -23,17 +23,18 @@ finetype profile -f <FILE> [OPTIONS]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-f, --file <FILE>` | *required* | Input CSV file |
-| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow` |
-| `-m, --model <DIR>` | `models/default` | Model directory |
+| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema` |
 | `--sample-size <N>` | `100` | Max values to sample per column |
 | `--delimiter <CHAR>` | auto-detect | CSV delimiter character |
 | `--no-header-hint` | — | Disable column name header hints |
-| `--model-type <TYPE>` | `char-cnn` | Model type: `char-cnn`, `tiered`, `transformer` |
-| `--sharp-only` | — | Disable Sense classifier (Sharpen-only with header hints) |
-| `--enum-threshold <N>` | `50` | Cardinality threshold for ENUM columns (0 = disable) |
+| `--model-type <TYPE>` | `multi-branch` | Model type: `multi-branch`, `char-cnn`, `tiered`, `transformer` |
+| `--enum-threshold <N>` | `32` | Cardinality threshold for ENUM columns (0 = disable). Default lowered from 50 in v0.6.20 prep work to reduce enum-overfit attribution in profile→validate round-trip |
+| `--stats` | — | Attach observed-data constraints (minLength, maxLength, minimum, maximum, enum, x-finetype-null-rate, x-finetype-cardinality) to JSON Schema output. Requires `-o json-schema` |
 | `-v, --verbose` | — | Show pipeline tracing (Sense, mask, hint, feature decisions) |
 
-**Output columns:** COLUMN, TYPE (semantic label), BROAD (DuckDB type), CONF (confidence %)
+**Output columns (plain):** COLUMN, TYPE (semantic label), BROAD (DuckDB type), CONF (confidence %)
+
+**`-o json-schema`** — table-level JSON Schema for the file. Replaces the table-mode of the retired `finetype schema <file>` invocation (v0.6.19, MADR 0070).
 
 ---
 
@@ -69,7 +70,11 @@ v0.6.20 audit will mirror the CLI fold (MADR 0070).
 
 ### `finetype validate`
 
-Validate CSV data against a JSON Schema (quality gate).
+Validate CSV (or Parquet) data against a JSON Schema. Default mode is
+**check-only** — exit code communicates pass/fail; no files written.
+Pass `--db <out.db> --table <name>` to materialise valid rows into a
+typed DuckDB table alongside a `finetype_reject_errors` sidecar in the
+same database — single pass, single CTAS.
 
 ```bash
 finetype validate <FILE> <SCHEMA> [OPTIONS]
@@ -77,15 +82,20 @@ finetype validate <FILE> <SCHEMA> [OPTIONS]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json` |
-| `--summary-only` | — | Print summary only — do not write sidecar files |
+| `--db <DB>` | — | Output DuckDB database file (created if absent). Optional — when omitted, validation runs in check-only mode. When supplied, `--table` is also required |
+| `--table <TABLE>` | — | Table name in the output database for valid rows. Required when `--db` is supplied |
+| `--append` | — | Append to an existing database. Required when `--db` already contains the named table or a prior `finetype_reject_errors` sidecar |
+| `--lenient` | — | Force exit code 0 regardless of reject count (does not affect error exit code 2) |
+| `-o, --output <FORMAT>` | `plain` | Summary-report format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema` |
 
-**Sidecar outputs** (appended to the full filename including extension):
-- `<file>.csv.valid.csv` — rows passing all rules
-- `<file>.csv.invalid.csv` — rows failing one or more rules
-- `<file>.csv.errors.jsonl` — machine-readable error records
+**Materialisation behaviour** (when `--db --table` are passed):
+- Valid rows → typed DuckDB table at `<DB>.<TABLE>`, per-column TRY-wrapped projection.
+- Invalid rows → `finetype_reject_errors` table in the same `.db`, with `column_name`, `error_type`, `constraint_failed`, `expected_type`, `error_message` columns.
+- Reject ontology: `error_type='SEMANTIC_TYPE'` (validator failure) and `error_type='TRANSFORM_FAILED'` with `constraint_failed='transform'` (validator passed, typed cast failed).
 
-**Exit code:** 1 if any rows are invalid, 0 if all pass.
+**Exit codes:** `0` no rejects · `1` rejects present (engine or transform) · `2` error (malformed schema, file unreadable, missing `duckdb` binary, etc.).
+
+**Requirements:** materialisation requires `duckdb` on `PATH`. Check-only mode does not.
 
 ---
 
@@ -124,15 +134,14 @@ finetype infer [OPTIONS]
 |------|---------|-------------|
 | `-i, --input <TEXT>` | — | Single text input |
 | `-f, --file <FILE>` | — | File of inputs (one per line) |
-| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow` |
+| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema` |
 | `--confidence` | — | Include confidence score |
 | `-v, --value` | — | Include input value in output |
 | `--mode <MODE>` | `row` | `row` (per-value) or `column` (distribution-based) |
 | `--header <NAME>` | — | Column name for header hint (with `--mode column`) |
 | `--sample-size <N>` | `100` | Sample size for column mode |
 | `--batch` | — | Read JSONL from stdin (requires `--mode column`) |
-| `--model-type <TYPE>` | `char-cnn` | Model type |
-| `--sharp-only` | — | Disable Sense classifier |
+| `--model-type <TYPE>` | `multi-branch` | Model type: `multi-branch`, `char-cnn`, `tiered`, `transformer` |
 | `--bench` | — | Print throughput statistics to stderr |
 
 **Row mode:** classifies each value independently.
@@ -142,11 +151,14 @@ finetype infer [OPTIONS]
 
 ### `finetype taxonomy`
 
-Show taxonomy information — browse available types.
+Show taxonomy information — browse available types, optionally filtered to a single type or glob.
 
 ```bash
-finetype taxonomy [OPTIONS]
+finetype taxonomy [TYPE_KEY] [OPTIONS]
 ```
+
+**Positional argument:**
+- `[TYPE_KEY]` — type key (e.g. `identity.person.email`) or glob pattern (e.g. `identity.person.*`). When supplied, the `--domain` / `--category` / `--priority` filters are ignored.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -154,14 +166,14 @@ finetype taxonomy [OPTIONS]
 | `-d, --domain <DOMAIN>` | — | Filter by domain |
 | `-c, --category <CATEGORY>` | — | Filter by category |
 | `--priority <N>` | — | Minimum release priority |
-| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow` |
+| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema` |
 | `--full` | — | Export all fields (description, validation, samples) |
 
-**Domains:** datetime, finance, geography, identity, measurement, representation, technology
+**Domains:** container, datetime, finance, geography, identity, representation, technology
 
 ---
 
-### `finetype generate`
+### `finetype generate` *(hidden — functional but absent from `finetype --help`)*
 
 Generate synthetic training data.
 
@@ -180,7 +192,7 @@ finetype generate [OPTIONS]
 
 ---
 
-### `finetype check`
+### `finetype check` *(hidden — functional but absent from `finetype --help`)*
 
 Validate generator ↔ taxonomy alignment.
 
@@ -207,7 +219,10 @@ Start MCP server for AI agent integration (stdio transport).
 finetype mcp
 ```
 
-No options. Runs as a stdio MCP server exposing: `infer`, `profile`, `schema`, `taxonomy`, `validate`, `ddl`, `generate`.
+No options. Runs as a stdio MCP server exposing the FineType CLI surface as
+MCP tools (e.g. `infer`, `profile`, `taxonomy`, `validate`). The MCP tool
+list mirrors the CLI surface; consult the server's tool-discovery response
+for the authoritative inventory at runtime.
 
 ## Output Formats
 
@@ -220,12 +235,13 @@ All commands that accept `-o` support these formats:
 | `csv` | Comma-separated, pipe to other tools |
 | `markdown` | Markdown table for documentation |
 | `arrow` | Apache Arrow IPC for analytics tools |
+| `json-schema` | JSON Schema export — table-mode on `profile`, type-mode on `taxonomy` (replaces the retired `schema` verb, MADR 0070) |
 
 ## Type Label Format
 
 All FineType types use a three-part label: `domain.category.type`
 
-- **domain** — broad area (identity, datetime, finance, geography, measurement, representation, technology)
+- **domain** — broad area (container, datetime, finance, geography, identity, representation, technology)
 - **category** — group within domain (person, timestamp, currency, internet, etc.)
 - **type** — specific format (email, iso_8601, amount, ip_v4, etc.)
 
