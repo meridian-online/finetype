@@ -23,11 +23,12 @@ cd ~/github/meridian-online/finetype/
 claude -p "$(awk '/^## Prompt/,0' orbit/contracts/2026-05-10-pass2-prep-prompt.md | tail -n +2)"
 ```
 
-**C. launchd one-shot** — Carson task. Add a one-shot LaunchAgent that
-fires on 2026-05-10 at 06:03 Australia/Brisbane invoking option B's
+**C. launchd one-shot** — infrastructure work. Add a one-shot LaunchAgent
+that fires on 2026-05-10 at 06:03 Australia/Brisbane invoking option B's
 command. Tracked via finetype-53r (launchd plist for cron-firing agent)
 — ideally the same plist gains a `StartCalendarInterval` entry for the
-2026-05-10 06:03 AEST one-shot.
+2026-05-10 06:03 AEST one-shot. See `docs/CRON-LAUNCHD-SETUP.md` for the
+full handoff spec.
 
 Hugh's call which to use; option A is the zero-infrastructure fallback.
 
@@ -52,7 +53,7 @@ Working directory: ~/github/meridian-online/finetype/
   - finetype-s16 (content-hash dedup)
   - finetype-nms (cron lockfile + preamble)
   - finetype-87j (append-only logs)
-  - finetype-53r (launchd plist — Carson handoff)
+  - finetype-53r (launchd plist for cron-firing agent)
 
 ## Output
 
