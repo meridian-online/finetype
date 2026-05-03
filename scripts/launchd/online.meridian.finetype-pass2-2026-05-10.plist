@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  FineType pass-2 tabletop brief preparation — one-shot launchd template.
+
+  Bead: finetype-53r "Bonus" section.
+  Authority: orbit/contracts/2026-05-10-pass2-prep-prompt.md option C.
+
+  Fires exactly once: 2026-05-10 06:03 Australia/Brisbane (AEST).
+  StartCalendarInterval pinned to specific Year+Month+Day+Hour+Minute
+  matches only that single minute that year — the plist physically
+  cannot fire again. cron_pass2_oneshot.sh additionally removes the
+  plist after firing for hygiene.
+
+  Install:
+      scripts/launchd/install.sh install-pass2
+
+  Disable / cancel:
+      scripts/launchd/install.sh uninstall-pass2
+
+  Verify:
+      launchctl list | grep finetype-pass2
+
+  Logs:
+      tail -f ~/Library/Logs/finetype-cron/pass2-stderr.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>online.meridian.finetype-pass2-2026-05-10</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>/Users/hugh/github/meridian-online/finetype/scripts/cron_pass2_oneshot.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/hugh/github/meridian-online/finetype</string>
+
+    <!--
+      One-shot trigger. launchd matches the system's local time against
+      this dictionary; specifying all five fields constrains the match
+      to a single minute on a single date.
+
+      2026-05-10 06:03 Australia/Brisbane (AEST, UTC+10).
+      launchd uses the system local timezone — verify with `date` that
+      the Mac is in AEST before installing.
+    -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Year</key>
+        <integer>2026</integer>
+        <key>Month</key>
+        <integer>5</integer>
+        <key>Day</key>
+        <integer>10</integer>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>3</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/hugh/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>/Users/hugh</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/hugh/Library/Logs/finetype-cron/pass2-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/hugh/Library/Logs/finetype-cron/pass2-stderr.log</string>
+</dict>
+</plist>
