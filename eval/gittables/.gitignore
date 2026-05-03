@@ -19,3 +19,8 @@ failure_log.tsv
 working_slice_coverage.tsv
 harvest_pool.tsv
 cycle_log.jsonl
+
+# Per-cycle artefacts (gate.json with per-file outcomes, work.json,
+# stderr captures). Cycle summary persists in cycle_log.jsonl; the raw
+# per-cycle dumps are debugging aids written by the cron-firing agent.
+cycles/
