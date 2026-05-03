@@ -580,7 +580,7 @@ provenance:
       - cron_process_survival_halt — infrastructure scope, not contract
 
   hot_wash: |
-    Five meta-observations from this session, captured before
+    Seven meta-observations from this session, captured before
     contract finalisation. None contradict the contract; all are
     methodology pass-2 fodder for the orbit memo.
 
@@ -625,6 +625,35 @@ provenance:
        engineering work does this contract require to operate? File
        them."
 
+    6. The orbit `schedule` skill is online-only — it provisions
+       remote cloud agents in Anthropic's infrastructure, not local
+       cron jobs. The scribe reflexively reached for it when scoping
+       the pass-2 tabletop trigger and had to be redirected by
+       Hugh. For tabletop-derived contracts where the cron-firing
+       agent must run on the user's machine (data locality, GPU
+       access, local repo state), `schedule` is the wrong tool.
+       Local equivalents: `CronCreate` (in-session, REPL-bound) for
+       low-stakes reminders; launchd / system cron for unattended
+       autonomous firing — the latter is infrastructure-team work.
+       Methodology pass-2: when authoring a contract, state
+       explicitly whether the cron-firing agent runs local or
+       remote, and route to the appropriate scheduling tool from
+       the start. Add a §2 standing-orders entry naming the
+       scheduling mechanism so future tabletops audit it.
+
+    7. `CronCreate`'s `durable: true` parameter was silently
+       ignored on this harness — both attempts produced
+       session-only crons (no `.claude/scheduled_tasks.json` file
+       created). For multi-day reminders, never trust a
+       session-bound mechanism. The fallback that worked: write
+       the prompt to a discoverable file at a sibling path (here:
+       `orbit/contracts/2026-05-10-pass2-prep-prompt.md`) and let
+       the human invoke it manually OR have infrastructure (launchd)
+       wire it in. Methodology pass-2: contract write step always
+       files the next-tabletop prompt as a sibling artefact, even
+       if a cron tool also schedules it. The artefact is the
+       single source of truth; the cron is the convenience layer.
+
   references:
     - orbit/decisions/0042-deprecate-regex-header-hints.md
     - orbit/decisions/0048-value-based-rules-only.md
@@ -641,6 +670,11 @@ provenance:
 
   next_tabletop:
     cadence: ~2026-05-10 (Hugh confirmed "in a few days")
+    prep_prompt: orbit/contracts/2026-05-10-pass2-prep-prompt.md
+    invocation: |
+      Manual or launchd one-shot per the prep_prompt file's "Invocation
+      options" section. CronCreate was attempted but `durable: true`
+      was silently ignored — see hot_wash item 7.
     review_topics:
       - retrain trigger calibration (E01 numbers — 20 pairs / 30%)
       - holdout size + cycle budget (2000 / 1h) effectiveness
