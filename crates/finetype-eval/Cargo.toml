@@ -57,6 +57,7 @@ parquet = { version = "54", default-features = false, features = ["arrow", "snap
 arrow = { version = "54", default-features = false, features = ["csv", "json"] }
 flate2 = "1"
 duckdb = { version = "=1.4.4", default-features = true, features = ["bundled"] }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 finetype-core = { path = "../finetype-core" }

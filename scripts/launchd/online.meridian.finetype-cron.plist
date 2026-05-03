@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  FineType cron-firing agent — launchd template.
+
+  Bead: finetype-53r.
+  Authority: orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml
+              §1 cycle cadence + §2 standing orders.
+
+  Install:
+      cp scripts/launchd/online.meridian.finetype-cron.plist \
+         ~/Library/LaunchAgents/online.meridian.finetype-cron.plist
+      launchctl load ~/Library/LaunchAgents/online.meridian.finetype-cron.plist
+
+  Disable:
+      launchctl unload ~/Library/LaunchAgents/online.meridian.finetype-cron.plist
+
+  Verify:
+      launchctl list | grep finetype-cron
+
+  Logs:
+      tail -f ~/Library/Logs/finetype-cron/stdout.log
+      tail -f ~/Library/Logs/finetype-cron/stderr.log
+
+  Customise the absolute paths below for your environment if your
+  username is not `hugh` or your repo lives somewhere other than
+  ~/github/meridian-online/finetype.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>online.meridian.finetype-cron</string>
+
+    <!--
+      Use bash -lc so the user's PATH (homebrew, cargo, claude binary)
+      is set up. Otherwise launchd's minimal PATH means `claude`,
+      `finetype`, and `duckdb` are all unfindable.
+    -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>/Users/hugh/github/meridian-online/finetype/scripts/cron_cycle.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/hugh/github/meridian-online/finetype</string>
+
+    <!-- 7200s = 2h, per contract §1 cycle cadence. -->
+    <key>StartInterval</key>
+    <integer>7200</integer>
+
+    <!--
+      Don't fire on launchctl load — let the next 2h boundary catch it.
+      Avoids an immediate-cycle stampede after every reboot.
+    -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!--
+      launchd's default PATH is /usr/bin:/bin:/usr/sbin:/sbin. Augment
+      with the locations of finetype, duckdb, claude, and cargo.
+    -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/hugh/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>/Users/hugh</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/hugh/Library/Logs/finetype-cron/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/hugh/Library/Logs/finetype-cron/stderr.log</string>
+
+    <!--
+      No throttling — let an overlapping cycle fire. The lockfile in
+      cron_preamble.sh is the structural protection; we want the second
+      cycle to fire and log H04 rather than be silently dropped by
+      launchd.
+    -->
+</dict>
+</plist>

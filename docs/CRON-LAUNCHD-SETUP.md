@@ -10,7 +10,13 @@ unattended on macOS, and `CronCreate` is REPL-bound (dies with the
 Claude Code session). launchd is the right mechanism for unattended
 recurring + one-shot triggers.
 
-Tracked via bead `finetype-53r`.
+Tracked via bead `finetype-53r`. The plist + helper scripts ship at:
+
+- `scripts/launchd/online.meridian.finetype-cron.plist` — launchd template
+- `scripts/launchd/finetype-cron.newsyslog.conf` — log rotation config
+- `scripts/launchd/install.sh` — `install | uninstall | status | dry-run-cycle`
+- `scripts/cron_cycle.sh` — entry point launchd invokes
+- `scripts/cron_preamble.sh` / `scripts/cron_postamble.sh` — lockfile + halt gates
 
 ## Why launchd, not cron
 
@@ -88,22 +94,47 @@ cycle logs). `newsyslog` is the macOS-native rotator —
 `/etc/newsyslog.d/finetype-cron.conf` with a config that archives to
 `.log.YYYYMMDD.gz` files.
 
-## Disable workflow
+## Install / disable workflow
 
-For emergency stop or maintenance:
+The shipped `scripts/launchd/install.sh` wraps the launchctl steps:
 
 ```bash
+# Install: copies plist, creates log dir, runs launchctl load
+scripts/launchd/install.sh install
+
+# Status: shows plist + launchctl + lockfile state
+scripts/launchd/install.sh status
+
+# Smoke test the full cycle (preamble + gate + postamble) without REPL
+scripts/launchd/install.sh dry-run-cycle
+
+# Disable + remove plist
+scripts/launchd/install.sh uninstall
+```
+
+Manual equivalent (if you don't want the wrapper):
+
+```bash
+launchctl load   ~/Library/LaunchAgents/online.meridian.finetype-cron.plist
 launchctl unload ~/Library/LaunchAgents/online.meridian.finetype-cron.plist
+launchctl list | grep finetype-cron
 ```
 
-To re-enable:
+Stale lockfile recovery: `scripts/cron_postamble.sh --force` removes
+`/tmp/finetype-cron.lock` regardless of cycle ownership. Use only when
+no cycle is actually running.
+
+## Log rotation
 
 ```bash
-launchctl load ~/Library/LaunchAgents/online.meridian.finetype-cron.plist
+sudo cp scripts/launchd/finetype-cron.newsyslog.conf \
+    /etc/newsyslog.d/finetype-cron.conf
+sudo newsyslog -nv  # dry-run to verify
 ```
 
-For permanent removal: `launchctl unload` + delete the plist file +
-`rm -f /tmp/finetype-cron.lock` (clean up any leftover lock).
+newsyslog runs daily and rotates at midnight; archives are gzipped and
+14 days are retained on-disk. For longer retention, copy `*.gz` files
+elsewhere before they age out.
 
 ## Acceptance criteria
 

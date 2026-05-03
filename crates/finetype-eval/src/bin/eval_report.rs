@@ -9,8 +9,11 @@ use clap::Parser;
 use finetype_eval::csv_utils::load_csv;
 use finetype_eval::matching::{is_domain_match, is_label_match};
 use finetype_eval::taxonomy::load_taxonomy_stats;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "eval-report", about = "FineType Evaluation Report Generator")]
@@ -31,6 +34,92 @@ struct Args {
     /// If not specified, writes to the same directory as --output with name profile_results.json.
     #[arg(long)]
     json_output: Option<PathBuf>,
+    /// Path to the model directory used to produce profile_results. Defaults
+    /// to `models/default` (the symlink). Header records the resolved tag
+    /// (symlink target name), the SHA256 of `model.safetensors`, and that
+    /// filename — H07 schema-field check from the autonomy contract
+    /// (orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml).
+    #[arg(long, default_value = "models/default")]
+    model_dir: PathBuf,
+}
+
+/// Resolved model identity for the report header.
+struct ModelIdentity {
+    tag: String,
+    weights_filename: String,
+    weights_sha256: String,
+}
+
+/// Discover the model identity from a directory (typically `models/default`).
+///
+/// Tag comes from the resolved symlink target's basename; weights are taken
+/// from `model.safetensors` if present, else the first `*.safetensors`,
+/// else the first `*.bin`. SHA256 over the chosen weights file.
+///
+/// Failure is non-fatal: returns `Err` with a message; caller logs
+/// "(unavailable)" in the header. The eval report still renders.
+fn discover_model_identity(model_dir: &Path) -> Result<ModelIdentity> {
+    if !model_dir.exists() {
+        anyhow::bail!("model directory not found: {}", model_dir.display());
+    }
+    // Resolve symlink chain to a real directory; preserve the symlink name as
+    // the tag (e.g. `models/default` → `sherlock-v19-relu-s42`).
+    let resolved = fs::canonicalize(model_dir).with_context(|| {
+        format!("could not resolve {}", model_dir.display())
+    })?;
+    let tag = resolved
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| model_dir.display().to_string());
+
+    // Pick a weights file. `model.safetensors` is the convention; fall back
+    // to any `*.safetensors` or `*.bin` so older / experimental layouts work.
+    let preferred = resolved.join("model.safetensors");
+    let weights = if preferred.exists() {
+        preferred
+    } else {
+        let mut candidate: Option<PathBuf> = None;
+        for entry in fs::read_dir(&resolved)? {
+            let entry = entry?;
+            let path = entry.path();
+            let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+            if ext == "safetensors" || ext == "bin" {
+                candidate = Some(path);
+                break;
+            }
+        }
+        candidate.ok_or_else(|| {
+            anyhow::anyhow!(
+                "no weights file (model.safetensors / *.safetensors / *.bin) under {}",
+                resolved.display()
+            )
+        })?
+    };
+
+    let weights_filename = weights
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| weights.display().to_string());
+
+    let mut hasher = Sha256::new();
+    let mut fh = fs::File::open(&weights).with_context(|| {
+        format!("could not open weights file {}", weights.display())
+    })?;
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = fh.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    let weights_sha256 = format!("{:x}", hasher.finalize());
+
+    Ok(ModelIdentity {
+        tag,
+        weights_filename,
+        weights_sha256,
+    })
 }
 
 struct Miss {
@@ -210,6 +299,22 @@ fn main() -> Result<()> {
     p(&mut w, "# FineType Evaluation Report");
     p(&mut w, "");
     w.push(format!("**Generated:** {now}"));
+    // H07 schema-field check (autonomy contract): record model identity in
+    // the header so a stale-cache-score-applied-to-wrong-model bug is
+    // detectable post-hoc.
+    match discover_model_identity(&args.model_dir) {
+        Ok(id) => {
+            w.push(format!("**Model tag:** {}", id.tag));
+            w.push(format!("**Model file:** {}", id.weights_filename));
+            w.push(format!("**Model SHA256:** {}", id.weights_sha256));
+        }
+        Err(e) => {
+            eprintln!("warning: could not record model identity: {e:#}");
+            w.push("**Model tag:** (unavailable)".to_string());
+            w.push("**Model file:** (unavailable)".to_string());
+            w.push("**Model SHA256:** (unavailable)".to_string());
+        }
+    }
     p(&mut w, "");
 
     // Headline
