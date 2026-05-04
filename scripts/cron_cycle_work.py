@@ -66,11 +66,28 @@ DEFAULT_HOLDOUT = REPO_ROOT / "eval" / "gittables" / "holdout_paths.txt"
 DEFAULT_COVERAGE_LOG = REPO_ROOT / "eval" / "gittables" / "working_slice_coverage.tsv"
 DEFAULT_FAILURE_LOG = REPO_ROOT / "eval" / "gittables" / "failure_log.tsv"
 DEFAULT_HARVEST_POOL = REPO_ROOT / "eval" / "gittables" / "harvest_pool.tsv"
+DEFAULT_INFERENCE_SIGNALS = REPO_ROOT / "eval" / "gittables" / "inference_signals.tsv"
 DEFAULT_CONTENT_HASH_CACHE = (
     REPO_ROOT / "eval" / "gittables" / ".content_hash_cache.tsv"
 )
 DEFAULT_FINETYPE = "finetype"
 DEFAULT_DUCKDB = "duckdb"
+
+# Per spec finetype-7zi ac-12: sidecar `inference_signals.tsv` 12-col schema.
+INFERENCE_SIGNALS_HEADER: tuple[str, ...] = (
+    "cycle_id",
+    "timestamp",
+    "file_path",
+    "file_content_sha256",
+    "column_name",
+    "predicted_type",
+    "inferred_correct_type",
+    "confidence",
+    "mechanism",
+    "validator_pass_rate",
+    "header_match",
+    "top_k_json",
+)
 
 # Per contract §1: a column is "trivial" iff predicted as plain_text or
 # fallback decimal_number. Reused from gittables_gate.TRIVIAL_TYPES.
@@ -91,8 +108,99 @@ class WorkOutcome:
     type_distribution: dict[str, int] = field(default_factory=dict)
     failure_rows: list[dict] = field(default_factory=list)  # for failure_log
     harvest_rows: list[dict] = field(default_factory=list)  # for harvest_pool
+    signal_rows: list[dict] = field(default_factory=list)   # for inference_signals (sidecar)
     elapsed_s: float = 0.0
     error: str | None = None
+
+
+def _infer_and_build_failure_row(
+    *,
+    column_name: str,
+    predicted_type: str,
+    observed_values: list[str],
+    harvest_samples: list[str],
+    finetype_bin: str,
+) -> tuple[dict, dict, dict]:
+    """Run `finetype infer-type` over (column_name, predicted_type, samples).
+
+    Returns three dicts:
+      - failure_row: 5 fields written to failure_log.tsv (joined with cycle/file
+        headers in `_write_logs`). The 9-col schema is preserved; this helper
+        fills `inferred_correct_type` and `mechanism` from real inference
+        output instead of the deprecated hardcoded literals.
+      - harvest_row: 3 fields for harvest_pool.tsv (target_generator copies
+        the predicted type for B01; `(trivial-fallback)` for B04 — caller
+        overrides via the returned dict).
+      - signal_row: 8 fields for the sidecar inference_signals.tsv (joined
+        with cycle/file headers in `_write_logs`). Confidence + signal
+        sub-scores live here, not in failure_log.tsv (ac-12).
+
+    Per spec finetype-7zi:
+      - ac-15: samples truncated to N=8 inside the binary.
+      - ac-09: mechanism is from the closed 10-token vocabulary.
+      - ac-04: output is deterministic (byte-identical re-run).
+
+    Subprocess errors fall back to the same `unknown` / `fallthrough` /
+    confidence=0.0 emission as the empty-samples precondition (spec ac-10).
+    """
+    import subprocess
+    payload = json.dumps(
+        {
+            "column_name": column_name,
+            "predicted_type": predicted_type,
+            "samples": observed_values,
+        }
+    )
+    inferred_correct_type = "unknown"
+    confidence = 0.0
+    mechanism = "fallthrough"
+    validator_pass_rate = 0.0
+    header_match = 0.0
+    top_k_json = "[]"
+    try:
+        res = subprocess.run(
+            [finetype_bin, "infer-type"],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if res.returncode == 0:
+            out = json.loads(res.stdout.strip())
+            inferred_correct_type = out.get("inferred_correct_type", "unknown")
+            confidence = float(out.get("confidence", 0.0))
+            mechanism = out.get("mechanism", "fallthrough")
+            signals = out.get("signals", {}) or {}
+            validator_pass_rate = float(signals.get("validator_pass_rate", 0.0))
+            header_match = float(signals.get("header_match", 0.0))
+            top_k_json = json.dumps(signals.get("top_k", []), sort_keys=True)
+    except Exception:
+        # Subprocess crash / timeout / parse error: fall through to defaults.
+        pass
+
+    failure_row = {
+        "column_name": column_name,
+        "predicted_type": predicted_type,
+        "observed_values_sample": _truncate_sample(observed_values),
+        "inferred_correct_type": inferred_correct_type,
+        "mechanism": mechanism,
+    }
+    harvest_row = {
+        "column_name": column_name,
+        "target_generator": predicted_type,
+        "samples_json": json.dumps(harvest_samples),
+    }
+    signal_row = {
+        "column_name": column_name,
+        "predicted_type": predicted_type,
+        "inferred_correct_type": inferred_correct_type,
+        "confidence": confidence,
+        "mechanism": mechanism,
+        "validator_pass_rate": validator_pass_rate,
+        "header_match": header_match,
+        "top_k_json": top_k_json,
+    }
+    return failure_row, harvest_row, signal_row
 
 
 def _read_path_set(path: Path) -> set[str]:
@@ -375,19 +483,17 @@ def _classify_and_log(
             )
             for c in b01_columns:
                 obs = samples.get(c, [])
-                out.failure_rows.append({
-                    "column_name": c,
-                    "predicted_type": col_types.get(c, ""),
-                    "observed_values_sample": _truncate_sample(obs),
-                    "inferred_correct_type": "unknown",
-                    "mechanism": "value-shape",
-                })
+                fr, hr, sr = _infer_and_build_failure_row(
+                    column_name=c,
+                    predicted_type=col_types.get(c, ""),
+                    observed_values=obs,
+                    harvest_samples=harvest_samples.get(c, []),
+                    finetype_bin=finetype_bin,
+                )
+                out.failure_rows.append(fr)
+                out.signal_rows.append(sr)
                 # B05: harvest these
-                out.harvest_rows.append({
-                    "column_name": c,
-                    "target_generator": col_types.get(c, ""),
-                    "samples_json": json.dumps(harvest_samples.get(c, [])),
-                })
+                out.harvest_rows.append(hr)
                 out.branches.append("B05")
         elif total_rejects_nt == 0 and non_trivial_pct >= NON_TRIVIAL_FRACTION_FLOOR:
             # B03 clean pass
@@ -401,20 +507,19 @@ def _classify_and_log(
                 csv_path, sorted(trivial_cols), HARVEST_SAMPLE_LIMIT
             )
             for c in sorted(trivial_cols):
-                out.failure_rows.append({
-                    "column_name": c,
-                    "predicted_type": col_types.get(c, ""),
-                    "observed_values_sample": _truncate_sample(
-                        harvest_samples.get(c, [])
-                    ),
-                    "inferred_correct_type": "unknown",
-                    "mechanism": "value-shape",
-                })
-                out.harvest_rows.append({
-                    "column_name": c,
-                    "target_generator": "(trivial-fallback)",
-                    "samples_json": json.dumps(harvest_samples.get(c, [])),
-                })
+                fr, hr, sr = _infer_and_build_failure_row(
+                    column_name=c,
+                    predicted_type=col_types.get(c, ""),
+                    observed_values=harvest_samples.get(c, []),
+                    harvest_samples=harvest_samples.get(c, []),
+                    finetype_bin=finetype_bin,
+                )
+                # B04's harvest target_generator is `(trivial-fallback)`,
+                # not the predicted type. Override the helper's default.
+                hr["target_generator"] = "(trivial-fallback)"
+                out.failure_rows.append(fr)
+                out.signal_rows.append(sr)
+                out.harvest_rows.append(hr)
                 out.branches.append("B05")
         else:
             # Mixed — partial rejects on non-trivial; could be B02 (validator
@@ -447,6 +552,7 @@ def _write_logs(
     coverage_log: Path,
     failure_log: Path,
     harvest_pool: Path,
+    inference_signals: Path,
 ) -> None:
     # Coverage row always written.
     append_tsv_row(
@@ -476,6 +582,21 @@ def _write_logs(
             },
             header=FAILURE_LOG_HEADER,
         )
+    # Inference signals — sidecar (ac-12). Append-only from creation; one
+    # row per failure row (paired by (cycle_id, file_path,
+    # file_content_sha256, column_name) per ac-12 join key).
+    for sr in outcome.signal_rows:
+        append_tsv_row(
+            inference_signals,
+            {
+                "cycle_id": cycle_id,
+                "timestamp": timestamp_iso,
+                "file_path": outcome.file_path,
+                "file_content_sha256": outcome.file_content_sha256,
+                **sr,
+            },
+            header=INFERENCE_SIGNALS_HEADER,
+        )
     # Harvest rows
     for hr in outcome.harvest_rows:
         append_tsv_row(
@@ -502,6 +623,12 @@ def main() -> int:
     parser.add_argument("--coverage-log", type=Path, default=DEFAULT_COVERAGE_LOG)
     parser.add_argument("--failure-log", type=Path, default=DEFAULT_FAILURE_LOG)
     parser.add_argument("--harvest-pool", type=Path, default=DEFAULT_HARVEST_POOL)
+    parser.add_argument(
+        "--inference-signals",
+        type=Path,
+        default=DEFAULT_INFERENCE_SIGNALS,
+        help="Sidecar TSV for per-row confidence + signal sub-scores (ac-12)",
+    )
     parser.add_argument(
         "--content-hash-cache", type=Path, default=DEFAULT_CONTENT_HASH_CACHE
     )
@@ -563,6 +690,7 @@ def main() -> int:
                 coverage_log=args.coverage_log,
                 failure_log=args.failure_log,
                 harvest_pool=args.harvest_pool,
+                inference_signals=args.inference_signals,
             )
             branches.extend(outcome.branches)
             outcome_counts[outcome.outcome] += 1
@@ -586,6 +714,7 @@ def main() -> int:
                     coverage_log=args.coverage_log,
                     failure_log=args.failure_log,
                     harvest_pool=args.harvest_pool,
+                    inference_signals=args.inference_signals,
                 )
                 branches.extend(outcome.branches)
                 outcome_counts[outcome.outcome] += 1

@@ -16,9 +16,14 @@ tables.zip
 # not (privacy + churn). If you need to inspect them on another box,
 # pull from the cron host.
 failure_log.tsv
+failure_log.calibrate.tsv
+failure_log.measure.tsv
 working_slice_coverage.tsv
 harvest_pool.tsv
 cycle_log.jsonl
+# Sidecar inference-signals log (finetype-7zi ac-12) — per-machine,
+# header-only on first cycle; data rows append from then on.
+inference_signals.tsv
 
 # Per-cycle artefacts (gate.json with per-file outcomes, work.json,
 # stderr captures). Cycle summary persists in cycle_log.jsonl; the raw

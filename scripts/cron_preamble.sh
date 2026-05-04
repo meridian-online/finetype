@@ -40,6 +40,9 @@ CONTRACT="$REPO_ROOT/orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.y
 GITTABLES_DIR="$REPO_ROOT/eval/gittables"
 FAILURE_LOG="$GITTABLES_DIR/failure_log.tsv"
 COVERAGE_LOG="$GITTABLES_DIR/working_slice_coverage.tsv"
+INFERENCE_SIGNALS="$GITTABLES_DIR/inference_signals.tsv"
+FINETYPE_BIN="${FINETYPE_BIN:-$REPO_ROOT/target/release/finetype}"
+INFERENCE_SIGNALS_HEADER="cycle_id	timestamp	file_path	file_content_sha256	column_name	predicted_type	inferred_correct_type	confidence	mechanism	validator_pass_rate	header_match	top_k_json"
 
 iso_utc() {
     date -u +%Y-%m-%dT%H:%M:%SZ
@@ -114,6 +117,44 @@ count_lines() {
 }
 FAIL_LINES_BEFORE="$(count_lines "$FAILURE_LOG")"
 COV_LINES_BEFORE="$(count_lines "$COVERAGE_LOG")"
+
+# ── 4a. inference_signals.tsv header init (ac-12) ──────────────────────
+# Sidecar `inference_signals.tsv` is append-only from creation. Initialise
+# the 12-column header on first cycle if the file does not yet exist.
+if [[ ! -f "$INFERENCE_SIGNALS" ]]; then
+    mkdir -p "$(dirname "$INFERENCE_SIGNALS")"
+    printf '%s\n' "$INFERENCE_SIGNALS_HEADER" > "$INFERENCE_SIGNALS"
+fi
+
+# ── 4b. Type-inference smoke gate (finetype-7zi ac-06) ─────────────────
+# Smoke fixture: canonical email column. Locked weights w_v=0.4, w_h=0.6.
+# Math (overlap-on-min header match): h={email}∩{identity,person,email}/
+# min(1,3) = 1.0; v=1.0 (validator passes canonical addresses); score = 1.0.
+# Rule 8 (prediction_confirmed) fires because predicted==inferred AND
+# validator pass-rate ≥ 0.7. Failure halts the cycle (H05 family).
+if [[ -x "$FINETYPE_BIN" ]]; then
+    SMOKE_INPUT='{"column_name":"email","predicted_type":"identity.person.email","samples":["alice@example.com","bob@example.com","carol@example.com","dave@example.org","eve@example.net","frank@example.com","grace@example.io","henry@example.com"]}'
+    SMOKE_OUT="$(printf '%s' "$SMOKE_INPUT" | "$FINETYPE_BIN" infer-type 2>/dev/null || true)"
+    SMOKE_OK="$(printf '%s' "$SMOKE_OUT" | python3 -c "
+import json, sys
+try:
+    out = json.loads(sys.stdin.read())
+except Exception as e:
+    print(f'parse_error:{e}'); sys.exit(0)
+if out.get('inferred_correct_type') != 'identity.person.email':
+    print(f\"wrong_type:{out.get('inferred_correct_type')}\"); sys.exit(0)
+conf = float(out.get('confidence', 0.0))
+if conf < 0.5:
+    print(f'low_confidence:{conf}'); sys.exit(0)
+if out.get('mechanism') != 'prediction_confirmed':
+    print(f\"wrong_mechanism:{out.get('mechanism')}\"); sys.exit(0)
+print('ok')
+")"
+    if [[ "$SMOKE_OK" != "ok" ]]; then
+        emit_halt "H05" "infer-type smoke gate failed: $SMOKE_OK (raw output: $SMOKE_OUT)"
+        exit 1
+    fi
+fi
 
 # ── 5. Emit preamble JSON ─────────────────────────────────────────────
 python3 - <<PY

@@ -21,6 +21,7 @@ registered).
 | `harvest_pool.tsv` | Training-data candidate pool — column samples earmarked for generator widening | finetype-s16 | append-only (uschg) |
 | `holdout_paths.txt` | Frozen 2000-file gate-metric surface | finetype-e6d / finetype-s16 | read-only at sprint start |
 | `cycle_log.jsonl` | Per-cycle summary (cycle_id, start, end, scores, line counts of the above) | finetype-nms / finetype-87j | append-only |
+| `inference_signals.tsv` | Sidecar for autonomous type-inference confidence + signal sub-scores. One row per `failure_log.tsv` B01/B04 row | finetype-7zi | append-only |
 
 ## `failure_log.tsv`
 
@@ -85,6 +86,35 @@ Header line:
 
 ```
 cycle_id\ttimestamp\tfile_path\tfile_content_sha256\tcolumn_name\ttarget_generator\tsamples_json
+```
+
+## `inference_signals.tsv`
+
+Append-only TSV. One row per (cycle, file, column) triple where a B01
+or B04 failure_log entry was written. Same join key as failure_log
+(`(cycle_id, file_path, file_content_sha256, column_name)` per
+finetype-7zi ac-12). Phase-1 signals only (validator pass-rate +
+header-name match); Phase-2 signal columns are deferred. Columns:
+
+| # | Column | Type | Notes |
+|---|---|---|---|
+| 1 | `cycle_id` | UUID | matches failure_log entry from same cycle |
+| 2 | `timestamp` | ISO 8601 UTC | |
+| 3 | `file_path` | string | absolute path |
+| 4 | `file_content_sha256` | hex64 | join key with failure_log |
+| 5 | `column_name` | string | matches failure_log column |
+| 6 | `predicted_type` | string | matches failure_log column |
+| 7 | `inferred_correct_type` | string | matches failure_log column (real value, never literal `unknown` unless empty samples) |
+| 8 | `confidence` | float ∈ [0,1] | weighted score `0.4·v + 0.6·h`, rounded to 4 dp |
+| 9 | `mechanism` | enum | one of the 10 closed-set tokens (finetype-7zi ac-09) |
+| 10 | `validator_pass_rate` | float ∈ [0,1] | Phase-1 signal #1 |
+| 11 | `header_match` | float ∈ [0,1] | Phase-1 signal #2 (overlap-on-min) |
+| 12 | `top_k_json` | JSON | top-5 candidate (type, score) pairs |
+
+Header line:
+
+```
+cycle_id\ttimestamp\tfile_path\tfile_content_sha256\tcolumn_name\tpredicted_type\tinferred_correct_type\tconfidence\tmechanism\tvalidator_pass_rate\theader_match\ttop_k_json
 ```
 
 ## `cycle_log.jsonl`
