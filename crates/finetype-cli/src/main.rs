@@ -380,6 +380,19 @@ enum Commands {
         model_config: Option<PathBuf>,
     },
 
+    /// Autonomous type-inference triangulator (bead finetype-7zi).
+    ///
+    /// Reads JSON from stdin: {"column_name": str, "predicted_type": str,
+    /// "samples": [str]}. Truncates samples to N=8 (matches OBSERVED_SAMPLE_LIMIT
+    /// in scripts/cron_cycle_work.py). Returns JSON to stdout: {"inferred_correct_type",
+    /// "confidence", "mechanism", "signals": {...}}. Exit 0 on success.
+    #[command(name = "infer-type")]
+    InferType {
+        /// Taxonomy file or directory
+        #[arg(short, long, default_value = "labels")]
+        taxonomy: PathBuf,
+    },
+
     /// Extract multi-branch feature vectors from a column of values (stdin)
     #[command(name = "extract-features", hide = true)]
     ExtractFeatures {
@@ -649,7 +662,34 @@ fn main() -> Result<()> {
             json,
             validation,
         } => cmd_extract_features(header, json, validation),
+
+        Commands::InferType { taxonomy } => cmd_infer_type(taxonomy),
     }
+}
+
+/// Autonomous type-inference triangulator (bead finetype-7zi).
+///
+/// Reads a single JSON object from stdin and writes a single JSON object to
+/// stdout. The wire shape is defined in `finetype_core::infer::{InferInput,
+/// InferOutput}`. Exits 0 on success and non-zero on internal error (e.g.
+/// stdin parse failure, taxonomy load failure).
+fn cmd_infer_type(taxonomy_path: PathBuf) -> Result<()> {
+    use finetype_core::infer::{infer, InferInput};
+
+    // Read all of stdin
+    let mut buf = String::new();
+    io::stdin().read_to_string(&mut buf)?;
+    let input: InferInput = serde_json::from_str(&buf)
+        .map_err(|e| anyhow::anyhow!("failed to parse stdin JSON: {}", e))?;
+
+    // Load taxonomy + compile validators (same loader as cmd_validate)
+    let mut taxonomy = load_taxonomy(&taxonomy_path)?;
+    taxonomy.compile_validators();
+    taxonomy.compile_locale_validators();
+
+    let out = infer(&taxonomy, &input);
+    println!("{}", serde_json::to_string(&out)?);
+    Ok(())
 }
 
 fn cmd_mcp() -> Result<()> {
