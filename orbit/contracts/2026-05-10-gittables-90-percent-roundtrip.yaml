@@ -1,0 +1,871 @@
+# FineType autonomy contract — GitTables 90% round-trip (pass-2)
+#
+# This file SUPERSEDES orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml
+# Authored 2026-05-10 in pass-2 tabletop session (facilitator: Hugh; scribe: Nightingale).
+# Methodology: orbit memo `2026-05-02-tabletop-autonomy-contract.md`.
+# This is the third instance of the methodology and the second pass on the
+# GitTables contract. Pass-1 ran 2026-05-03 and produced the predecessor contract;
+# eight cycles fired (7 full + 1 partial) before manual halt landed the day before
+# H13 would have fired. The pass-2 audit lives in
+# `orbit/contracts/2026-05-10-pass2-tabletop-brief.md`.
+#
+# The cron-firing agent reads this file at cycle start and matches observed
+# state against §3 branches, §4 halts, §5 escalations. Unmatched state
+# defaults to hold-and-log per the methodology spec — never improvise.
+
+contract_id: 2026-05-10-gittables-90-percent-roundtrip
+sprint_window: 2026-05-10 → contract_replacement_event
+status: active
+authored: 2026-05-10
+authored_by: pass-2 tabletop session (Hugh + Nightingale)
+supersedes: 2026-05-03-gittables-90-percent-roundtrip
+
+# ─────────────────────────────────────────────────────────────────────
+# §1 Objective function
+# ─────────────────────────────────────────────────────────────────────
+
+objective_function:
+  primary_target: |
+    Lift profile→validate round-trip pass rate on the GitTables parquet
+    catalogue from the pass-1 baseline (gate_score = 0.0785, byte-identical
+    across 7 measurements with sherlock-v19-relu-s42) to ≥ 90% on the
+    frozen holdout slice. Distance to target at pass-2 contract activation:
+    82.15 absolute points.
+
+  gate_metric:
+    name: gittables_holdout_roundtrip_pass_rate
+    target: 0.90
+    surface:
+      population: GitTables parquet catalogue at /Users/hugh/datasets/gittables
+      population_size: 1018286 files
+      holdout_size: 2000 files
+      holdout_selection: stratified-by-topic-cluster random sample, frozen
+                         at sprint start (2026-05-03), seed 20260503
+      holdout_path: eval/gittables/holdout_paths.txt
+    behaviour: |
+      The gate is a promotion benchmark, not an exploration tool.
+      Three properties:
+        1. Frozen holdout — same 2000 files every cycle.
+        2. Two-stage pass criterion — file passes iff
+           (a) ≥ 80% of columns predicted as non-trivial type
+               (NOT representation.text.plain_text;
+                NOT representation.numeric.decimal_number-as-fallback)
+           AND
+           (b) ≤ 1% of rows rejected on those non-trivial columns.
+           gate_score = files_passing / 2000.
+        3. Deterministic — same files × same model × deterministic
+           profile/validate ⇒ byte-identical output. Gate moves only
+           when the model moves.
+      The two-stage shape closes the metric-gaming hole flagged in
+      pass-1 hot-wash item 2 (a single-stage rows-valid rate is
+      trivially won by predicting every column as plain_text).
+    measurement: |
+      For each holdout file F:
+        1. Run `finetype profile -f F -o json-schema > F.schema.json`
+        2. Run `finetype validate F F.schema.json --db F.db --table T --lenient`
+        3. Classify F as one of:
+           - PASS  — both stage-1 thresholds cleared
+           - FAIL  — at least one stage-1 threshold missed but file ran
+           - ERROR — file failed to parse / read / produce a schema
+        4. gate_score = count(PASS) / 2000
+        5. Cycle log records (PASS, FAIL, ERROR) counts separately
+           — `pass_rate / fail_rate / error_rate` (pass-2 amendment;
+           the predecessor contract lumped ERROR with FAIL)
+    cadence: re-measured every cycle
+    estimated_cost_per_cycle: ~5-10 min on M1 (pass-1 observed
+                              range 128-638 s across 7 measurements;
+                              the predecessor contract's "~1h" estimate
+                              was 12× over-stated)
+
+  corpus_value_metric:
+    name: gittables_working_slice_cumulative_pass_rate
+    target: no fixed target — reported, not gated
+    surface:
+      population: GitTables corpus minus holdout (~1,016,286 files)
+      coverage_log_path: eval/gittables/working_slice_coverage.tsv
+      pass_1_progress_at_supersession: 21,524 files visited (~0.6% of corpus)
+    measurement: |
+      Each cycle samples N fresh files (default N=3000) it has not
+      visited this sprint. Round-robin invariant: every working-slice
+      file is visited at least once before any file is visited twice.
+      Aggregate "round-trip pass rate" across all files visited to date.
+    cadence: each cycle samples + reports
+    full_coverage_estimate: ~28 days at 12 cycles/day
+    use: |
+      Failure-mechanism discovery (feeds failure_log).
+      Training-data harvest (real-world examples for generator widening).
+      Taxonomy coverage map (which of 240 types appear in the wild).
+
+  bracketing_constraints:
+    - id: m19_eval_floor
+      rule: m-19 eval suite label accuracy ≥ current production − 0.5% to
+            promote a candidate; drop ≥ 1.0% absolute halts retrain.
+      current_production_baseline: 297/352 (84.4% label) on m-19 manifest
+      schema_field_check: ✓ — `make eval-report` produces
+                          eval/eval_output/report.md with per-type breakdown
+    - id: vci3_fixture_lock
+      rule: vci3_fixture_attribution_regression_match must continue to
+            pass. Per MADR 0076 row-level attribution drift halts.
+      schema_field_check: ✓ — `cargo test -p finetype-eval
+                          vci3_fixture_attribution_regression_match`
+    - id: per_type_collapse_floor
+      rule: no single m-19 type may regress ≥ 5.0% absolute on a
+            promoted retrain.
+      schema_field_check: ✓ — per-type table in eval_output/report.md
+
+# ─────────────────────────────────────────────────────────────────────
+# §2 Standing orders
+# ─────────────────────────────────────────────────────────────────────
+
+standing_orders:
+  cycle_preamble:
+    - read this contract; verify checksum against last cycle's record
+    - verify clean harness tree — `git diff --quiet` must return 0;
+      halt with cycle-log note if uncommitted changes present
+      (pass-2 amendment: pass-1 saw 3 of 7 full cycles run with
+      harness_dirty: true. Score was byte-identical so determinism
+      held in practice, but reproducibility from harness_sha alone
+      is broken on dirty cycles. Halt closes that window.)
+    - acquire cycle lockfile at /tmp/finetype-cron.lock containing
+      cycle_id only (no PID); halt H04 if lockfile contains a
+      cycle_id ≠ this cycle's id (pass-2 amendment: pass-1
+      preamble wrote $$ which was always dead by the time the
+      agent read it, producing false ambiguity in cycle 8)
+    - check free disk space; halt H01 if < 20 GB
+    - record cycle_start_timestamp + cycle_id (UUID) in cycle log
+
+  per_cycle_actions:
+    - re-measure gate_metric on holdout (~5-10 min)
+    - sample N=3000 fresh files from working slice (round-robin
+      invariant; tracked in coverage_log)
+    - run profile→validate per sampled file
+    - apply §3 branches per file outcome
+    - update failure_log (append-only)
+    - update coverage_log (append-only)
+    - check §4 halts; halt if any fire
+    - check §5 escalations; surface if any fire
+
+  cycle_postamble:
+    - log cycle_end_timestamp + summary (gate Δ, files visited,
+      branches taken, escalations raised)
+    - release cycle lockfile
+    - if any commits made this cycle:
+        1. git pull --rebase  (pass-2 amendment: belt-and-braces
+           against the no-PR direct-push policy)
+        2. git push  (no PR — contract authorises direct push given
+           audit + verification gates)
+
+  invariants:
+    - failure_log is append-only; entry count never decreases
+    - coverage_log is append-only; visited count never decreases
+    - holdout file set is frozen; never modified once sprint starts
+    - any file harvested into training data is permanently excluded
+      from holdout AND from working slice (content-hash deduped)
+
+  scheduling_mechanism:
+    local_or_remote: local
+    fired_by: launchd plist (finetype-53r) on Hugh's M1 Mac
+    cadence_observed_pass_1: ~2.2-2.5h between cycle starts
+
+# ─────────────────────────────────────────────────────────────────────
+# §3 Branch table
+# ─────────────────────────────────────────────────────────────────────
+
+branches:
+  # Scenario 1 — misclassification
+  - id: B01_misclassification_detected
+    when: |
+      validate produces ≥1 column where reject_count == row_count
+      AND rejected cell values do not match predicted type's
+      regex/enum
+      AND predicted type is high-specificity (regex with anchors,
+      enum with ≤16 members)
+    diagnosis: classifier misclassification (not validator-narrow)
+    action: |
+      Append entry to failure_log:
+        (file_path, column_name, predicted_type, observed_values_sample,
+         inferred_correct_type, mechanism: "header-signal" |
+         "value-shape" | "prefix-shape")
+      Harvest sample values into training-data candidate pool (per B05).
+      DO NOT touch validator (MADR 0042/0048 binding).
+      DO NOT block cycle — continue to next sampled file.
+    pass_1_fires: 6908
+
+  # B02 split — pass-2 amendment. Predecessor B02 conflated detection
+  # (always allowed) with action (paired commit subject to B07 — only
+  # legal in retrain mode). Pass-1 worker invented `B02-candidate` to
+  # bridge the gap; this codifies the discipline.
+  - id: B02a_validator_narrow_detected
+    when: |
+      validate produces a column with reject_count > 0 AND
+      reject_count < row_count
+      AND inspecting rejected values shows a recurring shape that
+      a sibling taxonomy type's pattern would accept
+    diagnosis: validator regex too narrow; iter-1→4 pattern
+    action: |
+      Append entry to failure_log with mechanism: "validator-narrow"
+      and predicted_sibling_type (the canonical sibling per MADR 0078).
+      Harvest sample values to harvest_pool (per B05).
+      Tag column for B02b consideration on next retrain.
+      DO NOT touch validator. DO NOT block cycle.
+    runs_in: every cycle (measurement-mode)
+    pass_1_fires: 7668 (recorded as B02-candidate)
+
+  - id: B02b_validator_narrow_widen
+    when: |
+      cycle is in retrain mode (E01a fired)
+      AND harvest_pool contains ≥ 1 column tagged B02a since last retrain
+    action: |
+      Identify canonical sibling pattern per MADR 0078.
+      Execute paired commit (taxonomy YAML + vciN-style regression
+      test asserting both new acceptance and preservation of existing
+      rejection). Subject to §3 B07 load-bearing-edit protocol.
+      Verify pre-retrain test pass before promoting.
+    runs_in: retrain-mode only
+    pass_1_fires: 0 (E01a never fired — see §5)
+
+  - id: B03_clean_pass
+    when: |
+      validate produces 0 rejects
+      AND ≥ 80% of columns predicted as non-trivial types
+    action: |
+      Log as clean_pass in coverage_log with predicted_type
+      distribution. Contributes to corpus_value_metric.
+      No further action this cycle.
+    pass_1_fires: 1491
+
+  - id: B04_trivial_predictions_no_rejects
+    when: |
+      validate produces 0 rejects
+      AND ≥ 20% of columns predicted as trivial types
+      (representation.text.plain_text or
+      representation.numeric.decimal_number with no other signal)
+    diagnosis: classifier-quality-issue (catches the metric-gaming
+               case at per-cycle level — extends gate-level
+               non-trivial-prediction floor)
+    action: |
+      Log as classifier_quality_issue (NOT clean_pass).
+      Harvest column samples for training-data widening on the
+      trivial-fallback columns.
+      Continue cycle.
+    pass_1_fires: 1931
+
+  - id: B05_training_data_harvest
+    when: |
+      a column is identified by B01, B02a, or B04 as a generator-widening
+      candidate
+    action: |
+      Append column samples to
+      eval/gittables/harvest_pool.tsv with
+      (file_content_sha256, column_name, samples, target_generator).
+      File becomes content-hash-excluded from holdout AND working
+      slice. Generator widening executes when retrain triggers (§5
+      retrain_trigger_threshold_met).
+    pass_1_fires: 18680
+
+  - id: B06_partial_file_read
+    when: |
+      parquet read returns < expected row count or read error
+      mid-stream
+    action: |
+      Skip file. Log as corpus_quality_issue with file path and
+      observed/expected row count. Continue to next sampled file.
+      Do NOT halt — corpus quality issues expected at GitTables
+      scale; tracked for §5 corpus_quality_issue_volume escalation.
+    pass_1_fires: 525
+
+  - id: B07_load_bearing_file_edit
+    when: |
+      cycle intends to Edit/Write to a path in
+      orbit/contracts/load-bearing-paths.yaml
+    action_sequenced: |
+      1. grep repo for path's filename + affected symbol/column/key
+      2. Read each consumer; classify tolerant | fragile | unknown
+      3. for each fragile or unknown, plan paired patch
+      4. execute edits + paired patches as single coherent commit;
+         commit message names consumer-graph audit
+      5. post-edit Read on EVERY edited file (per H02 verification
+         rule)
+      6. make ci as standard gate; does NOT substitute for audit
+    escalate_when: load-bearing path lacks consumer-graph-of-record;
+                   surface to §5 load_bearing_path_without_consumer_graph
+    pass_1_fires: 0 (no edits during measurement-mode cycles)
+
+  - id: B08_retrain_promote
+    when: |
+      candidate model trained AND scored on:
+      - m-19 eval suite (full)
+      - gate metric (full holdout)
+      - vci3 fixture
+      AND ALL of:
+      - m-19 absolute label accuracy ≥ current production − 0.5%
+      - gate metric ≥ current production − 0.0%
+      - vci3 passes
+      - no per-type m-19 regression ≥ 5.0% absolute
+    action: |
+      Swap models/default symlink to candidate.
+      Preserve previous as models/<previous-tag>-YYYYMMDD-SHA.
+      Tag candidate with timestamp + git SHA in cycle log.
+      Log promotion event with full score deltas.
+      Next cycle re-measures gate against new default.
+    pass_1_fires: 0 (no retrain mode entered)
+
+  - id: B09_retrain_hold
+    when: |
+      candidate model trained AND scored
+      AND in window between B08 promote and H05 halt thresholds
+      (e.g. m-19 down 0.6%, gate up 4% — genuinely ambiguous)
+    action: |
+      Keep current production. Preserve candidate at
+      models/<candidate-tag>. Log trade-off with full deltas.
+      Counts toward §5 three_consecutive_hold_and_log_retrains
+      escalation.
+    pass_1_fires: 0 (no retrain mode entered)
+
+  # B10 — pass-2 amendment. Codifies the cycle 4 (df6a4260) recovery.
+  - id: B10_partial_cycle_recovery
+    when: |
+      cycle starts and finds prior cycle_id has partial_cycle: true
+      flag in cycle_log AND append-only logs contain rows under
+      that cycle_id with no corresponding completion entry
+    diagnosis: prior cycle was killed mid-flight (H02 or external);
+               partial data is genuine but sample is incomplete
+    action: |
+      Accept partial data as-is — append-only invariant means it
+      cannot be cleanly removed. The prior cycle's cycle_log entry
+      already records partial_cycle: true plus partial_cycle_distinct_files
+      count, so cross-cycle analytics can filter or annotate it.
+      Start fresh cycle with new cycle_id; round-robin sampling
+      proceeds from current visit-counts (which include the partial
+      rows). Do NOT attempt to "complete" the prior cycle by
+      splicing rows under its cycle_id or under the new cycle_id.
+    escalate_when: ≥ 2 partial cycles in last 10 → §5 partial_cycle_volume
+                   (engineering signal: launcher idiom or process
+                   stability needs work — finetype-dwk territory)
+
+# ─────────────────────────────────────────────────────────────────────
+# §4 Halt conditions
+# ─────────────────────────────────────────────────────────────────────
+
+halts:
+  - id: H01_disk_space
+    trigger: free disk on / < 20 GB at cycle start
+    load_bearing: |
+      Branch could check pre-action but doesn't catch fill-during-cycle.
+      Cycle-start halt protects against starting work that will fail
+      mid-flight (training shards, duckdb tmp).
+    revert: skip cycle; log free-disk value; resume next cycle
+    schema_field_check: ✓ — `df -BG /` in shell
+    pass_1_fires: 0
+
+  - id: H02_post_edit_verification_failure
+    trigger: |
+      any Edit/Write tool call returns non-success
+      OR returns success with stderr containing known failure
+      patterns ("File has not been read", "no such file",
+      "command not found", "Killed", "core dumped")
+      OR a post-edit Read shows the file content does not include
+      the expected change
+      OR a long-running launched process (gate measurement,
+      working-slice driver) reports completion via wrapper-shell
+      exit code without verifiable output (cycle 4 lesson:
+      nohup-wrapping inside Bash run_in_background made wrapper
+      bash exit 0 immediately while inner process kept running;
+      agent treated wrapper exit as completion and launched
+      duplicates — see finetype-dwk for canonical launcher idiom)
+    load_bearing: |
+      iter-3 silent-Edit instance is the proof. Cycle 4 (df6a4260)
+      reproduced the same pattern at process-launch level. Branch
+      table cannot catch the swallowed-failure window between
+      "tool call returned" and "next verification fires". Without
+      PR review, that bug ships.
+    revert: |
+      do NOT proceed with subsequent steps in cycle. Do NOT retry
+      blindly. Do NOT route around via different tool. Append failure
+      to cycle log with full tool-call context. Set partial_cycle: true
+      if append-only logs received writes under this cycle_id. Cycle
+      ends; next cycle re-evaluates from observed state via B10
+      (which now includes the partial rows).
+    schema_field_check: ✓ — tool result inspection is intrinsic
+    pass_1_fires: 1 (cycle df6a4260 — caught launcher-idiom failure)
+
+  - id: H03_load_bearing_edit_without_audit
+    trigger: |
+      a commit touches a registered load-bearing path AND
+      the cycle log lacks an audit entry (per B07) for that path
+      in this cycle
+    load_bearing: |
+      Branch B07 is the protocol; halt is the integrity check.
+      Without halt, protocol is aspirational. Catches
+      "agent skipped audit because change seemed small" — exactly
+      the m-19 manifest schema migration failure pattern.
+    revert: git revert the commit; cycle ends; next cycle re-attempts
+            with audit
+    schema_field_check: ✓ — load-bearing-paths.yaml exists alongside
+                        this contract
+    pass_1_fires: 0 (B07 never fired)
+
+  # H04 — pass-2 amendment to disambiguate "lockfile present" from
+  # "concurrent cron firing." Cycle 8 (aaf42b66) read its own preamble's
+  # lockfile holding its own cycle_id and a dead PID; trigger semantics
+  # were ambiguous and worker spent escalation reasoning resolving it.
+  - id: H04_concurrent_cycle
+    trigger: |
+      /tmp/finetype-cron.lock contains a cycle_id that differs from
+      the current cycle's id at agent-read time.
+      (Lockfile content is cycle_id only — no PID. Presence-with-self-id
+      is normal post-preamble state and does NOT trigger.)
+    load_bearing: |
+      Branch cannot catch — second cycle starts independent of first.
+      Both writing to failure_log / coverage_log produces races.
+    revert: skip this cycle; log skip event with reason; do NOT
+            kill previous cycle
+    schema_field_check: ✓ — lockfile read + string compare
+    pass_1_fires: 0 (cycle 8 surfaced false-positive trigger; resolved
+                   by this amendment)
+
+  - id: H05_retrain_regression
+    trigger: |
+      candidate retrain scores hit ANY of:
+      - m-19 absolute label accuracy drops ≥ 1.0%
+      - gate metric drops ≥ 2.0%
+      - vci3_fixture_attribution_regression_match fails
+      - per-type m-19 regression ≥ 5.0% absolute on any type
+    load_bearing: |
+      Branch B08 is the action; halt is the catastrophic-floor
+      protection. Two thresholds (B08 promote-tight, H05 halt-wide)
+      create the B09 hold-and-log window deliberately.
+    revert: |
+      discard candidate; preserve at models/<rejected-tag>-SHA for
+      autopsy; log full diagnostic; do NOT immediately retry
+      retrain (use failure_log to decide if generator state needs
+      more harvesting first); cycle continues measuring against
+      current production
+    schema_field_check: |
+      ✓ m-19 per-type via report.md
+      ✓ gate metric harness shipped (finetype-e6d closed)
+    pass_1_fires: 0 (no retrains attempted; defer over-engineered
+                   judgement to next tabletop)
+
+  - id: H06_implausible_improvement
+    trigger: gate metric Δ ≥ +10% absolute in a single cycle
+    load_bearing: |
+      Branch cannot catch "implausible improvement" — cycle has no
+      prior on what's plausible. Could be progress, more likely
+      a measurement bug (holdout contamination, wrong model
+      reported, parser change affecting harness).
+    revert: HOLD result (don't promote, don't act on it). Surface
+            via §5 implausible_improvement escalation.
+    schema_field_check: ✓ — Δ computation against last cycle's
+                        recorded score
+    pass_1_fires: 0 (mathematically impossible while model frozen)
+
+  - id: H07_score_model_mismatch
+    trigger: promotion-gate evaluation report's recorded model
+             SHA/tag does not match candidate being evaluated
+    load_bearing: |
+      Branch cannot catch a stale-cache-score-applied-to-wrong-model
+      bug. Report and candidate must cross-verify at promotion time.
+    revert: discard score; rerun evaluation with explicit model
+            specification; if mismatch persists, halt cycle and
+            surface as engineering bug
+    schema_field_check: ✓ — eval report header includes model SHA + tag
+    pass_1_fires: 0 (no candidates evaluated)
+
+  - id: H08_failure_log_corruption
+    trigger: failure_log entry count drops between cycles
+             (append-only invariant violated)
+    load_bearing: |
+      Failure log is contract's memory; corruption silent and
+      catastrophic. Branch cannot catch (cycle N doesn't know
+      cycle N-1 count without explicit check).
+    revert: halt all cycles; surface to human; do NOT auto-recover
+    schema_field_check: ✓ — line count of append-only TSV
+    pass_1_fires: 0 (stress-tested by cycle 4's 3-concurrent-worker
+                   scenario; fcntl.flock + O_APPEND held — zero
+                   torn rows under partial-cycle conditions)
+
+  - id: H09_coverage_log_corruption
+    trigger: coverage_log visited count drops between cycles
+    load_bearing: same shape as H08
+    revert: halt all cycles; surface to human
+    schema_field_check: ✓ — line count of append-only TSV
+    pass_1_fires: 0 (stress-tested cycle 4 — held)
+
+  - id: H10_accidental_binary_push
+    trigger: |
+      git diff --staged includes files matching binary patterns
+      outside their registered locations:
+      - *.parquet anywhere
+      - *.bin / *.onnx / *.safetensors outside models/
+      - models/ directory contents (only the symlink may be tracked,
+        not target files)
+    load_bearing: |
+      Branch could catch if every commit's filelist inspected; halt
+      makes inspection mandatory. Real risk: cron retraining touches
+      models/ directory; accidental git add catches binary files.
+    revert: unstage offending files; commit without them; log event
+    schema_field_check: ✓ — `git diff --staged --name-only` filter
+    pass_1_fires: 0
+
+  - id: H11_corrupted_candidate_model
+    trigger: |
+      post-retrain, candidate model file size = 0
+      OR fails to load via standard FineType loader
+      OR fails sanity inference (one fixed input → expected output
+      shape and range)
+    load_bearing: |
+      Training script can exit 0 with a corrupted output. Halt forces
+      load + sanity check before any score is computed against it.
+    revert: discard candidate; preserve training logs for autopsy
+    schema_field_check: ✓ — file stat + load + canned-input inference
+    pass_1_fires: 0
+
+  - id: H12_multi_prediction_pipeline_drift
+    trigger: model returns ≠ 1 prediction per column post-Sharpen
+    load_bearing: |
+      Multi-branch + Sharpen contract is single-prediction-per-column.
+      Violation indicates pipeline drift; halt before downstream
+      consumers see malformed output.
+    revert: halt cycle; surface as engineering bug
+    schema_field_check: ✓ — predicted_types.len() == columns.len()
+    pass_1_fires: 0
+
+  # H13 — pass-2 amendment to specify null-Δ behaviour. Predecessor said
+  # "Δ < 0.1% absolute over 8 consecutive cycles"; cycle 4's null gate
+  # exposed three readings (pause / reset / advance). Worker chose pause
+  # conservatively; this amendment makes that the contract semantics.
+  - id: H13_holdout_stagnation
+    trigger: |
+      gate metric Δ < 0.1% absolute over 8 consecutive cycles
+      WITH NON-NULL gate measurements.
+      Cycles with null gate (partial_cycle: true; harness-error;
+      deferred for any reason) PAUSE the counter without
+      resetting it. A reset requires a non-null Δ ≥ 0.1%.
+    load_bearing: |
+      Branch cannot catch — each cycle's action evaluates fine in
+      isolation; only cross-cycle measurement reveals stagnation.
+      Cron has no inter-cycle memory unless this halt materialises it.
+      Pause-on-null avoids two failure modes: reset-on-null lets
+      intermittent harness failures hide stagnation; advance-on-null
+      punishes missed measurements as if they were no-progress.
+    revert: |
+      not a revert — promote-current-production stays default; log
+      full last-K cycles with actions + observed states; ALL CYCLES
+      STOP until contract replacement. Contract has reached useful
+      life.
+    schema_field_check: ✓ — gate metric series in cycle log
+    pass_1_status: counter at 6-7 of 8 when manual halt landed;
+                   contract was on cusp of natural retirement.
+                   Pass-2 supersession is the explicit retirement.
+
+# ─────────────────────────────────────────────────────────────────────
+# §5 Escalation triggers
+# ─────────────────────────────────────────────────────────────────────
+
+escalations:
+  # E01 split — pass-2 amendment. Predecessor E01 fired 7 of 7 full
+  # cycles to no effect; trigger expected `inferred_correct_type` to
+  # be a real value, but no autonomous type-inference module exists,
+  # so all entries had `inferred_correct_type: "unknown"`. The
+  # `(predicted_type, inferred_correct_type)` pair-structure collapsed
+  # to a single-axis "20 distinct predicted_types" threshold, trivially
+  # crossed by cycle 1. Worker correctly elected halt-and-surface for
+  # all 7 cycles. Split codifies the discipline.
+
+  - id: E01a_retrain_trigger_autonomous
+    trigger: |
+      failure_log accumulates ≥ 20 distinct
+      (predicted_type, inferred_correct_type) pairs
+      where inferred_correct_type IS NOT "unknown"
+      OR ≥ 30% of last 48h reject volume attributable to
+      misclassification (B01 entries) with non-unknown
+      inferred_correct_type
+      whichever fires first
+    ask_content: not an ask — cycle initiates retrain autonomously.
+                 Logged as RETRAIN_INITIATED event with full
+                 failure-log attribution snapshot.
+    ask_target: cycle log only
+    cycle_action: |
+      promote cycle from measurement-mode to retrain-mode:
+      1. apply pending generator widenings from harvest_pool
+         filtered to entries with non-unknown inferred_correct_type
+      2. run training (M1, Metal); train skill exists
+      3. score candidate on m-19 + gate + vci3
+      4. apply B08 promote / B09 hold / H05 halt as appropriate
+    blocked_by: |
+      Autonomous type-inference module for cycle worker.
+      Filed as P1 bead alongside this contract — without it, E01a
+      structurally cannot fire (predecessor cycles spent 21,789
+      failure-log entries with inferred_correct_type = "unknown").
+    notes: numeric thresholds carried forward from predecessor;
+           re-tune after first 8 cycles in retrain-mode.
+
+  - id: E01b_retrain_calibration_human_attended
+    trigger: |
+      failure_log accumulates ≥ 200 distinct predicted_types
+      AND working_slice_visited ≥ 20,000 files
+      AND no E01a fire since contract activation
+    ask_content: |
+      failure_log distribution by predicted_type +
+      harvest_pool size + sample of 50 random failure entries +
+      hypothesis: "either an inference module is needed before
+      E01a can fire, or the failure-mode distribution is too
+      diffuse for naive retrain — tabletop required."
+    ask_target: human (next tabletop)
+    cycle_action: continue cycles in measurement-only mode
+                  (no autonomous retrain initiation)
+    notes: |
+      At pass-2 contract activation, the corpus already exceeds both
+      thresholds (201 distinct predicted_types, 21,524 files visited
+      via the predecessor contract's accumulated state). E01b will
+      fire on the first cycle of this contract — that is correct
+      behaviour: it formalises the surfacing the worker has been
+      doing manually for 7 cycles. The fire is silenced when an
+      inference module ships and E01a starts firing.
+
+  - id: E02_three_consecutive_hold_retrains
+    trigger: 3 consecutive retrains land in B09 hold-and-log without
+             promoting
+    ask_content: |
+      full score deltas of all 3 retrain attempts +
+      generator changes attempted between them +
+      hypothesis: "generator improvements may be exhausted at this
+      taxonomy structure; tabletop required."
+    ask_target: human (next tabletop)
+    cycle_action: continue cycles in measurement-only mode
+                  (no further retrains until tabletop)
+    pass_1_fires: 0 (no retrain mode entered; defer judgement)
+
+  - id: E03_load_bearing_path_without_consumer_graph
+    trigger: cycle intends to edit a load-bearing path that has
+             no recorded consumer-graph audit-of-record
+    ask_content: |
+      path + commit intent + grep results + list of consumers found +
+      classification (tolerant | fragile | unknown) +
+      proposed paired patches
+    ask_target: human (immediate review or next tabletop)
+    cycle_action: HALT this cycle (don't ship the edit); resume
+                  next cycle if audit lands
+    pass_1_fires: 0
+
+  - id: E04_holdout_stagnation
+    trigger: same as H13 (escalation IS the surfacing of the halt;
+             inherits H13's null-Δ pause semantics)
+    ask_content: full last-8-cycles log (actions + observed states +
+                 score series); contract is at end of useful life
+    ask_target: human (mandatory tabletop)
+    cycle_action: HALT all further cycles until contract replacement
+
+  - id: E05_implausible_improvement
+    trigger: gate metric Δ ≥ +10% absolute in single cycle (also
+             halt H06)
+    ask_content: |
+      full measurement diff (which files moved, model SHA before/
+      after, harness git SHA before/after)
+    ask_target: human (audit before accepting)
+    cycle_action: HOLD result (don't promote, don't act on it)
+                  pending audit
+
+  - id: E06_corpus_quality_issue_volume
+    trigger: ≥ 10 files in last 100 sampled produce parquet read
+             errors / truncation / parser failures (B06 entries)
+    ask_content: file paths + error types + topic-cluster
+                 distribution
+    ask_target: human (decide: filter corpus, fix harness, or accept
+                noise floor)
+    cycle_action: continue cycles (corpus issues don't block
+                  contract operation)
+    pass_1_observed_rate: B06 fired 525× / 21,524 visited = 2.4%
+                          (well below 10% threshold; calibration
+                          stands)
+
+  # E07 — pass-2 amendment. New escalation paired with B10.
+  - id: E07_partial_cycle_volume
+    trigger: ≥ 2 partial cycles in last 10 (B10 fired ≥ 2× recently)
+    ask_content: cycle_ids + halt cause for each partial cycle +
+                 process-tree state at termination + suggested
+                 launcher-idiom changes
+    ask_target: human + finetype-dwk (launcher idiom bead)
+    cycle_action: continue cycles (B10 handles per-cycle recovery;
+                  this escalation is the engineering signal that
+                  process stability needs work)
+    notes: predecessor cycle 4 was the only partial cycle observed;
+           E07 catches the *pattern* of repeat partials, not the
+           one-off.
+
+# ─────────────────────────────────────────────────────────────────────
+# Pass-1 → pass-2 amendment summary
+# ─────────────────────────────────────────────────────────────────────
+
+amendments_from_predecessor:
+  predecessor: 2026-05-03-gittables-90-percent-roundtrip
+  audit_brief: orbit/contracts/2026-05-10-pass2-tabletop-brief.md
+  cycles_audited: 8 (7 full + 1 partial — df6a4260)
+
+  section_1:
+    - "ΔT estimate updated from `~1h on M1` to `~5-10 min on M1`
+       (pass-1 observed range 128-638s; predecessor was 12× over)"
+    - "Gate report split from PASS/FAIL to PASS/FAIL/ERROR; 54 holdout
+       files error every cycle (2.7%) and deserve separate accounting"
+    - "Added explicit `behaviour:` block describing determinism + two-
+       stage criterion + frozen-holdout property (was implicit; pass-1
+       hot-wash item 4 promoted to first-class contract content)"
+
+  section_2:
+    - "Lockfile content simplified to `cycle_id` only (no PID); cycle 8
+       false-positive on dead-PID-of-self resolved at contract level"
+    - "Added `harness_dirty` gate to preamble (3 of 7 pass-1 cycles
+       ran with uncommitted harness changes; reproducibility from
+       harness_sha alone was broken on those cycles)"
+    - "Added `git pull --rebase` before push in postamble (belt-and-
+       braces for no-PR direct-push policy)"
+
+  section_3:
+    - "B02 split into B02a_validator_narrow_detected (measurement-mode,
+       always allowed) + B02b_validator_narrow_widen (retrain-mode-only,
+       gated on E01a). Codifies pass-1 worker's invented `B02-candidate`
+       discipline."
+    - "Added B10_partial_cycle_recovery (codifies cycle 4's accept-as-is
+       handling; defines escalation E07 if pattern recurs)"
+    - "B05 trigger updated to include B02a (was: B01 or B04)"
+
+  section_4:
+    - "H04 trigger disambiguated: now compares cycle_id-in-lockfile
+       to current-cycle-id (was: lockfile-present)"
+    - "H13 null-Δ semantics specified: cycles with null gate PAUSE the
+       counter without resetting it. A reset requires non-null Δ ≥ 0.1%"
+    - "H02 trigger extended to cover long-running launched processes
+       (cycle 4 lesson: nohup-wrapped Bash run_in_background made
+       wrapper exit 0 immediately while inner process kept running)"
+
+  section_5:
+    - "E01 split into E01a_retrain_trigger_autonomous (gated on
+       inferred_correct_type != unknown — STRUCTURALLY BLOCKED until
+       inference module ships) + E01b_retrain_calibration_human_attended
+       (calibration backstop; will fire on cycle 1 of this contract,
+       which is correct — formalises 7 cycles of manual surfacing)"
+    - "Added E07_partial_cycle_volume (paired with B10)"
+
+  not_amended:
+    - "All four invariants (failure_log monotonic, coverage_log
+       monotonic, holdout frozen, harvest content-hash exclusion) —
+       survived cycle 4 stress test"
+    - "Bracketing constraints (m19 floor, vci3 lock, per-type collapse)
+       — untriggered, valid"
+    - "H05 / H07 / H11 / H12 / H03 / H10 — not exercised in pass-1
+       (no retrains, no edits); cannot judge over-engineering until
+       retrain mode runs"
+
+  external_to_contract:
+    - "finetype-ymi (P2): scripts/gittables_gate.sh bash 3.2 empty-array
+       crash. Workaround used pass-1 (pass any --jobs arg). Fix is
+       3-line guard."
+    - "finetype-dwk (P2): cron-firing agent launcher idiom. H02 caught
+       the failure once; bead prevents recurrence."
+    - "NEW P1 bead: autonomous type-inference module for cycle worker.
+       Unblocks E01a. Without it, every retrain is forever human-
+       attended via E01b."
+
+# ─────────────────────────────────────────────────────────────────────
+# Provenance
+# ─────────────────────────────────────────────────────────────────────
+
+provenance:
+  pass_2_session_date: 2026-05-10
+  facilitator: Hugh
+  scribe: Nightingale
+  methodology_source: |
+    ~/github/hughcameron/orbit/orbit/cards/memos/2026-05-02-tabletop-autonomy-contract.md
+  methodology_instance: 3 (pass-2 of GitTables contract)
+  audit_brief: orbit/contracts/2026-05-10-pass2-tabletop-brief.md
+  predecessor_provenance: |
+    See orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml
+    for pass-1 scenarios_walked, hazop_matrix, premortem_completion,
+    and the original hot-wash. Carried forward by reference rather
+    than duplicated.
+
+  pass_2_hot_wash:
+    # Captured before contract finalisation. None contradict the
+    # contract; all are methodology pass-3 fodder for the orbit memo.
+    1: |
+      Presupposed-capability failure mode. Pass-1 hot-wash item 5
+      enumerated observable infrastructure (gate harness, lockfile,
+      append-only logs) but missed *cognitive* infrastructure — the
+      type-inference module E01 needed. Methodology pass-3: when
+      authoring an escalation, trace each variable in the trigger
+      to its data source — directly logged / computable / requires
+      cycle-worker capability. Capability-gated variables become
+      engineering deliverables before the escalation can fire.
+
+    2: |
+      Escalation-as-noise risk. E01 fired 7 times to no effect;
+      signal density approached zero by cycle 3. Methodology pass-3:
+      halt rule for stuck escalations — if same escalation_id fires
+      N consecutive cycles with no resolution, suppress until contract
+      amendment or human ack lands.
+
+    3: |
+      Two-stage branch shape. Worker invented `B02-candidate` to
+      bridge a contract gap (detection always allowed; action retrain-
+      mode-gated). Methodology pass-3: branch authoring template
+      explicitly factors detection_action from intervention_action.
+
+    4: |
+      Determinism as load-bearing methodology fact. Byte-identical
+      0.0785 across 7 cycles is the strongest evidence the gate
+      harness is correct. Drift would mean harness bug. Methodology
+      pass-3: when designing a frozen-baseline gate, run twice
+      unchanged after activation; non-byte-identical second run =
+      halt before proceeding. H06 catches *implausible improvement*
+      but not *implausible drift* in a frozen baseline.
+
+    5: |
+      H02 + B10 pairing. Halts and branches form complementary pairs
+      around shared failure modes. Methodology pass-3: when adding
+      a halt, ask "what state will exist when this halt fires, and
+      which branch handles it next cycle?" Generic "halt and surface"
+      backstop signals an incomplete halt.
+
+    6: |
+      Counter-ambiguity in cross-cycle invariants. H13's "8 consecutive
+      cycles" admitted three readings under cycle 4's null-Δ slot.
+      Methodology pass-3: contract must specify behaviour for
+      missing/null/partial cycles at write time. Default presumption:
+      pause.
+
+    7: |
+      Worker-quality is downstream of standing-order quality. Worker
+      produced 7 high-quality cross-referenced escalation notes by
+      following "halt and surface, never improvise." Don't sacrifice
+      that rule even when individual cycles look like they could
+      "just handle it."
+
+  references:
+    - orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml
+    - orbit/contracts/2026-05-10-pass2-tabletop-brief.md
+    - orbit/contracts/load-bearing-paths.yaml
+    - orbit/decisions/0042-deprecate-regex-header-hints.md
+    - orbit/decisions/0048-value-based-rules-only.md
+    - orbit/decisions/0055-eval-realism-dimensions.md
+    - orbit/decisions/0056-train-eval-leakage-prevention.md
+    - orbit/decisions/0057-eval-coverage-floor.md
+    - orbit/decisions/0066-v19-retrain-hard-gate.md
+    - orbit/decisions/0076-validate-corpus-fixture-anti-regression-lock.md
+    - orbit/decisions/0078-validator-alternations-compose-canonical-sibling-patterns.md
+    - orbit/cards/0014-profile-validate-precision.yaml
+    - orbit/cards/0015-status-orderid-misclassification.yaml
+
+  next_tabletop:
+    cadence: triggered by E01a first-fire (retrain-mode entry) OR
+             E01b first-stuck (calibration ask) OR H13 fire (contract
+             retirement) OR ≥ 2 partial cycles in last 10 (E07)
+    prep_prompt: TBD — decide cadence trigger after first 5 cycles
+                 of pass-2 to see whether retrain-mode engages
+    review_topics:
+      - autonomous type-inference module status (P1 bead — unblocks E01a)
+      - E01a/E01b calibration (numeric thresholds)
+      - retrain-mode branch exercise (B02b, B07, B08, B09)
+      - retrain-mode halt exercise (H03, H05, H07, H10, H11)
+      - any new unmatched-state observations
+      - card 0015 status / progress

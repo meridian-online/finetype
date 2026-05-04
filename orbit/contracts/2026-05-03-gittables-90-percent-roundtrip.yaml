@@ -12,8 +12,11 @@
 # defaults to hold-and-log per the methodology spec — never improvise.
 
 contract_id: 2026-05-03-gittables-90-percent-roundtrip
-sprint_window: 2026-05-03 → contract_replacement_event
-status: active
+sprint_window: 2026-05-03 → 2026-05-10
+status: superseded
+superseded_by: 2026-05-10-gittables-90-percent-roundtrip
+superseded_on: 2026-05-10
+supersession_audit: orbit/contracts/2026-05-10-pass2-tabletop-brief.md
 authored: 2026-05-03
 authored_by: tabletop session (Hugh + Nightingale)
 
