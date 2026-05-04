@@ -82,7 +82,7 @@ def time_one(finetype_bin: str, column_name: str, predicted: str, samples: list[
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     p.add_argument(
         "--calibrate",
         type=Path,

@@ -125,7 +125,7 @@ def measure_half(
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     p.add_argument(
         "--measure",
         type=Path,
@@ -181,7 +181,7 @@ def main() -> int:
 
     print("\n[calibrate half — curve only]", file=sys.stderr)
     t0 = time.perf_counter()
-    c_total, _c_ac02, c_thr = measure_half(
+    c_total, _, c_thr = measure_half(
         args.calibrate, args.finetype_bin, args.max_rows
     )
     c_secs = time.perf_counter() - t0
