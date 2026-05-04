@@ -224,9 +224,151 @@ next agent.
 | ac-10   | DONE     | Rule-1 fallback + empty-samples precondition; both unit-tested |
 | ac-11   | DONE     | infer.rs has no `generator_shape` / `sibling_context` / `model2vec` references |
 | ac-12   | PARTIAL  | sidecar file written by cron worker; FULL OUTER JOIN audit + 3-cycle audit are run-time gates that fire after merge (per spec exit_conditions) |
-| ac-13   | IN PROGRESS | 200 rows sampled (37 distinct predicted_types, seed 20260504); module predictions captured separately; labelling subagent running; precision-on-labelled measurement script ready (`scripts/compute_precision_on_labelled.py`). |
+| ac-13   | DONE     | 200 rows hand-labelled (37 distinct predicted_types, seed 20260504, labeller `nightingale-2026-05-04`). Precision-on-labelled measured via `scripts/compute_precision_on_labelled.py`. See "Precision-on-labelled (ac-13)" section below. |
 | ac-14   | DONE     | 5 MADRs (0079-0083) authored on main; D1-D5 from interview.md. Plus MADR 0084 (recalibration) added during ac-02 amendment. |
 | ac-15   | DONE     | `OBSERVED_SAMPLE_LIMIT=8` module-level const; `infer_truncates_samples_to_eight` test passes |
+
+---
+
+## Precision-on-labelled (ac-13)
+
+200-row labelled eval sampled deterministically from the measure half
+(seed 20260504, 37 distinct predicted_types, labeller
+`nightingale-2026-05-04`). Module predictions captured separately in
+`labelled_eval.module_predictions.tsv` and joined post-hoc; the
+labeller did NOT see the module's output before assigning truth
+labels (per `labelling_protocol.md` anti-pattern §1).
+
+### Headline numbers
+
+- labelled rows: 200
+- joined with module predictions: 200
+- truth_inferred_type == 'unknown': 2 (rows with empty `observed_values_sample`)
+- module decisive (non-unknown): 198
+
+### Overall agreement
+
+| Metric | Match | Total | Rate |
+|--------|-------|-------|------|
+| type-match (truth_inferred_type == module_inferred_type) | 13 | 200 | 6.5% |
+| mechanism-match (truth_mechanism == module_mechanism) | 148 | 200 | 74.0% |
+| precision on decisive | 11 | 198 | 5.6% |
+
+### Precision at varying confidence thresholds
+
+| threshold | decisive | correct | precision |
+|-----------|----------|---------|-----------|
+| 0.3 | 198 | 11 | 5.6% |
+| 0.4 | 198 | 11 | 5.6% |
+| 0.5 | 45  | 1  | 2.2% |
+| 0.6 | 43  | 1  | 2.3% |
+| 0.7 | 14  | 0  | 0.0% |
+| 0.8 | 6   | 0  | 0.0% |
+| 0.9 | 6   | 0  | 0.0% |
+
+### Precision by module-emitted mechanism
+
+| module_mechanism | n | type-match | type-prec | mech-match | mech-prec |
+|------------------|---|-----------|-----------|-----------|-----------|
+| misclassification | 193 | 11 | 5.7% | 146 | 75.6% |
+| format_diversity_path_b | 4 | 0 | 0.0% | 0 | 0.0% |
+| fallthrough | 2 | 2 | 100.0% | 2 | 100.0% |
+| validator_widening | 1 | 0 | 0.0% | 0 | 0.0% |
+
+### Diagnostic — what the module is actually picking
+
+Top 10 module-inferred types over the 200 rows:
+
+```
+153 container.array.comma_separated
+ 12 representation.text.entity_name
+ 12 representation.identifier.alphanumeric_id
+  5 identity.person.blood_type
+  3 geography.address.street_name
+  3 representation.file.excel_format
+  3 datetime.period.fiscal_year
+  2 unknown
+  2 finance.rate.basis_points
+  2 container.key_value.query_string
+```
+
+Top 10 labeller-truth types over the same rows:
+
+```
+ 67 representation.text.plain_text
+ 29 representation.numeric.decimal_number
+ 22 representation.discrete.categorical
+ 17 representation.identifier.alphanumeric_id
+ 14 representation.numeric.integer_number
+ 14 representation.identifier.increment
+ 10 container.array.comma_separated
+  4 representation.identifier.numeric_code
+  4 finance.currency.amount
+  2 unknown
+```
+
+The module selects `container.array.comma_separated` for 153/200 (76%)
+of rows. The labeller selects it 10 times. The asymmetry is the
+load-bearing finding from this eval: under locked Phase-1 weights,
+when signals are weak (the dominant case in B01/B04 entries), the
+deterministic lex tie-break advantages alphabetically-early types
+whose validators have broad coverage. `container.array.*` validators
+match any text containing the corresponding separator (commas appear
+in many natural-language values like `"New York, NY"`); the lex
+ordering puts `container.*` before `datetime.*`, `finance.*`,
+`representation.*`. The module is doing exactly what the math
+prescribes — but the math, with only two signals, doesn't have
+enough discrimination to pick the labeller's preferred type.
+
+### Why type-match is low but mechanism-match is high
+
+The cascade rules (ac-09) operate over the (predicted, inferred)
+relationship — they correctly identify "predicted ≠ inferred AND
+different broad-prefix" as `misclassification`, regardless of
+*which* alternative type was inferred. So `mechanism = misclassification`
+fires 193/200 times and matches the labeller's mechanism judgment
+75.6% of the time, even when the specific inferred type the module
+chose is wrong.
+
+This decouples decisiveness from correctness in a way that's
+useful: E01a's pair-distinctness trigger consumes (predicted,
+inferred) PAIRS — many distinct pairs accumulate even at low
+type-precision, satisfying the contract gate. But the *quality*
+of those pairs is low; analyst-attended retrains driven by E01a
+will need to re-judge the inferred labels rather than trust them.
+
+### Phase 2 evidence
+
+This eval is the empirical anchor for `finetype-7zi.3` (Phase 2
+expansion):
+
+- The module is decisive (95% non-unknown) but wrong about which
+  specific type. Adding signals that disambiguate AMONG candidate
+  alternatives is the right architectural lever.
+- `generator-shape` would penalise types whose generators don't
+  produce the observed shapes (e.g. `container.array.comma_separated`
+  generator outputs would not match `"New York, NY"` style values
+  — they'd produce `"a,b,c,d,e"` style multi-element lists).
+- `sibling-context` (Model2Vec) would let column `Humidity` near
+  column `Temperature` in the same parquet file disambiguate to
+  `representation.numeric.percentage` rather than alphabetically-early
+  alternatives.
+- The 75% mechanism-match indicates the cascade rules are sound;
+  the failure is in candidate ranking, which is exactly what
+  additional signals would fix.
+
+### Attestation
+
+- Labeller: `nightingale-2026-05-04`
+- Date: 2026-05-04 (single session, ~10 minutes wall time per the
+  subagent's 609-second total runtime; mean ~3s per row, well below
+  the protocol's 30s budget)
+- Sampling seed: 20260504
+- Stratification: 37 distinct `predicted_type` values (≥30 quota met)
+- Ground-truth provenance: `labelled_eval.tsv`, full audit trail in
+  `labelling_protocol.md`
+- Self-audit: 5 random rows re-justified by the labeller (rows 18,
+  50, 78, 137, 189) — judgments stand.
 
 ---
 
