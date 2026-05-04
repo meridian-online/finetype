@@ -9,6 +9,7 @@
 
 pub mod checker;
 pub mod generator;
+pub mod infer;
 pub mod json_reader;
 pub mod locale_data;
 pub mod quality;
