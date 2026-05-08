@@ -9,7 +9,7 @@ state, exactly the m-19 manifest schema migration failure pattern
 referenced by the autonomy contract's load-bearing-paths registry.
 
 Editing this file requires updating every consumer in the same commit
-(see `orbit/contracts/load-bearing-paths.yaml` once these paths are
+(see `.orbit/contracts/load-bearing-paths.yaml` once these paths are
 registered).
 
 ## File layout
@@ -126,7 +126,7 @@ Append-only NDJSON. One line per cycle. Required keys:
   "cycle_id": "<uuid>",
   "cycle_start": "<iso8601>",
   "cycle_end": "<iso8601>",
-  "contract_path": "orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml",
+  "contract_path": ".orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml",
   "contract_sha256": "<hex64>",
   "model_tag": "<symlink-target>",
   "model_sha256": "<hex64>",

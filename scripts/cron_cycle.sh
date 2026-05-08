@@ -85,7 +85,7 @@ else
         # Per contract §2 standing orders: cron-firing agent reads the
         # contract at cycle start. Pass the cycle_id so the agent's
         # log entries are correlated with the lockfile.
-        PROMPT="You are the FineType cron-firing agent. Read orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml and run one cycle per §2 standing orders. Cycle ID: $CYCLE_ID. Halt and surface (do not improvise) on any unmatched state."
+        PROMPT="You are the FineType cron-firing agent. Read .orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml and run one cycle per §2 standing orders. Cycle ID: $CYCLE_ID. Halt and surface (do not improvise) on any unmatched state."
         "$CLAUDE_BIN" -p "$PROMPT" --permission-mode bypassPermissions || CYCLE_RC=$?
     fi
 fi

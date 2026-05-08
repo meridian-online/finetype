@@ -3,7 +3,7 @@
 This document is the self-contained infrastructure handoff for setting up
 the macOS launchd plist that fires the autonomous FineType agent every
 2h, per the active autonomy contract at
-`orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml`.
+`.orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml`.
 
 It exists because the contract requires the cron-firing agent to run
 unattended on macOS, and `CronCreate` is REPL-bound (dies with the
@@ -42,7 +42,7 @@ escalation surfaces, then exits.
 
 A pinned trigger at `2026-05-09T20:03:00Z` (Sun May 10 06:03 AEST)
 fires the pass-2 brief preparation prompt at
-`orbit/contracts/2026-05-10-pass2-prep-prompt.md`. Same launchd plist;
+`.orbit/contracts/2026-05-10-pass2-prep-prompt.md`. Same launchd plist;
 either an additional `StartCalendarInterval` entry on the recurring
 plist, or a sibling plist file. Sibling plist is cleaner (separation of
 concerns) but either works.
@@ -168,7 +168,7 @@ If wiring the recurring plist anyway, add the one-shot at the same time:
 - `StartCalendarInterval` pinned to 2026-05-10 06:03 AEST
 - `RunAtLoad: false`
 - `Program` invokes `claude -p` with the prompt body extracted from
-  `orbit/contracts/2026-05-10-pass2-prep-prompt.md` (option B's
+  `.orbit/contracts/2026-05-10-pass2-prep-prompt.md` (option B's
   invocation in that file shows the awk extraction)
 - After firing, the plist self-removes (pinned to a single date — won't
   fire again, but cleanliness suggests `rm` on the plist after the
