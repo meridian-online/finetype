@@ -1,0 +1,25 @@
+card: .orbit/cards/0014-profile-validate-precision.yaml
+autonomy: full
+budget: 3
+iteration: 1
+current_spec: .orbit/specs/2026-04-29-validate-corpus-iter4/
+status: shipped
+history:
+  - dir: .orbit/specs/2026-04-29-validate-corpus-iter4/
+    result: GO
+    pr: https://github.com/meridian-online/finetype/pull/61
+    review_pr_verdict: APPROVE
+started: 2026-04-29T00:00:00Z
+review_cycles:
+  review_spec: 0
+  review_pr: 0
+review_cycle_dates:
+  review_spec: 2026-04-29
+  review_pr: 2026-04-29
+notes: |
+  Design and spec stages completed inline (guided) before drive was kicked off:
+  interview.md and spec.yaml saved on disk. drive.yaml initialised at
+  status: review-spec, autonomy: full, to pick up from forked review-spec.
+  iter-4 is the fourth spec under card 0014; iter-1/iter-2/iter-3 shipped
+  via PRs #58 / #59 / #60. Card 0014 specs[] already updated to include
+  this spec path (line 62).

@@ -11,7 +11,7 @@
 //! `finetype_core::table_validator::validate_table` directly and writes
 //! results to the output `.db` via duckdb-rs (see ac-06, ac-09).
 //!
-//! **Decision reference.** `orbit/decisions/0064-validate-as-duckdb-reject-pipeline.md`
+//! **Decision reference.** `.orbit/choices/0064-validate-as-duckdb-reject-pipeline.md`
 //! captures the pivot rationale and cites this module as the compile-time
 //! evidence for finding (a) [vtab feature available] and finding (b)
 //! [scalar + table function coexistence compiles].
@@ -20,7 +20,7 @@
 //! catalog-lookup, or row-iteration primitives — so a table function
 //! cannot read from an existing DuckDB table by name. This is the
 //! structural blocker that ratified Scenario A. Full findings:
-//! `orbit/specs/2026-04-22-duckdb-extension-ergonomics/spike-duckdb-rs.md`.
+//! `.orbit/specs/2026-04-22-duckdb-extension-ergonomics/spike-duckdb-rs.md`.
 
 use duckdb::{
     core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId},

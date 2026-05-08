@@ -40,7 +40,7 @@ Usage:
 
 See:
     orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml §1
-    orbit/decisions/0056-train-eval-leakage-prevention.md
+    .orbit/choices/0056-train-eval-leakage-prevention.md
 """
 
 from __future__ import annotations

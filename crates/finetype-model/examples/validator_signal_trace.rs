@@ -1,5 +1,5 @@
 //! Discovery instrument for spec
-//! `orbit/specs/2026-04-21-validator-signal-attribution/`.
+//! `.orbit/specs/2026-04-21-validator-signal-attribution/`.
 //!
 //! Loads `models/default` (sherlock-v16) + taxonomy, then for each of four
 //! target eval columns reports:

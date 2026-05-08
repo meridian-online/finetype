@@ -1,0 +1,525 @@
+goal: |
+  Grow the validate-precision corpus from 7 → 12 datasets via PR-only manifest
+  growth (no harness code change), prioritising datasets that exercise the two
+  zero-coverage mechanisms — format_diversity (0/0 in iter-1) and
+  code_vs_canonical (0/0 in iter-1) — so the per-mechanism breakdown has
+  signal across all four designed mechanisms. The 5 new datasets are
+  NYC Taxi (FD), GDELT events (FD), FIFA players (CvC), S&P 500 constituents
+  (CvC — replaces the original NASDAQ tickers pick because the v0.6.19
+  taxonomy has no `finance.market.ticker_symbol` type; S&P 500 carries
+  GICS Sector + Headquarters + CIK columns whose validators DO exist),
+  and OECD employment (CvC mixed). Iteration ships when both target
+  mechanisms have ≥1 attribution in the post-state report.
+
+constraints:
+  - "Pure curation. No engine fixes — zero taxonomy edits, zero CLI changes,
+    zero harness code changes. The make validate-corpus binary built in
+    iter-1 (crates/finetype-eval/src/bin/validate_corpus.rs) is byte-unchanged
+    in this iteration. Engine fixes belong to follow-up cards under MADR 0066."
+  - "Public open-data sources only. Each of the 5 new datasets has a
+    verifiable source URL pinned in sources.yaml and a licence in
+    eval/licence_allowlist.txt. No private datasets, no Hugh's local stash,
+    no synthetic generation."
+  - "5000-row cap via deterministic head-sampling for datasets exceeding that
+    size. Preserves header + first 5000 data rows (matches iter-1 cap policy).
+    Datasets smaller than 5000 rows ship at full size. The harness accepts
+    un-capped data when the manifest points at it; the cap is a repo-footprint
+    discipline, not a harness contract."
+  - "100% GT column coverage. Every column in each new dataset has an
+    expected_label entry in the .gt.yaml sidecar. No column may be left
+    untyped — no_gt mechanism stays at 0 in the iter-2 report (matching
+    iter-1)."
+  - "Realism floor gate. Each candidate dataset's columns must pass
+    scripts/prescreen_eval.py against MADR 0055 floors before commit.
+    Datasets that fail the floor (e.g. >50% null rate, <0.05 unique ratio
+    on a non-categorical column, single-value columns dominating) are
+    dropped and replaced within the same mechanism bucket."
+  - "Leakage firewall extended additively. eval/row_hashes.tsv regenerated
+    via scripts/compute_row_hashes.py over the 12-dataset manifest. Existing
+    iter-1 hash rows are preserved byte-identical (the script iterates the
+    manifest and recomputes deterministically — same hash for same content)."
+  - "Sources.yaml schema is additive-only. The role enum already includes
+    `validate` from iter-1 (MADR 0073). New entries use role: validate.
+    Existing 7 iter-1 entries (un_locode, pokemon, etc.) are byte-unchanged.
+    No new fields, no shape changes."
+  - "Existing iter-1 manifest and corpus files are byte-unchanged. The
+    7 rows in eval/datasets/validate_manifest.csv from iter-1, the 7 CSVs
+    under eval/datasets/validate_corpus/csv/, and the 7 GT sidecars stay
+    exactly as committed in PR #58. Iter-2 only adds — never modifies."
+  - "No new MADRs. Iter-2 references the three MADRs from iter-1
+    (0072 round-trip metric, 0073 m-19 reuse, 0074 in-scope fix partition).
+    The pure-curation framing is consistent with 0074 (deferred mechanisms);
+    no architectural decision changes."
+  - "Mechanism mismatch is reported, not corrected. If NYC Taxi lands in
+    misclassification rather than format_diversity (parallel to iter-1's
+    un_locode), the report records the actual attribution honestly. The
+    dataset still contributes to M and to whatever mechanism actually fired.
+    No re-pick policy for *post-merge* mismatches — a dataset that landed
+    in the wrong bucket but otherwise meets all curation gates ships.
+    **Pre-merge escape hatch** (because AC-08 demands ≥1 attribution
+    each in FD + CvC): if after running `make validate-corpus` against
+    the 12-dataset manifest the post-state report shows 0 attributions
+    in either target mechanism, the implementer MAY add ONE additional
+    dataset (6th iter-2 dataset) within the same zero-coverage bucket,
+    without otherwise loosening curation gates. The headline becomes
+    `N of 13 datasets pass at P=99%` and the implementation_notes
+    are updated in-spec via a follow-up commit. This is a one-shot
+    pre-merge correction, not a standing policy. If after the 6th
+    pick a target mechanism still shows 0, AC-08 is downgraded to a
+    documented gap and a follow-up card is created — the iteration
+    ships rather than spinning indefinitely."
+  - "Rollback path: iter-2 datasets MAY be removed in a separate revert PR
+    if licence disputes or training-leakage issues surface post-merge.
+    The byte-unchanged constraint above applies to *clean* iter-1 entries,
+    not to iter-2 entries discovered defective later. A removal PR shrinks
+    the manifest, drops the CSV + GT sidecar + sources.yaml entry, and
+    regenerates row_hashes.tsv — same shape as an additive PR but in
+    reverse."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: |
+      5 new corpus CSVs committed under eval/datasets/validate_corpus/csv/:
+      nyc_taxi.csv, gdelt_events.csv, fifa_players.csv, sp500_constituents.csv,
+      oecd_employment.csv. Each capped at ≤5000 data rows + 1 header row via
+      deterministic head-sampling. Each is sourced from a public open-data
+      portal with a licence in eval/licence_allowlist.txt.
+    verification: |
+      `wc -l eval/datasets/validate_corpus/csv/{nyc_taxi,gdelt_events,fifa_players,sp500_constituents,oecd_employment}.csv`
+      reports ≤5001 lines per file. Each file has a header row matching the
+      manifest's column expectations. `git ls-files` shows all 5 tracked.
+
+  - id: ac-02
+    ac_type: code
+    description: |
+      5 GT sidecars committed at eval/datasets/validate_corpus/<name>.gt.yaml
+      (one per new CSV). Each sidecar has a single top-level `columns:` map
+      with 100% column coverage — every header in the corresponding CSV has
+      an expected_label entry. Sidecar shape matches iter-1 (no schema
+      change). Total new GT entries documented in progress.md.
+      **Two machine-checkable invariants:** (a) each sidecar's `columns:`
+      map cardinality equals the CSV's header column count exactly
+      (constraint #4 hardened from doc to gate); (b) every
+      `expected_label` value resolves to a real taxonomy type. Both gates
+      live in a committed verification script at
+      `scripts/check_validate_gt.sh` (see verification block for the
+      pinned shape).
+    verification: |
+      `find eval/datasets/validate_corpus -name "*.gt.yaml" | wc -l`
+      returns 12 (7 iter-1 + 5 iter-2). The committed verification
+      script `scripts/check_validate_gt.sh` exits 0 with the following
+      pinned shape (no pseudo-code; the script's body is reviewable):
+      ```bash
+      set -euo pipefail
+      for sidecar in eval/datasets/validate_corpus/{nyc_taxi,gdelt_events,fifa_players,sp500_constituents,oecd_employment}.gt.yaml; do
+        csv="eval/datasets/validate_corpus/csv/$(basename "$sidecar" .gt.yaml).csv"
+        # Invariant (a): cardinality of GT columns:-map equals CSV header count
+        csv_cols=$(head -1 "$csv" | awk -F',' '{print NF}')
+        yaml_cols=$(python3 -c "import yaml; print(len(yaml.safe_load(open('$sidecar'))['columns']))")
+        [ "$csv_cols" -eq "$yaml_cols" ] \
+          || { echo "MISMATCH cardinality $sidecar: csv=$csv_cols yaml=$yaml_cols"; exit 1; }
+        # Invariant (b): every expected_label is a real taxonomy type.
+        # Empirically `finetype taxonomy <unknown> -o json-schema` exits
+        # 1 on v0.6.19 — but content-grep on the error marker is the
+        # defence-in-depth shape (works regardless of exit-code contract,
+        # so future binary changes don't silently null this gate).
+        python3 -c "import yaml; print('\n'.join(yaml.safe_load(open('$sidecar'))['columns'].values()))" \
+          | while read -r label; do
+              out=$(finetype taxonomy "$label" -o json-schema 2>&1) || true
+              echo "$out" | grep -q '^Error: unknown type' \
+                && { echo "BAD label in $sidecar: $label"; exit 1; }
+            done
+      done
+      echo "AC-02: 12 sidecars, all cardinalities match, all labels valid"
+      ```
+      `git ls-files scripts/check_validate_gt.sh` returns 1.
+      `bash scripts/check_validate_gt.sh` exits 0.
+
+  - id: ac-03
+    ac_type: code
+    description: |
+      eval/datasets/validate_manifest.csv extended from 8 rows (header + 7)
+      to 13 rows (header + 12). The 5 new rows reference the 5 new CSVs and
+      include all 9 dataset-level manifest columns: `dataset, file_path,
+      source_url, licence, fetched_date, provenance_status, gt_sidecar_path,
+      row_count, column_count`. (This is the validate manifest's
+      dataset-level schema as committed in iter-1; column-level metadata
+      lives in the GT sidecar named by `gt_sidecar_path`.) The 7 iter-1
+      rows are byte-unchanged.
+    verification: |
+      `wc -l eval/datasets/validate_manifest.csv` returns 13.
+      Header row matches iter-1 byte-for-byte:
+      `dataset,file_path,source_url,licence,fetched_date,provenance_status,gt_sidecar_path,row_count,column_count`.
+      `git diff a91341d..HEAD -- eval/datasets/validate_manifest.csv` shows
+      only additions, no modifications to the 7 iter-1 rows.
+
+  - id: ac-04
+    ac_type: code
+    description: |
+      eval/datasets/sources.yaml extended with 5 new entries each carrying
+      `source_url`, `licence`, `fetched_date`, `role: validate`, and
+      a `datasets` array naming the corresponding CSV(s). The existing 36
+      role: eval entries and 7 role: validate entries from iter-1 are
+      byte-unchanged. The role enum is unchanged (`validate` already
+      permitted from iter-1, MADR 0073).
+    verification: |
+      `grep -c '^  - source_url:' eval/datasets/sources.yaml` increases by
+      exactly 5 (the actual entry-prefix in the file is `  - source_url:`,
+      not `- url:`).
+      Use property-bearing grep that ignores comment-line mentions:
+      `grep -cE '^    role: validate' eval/datasets/sources.yaml` increases
+      from 7 to 12. (A bare `grep -c 'role: validate'` would catch a
+      comment header at line 19 — the indented form pins the gate to
+      data lines only.)
+      `git diff` shows additive-only changes for iter-1's entries.
+
+  - id: ac-05
+    ac_type: code
+    description: |
+      eval/row_hashes.tsv regenerated by running
+      `python scripts/compute_row_hashes.py` after adding the 5 new datasets
+      to the manifest. The script iterates both the eval and validate
+      manifests; new rows surface from the 5 new CSVs and are added to the
+      hash table. Existing iter-1 hash rows are preserved (deterministic
+      SHA256 of normalised header+sample-values produces the same hash for
+      unchanged content). The hash table is per `(dataset, column_name,
+      row_value)` — total line count grows by ~(5 datasets × ~10 columns
+      × ~5000 rows) modulo dedup, not the row count alone.
+    verification: |
+      `wc -l eval/row_hashes.tsv` strictly grows from the iter-1 baseline
+      by at least N hashes per new dataset, where N ≥ 1 row × 1 column
+      (a true floor; the realistic delta is ~10×5000 hashes per dataset).
+      The load-bearing check is the leakage firewall regression test at
+      scripts/eval_leakage/test_validate_corpus_firewall.py — extended so
+      its assertion set includes ≥1 PASS per new dataset (so a silent
+      skip of any of the 5 new datasets surfaces as a failed assertion,
+      not as an undetectably-small line-count delta). Run it directly
+      (it is not invoked by `make ci`):
+      ```
+      python3 scripts/eval_leakage/test_validate_corpus_firewall.py
+      ```
+      Exit code 0. Expected post-state: ≥8 PASS assertions (3 iter-1 +
+      5 iter-2).
+
+  - id: ac-06
+    ac_type: gate
+    description: |
+      Each of the 5 new datasets passes the MADR 0055 realism floor.
+      `prescreen_eval.py` consumes the eval manifest's column-level
+      schema (`dataset, file_path, column_name, gt_label`), which the
+      validate manifest does not carry — the validate manifest is
+      dataset-level. The implementer therefore commits a synthesis
+      adapter at `scripts/synth_prescreen_manifest.py` that joins each
+      new validate manifest row with its GT sidecar's `columns:` map
+      (one synthesised row per column), writes the result to
+      `/tmp/validate_corpus_iter2_prescreen.csv`, and the gate runs
+      `python scripts/prescreen_eval.py --manifest /tmp/validate_corpus_iter2_prescreen.csv`.
+      Per-column metrics (null_rate, unique_ratio, whitespace_ratio,
+      format_variance, shannon_entropy, top_1_skew) must all be within
+      the pinned floors. Datasets that fail the floor are dropped
+      pre-commit and replaced from the same mechanism bucket. The
+      adapter is committed (not inline) so iter-3+ can reuse it.
+    verification: |
+      `git ls-files scripts/synth_prescreen_manifest.py` returns 1.
+      Run with explicit output path so the gate doesn't clobber m-19's
+      default-path artefact at eval/eval_output/prescreen.tsv:
+      ```
+      python scripts/prescreen_eval.py \
+        --manifest /tmp/validate_corpus_iter2_prescreen.csv \
+        --output /tmp/validate_corpus_iter2_prescreen.tsv
+      ```
+      Exits 0. The output TSV has `pass_floors=True` for every column from
+      the 5 new datasets — verified by header-aware awk (column 14 is
+      `pass_floors`; column 6 is `total` — naive `$6=="False"` was wrong):
+      ```
+      awk -F'\t' 'NR>1 && $14=="False"' /tmp/validate_corpus_iter2_prescreen.tsv \
+        | wc -l   # → 0
+      ```
+
+  - id: ac-07
+    ac_type: code
+    description: |
+      Iter-2 validate-corpus report committed at
+      eval/eval_output/validate_corpus.md after running
+      `make validate-corpus` against the extended 12-dataset manifest.
+      Headline format follows whatever the frozen harness emits — iter-1
+      shape is `**N of M datasets pass at P=99%** (baseline: B of M0;
+      delta: ±D)`. The harness is byte-frozen by constraint, so this
+      AC verifies the headline shape rather than dictating it. Per-mechanism
+      breakdown table includes the 4 designed mechanisms (enum_overfit,
+      format_diversity, misclassification, code_vs_canonical) plus
+      unknown / no_gt counters. Per-dataset table covers all 12 datasets.
+      Per-column attributions table covers all failing columns across
+      the 12 datasets.
+    verification: |
+      `grep -E "^\*\*[0-9]+ of (12|13) datasets pass" eval/eval_output/validate_corpus.md`
+      returns the headline line. The `(12|13)` alternation accommodates
+      constraint #10's pre-merge escape-hatch path (6th iter-2 dataset
+      added if FD or CvC remain at 0). Per-mechanism table has 6 rows
+      (4 designed + unknown + no_gt). Per-dataset table has 12 data rows
+      under normal path, 13 if the escape hatch fired. The file is
+      committed (not gitignored).
+
+  - id: ac-08
+    ac_type: gate
+    description: |
+      Per-mechanism breakdown in eval/eval_output/validate_corpus.md shows
+      ≥1 failing column attributed to format_diversity AND ≥1 failing
+      column attributed to code_vs_canonical. This is iter-2's exit
+      criterion: both zero-coverage mechanisms close.
+    verification: |
+      The per-mechanism table is a markdown pipe table. The gate is
+      satisfied when **either** both mechanisms attribute ≥1 column
+      **or** the constraint #10 gap-downgrade path fired (escape-hatch
+      6th dataset added but a target mechanism still shows 0; iter-3
+      follow-up spec filed). Pinned shell:
+      ```bash
+      fd_hit=$(grep -cE '^\| format_diversity\s+\|\s+[1-9]' \
+        eval/eval_output/validate_corpus.md)
+      cvc_hit=$(grep -cE '^\| code_vs_canonical\s+\|\s+[1-9]' \
+        eval/eval_output/validate_corpus.md)
+      gap_spec=$(ls -d .orbit/specs/*validate-corpus-iter3* 2>/dev/null | wc -l)
+      if [ "$fd_hit" -ge 1 ] && [ "$cvc_hit" -ge 1 ]; then
+        echo "AC-08 satisfied: both mechanisms ≥1"
+      elif [ "$gap_spec" -ge 1 ]; then
+        echo "AC-08 satisfied via gap-downgrade: iter-3 follow-up spec filed"
+      else
+        echo "AC-08 FAIL: neither both ≥1 nor gap-spec present"; exit 1
+      fi
+      ```
+      (The naive `awk '{print $4}'` parse gets `|` because pipes count
+      as their own whitespace tokens — grep on the leading-cell pattern
+      is the correct shape. The gap-card disjunction reconciles AC-08
+      with constraint #10 + exit_conditions; without it the three places
+      describing AC-08 disagree on the ship contract.)
+
+  - id: ac-09
+    ac_type: doc
+    description: |
+      Mechanism-mismatch report appended to eval/eval_output/validate_corpus.md
+      as a `## Iter-2 expected vs actual` section. Per-dataset row showing
+      expected target mechanism (from this spec) vs actual top mechanism
+      (from harness attribution). Mismatches are noted with a brief reason
+      (parallel to iter-1's un_locode finding: "expected format_diversity;
+      misclassification fired first because the column was mispredicted").
+    verification: |
+      `grep -E "^## Iter-2 expected vs actual" eval/eval_output/validate_corpus.md`
+      returns the section header. The section's pipe table has at least
+      5 data rows — verified by flag-based awk extraction (a naive
+      `awk '/start/,/^## /'` range expression self-terminates because
+      the start line itself matches `^## ` — same defect class as the
+      AC-06 awk-index bug; a flag-driven extractor with `next` is the
+      correct shape):
+      ```
+      awk '/^## Iter-2 expected vs actual/{flag=1; next} /^## /{flag=0} flag' \
+        eval/eval_output/validate_corpus.md \
+        | grep -cE '^\| [a-z][a-z0-9_]+ \|'
+      ```
+      returns ≥ 5 (one per new dataset; ≥ 6 if the constraint #10
+      escape-hatch path fires and a 6th iter-2 dataset ships).
+
+  - id: ac-10
+    ac_type: gate
+    description: |
+      `make ci` exits 0 (fmt + clippy + test + check). Iter-2 makes no code
+      changes, so this is enforcement of byte-stability — any CI failure
+      indicates an unintended drift (likely a manifest schema mistake or
+      sources.yaml typo). The Python firewall regression test under
+      `scripts/eval_leakage/` is NOT invoked by `make ci` today — it is
+      orchestrated explicitly by AC-05's verification (which calls
+      `python3 scripts/eval_leakage/test_validate_corpus_firewall.py`
+      directly). AC-10 is therefore a pure byte-stability gate.
+    verification: |
+      `make ci` exits 0. The forked review-pr verifies this independently.
+
+  - id: ac-11
+    ac_type: doc
+    description: |
+      Card 0014 (.orbit/cards/0014-profile-validate-precision.yaml) updated to
+      include this spec path in the `specs:` array. The card stays
+      `maturity: emerging` per its own goal statement (only flips to
+      established when the corpus reaches ≥20 datasets — this iter-2 ships
+      at 12). Scenarios are unchanged (they're stage-agnostic).
+
+      Note: an earlier draft of this AC referenced a stub card
+      `.orbit/cards/0015-validate-corpus-curation.yaml`, which was deleted
+      during iter-2 wrap as a corrected-orbit-glossary refactor — corpus
+      curation is *work*, not a user-observable capability, and belongs
+      under `.orbit/specs/`. The user-feature card stays at 0014.
+    verification: |
+      `grep "2026-04-28-validate-corpus-curation" .orbit/cards/0014-profile-validate-precision.yaml`
+      returns 1 hit. `grep "maturity:" .orbit/cards/0014-profile-validate-precision.yaml`
+      shows "emerging".
+
+implementation_notes:
+  - |
+    Per-dataset sourcing notes (best-effort starting points; the implementer
+    chooses based on what's actually available + licence-cleared):
+
+    - **NYC Taxi (target: format_diversity):** NYC TLC trip records portal
+      (https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page).
+      Recent yellow taxi monthly file → convert parquet to CSV, head-sample
+      5000. Public domain. Target columns: `tpep_pickup_datetime`
+      (datetime.timestamp.iso family), `tip_amount` (decimal_number),
+      `total_amount` (decimal_number).
+
+    - **GDELT events (target: format_diversity):** gdeltproject.org daily
+      CSV export. Recent day's events file. SPDX licence: `CC0-1.0`
+      (allowlist requires SPDX-strict — bare `CC0` is NOT in
+      eval/licence_allowlist.txt). Target column: `SQLDATE` (YYYYMMDD
+      short form) — tests format-diversity against datetime.date.iso.
+      `MonthYear` (YYYYMM) similar. `Actor1Name`, `Actor2Name` are text.
+
+    - **FIFA players (target: code_vs_canonical):** Kaggle FIFA players
+      dataset. SPDX licence: `CC0-1.0` or `CC-BY-SA-4.0` (allowlist
+      requires SPDX-strict — bare `CC0` / `CC-BY-SA` are NOT in
+      eval/licence_allowlist.txt). Target column: `nationality` —
+      country names not canonical (e.g. "England" vs "United Kingdom").
+      Tests validator strictness on geography.location.country.
+
+    - **S&P 500 constituents (target: code_vs_canonical, narrow):**
+      datahub.io `s-and-p-500-companies` CSV
+      (https://datahub.io/core/s-and-p-500-companies) or the Wikipedia
+      "List of S&P 500 companies" mirror. SPDX licence: `PDDL-1.0` (datahub
+      route) or `CC-BY-SA-4.0` (Wikipedia route) — both in
+      eval/licence_allowlist.txt; bare `CC-BY-SA` is NOT. Replaces
+      the original NASDAQ tickers pick because v0.6.19 taxonomy has
+      no `finance.market.ticker_symbol` type. **The CvC commitment for
+      this dataset rests on a single column** — `GICS Sector` —
+      because the v0.6.19 taxonomy lacks dedicated types for the
+      others. Column-by-column GT mapping:
+      - `Symbol` → `representation.text.word` (control; no CvC
+        expectation — no ticker-symbol validator exists).
+      - `GICS Sector` → `representation.discrete.categorical` (the
+        sole CvC slot for this dataset; controlled vocab of 11
+        canonical sectors with non-canonical capitalisation forms in
+        source data → CvC signal if the categorical validator
+        rejects unrecognised forms).
+      - `Headquarters Location` → `representation.text.plain_text`
+        (control; "City, ST" composite string — no atomic state
+        validator applies. The taxonomy has
+        `geography.location.state_code` for 2-letter abbreviations
+        only, which doesn't fit a composite "City, ST" cell).
+      - `CIK` → `representation.numeric.integer_number` (control; no
+        CIK-specific validator exists in v0.6.19).
+      - Other columns (`Date first added`, `Founded`, etc.) →
+        appropriate datetime / numeric / text labels per their values.
+      Net: S&P 500 contributes 1 CvC slot (GICS Sector). Combined with
+      FIFA's `nationality` and OECD's `LOCATION`, that's 3 CvC slots
+      across 3 datasets — sufficient for AC-08's ≥1 attribution.
+
+    - **OECD employment (target: code_vs_canonical mixed):** OECD.Stat CSV
+      export (e.g., labour force statistics) — country codes alpha-2 / alpha-3
+      mixing. CC-BY-4.0. Target column: `LOCATION` or `COU` — tests
+      geography.location.country_code.
+
+  - |
+    Pre-pick verification protocol (per dataset, before commit):
+    1. Download to a scratch dir, head-sample to 5000 rows
+    2. Run `finetype profile -f <csv> -o markdown` to inspect column types
+    3. Manually compare to expected GT labels — confirm the model classifies
+       most columns correctly (avoids dataset being a misclassification trap)
+    4. Run `python scripts/prescreen_eval.py` with a temp manifest entry —
+       confirm realism floors pass
+    5. If all green, commit; else drop and pick alternate within same
+       mechanism bucket
+
+  - |
+    Mismatch documentation pattern (per ac-09): the report appendix should
+    be honest. If a dataset's expected mechanism doesn't fire, record it
+    plainly:
+    ```
+    | dataset | expected | actual | match? | note |
+    |---|---|---|---|---|
+    | nyc_taxi | format_diversity | format_diversity | ✓ | tip_amount precision variance fires |
+    | gdelt_events | format_diversity | misclassification | ✗ | SQLDATE mispredicted as integer; format-diversity never tested |
+    | fifa_players | code_vs_canonical | code_vs_canonical | ✓ | nationality non-canonical names fire |
+    | sp500_constituents | code_vs_canonical | misclassification | ✗ | GICS Sector mispredicted; CvC never tested |
+    | oecd_employment | code_vs_canonical | code_vs_canonical | ✓ | LOCATION alpha-2/alpha-3 mix fires |
+    ```
+    (Lowercase pipe-table cells so the ac-09 grep regex
+    `^\| [a-z][a-z0-9_]+ \|` matches the dataset slug.)
+
+  - |
+    Order of work: corpus assembly is parallelisable across the 5 datasets
+    once each is sourced. The dependency chain is:
+    1. (Parallel) Download + head-sample + GT-author each of the 5 datasets
+    2. Update validate_manifest.csv (additive — 9-column dataset-level rows)
+    3. Update sources.yaml (additive — `- source_url:` entries with role: validate)
+    4. Synthesise the per-column eval-shaped prescreen manifest
+       (one row per (dataset, column_name, gt_label) tuple, joining
+       validate_manifest.csv + GT sidecars), then run
+       `python scripts/prescreen_eval.py --manifest /tmp/validate_corpus_iter2_prescreen.csv`
+       — drop+replace any failing datasets within the same mechanism bucket
+    5. Run `python scripts/compute_row_hashes.py` — regenerate hash table
+    6. Run `make validate-corpus` → commit iter-2 report at
+       eval/eval_output/validate_corpus.md
+    7. Append ac-09 `## Iter-2 expected vs actual` mismatch table to the
+       report (manual append after the harness completes — the harness
+       does not emit this section)
+    8. Update card 0014 `specs:` array (already done at spec stage; verify)
+    9. Run `make ci` → must exit 0
+    10. Open PR with the iter-2 changeset
+
+ontology_schema:
+  name: "ValidateCorpusDataset"
+  description: |
+    A single dataset entry in the validate-precision corpus curation
+    workflow. Captures the metadata required for manifest, sources.yaml,
+    GT sidecar, and mechanism-target tracking.
+  fields:
+    - name: "name"
+      type: "string"
+      description: "Slug identifier (matches CSV filename without extension)"
+    - name: "source_url"
+      type: "string"
+      description: "Pinned public URL where the dataset was fetched"
+    - name: "licence"
+      type: "string"
+      description: "SPDX identifier (must appear in eval/licence_allowlist.txt)"
+    - name: "fetched_date"
+      type: "string"
+      description: "ISO date YYYY-MM-DD when the dataset was downloaded"
+    - name: "row_count_pre_cap"
+      type: "integer"
+      description: "Total row count before head-sampling (informational)"
+    - name: "row_count_committed"
+      type: "integer"
+      description: "Row count in the committed CSV (≤5000 + 1 header)"
+    - name: "target_mechanism"
+      type: "string"
+      description: "Expected mechanism: format_diversity | code_vs_canonical"
+    - name: "actual_mechanism"
+      type: "string"
+      description: "Top mechanism observed in the iter-2 report (from harness attribution)"
+    - name: "match"
+      type: "boolean"
+      description: "Whether actual matches target (informational; mismatches ship per Q9)"
+    - name: "columns"
+      type: "list"
+      description: "Per-column GT entries — name + expected_label pairs"
+
+evaluation_principles:
+  - principle: "Mechanism coverage primary"
+    weight: 0.4
+  - principle: "Curation discipline"
+    weight: 0.3
+  - principle: "No engine drift"
+    weight: 0.2
+  - principle: "Movement-based reporting (not gating)"
+    weight: 0.1
+
+exit_conditions:
+  - "All 11 ACs marked complete in progress.md"
+  - "ac-08 satisfied: format_diversity ≥1 AND code_vs_canonical ≥1 in the post-state report — OR documented as a gap per constraint #10's pre-merge escape-hatch fallback (6th dataset added; if a target mechanism still shows 0, AC-08 is downgraded to a follow-up card and the iteration ships)"
+  - "make ci exits 0"
+  - "Forked review-pr APPROVE on cycle ≤3"
+  - "Card 0015 specs[] array includes this spec path"
+
+metadata:
+  version: "1.0"
+  test_prefix: "vcc"
+  timestamp: "2026-04-28T13:35:00Z"
+  ambiguity_score: 0.10
+  interview_ref: ".orbit/specs/2026-04-28-validate-corpus-curation/interview.md"

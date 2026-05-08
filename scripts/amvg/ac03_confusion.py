@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SPEC_DIR = REPO_ROOT / "orbit/specs/2026-04-24-amount-variant-generators"
+SPEC_DIR = REPO_ROOT / ".orbit/specs/2026-04-24-amount-variant-generators"
 DIAG_DIR = SPEC_DIR / "diagnostics"
 EVAL_CSV = REPO_ROOT / "eval/datasets/csv/coverage_closure_phase_ab.csv"
 MODEL = "models/default"

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Unit tests for the amvg (amount-variant generators) spec.
 
-Spec: orbit/specs/2026-04-24-amount-variant-generators/spec.yaml (v1.3)
+Spec: .orbit/specs/2026-04-24-amount-variant-generators/spec.yaml (v1.3)
 test_prefix: amvg
 
 These tests assert the structural and consistency contracts declared in
 each AC's `verification` clause. They are the machine-checked regression
 guard for the diagnostic artefacts under
-`orbit/specs/2026-04-24-amount-variant-generators/diagnostics/`.
+`.orbit/specs/2026-04-24-amount-variant-generators/diagnostics/`.
 
 The tests read committed artefacts; they do not regenerate them. The
 regeneration scripts (`scripts/amvg/ac0N_*.py`) are the producers. This
@@ -26,11 +26,11 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SPEC_DIR = REPO_ROOT / "orbit/specs/2026-04-24-amount-variant-generators"
+SPEC_DIR = REPO_ROOT / ".orbit/specs/2026-04-24-amount-variant-generators"
 DIAG_DIR = SPEC_DIR / "diagnostics"
-MADR_0065 = REPO_ROOT / "orbit/decisions/0065-amount-subtype-collapse-mechanism.md"
-MADR_0066 = REPO_ROOT / "orbit/decisions/0066-v19-retrain-hard-gate.md"
-MADR_0067 = REPO_ROOT / "orbit/decisions/0067-framing-correction-retrain-is-not-the-lever.md"
+MADR_0065 = REPO_ROOT / ".orbit/choices/0065-amount-subtype-collapse-mechanism.md"
+MADR_0066 = REPO_ROOT / ".orbit/choices/0066-v19-retrain-hard-gate.md"
+MADR_0067 = REPO_ROOT / ".orbit/choices/0067-framing-correction-retrain-is-not-the-lever.md"
 
 TARGET_SUBTYPES = [
     "amount_accounting",

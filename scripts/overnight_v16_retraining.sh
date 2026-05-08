@@ -39,7 +39,7 @@
 #   models/sherlock-v16/                                    — Trained model
 #   results/overnight-v16-retraining.log                    — Full log
 #
-# Spec: orbit/specs/2026-04-18-v16-data-audit-retrain/spec.yaml
+# Spec: .orbit/specs/2026-04-18-v16-data-audit-retrain/spec.yaml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -87,7 +87,7 @@ echo "   - ac-04: Coverage gaps filled (synthetic data for all 240 types)"
 echo "   - 100 epochs (v14 was 50), patience 15"
 echo ""
 echo " Target: ≥233/242 label accuracy (96.3%+)"
-echo " Spec: orbit/specs/2026-04-18-v16-data-audit-retrain/"
+echo " Spec: .orbit/specs/2026-04-18-v16-data-audit-retrain/"
 echo "================================================================"
 echo ""
 
@@ -617,7 +617,7 @@ echo " Total elapsed: ${ELAPSED_MIN} minutes"
 echo ""
 echo " Model: $MODEL_DIR/"
 echo " Log: $LOG_FILE"
-echo " Spec: orbit/specs/2026-04-18-v16-data-audit-retrain/spec.yaml"
+echo " Spec: .orbit/specs/2026-04-18-v16-data-audit-retrain/spec.yaml"
 echo ""
 echo " To promote v16 as default (use -sfn; BSD ln otherwise follows the"
 echo " existing symlink into the old target dir on macOS):"

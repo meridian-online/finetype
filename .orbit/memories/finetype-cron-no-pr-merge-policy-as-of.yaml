@@ -1,0 +1,4 @@
+key: finetype-cron-no-pr-merge-policy-as-of
+body: 'finetype-cron-no-pr-merge-policy: As of 2026-05-03 the cron-firing FineType agent has direct-push-to-main authority under the active autonomy contract (orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml). PR review gate replaced by: B07 consumer-graph audit + H02 post-edit verification + H03 load-bearing-edit-without-audit halt + H10 binary-push halt + green CI as standard post-push gate. Auto-merge equivalents NOT used; agent commits + pushes directly. Hugh withdrew PR-merge gate explicitly.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

@@ -1,7 +1,7 @@
 # FineType eval licence allowlist
 #
 # Every licence value in eval/datasets/manifest.csv must be in this file.
-# Validated by ac-02's licence-check under orbit/specs/2026-04-21-eval-expansion/
+# Validated by ac-02's licence-check under .orbit/specs/2026-04-21-eval-expansion/
 # (see MADR 0055 — Eval Realism Dimensions — for the policy).
 #
 # Lines starting with # are comments. One licence per line.

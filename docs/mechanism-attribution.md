@@ -274,6 +274,6 @@ fix.
 - `eval/datasets/validate_corpus/*.gt.yaml` — per-dataset ground
   truth sidecars; the `notes:` section is the authoritative
   curation thesis for each dataset.
-- `orbit/decisions/` — MADRs for the cascade design (bucket
+- `.orbit/choices/` — MADRs for the cascade design (bucket
   coalesce, fixture anti-regression lock, label-only
   code-vs-canonical attribution).

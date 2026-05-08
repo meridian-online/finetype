@@ -1507,7 +1507,7 @@ mod fixture_tests {
 
     /// Pinned fixture row-count baseline (constraint 5). Matches the
     /// `metadata.fixture_baseline_rows` value in
-    /// `orbit/specs/2026-04-28-validate-corpus-iter3/spec.yaml`. Subsequent
+    /// `.orbit/specs/2026-04-28-validate-corpus-iter3/spec.yaml`. Subsequent
     /// fixture changes that shrink the row count below this value fail
     /// the test — guards against silent fixture shrinkage, which would
     /// hide a regression in the harness's failing-column detection.

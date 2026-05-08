@@ -15,8 +15,8 @@ Coverage resolution (liberal — matches any of):
      when any synthetic source exists in the manifest.
 
 See:
-  orbit/decisions/0057-eval-coverage-floor.md (policy)
-  orbit/decisions/0055-eval-realism-dimensions.md (carve-out table)
+  .orbit/choices/0057-eval-coverage-floor.md (policy)
+  .orbit/choices/0055-eval-realism-dimensions.md (carve-out table)
 """
 
 from __future__ import annotations

@@ -1,0 +1,209 @@
+id: '0071'
+title: Validate absorbs load — single typed-output path, TRANSFORM_FAILED ontology
+status: accepted
+date_created: 2026-04-28
+date_modified: 2026-04-28
+body: |
+  # 0071. Validate absorbs load — single typed-output path, TRANSFORM_FAILED ontology
+
+  ## Context and Problem Statement
+
+  `finetype load` and `finetype validate` evolved as two adjacent verbs that
+  both produced typed DuckDB output from a CSV plus a profile/schema:
+
+  - **`finetype load`** (decision lineage: pre-MADR 0031) emitted a runnable
+    DuckDB CTAS DDL — profile the file, build per-column transforms from the
+    inferred labels, optionally promote low-cardinality columns to ENUM, print
+    the script. Stdout-only; the user piped it into `duckdb` themselves.
+  - **`finetype validate`** (MADR 0064, PR #46) is a JSON-Schema-driven
+    quality gate that materialises valid rows + a `finetype_reject_errors`
+    sidecar in a `.db` file. Single DuckDB session, single CTAS, single
+    validation engine (`finetype-core::table_validator`).
+
+  Two verbs, overlapping outputs. Both produce typed columns. Both build
+  transforms from `x-finetype-label`. They differ in two dimensions:
+
+  1. **Authority** — `load` trusts the model's profile; `validate` trusts the
+     schema. The schema is the durable contract; the profile is a one-shot
+     guess.
+  2. **Reject handling** — `load` has none. Cells that fail the typed cast
+     crash the CTAS or silently coerce to NULL.
+
+  The v0.6.19 CLI consolidation rally has been removing duplicate affordances
+  (PR #51 visibility cleanup, card 0003 `profile -o json-schema`, card 0006
+  schema verb fold). `load` is the last duplicate of an output path that
+  `validate` already owns more honestly.
+
+  The fold creates a new failure mode: a cell that passes JSON-Schema
+  validation but fails the typed cast (e.g. `"2024-02-30"` matches
+  `pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"` but `strptime` rejects it). The
+  existing reject ontology has no slot for this — `error_type` only carries
+  `SEMANTIC_TYPE` (engine validation failure).
+
+  ## Considered Options
+
+  1. **Soft deprecation of load** — keep `Commands::Load`, emit a warning,
+     redirect to `validate --db --table` internally, remove in v0.6.20.
+  2. **Carry both verbs forward** — leave `load` as-is, document that
+     `validate --db --table` is the preferred path. Two surfaces,
+     user-routed by intent.
+  3. **Hard fold** — delete `Commands::Load` outright in v0.6.19. Lift the
+     per-column transform logic from `build_load_expr` into a free
+     function `build_transform_projection(headers, extensions, taxonomy,
+     try_wrap)` adjacent to `cmd_validate_table`. Wire the projection
+     into the materialise path with TRY-wrapped transforms. Extend the
+     reject ontology with `error_type='TRANSFORM_FAILED'` /
+     `constraint_failed='transform'` for typed-cast failures.
+
+  ## Decision Outcome
+
+  Chosen option: **"Hard fold"**, because:
+
+  - v0.6.19 is the CLI surface consolidation release. Visibility cleanup
+    (PR #51) and the schema verb fold (card 0006, PR #54) both shipped
+    hard-removal posture without deprecation shims. A soft deprecation on
+    `load` would be asymmetric.
+  - `validate --db --table` is strictly more honest than `load`: the schema
+    is the contract, transforms run under TRY, failures land in a queryable
+    sidecar instead of crashing the CTAS or silently NULL-coercing.
+  - The transform-failure failure mode introduced by the fold is a real
+    signal worth surfacing — making it a first-class reject row (not a
+    dropped row, not a NULL coercion) preserves the audit trail.
+  - Lifting `build_load_expr` into a free function keeps the projection
+    builder testable in isolation and decoupled from any single command's
+    control flow. No `finetype-core` API expansion — the helper lives in
+    `crates/finetype-cli/src/main.rs` since transform projection is a
+    CLI-side concern (the engine's `table_validator` is pure pass/fail).
+
+  ### Consequences
+
+  - **Good, because** the public CLI surface drops to 5 verbs (infer,
+    profile, schema → taxonomy/profile, validate, mcp, taxonomy). Each
+    verb does one job.
+  - **Good, because** the typed-output path is now single-source: every
+    typed DuckDB table that ships out of FineType passes through a
+    schema-validated, TRY-wrapped, reject-tracked pipeline.
+  - **Good, because** `TRANSFORM_FAILED` rejects make the silent NULL
+    coercion that haunted `load` impossible — a cell that fails the cast
+    is recorded with the offending transform expression in
+    `error_message`.
+  - **Good, because** ENUM emission was a `load`-only affordance with
+    poor ergonomics under schema-driven validation (the schema's
+    `duckdb_type` is authoritative, not the column's empirical
+    cardinality). Dropping it removes a configuration knob (the
+    `--enum-threshold` flag) that no longer earns its keep.
+  - **Bad, because** `finetype load …` is a removed verb with no shim —
+    users who scripted against it will see a clap unknown-subcommand
+    error (exit 2). Migration is mechanical: every `load` call site
+    becomes `validate <csv> <schema> --db <out.db> --table <name>` with
+    a JSON Schema (which `profile -o json-schema` can generate from the
+    same CSV).
+  - **Bad, because** the typed-CTAS shape is now reachable only through
+    the validate path — analysts who want raw typed columns without the
+    reject-tracking overhead must use `CAST(col AS VARCHAR)` in a
+    follow-up SQL step. The documented escape hatch is the SQL cast
+    itself, not a `--no-transform` flag (rejected for the same one-job
+    reason).
+
+  ## Implementation Notes
+
+  ### Reject ontology extension
+
+  The 13-column `REJECT_SIDECAR_DDL` is unchanged. Two existing fields take
+  new enum values:
+
+  - **`error_type`** gains `'TRANSFORM_FAILED'`. Existing values
+    (`'SEMANTIC_TYPE'` plus the 7-token DuckDB `reject_errors` enum:
+    `MISSING COLUMNS`, `EXTRA COLUMNS`, `UNQUOTED VALUE`, `LINE SIZE OVER MAXIMUM`,
+    `INVALID UNICODE`, `CAST`, `INVALID STATE`) are byte-identical.
+  - **`constraint_failed`** gains `'transform'`. Existing constraint tokens
+    (`'pattern'`, `'enum'`, `'minLength'`, `'maxLength'`, `'minimum'`,
+    `'maximum'`, etc.) are byte-identical.
+
+  ### `error_message` semantic split
+
+  The `error_message` column carries human-readable failure context. The
+  fold introduces a clean semantic split:
+
+  - **`SEMANTIC_TYPE` rows** — `error_message` carries the engine's
+    validation reason (e.g. `"validation failed"`, `"value 'XXX-22222'
+    does not match pattern '^ORD-[0-9]{5}$'"`). Source: existing
+    `table_validator` output.
+  - **`TRANSFORM_FAILED` rows** — `error_message` carries the literal
+    string `"transform_failed: <transform-expr>"` where `<transform-expr>`
+    is the per-column TRY-wrapped expression that returned NULL on
+    non-NULL input (e.g. `"transform_failed: TRY(strptime(\"delivery_date\",
+    '%Y-%m-%d')::DATE)"`). This makes the failing transform visible at
+    query time without joining back to the schema.
+
+  The split is a convention of the CLI's reject INSERT, not a structural
+  change to the column. Downstream consumers can discriminate by
+  `error_type` and treat `error_message` as a free-form string in either
+  case.
+
+  ### Pre-CTAS sweep (binding choice)
+
+  Transform-failure detection runs against the staging table **before** the
+  user-table CTAS executes. For each typed column, an INSERT into a
+  `__finetype_transform_failures_<uuid>` temp table records `(row_idx,
+  column_name, error_message)` where the predicate
+  `{col_ref} IS NOT NULL AND TRY({transform}) IS NULL` fires. The
+  user-table CTAS then excludes those `__row_idx`s via `NOT IN`.
+
+  The post-CTAS DELETE alternative (CTAS first, then `DELETE FROM <user_table>
+  WHERE ...`) was rejected: it produces a transient inconsistent state where
+  the user table contains rows that are about to be deleted, and it requires
+  the CTAS to either crash on the first failure or silently NULL-coerce — the
+  exact behaviour the fold removes.
+
+  ### NULL-in-NULL-out
+
+  Staging-NULL → typed-NULL is **not** a transform failure. The predicate
+  `{col_ref} IS NOT NULL AND TRY({transform}) IS NULL` is the load-bearing
+  constraint. Empty CSV cells must continue to surface as DuckDB NULL in
+  the typed table, with no reject row emitted.
+
+  ### ENUM emission dropped
+
+  `finetype validate --db --table` produces no `CREATE TYPE … AS ENUM`
+  regardless of column cardinality. Low-cardinality columns retain the
+  schema's `duckdb_type` (typically VARCHAR). The `--enum-threshold` flag
+  is **not** carried over to `validate`. Users who want enum semantics
+  should declare them explicitly in the JSON Schema's `enum` keyword and
+  let DuckDB's `IN` constraints do the work.
+
+  ### MCP surface — description string only
+
+  `crates/finetype-mcp/src/tools/validate.rs::ValidateRequest` is byte-identical
+  (no new fields, no behavioural change). The MCP description string at
+  `crates/finetype-mcp/src/lib.rs:113` (`#[tool(description = ...)]`) gains
+  an addendum noting the typed-materialisation behaviour. The
+  `tools/validate.rs` edit is limited to a module-level doc comment.
+
+  The MCP tool remains a pure pass/fail validator — typed materialisation
+  is a CLI-only path. Agents that want typed output should call the CLI as
+  a subprocess.
+
+  ### `finetype load` removal
+
+  `Commands::Load`, the dispatch arm, the `cmd_load` function body,
+  `build_load_expr`, and `build_load_expr_enum` are deleted outright (~270
+  LOC plus 6 obsolete unit tests). `finetype load …` errors via clap's
+  stock unknown-subcommand handler with exit code 2 — no shim, no warning,
+  no carve-out. Verified by `validate_cli.rs::test_vrp_load_subcommand_removed`.
+
+  ## Refines
+
+  - **MADR 0064** (validate as DuckDB reject pipeline) — extends the reject
+    ontology with `TRANSFORM_FAILED` / `transform`; preserves the 13-column
+    sidecar shape; preserves single-CTAS, single-engine, single-session.
+    Date-modified bumped to 2026-04-28.
+  - **MADR 0070** (schema verb folds entirely) — same v0.6.19 consolidation
+    rally; orthogonal fold (schema → taxonomy/profile vs load → validate).
+
+  ## See
+
+  - Spec: `.orbit/specs/2026-04-28-validate-absorbs-load/spec.yaml` (v1.1, 13 ACs)
+  - Memo: `orbit/memos/2026-04-27-load-folds-into-validate.md`
+  - PR: (this rally branch) `rally/validate-absorbs-load`
+references: []

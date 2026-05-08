@@ -20,7 +20,7 @@
 #   models/sherlock-v19-gelu-s{42,43,44}/               — GELU+LN models
 #   results/overnight-v19-paired.log                    — Full log
 #
-# Spec: orbit/specs/2026-04-25-v19-paired-retrain/spec.yaml
+# Spec: .orbit/specs/2026-04-25-v19-paired-retrain/spec.yaml
 # Decision: 0068 (revisit GELU+LN), 0066 (hard gate)
 set -eo pipefail
 
@@ -86,7 +86,7 @@ echo " Seeds: ${SEEDS[*]}"
 echo " Epochs: $EPOCHS, patience: $PATIENCE, batch: $BATCH_SIZE"
 echo " Data: $FTMB_FILE (FTMB v5, v4 corpus + container + datetime)"
 echo ""
-echo " Spec: orbit/specs/2026-04-25-v19-paired-retrain/"
+echo " Spec: .orbit/specs/2026-04-25-v19-paired-retrain/"
 echo " Gate: MADR 0066 (3-seed + net_label ≥+1 + per-domain ≤3)"
 echo "================================================================"
 echo ""

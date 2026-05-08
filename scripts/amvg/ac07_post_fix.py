@@ -9,7 +9,7 @@ inserts 11 exact-match arms for the variant headers BEFORE the destructive
 returns its specific `finance.currency.amount_<variant>` label instead of
 the plain parent `finance.currency.amount`.
 
-Post-fix assertion (verbatim from orbit/decisions/0065-amount-subtype-collapse-mechanism.md):
+Post-fix assertion (verbatim from .orbit/choices/0065-amount-subtype-collapse-mechanism.md):
 
   "In diagnostics/predictions_post.tsv (profile run against models/default on
   eval/datasets/csv/coverage_closure_phase_ab.csv after the ac-06 fix lands),
@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SPEC_DIR = REPO_ROOT / "orbit/specs/2026-04-24-amount-variant-generators"
+SPEC_DIR = REPO_ROOT / ".orbit/specs/2026-04-24-amount-variant-generators"
 DIAG_DIR = SPEC_DIR / "diagnostics"
 EVAL_CSV = REPO_ROOT / "eval/datasets/csv/coverage_closure_phase_ab.csv"
 MODEL = "models/default"

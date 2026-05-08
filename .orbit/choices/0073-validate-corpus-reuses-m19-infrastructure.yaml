@@ -1,0 +1,81 @@
+id: '0073'
+title: Validate-precision corpus reuses m-19 infrastructure
+status: accepted
+date_created: 2026-04-28
+date_modified: 2026-04-28
+body: |
+  # 0073. Validate-precision corpus reuses m-19 infrastructure
+
+  ## Context and Problem Statement
+
+  The validate-precision corpus needs provenance tracking, licence
+  discipline, realism floors, and train/eval leakage prevention — exactly
+  the controls m-19 spent a sprint building (sources.yaml schema, MADR
+  0055 floors, row-hash firewall under `scripts/eval_leakage/`). The new
+  corpus is structurally distinct from m-19's eval data (whole CSVs, not
+  column-level samples) but the *infrastructure* it needs is identical
+  in shape. Two paths: parallel infrastructure dedicated to validate, or
+  extend the existing m-19 plumbing.
+
+  ## Considered Options
+
+  - **Extend m-19 infrastructure additively.**
+    `eval/datasets/sources.yaml` `role` enum gains a fourth value
+    (`validate`). `scripts/compute_row_hashes.py` reads both manifests
+    (`eval/datasets/manifest.csv` for eval, `eval/datasets/validate_manifest.csv`
+    for validate) and aggregates into the existing `eval/row_hashes.tsv`.
+    The shared normaliser at `scripts/eval_leakage/__init__.py` is
+    unchanged — only the manifest-iteration sites grow. MADR 0055
+    realism floors apply to validate-corpus columns too. One sources
+    file, one row-hash file, one normaliser.
+  - **Parallel infrastructure: separate `validate_sources.yaml`,
+    `validate_row_hashes.tsv`, separate normaliser.**
+    Cleaner separation, no risk of accidentally cross-contaminating
+    eval and validate provenance. But three duplicated files to keep
+    in sync, two normalisers that can drift, and the leakage firewall's
+    guarantee weakens (a row in `validate_row_hashes.tsv` is not
+    automatically forbidden in training data unless the training script
+    reads both files).
+  - **Inline validate provenance in the validate manifest only (no
+    sources.yaml entry).**
+    Smallest possible change. But validate-corpus rows would not
+    participate in the `make ci` provenance audit, and the leakage
+    firewall would have no source-of-truth listing of which CSVs are
+    "validate-role". Loses the m-19 contract.
+
+  ## Decision Outcome
+
+  Chosen option: **"Extend m-19 infrastructure additively"**, because
+  the two corpora have different *shape* (column-level samples vs whole
+  CSVs) but identical *invariants* (provenance, licence, realism, no
+  leakage). One source of truth for those invariants is correct;
+  duplicating it would be a maintenance drag with no isolation benefit
+  the schema doesn't already provide via the `role` field.
+
+  ### Consequences
+
+  - Good, because adding a CSV to validate-corpus is a 3-file PR
+    (manifest row, sources.yaml entry, GT sidecar) — no infrastructure
+    code touched.
+  - Good, because the leakage firewall is automatically tightened:
+    `prepare_multibranch_data.py` already excludes `role: eval` rows
+    from training data; the `role: validate` extension means
+    validate-corpus rows are also forbidden in training, by exactly
+    the same code path.
+  - Good, because MADR 0055 realism floors apply uniformly — the
+    pre-screen at `scripts/prescreen_eval.py` doesn't need to grow a
+    validate-specific code path.
+  - Bad, because the `role` enum is now a 4-value union that future
+    contributors must understand. The header comment block of
+    sources.yaml documents all four values explicitly.
+  - Bad, because the validate manifest schema diverges from the eval
+    manifest (9 columns vs 7, including a new `provenance_status`
+    column). They are sibling files, not the same file. MADR 0055
+    applies the same floors regardless.
+  - Neutral, because the row-hash table grows by ~50,000 distinct
+    hashes (validate-corpus contribution). The TSV is still
+    `git`-managed and reasonable to diff.
+
+  References: MADR 0055 (realism floors), MADR 0056 (leakage prevention),
+  MADR 0057 (coverage floor).
+references: []

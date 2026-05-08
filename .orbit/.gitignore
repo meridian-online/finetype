@@ -1,0 +1,14 @@
+# orbit-state runtime artefacts — local to each clone, never tracked.
+state.db
+state.db-journal
+state.db-wal
+schema-version
+locks/
+
+# Substrate content — tracked. The negations are pinned here so any
+# future ignore-everything rule (in this file or a parent) cannot
+# silently exclude the canonical substrate.
+!cards/
+!choices/
+!specs/
+!memories/

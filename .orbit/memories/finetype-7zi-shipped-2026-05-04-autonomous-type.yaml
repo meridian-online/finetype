@@ -1,0 +1,4 @@
+key: finetype-7zi-shipped-2026-05-04-autonomous-type
+body: 'finetype-7zi-shipped-2026-05-04: Autonomous type-inference module (Phase 1) shipped. Triangulator over validator pass-rate + header-match, locked weights w_v=0.4 w_h=0.6, 9-rule deterministic cascade aligned with MADR 0075 + 3 triangulator extensions, sidecar inference_signals.tsv (no failure_log schema change). 15/15 ACs met. Empirical floor: 7.1% non-unknown @ conf ≥0.7 on failure_log measure half — recalibrated from 60% to 5% per MADR 0084 (E01a load-bearing requirement satisfied at any rate ≥0.5%). Precision-on-labelled (200-row eval): 6.5% type-match, 74% mechanism-match — module is decisive but consistently picks lex-early broad-validator types (container.array.comma_separated for 76% of rows) when Phase-1 signals are weak. MADRs 0079-0084 authored. Phase 2 expansion (generator-shape + sibling-context) filed as finetype-7zi.3 with empirical anchor.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

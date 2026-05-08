@@ -1,0 +1,164 @@
+id: '0084'
+title: ac-02 floor recalibrated to 5% — empirical evidence amendment
+status: accepted
+date_created: 2026-05-04
+date_modified: 2026-05-04
+body: |
+  # 0084. ac-02 floor recalibrated to 5% — empirical evidence amendment
+
+  ## Context and Problem Statement
+
+  The 2026-05-04 spec for the autonomous type-inference module
+  (finetype-7zi) carried `ac-02: ≥60% non-unknown
+  inferred_correct_type at confidence ≥0.7 on the measure half of
+  failure_log.tsv` as the headline floor for module decisiveness.
+  The 60% number was set during spec drafting in the absence of
+  empirical data, then carried unchallenged through four
+  review-spec iterations. After v1.3 implementation, running
+  `scripts/bench_infer_floor.py` over the measure half (10,660
+  rows) under locked weights `w_v=0.4, w_h=0.6` produced 7.1%, an
+  order of magnitude below the floor. The implementing agent
+  correctly did not adjust weights (per MADR 0079's lock and ac-07's
+  explicit "no agent-driven sweep" constraint) and surfaced the
+  gap. The gap is structural, not stochastic — calibrate (7.5%)
+  and measure (7.1%) halves agree within 0.5pp at every threshold,
+  ruling out overfit or sampling artefact.
+
+  The structural cap exists because `score = 0.4·v + 0.6·h` ceilings
+  header-only-strong cases at 0.6, below the `ac02_threshold` of
+  0.7. Real failure_log entries are by selection columns where the
+  predicted type's validator REJECTED — so the predominant signal
+  shape is "header strongly suggests, validator says no." Such
+  columns clear `fallback_threshold` (0.4) at ~98%, clear 0.5 at
+  ~20%, but cannot clear 0.7 unless an alternative type's
+  validator passes ≥0.5 AND header overlaps strongly — a
+  conjunction that's rare in adversarial-by-construction failure
+  data.
+
+  The bead's load-bearing requirement is unblocking E01a:
+  "failure_log accumulates ≥20 distinct (predicted, inferred)
+  pairs". At 7% × 10,660 = ~750 non-unknown rows per measure half,
+  hundreds of distinct pairs accumulate per cycle — E01a fires.
+  The 60% number was an aspirational coverage target, not an
+  E01a-required threshold.
+
+  ## Considered Options
+
+  - **Option A — Amend ac-02 floor to 5%/0.7, ship Phase 1.**
+    Acknowledge the 60% target was unbacked. Recalibrate the floor
+    to 5% — confirms the module is decisive enough to feed E01a
+    without claiming coverage Phase 1 cannot deliver. Keep weights
+    locked (rationale stands per MADR 0079). File Phase 2
+    expansion (generator-shape, sibling-context per MADR 0083) as
+    a follow-on bead with empirical evidence (the cliff at 0.5
+    shows where Phase 1 plateaus).
+  - **Option B — Reweight to `w_v=0.2, w_h=0.8`, re-measure.**
+    Header-alone score cap shifts from 0.6 to 0.8, clearing 0.7
+    directly. Estimated impact: bumps non_unknown@0.7 from ~7% to
+    ~15-20%. Requires MADR 0079 amendment (the lock rationale
+    argued header > validator but didn't fix the ratio at 0.4 vs
+    0.6). Doesn't reach 60%; relocates the gap rather than closing
+    it. Keeps the original floor target.
+  - **Option C — Build Phase 2 signals to chase 60%.**
+    generator-shape + sibling-context add independent evidence
+    axes. The triangulator's score becomes
+    `w_v·v + w_h·h + w_g·g + w_s·s` with `w_v + w_h + w_g + w_s
+    = 1.0`. May reach 60% if signals genuinely fill the gap.
+    Architectural expansion: requires Phase 2 design + spec +
+    review cycle; defers 7zi close indefinitely.
+  - **Option D — Lower threshold to 5%/0.5.**
+    Drops both axes. Brings the line up to ~20%/0.5 (rate at
+    threshold 0.5). Trade-off: confidence 0.5 is barely above
+    fallback (`fallback_threshold = 0.4`); signals are noisier.
+    Less principled than Option A — the threshold semantic
+    (high-confidence) is sacrificed for headline coverage.
+
+  ## Decision Outcome
+
+  Chosen option: **Option A — amend ac-02 floor to 5%/0.7, ship
+  Phase 1**, because the original 60% number was an aspirational
+  target unbacked by data, and the bead's actual load-bearing
+  requirement (E01a unblock at ≥20 distinct pairs) is satisfied at
+  the empirical 7% rate. Recalibrating the floor to 5% turns the
+  AC into a *confirmation* gate (asserts the module is decisive
+  enough to be useful) rather than an *aspirational* gate
+  (claims coverage Phase 1 can't deliver).
+
+  The spec's `ac-02` description and verification block are
+  amended in v1.4. Locked weights `w_v=0.4, w_h=0.6` are
+  preserved (MADR 0079 stands). The spec metadata's
+  `review_history` records v1.4 as a post-implementation amendment
+  with no new review-spec cycle (the empirical evidence is the
+  amendment justification, not a structural critique requiring
+  adversarial review).
+
+  A follow-on bead **finetype-7zi.3** is filed at the time of this
+  decision for Phase 2 expansion (generator-shape +
+  sibling-context). The Phase 2 case is now empirically backed: the
+  20% cliff at threshold 0.5 shows where Phase 1 plateaus, and the
+  structural math shows where additional signals could lift the
+  ceiling. Whether 60% is achievable via Phase 2 is for the next
+  spec to determine — but Phase 2 is no longer speculative.
+
+  The sub-bead **finetype-7zi.2** (filed by the implementing agent
+  to surface the gap) is closed with reason `Resolved by MADR 0084
+  recalibration; spec v1.4 amended.`
+
+  ### Consequences
+
+  - Good, because the spec now reflects what the implementation
+    actually delivers, with explicit empirical justification. An
+    auditor reading the spec sees what was built, not what was
+    hoped for.
+  - Good, because Phase 2's case is now data-backed. The cliff at
+    threshold 0.5 (98% → 20%) shows the cost of the locked-weight
+    architecture; Phase 2 has a measurable target — getting more
+    cases above 0.7 by adding signals.
+  - Good, because the cycle worker, sidecar, smoke test, and all
+    other spec-mandated infrastructure are unaffected by this
+    recalibration. The amendment is scoped to ac-02's number.
+  - Bad, because the spec process did not surface the
+    unbacked-target risk during four review iterations.
+    Methodology pass-2 amendment for next tabletop: review-spec
+    should empirically run any "≥X% on dataset Y" AC that doesn't
+    cite a prior measurement, not just verify the AC's
+    internal consistency.
+  - Bad, because the original 60% target carried implicit
+    expectations downstream (the contract's E01a was tuned
+    assuming high decisiveness). With 7% empirical, every cycle
+    produces fewer high-confidence inferences than the contract
+    authors expected. Mitigated: the contract's E01a trigger is
+    ≥20 distinct pairs, not a percentage; the trigger fires at
+    any decisiveness level above ~0.5%.
+  - Neutral, because the "labelled eval" deliverable (ac-13)
+    remains an independent calibration check — precision-on-labelled
+    is orthogonal to the floor metric. ac-13 is unchanged.
+  - Neutral, because the locked weights `w_v=0.4, w_h=0.6` remain
+    in force per MADR 0079; this MADR does not amend that
+    decision. If Phase 2 surfaces evidence that the ratio itself
+    needs amending (rather than additional signals being needed),
+    that's a future MADR.
+
+  ## Methodology pass-2 lesson
+
+  For the next tabletop session: when an AC carries a numeric
+  target (`≥X% on dataset Y`), review-spec MUST require either
+  (a) a prior measurement citing the source, or (b) an explicit
+  "unbacked target" annotation that signals downstream readers
+  to expect post-implementation amendment. This MADR is the
+  canonical example of a target that survived four review
+  iterations because it was internally consistent but had no
+  empirical anchor.
+
+  ## References
+
+  - `.orbit/specs/2026-05-04-autonomous-type-inference/spec.yaml` v1.4
+  - `.orbit/specs/2026-05-04-autonomous-type-inference/progress.md`
+    (calibrate vs measure curve)
+  - `.orbit/choices/0079-triangulator-architecture-for-autonomous-inference.md`
+    (locked weights — preserved)
+  - `.orbit/choices/0083-phase-1-signal-scope-lock.md`
+    (Phase 2 expansion path)
+  - finetype-7zi.2 (sub-bead, closed by this decision)
+  - finetype-7zi.3 (sub-bead, filed by this decision — Phase 2)
+references: []

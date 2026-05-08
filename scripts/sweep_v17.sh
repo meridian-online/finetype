@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/sweep_v17.sh — Multi-seed training sweep for v17
 #
-# Spec: orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
+# Spec: .orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml (v1.3)
 #   — acceptance_criteria ac-09 (sweep + training gate).
 #
 # Differences from sweep_v16.sh:
@@ -37,7 +37,7 @@
 # profile eval (ac-11), not val_acc.
 #
 # ───────────────────────────────────────────────────────────────────
-# v18 RETRAIN BLOCK (spec: orbit/specs/2026-04-21-eval-expansion/, ac-13)
+# v18 RETRAIN BLOCK (spec: .orbit/specs/2026-04-21-eval-expansion/, ac-13)
 # ───────────────────────────────────────────────────────────────────
 # No v18 model sweep may start until the eval-expansion Phase A+B ships.
 # Enforced by spec ac-13 + constraint #4 (retrain block).
@@ -52,7 +52,7 @@
 #   6. v16 diagnostic re-score on expanded eval                      [ac-12]
 #
 # Do NOT copy this script to sweep_v18.sh and run it until all six are
-# checked off in orbit/specs/2026-04-21-eval-expansion/progress.md.
+# checked off in .orbit/specs/2026-04-21-eval-expansion/progress.md.
 # ───────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -335,6 +335,6 @@ echo "  If the winner's val_acc is in [${FLOOR_VAL_ACC}, ${AUTO_ACCEPT_VAL_ACC})
 echo "    require explicit Hugh sign-off on promotion PR (ac-11 manual-review)."
 echo ""
 echo "  Promotion gate: winner_score ≥ max(235, v16_baseline_score)."
-echo "  v16 baseline pinned in orbit/specs/2026-04-20-distilled-data-relabel-7-types/v16-baseline.md"
+echo "  v16 baseline pinned in .orbit/specs/2026-04-20-distilled-data-relabel-7-types/v16-baseline.md"
 echo ""
 echo "  Do NOT auto-promote. Proceed via ac-12 manual promotion PR."

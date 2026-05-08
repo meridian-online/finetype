@@ -12,7 +12,7 @@
 # Usage:
 #   ./scripts/sharpen_ablation.sh [model_dir]
 #
-# Spec: orbit/specs/2026-04-27-sharpen-rule-audit/spec.yaml (ac-01)
+# Spec: .orbit/specs/2026-04-27-sharpen-rule-audit/spec.yaml (ac-01)
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

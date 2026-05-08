@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 # `vtab` is transitively enabled by `loadable-extension` in the workspace
 # duckdb dep — we list it here as well for explicit documentation of the
-# spike's finding (see orbit/specs/2026-04-22-duckdb-extension-ergonomics/
+# spike's finding (see .orbit/specs/2026-04-22-duckdb-extension-ergonomics/
 # spike-duckdb-rs.md, finding a). ac-04 verification literal.
 duckdb = { workspace = true, features = ["vtab"] }
 libduckdb-sys = { workspace = true }

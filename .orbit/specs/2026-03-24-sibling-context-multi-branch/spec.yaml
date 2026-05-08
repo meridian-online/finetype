@@ -1,0 +1,189 @@
+goal: "Wire sibling-context attention into multi-branch training and inference so the header branch sees cross-column context, improving type prediction accuracy"
+
+constraints:
+  - "Single-value inference must work without siblings (graceful degradation to raw Model2Vec embedding)"
+  - "Sibling-context attention weights are frozen during multi-branch training — loaded as constant tensors (not Var-backed), following the FrozenSense pattern from crates/finetype-train/src/sense.rs"
+  - "FTMB v3 format required — records grouped by source table with sibling header list (see format_spec below)"
+  - "Synthetic training data uses assembled tables (5-15 related types grouped by taxonomy domain co-occurrence)"
+  - "Distilled training data uses Sherlock batch files to recover table groupings (same batch = same source table)"
+  - "No new disambiguation rules — numeric fix deferred to pipeline integration"
+  - "Regex header hints are inert when multi-branch is active (early return at column.rs:868 bypasses hint path). Not extended per decision 0042"
+  - "Pure Rust training pipeline (finetype-train crate) — no Python dependencies at runtime"
+  - "Flat model only for this sprint — hierarchical model deferred (OOM on M1 16GB in overnight-v3)"
+
+# ─── FTMB v3 Binary Format ───────────────────────────────────────────────────
+#
+# Addresses reviewer CRITICAL: format must be defined at byte level.
+#
+# Design: v3 adds a table-of-contents (TOC) after the file header, then
+# table groups containing records. The per-record layout is identical to v2
+# (label + char + embed + stats + header features). The new structure is the
+# grouping and sibling header metadata.
+#
+# File layout:
+#   [File Header: 28 bytes]
+#     4B  magic "FTMB"
+#     4B  version (3, little-endian u32)
+#     8B  n_records (total across all groups, little-endian u64)
+#     2B  char_dim (u16)
+#     2B  embed_dim (u16)
+#     2B  stats_dim (u16)
+#     2B  header_dim (u16)
+#     2B  n_groups (u16) — number of table groups
+#     2B  reserved (0)
+#
+#   [Table Groups: variable length, repeated n_groups times]
+#     Per group:
+#       2B  n_columns (u16) — number of records in this group
+#       2B  n_sibling_headers (u16) — number of sibling header strings
+#       For each sibling header:
+#         2B  header_len (u16)
+#         *B  header_bytes (UTF-8)
+#       For each column/record (n_columns times):
+#         2B  label_len (u16)
+#         *B  label_bytes (UTF-8)
+#         2B  column_index (u16) — index into sibling_headers for THIS column's header
+#         char_dim*4B  char_features (f32 LE)
+#         embed_dim*4B embed_features (f32 LE)
+#         stats_dim*4B stats_features (f32 LE)
+#         header_dim*4B header_features (f32 LE, raw Model2Vec — NOT enriched)
+#
+# Backward compatibility:
+#   - v3 reader: reads v1/v2 files by treating entire file as one group with
+#     empty sibling list. header_features used as raw embedding (no enrichment).
+#   - v1/v2 readers: cannot read v3 files (different header size). This is
+#     acceptable — v3 is consumed only by the updated training pipeline.
+#
+# Key design choice: header_features in the file are RAW Model2Vec embeddings.
+# Enrichment via sibling-context attention happens at training time (frozen
+# forward pass) and at inference time. This avoids baking attention weights
+# into the data file.
+
+format_spec:
+  version: 3
+  header_size: 28
+  new_fields:
+    - "n_groups (u16): number of table groups"
+    - "reserved (u16): zero padding for alignment"
+  group_structure: "n_columns + n_sibling_headers + sibling_header_strings + records"
+  record_additions: "column_index (u16) pointing into group's sibling_headers array"
+  backward_compat: "v3 reader handles v1/v2 as single group with empty siblings"
+
+# ─── Training Loop Changes ────────────────────────────────────────────────────
+#
+# Addresses reviewer CRITICAL: training binary changes must be specified.
+#
+# Files modified: crates/finetype-train/src/multi_branch.rs
+#
+# 1. New struct: FrozenSiblingContext
+#    - Mirrors SiblingContextAttention from finetype-model but loads weights
+#      as constant tensors (Tensor::new, NOT VarMap), following the FrozenSense
+#      pattern in crates/finetype-train/src/sense.rs.
+#    - Method: forward(&self, header_embeds: &Tensor) -> Tensor
+#      Input: [N_cols, 128] raw Model2Vec embeddings
+#      Output: [N_cols, 128] enriched embeddings
+#    - Loaded once at training start from models/sibling-context/model.safetensors
+#
+# 2. Modified MultiBranchDataset
+#    - New field: table_groups: Vec<TableGroup> where TableGroup has
+#      record_indices (into flat records array) + sibling_headers
+#    - batch() method changes: instead of random sampling across all records,
+#      samples entire table groups, runs FrozenSiblingContext on group headers,
+#      then constructs batch with enriched header_features replacing raw ones
+#    - For v1/v2 data (single group, no siblings): header_features pass through
+#      un-enriched (identity behavior)
+#
+# 3. Modified train loop
+#    - Loads FrozenSiblingContext alongside VarMap for multi-branch weights
+#    - Per-batch: extract table group, run frozen attention on raw headers,
+#      substitute enriched embeddings into header_feats tensor
+#    - Gradients do NOT flow through FrozenSiblingContext (constant tensors) —
+#      only the header branch MLP weights update
+#
+# 4. Batching strategy
+#    - Tables with N columns produce N training examples per batch inclusion
+#    - Batch assembly: sample table groups until batch is full (may overshoot)
+#    - Shuffle at table-group level, not record level (preserves sibling context)
+
+training_changes:
+  new_structs:
+    - "FrozenSiblingContext — constant-tensor mirror of SiblingContextAttention"
+  modified_structs:
+    - "MultiBranchDataset — adds table_groups, changes batch() to group-aware"
+    - "TrainingRecord — unchanged (raw header_features stored)"
+  frozen_model_path: "models/sibling-context/model.safetensors"
+  gradient_flow: "Frozen attention uses constant tensors — gradients pass through to upstream trainable vars but do NOT update attention weights"
+  batching: "Sample whole table groups, run frozen attention per group, build batch from enriched features"
+
+# ─── Synthetic Table Assembly ─────────────────────────────────────────────────
+#
+# Addresses reviewer WARN: grouping strategy must be concrete.
+#
+# Strategy: domain-based table templates with controlled noise.
+#
+# Templates define realistic table archetypes:
+#   - "person_record": [email, full_name, phone, city, postal_code, age, gender]
+#   - "financial_txn": [usd, iban, iso_8601, entity_name, currency_code]
+#   - "geo_dataset": [latitude, longitude, city, country, region, elevation]
+#   - "web_log": [ip_v4, url, user_agent, iso_8601, http_status_code]
+#   - "product_catalog": [alphanumeric_id, entity_name, usd, category, description]
+#   - etc. (~15-20 templates covering major domain combinations)
+#
+# Per assembled table:
+#   1. Pick a template
+#   2. For each type in template, generate synthetic values + pick realistic header
+#   3. Optionally add 1-3 random types from other domains (controlled noise)
+#   4. Table size: 5-15 columns (template size + noise)
+#
+# This produces tables where sibling co-occurrence is realistic (email + name
+# co-occur, not email + geohash + hex_color), teaching the attention model
+# useful cross-column patterns.
+
+synthetic_assembly:
+  strategy: "Domain-based table templates with controlled noise"
+  template_count: "15-20 archetypes covering major domain combinations"
+  noise: "1-3 random off-domain types per table"
+  table_size: "5-15 columns"
+
+acceptance_criteria:
+  - "AC-1: FTMB v3 format implemented per format_spec — 28-byte header, table groups with sibling headers, column_index per record. Backward-compatible v1/v2 reading (single group, empty siblings)."
+  - "AC-2: Data prep generates FTMB v3 with (a) synthetic table assembly using domain-based templates and (b) distilled table groupings recovered from Sherlock batch files."
+  - "AC-3: FrozenSiblingContext struct implemented in finetype-train — loads sibling-context model as constant tensors, runs frozen forward pass. MultiBranchDataset batches by table group, enriches header embeddings via frozen attention before feeding to header branch MLP."
+  - "AC-4: Multi-branch inference wires sibling context — classify_columns_with_context() no longer bypasses multi-branch. When multi-branch is active with sibling context, headers are enriched before classification."
+  - "AC-5: Single-value inference verified — `finetype infer -i 'alice@example.com'` produces valid label with no panic/NaN. N=1 attention pass produces near-identity enrichment via residual connection. Test with trained (not random) weights."
+  - "AC-6: Model trained with sibling context and evaluated on 190-column profile eval. Both raw multi-branch and post-processed (with existing disambiguation rules) scores reported."
+  - "AC-7: Ablation comparison — re-train on FTMB v3 data with sibling attention disabled (raw Model2Vec header_features used directly, no enrichment) as baseline. Compare against sibling-enriched model on same v3 data. Delta measures sibling signal contribution."
+
+fallback_plan:
+  trigger: "AC-7 ablation shows sibling context provides ≤1 column improvement or degrades accuracy"
+  actions:
+    - "Document findings: the 6-class Sense-trained attention does not transfer to 250-class multi-branch"
+    - "Ship FTMB v3 format and training infrastructure regardless (reusable for future attention models)"
+    - "Investigate: retrain sibling attention against multi-branch loss (250-class supervision) rather than Sense loss"
+    - "The fallback investigation is a new spike, not a blocker for this sprint"
+
+evaluation_principles:
+  - principle: "Model accuracy improvement (post-processed pipeline output)"
+    weight: 0.4
+  - principle: "Sibling signal contribution (ablation delta)"
+    weight: 0.3
+  - principle: "Graceful degradation (single-value inference unaffected)"
+    weight: 0.2
+  - principle: "Format backward compatibility (v1/v2 files still load)"
+    weight: 0.1
+
+exit_conditions:
+  - "Model trained with sibling context, evaluated, and ablation comparison completed"
+  - "Results documented with clear next-step recommendation (pipeline integration or further training)"
+  - "If fallback triggered: findings documented, infrastructure shipped, investigation spike scoped"
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-24T04:00:00Z"
+  ambiguity_score: 0.08
+  interview_ref: ".orbit/specs/2026-03-24-sibling-context-multi-branch/interview.md"
+  review_ref: ".orbit/specs/2026-03-24-sibling-context-multi-branch/review-spec-2026-03-24.md"
+  decisions:
+    - "0041-multi-branch-as-sense-replacement"
+    - "0042-remove-regex-header-hints"
+    - "0038-supersede-v2-fixes-with-retraining"

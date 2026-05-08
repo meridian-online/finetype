@@ -1,0 +1,174 @@
+id: '0085'
+title: Inference module may consume model-internal sibling-context attention
+status: accepted
+date_created: 2026-05-04
+date_modified: 2026-05-04
+body: |
+  # 0085. Inference module may consume model-internal sibling-context attention
+
+  ## Context and Problem Statement
+
+  MADR 0083 (Phase 1 signal scope lock) recorded an architectural
+  constraint in its "Bad" consequences block:
+
+  > sibling-context as a signal is currently computed for free elsewhere
+  > in the runtime (the cycle worker's profile call already runs
+  > Model2Vec sibling attention). Phase 1 is leaving that signal on the
+  > floor. Mitigated: **the inference module's signals are intentionally
+  > independent of the model — one of the architectural claims (MADR
+  > 0079) is that the inference module triangulates ON the model's
+  > prediction, not WITH the model's internals. Sibling-context
+  > attention is part of the model's internals. If a future card moves
+  > toward 'inference reuses model internals,' that's a different
+  > architectural decision.**
+
+  Phase 2 (bead `finetype-dnf`) is that future card. Its scenario 4
+  adds sibling-context as a triangulator signal that "draws on
+  already-loaded Model2Vec embeddings." This is the architectural fork
+  MADR 0083 flagged — the inference module would now triangulate WITH
+  the model's internals. Phase 2 cannot proceed on sibling-context
+  implementation until this fork is settled.
+
+  The empirical case for sibling-context's necessity is partial. The
+  Phase 2 plausibility memo (`.orbit/specs/2026-05-04-autonomous-type-inference/phase2_plausibility.md`)
+  shows Phase 1's failure-distribution centre of mass is the "cliff
+  cluster" — 78% of rows have strong validator (≥0.7) and silent
+  header (<0.3), scoring near 0.4. Generator-shape addresses this
+  cluster (correlated-with-validator but lifts the score above
+  fallback). Sibling-context's strict-classifier addressable set is
+  small (1.6% of rows by the memo's tabulation), but the conservative
+  classifier likely under-counts: when the validator's argmax is
+  *correct* under cluster context but the column header is silent,
+  sibling-context confirms the argmax and adds score weight that
+  generator-shape (correlated with validator on argmax) cannot.
+
+  ## Considered Options
+
+  - **Option A — Yes, re-frame independence as "independent error
+    sources, not independent code paths".** The inference module reads
+    the model's already-computed Model2Vec sibling-attention output
+    rather than re-invoking attention from scratch. The architectural
+    claim shifts from "code-path independence" (the inference module
+    has no Rust dependency on `crates/finetype-model/`) to "error-mode
+    independence" (sibling-context's failure modes — header noise,
+    obfuscated names, sparse-cluster files — are uncorrelated with
+    validator's failure modes — locale gaps, format diversity, enum
+    incompleteness). Cost: small. The cycle worker's profile call has
+    already run sibling attention by the time inference fires; the
+    inference module reads cached output as a per-column score.
+  - **Option B — No, implement sibling-context from scratch in the
+    inference module.** Separate Model2Vec invocation, separate
+    attention computation, no `crates/finetype-model` dependency.
+    Preserves MADR 0083's architectural boundary literally. Cost:
+    large — Model2Vec attention is the heaviest signal family by
+    estimated cost (the loader is ~400K params per MADR 0083); a fresh
+    invocation per inference call is plausibly budget-busting against
+    ac-06's 100ms median. Code duplication of the model's existing
+    sibling-attention path.
+  - **Option C — Defer sibling-context to a future phase, ship Phase 2
+    with generator-shape only.** Scope reduction: Phase 2 expands from
+    2 signals (validator + header) to 3 (+ generator-shape) instead of
+    4. Score becomes `w_v·v + w_h·h + w_g·g` with sum=1.0. Avoids the
+    architectural fork entirely. Empirical cost: ≤2 pp on the
+    `non_unknown@0.7` headline (per the plausibility memo's strict
+    classifier). The 78% cliff cluster is still addressed by
+    generator-shape. The architectural decision moves to a future
+    Phase 3 card.
+
+  ## Decision Outcome
+
+  Chosen option: **Option A — re-frame independence as "independent
+  error sources, not independent code paths"**, because the empirical
+  case for sibling-context's information value is real (the column-graph
+  topology error mode is genuinely uncorrelated with validator's
+  value-shape error mode), the cost of consuming the model's already-
+  computed attention output is small (the data is in memory by inference
+  time), and the architectural boundary MADR 0083 imposed was a
+  *deferment*, not a *prohibition*. Phase 2 IS the future card 0083
+  gestured at; this MADR is its declared fork.
+
+  The independence claim that load-bears the triangulator architecture
+  (MADR 0079) is preserved by re-framing what "independent" means:
+
+  | Independence flavour | Phase 1 (MADR 0083) | Phase 2 (this MADR) |
+  |---|---|---|
+  | Code-path independence | YES — `crates/finetype-core/src/infer.rs` has zero deps on `crates/finetype-model` | NO — inference reads model-computed attention output |
+  | Error-source independence | YES (default — different signals fail differently) | YES (preserved — sibling-context's error mode is column-graph topology, validator's is value-shape regex) |
+  | Score independence | YES (signals computed per-column, no cross-talk) | YES (sibling-context score is per-column scalar, computed once upstream) |
+
+  The triangulator's load-bearing claim — that the four signals fail
+  *for different reasons* on different inputs — survives the reframe.
+  The code-path independence was a Phase 1 constraint chosen for scope
+  discipline (don't entangle modules during early development), not a
+  permanent architectural axiom. Phase 2's empirical case justifies
+  relaxing it.
+
+  The reframe is also auditable: the inference module's source files
+  remain in `crates/finetype-core/`. The new dependency on
+  `crates/finetype-model/` for sibling-context is explicit at the crate
+  boundary (`Cargo.toml` dependency entry) and limited to the read path
+  of one cached scalar per column. The model's internals remain
+  encapsulated; the inference module reads a published surface.
+
+  Option B was rejected because the latency cost of duplicating
+  Model2Vec attention from scratch likely exceeds ac-06's 100ms median
+  budget — and would require its own cost-model paragraph that the
+  plausibility memo's modest expected-lift estimate does not justify.
+
+  Option C was rejected as the modal recommendation but stands as the
+  acceptable fallback if Phase 2 implementation surfaces evidence that
+  this MADR's reframe doesn't hold. Specifically: if measured
+  sibling-context lift on the failure_log measure half is <0.5 pp on
+  `non_unknown@0.5` (signal effectively absent), the implementing agent
+  should escalate via a sub-bead recommending a Phase 3 follow-on that
+  re-implements sibling-context properly (Option B) rather than ship a
+  contributing-zero signal.
+
+  ### Consequences
+
+  - Good, because the architectural fork MADR 0083 explicitly deferred
+    is now consciously made with empirical justification rather than
+    defaulted-into.
+  - Good, because the cost is small — sibling attention is a per-column
+    scalar already in memory by inference time; reading it is a HashMap
+    lookup, not a recomputation.
+  - Good, because the triangulator's load-bearing independence claim
+    (MADR 0079) is preserved under the reframe to error-source
+    independence. The four signals continue to fail for different
+    reasons on different inputs.
+  - Good, because the dependency is auditable at the crate boundary —
+    `crates/finetype-core` gains a single explicit dep on
+    `crates/finetype-model` for the sibling-attention reader. Future
+    agents can see the boundary in `Cargo.toml`.
+  - Bad, because code-path independence is permanently relinquished —
+    the inference module is no longer drop-in-replaceable without the
+    model. Future model architectures that don't expose sibling
+    attention break inference.
+  - Bad, because the inference module now has an implicit ordering
+    constraint: it must run AFTER the model's profile call (which
+    computes sibling attention). The cycle worker already enforces this
+    ordering, but it becomes a structural invariant, not a coincidence.
+  - Neutral, because the empirical lift estimate for sibling-context
+    is ≤2 pp by the plausibility memo's strict classifier. If the
+    reframe proves correct in implementation (sibling-context contributes
+    ≥0.5 pp on `non_unknown@0.5`), Phase 2 ships as designed. If not,
+    the Option-C fallback (escalate to Phase 3) is the documented
+    exit path.
+
+  ## References
+
+  - `.orbit/choices/0079-triangulator-architecture-for-autonomous-inference.md`
+    (the load-bearing independence claim)
+  - `.orbit/choices/0083-phase-1-signal-scope-lock.md` (the deferment
+    this MADR resolves)
+  - `.orbit/choices/0084-ac02-floor-empirical-recalibration.md` (the
+    empirical-evidence discipline this MADR honours)
+  - `.orbit/specs/2026-05-04-autonomous-type-inference/phase2_plausibility.md`
+    (per-signal lift estimates feeding this decision)
+  - `.orbit/cards/0016-phase-2-triangulator-signals.yaml` (the card whose
+    ac-02 [gate] this MADR satisfies)
+  - `crates/finetype-core/src/infer.rs` (where the new dependency on
+    `crates/finetype-model` will be declared)
+  - `crates/finetype-model/src/column.rs:435,546` (the `SiblingContextAttention`
+    attribute the inference module will read)
+references: []

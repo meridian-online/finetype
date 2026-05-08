@@ -4,7 +4,7 @@ sample_labelled_eval.py — sample 200 rows from failure_log.measure.tsv
 for hand-labelling per spec ac-13 / labelling_protocol.md.
 
 Output:
-  orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.unlabelled.tsv
+  .orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.unlabelled.tsv
 
 Rules:
 - Source: eval/gittables/failure_log.measure.tsv (bucket 1, never bucket 0)

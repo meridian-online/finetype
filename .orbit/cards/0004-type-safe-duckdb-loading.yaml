@@ -1,0 +1,40 @@
+feature: Type-safe DuckDB loading
+as_a: data analyst
+i_want: to generate a runnable DuckDB CREATE TABLE statement from a CSV file, with correct column types inferred automatically
+so_that: I can load data with proper types in one pipeline command instead of writing DDL by hand
+goal: Capability folds into validate (card 0005) — CSV → typed DuckDB table is now one verb, not two
+maturity: established
+scenarios:
+- name: Generate and execute CREATE TABLE (historical)
+  given: a CSV file with columns of mixed types
+  when: I ran finetype load -f data.csv | duckdb (≤ v0.6.18)
+  then: FineType profiled the file, generated a CREATE TABLE AS SELECT with type-correct casts, and piped it to DuckDB for execution
+  gate: false
+- name: Transformation contracts guarantee safe casts (historical)
+  given: a column detected as datetime.date.mdy_slash
+  when: the load command generated SQL
+  then: the transform expression strptime(col, '%m/%d/%Y')::DATE was guaranteed to succeed on the detected values (99.9% actionability) — same contract now applied by validate
+  gate: false
+- name: Custom table name (historical)
+  given: a CSV file
+  when: I ran finetype load -f data.csv --table-name my_table
+  then: the generated DDL used the specified table name — replaced by validate's --table flag
+  gate: false
+- name: Column name normalisation (historical)
+  given: a CSV with messy column headers
+  when: I ran finetype load
+  then: column names were normalised to DuckDB-safe identifiers by default — behaviour preserved in validate
+  gate: false
+specs:
+- .orbit/specs/2026-04-27-cli-pipeline-reshape/
+relations:
+- card: 0005-schema-driven-data-validation
+  type: superseded-by
+  reason: Retired in favour of successor card
+references:
+- README.md
+- CLAUDE.md
+- .orbit/choices/0036-delegate-normalize-names-to-duckdb.md
+- orbit/memos/2026-04-27-load-folds-into-validate.md
+- orbit/memos/2026-04-27-load-rethink-as-transform.md
+notes: []

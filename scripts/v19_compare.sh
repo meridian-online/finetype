@@ -22,7 +22,7 @@
 #   diagnostics/v19_per_column_diff.tsv    — Per-column three-way diff
 #   diagnostics/v19_per_domain_delta.tsv   — Per-domain delta table
 #
-# Spec: orbit/specs/2026-04-25-v19-paired-retrain/spec.yaml
+# Spec: .orbit/specs/2026-04-25-v19-paired-retrain/spec.yaml
 # Decision: 0066 (hard gate), 0068 (GELU+LN revisit)
 set -eo pipefail
 

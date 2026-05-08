@@ -1,0 +1,33 @@
+card: .orbit/cards/0014-profile-validate-precision.yaml
+autonomy: guided
+budget: 3
+iteration: 1
+current_spec: .orbit/specs/2026-04-28-validate-corpus-iter3/
+status: shipped
+pr: https://github.com/meridian-online/finetype/pull/60
+history:
+  - dir: .orbit/specs/2026-04-28-validate-corpus-iter3
+    result: GO
+    pr: https://github.com/meridian-online/finetype/pull/60
+    notes: |
+      14/14 ACs verified, 21 vci3_* tests pass, make ci exit 0.
+      Forked review-pr cycle 1 returned APPROVE with 3 LOW findings
+      (no blockers). Author greenlit PR creation.
+started: 2026-04-29T00:00:00Z
+review_cycles:
+  review_spec: 2
+  review_pr: 0
+review_cycle_dates:
+  review_spec: 2026-04-29
+  review_pr: 2026-04-29
+notes: |
+  Design stage completed inline during this session before drive was kicked off
+  (interview.md was saved with full Q&A + decisions + implementation notes
+  before drive.yaml existed). drive.yaml initialised at status: spec to pick up
+  from spec generation. iter-3 is the third spec under card 0014; iter-1
+  (validate-precision-corpus) and iter-2 (validate-corpus-curation) shipped
+  via PR #58 and #59 respectively.
+
+  Pre-drive review-spec on the stub spec (REQUEST_CHANGES, 3 HIGH/5 MED/2 LOW)
+  preserved at review-spec-2026-04-29-stub.md for audit trail. Drive cycle 1
+  generates a fresh review of the now-full spec.

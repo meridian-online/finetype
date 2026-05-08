@@ -30,7 +30,7 @@ the ordering is content-addressed). N defaults to 1000 to match Phase 1.
 Usage:
     python scripts/phase2_plausibility_scan.py --max-rows 1000 \
         --finetype-bin ./target/release/finetype \
-        --output orbit/specs/2026-05-04-autonomous-type-inference/phase2_plausibility.json
+        --output .orbit/specs/2026-05-04-autonomous-type-inference/phase2_plausibility.json
 """
 from __future__ import annotations
 

@@ -1,0 +1,4 @@
+key: finetype-retrain-authority-cron-agent-has-end-to
+body: 'finetype-retrain-authority: Cron agent has end-to-end retrain authority on M1 (Metal). Trigger: E01 — failure_log accumulates ≥20 distinct (predicted, observed-inferred) misclassification pairs OR ≥30% of last 48h reject volume from misclassification. Promote: B08 (m-19 ≥ -0.5%, gate ≥ 0%, vci3 pass, no per-type ≥5% regression). Hold: B09 (window). Halt: H05 (m-19 drop ≥1%, gate drop ≥2%, vci3 fail, per-type ≥5%). Plus H07 (model-SHA mismatch in eval report) + H11 (corrupted candidate model) + H12 (pipeline drift in prediction count). models/default symlink swap is the promotion mechanism. Authored 2026-05-03 in tabletop.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

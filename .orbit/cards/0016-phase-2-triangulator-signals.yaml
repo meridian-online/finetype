@@ -1,0 +1,43 @@
+feature: Phase 2 triangulator signals — generator-shape and sibling-context
+as_a: FineType cycle worker (and the auditor reading its failure_log + inference_signals sidecar)
+i_want: the autonomous type-inference module to triangulate over four signals (validator pass-rate, header-name match, generator-shape, sibling-context) instead of two, with score = w_v·v + w_h·h + w_g·g + w_s·s and w_v + w_h + w_g + w_s = 1.0
+so_that: more failing columns receive a high-confidence (≥0.7) inferred_correct_type, the cliff at threshold 0.5 visible in Phase 1's measurement lifts, and the bead's original 60% aspiration is either reached or empirically recategorised as a structural ceiling with a documenting MADR
+goal: Determine empirically whether 4-signal triangulation lifts non_unknown@0.7 toward the original 60% target on the measure half of failure_log.tsv. If yes — ship Phase 2 and restore ac-02 to 60%. If no — document the structural ceiling in a Phase 2 MADR, leaving ac-02 at the recalibrated 5% floor. Either way the cliff at threshold 0.5 must visibly lift — that is the falsifiable claim that the new signals carry information.
+maturity: emerging
+scenarios:
+- name: Empirical floor decision
+  given: Phase 2 module shipped with all four signals and design-time-locked weights, measured against failure_log.tsv's measure half (the same 10,660-row partition Phase 1 used)
+  when: I read progress.md's calibration sweep
+  then: the report concludes one of two ways — (a) ≥60% non-unknown at confidence ≥0.7 IS achieved, in which case Phase 2 ships and ac-02 returns to its original 60% number, OR (b) a new empirical ceiling X% < 60% is documented in a Phase 2 MADR naming the structural cause; no third path
+  gate: false
+- name: Cliff at threshold 0.5 lifts
+  given: Phase 1's measurement showed 98% non-unknown at threshold 0.4 and 20% at threshold 0.5 — a 78pp cliff signalling header-only-strong cases bunch just above fallback
+  when: I read Phase 2's (non_unknown_rate, threshold) curve on the same measure half
+  then: the area under the curve between thresholds 0.5 and 0.7 visibly grows, demonstrating that the new signals shifted score mass upward — this is Phase 2's load-bearing 'the signals carry information' evidence, independent of whether the headline 60% is met
+  gate: false
+- name: Each new signal has independent diagnostic value
+  given: a failing column Phase 1 emitted as 'unknown' or below-threshold
+  when: the Phase 2 module re-infers the same column and the inference now clears ≥0.7
+  then: the sidecar's per-signal score breakdown attributes the lift to a specific signal (generator-shape OR sibling-context, not 'four-signals-collectively') — disabling either signal in isolation produces a predictable subset of regressions, and the auditor can answer 'which signal saved this column?'
+  gate: false
+- name: Latency budget preserved
+  given: the Phase 2 module loaded into the cycle worker, generator-shape pulling from crates/finetype-core/src/generator.rs and sibling-context drawing on already-loaded Model2Vec embeddings
+  when: I run the 1000-column M1 benchmark inherited from Phase 1's ac-05
+  then: median per-column latency stays under 100ms — Phase 2's two added signals fit inside the original budget without escalating to a long-lived inference server (if they don't, the breach itself is a Phase 2 finding requiring an architectural MADR before ship)
+  gate: false
+- name: Phase 1 infrastructure remains a stable foundation
+  given: Phase 1's `finetype infer-type` CLI subcommand, sidecar TSV schema, calibrate/measure split, B01/B04 cycle-worker integration, and 9-rule mechanism cascade
+  when: Phase 2 ships
+  then: the changes are additive — sidecar gains `generator_shape` and `sibling_context` score columns (existing 12-column schema preserved by append), CLI surface is backward-compatible, the canonical-email smoke test still passes, the cascade gains rules for the new signals without retiring existing ones — a downstream consumer of Phase 1's sidecar format keeps working unchanged
+  gate: false
+specs: []
+relations: []
+references:
+- .orbit/choices/0079-triangulator-architecture-for-autonomous-inference.md (locked weights w_v=0.4, w_h=0.6 for Phase 1; Phase 2 extends invariant to 4 signals)
+- .orbit/choices/0083-phase-1-signal-scope-lock.md (defers generator-shape and sibling-context to Phase 2; spells out forward-compatible weight invariant)
+- .orbit/choices/0084-ac02-floor-empirical-recalibration.md (Phase 2 case is data-backed; cliff at 0.5 is the structural cause)
+- .orbit/specs/2026-05-04-autonomous-type-inference/ (Phase 1 spec — infrastructure to be reused)
+- finetype-7zi.3 (Phase 2 placeholder bead — to be closed as superseded once this card is promoted)
+- crates/finetype-core/src/generator.rs (generator-shape signal source)
+- Model2Vec sibling attention loaded in cycle worker (sibling-context signal source)
+notes: []

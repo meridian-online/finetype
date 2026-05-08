@@ -1,0 +1,517 @@
+goal: |
+  Ship a deterministic, autonomous type-inference module that fills
+  `failure_log.tsv`'s `inferred_correct_type` and `mechanism` columns
+  with meaningful values (replacing the hardcoded "unknown" /
+  "value-shape" placeholders), so that E01a in the 2026-05-10
+  GitTables 90% round-trip contract can fire on real (predicted,
+  inferred) pair-distinctness instead of degenerating to "20 distinct
+  predicted types". Phase 1 is a triangulator over two cheap signals
+  (validator pass-rate + header-name match) that uses the model's
+  prediction as a structural prior. Mechanism vocabulary aligns with
+  MADR 0075's rule-emitted cascade tokens and extends with three
+  triangulator-specific tokens; rule-cascade order makes mechanism
+  selection deterministic. Per-row confidence and signal subscores
+  are written to a sidecar `inference_signals.tsv` so failure_log's
+  9-column schema is never altered (avoiding any conflict with the
+  contract's H08 append-only invariant).
+
+constraints:
+  - "Deterministic. Same inputs MUST produce byte-identical output (taxonomy ID, confidence rounded to 4 decimal places, mechanism, signal subscores)."
+  - "<100ms median per column on M1, measured over a 1000-column benchmark whose invocation pattern matches the cycle worker's production code path (one subprocess invocation per column for subprocess form; one socket round-trip per column for server form)."
+  - "Phase 1 signals limited to validator pass-rate + header-name match. Generator-shape and sibling-context are explicitly Phase 2 (out of scope here) and only revisited if the calibration sweep cannot reach the floor with the Phase 1 pair."
+  - "Read-only on the taxonomy. The module MAY emit mechanism=`validator_widening` to flag a suspect validator but MUST NOT amend `labels/definitions_*.yaml`, the generator code, or any taxonomy artefact. Validator widening remains human-attended via E04 + tabletop."
+  - "Stay on B01/B04 logging surfaces. Do not extend logging to B02-candidates in this bead. MADR 0078 policy stands."
+  - "Mechanism vocabulary MUST emit only rule-emitted tokens from MADR 0075's closed cascade (`enum_overfit`, `format_diversity_path_a`, `format_diversity_path_b`, `code_vs_canonical_path_a`, `code_vs_canonical_path_b`, `misclassification`, `fallthrough`) PLUS three triangulator-specific extensions (`validator_widening`, `prediction_confirmed`, `unknown_no_fit`). Display roll-ups (`format_diversity`, `code_vs_canonical`) are NEVER emitted."
+  - "Triangulator architecture, not from-scratch type-finder. The model's prediction is a structural prior; the inferred type is selected from the triangulator's argmax with deterministic tie-breaking (lexicographically smaller taxonomy ID wins). The model's prediction has no special status in the argmax — if the triangulator disagrees, the disagreement *is* the signal (mechanism = `misclassification` or path-b variants per ac-09's cascade)."
+  - "Generic fallback policy. When no candidate type achieves score ≥ `fallback_threshold` (= 0.4), emit `inferred_correct_type=representation.text.string` at confidence 0.3 with mechanism=`unknown_no_fit`. Reserve `inferred_correct_type=unknown` (with confidence 0.0, mechanism=`fallthrough`) for the case where the column has no observed values — this is checked as a PRECONDITION before the cascade runs, not as the last cascade rule."
+  - "Locked aggregation weights. Default weights are LOCKED at `w_v=0.4, w_h=0.6` for Phase 1. Header is weighted higher than validator pass-rate because the titanic/airports evidence in `interview.md` Q3 establishes validators as the more error-prone of the two signals. Deviations from these weights require a separate decision (MADR amendment); they cannot be selected by the implementing agent against any subset of `failure_log.tsv`. The descriptive sweep that runs on the calibrate half is for the curve in `progress.md`, not for weight selection."
+  - "Threshold token register (decoupled). Three distinct thresholds with three distinct numbers and named constants: `fallback_threshold = 0.4` (Rule 9 fires when `max_score < 0.4`); `smoke_min_confidence = 0.5` (ac-06 smoke-test floor); `ac02_threshold = 0.7` (ac-02 held-out floor). Names appear in source code as `const`s; the numbers are not reused for any other purpose."
+  - "Sample truncation. Inference module truncates `samples` to N=8 (matches the cycle worker's `OBSERVED_SAMPLE_LIMIT` at `scripts/cron_cycle_work.py:80`) before validator scan. The same N is used for the descriptive sweep, the labelled-eval grading, the smoke test, and production cycles."
+  - "failure_log.tsv schema is unchanged. The 9 columns (cycle_id, timestamp, file_path, file_content_sha256, column_name, predicted_type, observed_values_sample, inferred_correct_type, mechanism) are preserved in order; this bead changes only the *content* of the last two (no longer hardcoded). Confidence and signal subscores live in a sidecar `eval/gittables/inference_signals.tsv` (append-only, new file from day 1)."
+  - "Calibration partition. `failure_log.tsv` is partitioned deterministically by `file_content_sha256 MOD 2`: bucket 0 = calibrate (descriptive sweep, curve in progress.md), bucket 1 = measure (ac-02 floor, ac-13 labelled-eval pool). Weight selection is locked (see prior constraint); the partition exists for measure-half evaluation integrity."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: doc
+    description: |
+      A specification document exists naming the candidate approach as
+      "triangulator over validator pass-rate + header-name match (Phase
+      1)". This `spec.yaml` plus the linked `interview.md` satisfy the
+      bead's spec-doc requirement.
+    verification: |
+      File `.orbit/specs/2026-05-04-autonomous-type-inference/spec.yaml`
+      exists and `goal:` field names "triangulator" architecture and
+      Phase 1 signal pair.
+
+  - id: ac-02
+    ac_type: code
+    description: |
+      Inference module produces non-`unknown` `inferred_correct_type`
+      on ≥5% of B01/B04 entries from the MEASURE half of
+      `eval/gittables/failure_log.tsv` (rows where
+      `file_content_sha256` SHA-bucket MOD 2 == 1) at confidence ≥
+      `ac02_threshold` (= 0.7), with the locked weights
+      `w_v=0.4, w_h=0.6` (per ac-07). This is a confirmation floor —
+      it asserts the module is decisive enough on at least one in
+      twenty failure_log rows to feed E01a's "≥20 distinct
+      (predicted, inferred) pairs" trigger. The 60% target this AC
+      previously carried was an unbacked aspiration set during spec
+      drafting without empirical data; recalibrated to 5% by MADR
+      0084 after the v1.3 implementation surfaced a structural cap
+      (header-only cases score ≤0.6 under the locked weights). The
+      descriptive sweep additionally reports the (non_unknown_rate,
+      threshold) curve in `progress.md`, computed on the calibrate
+      half (bucket 0) for educational reference and as evidence for
+      the Phase 2 case (see follow-on bead filed at close).
+    verification: |
+      `scripts/bench_infer_floor.py` (new) splits `failure_log.tsv` by
+      `file_content_sha256` MOD 2 (calibrate=0, measure=1; deterministic,
+      leak-free), runs `finetype infer-type` over each row of the measure
+      half using `predicted_type`, `column_name`, and
+      `observed_values_sample` as inputs, and tallies rows with
+      `inferred_correct_type != "unknown"` AND `confidence >= 0.7`.
+      Asserts ratio ≥ 0.05 on the measure half (the recalibrated floor
+      per MADR 0084). Curve recorded in `progress.md` as a table with
+      columns (threshold, measure_half_non_unknown_rate,
+      calibrate_half_non_unknown_rate) and a one-line note if
+      calibrate-vs-measure differ by >5pp (suggests overfit; document
+      the deviation).
+
+  - id: ac-03
+    ac_type: code
+    description: |
+      `scripts/cron_cycle_work.py` integrates the inference module at
+      both B01 (currently lines 376-391) and B04 (currently lines
+      403-418) failure_log append sites. The two structurally
+      identical loops are refactored into a single helper that calls
+      inference before appending. The hardcoded
+      `"inferred_correct_type": "unknown"` and
+      `"mechanism": "value-shape"` literals are removed. The cycle
+      worker also writes a corresponding row to
+      `eval/gittables/inference_signals.tsv` for each B01/B04 column.
+    verification: |
+      `grep -n '"inferred_correct_type": "unknown"' scripts/cron_cycle_work.py`
+      returns no matches. `grep -n '"mechanism": "value-shape"' scripts/cron_cycle_work.py`
+      returns no matches. A single helper function
+      (e.g. `_infer_and_build_failure_row()`) is invoked from both B01
+      and B04 branches. After running one full cycle on a 100-file
+      sample, `inference_signals.tsv` row count equals
+      failure_log.tsv row count for that cycle_id.
+
+  - id: ac-04
+    ac_type: gate
+    description: |
+      Inference is deterministic. Re-running the module on the same
+      input column produces byte-identical output (taxonomy ID,
+      confidence rounded to 4 decimal places, mechanism, signal
+      subscores). Floating-point determinism is enforced by:
+        (i) candidate types are iterated in lexicographic order of
+            taxonomy ID at scoring time (not just at tie-break);
+        (ii) each candidate's `score` is rounded to 4 decimal places
+             BEFORE the argmax comparison, eliminating sub-ulp
+             differences that could otherwise flip argmax across
+             runs;
+        (iii) tie-breaking on equal-rounded-score: lexicographically
+              smaller taxonomy ID wins.
+    verification: |
+      A unit/integration test invokes `finetype infer` twice on a
+      golden fixture column (≥10 rows) and asserts byte-identical
+      stdout. A second test verifies the lexicographic tie-break by
+      constructing a synthetic column where two types score
+      identically post-rounding. A third test stress-tests
+      determinism across 100 rounds on a column whose raw scores
+      differ from another candidate by less than 1e-5 (the
+      sub-ulp window the rounding eliminates), asserting argmax is
+      stable across all 100 rounds. Test runs in CI and as part of
+      the cycle preamble smoke check (ac-06).
+
+  - id: ac-05
+    ac_type: gate
+    description: |
+      Median latency <100ms per column on M1 over a 1000-column
+      benchmark sampled from `failure_log.tsv` (calibrate half;
+      measure half is reserved for ac-02). Benchmark MUST invoke the
+      same code path the cycle worker uses in production: one
+      subprocess invocation per column for subprocess form, OR one
+      socket round-trip per column for server form. The benchmarked
+      invocation pattern is recorded in `progress.md` alongside p50
+      and p95 numbers.
+    verification: |
+      `scripts/bench_infer.py` (new) measures p50 and p95 latency over
+      1000 random rows from the calibrate half of `failure_log.tsv`,
+      using the same Python entry point as `cron_cycle_work.py`.
+      Reports median (must be <100ms) and p95 in `progress.md`. If
+      subprocess form breaches, escalate to long-lived `finetype
+      infer-server` started from cycle preamble (Unix socket); the
+      breach + escalation are logged in `progress.md`.
+
+  - id: ac-06
+    ac_type: gate
+    description: |
+      Smoke test wired into `scripts/cron_preamble.sh`. Module loads,
+      sanity-infers one canned column (canonical email), returns the
+      expected type with high confidence and the deterministic
+      `prediction_confirmed` mechanism. Failing the smoke check halts
+      the cycle (H05 family). Smoke test is a load + correctness
+      check; the validator-broken cases (titanic Sex / airports
+      timezone) are exercised by `labelled_eval.tsv` (ac-13) and the
+      held-out floor (ac-02), not here.
+    verification: |
+      `scripts/cron_preamble.sh` invokes `finetype infer` with a canned
+      input: `column_name="email"`,
+      `predicted_type="identity.person.email"` (verified in
+      `labels/definitions_identity.yaml:132`; aliases include
+      `email_address`), samples=["alice@example.com",
+      "bob@example.com", "carol@example.com", "dave@example.org",
+      "eve@example.net", "frank@example.com", "grace@example.io",
+      "henry@example.com"]. Asserts:
+      `inferred_correct_type == "identity.person.email"`,
+      `confidence >= smoke_min_confidence` (= 0.5),
+      mechanism == `prediction_confirmed`. Math under locked weights:
+      validator passes 100% on canonical addresses (`v=1.0`), header
+      `email` overlaps the label-tail tokens of `identity.person.email`
+      (under Jaccard `h=1/3≈0.33` minimum; under overlap-on-min
+      `h=1.0`; either way `score ≥ 0.4·1.0 + 0.6·0.33 = 0.6 ≥ 0.5`).
+      Rule 8 (prediction_confirmed) fires because predicted==inferred
+      AND validator_pass_rate ≥ 0.7. Non-zero exit halts the cycle.
+
+  - id: ac-07
+    ac_type: code
+    description: |
+      Triangulator architecture: Phase 1 inference fuses
+      `validator_pass_rate` and `header_match` via a weighted sum
+      `score(type) = w_v · validator_pass_rate(type) + w_h ·
+      header_match(type)` where `w_v + w_h = 1.0` is invariant. Weights
+      are LOCKED at `w_v=0.4, w_h=0.6` for this bead (rationale in
+      constraint block: titanic/airports evidence in interview.md Q3
+      establishes validators as the more error-prone signal, so header
+      is weighted higher). The implementing agent does not run a
+      weight-selection sweep; the descriptive sweep on the calibrate
+      half exists only to populate the curve in `progress.md` for
+      future Phase-2 calibration work. Confidence is `max_type score`.
+      Inferred type is the argmax with lexicographic tie-break (ac-04).
+    verification: |
+      Inspection of `crates/finetype-core/src/infer.rs` shows the
+      weighted-sum form with `w_v=0.4, w_h=0.6` named as
+      module-level `const`s. `progress.md` records: (a) the
+      descriptive sweep grid on the calibrate half (purely curve);
+      (b) measure-half non_unknown_rate at the locked weights
+      (must satisfy ac-02). NO rationale block for weight
+      "selection" — the weights are locked.
+
+  - id: ac-08
+    ac_type: code
+    description: |
+      Read-only validator authority. The module emits mechanism =
+      `validator_widening` when ALL of: (a) predicted_type's validator
+      rejects ≥50% of samples; AND (b) header-name match for the
+      predicted_type is ≥0.7; AND (c) the inferred type (argmax)
+      equals the predicted type. The module MUST NOT modify any file
+      under `labels/`, `crates/finetype-core/src/`, or otherwise
+      mutate validator state. Note: when (a) and (c) hold but (b)
+      does not, the cascade falls through to MADR 0075's
+      `enum_overfit` (rule 1) or `format_diversity_path_a` (rule 4)
+      depending on validator type — that's the intended behaviour.
+    verification: |
+      Module's source has no write-paths into `labels/`, `crates/`,
+      or generator tables (audited via `grep` against the file
+      list). A unit test on the Sex titanic column (predicted gender,
+      validator rejects 100%, header `Sex` matches `gender` strongly,
+      gender argmax) asserts mechanism = `validator_widening`. A
+      negative test on a column where header-match score < 0.7
+      asserts mechanism = `enum_overfit` or
+      `format_diversity_path_a` (whichever 0075 rule fires).
+
+  - id: ac-09
+    ac_type: code
+    description: |
+      Mechanism vocabulary is the closed set of MADR 0075's
+      rule-emitted tokens plus three triangulator-specific extensions.
+      ALLOWED values:
+      `enum_overfit`, `format_diversity_path_a`, `format_diversity_path_b`,
+      `code_vs_canonical_path_a`, `code_vs_canonical_path_b`,
+      `misclassification`, `fallthrough` (from MADR 0075);
+      `validator_widening`, `prediction_confirmed`, `unknown_no_fit`
+      (triangulator-specific). NO display roll-ups (`format_diversity`,
+      `code_vs_canonical`) are ever emitted. Mechanism selection is:
+
+        PRECONDITION: if `samples` is empty after truncation
+        (ac-15), short-circuit with mechanism=`fallthrough`,
+        inferred_correct_type=`unknown`, confidence=0.0. Cascade
+        does not run. This precondition is structurally separate
+        from the rule cascade because no candidate scores can be
+        computed when there is nothing to score.
+
+        Otherwise, the rule cascade fires in this priority order
+        (first-fire wins; `max_score` is the max weighted score
+        across the candidate pool):
+
+        Rule 1: unknown_no_fit          — `max_score <
+                                          fallback_threshold` (= 0.4);
+                                          emit
+                                          inferred=`representation.text.string`,
+                                          confidence=0.3.
+        Rule 2: validator_widening      — ac-08 conditions hold
+                                          (predicted's validator
+                                          rejects ≥50% AND header_match
+                                          for predicted is ≥0.7 AND
+                                          argmax == predicted).
+        Rule 3: enum_overfit            — predicted == inferred,
+                                          predicted's validator is
+                                          enum-typed, ≥50% reject
+                                          (per MADR 0075 rule 1).
+        Rule 4: format_diversity_path_b — predicted != inferred,
+                                          predicted/inferred share
+                                          broad prefix
+                                          (per MADR 0075 rule 2).
+        Rule 5: code_vs_canonical_path_b — predicted != inferred,
+                                          predicted/inferred form a
+                                          code-vs-canonical XOR
+                                          allowlist pair
+                                          (per MADR 0075 rule 3).
+        Rule 6: format_diversity_path_a — predicted == inferred,
+                                          regex reject, no seam
+                                          (per MADR 0075 rule 4).
+        Rule 7: code_vs_canonical_path_a — predicted == inferred,
+                                          regex reject, seam detected
+                                          (per MADR 0075 rule 5).
+        Rule 8: prediction_confirmed    — predicted == inferred,
+                                          validator pass-rate ≥0.7.
+        Rule 9: misclassification       — predicted != inferred,
+                                          catch-all (per MADR 0075
+                                          rule 6).
+    verification: |
+      `crates/finetype-core/src/infer.rs` defines a closed enum (or
+      `&'static str` slice with exhaustive match) over the 10 allowed
+      labels. The cascade order is encoded as a `RULES: &[RuleFn]`
+      slice (matching MADR 0075's rule-owned-trigger doctrine), with
+      the empty-samples precondition checked before slice traversal.
+      One unit test per rule asserts the rule fires on a constructed
+      input and is gated out by the previous rules. One unit test
+      asserts the precondition fires on empty samples and the cascade
+      is skipped. A property test over 1000 random columns from the
+      calibrate half asserts every emitted mechanism is in the closed
+      set.
+
+  - id: ac-10
+    ac_type: code
+    description: |
+      Fallback policy. Rule 1 of the cascade (ac-09) emits
+      `inferred_correct_type = "representation.text.string"`,
+      confidence = 0.3 (exact), mechanism = `unknown_no_fit` when
+      `max_score < fallback_threshold` (= 0.4). The
+      empty-samples PRECONDITION (structurally before the cascade)
+      emits `inferred_correct_type = "unknown"`, confidence = 0.0,
+      mechanism = `fallthrough`.
+    verification: |
+      Two unit tests: (a) a column where every candidate scores
+      below 0.4 asserts
+      `inferred_correct_type=="representation.text.string"`,
+      `confidence==0.3`, `mechanism=="unknown_no_fit"`; (b) a column
+      with empty `samples` asserts `inferred_correct_type=="unknown"`,
+      `confidence==0.0`, `mechanism=="fallthrough"`, AND the cascade's
+      rule slice was not entered (instrumented via a counter or trace
+      flag).
+
+  - id: ac-11
+    ac_type: code
+    description: |
+      Phase 1 signal scope is locked to validator pass-rate +
+      header-name match. The module's source MUST NOT reference
+      generator-shape extraction, sibling-context attention, or
+      Model2Vec embeddings. Phase 2 signals are explicitly out of
+      scope and surface as TODO comments only if their integration
+      points need to be sketched.
+    verification: |
+      `grep -ri 'generator_shape\|sibling_context\|model2vec' crates/finetype-core/src/infer.rs`
+      returns only TODO comments (or no matches). Module compiles
+      without depending on `generator.rs`'s public surface beyond
+      what `validator.rs` and `taxonomy.rs` already expose.
+
+  - id: ac-12
+    ac_type: code
+    description: |
+      Sidecar inference signals file `eval/gittables/inference_signals.tsv`
+      is created (new file, append-only from day 1) with schema:
+      `cycle_id`, `timestamp`, `file_path`, `file_content_sha256`,
+      `column_name`, `predicted_type`, `inferred_correct_type`,
+      `confidence`, `mechanism`, `validator_pass_rate`, `header_match`,
+      `top_k_json`. failure_log.tsv's existing 9-column schema is
+      UNCHANGED — this bead modifies only the *content* of the
+      `inferred_correct_type` and `mechanism` columns (no longer
+      hardcoded). The new sidecar respects the contract's H08/H09
+      append-only invariant by being append-only from creation; no
+      existing append-only file is rewritten.
+    verification: |
+      `eval/gittables/inference_signals.tsv` exists after the first
+      integration cycle. Its header has the 12 columns above in
+      order. `head -1 eval/gittables/failure_log.tsv` BEFORE and AFTER
+      this bead lands shows the same 9-column header. After 3
+      integration cycles (the same window required by the
+      cycle-preamble smoke gate in exit_conditions), the
+      `progress.md` audit performs:
+        (a) FULL OUTER JOIN inference_signals.tsv with failure_log.tsv
+            (filtered to outcome IN {B01, B04}) on
+            `(cycle_id, file_path, file_content_sha256, column_name)`;
+            asserts no rows have null on either side (every B01/B04
+            failure row has a sidecar row, and every sidecar row has a
+            failure row);
+        (b) `SELECT COUNT(*) FROM inference_signals` equals
+            `SELECT COUNT(DISTINCT (cycle_id, file_path,
+             file_content_sha256, column_name)) FROM inference_signals`
+            (key uniqueness within the sidecar; no duplicate rows);
+        (c) row counts in failure_log.tsv (B01/B04 only) and
+            inference_signals.tsv match exactly per cycle_id, for all
+            3 cycles.
+      Including `file_content_sha256` in the join key prevents
+      same-path-different-content collisions within a single cycle.
+
+  - id: ac-13
+    ac_type: doc
+    description: |
+      Ground-truth labelled eval subset published at
+      `.orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.tsv`.
+      200 rows sampled from the MEASURE half of `failure_log.tsv`
+      (`file_content_sha256` MOD 2 == 1; never the calibrate half),
+      stratified by `predicted_type` to cover ≥30 distinct types.
+      Columns: original 9 columns from failure_log.tsv plus
+      `truth_inferred_type`, `truth_mechanism`, `labeller`,
+      `labelled_at`, `note`. Sibling file `labelling_protocol.md`
+      documents: (i) labelling rubric; (ii) tie-break rules when more
+      than one taxonomy type fits; (iii) protocol for unclear rows
+      (resolution: emit `unknown` as `truth_inferred_type` with
+      `note` explaining); (iv) sampling seed. `progress.md` reports
+      precision-on-labelled (= fraction where module's
+      `inferred_correct_type` matches `truth_inferred_type`) at the
+      ac-02 threshold.
+    verification: |
+      `labelled_eval.tsv` exists with ≥200 rows and ≥30 distinct
+      `predicted_type` values; every row's `file_content_sha256` MOD 2
+      equals 1 (held-out only). `labelling_protocol.md` exists and
+      covers the four rubric points above. `progress.md` reports
+      precision-on-labelled. Sampling seed and labeller attestation
+      documented.
+
+  - id: ac-14
+    ac_type: doc
+    description: |
+      Five MADR records authored, one per non-trivial design decision
+      (D1-D5) surfaced in `interview.md`. (D6 — "B01/B04 only,
+      MADR 0078 policy stands" — is a non-decision and does not
+      warrant a record; its rationale lives in this spec's constraint
+      block and the existing MADR 0078.) Each MADR includes context,
+      considered options, decision outcome, and consequences. Status:
+      at minimum `proposed`; `accepted` once the spec lands.
+    verification: |
+      Five new files exist under `.orbit/choices/` covering: (D1)
+      triangulator architecture; (D2) read-only validator authority;
+      (D3) mechanism vocabulary alignment with MADR 0075's
+      rule-emitted tokens (not display roll-ups); (D4) generic
+      fallback policy with cascade Rule-9/Rule-10 split; (D5)
+      Phase 1 signal scope lock. `progress.md` lists the file paths
+      and statuses.
+
+  - id: ac-15
+    ac_type: code
+    description: |
+      Sample truncation is enforced inside the inference module
+      before any validator scan. The module truncates the input
+      `samples` array to N=8 entries (matches
+      `OBSERVED_SAMPLE_LIMIT` at `scripts/cron_cycle_work.py:80`).
+      The same N is applied uniformly across the calibration sweep
+      (ac-07), the floor benchmark (ac-02), the latency benchmark
+      (ac-05), the labelled eval (ac-13), and the smoke test (ac-06).
+    verification: |
+      `crates/finetype-core/src/infer.rs` source contains a
+      truncation step at module entry with `N = 8` named as a
+      module-level constant matching the cycle worker's
+      `OBSERVED_SAMPLE_LIMIT`. A unit test passes a 100-element
+      `samples` array and asserts validator-scan call count
+      corresponds to 8 samples × 240 types = 1920, not
+      100 × 240 = 24000.
+
+implementation_notes:
+  - "Append sites — `scripts/cron_cycle_work.py` lines 376-391 (B01) and 403-418 (B04) build failure_row dicts with hardcoded inferred_correct_type=\"unknown\" / mechanism=\"value-shape\". Refactor into one helper, e.g. `_infer_and_build_failure_row(column_name, predicted_type, observed_values, harvest_samples) -> (failure_row, signal_row)`."
+  - "Existing primitives — `crates/finetype-core/src/validator.rs` (48KB) is already loaded by the runtime as \"240 validators cached, 6 with locale validators\". Reuse this loader; do not re-instantiate."
+  - "Taxonomy labels — `crates/finetype-core/src/taxonomy.rs` (55KB) holds 240 type definitions. Header-match signal: tokenise column_name (snake_case → tokens, lowercase), tokenise the taxonomy label tail (`identity.person.gender` → tokens [identity, person, gender]), score by token-set Jaccard or weighted-overlap. Calibration sweep determines whether to weight tail tokens (rightmost = leaf) more heavily."
+  - "Surface — Rust binary subcommand `finetype infer` reading JSON from stdin and returning JSON to stdout. JSON shape: input `{column_name, predicted_type, samples}` (samples truncated by the binary to N=8 per ac-15), output `{inferred_correct_type, confidence, mechanism, signals: {validator_pass_rate, header_match, top_k: [{type, score}, ...]}}`. Cycle worker (Python) shells out per column. If subprocess fork breaches ac-05, escalate to long-lived `finetype infer-server` started from cron_preamble.sh."
+  - "Determinism — closed-set tie-break on argmax: when two types have equal score, pick the lexicographically smaller taxonomy ID. Hash inputs into a fixture cache for ac-04's golden test."
+  - "Calibration corpus split — `eval/gittables/failure_log.tsv` partitioned deterministically by `file_content_sha256 MOD 2`: bucket 0 = calibrate (weight tuning, ac-07), bucket 1 = measure (ac-02 floor, ac-13 labelled-eval pool). Implementing agent generates the partition once via `scripts/split_failure_log.py` (new, deterministic), records the row counts of each half in `progress.md`."
+  - "MADR 0075 cascade as scaffolding — the inference module's rule-cascade (ac-09) is structurally a superset of the existing `crates/finetype-eval/src/mechanism_cascade.rs` (or wherever 0075's cascade lives). Implementing agent should consider extracting a shared cascade primitive: 0075's cascade runs (predicted, expected, samples) → mechanism; this module runs (predicted, samples) → (expected, mechanism). Same rule predicates, different argument shape."
+  - "Smoke-test fixture — canned `email` column. Header tokenises to `[email]` which overlaps directly with the canonical email type's label tail (e.g. `identity.contact.email_address` → tokens `[identity, contact, email_address]` or `[identity, contact, email, address]` depending on tokeniser; either way, `email` is a tail token). Validator passes 100% on well-formed addresses. Math under locked weights: `score = 0.4·1.0 + 0.6·~1.0 = ~1.0`. Cascade fires Rule 8 (prediction_confirmed) because predicted==inferred AND validator_pass_rate ≥0.7. Smoke test is deterministic and uncoupled from validator-quirk cases. The validator-broken cases (titanic Sex, airports timezone, ecommerce status→periodicity) are exercised by `labelled_eval.tsv` (ac-13) and the held-out floor (ac-02)."
+  - "MADR drafting — start with D3 (mechanism vocabulary alignment) since it cites the rule cascade form that D1 (triangulator) builds on. Then D1, D2, D4, D5. Each MADR ≤120 lines; cite `interview.md` Q-numbers in Context."
+  - "Latency budget breakdown — phase 1 cost model with N=8 (ac-15): 240 validator regex/enum runs × 8 sample values = 1920 regex evaluations per column. RustC regex on M1 is ~1µs per match → ~2ms. Plus header-match (one taxonomy scan) ≈ 1ms. Plus JSON serialisation ≈ 5-20ms. Total ~25ms — well under 100ms even with subprocess overhead. The N=8 cap is what makes this worst-case predictable."
+  - "Sidecar file initialization — `inference_signals.tsv` created by `scripts/cron_preamble.sh` with header row if not present (idempotent). New file from day 1; never rewritten; always appended."
+
+ontology_schema:
+  name: "InferenceOutput"
+  description: |
+    Per-column inference result emitted by `finetype infer`. The
+    cycle worker decomposes this into two append targets: the
+    existing `failure_log.tsv` (gets `inferred_correct_type` +
+    `mechanism` content; schema unchanged) and the new sidecar
+    `inference_signals.tsv` (gets `confidence` + signal subscores).
+  fields:
+    - name: "inferred_correct_type"
+      type: "string"
+      description: |
+        Taxonomy type ID (e.g. `identity.person.gender`) OR the generic
+        fallback `representation.text.string` (Rule 1: `max_score <
+        fallback_threshold`) OR the literal `unknown` (precondition
+        guard: empty `samples`).
+    - name: "confidence"
+      type: "float"
+      description: |
+        Range [0.0, 1.0]. Weighted aggregate of phase-1 signal scores
+        per ac-07 (`w_v=0.4, w_h=0.6` locked). Special values: 0.3
+        for Rule-1 (unknown_no_fit) fallback emissions; 0.0 for
+        empty-samples fallthrough (precondition guard).
+    - name: "mechanism"
+      type: "string"
+      description: |
+        One of the 10-element closed set defined in ac-09's cascade.
+        Rule order is deterministic; first-fire wins.
+    - name: "signals"
+      type: "object"
+      description: |
+        Sub-scores by signal: `{validator_pass_rate: float ∈ [0,1],
+        header_match: float ∈ [0,1], top_k: [{type, score}, ...]}`.
+        `top_k` lists the highest-scoring 5 candidate types for
+        diagnostic transparency. Stored in the sidecar
+        `inference_signals.tsv`, never in `failure_log.tsv`.
+
+evaluation_principles:
+  - principle: "Decisiveness on held-out — fraction of measure-half failure_log entries with non-unknown inference at confidence ≥0.7 (must hit floor 0.60 per ac-02)"
+    weight: 0.35
+  - principle: "Precision-on-labelled — fraction of correct inferences on the 200-entry hand-labelled subset, sampled from measure half only (no AC threshold; reported as a calibration check)"
+    weight: 0.35
+  - principle: "Determinism — byte-identical output on rerun (binary AC ac-04, but inspected first when failures surface)"
+    weight: 0.15
+  - principle: "Latency — <100ms median per column on M1 with production-shape benchmark (ac-05)"
+    weight: 0.15
+
+exit_conditions:
+  - "All 15 acceptance criteria pass."
+  - "Five MADRs (D1-D5) authored and `accepted`. (D6 dropped as a non-decision per ac-14.)"
+  - "`progress.md` captures: (a) calibration curve table on calibrate half — non_unknown_rate × threshold; (b) measure-half non_unknown_rate at the chosen threshold (ac-02 evidence); (c) precision-on-labelled at the ac-02 threshold (ac-13); (d) latency p50/p95 with production code path noted (ac-05); (e) chosen weights with one-line rationale (ac-07); (f) link to `labelled_eval.tsv` and `labelling_protocol.md`; (g) row counts in calibrate vs measure halves of failure_log.tsv."
+  - "Cycle preamble smoke test green for 3 consecutive cron cycles before bead close. Failure on any of the 3 reverts the merge and re-opens the bead."
+  - "Bead's stored `acceptance_criteria` field updated via `bd update finetype-7zi --acceptance` to the orbit-convention list (`- [ ] ac-NN [gate]: description`) reflecting the 15 ACs in this spec, with `[gate]` markers on ac-04, ac-05, ac-06."
+
+metadata:
+  version: "1.4"
+  test_prefix: "infer"
+  timestamp: "2026-05-04T00:00:00Z"
+  ambiguity_score: 0.04
+  interview_ref: ".orbit/specs/2026-05-04-autonomous-type-inference/interview.md"
+  bead_ref: "finetype-7zi"
+  parent_contract: "orbit/contracts/2026-05-10-gittables-90-percent-roundtrip.yaml"
+  related_decisions:
+    - ".orbit/choices/0075-mechanism-bucket-coalesce.md"
+    - ".orbit/choices/0078-validator-alternations-compose-canonical-sibling-patterns.md"
+    - ".orbit/choices/0042-deprecate-regex-header-hints.md"
+    - ".orbit/choices/0048-value-based-rules-only.md"
+  review_history:
+    - "review-spec-2026-05-04.md (v1.0 → v1.1 — REQUEST_CHANGES, 4 HIGH / 3 MEDIUM / 4 LOW; all addressed)"
+    - "review-spec-2026-05-04-v2.md (v1.1 → v1.2 — REQUEST_CHANGES, 1 HIGH / 4 MEDIUM / 1 LOW; all addressed via locked weights w_v=0.4,w_h=0.6, decoupled threshold register, precondition-guard for empty samples, sidecar SHA join key)"
+    - "review-spec-2026-05-04-v3.md (v1.2 → v1.3 — REQUEST_CHANGES, 1 HIGH / 1 MEDIUM / 1 LOW; smoke fixture switched from titanic Sex (no token overlap) to canonical email (direct overlap), join-key uniqueness via FULL OUTER JOIN + multi-cycle audit, f64 determinism via round-before-argmax + lex iteration)"
+    - "v1.3 → v1.4 (post-implementation amendment, no review cycle): empirical floor measurement showed locked-weight architecture caps non_unknown@0.7 at ~7%; the original 60% target was unbacked. ac-02 floor recalibrated to 5% per MADR 0084; bead's load-bearing E01a-unblock requirement met at the new floor. Phase 2 signal expansion filed as follow-on bead."

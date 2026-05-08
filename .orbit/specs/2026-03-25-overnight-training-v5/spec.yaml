@@ -1,0 +1,229 @@
+goal: >
+  Push raw multi-branch model accuracy from 121/190 to 140+/190 (and post-Sharpen
+  from 155/190 to 170+/190) through improved training data quality, value-level
+  augmentation, hard-negative oversampling, and an architecture scale-up experiment.
+  Ship the best model as sherlock-v5 default before v0.6.13 release.
+
+constraints:
+  - "Single overnight run on M1 Pro with Metal (~8 hours total budget, adaptive — see AC-7 timing probe)"
+  - "Must not regress post-Sharpen accuracy below current 155/190 AND no more than 5 currently-passing columns may regress"
+  - "Preserve 50/50 distilled/synthetic blend ratio with adaptive fill for types with insufficient distilled data"
+  - "Sibling-context attention model is frozen (reuse v4 weights, do not retrain)"
+  - "All pipeline changes implemented in Python (prepare script) and Rust (generators, augmentation); no new dependencies"
+  - "Two model variants trained on identical data for fair comparison"
+  - "29 profile eval datasets must be excluded from training corpus (no eval contamination)"
+
+acceptance_criteria:
+  - id: AC-1
+    title: "Generator collision fixes"
+    description: >
+      Fix generators for the top collision types identified in eval:
+      (a) hs_code — generate 3-level format (XXXX.XX.XX) ≥70% of the time, use realistic
+          chapter prefixes (01–99), eliminate single-level XXXX.XX format that collides with decimal_number.
+      (b) latitude/longitude — vary precision (2–8 decimal places), add realistic coordinate
+          clustering, include negative-only distributions.
+      (c) version — always generate ≥3-part versions (M.N.P minimum), increase v-prefix rate to ≥40%.
+      (d) ssn — add area-number range constraints (001–899 for area, 01–99 for group) to make
+          generated SSNs structurally distinguishable from phone numbers.
+    verification: >
+      Run `finetype check` — 250/250 passing, 12500/12500 samples.
+      Manual inspection: generate 100 samples of each fixed type, confirm <5% visual overlap
+      with their collision partner.
+
+  - id: AC-2
+    title: "Value-level augmentation module"
+    description: >
+      Implement augmentation in the data preparation pipeline that applies controlled noise
+      to 30-40% of training samples. Augmentation is in-place replacement (does not increase
+      total record count — same number of records, 30-40% have augmented values).
+      Augmentation types:
+      (a) Whitespace: leading/trailing spaces, tabs, \r\n artifacts (10% of augmented samples)
+      (b) Encoding artifacts: common mojibake patterns (Ã© for é, â€™ for ') (5% of augmented)
+      (c) Format mixing: within a column, vary format for 10-20% of values (e.g., phone column
+          with 85% E.164 + 15% local format) (10% of augmented)
+      (d) Null representation mixing: inject NULL/N-A/n-a/-/empty values into 5-10% of column
+          positions (10% of augmented)
+      (e) Case variation: random case changes for text types (5% of augmented)
+    verification: >
+      Generate augmented dataset, sample 1000 rows, confirm 30-40% have at least one
+      augmentation applied. Verify that the pre-augmentation source values parse as their
+      labelled type (augmented values are intentionally noisy and are NOT required to pass
+      strict validators — that is the point of augmentation).
+
+  - id: AC-3
+    title: "Hard-negative oversampling"
+    description: >
+      Increase samples_per_type to 2-3x for the top-10 confused type pairs from eval:
+      hs_code, decimal_number, latitude, longitude, version, ssn, phone_number, ean, upc, npi.
+      These types get 6000-9000 samples vs the standard 3000-5000 for other types.
+    verification: >
+      Training manifest shows oversampled types at ≥2x the base samples_per_type.
+      Per-type counts logged in manifest JSON.
+
+  - id: AC-4
+    title: "Distilled label validation"
+    description: >
+      Run a quick format-check pass on distilled labels before blending. For each distilled
+      row, check if the column values are plausible for the assigned label by running them
+      through FineType's validation patterns. Flag rows where <50% of values match the
+      label's validation pattern. Exclude flagged rows from training.
+    verification: >
+      Log the number of rows flagged and excluded per type. Report total exclusion rate.
+      Exclusion rate should be <15% of total distilled rows (higher suggests label quality
+      is worse than expected). Log the actual achieved per-type blend ratio after validation
+      and adaptive fill. If >30 types have distilled contribution <20%, emit a WARNING in the
+      manifest and pause for human review before proceeding to training.
+
+  - id: AC-5
+    title: "Training pipeline — data preparation"
+    description: >
+      Update prepare_multibranch_data.py (or equivalent) to:
+      (a) Accept --samples-per-type (default 3000) and --oversample-types (comma-separated list)
+      (b) Apply augmentation at configured rate (--augmentation-rate, default 0.35) — in-place replacement
+      (c) Run label validation pass before blending (--validate-labels flag)
+      (d) Write FTMB v3 format with table grouping for sibling-context
+      (e) Log comprehensive manifest with per-type counts, augmentation stats, exclusion stats,
+          actual per-type blend ratios (distilled vs synthetic)
+      (f) Verify eval dataset exclusion: cross-reference the 31 profile eval dataset names
+          (titanic, iris, earthquakes_2024, etc.) against distilled corpus sources. Exclude any
+          overlapping columns. Log exclusion count.
+    verification: >
+      Run data preparation with --samples-per-type 3000 --augmentation-rate 0.35
+      --validate-labels --oversample-types "hs_code,decimal_number,latitude,longitude,version,ssn,phone_number,ean,upc,npi".
+      Manifest shows expected counts. Total records: ~810k (240 types × 3000 + 10 types × 9000).
+      Manifest confirms zero eval dataset overlap.
+
+  - id: AC-6
+    title: "Architecture scale-up variant"
+    description: >
+      Define a second model configuration (~50% wider than current sherlock-v4-sibling).
+      Current architecture (verified from models/sherlock-v4-sibling/config.json):
+      - char branch: 960 → Dense(300, ReLU) → Dense(300) → [300]
+      - embed branch: 512 → Dense(200, ReLU) → Dense(200) → [200]
+      - stats branch: 27 → Dense(128, ReLU) → Dense(64) → [64]
+      - header branch: 128 → Dense(128, ReLU) → Dense(64) → [64]
+      - merge trunk: concat([300,200,64,64]=628) → Dense(500) → Dense(500) → Dense(250)
+      Scaled configuration (~50% wider):
+      - char branch: 960 → Dense(450, ReLU) → Dense(450) → [450]
+      - embed branch: 512 → Dense(300, ReLU) → Dense(300) → [300]
+      - stats branch: 27 → Dense(192, ReLU) → Dense(96) → [96]
+      - header branch: 128 → Dense(192, ReLU) → Dense(96) → [96]
+      - merge trunk: concat([450,300,96,96]=942) → Dense(750) → Dense(750) → Dense(250)
+      Train both current and scaled configs on the same prepared data.
+    verification: >
+      Two trained models saved: sherlock-v5-current and sherlock-v5-scaled.
+      Both complete target epochs (or early-stop). Training logs show loss convergence for both.
+
+  - id: AC-7
+    title: "Overnight run script"
+    description: >
+      Create overnight_v5.sh that orchestrates the full pipeline:
+      0. Preflight checks:
+         (a) Metal GPU probe — run 1 epoch on 1000-sample mini-batch, confirm throughput
+             >500 samples/sec. Abort with error if throughput suggests CPU fallback.
+         (b) Timing probe — run 2 epochs of current architecture on full prepared dataset.
+             Project total wall time for both architectures × target epochs. If projection
+             exceeds 7 hours, reduce epochs adaptively (minimum 20 epochs).
+      1. Fix generators (Rust changes already compiled)
+      2. Prepare data (AC-5 pipeline)
+      3. Train current architecture → sherlock-v5-current
+      4. Train scaled architecture → sherlock-v5-scaled
+      5. Run profile eval on both (raw + post-Sharpen)
+      6. Per-column regression check against current 155/190 baseline
+      7. Write comparison report to output/overnight-v5/comparison.md
+      Script must be idempotent and resumable: each stage writes a completion marker file.
+      On re-run, skip stages with existing markers. Stage markers are in output/overnight-v5/.
+    verification: >
+      Run overnight_v5.sh end-to-end. Total wall time ≤ 8 hours on M1 Pro.
+      Comparison report shows raw and post-Sharpen accuracy for both variants.
+      Resumability test: kill after data prep, re-run, confirm it skips to training.
+
+  - id: AC-8
+    title: "Raw model accuracy target"
+    description: >
+      Best-of-two trained models achieves ≥140/190 raw label accuracy on profile eval
+      (29 datasets, 190 format-detectable columns).
+    verification: >
+      Run eval/profile_eval.sh with the trained model (no Sharpen). Score ≥140/190.
+
+  - id: AC-9
+    title: "Post-Sharpen accuracy target"
+    description: >
+      Best-of-two trained models achieves ≥170/190 post-Sharpen label accuracy on
+      profile eval (full inference pipeline with feature_sharpen + value_sharpen +
+      apply_header_sharpen). No more than 5 columns that currently pass (in the
+      155/190 baseline) may regress to failing.
+    verification: >
+      Run eval/profile_eval.sh with full pipeline. Score ≥170/190.
+      Compare per-column results against current baseline. List any regressions.
+      Fail if >5 previously-passing columns now fail.
+
+  - id: AC-10
+    title: "Ship winning model as default"
+    description: >
+      Update models/default symlink to point to the winning sherlock-v5-* variant.
+      Publish to HuggingFace meridian-online/finetype-model. Update config.json with
+      architecture metadata.
+    verification: >
+      models/default → sherlock-v5-{current|scaled}.
+      curl -sfI HuggingFace URL returns 200 for all model files.
+      DuckDB extension downloads and loads the new model successfully.
+      Spot-check: run 5 known-correct columns through finetype() in DuckDB, confirm
+      labels match profile eval expectations.
+      Rollback: if spot-check fails, restore previous models/default symlink and
+      revert HuggingFace upload.
+
+ontology_schema:
+  name: "OvernightTrainingRun"
+  description: "Configuration and results for an overnight multi-branch training run"
+  fields:
+    - name: "samples_per_type"
+      type: "number"
+      description: "Base number of training samples per taxonomy type (3000-5000)"
+    - name: "oversample_multiplier"
+      type: "number"
+      description: "Multiplier for confused types (2-3x)"
+    - name: "augmentation_rate"
+      type: "number"
+      description: "Fraction of samples receiving in-place augmentation (0.30-0.40)"
+    - name: "epochs"
+      type: "number"
+      description: "Training epochs (target 40, adaptive minimum 20)"
+    - name: "architecture_variant"
+      type: "string"
+      description: "current (trunk 500→500) or scaled (trunk 750→750)"
+    - name: "raw_accuracy"
+      type: "number"
+      description: "Raw model label accuracy on profile eval (target ≥140/190)"
+    - name: "sharpen_accuracy"
+      type: "number"
+      description: "Post-Sharpen label accuracy on profile eval (target ≥170/190)"
+    - name: "regression_count"
+      type: "number"
+      description: "Number of previously-passing columns that regressed (max 5)"
+
+evaluation_principles:
+  - principle: "Raw model accuracy improvement"
+    weight: 0.35
+  - principle: "Post-Sharpen accuracy improvement"
+    weight: 0.30
+  - principle: "No regression on currently-correct columns (≤5 regressions)"
+    weight: 0.20
+  - principle: "Training pipeline reproducibility and documentation"
+    weight: 0.15
+
+exit_conditions:
+  - "Best model achieves ≥140/190 raw AND ≥170/190 post-Sharpen AND ≤5 regressions"
+  - "OR: Best model achieves ≥155/190 post-Sharpen (no regression) and the overnight run completes — ship incremental improvement and iterate"
+  - "STOP if both variants score <155/190 post-Sharpen — data quality issue, return to investigation"
+  - "STOP if timing probe projects >7 hours and adaptive reduction to 20 epochs still exceeds budget"
+
+metadata:
+  version: "2.0"
+  timestamp: "2026-03-25T23:00:00Z"
+  ambiguity_score: 0.09
+  interview_ref: ".orbit/specs/2026-03-25-overnight-training-v5/interview.md"
+  review_ref: ".orbit/specs/2026-03-25-overnight-training-v5/review-spec-2026-03-25.md"
+  sprint: "m-16"
+  risk_tier: "HIGH"
+  estimated_duration: "8 hours (overnight, unattended, adaptive)"

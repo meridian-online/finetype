@@ -61,7 +61,7 @@ pub struct ColumnValidationStats {
 ///
 /// Produced by `validate_table` and projected by the CLI into the DuckDB
 /// `finetype_reject_errors` sidecar. See ontology `RejectEntry` in
-/// `orbit/specs/2026-04-22-duckdb-extension-ergonomics/spec.yaml`.
+/// `.orbit/specs/2026-04-22-duckdb-extension-ergonomics/spec.yaml`.
 ///
 /// A single failing cell can produce multiple `RejectRecord`s when the
 /// cell's value violates multiple independent constraints (e.g. type +

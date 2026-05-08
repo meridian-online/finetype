@@ -1,0 +1,259 @@
+goal: |
+  Add `OutputFormat::JsonSchema` to `finetype profile` so `profile -f
+  <file> -o json-schema [--stats] [--enum-threshold N]` emits table-level
+  JSON Schema (with `x-finetype-label` + `x-finetype-pii` extensions and,
+  under `--stats`, observed-data constraints) to stdout. Mirror the
+  capability in the MCP `profile` tool via a new `format` parameter
+  (`json` default, `json-schema` opt-in), and hard-error the MCP `schema`
+  tool's `path`/`data` branch in the same PR. The output replaces the
+  table-mode of `finetype schema <file.csv>` byte-for-content (modulo the
+  trimmed extensions already shipped in PR #51); the verb deletion itself
+  belongs to card 0006.
+
+constraints:
+  - "Stdout-by-default for `-o json-schema` — no `--stdout` flag, no sidecar; uniform with the other 5 output formats."
+  - "`--stats` is gated to `-o json-schema` — using it with any other `-o` value must clap-error before dispatch."
+  - "Single `--enum-threshold` flag on `profile` controls categorical detection in plain/json/markdown/csv rendering AND the `enum` keyword in JSON Schema output (under `--stats`); no per-mode flag split."
+  - "`OutputFormat::JsonSchema` is the enum variant; `json-schema` (kebab-case) is the CLI surface name via clap's `value_enum` derive."
+  - "MCP `profile` gains `format: json | json-schema` parameter (default `json`) in the same PR; MCP `schema` tool's `path`/`data` (table) branch hard-errors in the same PR. (Type-key branch is card 0006's concern.)"
+  - "Schema export verbosity is fixed to `x-finetype-label` + `x-finetype-pii` only (PR #51 contract); this card MUST NOT re-introduce broad-type, transform, transform-ext, format-string, domain, or confidence extensions."
+  - "No regression in `profile`'s existing 5 output formats (`plain`, `json`, `csv`, `markdown`, `arrow`) — they keep their current shape, defaults, and `--enum-threshold` behaviour."
+  - "Existing `golden_profile_*` tests stay green; new `golden_profile_json_schema_*` tests are added under their own section in `cli_golden.rs`."
+  - "The shared JSON Schema emitter is a CLI-internal helper module (`crates/finetype-cli/src/json_schema.rs`) — NOT promoted to `finetype-core` in this card. Card 0006 extends the same helper for type-mode."
+  - "Migration of the README example at `README.md` line ~82 (`finetype schema data.csv --stdout > schema.json` → `finetype profile -f data.csv -o json-schema > schema.json`) ships in this card's PR — do not defer to card 0006."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: |
+      `OutputFormat::JsonSchema` enum variant added to the `OutputFormat`
+      enum in `crates/finetype-cli/src/main.rs` (~line 476-483). Variant
+      surfaces as `json-schema` on the CLI via clap's `value_enum` derive.
+    verification: |
+      `finetype profile --help` lists `json-schema` among the `-o` values.
+      `finetype profile -f eval/datasets/csv/people_directory.csv -o json-schema`
+      exits 0 and emits valid JSON to stdout.
+  - id: ac-02
+    ac_type: code
+    description: |
+      Shared JSON Schema emitter lifted into a new CLI-internal helper
+      module at `crates/finetype-cli/src/json_schema.rs`. The module
+      exposes a single `emit_table_schema(...)` function consuming the
+      profile result + flags (`stats: bool`, `enum_threshold: usize`)
+      and returning a `serde_json::Value` matching today's
+      `cmd_schema_table` byte shape (modulo PR #51's trimmed extensions).
+    verification: |
+      `cargo build -p finetype-cli` succeeds. `crates/finetype-cli/src/main.rs`
+      no longer contains the `cmd_schema_table` body inline — only a thin
+      caller. `crates/finetype-cli/src/json_schema.rs` exists and is
+      `mod`-declared in `main.rs` or `lib.rs`.
+  - id: ac-03
+    ac_type: code
+    description: |
+      `cmd_profile`'s match arm in `main.rs` (~line 4386-4757) gains a
+      `OutputFormat::JsonSchema` branch that calls the helper from ac-02
+      and writes the resulting JSON to stdout (pretty-printed, trailing
+      newline). The branch reuses `cmd_profile`'s existing
+      `enum_threshold` argument with no rebinding.
+    verification: |
+      `finetype profile -f eval/datasets/csv/ecommerce_orders.csv -o json-schema`
+      emits a JSON Schema document containing top-level `$schema`, `type:
+      object`, `properties` and the trimmed `x-finetype-label` /
+      `x-finetype-pii` extensions on at least one column.
+  - id: ac-04
+    ac_type: code
+    description: |
+      `Profile`'s clap variant gains a `--stats` boolean flag (default
+      false). When `--stats` is set with any `OutputFormat` other than
+      `JsonSchema`, dispatch errors with a clap-style message naming the
+      conflict (`--stats requires -o json-schema`).
+    verification: |
+      `finetype profile -f f.csv -o json --stats` exits non-zero and
+      prints a message containing `--stats requires -o json-schema`.
+      `finetype profile -f f.csv -o json-schema --stats` exits 0.
+  - id: ac-05
+    ac_type: code
+    description: |
+      Under `--stats` + `-o json-schema`, the helper attaches
+      observed-data constraints matching today's `cmd_schema_table`
+      `--stats` output: `minLength`, `maxLength` for strings;
+      `minimum`, `maximum` for numerics; `enum` for low-cardinality
+      columns (gated by `--enum-threshold`); and the
+      `x-finetype-null-rate` / `x-finetype-cardinality` extensions
+      where they appear today.
+    verification: |
+      `finetype profile -f eval/datasets/csv/people_directory.csv \
+        -o json-schema --stats --enum-threshold 50`
+      output contains `minLength`, `maxLength`, and at least one `enum`
+      keyword. `x-finetype-null-rate` and `x-finetype-cardinality`
+      appear on every column property.
+  - id: ac-06
+    ac_type: code
+    description: |
+      MCP `profile` tool (`crates/finetype-mcp/src/tools/profile.rs`)
+      gains a `format` parameter accepting `json` (default) or
+      `json-schema`. When `json-schema`, the tool projects results
+      through the same shared emitter (ac-02) and returns a JSON Schema
+      document in the primary content slot. JSON-mode output stays
+      byte-identical to today's behaviour.
+    verification: |
+      An MCP test (or manual `curl`-equivalent harness) invoking
+      `profile { path: "fixture.csv", format: "json-schema" }` returns
+      a JSON Schema object. The same call without `format` (or with
+      `format: "json"`) returns today's profile JSON shape. `cargo test
+      -p finetype-mcp` passes.
+  - id: ac-07
+    ac_type: code
+    description: |
+      MCP `schema` tool (`crates/finetype-mcp/src/tools/schema.rs`)
+      `path`/`data` (table) branch hard-errors with a tailored message
+      pointing at `profile`. The message body reads (verbatim):
+      `Table-mode schema export was folded into profile in v0.6.19. Use
+      profile with format: "json-schema" instead.` The type-key branch
+      remains unchanged (card 0006's concern).
+    verification: |
+      An MCP call `schema { path: "fixture.csv" }` returns an error
+      result whose message contains the exact migration string above.
+      An MCP call `schema { key: "identity.person.email" }` continues
+      to work unchanged.
+  - id: ac-08
+    ac_type: code
+    description: |
+      Three new golden tests added under a `PROFILE JSON SCHEMA OUTPUT`
+      section in `crates/finetype-cli/tests/cli_golden.rs`:
+      `golden_profile_json_schema_people_directory`,
+      `golden_profile_json_schema_stats_ecommerce_orders`,
+      `golden_profile_json_schema_enum_threshold_titanic`. Each asserts
+      output shape via `serde_json` parse + structural assertions
+      (top-level `$schema`/`type`/`properties`; presence/absence of
+      `--stats`-gated keywords; `enum` keyword toggling on
+      `--enum-threshold`).
+    verification: |
+      `cargo test -p finetype-cli --test cli_golden -- --ignored` runs
+      and the three new tests pass. None of the existing
+      `golden_profile_*`, `golden_schema_*` tests have been modified.
+  - id: ac-09
+    ac_type: doc
+    description: |
+      Inline `--help` text for `profile` updated: the `-o`/--output
+      enum lists `json-schema`; the new `--stats` flag has a one-line
+      description naming its dependency on `-o json-schema`. README
+      example at line ~82 migrated from `finetype schema data.csv
+      --stdout > schema.json` to `finetype profile -f data.csv -o
+      json-schema > schema.json`.
+    verification: |
+      `finetype profile --help | grep json-schema` matches. `grep
+      "schema data.csv" README.md` returns no results. `grep
+      "profile -f data.csv -o json-schema" README.md` matches.
+  - id: ac-10
+    ac_type: gate
+    description: |
+      Round-trip parity: for at least one fixture
+      (`eval/datasets/csv/people_directory.csv`), `profile -f f.csv
+      -o json-schema` followed by `validate -f f.csv --schema -`
+      (stdin) round-trips cleanly with zero rejects. If card 0005's
+      `--schema -` (stdin) support has not yet shipped at
+      implementation time, this AC degrades to: helper output parses
+      as valid JSON Schema (Draft 2020-12) via a dependency-free
+      shape check.
+    verification: |
+      Either `finetype profile -f people_directory.csv -o json-schema |
+      finetype validate -f people_directory.csv --schema -` exits 0
+      with zero rejects, OR (degraded) `serde_json::from_str` succeeds
+      and the parsed document satisfies the structural assertions
+      named in ac-08.
+  - id: ac-11
+    ac_type: gate
+    description: |
+      `make ci` passes (fmt, clippy, test, taxonomy check) on the
+      branch head. Zero new clippy warnings introduced. No regression
+      in any pre-existing `golden_*` test.
+    verification: |
+      `make ci` exits 0 locally and in GitHub Actions on the PR.
+
+implementation_notes:
+  - |
+    `cmd_schema_table` (`crates/finetype-cli/src/main.rs:2699+`) is the
+    table-mode JSON Schema emitter today. Its body is the seed for
+    `crates/finetype-cli/src/json_schema.rs`'s `emit_table_schema()`.
+    Lift verbatim (modulo signature: take profile result + flags, return
+    `serde_json::Value`). Card 0006 will later extend the same helper
+    for type-mode.
+  - |
+    `OutputFormat` enum at `main.rs:476-483` adds the `JsonSchema`
+    variant. clap's `value_enum` derive renders it `json-schema` on
+    the CLI; reuse the existing `Display`/`FromStr` impls if any.
+  - |
+    Two implementation choices for the `--stats`-with-non-json-schema
+    conflict: (a) clap `conflicts_with` / `requires` on the
+    `output_format` argument, OR (b) explicit check at the top of
+    `cmd_profile` returning a clap-style error. Either is acceptable;
+    (a) preserves clap's error formatting and is preferred.
+  - |
+    MCP `tools/profile.rs` shape today emits a fixed JSON object. Add
+    an optional `format` field (`Option<ProfileFormat>` enum, default
+    `Json`); on `JsonSchema`, route through the shared emitter and
+    return its JSON in `Content::text(serde_json::to_string_pretty(&v)?)`.
+    `tools/schema.rs` `path`/`data` branch returns
+    `Err(McpError::invalid_request(...))` with the verbatim migration
+    string from ac-07.
+  - |
+    The round-trip AC (ac-10) is conditional on card 0005's
+    `--schema -` (stdin) support landing first. The rally's serial
+    order (0003 → 0006 → 0005) means card 0005 lands AFTER this card,
+    so the degraded path (structural shape check via `serde_json`)
+    is the realistic outcome at PR-time. Note this in
+    `progress.md` when the implementation enters review-pr.
+  - |
+    Existing `golden_schema_*` tests for type-mode (`golden_schema_email`,
+    `golden_schema_iso_date`) at `cli_golden.rs:142, 638, 740` belong
+    to card 0006 — do not touch in this card.
+
+ontology_schema:
+  name: "ProfileJsonSchemaOutput"
+  description: |
+    Models the new output format and the helper module's contract.
+  fields:
+    - name: "OutputFormat::JsonSchema"
+      type: "enum_variant"
+      description: "New CLI-surface format value `json-schema`; activates the helper-driven emitter branch in `cmd_profile`."
+    - name: "Profile.stats"
+      type: "bool"
+      description: "Clap flag (default false). Gated to `OutputFormat::JsonSchema`. Activates observed-data constraints in the emitter."
+    - name: "json_schema::emit_table_schema"
+      type: "fn(profile_result, stats: bool, enum_threshold: usize) -> serde_json::Value"
+      description: "Sole helper consumed by both `cmd_profile` (this card) and `cmd_taxonomy` (card 0006)."
+    - name: "MCP.profile.format"
+      type: "enum {Json, JsonSchema} (default Json)"
+      description: "MCP-side mirror of the CLI's `-o` switch. `JsonSchema` invokes the same helper as the CLI branch."
+    - name: "MCP.schema.path|data"
+      type: "branch"
+      description: "Hard-errors in this card with the migration string from ac-07."
+
+evaluation_principles:
+  - principle: "Behaviour preservation — `-o json-schema` output must be byte-for-content equivalent to today's `schema -f f.csv` output (modulo PR #51's trimmed extensions). No silent shape drift."
+    weight: 0.30
+  - principle: "Surface symmetry — every `-o X` value writes to stdout uniformly; no flag asymmetry; `--stats` is the single new flag and is bounded by clap conflict."
+    weight: 0.25
+  - principle: "MCP/CLI lockstep — MCP `profile` gains the same capability in the same PR; MCP `schema` table-branch dies in the same PR. No cross-surface drift permitted."
+    weight: 0.20
+  - principle: "Helper shareability — helper module's signature is fit-for-purpose for both card 0003 (table-mode) and card 0006 (type-mode); lifting + delete in card 0006 must not require re-shaping the public function."
+    weight: 0.15
+  - principle: "Test surface honesty — golden tests assert structural properties, not byte-string equality (the latter ties tests to formatter quirks). 3 tests, named for what they exercise."
+    weight: 0.10
+
+exit_conditions:
+  - "All 11 ACs verified — code, doc, gate."
+  - "PR review-pr verdict APPROVE on the forked review."
+  - "PR merged into the rally branch (or main, if the rally degrades)."
+  - "Card 0003's `specs` array updated with `.orbit/specs/2026-04-28-profile-json-schema-output/spec.yaml`."
+
+metadata:
+  version: "1.0"
+  test_prefix: "pjs"
+  timestamp: "2026-04-28T11:42:00Z"
+  ambiguity_score: 0.08
+  interview_ref: ".orbit/specs/2026-04-28-profile-json-schema-output/interview.md"
+  card_ref: ".orbit/cards/0003-tabular-data-profiling.yaml"
+  rally_ref: ".orbit/specs/2026-04-28-v0619-cli-consolidation-rally/"
+  release_target: "v0.6.19"

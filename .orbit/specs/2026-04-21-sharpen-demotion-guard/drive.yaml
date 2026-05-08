@@ -1,0 +1,19 @@
+card: .orbit/cards/0002-semantic-type-detection.yaml
+autonomy: guided
+budget: 3
+iteration: 1
+current_spec: .orbit/specs/2026-04-21-sharpen-demotion-guard/
+status: shipped
+shipped_at: 2026-04-21T00:00:00Z
+pr: https://github.com/meridian-online/finetype/pull/44
+merge_commit: f597fe6
+history: []
+started: 2026-04-21T00:00:00Z
+review_cycles:
+  review_spec: 1
+  review_pr: 0
+review_cycle_dates:
+  review_spec: "2026-04-21"
+  review_pr: "2026-04-21"
+notes:
+  - "Follow-up drive on card 0002-semantic-type-detection. Discovery already done at .orbit/specs/2026-04-21-validator-signal-attribution/ (interview.md + findings.md). Findings: (1) silent-zeros hypothesis FALSE; (2) validator precision pollution — on http_method values, 25+ types tie at pass_rate=1.000; (3) post-processing demotion — raw multi-branch returns http_method (0.595), CLI full pipeline returns categorical (0.373). Recommendation from discovery: Sharpen demotion guard, not promotion rule. This drive crystallises that recommendation into spec → implement → ship."

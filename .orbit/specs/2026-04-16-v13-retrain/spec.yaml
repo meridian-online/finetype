@@ -1,0 +1,177 @@
+goal: >
+  Retrain multi-branch model (v13) with improved training data quality, expanded
+  validation patterns, rebalanced class distribution, and increased validation
+  branch capacity. Target: ≥210/227 label accuracy (92.5%+) on profile eval.
+
+constraints:
+  - All 4 priority tiers from the retrain brief ship together in v13
+  - Create state_code as a new taxonomy type (not just drop contaminated rows)
+  - Hard cap distilled rows at 600 per type
+  - Architecture change — validation branch 240→192→128, merged dim 1006→1070
+  - Adding state_code increases type count from 239 to 240 — n_classes, valid_dim, label_map, type_index_keys, label_category_map.rs assertions all update
+  - MultiBranchConfig code defaults stay at valid_hidden [0, 0] for backward compat — only config.json specifies [192, 128]
+  - Distilled filtering runs before distilled cap (filter bad rows, then cap at 600)
+  - Per-branch gradient norms logged to results.json (structured, per-epoch)
+  - 50 epochs, 1200 columns/type, 70/30 distilled-heavy blend
+  - Overnight training run on M1 Mac with Metal
+  - models/default symlink stays on sherlock-v11 until v13 eval is verified
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: >
+      P1a: Remove state_code→country_code remap from data/label_remap.json.
+      Create geography.location.state_code taxonomy type in
+      labels/definitions_geography.yaml with: title, description, designation
+      (locale_specific), validation pattern, validation_by_locale (US, CA, AU
+      at minimum), generator, format_string, and transform.
+    verification: >
+      cargo run -- check passes (taxonomy/generator alignment). cargo run --
+      generate geography.location.state_code produces valid state codes.
+      label_remap.json no longer contains state_code entry. n_classes=240
+      in model config. label_category_map.rs GEOGRAPHIC_LABELS includes
+      state_code and test assertions updated (240 total, 25 geographic).
+      cargo test -p finetype-model passes.
+
+  - id: ac-02
+    ac_type: code
+    description: >
+      P1b-d: Filter mislabeled distilled rows. Drop all distilled rows for SSN
+      (3 rows, all mislabeled). Drop all distilled rows for user_agent (4 rows,
+      all mislabeled). Filter phone_number distilled rows to keep only those
+      with actual phone-format values (drop year ranges like "1985 - 1987").
+      Filter postal_code distilled rows to keep only those matching numeric or
+      known alphanumeric postal code patterns (~4 of 34 rows are clean).
+    verification: >
+      Distilled data filtering is integrated into the training data prep
+      pipeline (prepare_multibranch_data.py or equivalent). Filtering runs
+      before the distilled cap (ac-04). Filtered output has zero SSN rows,
+      zero user_agent rows, reduced phone_number and postal_code rows.
+      Original distilled CSV is not modified. Overnight training script
+      invokes the filter as part of its pipeline.
+
+  - id: ac-03
+    ac_type: code
+    description: >
+      P2: Add missing validation patterns to taxonomy definitions. Add
+      http_method validation (exact match: GET, POST, PUT, DELETE, PATCH, HEAD,
+      OPTIONS, CONNECT, TRACE). Add user_agent validation (must contain known
+      UA prefix like Mozilla/, curl/, python-requests/, etc.). Add latitude
+      range validation (value in [-90, 90]). Tighten geohash validation
+      (minimum length 6, or character distribution check, or negative pattern
+      for non-geohash strings).
+    verification: >
+      cargo run -- check passes. Each new validation pattern is testable via
+      cargo test. Patterns discriminate correctly — http_method 100% pass rate
+      on HTTP methods, latitude rejects values outside [-90, 90], geohash
+      rejects short strings and obvious non-geohashes.
+
+  - id: ac-04
+    ac_type: code
+    description: >
+      P3a: Cap distilled rows per type at 600 in the training data pipeline.
+      Types with more than 600 distilled rows are randomly sampled down to 600.
+      Types with fewer than 600 are unaffected. Cap is applied before the 70/30
+      blend ratio.
+    verification: >
+      Training data generation with cap produces ≤600 distilled rows per type.
+      Verify with a count query on the training data. Types previously over 600
+      (country: 3488, decimal_number: 5154, integer_number: 5629) are capped.
+
+  - id: ac-05
+    ac_type: code
+    description: >
+      P3b: Add hard-negative mining for latitude vs decimal_number. Generate
+      synthetic decimal_number examples specifically in the [-90, 90] range
+      with non-geographic headers (e.g., "error", "score", "depth", "rating",
+      "percentage"). These augment the existing decimal_number training data.
+    verification: >
+      Hard-negative examples are present in training data. Headers are
+      non-geographic. Values fall in [-90, 90] range.
+
+  - id: ac-06
+    ac_type: code
+    description: >
+      P4a: Increase validation branch hidden dimensions from [128, 64] to
+      [192, 128]. Set in v13 config.json only — do NOT change
+      MultiBranchConfig code defaults (valid_hidden stays [0, 0] for
+      backward compat with older models). Merged dim changes from 1006
+      to 1070. Merge hidden layer sizes may need adjustment to
+      accommodate the larger input.
+    verification: >
+      Model config.json shows valid_hidden: [192, 128]. cargo test -p
+      finetype-train passes — all gradient flow and forward pass tests work
+      with new dimensions. Merged dim is 1070.
+
+  - id: ac-07
+    ac_type: code
+    description: >
+      P4b: Add per-branch gradient norm monitoring to the training loop.
+      After each epoch, compute and log the L2 gradient norm for each branch
+      (char, embed, stats, header, validation). Add a branch_gradient_norms
+      field to EpochMetrics with #[serde(default)] for backward compatibility
+      with existing results.json files. Type: Option<HashMap<String, f32>>
+      or HashMap with serde(default). These are written to results.json
+      alongside existing metrics.
+    verification: >
+      results.json contains branch_gradient_norms for each epoch. All 5
+      branches have entries. Values are non-zero (gradient is flowing).
+      Existing results.json files (e.g., models/sherlock-v12/results.json)
+      still deserialize without error.
+
+  - id: ac-08
+    ac_type: code
+    description: >
+      Training run: Train v13 with all P1-P4 changes applied. 50 epochs,
+      1200 columns/type, 70/30 blend, Metal backend. Model saved to
+      models/sherlock-v13/ with config.json, model.safetensors, results.json,
+      and type_index.json.
+    verification: >
+      models/sherlock-v13/ exists with all required files. results.json has
+      50 entries (or fewer if early stopping triggers). Best val_accuracy
+      is recorded.
+
+  - id: ac-09
+    ac_type: code
+    description: >
+      Eval run: Run profile eval against v13 model on all 35 datasets (227
+      columns). Generate eval report. Target: ≥210/227 label accuracy (92.5%+).
+    verification: >
+      models/sherlock-v13/eval/report.md exists. Label accuracy, domain
+      accuracy, and misclassification list are recorded. Compare against
+      v12 baseline (204/227).
+
+deliverables:
+  - labels/definitions_geography.yaml — state_code type definition, latitude validation, geohash tightened
+  - data/label_remap.json — state_code remap removed
+  - labels/definitions_technology.yaml — http_method, user_agent validation patterns
+  - crates/finetype-model/src/label_category_map.rs — GEOGRAPHIC_LABELS + assertion updates for 240 types
+  - crates/finetype-train/src/multi_branch.rs — architecture change, gradient norms
+  - crates/finetype-train/src/training.rs — EpochMetrics branch_gradient_norms field (#[serde(default)])
+  - training data pipeline — distilled filtering + cap + hard negatives
+  - scripts/overnight_v13_retraining.sh — overnight training + eval script
+  - models/sherlock-v13/ — trained model + eval results
+
+evaluation_principles:
+  - principle: "Data quality over data quantity — clean training data beats more training data"
+    weight: 0.4
+  - principle: "Measurable improvement — eval numbers must go up, not just feel better"
+    weight: 0.3
+  - principle: "No regressions — items fixed in v12 must stay fixed in v13"
+    weight: 0.3
+
+exit_conditions:
+  - All P1-P4 code changes committed and tested
+  - v13 model trained to completion (50 epochs or early stopping)
+  - Profile eval run with results recorded
+  - Eval accuracy ≥210/227 or findings documented explaining the gap
+
+metadata:
+  version: "1.1"
+  timestamp: "2026-04-16T17:00:00Z"
+  ambiguity_score: 0.07
+  interview_ref: ".orbit/specs/2026-04-16-v13-retrain/interview.md"
+  prior_art:
+    - ".orbit/specs/2026-04-16-v12-data-quality-audit/retrain-brief.md"
+    - ".orbit/specs/2026-04-16-v12-data-quality-audit/audit.md"
+    - ".orbit/specs/2026-04-16-v12-data-quality-audit/confidence-analysis.md"

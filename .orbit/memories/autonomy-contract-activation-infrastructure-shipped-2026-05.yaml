@@ -1,0 +1,4 @@
+key: autonomy-contract-activation-infrastructure-shipped-2026-05
+body: Autonomy-contract activation infrastructure shipped 2026-05-03 as 5 P1 beads (e6d/s16/87j/nms/53r). Gate harness scripts/gittables_gate.{py,sh} measures GitTables holdout (2000 files, frozen seed 20260503). Content-hash dedup primitive at scripts/eval_leakage/content_hash.py — version 1.0.0. Append-only logs with fcntl.flock + O_APPEND at scripts/append_log.py + integrity check log_integrity_check.sh enforcing H08/H09. cron_cycle.sh wraps preamble→cycle→postamble, dry-run mode tested. launchd plist + newsyslog config + install.sh at scripts/launchd/. holdout_paths.txt frozen with 1018257 dedup pop (29 collisions removed); cache .content_hash_cache.tsv gitignored (152MB). 23 tests across 6 test files in scripts/eval_leakage/.
+timestamp: 1970-01-01T00:00:00Z
+labels: []

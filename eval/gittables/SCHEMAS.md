@@ -175,6 +175,6 @@ intentional. Steps:
    eval/gittables/failure_log.tsv eval/gittables/working_slice_coverage.tsv`.
 5. **Re-enable cron**: `scripts/launchd/install.sh install`. The next
    cycle's preamble will record the new line counts and resume.
-6. **Tabletop**: file a memo at `orbit/cards/memos/` describing the
+6. **Tabletop**: file a memo at `.orbit/cards/memos/` describing the
    incident — the next pass-2 tabletop will decide whether to amend
    H08/H09 thresholds.

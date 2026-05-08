@@ -619,7 +619,7 @@ mod tests {
     /// HTTP method schema mirroring the v17 taxonomy: 27 case variants of
     /// 9 methods enumerated in both pattern AND enum. See
     /// labels/definitions_technology.yaml (technology.internet.http_method)
-    /// and spec orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml.
+    /// and spec .orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml.
     fn http_method_schema() -> Validation {
         const VARIANTS: [&str; 27] = [
             "GET", "Get", "get", "POST", "Post", "post", "PUT", "Put", "put", "DELETE", "Delete",
@@ -940,7 +940,7 @@ datetime.timestamp.iso_8601:
         assert!(!compiled.is_valid("TRUE "));
     }
 
-    /// AC-07 (spec orbit/specs/2026-04-20-distilled-data-relabel-7-types/): the
+    /// AC-07 (spec .orbit/specs/2026-04-20-distilled-data-relabel-7-types/): the
     /// HTTP-method validator accepts all 27 case variants (9 methods ×
     /// {UPPER, lower, Title}) and rejects non-method strings, mixed-case
     /// outside the 27, whitespace-contaminated, and adjacent tokens.

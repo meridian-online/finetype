@@ -1,0 +1,92 @@
+id: '0053'
+title: Training Gate — 88% Val-Acc Floor with Manual-Review Band
+status: accepted
+date_created: 2026-04-20
+date_modified: 2026-04-20
+body: |
+  # 0053. Training Gate — 88% Val-Acc Floor with Manual-Review Band
+
+  ## Context and Problem Statement
+
+  v14 shipped at 91.2% val_acc; v16 at a comparable level. A naive
+  training gate ("reject any seed below the best historical val_acc")
+  would auto-reject v17 seeds that land at 90.5% even if their profile
+  eval (the downstream quality signal we actually care about) is better
+  than v16's. Conversely, a too-lax gate ("reject only catastrophic
+  failures") risks promoting a model with a real regression.
+
+  The relationship between val_acc and profile eval is not tight.
+  Val_acc measures per-sample classification on held-out training data;
+  profile eval measures per-column correctness on real-world tables
+  with sibling context, disambiguation, and Sharpen rules applied. A
+  0.5% val_acc drop can hide an eval gain or loss of several columns.
+
+  We need a gate that:
+  - Rejects catastrophically broken runs automatically (no human
+    judgment required when the signal is unambiguous).
+  - Allows marginal runs to proceed to profile eval — that's the test
+    that actually matters.
+  - Surfaces the marginal cases to Hugh for explicit sign-off, because
+    "probably fine" shouldn't be self-attested by the agent.
+
+  ## Considered Options
+
+  - **A. Hard floor at 91.2% (v14)** — auto-reject anything below.
+    Brittle: 90.8% with a +3 eval gain would be rejected.
+  - **B. Hard floor at 88%** — loose enough that any plausibly working
+    run makes it through. Catches only catastrophic failures.
+  - **C. Two-tier: 88% catastrophic floor + 88-91.2% manual-review band
+    requiring Hugh sign-off** — auto-reject below 88%, auto-accept at
+    91.2%+, require explicit sign-off in between.
+
+  ## Decision Outcome
+
+  Chosen option: **C — two-tier gate**. 88% is roughly 1σ below v14's
+  91.2% on typical training variance, which makes it a principled floor
+  rather than a round number. The manual-review band reflects the
+  val_acc-to-eval gap: we don't auto-promote just because it "probably
+  works," and we don't auto-reject just because it's not record-setting.
+
+  Operational rules:
+
+  1. **Below 88% val_acc** — automatic rejection. Seed is discarded.
+     No retry at the same seed; change something and re-train.
+  2. **88% ≤ val_acc < 91.2%** — manual-review band. Seed proceeds to
+     profile eval, but promotion requires Hugh sign-off on the
+     promotion PR, referencing profile-eval diff, training curves
+     (`epochs.jsonl`), and val_acc trajectory.
+  3. **val_acc ≥ 91.2%** — auto-accept the seed for profile eval.
+     Standard winner-selection rules apply (decision 0052).
+  4. **All-seeds-fail-floor halt** — if all 3 seeds in the sweep fall
+     below 88%, halt the sweep and investigate. Do not proceed to
+     profile eval or promotion.
+  5. **Sign-off is explicit, not implicit.** Hugh leaves a PR comment
+     stating review of the eval diff + curves. Agent self-attestation
+     ("manual review passed") is not acceptable.
+
+  ### Consequences
+
+  - Good, because catastrophic failures are caught without wasting
+    eval time.
+  - Good, because marginal-but-potentially-good runs aren't discarded
+    on val_acc alone — profile eval gets to decide.
+  - Good, because the manual-review band forces explicit human judgment
+    on the ambiguous cases, closing the self-attestation loophole.
+  - Bad, because the 88% floor is heuristic — drawn from one historical
+    distribution (v14's training variance). If v17 architecture shifts
+    the distribution, the floor may need revisiting.
+  - Bad, because Hugh sign-off is a blocking dependency; if he's
+    unavailable, promotion waits. Acceptable given release cadence.
+  - Neutral, because the all-seeds-fail-floor halt is a safety net that
+    will rarely trigger but is cheap to implement.
+
+  ## References
+
+  - Spec: `.orbit/specs/2026-04-20-distilled-data-relabel-7-types/spec.yaml` (v1.3)
+  - Related decision: `.orbit/choices/0052-scope-aware-eval-gate.md`
+    (profile-eval-level gate; this decision is the training-level gate
+    upstream of it)
+  - Training output: `models/sherlock-v17-seed-{42,43,44}/results.json`,
+    `epochs.jsonl`
+  - Sweep script: `scripts/sweep_v17.sh` (ac-09)
+references: []

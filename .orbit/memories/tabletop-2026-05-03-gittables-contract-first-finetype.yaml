@@ -1,0 +1,4 @@
+key: tabletop-2026-05-03-gittables-contract-first-finetype
+body: 'tabletop-2026-05-03-gittables-contract: First FineType autonomy contract authored at orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml. Five sections: gate metric (90% round-trip on 2000-file frozen holdout) + corpus value (cumulative coverage on 1.016M working slice), 13 halts (H01-H13), 6 escalations (E01-E06), 9 branches (B01-B09). Cron agent runs end-to-end: sample, profile, validate, harvest, retrain, promote. Direct push to main authorised. Load-bearing-paths registry at orbit/contracts/load-bearing-paths.yaml (24 entries) gates B07 audit protocol. Engineering deltas filed: finetype-e6d (gate harness), finetype-s16 (content-hash dedup), finetype-nms (cron lockfile + preamble), finetype-87j (append-only logs). Pass-2 tabletop in ~2026-05-10.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

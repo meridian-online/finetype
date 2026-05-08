@@ -1,0 +1,308 @@
+goal: >
+  Rebuild the FineType eval corpus so every type in the 240-type taxonomy has
+  at least one realistic eval column, grounded in a three-dimensional realism
+  standard (provenance + messiness + distributional fidelity) and protected
+  from training-data contamination by row-hash deduplication and source-level
+  role separation. Phase A + B of a multi-phase programme; Phase C (edge-case
+  coverage to reach ~400 columns) is explicitly out of scope.
+
+constraints:
+  - "Audit methodology is programmatic pre-screen + human review — no LLM-as-judge for the final keep/augment/replace call. Reinforces CLAUDE.md Engineering Principle 3."
+  - "All sourced data must be ethically obtained for research purposes, with machine-readable attribution (source_url, licence, fetched_date) per dataset."
+  - "Train/eval contamination is prevented by two mechanisms that must both be live before shipping: (a) source-level role manifest (train | eval | both-forbidden); (b) row-hash SHA256 deduplication over normalised (header, sample-values) applied as a training-pipeline filter."
+  - "No v18 model sweep may start until Phase A + B ships. The retrain block is enforced via sprint policy and a note in the sweep script comments."
+  - "Header authenticity is explicitly out of scope for this programme — flagged in the interview as a separate future concern."
+  - "Edge-case second-column coverage per type (Phase C) is out of scope. Phase A + B closes zero-coverage only (≥1 column per type)."
+  - "The augment worklist may remain open at sprint end — only the replace worklist must be cleared."
+  - "Existing 242 eval columns may be kept in place unless the audit flags them replace. Existing ground-truth labels are not renegotiated except as a side-effect of replacement (when replacement changes the source column header, the triage worklist must flag the implicit gt_label change explicitly)."
+  - "Manifest.csv remains the single machine-readable source of truth. No parallel metadata file proliferation."
+  - "Restricted-registry carve-out: for types whose only authoritative source is behind a restricted registry (e.g. identity.medical.cpt under AMA licence; identity.government.ssn as PII), provenance_status may be `synthetic-necessary` with an explicit carve-out entry in the realism MADR (ac-09) naming each such type and its rationale. This is the only sanctioned route around the real/hand-curated floor in ac-04."
+  - "MADR ordering: the three MADRs (ac-09, ac-10, ac-11) must exist in `proposed` status and be referenced by code ACs (ac-01, ac-07) before those code ACs begin implementation. They may move to `accepted` only after the implementation validates them. This prevents the decision register from degenerating into post-hoc rubber-stamping."
+
+acceptance_criteria:
+  - id: ac-01
+    ac_type: code
+    description: >
+      A programmatic pre-screen script exists under scripts/ that reads
+      eval/datasets/manifest.csv, loads each referenced CSV/JSON file, and
+      emits per-column metrics covering messiness (null_rate, unique_ratio,
+      whitespace_ratio, format_variance) and distributional fidelity
+      (shannon_entropy, top_k_skew). Output is a TSV/CSV suitable for
+      spreadsheet review. The script additionally emits a pass/fail
+      judgement per column against pinned floors; floors are defined in
+      a per-type-family config (pre-screen_floors.yaml checked in under
+      eval/) and are referenced (not re-derived) by ac-04's verification.
+      Default floors — subject to revision during implementation under
+      ac-09 — are null_rate ≤ 0.20, unique_ratio in family-appropriate
+      bands (e.g. ≥ 0.95 for id-like, ≤ 0.5 for categorical), shannon
+      entropy ≥ family-specific floor, top-1 skew ≤ 0.5 for non-categorical.
+    verification: "Run the script on the current 242-column eval set; verify (a) the output file has one row per (dataset, column) with non-null numeric metrics for each dimension, (b) every row carries a pass_floors boolean, (c) pre-screen_floors.yaml exists under eval/ and defines at least one floor per type family represented in the current corpus."
+
+  - id: ac-02
+    ac_type: config
+    description: >
+      eval/datasets/manifest.csv schema is extended from 4 columns to 7:
+      adds source_url, licence, fetched_date. All existing 242 rows have
+      these fields populated (source_url may be "internal" for Hugh-authored
+      coverage datasets; licence must be a valid SPDX identifier or one of
+      the allowlisted free-form values {internal, public-domain, unknown-investigating};
+      fetched_date must be ISO-8601 YYYY-MM-DD). The licence allowlist is
+      committed as eval/licence_allowlist.txt.
+    verification: "Inspect manifest.csv header; confirm 7 columns. Run a validator script asserting: (a) zero empty cells in source_url, licence, fetched_date across all 242+ rows; (b) every licence value is in eval/licence_allowlist.txt; (c) every fetched_date matches ^\\d{4}-\\d{2}-\\d{2}$."
+
+  - id: ac-03
+    ac_type: doc
+    description: >
+      A triage worklist (.orbit/specs/2026-04-21-eval-expansion/triage.md) is
+      produced from the pre-screen output plus Hugh's human review. Each of
+      the 242 existing columns carries exactly one of {keep, augment, replace}
+      with a one-line rationale. Where the action is `replace`, the worklist
+      additionally flags whether the replacement is expected to change
+      gt_label (per the ground-truth constraint). Worklist is committed.
+    verification: "Grep the worklist for one row per (dataset, column); confirm every row has a non-empty action field and rationale. Every row with action=`replace` additionally has a gt_label_change boolean. Total rows ≥ 242."
+
+  - id: ac-04
+    ac_type: code
+    description: >
+      Every column flagged `replace` in triage.md has been replaced with a
+      sourced column in eval/datasets/. Replacement columns meet the realism
+      bar: provenance_status ∈ {real, hand-curated}, and the pre-screen
+      script's pass_floors boolean is true for the replacement, and the
+      manifest.csv row's source_url points at a real fetchable URL (HEAD
+      check for http(s) sources) or a repo-local hand-curated file.
+      Types in the restricted-registry carve-out (see constraint #10) are
+      the only permitted exception — their replacement rows may carry
+      provenance_status=`synthetic-necessary` and must be listed in the
+      carve-out table in ac-09's MADR.
+    verification: "For each triage.md row with action=`replace`: (a) the corresponding manifest.csv row has provenance_status in {real, hand-curated} OR the type is in the ac-09 carve-out table and provenance_status=`synthetic-necessary`; (b) pre-screen output's pass_floors column is true for that (dataset, column); (c) source_url either passes an HTTP HEAD check or resolves to a file under eval/datasets/ that is non-empty."
+
+  - id: ac-05
+    ac_type: gate
+    description: >
+      Every type in the 240-type taxonomy has ≥1 eval column in the expanded
+      manifest.csv, when resolved through eval/schema_mapping.yaml AND the
+      referenced file actually contains values for that column. Zero-coverage
+      closed specifically for the v17 handover's 5 unmeasured types
+      (swift_bic, cpt, loinc, excel_format, user_agent) plus any additional
+      gaps surfaced during audit. Types qualifying under the restricted-
+      registry carve-out satisfy this gate with a synthetic-necessary column.
+    verification: "Run a coverage script that loads labels/*.yaml, walks manifest.csv + schema_mapping.yaml, and asserts: (a) set(taxonomy_types) ⊆ set(covered_types); (b) every referenced file_path exists; (c) every (dataset, column) pair has ≥ 5 non-null values when loaded. Exit code 0 required."
+
+  - id: ac-06
+    ac_type: code
+    description: >
+      A row-hash computation produces eval/row_hashes.tsv — one row per
+      (dataset, column, value) with SHA256 over (normalised_header ||
+      '\\x00' || normalised_value). Normalisation is defined once, in a
+      shared module (crates/finetype-core or a Python helper) and imported
+      by both the hash-generation script and the training-pipeline filter
+      (ac-07), so the two sides cannot drift. Normalisation spec:
+      header = lower(trim(header)); value = trim(value) with Unicode NFC
+      and \\r\\n collapsed to \\n. File is regenerable from manifest.csv
+      via a deterministic script.
+    verification: "Delete and regenerate row_hashes.tsv; confirm byte-identical output. Confirm file covers every eval column in manifest.csv. Unit test: plant a row in a synthetic training corpus that matches an eval row under the shared normaliser; confirm the filter (ac-07) removes it."
+
+  - id: ac-07
+    ac_type: code
+    description: >
+      The training data pipeline (scripts/prepare_multibranch_data.py)
+      imports eval/row_hashes.tsv and filters any training row whose
+      (normalised_header, normalised_value) hash matches, using the shared
+      normaliser from ac-06. Filter is active by default; a `--no-dedup`
+      debug flag exists for emergency rollback and diagnostics. The filter
+      logs both the total rows seen and the rows removed.
+    verification: "Unit test: seed a training corpus with K planted collisions against row_hashes.tsv; run the pipeline and confirm exactly K rows are removed and the log reports K. Run the pipeline on the real current training corpus and capture the removal count in progress.md for visibility (expected to be non-zero given v16 was built without this filter)."
+
+  - id: ac-08
+    ac_type: doc
+    description: >
+      A source manifest (eval/datasets/sources.yaml) records each unique
+      source_url with fields: role (train | eval | both-forbidden), licence,
+      attribution_text, notes. Covers every source used across the repo,
+      not just this sprint's additions. Resolution rule for sources found
+      feeding both sides: **eval keeps the source; training relocates to
+      an alternative**; if no alternative exists for a training source, the
+      type is marked for re-sourcing and tracked in progress.md. The rule
+      prevents the three-way deadlock of (train vs eval vs coverage).
+    verification: "Read sources.yaml; confirm every distinct source_url in manifest.csv plus every distinct source referenced by scripts/prepare_multibranch_data.py's loaders has an entry with a valid role. Confirm zero `both-forbidden` entries remain unresolved at sprint close; any that cannot be resolved are listed with their replacement plan in progress.md."
+
+  - id: ac-09
+    ac_type: doc
+    description: >
+      MADR published: .orbit/choices/NNNN-eval-realism-dimensions.md.
+      Captures (a) the three-dimensional realism standard (provenance +
+      messiness + distributional fidelity), (b) the deliberate exclusion of
+      header authenticity from this programme, (c) the triage action schema,
+      (d) the pinned pre-screen floors (referenced by ac-01 and ac-04),
+      (e) the restricted-registry carve-out table listing each exempted
+      type with a one-paragraph rationale. MADR is drafted (`proposed`
+      status) before ac-01 implementation begins; moves to `accepted` after
+      ac-04 verifies against its floors.
+    verification: "File exists; follows MADR template in .orbit/choices/_template.md; contains the floors table and carve-out table; status is `accepted` before the sprint closes."
+
+  - id: ac-10
+    ac_type: doc
+    description: >
+      MADR published: .orbit/choices/NNNN-train-eval-leakage-prevention.md.
+      Captures (a) the two-layer defence (source role manifest + row-hash
+      filter), (b) the hashing scheme and normalisation spec, (c) the
+      enforcement point in the training pipeline, (d) an explicit
+      enumeration of **known filter blind spots under Consequences/Bad**:
+      format-drift collisions (e.g. timestamp reformatting between train
+      and eval), header synonyms not caught by `lower(trim())`, whitespace
+      normalisations beyond NFC+newline collapse. Supersedes no prior
+      decision but references 0049 and 0050. Drafted before ac-06/ac-07
+      implementation begins.
+    verification: "File exists; status is `accepted` before sprint close; referenced from prepare_multibranch_data.py module docstring; contains a non-empty 'Known blind spots' section under Consequences."
+
+  - id: ac-11
+    ac_type: doc
+    description: >
+      MADR published: .orbit/choices/NNNN-eval-coverage-floor.md. Captures
+      (a) the per-type minimum (≥1 column in Phase A+B; long-term target
+      ≥1 realistic + ≥1 edge-case per type in future Phase C), (b) the
+      policy that the augment worklist may remain open while replace must
+      be cleared, (c) the restricted-registry carve-out's interaction with
+      the coverage gate.
+    verification: "File exists; status is `accepted` before sprint close; links to the coverage script from ac-05."
+
+  - id: ac-12
+    ac_type: gate
+    description: >
+      Post-expansion diagnostic: v16 (current models/default) is re-scored
+      against the expanded eval set and the result is captured in
+      .orbit/specs/2026-04-21-eval-expansion/progress.md. The re-score is
+      **diagnostic-only** and explicitly NOT the promotion floor for v18,
+      because v16's training corpus predates the row-hash filter and
+      likely overlaps with the expanded eval (the exact contamination
+      ac-10 addresses). v18's true baseline is the first model trained
+      with the filter active. The per-type delta table must tag each row
+      `previously_covered` or `newly_covered` so the score movement is
+      not mis-diagnosed as regression on known types.
+    verification: "progress.md contains a 'v16 re-score on expanded eval (diagnostic)' section with: (a) overall numeric score (correct/total, domain accuracy); (b) per-type delta table with a newly_covered flag on each row; (c) separate subset scores for previously_covered-only vs newly_covered-only; (d) an explicit note that this is not the v18 promotion baseline."
+
+  - id: ac-13
+    ac_type: config
+    description: >
+      Retrain block is mechanically visible: scripts/sweep_v17.sh (or any
+      successor sweep script) has a block comment at the top noting that
+      v18+ sweeps are gated on this spec's completion, citing this spec
+      path and the specific AC that closes the block (ac-14 handover).
+      CLAUDE.md "Sprint Goal" section is updated to reflect the current
+      work. FINETYPE_CI_MODEL and FINETYPE_MODEL are left untouched —
+      the retrain block is process, not CI configuration.
+    verification: "Grep sweep scripts for the block comment; confirm it names this spec path. Diff CLAUDE.md before/after to confirm the Sprint Goal section reflects Phase A+B. Confirm neither FINETYPE_CI_MODEL nor FINETYPE_MODEL changed during this sprint."
+
+  - id: ac-14
+    ac_type: doc
+    description: >
+      progress.md captures each working day's decisions, counts (columns
+      replaced, types newly covered, rows removed by the ac-07 filter,
+      both-forbidden resolutions under ac-08), and any sourcing dead-ends
+      encountered. Handover.md is produced at sprint close, following the
+      pattern in .orbit/specs/2026-04-20-distilled-data-relabel-7-types/handover.md.
+      If the audit is not substantially complete by working day 5 (Phase A
+      done, replacement sourcing underway), a checkpoint entry in
+      progress.md escalates to Hugh with a scope-trim proposal.
+    verification: "Both files exist; handover.md has TL;DR, State of the repo, What got done, Next work, Open questions sections; progress.md contains a day-5 checkpoint entry (either 'on track' or an escalation note)."
+
+  - id: ac-15
+    ac_type: code
+    description: >
+      All consumers of eval/datasets/manifest.csv are patched to handle
+      the 7-column schema before the schema change lands in main. Known
+      consumers inventoried: eval/profile_eval.sh (bash read at lines ~78
+      and ~148 takes only 4 fields and will fold the appended 3 into
+      gt_label — must be patched to skip the trailing fields or parse
+      all 7); Rust consumers (eval_mapping.rs, eval_actionability.rs,
+      extract_features.rs, data.rs — use positional csv::Reader and are
+      tolerant of appended columns but must be re-verified); DuckDB SQL
+      loaders in eval dashboards (if any); any scripts found via `grep
+      -r "manifest.csv"` during implementation.
+    verification: "Before ac-02's schema change lands: (a) inventory committed in progress.md listing every consumer found; (b) each bash/shell consumer explicitly patched and diffed; (c) each Rust consumer confirmed to still pass its tests under the extended schema. After ac-02 lands: `make eval-report` on v16 produces a score within ±1 column of the pre-change baseline (235/242) — any deviation is a silent-parse bug and blocks the merge."
+
+ontology_schema:
+  name: "EvalCorpusExpansion"
+  description: >
+    The data and metadata shape for a realism-graded, leakage-protected eval
+    corpus. Every EvalColumn entry in manifest.csv corresponds to real rows
+    in a file under eval/datasets/; every SourceManifestEntry in sources.yaml
+    is referenced by ≥1 manifest.csv row or ≥1 training loader.
+
+  fields:
+    - name: "dataset"
+      type: "string"
+      description: "Short dataset identifier, used as foreign key across manifest.csv and schema_mapping.yaml"
+    - name: "file_path"
+      type: "string"
+      description: "Repo-relative path to the CSV/JSON/NDJSON file holding this column's data"
+    - name: "column_name"
+      type: "string"
+      description: "Column header as it appears in the source file"
+    - name: "gt_label"
+      type: "string"
+      description: "Short ground-truth label resolved to a full FineType type via schema_mapping.yaml"
+    - name: "source_url"
+      type: "string"
+      description: "Canonical URL for the dataset's origin (HuggingFace dataset ID, API endpoint, public CSV URL, or 'internal' for Hugh-authored coverage sets)"
+    - name: "licence"
+      type: "string"
+      description: "SPDX identifier (MIT, CC-BY-4.0, CC0-1.0, ODbL-1.0, etc.) OR an allowlisted free-form value {internal, public-domain, unknown-investigating}. Full allowlist lives in eval/licence_allowlist.txt."
+    - name: "fetched_date"
+      type: "string"
+      description: "ISO-8601 date (YYYY-MM-DD) the data was fetched or authored. Useful for temporal provenance and re-fetching."
+    - name: "realism_action"
+      type: "string"
+      description: "One of keep | augment | replace, assigned during audit and retained in triage.md (not in manifest.csv)"
+    - name: "provenance_status"
+      type: "string"
+      description: "One of real | hand-curated | synthetic | distilled | synthetic-necessary. `synthetic-necessary` is reserved for the restricted-registry carve-out (constraint #10) and requires an entry in ac-09's carve-out table."
+    - name: "source_role"
+      type: "string"
+      description: "From sources.yaml: train | eval | both-forbidden. A source cannot be used in both train and eval; both-forbidden marks sources needing resolution under ac-08's rule (eval keeps; train relocates)."
+    - name: "row_hash"
+      type: "string"
+      description: "SHA256 hex digest over (normalised_header || '\\x00' || normalised_value), using the shared normaliser defined in ac-06. Stored per row in eval/row_hashes.tsv."
+
+evaluation_principles:
+  - principle: "Realism fidelity — every new or retained column passes the three-dimensional bar (provenance + messiness + distributional fidelity) that the interview settled on"
+    weight: 0.40
+  - principle: "Coverage completeness — every taxonomy type has ≥1 eval column at sprint close, including the restricted-registry carve-out satisfying coverage via synthetic-necessary; the five handover-named types are explicitly verified"
+    weight: 0.30
+  - principle: "Leakage integrity — row-hash filter is live with a shared normaliser, source role manifest is populated, both-forbidden sources are resolved, and the training pipeline exercises both layers"
+    weight: 0.20
+  - principle: "Auditability — provenance ledger, triage worklist, attribution, and MADR blind-spot enumeration are complete enough for a future session to re-derive decisions without Hugh in the room"
+    weight: 0.10
+
+exit_conditions:
+  - "All 15 acceptance criteria pass their verification."
+  - "Three MADRs (ac-09, ac-10, ac-11) are `accepted` and cross-linked from this spec's progress.md. All three were authored in `proposed` status before the code ACs they govern began implementation."
+  - "v16 re-score (diagnostic, not promotion baseline) on expanded eval is captured in progress.md with a per-type delta table tagged previously_covered vs newly_covered."
+  - "Handover.md is written and ready for the next session."
+  - "Consumer inventory (ac-15) shows every manifest.csv reader patched or verified; make eval-report on v16 lands within ±1 column of the pre-change baseline."
+
+metadata:
+  version: "1.1"
+  test_prefix: "evalx"
+  timestamp: "2026-04-21T00:00:00Z"
+  ambiguity_score: 0.08
+  interview_ref: ".orbit/specs/2026-04-21-eval-expansion/interview.md"
+  review_ref: ".orbit/specs/2026-04-21-eval-expansion/review-spec-2026-04-21.md"
+  supersedes: []
+  related_decisions:
+    - ".orbit/choices/0049-preserve-synthetic-for-bad-distilled-types.md"
+    - ".orbit/choices/0050-per-type-sourcing-policy.md"
+    - ".orbit/choices/0052-scope-aware-eval-gate.md"
+    - ".orbit/choices/0054-hold-v17-no-promotion.md"
+  phase: "A+B (of A, B, C programme)"
+  out_of_scope:
+    - "Phase C edge-case coverage (≥1 edge-case column per type beyond the happy-path floor)"
+    - "Header authenticity realism dimension"
+    - "Renegotiation of existing ground-truth labels except as a side-effect of replacement"
+  revision_history:
+    - version: "1.0"
+      date: "2026-04-21"
+      note: "Initial draft from interview.md"
+    - version: "1.1"
+      date: "2026-04-21"
+      note: "Revised per review-spec-2026-04-21.md. Blockers addressed: (F-B1) new ac-15 for consumer patching + baseline regression; (F-B2) restricted-registry carve-out constraint + synthetic-necessary provenance; (F-B3) pinned pre-screen floors in ac-01 + carve-out table in ac-09. Highs addressed: (F-H1) ac-04 now requires provenance + floors check; (F-H2) ac-10 requires blind-spot enumeration; (F-H3) ac-12 requires previously/newly-covered split; (F-H4) ac-08 resolution rule; (F-H5) ac-12 diagnostic-only caveat. Mediums: (F-M1) day-5 checkpoint in ac-14; (F-M2) MADR ordering constraint; (F-M3) SPDX allowlist in ac-02; (F-M4) file-exists + ≥5 rows in ac-05."

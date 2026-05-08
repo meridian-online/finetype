@@ -141,7 +141,7 @@ finance.currency.amount:
     #      alternations. See MADR 0078 — validator alternations may compose
     #      canonical sibling-type patterns when the shape is canonical to that
     #      sibling type. Widened in v0.6.20 under spec
-    #      orbit/specs/2026-04-29-validate-corpus-iter4 ac-01.
+    #      .orbit/specs/2026-04-29-validate-corpus-iter4 ac-01.
     pattern: "^[\\$£¥₹₩₿\\p{Sc}]?\\s?-?\\s?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?$|^-?[\\$£¥₹₩₿\\p{Sc}]\\s?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?$|^\\([\\$£¥₹₩₿\\p{Sc}]?[0-9]{1,3}(,[0-9]{3})*(\\.[0-9]{1,2})?\\)$|^-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$"
   tier: [VARCHAR, currency]
   release_priority: 4

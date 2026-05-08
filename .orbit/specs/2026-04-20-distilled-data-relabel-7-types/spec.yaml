@@ -1,0 +1,547 @@
+goal: >
+  Retrain sherlock to v17 on a corpus that combines v16's existing data
+  with public-dataset distilled rows for user_agent and LOINC (with
+  fallback to generator if no suitable dataset is found), improved
+  synthetic generators for SWIFT BIC / CPT / Excel format / SSN (≥1000
+  unique values each, audited against v16 eval failures), and a YAML
+  schema ENUM expansion for http_method (case variants). Promote v17
+  only if profile eval clears a scope-aware net-positive gate
+  (v17 ≥ max(235/242, v16-baseline-at-corpus-freeze)). Release v0.6.18.
+
+  N=1 email regression is NOT fixed by this spec — it stays tracked in
+  .orbit/specs/2026-04-20-v16-n1-email-regression/ with its own discovery.
+
+# ─────────────────────────────────────────────────────────────────────
+# First-class sourcing table. Mutations to this table during
+# implementation require a spec bump (v1.3+), not an ad-hoc change.
+# Referenced by constraints + ac-03 + ac-04.
+# ─────────────────────────────────────────────────────────────────────
+sourcing_table:
+  - type: "technology.internet.user_agent"
+    path: "public_dataset"
+    primary_candidate: "https://github.com/ua-parser/uap-core — test_resources/*.yaml contains real UA fixture strings with expected parse results (Apache-2.0). Extract raw UA strings from the fixtures, not the regexes.yaml patterns."
+    secondary_candidate: "Kaggle: user-agent-strings datasets (verify CC-0/CC-BY at ac-01 time). Alternative: extract UA column from any public web access log dataset (e.g. NASA-HTTP on Kaggle)."
+    fallback: "If neither candidate yields ≥1000 usable values under a permissive license, fall back to an improved generator in the existing user_agent generator module."
+    target_rows_or_unique_values: 1000
+    v16_failure_motivating: "user_agent ×2 misclassified as jwt / docker_ref on corrected eval"
+
+  - type: "identity.medical.loinc"
+    path: "public_dataset"
+    primary_candidate: "LOINC top-N common-code subset (published in LOINC's free 'essentials' tier or extracted from public clinical datasets like MIMIC-IV's d_labitems — verify terms at ac-01 time)"
+    secondary_candidate: "Kaggle: search for loinc-codes / clinical-lab-codes datasets; verify CC-0/CC-BY license at ac-01 time"
+    fallback: "If no dataset is obtainable under acceptable terms within 1 day of implementation start, fall back to an improved generator targeting the 5-digit-dash-digit format (NNNNN-N) with realistic component/property/timing tokens from LOINC's published grammar."
+    target_rows_or_unique_values: 1000
+    v16_failure_motivating: "N/A (loinc has no v16 eval failure; this is quality prevention for future data)"
+
+  - type: "finance.banking.swift_bic"
+    path: "generator"
+    source_location: "crates/finetype-core/src/generators/swift_bic.rs (or existing module)"
+    target_rows_or_unique_values: 1000
+    v16_failure_motivating: "swift_bic distilled rows included ROSEDALE, FRANCE, WINNEBAGO, SULLIVAN, REG_DWORD per training-audit.md"
+    improvements_required:
+      - "ISO 3166-1 alpha-2 country codes in positions 5-6 (not arbitrary strings)"
+      - "Bank codes in positions 1-4 (4 alpha characters)"
+      - "Location + branch suffix variants (8 vs 11 chars)"
+
+  - type: "identity.medical.cpt"
+    path: "generator"
+    source_location: "crates/finetype-core/src/generators/cpt.rs (or existing module)"
+    target_rows_or_unique_values: 1000
+    v16_failure_motivating: "cpt distilled rows included 5-digit ints + 'Early Childhood Education and Teaching' per training-audit.md"
+    improvements_required:
+      - "5-digit format with Category I (00100-99607) and Category III (0016T-0624T) ranges"
+      - "Reject 5-digit integers that don't match the Category I/III ranges"
+      - "Realistic distribution across procedure categories"
+
+  - type: "representation.file.excel_format"
+    path: "generator"
+    source_location: "crates/finetype-core/src/generators/excel_format.rs (or existing module)"
+    target_rows_or_unique_values: 500
+    v16_failure_motivating: "excel_format distilled rows included CLI commands, country names, time durations per training-audit.md. Note: ≥500 rather than ≥1000 because the legitimate vocabulary is smaller."
+    improvements_required:
+      - "Token grammar: # 0 , . ; [ ] $ € £ ¥ % E/e A/a P/p M/m / d D y Y h H s S"
+      - "Multi-section syntax: positive;negative;zero;text"
+      - "Date/time variants (yyyy-mm-dd, mm/dd/yyyy, h:mm:ss, AM/PM)"
+      - "Numeric variants (#,##0.00, $#,##0.00, 0.00%, 0.00E+00)"
+
+  - type: "identity.government.ssn"
+    path: "generator"
+    source_location: "crates/finetype-core/src/generators/ssn.rs (or existing module) — synthetic-only, PRIVACY CONSTRAINT: never scrape real SSNs"
+    target_rows_or_unique_values: 1000
+    v16_failure_motivating: "people_directory phone→ssn misclassification; ssn generator may under-represent the canonical XXX-XX-XXXX format variants"
+    improvements_required:
+      - "Dashed format (XXX-XX-XXXX) as primary"
+      - "No-dashes format (XXXXXXXXX) as secondary"
+      - "Reject invalid area numbers (000, 666, 900-999) and group numbers (00)"
+
+  - type: "technology.internet.http_method"
+    path: "schema_only"
+    source_location: "labels/definitions_technology.yaml (enum + pattern updated)"
+    target_rows_or_unique_values: "N/A (closed set, no distilled rows)"
+    v16_failure_motivating: "http_method distilled rows included SAN JOAQUIN, GOAT, OPERATING, IN PROGRESS, ENROUTE per training-audit.md"
+    improvements_required:
+      - "Enumerate all 27 variants explicitly in both enum AND pattern (9 methods × {UPPER, lower, Title})"
+      - "Do NOT rely on (?i) regex flag — CompiledValidator applies pattern AND enum conjunctively (validator.rs:95), so enum-only coverage is required regardless"
+
+constraints:
+  - >
+    Sourcing policy: public datasets (Kaggle / GitHub) OR synthetic
+    generators only. No restricted registry scraping; no license-review
+    machinery. Per-type sourcing decisions are captured in the
+    top-level `sourcing_table:` field above — that table is the
+    single source of truth.
+  - >
+    http_method is handled entirely via the YAML schema. No new distilled
+    rows, no generator changes. The schema expansion cascades into the
+    CompiledValidator (case variants accepted) and the multi-branch
+    validation-branch feature (pass-rate goes up, realised only after
+    retrain).
+  - >
+    HTTP-method enum strategy (decided, not delegated): enumerate all
+    27 case variants explicitly in both the `enum` array and the
+    `pattern` alternation. Do NOT use (?i) alone — verified via
+    `CompiledValidator::is_valid` at crates/finetype-core/src/validator.rs:95,
+    which delegates to jsonschema::Validator applying pattern AND enum
+    conjunctively. An enum of `[GET, POST, …]` with pattern
+    `(?i)^(GET|POST|…)$` would still reject "Get" because enum is
+    exact-string.
+  - >
+    SSN remains synthetic-only. Do not scrape, download, or store real
+    SSN values.
+  - >
+    Generator improvement bar: ≥1000 unique values per generator
+    (SWIFT BIC, CPT, SSN) and ≥500 for Excel format (smaller legitimate
+    vocabulary). Each generator's improvements are audited against the
+    v16 eval failure cited in the sourcing_table.
+  - >
+    Integration: per-type source loaders (one Python module per
+    public-dataset type) under output/distillation-v4/loaders/.
+    Generator improvements live in their existing generator modules.
+    Do not patch output/distillation-v3/ in place — v3 retained for
+    reproducibility.
+  - >
+    Fallback-to-generator clause: if either of the public-dataset
+    types (user_agent, LOINC) cannot obtain ≥target rows under an
+    acceptable license within the time budget specified in the
+    sourcing_table entry, the implementer switches that type to the
+    generator path. This is treated as a **path-swap fast path**,
+    not a full spec bump: the implementer documents the swap in
+    SOURCES.md (citing which candidate failed and why) + adds a
+    progress.md note, and continues. Full spec-bump (v1.x → v1.x+1
+    with a fresh /orb:review-spec pass) is only required if the swap
+    changes a target row count, evaluation gate, or scope boundary.
+    Pure path-swaps (public_dataset → generator for the same type,
+    keeping the target count) do NOT require a new spec review.
+  - >
+    Retrain methodology: 3-seed sweep (seeds 42, 43, 44), 100 epochs
+    each, fresh (not warm-started from v16). Output directories:
+    `models/sherlock-v17-seed-{42,43,44}/`. Mirrors v16 methodology.
+    Expected compute: ~7.5h wall-clock on M1 Pro with Metal
+    (v16 precedent: ~2.5h/seed). Overnight run via
+    `scripts/sweep_v17.sh` (adapted from `sweep_v16.sh`).
+  - >
+    Training gate: reject any checkpoint with val_acc < 88% (catastrophic
+    floor). Checkpoints with val_acc in 88–91.2% trigger manual review,
+    not automatic rejection. Rationale for 88%: v14 shipped at 91.2%
+    val_acc with real eval quality; the 88% floor is ~3pp below that
+    (≈1σ), sufficient to catch data-corruption / label-remap bugs
+    without over-constraining a materially different corpus. Profile
+    eval (ac-11) is the true promotion gate.
+  - >
+    Eval promotion gate: the implementer captures v16's profile eval
+    score on the corrected ground truth AT corpus-freeze (the moment
+    output/distillation-v4/ is finalised and about to be consumed by
+    scripts/prepare_multibranch_data.py). The v16 baseline is pinned
+    to (a) the score, (b) the git SHA of eval/datasets/ and
+    eval/schema_mapping.yaml at that moment, and (c) the timestamp.
+    Promotion requires v17_winner ≥ max(235/242, v16_baseline).
+    Baseline is reused verbatim in ac-11 — no re-measurement against
+    drifted GT.
+  - >
+    Decision 0049 treatment: **amended in place**, NOT superseded.
+    Core thesis (keep synthetic generators for the 7 types) remains
+    accepted. Add a 'date-modified' header + an 'Update 2026-04-2X'
+    section noting public-dataset distilled data now exists for
+    user_agent + LOINC, and that SWIFT/CPT/Excel/SSN generators are
+    improved rather than replaced. Status stays `accepted`.
+  - >
+    N=1 email regression is OUT OF SCOPE. v17 does NOT claim to fix it.
+    Tracked in .orbit/specs/2026-04-20-v16-n1-email-regression/. If that
+    spec's eventual mechanism decision turns out to modify training
+    corpus composition, it ships in v18+, not v17.
+  - >
+    Label remap (data/label_remap.json): any new distilled labels from
+    v4 loaders must resolve to canonical taxonomy types. A validator
+    script is required (ac-05) — not a manual grep.
+  - >
+    Release promotion ordering (strict, per the CI-decouple flow):
+      Step 1. sherlock-v17 uploaded to HuggingFace and resolvable at
+              `.../resolve/main/sherlock-v17/{model.safetensors,config.json,label_map.json}`.
+      Step 2. FINETYPE_CI_MODEL bumped to `sherlock-v17` in both
+              `.github/workflows/ci.yml` and `.github/workflows/release.yml`.
+      Step 3. `models/default` symlink flipped to `sherlock-v17`.
+    Steps 2 and 3 ship in the same PR. Step 1 MUST precede step 2, or
+    CI fails on the PR that bumps FINETYPE_CI_MODEL.
+
+acceptance_criteria:
+  - id: ac-01
+    description: >
+      Per-type source loaders exist under
+      output/distillation-v4/loaders/ for public-dataset types in the
+      sourcing_table (currently user_agent and LOINC). Each loader is
+      an independently runnable Python module that emits a per-type
+      CSV with header [value,label] and canonical taxonomy labels.
+      If the primary+secondary candidates in sourcing_table fail
+      license/coverage review, the implementer invokes the
+      fallback-to-generator clause, updates the sourcing_table via
+      spec bump, and documents the decision in SOURCES.md.
+    verification: >
+      For each public-dataset type: (a) loader runs without error;
+      (b) emitted CSV has header [value,label]; (c) row count meets
+      target in sourcing_table; (d) labels match the canonical
+      taxonomy key (spot-check 3 values per file); (e) SOURCES.md
+      records which candidate was used AND the license.
+
+  - id: ac-02
+    description: >
+      Generator improvements for every type with
+      sourcing_table.path == "generator" (currently SWIFT BIC, CPT,
+      Excel format, SSN). Each generator meets the target unique-value
+      count from sourcing_table AND implements every item in its
+      `improvements_required` list.
+    verification: >
+      For each of the 4 generators: (a) run it; (b) `sort -u | wc -l`
+      shows ≥ target; (c) each `improvements_required` item is
+      implemented (code diff shows the variant/range/rejection logic);
+      (d) SOURCES.md has a per-generator section citing the v16 eval
+      failure + the specific improvements added.
+
+  - id: ac-03
+    description: >
+      output/distillation-v4/SOURCES.md exists and is consistent with
+      the top-level `sourcing_table:` field in this spec. Every one of
+      the 7 types has an entry; each entry reports its path
+      (public_dataset / generator / schema_only), its source location
+      (dataset URL + license, generator file path, or YAML file path),
+      and any deviations from the sourcing_table (with spec-bump
+      reference if a fallback was invoked).
+    verification: >
+      File exists; grep confirms 7 type entries; for each
+      public_dataset type, the URL is resolvable and license is cited;
+      the SOURCES.md entries match sourcing_table verbatim or cite a
+      spec-bump that explains the delta.
+
+  - id: ac-04
+    description: >
+      scripts/prepare_multibranch_data.py consumes v4 per-type CSVs
+      alongside v3 distillation and the improved generators. v3's
+      rows for the 7 target types are NOT mixed with v4 data —
+      v4 replaces them. `_DROP_DISTILLED_TYPES` at
+      scripts/prepare_multibranch_data.py:867 is updated:
+        Public-dataset types (user_agent, LOINC): REMOVED from the
+          list — they now have real distilled data.
+        Generator-path types (SWIFT BIC, CPT, Excel format, SSN):
+          REMAIN in the list — they use generators, not distilled rows.
+        http_method: REMAINS in the list — schema-only treatment.
+    verification: >
+      Run prep script; inspect output distilled counts. Grep
+      _DROP_DISTILLED_TYPES; assert user_agent + LOINC are NOT in the
+      list; assert SSN, SWIFT BIC, CPT, Excel format, http_method ARE
+      in the list.
+
+  - id: ac-05
+    description: >
+      scripts/validate_label_remap.py exists (new script) and runs
+      before training. It traverses transitive chains in
+      data/label_remap.json and fails if any label doesn't resolve to
+      a canonical taxonomy key. Wired into the prep script or CI so
+      it fails loud on unresolved labels. Scope is limited to chain
+      traversal + canonical-key resolution — no taxonomy validation
+      beyond that (that's `finetype check`'s job).
+    verification: >
+      Script exists and is executable; `./scripts/validate_label_remap.py`
+      exits 0 on current repo state; introducing a deliberate broken
+      chain (in a test fixture) makes it exit non-zero with a clear
+      error message identifying the unresolved label.
+
+  - id: ac-06
+    description: >
+      HTTP-method YAML schema — sub-AC (a) of 2. Update
+      labels/definitions_technology.yaml L283-286 so both `enum` AND
+      `pattern` enumerate all 27 case variants of the 9 HTTP methods:
+      `GET Get get POST Post post PUT Put put DELETE Delete delete
+      PATCH Patch patch HEAD Head head OPTIONS Options options
+      TRACE Trace trace CONNECT Connect connect`. Do NOT use (?i)
+      alone — enum exact-string matching defeats regex-only case
+      handling.
+
+      Also update SOURCES.md http_method entry with: (a) the schema
+      change; (b) the documented cascade effect — retrain picks up a
+      stronger validation-branch pass-rate feature; (c) language note:
+      stop calling the validation branch a "filter" or "gate" in this
+      codebase; it is a learned pass-rate feature.
+    verification: >
+      `finetype check` passes. Diff on
+      labels/definitions_technology.yaml shows enum + pattern with 27
+      variants each. SOURCES.md http_method entry mentions schema
+      change + cascade + language note.
+
+  - id: ac-07
+    description: >
+      HTTP-method CompiledValidator — sub-AC (b) of 2. Unit test in
+      crates/finetype-core/src/validator.rs asserts
+      `CompiledValidator::is_valid` returns true for all 27 case
+      variants (GET, Get, get, POST, Post, post, … CONNECT, Connect,
+      connect) and false for:
+        - non-method strings: "GOAT", "SAN JOAQUIN", "PATROL"
+        - mixed-case outside the 27 list: "gET", "POSt", "geT"
+        - whitespace-contaminated: " GET", "GET ", "GET\n"
+        - adjacent tokens: "GET /", "GET HTTP/1.1"
+    verification: >
+      `cargo test -p finetype-core validator` passes. Test function
+      named `ac07_http_method_case_variants` (for /orb:review-pr AC
+      coverage scan). Test iterates the 27-variant list.
+
+  - id: ac-08
+    description: >
+      Decision 0049 amended in place.
+      .orbit/choices/0049-preserve-synthetic-for-bad-distilled-types.md
+      has an updated 'date-modified' header and a new
+      '## Update 2026-04-2X' section noting: (a) public-dataset
+      distilled data now exists for user_agent + LOINC; (b) SWIFT
+      BIC / CPT / Excel format / SSN use improved generators;
+      (c) http_method handled via YAML schema ENUM. Status remains
+      `accepted`, NOT `superseded`.
+    verification: >
+      Diff on 0049 shows date-modified + update section; grep confirms
+      `status: accepted` unchanged.
+
+  - id: ac-09
+    description: >
+      3-seed sweep completes via scripts/sweep_v17.sh (adapted from
+      sweep_v16.sh). Seeds 42, 43, 44 × 100 epochs each, fresh
+      training. Output directories: `models/sherlock-v17-seed-42/`,
+      `models/sherlock-v17-seed-43/`, `models/sherlock-v17-seed-44/`.
+      Training gate: any checkpoint with val_acc < 88% is REJECTED
+      (script exits non-zero); checkpoints with val_acc 88%–91.2% are
+      RETAINED but flagged in progress.md for manual review before
+      promotion. results.json + epochs.jsonl written per seed.
+
+      **No-promotion branch:** If all 3 seeds' best val_acc fall below
+      88%, the spec halts. Implementer investigates (data corruption,
+      label_remap break, config drift). v17 is not promoted; v0.6.18 is
+      not released.
+    verification: >
+      models/sherlock-v17-seed-{42,43,44}/results.json exist, each
+      with 100 EpochMetrics; best-epoch val_accuracy ≥ 0.88 for all 3.
+      If any seed's best is 88–91.2%, progress.md has a review note.
+      If all 3 seeds fail the floor, progress.md documents the halt +
+      investigation path.
+
+  - id: ac-10
+    description: >
+      v16 baseline captured at corpus-freeze. The implementer runs
+      `eval/profile_eval.sh` against sherlock-v16 at the moment
+      output/distillation-v4/ is finalised (immediately before the
+      sweep begins). Results written to
+      .orbit/specs/2026-04-20-distilled-data-relabel-7-types/v16-baseline.md
+      containing: (a) score x/242, (b) git SHA of eval/datasets/ +
+      eval/schema_mapping.yaml at time-of-capture, (c) wall-clock
+      timestamp, (d) finetype CLI version string. The same eval
+      inputs are reused verbatim in ac-11.
+    verification: >
+      File v16-baseline.md exists with all 4 fields; `git rev-parse`
+      on the recorded SHA succeeds; the SHA matches the
+      eval/datasets/ + eval/schema_mapping.yaml state at that commit.
+
+  - id: ac-11
+    description: >
+      Profile eval on all 3 seeds' best checkpoints, scored against
+      the eval inputs pinned in ac-10 (NOT against drifted GT).
+
+      **Winner selection:** winner = seed with highest profile-eval
+      score (x/242). Ties broken by highest val_acc (from ac-09).
+      Further ties broken by lowest seed number (42 > 43 > 44).
+
+      **Promotion gate:** winner_score ≥ max(235, v16_baseline_score).
+
+      **No-promotion branch:** if winner_score < max(235, v16_baseline),
+      spec halts. Implementer documents in progress.md which seeds
+      scored what, which per-column regressions drove the miss, and
+      whether a data fix is worth pursuing before a v17.2 retrain vs
+      deferring v17 entirely. v0.6.18 is NOT released.
+
+      **Manual-review branch:** if winner's val_acc is in 88–91.2% AND
+      profile eval passes the gate, promotion is gated on an explicit
+      Hugh sign-off (NOT implementer self-attestation). The implementer
+      pauses, posts the per-seed per-column eval diff + the winner's
+      val_acc + training curves (from epochs.jsonl) as a comment on the
+      promotion PR, and waits for Hugh's explicit "approve promote"
+      reply. The approval (verbatim Hugh comment) is quoted in
+      progress.md before ac-12 runs.
+    verification: >
+      eval/profile_eval.sh run against each seed's best checkpoint
+      using the ac-10 pinned eval inputs; per-seed per-column mismatch
+      tables recorded in eval-comparison.md (markdown table per seed);
+      winner + tiebreakers documented; promotion decision (promote /
+      halt / manual-review cleared) documented in progress.md.
+
+  - id: ac-12
+    description: >
+      sherlock-v17 promoted per the CI-decouple flow (strict ordering):
+
+      1. **HF upload first**: sherlock-v17/{model.safetensors,
+         config.json, label_map.json} uploaded to
+         meridian-online/finetype-model on HuggingFace and verified
+         resolvable via `curl -fsI` before any PR is opened.
+      2. **Same-PR workflow bump + symlink flip**: a single PR
+         (a) bumps FINETYPE_CI_MODEL to sherlock-v17 in
+         `.github/workflows/ci.yml` and `.github/workflows/release.yml`,
+         AND (b) flips `models/default` symlink to sherlock-v17.
+      3. **CI drift-check silent**: the drift-check job from the
+         CI-decouple spec emits no ::warning:: in the PR run.
+
+      **Rollback rule**: if ac-13 (tag push + release workflow) fails
+      after ac-12 is merged, the implementer opens an immediate
+      revert PR restoring models/default → sherlock-v16 AND
+      FINETYPE_CI_MODEL → sherlock-v16 in both workflows. Rationale:
+      while the release tag/binaries are broken, keeping the symlink
+      on a model that has no corresponding release creates downstream
+      install-path ambiguity. The revert PR is merged before any
+      retry of ac-13.
+    verification: >
+      Step 1: `curl -fsI .../sherlock-v17/{model.safetensors,config.json,
+      label_map.json}` returns 200 for all 3, output captured in
+      progress.md BEFORE the promotion PR is opened (timestamp in the
+      progress.md entry proves ordering).
+      Step 2/3: `git diff main -- .github/workflows/ models/` on the
+      promotion PR shows both env bumps + symlink flip; `ls -l
+      models/default` on main post-merge resolves to sherlock-v17.
+      drift-check job log contains no `::warning::`.
+
+  - id: ac-13
+    description: >
+      v0.6.18 released: Cargo.toml workspace version bumped
+      0.6.17 → 0.6.18; tag v0.6.18 pushed to main; GitHub release
+      published with 5-platform binaries; Homebrew tap auto-bumped.
+      eval/eval_output/report.md refreshed with v17 winner numbers
+      from ac-11.
+    verification: >
+      `gh release view v0.6.18` shows 5 binaries + sha256s;
+      homebrew-tap commit bumps Formula/finetype.rb to 0.6.18;
+      report.md headline score == winner score from ac-11.
+
+  - id: ac-14
+    description: >
+      MADR files committed for the surfaced decisions:
+        (a) Per-type sourcing policy — public datasets OR generators,
+            not restricted registries; sourcing_table is the spec's
+            single source of truth.
+        (b) http_method via YAML-schema ENUM-only, enumerating 27 case
+            variants (not (?i) regex). Documents the 3-surface cascade.
+        (c) Scope-aware eval gate — max(235/242, v16-at-corpus-freeze).
+        (d) Training gate relaxed — 88% catastrophic floor with
+            88–91.2% manual-review band.
+      Each MADR references this spec.
+    verification: >
+      `ls decisions/` shows 4 new files (NNNN-short-title.md) with
+      status: accepted, each referencing
+      .orbit/specs/2026-04-20-distilled-data-relabel-7-types/.
+
+ontology_schema:
+  name: "DistilledDataSource"
+  description: >
+    Per-type sourcing decision for the v17 training corpus. The
+    top-level sourcing_table field is the authoritative instance
+    set; this schema documents the shape.
+  fields:
+    - name: "type_label"
+      type: "string"
+      description: "Canonical taxonomy label, e.g. technology.identifiers.loinc"
+    - name: "path"
+      type: "enum"
+      description: "public_dataset | generator | schema_only"
+    - name: "primary_candidate"
+      type: "string"
+      description: "Primary source (URL for public_dataset; file path for generator/schema_only)"
+    - name: "secondary_candidate"
+      type: "string"
+      description: "Fallback URL/path if primary is unavailable"
+    - name: "fallback"
+      type: "string"
+      description: "Invocation rule if primary+secondary both fail"
+    - name: "target_rows_or_unique_values"
+      type: "integer"
+      description: "Target row count (public_dataset) or unique-value count (generator)"
+    - name: "v16_failure_motivating"
+      type: "string"
+      description: "Specific v16 eval column/failure this work targets"
+    - name: "improvements_required"
+      type: "list[string]"
+      description: "For generator path: enumerated improvements (format variants, range validation, etc.)"
+
+evaluation_principles:
+  - principle: "Net model quality improvement on profile eval"
+    weight: 0.40
+  - principle: "Sourcing simplicity — public datasets OR generators, no license gymnastics"
+    weight: 0.20
+  - principle: "Pipeline hygiene — clean v4 integration, no v3 patching"
+    weight: 0.20
+  - principle: "Reproducibility — pinned baseline, documented sourcing_table, 3-seed sweep"
+    weight: 0.20
+
+exit_conditions:
+  - "All 14 acceptance criteria verified"
+  - "v0.6.18 live on GitHub releases + Homebrew tap"
+  - "Profile eval winner ≥ max(235/242, v16-baseline-at-corpus-freeze)"
+  - "4 MADR files committed for the surfaced decisions"
+  - "Decision 0049 amended in place (status remains accepted)"
+  - "CLAUDE.md 'Recent work' and 'What's next' sections updated"
+
+metadata:
+  version: "1.3"
+  timestamp: "2026-04-20T00:00:00Z"
+  ambiguity_score: 0.03
+  interview_ref: ".orbit/specs/2026-04-20-distilled-data-relabel-7-types/interview.md"
+  review_refs:
+    - ".orbit/specs/2026-04-20-distilled-data-relabel-7-types/review-spec-2026-04-20.md (v1.0)"
+    - ".orbit/specs/2026-04-20-distilled-data-relabel-7-types/review-spec-2026-04-20-v1.1.md (v1.1)"
+    - ".orbit/specs/2026-04-20-distilled-data-relabel-7-types/review-spec-2026-04-20-v1.2.md (v1.2)"
+  risk_tier: "HIGH"
+  changes_from_v1_2:
+    - "Taxonomy keys corrected: technology.web.* → technology.internet.*; loinc key corrected to identity.medical.loinc (review v1.2 HIGH H1 — ac-04 verification grep would have spuriously passed otherwise)"
+    - "ac-11 manual-review branch now requires explicit Hugh sign-off on promotion PR, NOT implementer self-attestation (review v1.2 HIGH H2)"
+    - "Fallback-to-generator clause: path-swaps for same type + same target are fast-path (SOURCES.md + progress.md note), no spec bump (review v1.2 MEDIUM M1)"
+    - "ac-12 adds explicit rollback rule if ac-13 release fails after ac-12 symlink merged (review v1.2 MEDIUM M2)"
+    - "ua-parser primary candidate corrected to test_resources/*.yaml (fixtures), not regexes.yaml (patterns); LOINC primary candidate replaced with a realistic published subset (review v1.2 MEDIUM M3)"
+    - "ac-07 negative-test list expanded: mixed-case outside 27 list, whitespace-contaminated, adjacent tokens (review v1.2 LOW L4)"
+    - "ac-12 verification now pins curl HEAD output capture in progress.md with timestamp to prove ordering (review v1.2 LOW L3)"
+  changes_from_v1_1:
+    - "Candidate URLs + fallback-to-generator clause added to sourcing_table (review v1.1 HIGH H1)"
+    - "ac-11 (promotion) adds tiebreaker + no-promotion branch; ac-09 adds all-seeds-fail-floor halt (review v1.1 HIGH H2)"
+    - "ac-10 (baseline) pinned to corpus-freeze moment + git SHA (review v1.1 MEDIUM M1)"
+    - "HTTP-method enum strategy decided explicitly (27 variants, no (?i) alone) (review v1.1 MEDIUM M2)"
+    - "Former ac-08 (validation-branch cascade) collapsed into ac-06 (review v1.1 MEDIUM M3)"
+    - "sourcing_table elevated to first-class top-level field, mutations require spec bump (review v1.1 MEDIUM M4)"
+    - "ac-05 scope clarified: chain traversal only, not taxonomy validation (review v1.1 LOW)"
+    - "ac-12 HF-first ordering made strict, verification via curl HEAD before PR (review v1.1 LOW)"
+    - "ac-09 seed naming convention made explicit: models/sherlock-v17-seed-{42,43,44} (review v1.1 LOW)"
+    - "88% training-gate floor rationale added: v14 shipped at 91.2%, 88% ≈ 1σ below (review v1.1 implicit)"
+  changes_from_v1_0:
+    - "N=1 email regression split back out of scope (review v1.0 HIGH)"
+    - "Licensing machinery dropped — public datasets OR generators (review v1.0 HIGH)"
+    - "ac-05 split into ac-06/07/08 covering 3 HTTP-method ENUM surfaces (review v1.0 HIGH) — further collapsed in v1.2"
+    - "Eval gate scope-aware: max(235/242, v16-at-start) (review v1.0 HIGH)"
+    - "Training gate relaxed: 88% floor + 88–91.2% manual review (review v1.0 MEDIUM)"
+    - "Decision 0049 amended in place, NOT superseded (review v1.0 MEDIUM)"
+    - "label_remap validator script now required, not optional (review v1.0 MEDIUM)"
+    - "Compute budget explicit: ~7.5h on M1 Pro Metal (review v1.0 MEDIUM)"
+  related_specs:
+    - ".orbit/specs/2026-04-18-v16-data-audit-retrain/"
+    - ".orbit/specs/2026-04-20-v16-release/handover.md"
+    - ".orbit/specs/2026-04-20-v16-n1-email-regression/"
+    - ".orbit/specs/2026-04-20-ci-decouple-default-symlink/"
+  related_decisions:
+    - ".orbit/choices/0049-preserve-synthetic-for-bad-distilled-types.md"
+    - ".orbit/choices/0038-strength-through-simplification.md"
+    - ".orbit/choices/0048-value-based-rules-only.md"

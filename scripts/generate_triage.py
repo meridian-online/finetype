@@ -19,8 +19,8 @@ Rationale per row records the exact failing metrics so Hugh can
 override the call in his human-review pass.
 
 See:
-  orbit/specs/2026-04-21-eval-expansion/spec.yaml (ac-03)
-  orbit/decisions/0055-eval-realism-dimensions.md (triage schema)
+  .orbit/specs/2026-04-21-eval-expansion/spec.yaml (ac-03)
+  .orbit/choices/0055-eval-realism-dimensions.md (triage schema)
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("orbit/specs/2026-04-21-eval-expansion/triage.md"),
+        default=Path(".orbit/specs/2026-04-21-eval-expansion/triage.md"),
     )
     args = parser.parse_args()
 

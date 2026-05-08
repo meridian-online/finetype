@@ -1,0 +1,98 @@
+id: '0075'
+title: Mechanism-attribution buckets — coalesce to 4, two trigger paths each
+status: accepted
+date_created: 2026-04-29
+date_modified: 2026-04-29
+body: |
+  # 0075. Mechanism-attribution buckets — coalesce to 4, two trigger paths each
+
+  ## Context and Problem Statement
+
+  Iter-2's `validate-corpus` mechanism-attribution cascade exposed a gap:
+  the iter-2 curated datasets (NYC Taxi, GDELT, FIFA, OECD, S&P 500)
+  were chosen specifically to exercise the `format_diversity` and
+  `code_vs_canonical` buckets, but every column in those datasets
+  attributed to `misclassification` because the iter-1 cascade only
+  fired the more-specific buckets when `predicted == expected`. When
+  the model picked the wrong subtype within the right family (NYC Taxi
+  SQL-standard timestamp predicted as ISO-8601), the cascade saw
+  "predicted ≠ expected" and routed the failure to misclassification —
+  losing the diagnostic signal the curated dataset was designed to
+  surface.
+
+  The cascade needs a way to attribute path-B failures (predicted ≠
+  expected) to format_diversity and code_vs_canonical without
+  exploding the bucket count. Either each path becomes its own
+  bucket (8 buckets) or the existing 4 buckets gain a second trigger
+  path each.
+
+  ## Considered Options
+
+  - **Option A — 8 buckets** (`format_diversity_path_a`,
+    `format_diversity_path_b`, `code_vs_canonical_path_a`,
+    `code_vs_canonical_path_b`, plus the 4 existing). Maximum precision
+    in the report tables; per-mechanism counts directly map to
+    trigger-path frequencies.
+  - **Option B — 4 buckets, two trigger paths each.** Bucket count
+    matches iter-2; each rule emits a `(Mechanism, &'static str)` tuple
+    where the second slot is a 6-label trigger string (`path-a-pattern`,
+    `path-b-prefix`, `path-b-codetype`, `enum-constraint`,
+    `prediction-error`, `fallthrough`). The per-mechanism breakdown
+    table stays 4 rows; a new `Trigger` column in the per-column table
+    surfaces the path.
+  - **Option C — Path B merged into misclassification with a sub-flag.**
+    Bucket count stays 4; the per-mechanism breakdown table is unchanged
+    from iter-2; a column-level boolean `same_broad_prefix` marks the
+    subtype-drift case. Lossy: the analyst loses the bucket-level
+    signal in the headline table.
+
+  ## Decision Outcome
+
+  Chosen option: **Option B — 4 buckets, two trigger paths each**,
+  because it preserves iter-2's headline table shape (the
+  per-mechanism breakdown reads identically) while restoring the
+  diagnostic precision the curated datasets were designed to surface.
+  The trigger label is rule-owned (each `try_*` function returns its
+  own `&'static str`), never inferred from the variant — this keeps
+  the rules and the report column in lock-step.
+
+  The 7-rule cascade order codifies the bucket-coalesce decision:
+
+  1. `enum_overfit` (predicted == expected + enum reject)
+  2. `format_diversity_path_b` (predicted != expected, same broad prefix)
+  3. `code_vs_canonical_path_b` (predicted != expected, XOR allowlist)
+  4. `format_diversity_path_a` (predicted == expected, pattern reject, !seam)
+  5. `code_vs_canonical_path_a` (predicted == expected, pattern reject, seam)
+  6. `misclassification` (predicted != expected, catch-all)
+  7. `fallthrough` (terminal unknown)
+
+  Path-B rules fire BEFORE catch-all misclassification (Rule 6) so
+  subtype drift and code-vs-canonical attribute correctly. Same-prefix
+  mismatches resolve to FormatDiversity (Rule 2) before code-typed
+  allowlist XOR can fire (Rule 3) — this means same-prefix code/text
+  pairs (`country` vs `country_code`) attribute as FormatDiversity,
+  which the spec's cascade-order discussion accepts as the right
+  trade-off for the iter-2 anchor coverage.
+
+  ### Consequences
+
+  - Good, because iter-2's curated datasets attribute to their target
+    buckets (FIFA Value → code_vs_canonical, NYC Taxi
+    tpep_pickup_datetime → format_diversity) without inflating the
+    per-mechanism breakdown table.
+  - Good, because the trigger label is rule-owned — a new rule cannot
+    silently steal a label that another rule promises to emit.
+  - Good, because the cascade order is mechanically encoded in the
+    `RULES: &[RuleFn]` slice, not narrative prose; rule reordering
+    requires a code change visible in PR review.
+  - Bad, because same-prefix code/text pairs (a hypothetical column
+    predicted as `geography.location.country` vs expected
+    `geography.location.country_code`) attribute as FormatDiversity
+    rather than CodeVsCanonical. Mitigated: the spec accepts this
+    collision because path-B prefix mismatch is the more common case;
+    cross-prefix code-vs-canonical (FIFA Value → currency.amount) is
+    the load-bearing iter-2 anchor and is unaffected.
+  - Neutral, because the trigger labels Rules 4 and 5 emit are
+    identical (`path-a-pattern`) — the mechanism enum is the
+    discriminator; the trigger label is a coarser breadcrumb.
+references: []

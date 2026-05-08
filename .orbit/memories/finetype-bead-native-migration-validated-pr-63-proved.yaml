@@ -1,0 +1,4 @@
+key: finetype-bead-native-migration-validated-pr-63-proved
+body: 'finetype-bead-native-migration-validated: PR #63 proved the bead-native flow end-to-end on 0011-agent-ready-skills (finetype-u6a). All 6 substrate signals from migration-0.4.0.md step 5 confirmed. Drive iteration 1 / guided autonomy / 3 review-spec cycles + 1 review-pr cycle.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

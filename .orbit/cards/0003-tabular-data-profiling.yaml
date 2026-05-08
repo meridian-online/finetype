@@ -1,0 +1,42 @@
+feature: Tabular data profiling
+as_a: data analyst
+i_want: to profile a CSV or Parquet file and get the detected semantic type for every column — and optionally export the result as a JSON Schema I can edit and feed back into validate
+so_that: I can understand the structure of an unfamiliar dataset without manually inspecting each column, and then promote the inferred shape into a durable schema contract
+goal: CSV and Parquet profiling with 6 output formats (plain, json, csv, markdown, arrow, json-schema), null detection, enum threshold — and json-schema output as the canonical bridge into validate
+maturity: established
+scenarios:
+- name: Profile a CSV file
+  given: a CSV file with multiple columns of unknown types
+  when: I run finetype profile -f data.csv
+  then: FineType outputs a table showing each column's detected type, confidence, and locale
+  gate: false
+- name: Multiple output formats
+  given: a profiled dataset
+  when: I specify an output format with -o plain|json|csv|markdown|arrow|json-schema
+  then: profile results are rendered in the requested format for downstream consumption — including JSON Schema, suitable as direct input to finetype validate
+  gate: false
+- name: Profile is the source of table-level schemas
+  given: a CSV file
+  when: I run finetype profile -f data.csv -o json-schema --stdout
+  then: FineType emits a table-level JSON Schema with x-finetype-label per column — replacing the earlier table-mode invocation of finetype schema
+  gate: false
+- name: Null detection
+  given: a CSV file with missing or null values in some columns
+  when: I profile the file
+  then: null values are detected and excluded from type inference so they don't corrupt the classification
+  gate: false
+- name: Enum detection
+  given: a column with a small number of distinct values
+  when: I profile with --enum-threshold N
+  then: columns with fewer than N distinct values are flagged as categorical/enum candidates
+  gate: false
+specs:
+- .orbit/specs/2026-04-27-cli-pipeline-reshape/
+- .orbit/specs/2026-04-28-profile-json-schema-output/spec.yaml
+relations: []
+references:
+- README.md
+- docs/ARCHITECTURE.md
+- CLAUDE.md
+- orbit/memos/2026-04-27-schema-profile-overlap.md
+notes: []

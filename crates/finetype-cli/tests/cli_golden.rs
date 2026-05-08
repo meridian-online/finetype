@@ -636,7 +636,7 @@ fn golden_taxonomy_json_schema_email() {
 /// assert them too as belt-and-braces against future N=1
 /// regressions across the technology.internet domain.
 ///
-/// Spec: `orbit/specs/2026-04-20-v16-n1-email-regression/`.
+/// Spec: `.orbit/specs/2026-04-20-v16-n1-email-regression/`.
 #[test]
 #[ignore]
 fn golden_infer_n1_email_column() {

@@ -1,0 +1,4 @@
+key: cycle-df6a4260-2026-05-03-halted-partial-cycle
+body: 'cycle-df6a4260-2026-05-03-halted-partial: Cycle 4 of GitTables 90% round-trip contract halted mid-flight. Symptoms: launch-idiom misuse (nohup+& inside run_in_background:true) led to wrapper-exit-0 + duplicate launches; 3 concurrent cron_cycle_work.py wrote to append-only logs under same cycle_id before being pkill''d. Partial state under df6a4260: 524 coverage rows (523 distinct files), 446 failure, 446 harvest — append integrity intact, no torn rows. Gate not measured. H02 + unmatched_state escalation surfaced; bead finetype-dwk filed for tabletop 2026-05-10. Recommended: never wrap with nohup/& inside Bash run_in_background — let the tool reparent to launchd directly.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

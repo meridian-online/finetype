@@ -1,7 +1,7 @@
 #!/bin/bash
 # Validate iter-2 GT sidecars: cardinality + label validity.
 #
-# AC-02 of orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml.
+# AC-02 of .orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml.
 #
 # Two invariants per sidecar:
 #   (a) cardinality — `columns:` map size equals the CSV's header column count

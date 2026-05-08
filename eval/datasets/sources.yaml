@@ -342,7 +342,7 @@ sources:
   # FIFA, OECD) mechanism coverage, closing the 0/0 zero-coverage gap
   # surfaced by iter-1's expected-vs-actual mismatch table. All sourced
   # from public open-data portals at SPDX-strict licences. Spec:
-  # orbit/specs/2026-04-28-validate-corpus-curation/.
+  # .orbit/specs/2026-04-28-validate-corpus-curation/.
   - source_url: https://datahub.io/core/s-and-p-500-companies/r/constituents.csv
     role: validate
     licence: PDDL-1.0

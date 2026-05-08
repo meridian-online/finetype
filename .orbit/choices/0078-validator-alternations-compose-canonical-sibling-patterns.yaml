@@ -1,0 +1,128 @@
+id: '0078'
+title: Validator alternations may compose canonical sibling-type patterns
+status: accepted
+date_created: 2026-04-29
+date_modified: 2026-04-29
+body: |
+  # 0078. Validator alternations may compose canonical sibling-type patterns
+
+  ## Context and Problem Statement
+
+  iter-4 of the validate-corpus arc needed to widen
+  `finance.currency.amount`'s `validation.pattern` to accept plain
+  bare-decimal money values like `1914.96`, `19.95`, `100`, `-50.5`.
+  The discovery vehicle (`eval/datasets/csv/ecommerce_orders.csv`)
+  had `total_price` rejecting 63/100 rows under the existing pattern,
+  which required a currency symbol or comma-grouped thousands.
+
+  Two bracketing constraints were already in force:
+
+  - **MADR 0042** deprecated regex header hints. Header-conditional
+    validator widening is off the taxonomy table.
+  - **MADR 0048** restricted new disambiguation rules to value-based
+    Sharpen rules. Header-dependent rules are deferred.
+
+  That left the validator-layer regex as the only legitimate site for
+  the fix. The question became: how do we author the new alternation?
+  Options surfaced during the iter-4 design session:
+
+  - **Invent a tighter bare-decimal pattern** narrowed to e-commerce
+    shape (1–4 integer digits, 1–4 decimal digits, no scientific
+    notation). Risks proliferating slightly-different bare-decimal
+    regexes across `definitions_finance.yaml` and elsewhere; each
+    variant becomes its own maintenance burden.
+  - **Look for canonical prior art.** External canonical sources for
+    unsymboled money formats don't exist — CLDR is a locale-aware DSL
+    not a regex; there's no IETF/ISO standard for the unsymboled form.
+    But `representation.numeric.decimal_number` (at
+    `labels/definitions_representation.yaml:79`) already governs
+    exactly this shape across the taxonomy. iter-1 ac-10 had widened
+    that pattern to absorb scientific notation; the same regex is the
+    canonical bare-decimal shape we need.
+  - **Refactor amount and decimal_number to share a YAML fragment.**
+    YAML doesn't support imports natively. FineType's taxonomy treats
+    each definition as self-contained.
+
+  The decision shapes how future validator widening should be authored.
+
+  ## Considered Options
+
+  - **Option A — Invent a fresh alternation per widening site.** Each
+    validator that needs to absorb a new shape gets a hand-rolled
+    regex variant. Reviewer judgment is the only quality gate.
+  - **Option B — Compose the canonical pattern from a sibling type
+    verbatim.** When a widening shape is already canonical to another
+    taxonomy entry (here: `representation.numeric.decimal_number` for
+    bare decimals), reuse that entry's pattern byte-identically as a
+    new alternation. A YAML comment immediately above the pattern
+    names the source path + line number for traceability.
+  - **Option C — Refactor to a shared YAML fragment.** Introduce a
+    taxonomy-level snippet system so `decimal_number` and `amount`
+    can both reference one definition. Architectural change — bigger
+    blast radius than a localised widening warrants.
+
+  ## Decision Outcome
+
+  Chosen option: **Option B — compose the canonical sibling pattern
+  verbatim**, because it is the smallest change that respects the
+  two bracketing constraints (validator-layer fix, no header hints,
+  no new value-based rules) AND avoids the parallel-evolution risk
+  that Option A invites.
+
+  The load-bearing precedent is *composition over invention*: when
+  widening a validator's pattern, prefer reusing a sibling type's
+  canonical pattern verbatim (with a comment annotation naming the
+  source) over inventing a new regex variant. The iter-4 instance
+  is `decimal_number → amount`: the 4th alternation in
+  `finance.currency.amount` at `definitions_finance.yaml:131` is
+  byte-identical to `representation.numeric.decimal_number`'s
+  pattern at `definitions_representation.yaml:79`.
+
+  The annotation contract is:
+
+  - A YAML comment block immediately above the widened `pattern:`
+    line names every alternation in declaration order, identifies
+    which alternation is borrowed, points to the source's path +
+    line number, and references this MADR.
+  - The comment is the human-readable substitute for the YAML-import
+    capability the format doesn't offer.
+
+  This decision does not retroactively reshape the taxonomy. It is
+  forward-looking: the next time a validator needs to widen, the
+  default move is to scan the rest of the taxonomy for a canonical
+  sibling pattern before inventing one. If no canonical sibling
+  exists, hand-rolled regexes are still permitted — but with a
+  comment naming the absence as a check that prior-art was
+  considered.
+
+  ### Consequences
+
+  - Good, because the validator regex stays minimal — one
+    alternation appended, no DSL machinery, no new files. The
+    iter-4 change is `+13 / -1` lines in `definitions_finance.yaml`
+    (12-line comment block + 1-line pattern union extension; the
+    pre-existing pattern line is replaced with the union including
+    the new alternation).
+  - Good, because the comment annotation makes the borrowing
+    legible to anyone reading the YAML — they don't need to consult
+    this MADR to understand where alternation 4 comes from. The MADR
+    reference makes the *precedent* discoverable.
+  - Good, because future validator widening has a clear default
+    motion (scan for canonical sibling → reuse verbatim with
+    annotation) which short-circuits the Option-A drift risk.
+  - Bad, because byte-identity creates an implicit coupling between
+    the source pattern and the borrowing pattern. If
+    `decimal_number`'s pattern changes, `amount`'s alternation 4
+    drifts silently. Mitigated: the comment names the source path,
+    so a reviewer touching `decimal_number` is exactly one Grep
+    away from the borrowing site.
+  - Neutral, because the precedent only applies when a canonical
+    sibling pattern exists. iter-4 is the first instance; future
+    cards may or may not surface comparable opportunities.
+  - Bracketing decisions remain in force: MADR 0042 (no regex
+    header hints) and MADR 0048 (value-based Sharpen rules only)
+    define the layers above and below the validator. iter-4's
+    widening sits at the validator layer because it is the right
+    layer for shape composition; classification precision (header
+    + value-shape) remains the model's responsibility.
+references: []

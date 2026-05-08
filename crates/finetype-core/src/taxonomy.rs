@@ -114,7 +114,7 @@ impl Validation {
     /// `[A-Za-z0-9_]+`, `[A-Za-z0-9 ]+`, `[A-Za-z0-9_\-\.]+`,
     /// `[\w\s]+`, `[\w]+`, `[\s]+`, and any `.{0,N}` / `.{1,N}` form.
     ///
-    /// See MADR 0059 (`orbit/decisions/0059-demotion-guard-over-promotion.md`)
+    /// See MADR 0059 (`.orbit/choices/0059-demotion-guard-over-promotion.md`)
     /// and the Precision Principle in `CLAUDE.md`: *"A validation that
     /// confirms 90% of random input is not a validation."*
     pub fn is_precise(&self) -> bool {
@@ -1162,7 +1162,7 @@ representation.discrete.categorical:
     }
 
     // --- ac-01: Validation::is_precise() tests (spec:
-    // orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml) ---
+    // .orbit/specs/2026-04-21-sharpen-demotion-guard/spec.yaml) ---
     //
     // Prefix convention: dgd (Demotion Guard Disambiguation) per spec
     // metadata.test_prefix. Numbering ties tests back to ac-01's four

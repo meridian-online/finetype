@@ -1,0 +1,4 @@
+key: tabletop-method-lesson-6-schedule-online-only-added
+body: 'tabletop-method-lesson-6-schedule-online-only: Added 2026-05-03. The orbit `schedule` skill provisions remote cloud agents in Anthropic infrastructure, NOT local cron. Wrong tool for tabletop-derived contracts where the cron-firing agent must run on the user''s machine (data locality, GPU access, local repo state). Local equivalents: `CronCreate` (REPL-bound, low-stakes reminders); launchd / system cron (unattended autonomous, infrastructure work). Methodology pass-2 amendment: contracts must state local vs remote scheduling mechanism explicitly; §2 standing orders should name the mechanism for future-tabletop audit. Source: pass-1 tabletop scribe error during pass-2-trigger setup; redirected by Hugh.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SPEC_DIR = REPO_ROOT / "orbit/specs/2026-04-24-amount-variant-generators"
+SPEC_DIR = REPO_ROOT / ".orbit/specs/2026-04-24-amount-variant-generators"
 DIAG_DIR = SPEC_DIR / "diagnostics"
 FTMB = REPO_ROOT / "output/multibranch-training/v16-blend-70-30.ftmb"
 READ_FTMB = REPO_ROOT / "scripts/read_ftmb.py"

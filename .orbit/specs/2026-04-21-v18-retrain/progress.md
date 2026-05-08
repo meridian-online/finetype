@@ -1,0 +1,38 @@
+# Implementation Progress
+
+Spec path: .orbit/specs/2026-04-21-v18-retrain/spec.yaml
+Spec hash: sha256:0755157096ed679486a5ae831f3f2b5c1f0b1758cc421b04e8af9c80bbfe00dd
+Started: 2026-04-21
+Current AC: complete
+
+## Hard Constraints
+- [x] Fixed data seed — prep runs ONCE with DATA_SEED=42. All training seeds reuse the same .ftmb. One prep artefact per sweep, not per seed. — Single prep invocation at sweep_v18.sh start; FTMB reused by all 3 training seeds; cleaned only after all training complete.
+- [x] Triage is a hard gate — no training run may start before triage.md enumerates every v16 misclassification on the expanded 352-col eval with a per-type lever assignment. — triage.md shipped before sweep launched; 55 failures enumerated with levers.
+- [x] Promotion gate (pinned v16 baseline via git SHA): v18_score ≥ 297/352 AND per-domain regression ≤ 3 columns in any single domain. — Seed 42 = 297/352 (tie, meets ≥); max per-domain delta = datetime +3 (at limit). Both met mechanically.
+- [x] Leakage firewall must be active — row-hash filter on by default, sources.yaml role manifest present, realism pre-screen passing. Log line asserting hash-filter active required. — `hash_filter_active: true` present in sweep-v18.log. 761,219 eval rows filtered out of 28.8M corpus rows. Defence-in-depth: leaked_rows_after_filter=0.
+- [x] Scope: retrain + Sharpen adjustments only. Sharpen rules must be value-based per decision 0048. Taxonomy edits OUT-OF-SCOPE for v18. — No taxonomy changes; no new Sharpen rules added in v18 sweep.
+- [x] 3-seed training-only sweep — seeds {42,43,44}, 100 epochs, patience 15, one shared .ftmb. Training gate from decision 0053 unchanged. — 3 seeds completed; early-stopped at epochs ~47-53 on patience-15; all AUTO_ACCEPT per decision 0053.
+- [x] Sibling-context attention preserved — classify_columns_with_context remains the default profile path. — FTMB v3 format with sibling_headers field; n_sibling_headers=133252 emitted pre-write. Profile eval used classify_columns_with_context path.
+- [x] No release promotion before gate cleared. models/default symlink unchanged until winner selected. — models/default still → sherlock-v16. v18 HELD per decision 0062.
+- [x] Corpus base (v3 / v4 / v4+additions) is a triage-informed decision — must be recorded in a MADR before prep runs. — Decision 0060 accepted (v3 base) before sweep launched.
+- [x] If corpus base includes v4 assets, a clean rebase onto main is required before prep — or required merge resolutions documented in the corpus MADR. — N/A: v3 base chosen; no v4 assets included.
+- [x] Row-hash firewall verification required if v4 corpus adopted — log v4-vs-expanded-eval overlap count before training. — N/A: v3 base. Row-hash overlap logged anyway (761,219 eval rows filtered from v3 corpus).
+- [x] Prep log must contain the literal marker `hash_filter_active: true`. — Present at line emitted by prepare_multibranch_data.py under dedup-active branch (scripts/prepare_multibranch_data.py:2949).
+- [x] Prep-script instrumentation is IN SCOPE for v18 — patch prepare_multibranch_data.py to emit 8 markers. — 8 markers added: corpus_base, eval_hash_table_sha256, pre_filter_rows, row_hash_overlap, post_filter_rows, hash_filter_active, leaked_rows_after_filter, n_sibling_headers. py_compile passes.
+- [x] Dependency ordering is strict: ac-01 → ac-03 → prep → ac-05 → ac-07. — Order honoured: triage (ac-01) shipped first, corpus MADR (ac-03) before sweep_v18.sh launched prep, prep emitted all 8 markers before training began, all 3 seeds trained before winner selected (ac-07).
+- [x] No auto-promotion. Winner selection (ac-07) and release-scope decision (ac-10) are separate steps. — ac-07 selected seed 42 mechanically; ac-09/ac-10 then decided HELD separately (decision 0062 + handover.md).
+- [x] Time/compute budget: per-seed training target 4h soft / 6h concerning. Total sweep ≤ 12h end-to-end. — Per-seed: 8497s/7449s/7768s ≈ 2.4h/2.1h/2.2h (well under 4h soft). Total sweep: 440 min = 7.3h (well under 12h).
+
+## Detours
+
+## Acceptance Criteria
+- [x] ac-01 (gate): Triage discovery complete. triage.md enumerates every v16 misclassification on expanded 352-col eval with SHA-pinned inputs, per-domain summary, per-row lever. — 55 failures enumerated, 3 non-investigate-further lever buckets identified (add-data: 52, add-sharpen-rule: 1, fix-label-remap: 1, investigate-further: 1). See `triage.md`.
+- [x] ac-02: scripts/sweep_v18.sh skeleton (single prep, 3 training seeds) + prepare_multibranch_data.py instrumentation (8 log markers). — sweep_v18.sh: bash -n OK, single prep invocation outside seed loop, DATA_SEED=42 fixed, 3 training seeds {42,43,44} share one .ftmb, pre-flight marker verification. prep script: all 8 markers (corpus_base, eval_hash_table_sha256, pre_filter_rows, row_hash_overlap, post_filter_rows, hash_filter_active, leaked_rows_after_filter, n_sibling_headers), py_compile OK.
+- [x] ac-03: .orbit/choices/0060-v18-corpus-base.md (status accepted, ≥3 triage rows OR negative-evidence argument). — v3 base chosen. 3 triage rows in favour of v3 cited (amount variants × 12, container types × 8, datetime-specifics × 6) + negative-evidence argument (no LOINC/SSN/CPT/swift_bic in 55-failure set). No rebase required.
+- [x] ac-04: Row-hash firewall ACTIVE in results/sweep-v18.log (6 markers + sentinel arithmetic + SHA256). — All 8 markers present: corpus_base=output/distillation-v3/sherlock_distilled.csv.gz, eval_hash_table_sha256=327b78107820645f0073a830b554061127d540c22b1805dbaab553cdc833b02d, pre_filter_rows=28768204, row_hash_overlap=761219, post_filter_rows=28005745, hash_filter_active=true, leaked_rows_after_filter=0, n_sibling_headers=133252. Sentinel arithmetic: pre-overlap=28006985 vs post=28005745 (delta 1240 rows = internal-corpus dedup). Defence-in-depth re-hash: 0 eval rows leaked post-filter. Firewall verified ACTIVE.
+- [x] ac-05: 3-seed sweep completes cleanly. Per-seed model dirs with 6 files each. Summary CSV. — 440 min wall-clock (within 12h budget). 3 seeds all AUTO_ACCEPT. Summary CSV: seed,val_accuracy,eval_correct,eval_total,eval_pct,gate_status,time_secs; 42,0.9134,297,352,84.4,AUTO_ACCEPT,8497; 43,0.9130,296,352,84.1,AUTO_ACCEPT,7449; 44,0.9133,292,352,83.0,AUTO_ACCEPT,7768. Per-seed dirs have config.json, label_map.json, model.safetensors, results.json, epochs.jsonl, eval/report.md, eval/profile_results.csv.
+- [x] ac-06 (gate): Training gate — ≥1 seed val_acc ≥ 0.88. — All 3 seeds cleared auto-accept (≥0.912). Seed 42=0.9134, seed 43=0.9130, seed 44=0.9133. Training-stability variance 0.0004 (clean signal per decision 0061).
+- [x] ac-07 (gate): Promotion gate — winner ≥ 297/352 AND per-domain regression ≤ 3. — Winner: seed 42 (highest eval: 297). Promotion-gate mechanics: (a) score 297/352 = v16 baseline (threshold met, not exceeded). (b) Max per-domain regression: datetime +3 (AT ≤3 limit). Both conditions met mechanically. Outcome recommendation: HELD per ac-09 — net-zero label-accuracy delta matches v17 precedent (decision 0054).
+- [x] ac-08: .orbit/choices/0061-sweep-data-seed-discipline.md (status accepted, quantifies v17 waste). — Options A/B/C considered, B chosen. ~60min + 1.9GB waste quantified in Context. v18 named first adopter in Consequences.
+- [x] ac-09: .orbit/choices/0062-v18-outcome.md (status accepted, promoted/held/halted outcome). — HELD. Net-zero label delta (8 fixes / 8 regressions / 47 persistent). Datetime regression at gate limit (+3). Matches v17 precedent. v16 remains shipped.
+- [x] ac-10 (gate): handover.md names release scope decision. — `models/default` unchanged, `FINETYPE_CI_MODEL` unchanged, no HuggingFace upload. 3 follow-up generator cards named (amount-variant, container-type, datetime-subtype).

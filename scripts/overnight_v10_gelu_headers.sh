@@ -39,7 +39,7 @@
 #   results/overnight-v10-gelu-headers.log                      — Full log
 #   results/eval-pack-sherlock-v10-gelu.tar.gz                  — Eval pack for transfer
 #
-# Spec: orbit/specs/2026-04-11-candle-autoresearch-port/spec.yaml
+# Spec: .orbit/specs/2026-04-11-candle-autoresearch-port/spec.yaml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -80,7 +80,7 @@ echo " Purpose: Fair GELU+LN comparison — v8/v9 trained on data"
 echo "   with all-zero headers. This generates fresh data with real"
 echo "   Model2Vec header features and sibling-context enrichment."
 echo ""
-echo " Spec: orbit/specs/2026-04-11-candle-autoresearch-port/"
+echo " Spec: .orbit/specs/2026-04-11-candle-autoresearch-port/"
 echo "================================================================"
 echo ""
 

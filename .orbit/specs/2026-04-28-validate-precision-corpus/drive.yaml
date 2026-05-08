@@ -1,0 +1,23 @@
+card: .orbit/cards/0014-profile-validate-precision.yaml
+autonomy: full
+budget: 3
+iteration: 1
+current_spec: .orbit/specs/2026-04-28-validate-precision-corpus/
+status: shipped
+history:
+  - dir: .orbit/specs/2026-04-28-validate-precision-corpus/
+    result: GO
+    pr: https://github.com/meridian-online/finetype/pull/58
+    review_spec_cycles: 2
+    review_pr_cycles: 1
+    headline: "3 of 7 datasets pass at P=99% (N₀=3; N=3; delta +0)"
+started: 2026-04-28T17:35:00+01:00
+review_cycles:
+  review_spec: 1
+  review_pr: 0
+review_cycle_dates:
+  review_spec: 2026-04-28
+  review_pr: 2026-04-28
+notes:
+  - "Design stage skipped on initialisation: interview.md already exists from /orb:discovery (10-question session, decisions surfaced)."
+  - "Initial state set to 'spec' per the file-presence-overrides-drive.yaml-status rule (§11.5)."

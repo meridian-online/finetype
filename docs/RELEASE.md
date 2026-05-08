@@ -4,7 +4,7 @@ Reference for promoting a new model and cutting a release.
 
 ## Promotion flow (new model → release)
 
-After the v0.6.17 release we decoupled CI from the `models/default` symlink (see `orbit/specs/2026-04-20-ci-decouple-default-symlink/`). The 3-step flow:
+After the v0.6.17 release we decoupled CI from the `models/default` symlink (see `.orbit/specs/2026-04-20-ci-decouple-default-symlink/`). The 3-step flow:
 
 1. **Publish to HuggingFace** — upload the trained model directory to `meridian-online/finetype-model` on HF.
 2. **Bump `FINETYPE_CI_MODEL`** in `.github/workflows/ci.yml` and `.github/workflows/release.yml` (workflow-level `env:` blocks).

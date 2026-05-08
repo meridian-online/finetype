@@ -23,7 +23,7 @@ fn main() -> Result<()> {
         .unwrap_or_else(|| "eval/datasets/manifest.csv".to_string());
     let output_path = std::env::args()
         .nth(2)
-        .unwrap_or_else(|| "orbit/specs/2026-03-disambiguator-spike/features.csv".to_string());
+        .unwrap_or_else(|| ".orbit/specs/2026-03-disambiguator-spike/features.csv".to_string());
 
     eprintln!("Loading models...");
     let cc = setup_classifier()?;

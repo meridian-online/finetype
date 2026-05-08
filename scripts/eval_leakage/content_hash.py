@@ -29,7 +29,7 @@ parquet sizes (~50 KB) is achieved trivially.
 
 See:
     orbit/contracts/2026-05-03-gittables-90-percent-roundtrip.yaml §2 invariants
-    orbit/decisions/0056-train-eval-leakage-prevention.md
+    .orbit/choices/0056-train-eval-leakage-prevention.md
     bead finetype-s16
 """
 

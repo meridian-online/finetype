@@ -2164,7 +2164,7 @@ impl ColumnClassifier {
         // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
-        // See orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
+        // See .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
         let disable_measurement = rhh::is_disabled("header_hint_measurement");
         let disable_sci_measurement = rhh::is_disabled("header_hint_sci_measurement");
         let disable_person_override = rhh::is_disabled("header_hint_person_override");
@@ -3848,7 +3848,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     let h = h.trim();
 
     // RHH instrumentation hooks — see crate::rhh and
-    // orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02. When the
+    // .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02. When the
     // `rhh-instrumentation` feature is off, all `disable_*` are constant
     // `false` and the optimiser eliminates the conjunctions; zero overhead.
     let disable_table = rhh::is_disabled("header_hint_table");
@@ -4046,7 +4046,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             // These MUST precede the generic `h.contains("amount")` substring
             // matcher below — otherwise every variant header like `amount_comma`
             // collapses to the plain `finance.currency.amount` label. See spec
-            // orbit/specs/2026-04-24-amount-variant-generators ac-01..04 for the
+            // .orbit/specs/2026-04-24-amount-variant-generators ac-01..04 for the
             // diagnostic arc. Header normalisation replaces `_`/`-` with space.
             "amount accounting" | "amount acc" => {
                 return Some("finance.currency.amount_accounting");

@@ -1,0 +1,688 @@
+# FineType autonomy contract — GitTables 90% round-trip
+#
+# Authored 2026-05-03 in tabletop session (facilitator: Hugh; scribe: Nightingale).
+# Methodology: orbit memo `2026-05-02-tabletop-autonomy-contract.md`.
+# This is the second instance of the methodology; the first ran in another
+# project on 2026-05-02. Findings 1, 2, 3 from the first instance are honoured
+# in this contract: load-bearing test on halts, schema back-pressure on
+# halt-named fields, catalysing-scenario pivot.
+#
+# The cron-firing agent reads this file at cycle start and matches observed
+# state against §3 branches, §4 halts, §5 escalations. Unmatched state
+# defaults to hold-and-log per the methodology spec — never improvise.
+
+contract_id: 2026-05-03-gittables-90-percent-roundtrip
+sprint_window: 2026-05-03 → 2026-05-10
+status: superseded
+superseded_by: 2026-05-10-gittables-90-percent-roundtrip
+superseded_on: 2026-05-10
+supersession_audit: orbit/contracts/2026-05-10-pass2-tabletop-brief.md
+authored: 2026-05-03
+authored_by: tabletop session (Hugh + Nightingale)
+
+# ─────────────────────────────────────────────────────────────────────
+# §1 Objective function
+# ─────────────────────────────────────────────────────────────────────
+
+objective_function:
+  primary_target: |
+    Lift profile→validate round-trip pass rate on the GitTables parquet
+    catalogue from the current baseline (TBD — first cycle measures it)
+    to ≥ 90% on the frozen holdout slice.
+
+  gate_metric:
+    name: gittables_holdout_roundtrip_pass_rate
+    target: 0.90
+    surface:
+      population: GitTables parquet catalogue at /Users/hugh/datasets/gittables
+      population_size: 1018286 files
+      holdout_size: 2000 files
+      holdout_selection: stratified-by-topic-cluster random sample, frozen
+                         at sprint start (2026-05-03), seed 20260503
+      holdout_path: eval/gittables/holdout_paths.txt
+    measurement: |
+      For each holdout file F:
+        1. Run `finetype profile -f F -o json-schema > F.schema.json`
+        2. Run `finetype validate F F.schema.json --db F.db --table T --lenient`
+        3. F is a "round-trip pass" iff:
+           (a) ≥ 80% of columns predicted as non-trivial type
+               (NOT representation.text.plain_text;
+                NOT representation.numeric.decimal_number-as-fallback)
+           (b) ≤ 1% of rows rejected on the non-trivial columns
+        4. Pass rate = files passing / 2000
+    cadence: re-measured every cycle
+    estimated_cost_per_cycle: ~1h on M1 (2000 files × ~1.8s/file)
+
+  corpus_value_metric:
+    name: gittables_working_slice_cumulative_pass_rate
+    target: no fixed target — reported, not gated
+    surface:
+      population: GitTables corpus minus holdout (~1,016,286 files)
+      coverage_log_path: eval/gittables/working_slice_coverage.tsv
+    measurement: |
+      Each cycle samples N fresh files (default N=3000) it has not
+      visited this sprint. Round-robin invariant: every working-slice
+      file is visited at least once before any file is visited twice.
+      Aggregate "round-trip pass rate" across all files visited to date.
+    cadence: each cycle samples + reports
+    full_coverage_estimate: ~28 days at 12 cycles/day
+    use: |
+      Failure-mechanism discovery (feeds failure_log).
+      Training-data harvest (real-world examples for generator widening).
+      Taxonomy coverage map (which of 240 types appear in the wild).
+
+  bracketing_constraints:
+    - id: m19_eval_floor
+      rule: m-19 eval suite label accuracy ≥ current production − 0.5% to
+            promote a candidate; drop ≥ 1.0% absolute halts retrain.
+      current_production_baseline: 297/352 (84.4% label) on m-19 manifest
+      schema_field_check: ✓ — `make eval-report` produces
+                          eval/eval_output/report.md with per-type breakdown
+    - id: vci3_fixture_lock
+      rule: vci3_fixture_attribution_regression_match must continue to
+            pass. Per MADR 0076 row-level attribution drift halts.
+      schema_field_check: ✓ — `cargo test -p finetype-eval
+                          vci3_fixture_attribution_regression_match`
+    - id: per_type_collapse_floor
+      rule: no single m-19 type may regress ≥ 5.0% absolute on a
+            promoted retrain.
+      schema_field_check: ✓ — per-type table in eval_output/report.md
+
+# ─────────────────────────────────────────────────────────────────────
+# §2 Standing orders
+# ─────────────────────────────────────────────────────────────────────
+
+standing_orders:
+  cycle_preamble:
+    - read this contract; verify checksum against last cycle's record
+    - acquire cycle lockfile at /tmp/finetype-cron.lock; halt if present
+    - check free disk space; halt if < 20 GB
+    - record cycle_start_timestamp + cycle_id (UUID) in cycle log
+
+  per_cycle_actions:
+    - re-measure gate_metric on holdout (ΔT ≈ 1h)
+    - sample N=3000 fresh files from working slice (round-robin
+      invariant; tracked in coverage_log)
+    - run profile→validate per sampled file
+    - apply §3 branches per file outcome
+    - update failure_log (append-only)
+    - update coverage_log (append-only)
+    - check §4 halts; halt if any fire
+    - check §5 escalations; surface if any fire
+
+  cycle_postamble:
+    - log cycle_end_timestamp + summary (gate Δ, files visited,
+      branches taken, escalations raised)
+    - release cycle lockfile
+    - if any commits made this cycle, push (no PR — contract
+      authorises direct push given audit + verification gates)
+
+  invariants:
+    - failure_log is append-only; entry count never decreases
+    - coverage_log is append-only; visited count never decreases
+    - holdout file set is frozen; never modified once sprint starts
+    - any file harvested into training data is permanently excluded
+      from holdout AND from working slice (content-hash deduped)
+
+# ─────────────────────────────────────────────────────────────────────
+# §3 Branch table
+# ─────────────────────────────────────────────────────────────────────
+
+branches:
+  # Scenario 1 — misclassification
+  - id: B01_misclassification_detected
+    when: |
+      validate produces ≥1 column where reject_count == row_count
+      AND rejected cell values do not match predicted type's
+      regex/enum
+      AND predicted type is high-specificity (regex with anchors,
+      enum with ≤16 members)
+    diagnosis: classifier misclassification (not validator-narrow)
+    action: |
+      Append entry to failure_log:
+        (file_path, column_name, predicted_type, observed_values_sample,
+         inferred_correct_type, mechanism: "header-signal" |
+         "value-shape" | "prefix-shape")
+      Harvest sample values into training-data candidate pool (per B05).
+      DO NOT touch validator (MADR 0042/0048 binding).
+      DO NOT block cycle — continue to next sampled file.
+
+  - id: B02_validator_narrow
+    when: |
+      validate produces a column with reject_count > 0 AND
+      reject_count < row_count
+      AND inspecting rejected values shows a recurring shape that
+      a sibling taxonomy type's pattern would accept
+    diagnosis: validator regex too narrow; iter-1→4 pattern
+    action: |
+      Identify canonical sibling pattern per MADR 0078.
+      Plan validator widening as a paired commit (taxonomy YAML +
+      vciN-style regression test asserting both new acceptance and
+      preservation of existing rejection).
+      Subject to §3 B07 load-bearing-edit protocol.
+
+  - id: B03_clean_pass
+    when: |
+      validate produces 0 rejects
+      AND ≥ 80% of columns predicted as non-trivial types
+    action: |
+      Log as clean_pass in coverage_log with predicted_type
+      distribution. Contributes to corpus_value_metric.
+      No further action this cycle.
+
+  - id: B04_trivial_predictions_no_rejects
+    when: |
+      validate produces 0 rejects
+      AND ≥ 20% of columns predicted as trivial types
+      (representation.text.plain_text or
+      representation.numeric.decimal_number with no other signal)
+    diagnosis: classifier-quality-issue (catches the metric-gaming
+               case at per-cycle level — extends gate-level
+               non-trivial-prediction floor)
+    action: |
+      Log as classifier_quality_issue (NOT clean_pass).
+      Harvest column samples for training-data widening on the
+      trivial-fallback columns.
+      Continue cycle.
+
+  - id: B05_training_data_harvest
+    when: |
+      a column is identified by B01 or B04 as a generator-widening
+      candidate
+    action: |
+      Append column samples to
+      eval/gittables/harvest_pool.tsv with
+      (file_content_sha256, column_name, samples, target_generator).
+      File becomes content-hash-excluded from holdout AND working
+      slice. Generator widening executes when retrain triggers (§5
+      retrain_trigger_threshold_met).
+
+  - id: B06_partial_file_read
+    when: |
+      parquet read returns < expected row count or read error
+      mid-stream
+    action: |
+      Skip file. Log as corpus_quality_issue with file path and
+      observed/expected row count. Continue to next sampled file.
+      Do NOT halt — corpus quality issues expected at GitTables
+      scale; tracked for §5 corpus_quality_issue_volume escalation.
+
+  - id: B07_load_bearing_file_edit
+    when: |
+      cycle intends to Edit/Write to a path in
+      orbit/contracts/load-bearing-paths.yaml
+    action_sequenced: |
+      1. grep repo for path's filename + affected symbol/column/key
+      2. Read each consumer; classify tolerant | fragile | unknown
+      3. for each fragile or unknown, plan paired patch
+      4. execute edits + paired patches as single coherent commit;
+         commit message names consumer-graph audit
+      5. post-edit Read on EVERY edited file (per H02 verification
+         rule)
+      6. make ci as standard gate; does NOT substitute for audit
+    escalate_when: load-bearing path lacks consumer-graph-of-record;
+                   surface to §5 load_bearing_path_without_consumer_graph
+
+  - id: B08_retrain_promote
+    when: |
+      candidate model trained AND scored on:
+      - m-19 eval suite (full)
+      - gate metric (full holdout)
+      - vci3 fixture
+      AND ALL of:
+      - m-19 absolute label accuracy ≥ current production − 0.5%
+      - gate metric ≥ current production − 0.0%
+      - vci3 passes
+      - no per-type m-19 regression ≥ 5.0% absolute
+    action: |
+      Swap models/default symlink to candidate.
+      Preserve previous as models/<previous-tag>-YYYYMMDD-SHA.
+      Tag candidate with timestamp + git SHA in cycle log.
+      Log promotion event with full score deltas.
+      Next cycle re-measures gate against new default.
+
+  - id: B09_retrain_hold
+    when: |
+      candidate model trained AND scored
+      AND in window between B08 promote and H05 halt thresholds
+      (e.g. m-19 down 0.6%, gate up 4% — genuinely ambiguous)
+    action: |
+      Keep current production. Preserve candidate at
+      models/<candidate-tag>. Log trade-off with full deltas.
+      Counts toward §5 three_consecutive_hold_and_log_retrains
+      escalation.
+
+# ─────────────────────────────────────────────────────────────────────
+# §4 Halt conditions
+# ─────────────────────────────────────────────────────────────────────
+
+halts:
+  - id: H01_disk_space
+    trigger: free disk on / < 20 GB at cycle start
+    load_bearing: |
+      Branch could check pre-action but doesn't catch fill-during-cycle.
+      Cycle-start halt protects against starting work that will fail
+      mid-flight (training shards, duckdb tmp).
+    revert: skip cycle; log free-disk value; resume next cycle
+    schema_field_check: ✓ — `df -BG /` in shell
+
+  - id: H02_post_edit_verification_failure
+    trigger: |
+      any Edit/Write tool call returns non-success
+      OR returns success with stderr containing known failure
+      patterns ("File has not been read", "no such file",
+      "command not found", "Killed", "core dumped")
+      OR a post-edit Read shows the file content does not include
+      the expected change
+    load_bearing: |
+      iter-3 silent-Edit instance is the proof. Branch table cannot
+      catch the swallowed-failure window between "tool call returned"
+      and "next verification fires". Without PR review, that bug ships.
+    revert: |
+      do NOT proceed with subsequent steps in cycle. Do NOT retry
+      blindly. Do NOT route around via different tool. Append failure
+      to cycle log with full tool-call context. Cycle ends; next
+      cycle re-evaluates from observed state (which now includes
+      the failure).
+    schema_field_check: ✓ — tool result inspection is intrinsic
+
+  - id: H03_load_bearing_edit_without_audit
+    trigger: |
+      a commit touches a registered load-bearing path AND
+      the cycle log lacks an audit entry (per B07) for that path
+      in this cycle
+    load_bearing: |
+      Branch B07 is the protocol; halt is the integrity check.
+      Without halt, protocol is aspirational. Catches
+      "agent skipped audit because change seemed small" — exactly
+      the m-19 manifest schema migration failure pattern.
+    revert: git revert the commit; cycle ends; next cycle re-attempts
+            with audit
+    schema_field_check: ✓ — load-bearing-paths.yaml exists alongside
+                        this contract (initial registry shipped)
+
+  - id: H04_concurrent_cycle
+    trigger: cron fires while previous cycle's lockfile present
+             at /tmp/finetype-cron.lock
+    load_bearing: |
+      Branch cannot catch — second cycle starts independent of first.
+      Both writing to failure_log / coverage_log produces races.
+    revert: skip this cycle; log skip event with reason; do NOT
+            kill previous cycle
+    schema_field_check: ✓ — lockfile mechanism shipped as bead
+                        (engineering delta filed alongside contract)
+
+  - id: H05_retrain_regression
+    trigger: |
+      candidate retrain scores hit ANY of:
+      - m-19 absolute label accuracy drops ≥ 1.0%
+      - gate metric drops ≥ 2.0%
+      - vci3_fixture_attribution_regression_match fails
+      - per-type m-19 regression ≥ 5.0% absolute on any type
+    load_bearing: |
+      Branch B08 is the action; halt is the catastrophic-floor
+      protection. Two thresholds (B08 promote-tight, H05 halt-wide)
+      create the B09 hold-and-log window deliberately.
+    revert: |
+      discard candidate; preserve at models/<rejected-tag>-SHA for
+      autopsy; log full diagnostic; do NOT immediately retry
+      retrain (use failure_log to decide if generator state needs
+      more harvesting first); cycle continues measuring against
+      current production
+    schema_field_check: |
+      ✓ m-19 per-type via report.md
+      ✗ gate metric harness needs to be built (engineering bead
+        filed alongside contract — see deliverables)
+
+  - id: H06_implausible_improvement
+    trigger: gate metric Δ ≥ +10% absolute in a single cycle
+    load_bearing: |
+      Branch cannot catch "implausible improvement" — cycle has no
+      prior on what's plausible. Could be progress, more likely
+      a measurement bug (holdout contamination, wrong model
+      reported, parser change affecting harness).
+    revert: HOLD result (don't promote, don't act on it). Surface
+            via §5 implausible_improvement escalation.
+    schema_field_check: ✓ — Δ computation against last cycle's
+                        recorded score
+
+  - id: H07_score_model_mismatch
+    trigger: promotion-gate evaluation report's recorded model
+             SHA/tag does not match candidate being evaluated
+    load_bearing: |
+      Branch cannot catch a stale-cache-score-applied-to-wrong-model
+      bug. Report and candidate must cross-verify at promotion time.
+    revert: discard score; rerun evaluation with explicit model
+            specification; if mismatch persists, halt cycle and
+            surface as engineering bug
+    schema_field_check: |
+      ✗ — eval report header must include model SHA + tag + filename.
+      Engineering bead filed alongside contract.
+
+  - id: H08_failure_log_corruption
+    trigger: failure_log entry count drops between cycles
+             (append-only invariant violated)
+    load_bearing: |
+      Failure log is contract's memory; corruption silent and
+      catastrophic. Branch cannot catch (cycle N doesn't know
+      cycle N-1 count without explicit check).
+    revert: halt all cycles; surface to human; do NOT auto-recover
+            (recovery requires knowing whether deletion was
+            malicious / accidental / intentional)
+    schema_field_check: ✓ — line count of append-only TSV
+
+  - id: H09_coverage_log_corruption
+    trigger: coverage_log visited count drops between cycles
+    load_bearing: same shape as H08 — append-only memory whose
+                  corruption is silent
+    revert: halt all cycles; surface to human
+    schema_field_check: ✓ — line count of append-only TSV
+
+  - id: H10_accidental_binary_push
+    trigger: |
+      git diff --staged includes files matching binary patterns
+      outside their registered locations:
+      - *.parquet anywhere
+      - *.bin / *.onnx / *.safetensors outside models/
+      - models/ directory contents (only the symlink may be tracked,
+        not target files)
+    load_bearing: |
+      Branch could catch if every commit's filelist inspected; halt
+      makes inspection mandatory. Real risk: cron retraining touches
+      models/ directory; accidental git add catches binary files.
+    revert: unstage offending files; commit without them; log event
+    schema_field_check: ✓ — `git diff --staged --name-only` filter
+
+  - id: H11_corrupted_candidate_model
+    trigger: |
+      post-retrain, candidate model file size = 0
+      OR fails to load via standard FineType loader
+      OR fails sanity inference (one fixed input → expected output
+      shape and range)
+    load_bearing: |
+      Training script can exit 0 with a corrupted output. Halt forces
+      load + sanity check before any score is computed against it.
+    revert: discard candidate; preserve training logs for autopsy;
+            do NOT auto-retry (training failure root cause matters)
+    schema_field_check: ✓ — file stat + load + canned-input inference
+
+  - id: H12_multi_prediction_pipeline_drift
+    trigger: model returns ≠ 1 prediction per column post-Sharpen
+    load_bearing: |
+      Multi-branch + Sharpen contract is single-prediction-per-column.
+      Violation indicates pipeline drift; halt before downstream
+      consumers see malformed output.
+    revert: halt cycle; surface as engineering bug
+    schema_field_check: ✓ — predicted_types.len() == columns.len()
+
+  - id: H13_holdout_stagnation
+    trigger: gate metric Δ < 0.1% absolute over last 8 consecutive
+             cycles
+    load_bearing: |
+      Branch cannot catch — each cycle's action evaluates fine in
+      isolation; only cross-cycle measurement reveals stagnation.
+      Cron has no inter-cycle memory unless this halt materialises it.
+    revert: |
+      not a revert — promote-current-production stays default; log
+      full last-K cycles with actions + observed states; ALL CYCLES
+      STOP until contract replacement. Contract has reached useful
+      life.
+    schema_field_check: ✓ — gate metric series in cycle log
+    notes: |
+      This is the contract's natural expiry trigger — addresses
+      the "staleness" open question from methodology memo. Resolution
+      is a new tabletop, not auto-recovery.
+
+# ─────────────────────────────────────────────────────────────────────
+# §5 Escalation triggers
+# ─────────────────────────────────────────────────────────────────────
+
+escalations:
+  - id: E01_retrain_trigger_threshold_met
+    trigger: |
+      failure_log accumulates ≥ 20 distinct (predicted_type,
+      observed_inferred_type) pairs
+      OR ≥ 30% of last 48h reject volume attributable to
+      misclassification (B01 entries)
+      whichever fires first
+    ask_content: not an ask — cycle initiates retrain autonomously.
+                 Logged as RETRAIN_INITIATED event with full
+                 failure-log attribution snapshot.
+    ask_target: cycle log only
+    cycle_action: |
+      promote cycle from measurement-mode to retrain-mode:
+      1. apply pending generator widenings from harvest_pool
+      2. run training (M1, Metal); train skill exists
+      3. score candidate on m-19 + gate + vci3
+      4. apply B08 promote / B09 hold / H05 halt as appropriate
+    notes: first-pass calibration — re-tune in pass-2 tabletop
+
+  - id: E02_three_consecutive_hold_retrains
+    trigger: 3 consecutive retrains land in B09 hold-and-log without
+             promoting
+    ask_content: |
+      full score deltas of all 3 retrain attempts +
+      generator changes attempted between them +
+      hypothesis: "generator improvements may be exhausted at this
+      taxonomy structure; tabletop required."
+    ask_target: human (next tabletop)
+    cycle_action: continue cycles in measurement-only mode
+                  (no further retrains until tabletop)
+
+  - id: E03_load_bearing_path_without_consumer_graph
+    trigger: cycle intends to edit a load-bearing path that has
+             no recorded consumer-graph audit-of-record
+    ask_content: |
+      path + commit intent + grep results + list of consumers found +
+      classification (tolerant | fragile | unknown) +
+      proposed paired patches
+    ask_target: human (immediate review or next tabletop)
+    cycle_action: HALT this cycle (don't ship the edit); resume
+                  next cycle if audit lands
+
+  - id: E04_holdout_stagnation
+    trigger: same as H13 (escalation IS the surfacing of the halt)
+    ask_content: full last-8-cycles log (actions + observed states +
+                 score series); contract is at end of useful life
+    ask_target: human (mandatory tabletop)
+    cycle_action: HALT all further cycles until contract replacement
+
+  - id: E05_implausible_improvement
+    trigger: gate metric Δ ≥ +10% absolute in single cycle (also
+             halt H06)
+    ask_content: |
+      full measurement diff (which files moved, model SHA before/
+      after, harness git SHA before/after)
+    ask_target: human (audit before accepting)
+    cycle_action: HOLD result (don't promote, don't act on it)
+                  pending audit
+
+  - id: E06_corpus_quality_issue_volume
+    trigger: ≥ 10 files in last 100 sampled produce parquet read
+             errors / truncation / parser failures (B06 entries)
+    ask_content: file paths + error types + topic-cluster
+                 distribution
+    ask_target: human (decide: filter corpus, fix harness, or accept
+                noise floor)
+    cycle_action: continue cycles (corpus issues don't block
+                  contract operation)
+
+# ─────────────────────────────────────────────────────────────────────
+# Provenance + matrix audit hash
+# ─────────────────────────────────────────────────────────────────────
+
+provenance:
+  session_date: 2026-05-03
+  facilitator: Hugh
+  scribe: Nightingale
+  methodology_source: |
+    ~/github/hughcameron/orbit/.orbit/cards/memos/2026-05-02-tabletop-autonomy-contract.md
+  methodology_instance: 2 (first ran in another project on 2026-05-02)
+
+  scenarios_walked:
+    - id: S1
+      type: real-catalysing
+      source: ecommerce_orders.csv failure (2026-05-03 user demo)
+      surfaced: B01, E01, H05, H13
+    - id: S2
+      type: real
+      source: iter-3 review-pr cycle 1→2 silent Edit failure
+              (.orbit/specs/2026-04-28-validate-corpus-iter3/ progress)
+      surfaced: H02
+    - id: S3
+      type: real
+      source: v17→v18→v19 retrain arc + MADR 0066 v19 hard gate
+      surfaced: B08, B09, H05, H07, H11
+    - id: S4
+      type: real
+      source: m-19 manifest schema migration silent corruption
+              (.orbit/specs/2026-04-21-eval-expansion/ ac-15)
+      surfaced: B07, H03, H10
+    - id: S7
+      type: imagined
+      source: cross-cycle stagnation hypothetical
+      surfaced: H13, E04
+    - ids: [S5, S6]
+      type: subsumed
+      reason: |
+        S5 (before/after measurement) implicit in dual-metric framing;
+        gate re-measured every cycle. S6 (sampling reproducibility)
+        structurally addressed — gate on frozen holdout is
+        reproducible by construction.
+
+  hazop_matrix:
+    parameters: 11
+    guide_words: 7
+    cells_walked: 77
+    cells_with_new_branches_or_halts: 9
+    deltas:
+      - cell: LESS × Reject count
+        surfaced: B04
+      - cell: MORE × Holdout score
+        surfaced: H06, E05
+      - cell: OTHER THAN × m-19 eval score
+        surfaced: H07
+      - cell: REVERSE × Failure log
+        surfaced: H08
+      - cell: REVERSE × Working-slice coverage
+        surfaced: H09
+      - cell: AS WELL AS × Commit/push state
+        surfaced: H10
+      - cell: REVERSE × Candidate model
+        surfaced: H11
+      - cell: AS WELL AS × Predicted types
+        surfaced: H12
+      - cell: PART OF × Sampled file
+        surfaced: B06
+
+  premortem_completion:
+    candidates_added: [H01_disk_space, H04_concurrent_cycle]
+    candidates_cut:
+      - clock_skew_halt — not load-bearing
+      - memory_pressure_halt — standing-order suffices
+      - cron_process_survival_halt — infrastructure scope, not contract
+
+  hot_wash: |
+    Seven meta-observations from this session, captured before
+    contract finalisation. None contradict the contract; all are
+    methodology pass-2 fodder for the orbit memo.
+
+    1. The original session brief proposed scoping the contract to
+       validate-corpus iter-5+. Hugh's reframe (full GitTables, no
+       PR merges, retrain authority) was an order-of-magnitude
+       larger than the bottom-up brief assumed. Methodology pass-2
+       lesson: facilitator should probe "what do you want the cron
+       to OWN" earlier, not bottom-up from a recent spec dir.
+
+    2. Metric-gameability emerged late as a load-bearing question.
+       The non-trivial-prediction floor only got pinned because the
+       scribe challenged "validation rate >90%" as undefined. A
+       cron agent optimising raw rejects has a trivial winning move
+       (push every prediction to plain_text). Methodology pass-2:
+       add a step-1 check — "is the proposed metric game-able by
+       the contracted agent?" Run before any scenario walks.
+
+    3. Dual-metric framing (gate + corpus value) emerged from Hugh's
+       pushback that a frozen holdout left 1.016M files invisible.
+       Methodology pass-2: explicitly ask "what value comes from
+       data the gate doesn't see?" The answer was three additional
+       uses of the corpus (failure-mechanism discovery, training-
+       data harvest, taxonomy coverage map).
+
+    4. Three halt categories share a structural shape:
+       "branch cannot catch a cross-cycle pattern."
+       - H13 holdout_stagnation
+       - H08 failure-log REVERSE
+       - H09 coverage-log REVERSE
+       These all materialise inter-cycle memory as halt invariants
+       because the cron has no other memory mechanism. Worth
+       promoting to a methodology pattern: "cross-cycle invariants
+       always become halts; branches cannot bridge cycles."
+
+    5. The contract's outputs include MORE than just the contract
+       YAML. Auxiliary artefacts (load-bearing-paths registry) and
+       engineering work (gate harness, content-hash dedup, lockfile
+       mechanism, append-only log integrity tooling) surface as
+       beads from the contract. Methodology pass-2: contract write
+       step explicitly includes "what auxiliary artefacts and
+       engineering work does this contract require to operate? File
+       them."
+
+    6. The orbit `schedule` skill is online-only — it provisions
+       remote cloud agents in Anthropic's infrastructure, not local
+       cron jobs. The scribe reflexively reached for it when scoping
+       the pass-2 tabletop trigger and had to be redirected by
+       Hugh. For tabletop-derived contracts where the cron-firing
+       agent must run on the user's machine (data locality, GPU
+       access, local repo state), `schedule` is the wrong tool.
+       Local equivalents: `CronCreate` (in-session, REPL-bound) for
+       low-stakes reminders; launchd / system cron for unattended
+       autonomous firing — the latter is infrastructure-team work.
+       Methodology pass-2: when authoring a contract, state
+       explicitly whether the cron-firing agent runs local or
+       remote, and route to the appropriate scheduling tool from
+       the start. Add a §2 standing-orders entry naming the
+       scheduling mechanism so future tabletops audit it.
+
+    7. `CronCreate`'s `durable: true` parameter was silently
+       ignored on this harness — both attempts produced
+       session-only crons (no `.claude/scheduled_tasks.json` file
+       created). For multi-day reminders, never trust a
+       session-bound mechanism. The fallback that worked: write
+       the prompt to a discoverable file at a sibling path (here:
+       `orbit/contracts/2026-05-10-pass2-prep-prompt.md`) and let
+       the human invoke it manually OR have infrastructure (launchd)
+       wire it in. Methodology pass-2: contract write step always
+       files the next-tabletop prompt as a sibling artefact, even
+       if a cron tool also schedules it. The artefact is the
+       single source of truth; the cron is the convenience layer.
+
+  references:
+    - .orbit/choices/0042-deprecate-regex-header-hints.md
+    - .orbit/choices/0048-value-based-rules-only.md
+    - .orbit/choices/0055-eval-realism-dimensions.md
+    - .orbit/choices/0056-train-eval-leakage-prevention.md
+    - .orbit/choices/0057-eval-coverage-floor.md
+    - .orbit/choices/0066-v19-retrain-hard-gate.md
+    - .orbit/choices/0076-validate-corpus-fixture-anti-regression-lock.md
+    - .orbit/choices/0078-validator-alternations-compose-canonical-sibling-patterns.md
+    - .orbit/cards/0014-profile-validate-precision.yaml
+    - .orbit/cards/0015-status-orderid-misclassification.yaml
+    - .orbit/specs/2026-04-21-eval-expansion/
+    - .orbit/specs/2026-04-29-validate-corpus-iter4/
+
+  next_tabletop:
+    cadence: ~2026-05-10 (Hugh confirmed "in a few days")
+    prep_prompt: orbit/contracts/2026-05-10-pass2-prep-prompt.md
+    invocation: |
+      Manual or launchd one-shot per the prep_prompt file's "Invocation
+      options" section. CronCreate was attempted but `durable: true`
+      was silently ignored — see hot_wash item 7.
+    review_topics:
+      - retrain trigger calibration (E01 numbers — 20 pairs / 30%)
+      - holdout size + cycle budget (2000 / 1h) effectiveness
+      - any halts that fired and need amendment
+      - any unmatched-state observations from hold-and-log
+      - any stagnation patterns short of H13
+      - card 0015 status / progress (the misclassification card
+        that scenarios 1 + B01 will be feeding generator work toward)

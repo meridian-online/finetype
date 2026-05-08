@@ -1,0 +1,4 @@
+key: first-cron-cycle-c7e7a6cc-2026-05-03-gate
+body: 'first-cron-cycle-c7e7a6cc-2026-05-03: gate baseline 0.0785 (157/2000) on holdout, working-slice 240/3000 clean, 79 corpus_quality (2.6%). E01 calibration-ambiguity surfaced to tabletop pass-2: failure_log uses inferred_correct_type=''unknown'' for all 3108 entries because autonomous-inference module does not exist; literal 20-pair threshold degenerates to 20-distinct-predicted-types. NOT initiated retrain. Cycle worker shipped as scripts/cron_cycle_work.py (commit 8dbe191). Pass-2 amendments needed: (a) ship inference module, OR (b) split E01 into autonomous vs calibration surfaces, AND (c) CSV header sanitisation pre-pass to recover the 54+79 corpus_quality_issues caused by validate-step DuckDB binder errors on weird column names.'
+timestamp: 1970-01-01T00:00:00Z
+labels: []

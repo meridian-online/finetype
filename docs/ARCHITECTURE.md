@@ -154,7 +154,7 @@ Key fields: `broad_type` (target DuckDB type), `transform` (DuckDB SQL expressio
 
 ## Decision Register
 
-30 architectural decisions in `orbit/decisions/` (MADR format). Browse with `ls orbit/decisions/`.
+30 architectural decisions in `.orbit/choices/` (MADR format). Browse with `ls .orbit/choices/`.
 
 ---
 
@@ -245,7 +245,7 @@ Read `results.json` or `epochs.jsonl` directly — overnight scripts, comparison
 
 ## Evaluation Infrastructure
 
-**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v19-relu-s42: **369/448 (82.4% label)** on the post-eval-expansion 448-row manifest (m-19; spec `orbit/specs/2026-04-21-eval-expansion/`). Manifest schema: 7 columns (`dataset, file_path, column_name, gt_label, source_url, licence, fetched_date`). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD).
+**Profile eval** (`eval/profile_eval.sh`) — Multi-branch+Sharpen with sherlock-v19-relu-s42: **369/448 (82.4% label)** on the post-eval-expansion 448-row manifest (m-19; spec `.orbit/specs/2026-04-21-eval-expansion/`). Manifest schema: 7 columns (`dataset, file_path, column_name, gt_label, source_url, licence, fetched_date`). 240-type taxonomy. Timestamp interchangeability tightened to format-compatible families (ISO, SQL, RFC 2822, MDY, DMY, YMD).
 
 The CLI uses `FINETYPE_MODEL` env var (default: `models/default`); the eval script respects it (passed as `--model`). Note: `FINETYPE_MODEL_DIR` is a separate env var for the DuckDB extension only — see `DEVELOPMENT.md`.
 

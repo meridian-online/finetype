@@ -1,0 +1,28 @@
+feature: PII detection
+as_a: data engineer responsible for compliance
+i_want: to know which columns in a dataset contain personally identifiable information as a byproduct of type profiling
+so_that: I can flag sensitive columns for masking, access control, or audit without a separate PII scanning tool
+goal: PII flag in JSON Schema output via x-finetype-pii — not yet surfaced in profile or DuckDB extension
+maturity: emerging
+scenarios:
+- name: PII flagged during profiling
+  given: a CSV file with mixed column types
+  when: I profile the file and export the schema
+  then: columns containing PII types (email, phone_number, credit_card_number, ssn) are flagged with x-finetype-pii in the JSON Schema output
+  gate: false
+- name: PII is a type property, not a scan
+  given: the type taxonomy
+  when: a column is classified as a PII-bearing type (identity.person.email, identity.payment.credit_card_number, etc.)
+  then: the PII flag comes from the taxonomy definition — no separate scanning pass, no regex heuristics, no false positives from pattern matching
+  gate: false
+- name: Query PII columns in DuckDB
+  given: a table profiled with finetype_detail()
+  when: I filter for PII-bearing columns
+  then: I can identify sensitive columns using the type label's domain and category (identity.person.*, identity.payment.*)
+  gate: false
+specs: []
+relations: []
+references:
+- 'web: docs/projects/finetype/cli/schema.mdx'
+- labels/definitions_identity.yaml
+notes: []
