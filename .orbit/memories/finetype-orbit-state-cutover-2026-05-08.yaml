@@ -1,0 +1,4 @@
+key: finetype-orbit-state-cutover-2026-05-08
+body: FineType cutover to orbit-state v0.1 landed at commit 2f15dda on 2026-05-08. Migration A (orbit/ → .orbit/, decisions/ → choices/), Migration B (bd archived to .beads-archive/; 13 memories migrated, 0 specs since this project's bd usage was unlabelled task-shaped — issues remain recoverable from .beads-archive/issues.jsonl during the 2-week window). 16 cards conformed to v0.1 strict schema (dropped scenario.source_lines, remapped maturity values, hoisted superseded_by into relations[]). CI gate at .github/workflows/orbit-verify.yml clones hughcameron/orbit and builds orbit binary per run. Dogfood window starts at this commit; cleanup of legacy .orbit/specs/ subdirectories (interview.md / progress.md from old format) is deferred follow-up — orbit-state's spec model uses flat <id>.yaml + <id>.notes.jsonl + <id>.tasks.jsonl, not subdirs.
+timestamp: 2026-05-08T01:05:55.02059Z
+labels: []
