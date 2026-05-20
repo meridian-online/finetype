@@ -1,99 +1,1711 @@
 dbpedia_or_schemaorg_class	finetype_taxonomy_id	mapping_status	note
-http://dbpedia.org/ontology/cites		no_finetype_equivalent	citation reference; no non-trivial FineType type
-http://dbpedia.org/ontology/fileURL	technology.internet.url	direct	URL pointing to a file
-http://dbpedia.org/ontology/author	identity.person.full_name	direct	person's name
-http://dbpedia.org/ontology/type		no_finetype_equivalent	too generic
-http://dbpedia.org/ontology/title		no_finetype_equivalent	free-text title; trivial-only
-http://dbpedia.org/ontology/name	identity.person.full_name	partial	may be person or generic entity
-http://dbpedia.org/ontology/end	datetime.date.iso_8601	partial	end date; could be timestamp or other date subtype
-http://dbpedia.org/ontology/start	datetime.date.iso_8601	partial	start date; same as end
-http://dbpedia.org/ontology/source		no_finetype_equivalent	free-text source reference
-http://dbpedia.org/ontology/abstract		no_finetype_equivalent	free text; trivial-only
-http://dbpedia.org/ontology/age		no_finetype_equivalent	numeric age; FineType has no specific age type
-http://dbpedia.org/ontology/date	datetime.date.iso_8601	partial	date; specific format varies
-http://dbpedia.org/ontology/issn	identity.commerce.issn	direct	ISSN identifier
-http://dbpedia.org/ontology/passengersPerYear		no_finetype_equivalent	numeric count; trivial-only
-http://dbpedia.org/ontology/publisher	representation.text.entity_name	partial	organisation/publisher name
-http://dbpedia.org/ontology/rank		no_finetype_equivalent	ordinal numeric; trivial-only
-http://dbpedia.org/ontology/volume		no_finetype_equivalent	publishing volume; numeric trivial
-http://dbpedia.org/ontology/year	datetime.component.year	direct	4-digit year
-http://dbpedia.org/ontology/id	representation.identifier.alphanumeric_id	partial	generic identifier; specific subtype varies
-http://dbpedia.org/ontology/comment		no_finetype_equivalent	free text
-http://dbpedia.org/ontology/careerPoints		no_finetype_equivalent	numeric; trivial
-http://dbpedia.org/ontology/created	datetime.timestamp.iso_8601	partial	creation timestamp
-http://dbpedia.org/ontology/openAccessContent		no_finetype_equivalent	boolean/categorical
-http://dbpedia.org/ontology/parent	identity.person.full_name	partial	parent name (kinship)
-http://dbpedia.org/ontology/storyEditor	identity.person.full_name	direct	person's name
-http://dbpedia.org/ontology/sourceText		no_finetype_equivalent	free text
-http://dbpedia.org/ontology/aircraftUser	representation.text.entity_name	partial	organisation name
-http://dbpedia.org/ontology/genre		no_finetype_equivalent	categorical text
-http://dbpedia.org/ontology/isPartOf		no_finetype_equivalent	relation/reference
-http://dbpedia.org/ontology/depth		no_finetype_equivalent	measurement; no FineType type
-http://dbpedia.org/ontology/escapeVelocity		no_finetype_equivalent	physical measurement
-http://dbpedia.org/ontology/fc	representation.identifier.alphanumeric_id	partial	identifier code
-http://dbpedia.org/ontology/informationName	representation.text.entity_name	partial	named entity
-http://dbpedia.org/ontology/length		no_finetype_equivalent	measurement
-http://dbpedia.org/ontology/numberOfPersonInOccupation		no_finetype_equivalent	numeric count
-http://dbpedia.org/ontology/orthologousGene		no_finetype_equivalent	biological identifier; no FineType match
-http://dbpedia.org/ontology/projectReferenceID	representation.identifier.alphanumeric_id	direct	identifier
-http://dbpedia.org/ontology/temperature		no_finetype_equivalent	measurement; no FineType type
-http://dbpedia.org/ontology/uRN	representation.identifier.alphanumeric_id	partial	URN; identifier shape
+http://dbpedia.org/ontology/aSide		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/abbreviation		no_finetype_equivalent	free-text abbreviation
 http://dbpedia.org/ontology/ableToGrind		no_finetype_equivalent	boolean
+http://dbpedia.org/ontology/absoluteMagnitude		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/abstract		no_finetype_equivalent	free text; trivial-only
+http://dbpedia.org/ontology/academicAdvisor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/academicDiscipline		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/acceleration		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/access		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/accessDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/achievement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/actScore		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/actingHeadteacher	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/activeCases		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/activeYears		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/activeYearsEndDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/activeYearsEndYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/activeYearsEndYearMgr	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/activeYearsStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/activeYearsStartYearMgr	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/activity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/address	geography.address.full_address	partial	auto-classified
+http://dbpedia.org/ontology/addressInRoad		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/administrativeStatus		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/administrator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/afdbId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/affiliate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/affiliation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/age		no_finetype_equivalent	numeric age; FineType has no specific age type
+http://dbpedia.org/ontology/ageRange		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/agency	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/agencyStationCode	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/aggregation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/airDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftAttack		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftElectronic		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftHelicopter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftHelicopterObservation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftTransport		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aircraftUser	representation.text.entity_name	partial	organisation name
 http://dbpedia.org/ontology/album	representation.text.entity_name	partial	album title (entity name)
+http://dbpedia.org/ontology/alias		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/allcinemaId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/allegiance		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alliance		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alongside		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alpsMajorSector		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alpsSection		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alpsSubgroup		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alternativeName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/alternativeTitle		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/altitude		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/amateurTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/americanComedyAward		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/animal		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/animator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/anniversary		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/announcedFrom		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/annualTemperature		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/aoCloassification		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/apcPresident		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/apparentMagnitude		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/appearance		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/approach		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/approvedByLowerParliament		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/approximateCalories		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/architecturalStyle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/area		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/areaCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/areaLand		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/areaMetro		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/areaOfCatchment		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/areaOfSearch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/areaRank		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/areaTotal		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/areaTotalRanking		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/areaUrban		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/areaWater		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/arm		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/army		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/arrestDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/artPatron		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/artery		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/artificialSnowArea		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/artist	identity.person.full_name	direct	artist name
+http://dbpedia.org/ontology/artisticFunction	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/asWikiText		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/ascent		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/aspectRatio		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/assembly		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/assetUnderManagement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/assets		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/assistantPrincipal		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/associate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/associatedAct		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/associatedBand		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/associatedMusicalArtist	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/associatedRocket		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/associationOfLocalGovernment		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/astrologicalSign		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/atPage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/atRowNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/atcSuffix		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/athletics		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/atomicNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/attorneyGeneral		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/aunt		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/author	identity.person.full_name	direct	person's name
+http://dbpedia.org/ontology/authority	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/authorityTitle	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/automobilePlatform	technology.identifier.alphanumeric_id	partial	auto-classified
+http://dbpedia.org/ontology/availableSmartCard		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/average		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/averageAnnualGeneration		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/averageClassSize		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/averageDepth		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/averageSpeed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/award		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/awardName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bSide		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/background		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/badGuy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/band		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/barPassRate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/basedOn		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/battery		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/battle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bedCount		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/bestFinish		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bestLap		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bestRankDouble		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/bestRankSingle		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/bibsysId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bicycleInformation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bigPoolRecord		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/binomial		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bird		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/birthDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/birthName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/birthPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/birthSign		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/birthYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/blackLongDistancePisteNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/blazonLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/block		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bloodGroup		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bloodType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bnfId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/board		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/bodyDiscovered	datetime.date.iso_8601	partial	date
+http://dbpedia.org/ontology/bodyStyle		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/boilingPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/book		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/border		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/borough		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bowlingSide		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/brainInfoNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/brainInfoType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/branchFrom		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/branchTo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/brand		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bridgeCarries		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/britishComedyAwards		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/britishOpen		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/brother		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/budget	finance.currency.amount	partial	auto-classified
 http://dbpedia.org/ontology/budgetYear	datetime.component.year	direct	year
+http://dbpedia.org/ontology/building		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/buildingEndYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/buildingStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/buildingType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/bustSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cableCar		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/calculationNeeds		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/callSign		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/campus		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/campusType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/canBaggageChecked		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/canonizedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/capacity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/capacityFactor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/capital	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/capitalCoordinates	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/capitalElevation	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/capitalPosition	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/captureDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/carNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/carbohydrate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/careerPoints		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/careerPrizeMoney		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cargoFuel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cargoGas		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/casNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/casSupplemental		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/case		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/casualties		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/catch		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/category		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/causeOfDeath		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/causedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/censusYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/center		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ceo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/certification		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/chEBI		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/chain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/chairLabel		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/chairman		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/champion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/championInDouble		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/championInDoubleFemale		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/championInSingle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/championInSingleFemale		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/championInSingleMale		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/championships		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/channel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/characterInPlay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/chemSpiderId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/chemicalFormula		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/chiefEditor	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/child		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/choreographer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/chorusCharacterInPlay		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/chromosome		no_finetype_equivalent	biological identifier
+http://dbpedia.org/ontology/circle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/circuitLength		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/circuitName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cites		no_finetype_equivalent	citation reference; no non-trivial FineType type
+http://dbpedia.org/ontology/city	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/cityLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/citySince		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cityType		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/clade		no_finetype_equivalent	biological classification
+http://dbpedia.org/ontology/class		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/classes		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/classification		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/climate		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/climbUpNumber		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/closeTo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/closed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/closingDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/clothSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/clothingSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/club		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cluster		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cmpEvaDuration	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/cmykCoordinateBlack	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/cmykCoordinateYellow	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/co2Emission		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/coExecutiveProducer	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/coProducer	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/coach		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/coastLine		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/coatOfArms		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/code	representation.identifier.alphanumeric_id	partial	auto-classified
+http://dbpedia.org/ontology/codeBook		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/codeDistrict	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/codeIndex		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/codeListOfHonour		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/codeMemorial		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/codeNationalMonument		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/codeSettlement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/codeStockExchange		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/collection		no_finetype_equivalent	entity reference
 http://dbpedia.org/ontology/collectionSize		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/college		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/colorChart		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/colour		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/colourHexCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/colourName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/command		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/commandModule		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/commandStructure		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/comment		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/commissioner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/commissionerDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/committee		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/commonName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/company	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/comparable		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/competition		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/compiler		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/completionDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/complexity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/complications		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/component		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/composer	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/compressionRatio		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/computingInput		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/computingMedia		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/computingPlatform		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/configuration		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/confirmedCases		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/conflict		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/connectsReferencedTo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/connotation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/conservationStatusSystem		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/construction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/constructionMaterial		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/contest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/continent	geography.location.continent	direct	auto-classified
+http://dbpedia.org/ontology/contractAward		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/convictionDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/convictionPenalty		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/coolingSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cost	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/council		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/country	geography.location.country	direct	country
+http://dbpedia.org/ontology/countryCode	geography.location.country_code	direct	auto-classified
+http://dbpedia.org/ontology/countryOrigin		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/countryRank		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/countryWithFirstAstronaut		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/countryWithFirstSatellite		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/countryWithFirstSatelliteLaunched		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/countryWithFirstSpaceflight		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/county	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/countySeat	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/course		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/coverArtist	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/cpu		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/created	datetime.timestamp.iso_8601	partial	creation timestamp
+http://dbpedia.org/ontology/creationChristianBishop		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/creationYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/creativeDirector	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/creator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/credit		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/crest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/crew		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/crewSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/criminalCharge	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/criteria		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/crosses		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/crownDependency	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/cuisine		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cultivatedVariety		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/curator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currency	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/currencyCode	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/currentCity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentLeague		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentMember	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/currentPartner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentProduction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentRank		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/currentRecord		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentSeason		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentStatus		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/currentTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/currentTeamMember	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/currentlyUsedFor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cylinderBore		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/cylinderCount		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/dam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/damage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/date	datetime.date.iso_8601	partial	date; specific format varies
+http://dbpedia.org/ontology/dateAgreement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dateClosed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dateCompleted		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dateExtended	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/dateLastUpdated	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/dateOfAbandonment		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dateOfBurial		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dateUnveiled		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/dateUse	datetime.date.iso_8601	partial	date use case
+http://dbpedia.org/ontology/daughter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/davisCup		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/day		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/daylightSavingTimeZone		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deFactoLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deadInFightDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deadInFightPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deathAge		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deathCause		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deathDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deathPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/deathYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/debut		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dec		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/decay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/decideDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/declination		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/decoration		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/definition		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/deliveryDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/demographics		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/demographicsAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/denomination		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/density		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/department	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/departmentCode	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/depictionDescription		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/depth		no_finetype_equivalent	measurement; no FineType type
+http://dbpedia.org/ontology/depths		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/derivedWord		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/description		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/designCompany	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/designer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/destination		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/detectionMethod		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/developer		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/dfE		no_finetype_equivalent	ambiguous abbreviation
+http://dbpedia.org/ontology/diameter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/differentialDiagnosis		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/digitalChannel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/diploma		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/director	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/discharge	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/disciple		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/discipline		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/discontinued		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/discovered		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/discovery		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/disease		no_finetype_equivalent	medical concept; no FineType type
+http://dbpedia.org/ontology/displacement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dissolutionDate		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/dissolved	datetime.date.iso_8601	partial	date
+http://dbpedia.org/ontology/distance		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/distanceToCapital	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/distanceToCharingCross		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/distanceToDouglas		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/distanceToLondon		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/distanceToNearestCity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/distanceTraveled		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/distributingLabel		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/distributor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/district	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/division		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/doctoralAdvisor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/documentDesignation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/documentNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/domain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/draft		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/draftPick		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/draftRound		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/drainsFrom		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/drainsTo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/drama		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/drugbank		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/dryCargo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/duration	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/dutchMIPCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dutchNAIdentifier		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/dutchWinkelID		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eMedicineSubject		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eMedicineTopic		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eTeatrId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ecNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/editing		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/editor	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/education		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/educationPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/educationSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/effectiveRadiatedPower		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/electionDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/electionMajority		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/elementAbove		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/elementBlock		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/elementGroup		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/elementPeriod	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/elevation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/elevatorCount		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/employer	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/end	datetime.date.iso_8601	partial	end date; could be timestamp or other date subtype
+http://dbpedia.org/ontology/endDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/endDateTime	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/endPoint	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/endYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/endYearOfInsertion	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/endYearOfSales	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/endingTheme	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/enemy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/engine		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/enginePower		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/engineer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/enshrinedDeity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/entrezgene		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/episode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/episodeNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/epoch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eptFinalTable		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/equipment		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/equity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/era		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/escapeVelocity		no_finetype_equivalent	physical measurement
+http://dbpedia.org/ontology/espnId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ethnicGroup		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ethnicGroupsInYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ethnicity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eurobabeIndexId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/europeanParliamentGroup		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/europeanUnionEntranceDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/event		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eventDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eventDescription		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/exhibition		no_finetype_equivalent	entity reference
 http://dbpedia.org/ontology/externalOrnament		no_finetype_equivalent	descriptive text
+http://dbpedia.org/ontology/eyeColor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eyeColour		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/eyes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/faaLocationIdentifier		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/facilityId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/facultySize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/failedLaunches		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/family		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/fareZone		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fastestDriver		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fat		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fatalityRate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/father		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fc	representation.identifier.alphanumeric_id	partial	identifier code
+http://dbpedia.org/ontology/feat		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/feature		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/features		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/federalState		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/fees	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/field		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fileExtension		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fileSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fileURL	technology.internet.url	direct	URL pointing to a file
+http://dbpedia.org/ontology/filename		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fillingStation		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/film		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/filmAudioType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/filmColourType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/filmPolskiId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalFlight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalLost		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalLostDouble		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalLostSingle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalLostTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalPublicationDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/finalPublicationYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fipsCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstAppearance		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstAscentPerson		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstAscentYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstDriver		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstFlight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstFlightEndDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/firstFlightStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/firstGame		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstLaunch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstLaunchDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstLaunchRocket		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstLeader		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstMention		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstOwner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstProMatch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstPublicationDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstPublicationYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstPublisher	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/firstWin		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/firstWinner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/flag		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/flagBorder		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/flagCaption		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/flagLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/flagSize		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/flashPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/floorArea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/floorCount		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/flower		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/flyingHours	datetime.time.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/focus		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/followedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/followingEvent		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/follows		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/foot		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/forces		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/format		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/formationDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/formerCoach		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/formerName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/formula		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/foundation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/foundedBy	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/foundingDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/foundingYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/free		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/freeFlightTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/freeLabel		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/frequency		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/frequencyOfPublication		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/frequentlyUpdated	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/friend	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/frontierLength		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/frozen		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fuel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fuelCapacity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fuelConsumption		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/fuelSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fuelType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fuelTypeName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/fullScore		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/functionEndDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/functionStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/functionStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/fundedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/galleryItem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gameArtist	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/gameEngine		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/games		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/garrison		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gasChambers		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gdpPerCapita		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/gender	identity.person.gender	direct	gender
+http://dbpedia.org/ontology/geneLocation		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/geneLocationStart	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/geneReviewsId		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/geneReviewsName		no_finetype_equivalent	biological name; no FineType type
+http://dbpedia.org/ontology/generalManager		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/generationUnits		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/genomeDB		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/genre		no_finetype_equivalent	categorical text
+http://dbpedia.org/ontology/genus		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/geolocDual		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/geology		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/giniCoefficient		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/giniCoefficientAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/giniCoefficientRanking		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/glycemicIndex		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/goalsInLeague		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/goalsInNationalTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/goldMedalDouble		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/goldMedalSingle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/goldMedalist		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/goldenCalfAward		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/governingBody		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/government		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/governmentElevation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/governmentPosition		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/governmentType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/governor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gradName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gradNum		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/grades		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/graySubject		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/greekName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gridReference		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/grindingCapability		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gross		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/grossDomesticProduct		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/grossDomesticProductAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/grossDomesticProductNominalPerCapita		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/grossDomesticProductPerPeople		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/grossDomesticProductPurchasingPowerParityPerCapita		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ground		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/groundsForLiquidation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/growingGrape		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/guest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/gun		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hairColor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hairColour		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hallOfFame		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hand		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/handedness		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasAbsorbedMunicipality		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasAnnotation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasChannel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasInput		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasInsidePlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasJunctionWith		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasKMLData		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasNaturalBust		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasOutsidePlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasSurfaceForm		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hasVariant		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/head		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/headLabel		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/headOfFamily		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/height		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/heightAboveAverageTerrain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/heightAttack		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/heritageRegister		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/highest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/highestAltitude		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/highestBreak		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/highestBuildingInYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/highestMountain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/highestPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/highwaySystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hipSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/historicalMap		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/historicalRegion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/homeArena		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/homeStadium		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/horseRidingDiscipline		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/house		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/hraState		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/hsvCoordinateSaturation	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/hsvCoordinateValue	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/hubAirport		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/humanDevelopmentIndex		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/humanDevelopmentIndexAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/humanDevelopmentIndexRank		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/humanDevelopmentIndexRankingCategory		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/iafdId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/iataLocationIdentifier		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/icaoAirlineCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/icaoLocationIdentifier		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/iconographicAttributes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/id	representation.identifier.alphanumeric_id	partial	generic identifier; specific subtype varies
+http://dbpedia.org/ontology/idNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/identificationSymbol		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/ideology		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/imageSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/imdbId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/impactFactor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/impactFactorAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/importantStation		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/inCemetery		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/inclination		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/income		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/industry		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/infantMortality		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/inflow		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/influenced		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/influencedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/information		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/informationName	representation.text.entity_name	partial	named entity
+http://dbpedia.org/ontology/ingredient		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ingredientName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/initiallyUsedFor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/inn		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/installedCapacity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/institution	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/instrument		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/interest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/internationalAffiliation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/internationalPhonePrefix		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/internationally		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/introduced		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/introductionDate		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/isCityState		no_finetype_equivalent	boolean
+http://dbpedia.org/ontology/isHandicappedAccessible		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/isPartOf		no_finetype_equivalent	relation/reference
 http://dbpedia.org/ontology/isPartOfAnatomicalStructure		no_finetype_equivalent	relation
+http://dbpedia.org/ontology/isPartOfMilitaryConflict		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/isPartOfName		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/isPartOfWineRegion		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/isPeerReviewed		no_finetype_equivalent	boolean
+http://dbpedia.org/ontology/isRouteStop		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/isbn	identity.commerce.isbn	direct	auto-classified
+http://dbpedia.org/ontology/island		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/isniId		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/iso31661Code	geography.location.country_code	direct	ISO 3166-1 country code
+http://dbpedia.org/ontology/isoCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/isoCodeRegion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/issn	identity.commerce.issn	direct	ISSN identifier
+http://dbpedia.org/ontology/ist		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/iucnCategory		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/iupacName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/jointCommunity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/judge		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/juniorSeason		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/juniorTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/juniorYearsEndYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/juniorYearsStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/jurisdiction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/jutsu		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/keyPerson		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/killedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/kinOfLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/kindOfCoordinate	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/kindOfCriminal		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/kindOfCriminalAction		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/kindOfRock		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/kingdom		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/knownFor		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/ko		no_finetype_equivalent	ambiguous
+http://dbpedia.org/ontology/lahHof		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lake		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/land		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/landingSite		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/language		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/languageCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/languageFamily		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/languageRegulator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/largestWin		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastAirDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastAppearance		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastElectionDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastFamilyMember	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/lastFlight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastFlightEndDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/lastFlightStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/lastLaunch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastLaunchDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastPosition		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastPublicationDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastSeason		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lastWin		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/laterality		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/latestElection		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/latestPreviewDate		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/latestPreviewVersion		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/latestReleaseDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/latestReleaseVersion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/latinName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/launch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/launchPad		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/launchSite		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/laurenceOlivierAward		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lawCountry		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/layingDown		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/layout		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lcc		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lccnId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leadTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leadYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leaderFunction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leaderName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leadership		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/league		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leftChild		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/leftTributary		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/legalArticle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/legalForm		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/legislativePeriodName	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/length		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/lengthQuote		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lengthReference		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lethalOnMice		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/licenceLetter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/licenceNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/license		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lifeExpectancy	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/limit		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lineLength		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/linguisticsTradition		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/linkedTo	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/listItemOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/literaryGenre		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/littlePoolRecord		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/livingPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/loadLimit		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/localAuthority	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/localPhonePrefix		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/locality		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/localizationThumbnailCaption		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/locatedInArea		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/location	geography.location.city	partial	location (city/region varies)
+http://dbpedia.org/ontology/locationCity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/locationCountry		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/locationIdentifier		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/locationName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/locusSupplementaryData		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/logo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/longDistancePisteKilometre		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/longDistancePisteNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/longName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lowerAge		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lowerEarthOrbitPayload		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lowest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lowestAltitude		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/lowestPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lunarOrbitTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lunarRover		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/lunarSampleMass		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/lunarSurfaceTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/lyrics		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/magazine		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/maidenFlight	datetime.date.iso_8601	partial	date
+http://dbpedia.org/ontology/mainBuilding		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mainCharacter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mainDomain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mainFamilyBranch		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/maintainedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/majorIsland		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/majorShrine		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/management		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/managementCountry		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/manager		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/managerTitle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/managerYearsStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/manufacturer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/map		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mapCaption		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/mapDescription		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/march		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/marketCapitalisation	geography.location.city	direct	auto-classified
+http://dbpedia.org/ontology/mass		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/mastersWins		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/matchPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/material		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/max		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/maxAbsoluteMagnitude		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maxApparentMagnitude		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maxTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maximumBoatBeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maximumBoatLength		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maximumDepth		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maximumDepthQuote		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maximumDischarge	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/maximumInclination		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/maximumTemperature		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/mayorArticle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meanRadius		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meanTemperature		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/meaning		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/measurements		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/media		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mediaItem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mediaType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/medicalDiagnosis		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/medicalSpecialty		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/medication		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/medlinePlus		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meetingBuilding		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meetingRoad		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meltingPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/member	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/membership	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/membershipAsOf	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/mergedWith		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mergerDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meshId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meshName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/meshNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/militaryBranch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/militaryGovernment		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/militaryService		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/militaryUnit		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/militaryUnitSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/millsCodeBE		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/millsCodeNL		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/min		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/minTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/minimumArea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/minimumDischarge	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/minimumElevation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/minimumInclination		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/minimumTemperature		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/mission		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/model		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/modelEndYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/modelLineVehicle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/modelStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/modelStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/molecularWeight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/monarch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/month	datetime.component.month_name	partial	auto-classified
 http://dbpedia.org/ontology/mood		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/mostDownPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mostSuccessfulPlayer	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/mostWins		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mother		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/motive		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/mount		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/movement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/movie		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/museumType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/musicBand		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/musicBrainzArtistId	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/musicComposer	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/musicFusionGenre		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/musicalBand		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/musicalKey		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/musicians		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/muteCharacterInPlay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/name	identity.person.full_name	partial	may be person or generic entity
+http://dbpedia.org/ontology/nameAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameDay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInCantoneseChinese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInHangulKorean		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInJapanese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInMinnanyuChinese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInPinyinChinese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInSimplifiedChinese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInTraditionalChinese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nameInWadeGilesChinese		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/namedAfter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/namedByLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/names		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nationalChampionship		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nationalRanking		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/nationalTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nationalTopographicSystemMapNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/nationalTournamentSilver		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nationality		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nciId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ndlId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nearestCity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/neighbourRegion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/neighbourhood		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/netIncome		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/network		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/newspaper		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nextEntity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nextEvent		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ngcName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nisCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nlaId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/noContest		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nominee		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nonFictionSubject		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nonProfessionalCareer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nord		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/northEastPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/northWestPlace		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/notSolubleIn		no_finetype_equivalent	descriptive
+http://dbpedia.org/ontology/notableFeatures		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/notableIdea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/notableWork		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/note		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/noteOnPlaceOfBurial		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/noteOnRestingPlace		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/notes		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/notifyDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/nrhpReferenceNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/nrhpType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/number		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfAcademicStaff		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfAlbums		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfBronzeMedalsWon		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/numberOfCity		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/numberOfClasses		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfClassesWithResource		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfCollectionItems		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfCountries		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfDeaths		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfDistrict	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/numberOfDoors		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfEmployees		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfEpisodes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfFederalDeputies		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfFilms		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfGoals		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfGraduateStudents	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfHoles		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfHouses		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfIndegree		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfIsland		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfLanes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfLawyers		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfLines		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfLiveAlbums		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfLocations		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfMembers	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfMembersAsOf	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfMusicalArtistInstrument	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/numberOfMusicalArtistStyle	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/numberOfNewlyIntroducedSports		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfOffices		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfOfficials		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPages		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfParkingSpaces		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfParticipatingFemaleAthletes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfParticipatingMaleAthletes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPeopleAttending	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/numberOfPeopleLicensed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPersonBornInPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPersonEntities		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPersonFromUniversity	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfPersonInOccupation		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/numberOfPiersInWater		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPixels		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPlatformLevels		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPlayers	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfPredicates		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfProfessionals		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfProperties		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfPropertiesUsed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfReactors		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfRedirectedResource		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfResource		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfResourceOfClass		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfResourceOfType		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/numberOfResourceWithType		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/numberOfRooms		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfRun		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfSeasons		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfSeatsInParliament		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfSettlementsInCountry		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfSoccerPlayerInCountryRepre	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfSoccerPlayersBornInPlace	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfSoccerPlayersInTeam	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfSpeakers		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfSportsEvents		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfStaff		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfStars		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfStations		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/numberOfStudents	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfTeams		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfTriples		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfTurns		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfUndergraduateStudents	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/numberOfUniqeResources		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfUseOfProperty		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfVehicles		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfVisitorsAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfVolumes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberOfVolunteers		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/numberSold		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/observatory		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/occupation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/odor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/offeredClasses		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/office		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/officerInCharge	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/officialName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/officialOpenedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ofsCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/oilSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/oldDistrict	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/oldName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/oldcode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/olympicGamesWins		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ons		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/openAccessContent		no_finetype_equivalent	boolean/categorical
+http://dbpedia.org/ontology/openingTheme		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/openingYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/operatingIncome		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/operatingSystem		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/operator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/opponent		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/orbitalEccentricity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/orbitalPeriod	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/orbits		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/orcidId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/order		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/orderDate		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/orderInOffice		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/organ		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/organSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/organisation	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/orientation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/origin		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/originalDanseScore		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/originalEndPoint	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/originalLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/originalMaximumBoatLength		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/originalName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/originalStartPoint	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/originalTitle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/originallyUsedFor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/orthologousGene		no_finetype_equivalent	biological identifier; no FineType match
+http://dbpedia.org/ontology/other		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherActivity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherAppearances		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherFamilyBranch		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/otherFuelType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherFunction		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/otherInformation		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/otherLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherParty		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherServingLines		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/otherSportsExperience		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/output		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/overallRecord		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/owner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/owningCompany	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/painter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/parent	identity.person.full_name	partial	parent name (kinship)
+http://dbpedia.org/ontology/parentCompany	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/parentMountainPeak		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/parentOrganisation	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/parentheses		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/parish		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/parkingLotsCars		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/parkingLotsTrucks		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/part		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/partialFailedLaunches		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/participant		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/participatingIn		no_finetype_equivalent	relation
+http://dbpedia.org/ontology/particularSign		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/partitionCoefficient		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/partner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/party		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/passengersPerDay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/passengersPerYear		no_finetype_equivalent	numeric count; trivial-only
+http://dbpedia.org/ontology/passengersUsedSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/pastMember	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/patent		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/pdb	representation.identifier.alphanumeric_id	partial	PDB ID; identifier shape
+http://dbpedia.org/ontology/penaltiesTeamA		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/penaltyScore		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/pendamicDeaths	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/peopleName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/perCapitaIncome		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/perCapitaIncomeAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/percentage		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/percentageAlcohol		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/percentageFat		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/percentageLiteracyWomen		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/percentageOfAreaWater		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/perimeter		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/period	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/person	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/personFunction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/personName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/philosophicalSchool		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/phonePrefix		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/phonePrefixLabel		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/photographer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/phylum		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/picture		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/pictureDescription		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/pictureFormat		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/picturesCommonsCategory		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/pistonStroke		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/place		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/placeOfBurial		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/plant		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/playRole		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/playerInTeam	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/playerSeason	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/playerStatus	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/playingTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/plays		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/poleDriver		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/policeName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/politicGovernmentDepartment	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/politicalFunction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/politicalLeader		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/politicalPartyInLegislature		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/politicalPartyOfLeader		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/politicalSeats		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/popularVote		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/population		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationAsOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationDensity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationPctChildren		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationPctMen		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationPctWomen		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationRural		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/populationTotal		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/populationTotalRanking		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/populationTotalReference		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/populationUrban		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/portfolio		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/position		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/postalCode	geography.address.postal_code	direct	auto-classified
+http://dbpedia.org/ontology/power		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/powerOutput		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/powerType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/prefaceBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/prefix		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/presentMunicipality		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/presentName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/president		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/previousEntity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/previousInfrastructure		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/previousName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/previousPopulationTotal		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/previousWork		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/price	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/primaryFuelType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/primate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/primeMinister		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/principal		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/proTeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/procedure		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/producedBy		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/producer	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/product		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/production		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/productionCompany	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/productionStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/profession		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/programCost	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/programmeFormat		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/programmingLanguage		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/project	representation.text.entity_name	partial	project name
 http://dbpedia.org/ontology/projectBudgetFunding	finance.currency.amount	partial	monetary amount
+http://dbpedia.org/ontology/projectBudgetTotal	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/projectCoordinator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/projectKeyword		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/projectObjective		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/projectParticipant		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/projectReferenceID	representation.identifier.alphanumeric_id	direct	identifier
+http://dbpedia.org/ontology/projectStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/projectType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/prominence		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/promotion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/pronunciation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/protectionStatus		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/protein		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/provCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/provides		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/province	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/publication		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/publicationDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/publiclyAccessible		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/publisher	representation.text.entity_name	partial	organisation/publisher name
+http://dbpedia.org/ontology/purpose		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/qatarClassic		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/quote		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ra		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/race		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/raceHorse		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/raceTrack		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/races		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/radio		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/radioStation	representation.text.entity_name	partial	station name
+http://dbpedia.org/ontology/railwayPlatforms		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/range		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/rank		no_finetype_equivalent	ordinal numeric; trivial-only
+http://dbpedia.org/ontology/rankInFinalMedalCount		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/ranking		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/rankingsDoubles		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/rating		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/ratio		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/recentWinner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/recordDate		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/recordLabel	representation.text.entity_name	partial	record label name
+http://dbpedia.org/ontology/recordedIn		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/recoveryCases		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/redListIdNL		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/reference		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/refseqprotein		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/regime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/region	geography.location.region	partial	auto-classified
+http://dbpedia.org/ontology/regionLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/regionType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/regionalCouncil		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/regionalLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/registration		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/registry		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/related		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relatedFunctions		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relatedMeanOfTransportation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relatedPlaces		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relative		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relativeAtomicMass		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/releaseDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/releaseLocation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/relief		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/religion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/reopened		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/reopeningDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/reportingMark		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/representative		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/requirement		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/residence		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/resolution		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/restoreDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/restriction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/result		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/retentionTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/retired		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/revenue	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/review		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/rgbCoordinateBlue		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/rgbCoordinateGreen	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/rgbCoordinateRed	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/ridId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/rightAscension		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/rightChild		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/rightTributary		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/river		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/riverBranch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/riverMouth		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/road		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/rocketStages		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/role		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/roleInEvent		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/roofHeight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/rotationPeriod	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/route		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/routeDirection		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/routeEnd	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/routeEndDirection	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/routeEndLocation	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/routeLine		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/routeNext		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/routeNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/routeStart	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/routeStartDirection	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/routeStartLocation	datetime.date.iso_8601	partial	auto-classified
 http://dbpedia.org/ontology/runningMate	identity.person.full_name	direct	person name
+http://dbpedia.org/ontology/runtime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/salary	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/sales		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sameName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/satScore		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/satellite		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/scale		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/scene		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/school		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/schoolCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/schoolNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/scientificName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/score		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/screenActorsGuildAward		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/sea		no_finetype_equivalent	geographic feature; no specific type
+http://dbpedia.org/ontology/season		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/seasonNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/seatNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/second		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/secretaryGeneral		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/security		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/seiyu		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/selection		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/selectionPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/selectionYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/senator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/senior		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sentence		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/series		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/service		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/serviceEndDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/serviceModule		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/serviceNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/serviceStartDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/serviceStartYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/servingSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sessionNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/setDesigner		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/settingOfPlay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/settlement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/settlementAttached		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/setupTime		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/severeCases		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sex	identity.person.gender	direct	auto-classified
+http://dbpedia.org/ontology/sexualOrientation		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/shape		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/shareDate		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/shareOfAudience	representation.numeric.percentage	direct	percentage
+http://dbpedia.org/ontology/shareSource		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/sharingOutPopulation		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sharingOutPopulationYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shipBeam		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shipCrew		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shipDisplacement		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shipLaunch		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shoeSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shoot		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shortProgCompetition		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/shortProgScore		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/show		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/showJudge		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/signName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/signature		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/significantBuilding		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/significantDesign		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/significantProject		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/silCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/silverMedalist		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/simcCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/similar		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sister		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sizeLogo		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sizeMap		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sizeThumbnail		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/skiLift		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/skills		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/skinColor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/slogan		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/smiles		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/snowParkNumber		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/soccerLeagueSeason		no_finetype_equivalent	season identifier
+http://dbpedia.org/ontology/soccerTournamentLastChampion		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/soccerTournamentThisSeason		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/solventWithGoodSolubility		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/son		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/soundRecording		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/source		no_finetype_equivalent	free-text source reference
+http://dbpedia.org/ontology/sourcePlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sourceState		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/sourceText		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/southEastPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/southWestPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/space		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/speaker		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/specialEffects		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/specialTrial		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/specialist		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/species		no_finetype_equivalent	biological classification
+http://dbpedia.org/ontology/speedLimit		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/splitFromParty		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/spokenIn		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sport		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sportSpecialty		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/spouse		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/spouseName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/spurOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/staff		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/starRating		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/start	datetime.date.iso_8601	partial	start date; same as end
+http://dbpedia.org/ontology/startDate	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startDateTime	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startPoint	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startWct	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startWqs	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startYear	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startYearOfInsertion	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/startYearOfSales	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/statName		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/statValue		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/state	geography.location.state_code	partial	auto-classified
+http://dbpedia.org/ontology/stateOfOrigin		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/stateOfOriginPoint		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/stateOfOriginYear		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/stationStructure		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/stationVisitDuration	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/statistic		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/statisticLabel		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/statisticValue		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/status		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/statusManager		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/statusYear		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/stockExchange		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/storyEditor	identity.person.full_name	direct	person's name
+http://dbpedia.org/ontology/strength		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/structuralSystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/student	identity.person.full_name	partial	auto-classified
+http://dbpedia.org/ontology/style		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subClassis		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/subFamily		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/subMunicipalityType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subOrder		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/subdivisionName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subjectOfPlay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subjectTerm		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subsequentInfrastructure		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subsequentWork		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subsystem		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/subsystemLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/subtitle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/successfulLaunches		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/sudocId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/summerTemperature		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/superFamily		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/superOrder		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/superbowlWin		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/supplies		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/supply		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/surfaceArea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/surfaceFormOccurrenceOffset		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/surfaceGravity		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/surfaceType		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/suspectedCases		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/swimmingStyle		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/symbol		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/symptom		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/synonym		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/systemOfLaw		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/systemRequirements		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/tag		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/targetAirport		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/targetSpaceStation		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/taste		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/taxon	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/teachingStaff		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/team		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/teamName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/teamPoint		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/teamSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/technique		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tempPlace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/temperature		no_finetype_equivalent	measurement; no FineType type
+http://dbpedia.org/ontology/templateName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tenant		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/termOfOffice		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/termPeriod	datetime.period.duration	partial	auto-classified
+http://dbpedia.org/ontology/territory		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/tessitura		no_finetype_equivalent	music range
+http://dbpedia.org/ontology/theology		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/third		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/throwingSide		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/thumbnail		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/thumbnailCaption		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/tie		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/time	datetime.time.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/timeInSpace		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/timeZone		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/title		no_finetype_equivalent	free-text title; trivial-only
+http://dbpedia.org/ontology/titleDouble		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/titleLanguage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/titleSingle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/topFloorHeight		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/topLevelDomain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/topSpeed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/topic		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/totalCargo		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/totalDiscs		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/totalIliCases		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/totalLaunches		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/totalMass		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/totalTracks		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/totalTravellers		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/touristicSite		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/towerHeight		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/trackNumber		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/trackWidth		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tradeMark		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tradingName		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/trainer		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/training		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/translatedMotto		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/translator		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/transmission		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/treatment		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/tree		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tuition		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tvComId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/tvShow		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/twinTown		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/type		no_finetype_equivalent	too generic
+http://dbpedia.org/ontology/typeCoordinate	geography.location.coordinates	partial	auto-classified
+http://dbpedia.org/ontology/typeOfGrain		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/typeOfStorage		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/typeOfYeast		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/uRN	representation.identifier.alphanumeric_id	partial	URN; identifier shape
+http://dbpedia.org/ontology/uciCode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/unNumber		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/uncle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/unicode		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/unitCost	finance.currency.amount	partial	auto-classified
+http://dbpedia.org/ontology/unitedStatesNationalBridgeId		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/university	representation.text.entity_name	partial	auto-classified
+http://dbpedia.org/ontology/unknownOutcomes		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/updated	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/upperAge		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/usOpenDouble	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/usOpenMixed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/usOpenSingle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/usSales		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/usedInWar		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/uses		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/usingCountry		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/utcOffset		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/value		no_finetype_equivalent	auto-classified; no heuristic match
 http://dbpedia.org/ontology/vaporPressure		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/variantOf		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/varietals		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/vehicle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/vehiclesInFleet		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/vehiclesPerDay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/veneratedIn		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/version		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/viafId		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/victoryAsMgr		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/victoryPercentageAsMgr		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/virtualChannel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/visitorStatisticsAsOf		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/visitorsPerDay		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/visitorsPerYear		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/visitorsPercentageChange		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/visitorsTotal		no_finetype_equivalent	auto-classified
 http://dbpedia.org/ontology/voice		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/voltageOfElectrification		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/volume		no_finetype_equivalent	publishing volume; numeric trivial
+http://dbpedia.org/ontology/vonKlitzingConstant		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/votesAgainst		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/votesFor		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/waistSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/war		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/ward		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/water		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/waterPercentage		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/waterwayThroughTunnel		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/weapon		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/websiteLabel	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/weddingParentsDate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/weight		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/wholeArea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/width		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/wikiPageCharacterSize		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageEditLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikiPageExternalLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikiPageExtracted		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageHistoryLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikiPageID		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageInDegree		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageInterLanguageLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikiPageModified	datetime.date.iso_8601	partial	auto-classified
+http://dbpedia.org/ontology/wikiPageOutDegree		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageRedirects		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageRevisionID		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageRevisionLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikiPageUsesTemplate		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wikiPageWikiLink	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikiPageWikiLinkText	technology.internet.url	direct	auto-classified
+http://dbpedia.org/ontology/wikidataSplitIri		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wimbledonMixed		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wingArea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wins		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winsAtAlpg		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winsAtJapan		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winsAtLAGT		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winsAtLET		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winsAtSun		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winsInEurope		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/winterTemperature		no_finetype_equivalent	auto-classified
+http://dbpedia.org/ontology/woRMS		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wordBefore		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/work		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/workArea		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/world		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/worldOpen		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/worstDefeat		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wptFinalTable		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/wptTitle		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/writer	identity.person.full_name	direct	auto-classified
+http://dbpedia.org/ontology/year	datetime.component.year	direct	4-digit year
+http://dbpedia.org/ontology/yearElevationIntoNobility		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/yearOfConstruction		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/years		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/youthClub		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/youthYears		no_finetype_equivalent	auto-classified; no heuristic match
+http://dbpedia.org/ontology/zipCode	geography.address.postal_code	direct	auto-classified
+http://dbpedia.org/ontology/zodiacSign		no_finetype_equivalent	auto-classified; no heuristic match

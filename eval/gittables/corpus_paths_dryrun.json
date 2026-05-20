@@ -1,0 +1,22 @@
+{
+  "n_corpus_total": 1018286,
+  "n_measure_half_estimate": 509143,
+  "n_sampled": 1000,
+  "jobs": 16,
+  "per_file_means_s": {
+    "sha256": 0.0005,
+    "baseline_profile_validate_s": 0.9935,
+    "ydf_inference_s": 0.0701,
+    "dbpedia_kv_extraction_s": 0.1173,
+    "total_s": 1.1814
+  },
+  "projected_full_corpus": {
+    "wall_clock_seconds_single_core": 601486.7,
+    "wall_clock_seconds_at_jobs": 37592.9,
+    "wall_clock_hours_at_jobs": 10.44,
+    "target_hours": 48.0,
+    "ceiling_hours": 72.0,
+    "soft_fail": false,
+    "amend_required": false
+  }
+}

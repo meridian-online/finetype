@@ -190,6 +190,137 @@ it to exclude.
 - ac-01 ✅ closed (2026-05-20)
 - ac-02 ✅ closed (2026-05-21)
 - ac-03 ✅ closed (2026-05-21)
-- ac-04..ac-13 pending. Next: ac-04 (corpus index + runtime budget
-  dry-run) and ac-05 (full DBpedia / Schema.org annotation extraction
-  on top of the ac-02 seed mapping).
+- ac-04 ✅ closed (2026-05-21)
+- ac-05 ✅ closed (2026-05-21)
+- ac-06..ac-13 pending. Chunk 3a complete.
+
+## 2026-05-21 — ac-04 closed (corpus index + runtime dry-run)
+
+Built `eval/gittables/corpus_paths.txt` (1,018,286 parquets sorted
+lexicographically) and `eval/gittables/corpus_paths.sha256`
+(`27329eda15d6e6b9e2d94231b0c271855489c0463b5a5e9611b2478104e750ec`).
+The 64 MB index is gitignored; the .sha256 file is tracked. Index is
+regenerable via the comment captured in `.gitignore`.
+
+Dry-run on 1000 measure-half samples at `--jobs 16` produced
+`eval/gittables/corpus_paths_dryrun.json`:
+
+```
+per_file_means_s:
+  sha256:                      0.0005
+  baseline_profile_validate_s: 0.9935
+  ydf_inference_s:             0.0701
+  dbpedia_kv_extraction_s:     0.1173
+  total_s:                     1.1814
+
+projected_full_corpus (jobs=16):
+  wall_clock_hours: 10.44
+  target_hours:     48.00
+  ceiling_hours:    72.00
+  soft_fail:        false
+  amend_required:   false
+```
+
+10.4 h projection is well under the 48 h target — no amendment needed.
+Profile + validate is the dominant cost (84% of per-file time); YDF
+and DBpedia together are ~16%. SHA256 is negligible.
+
+The `--dry-run` runner is `scripts/gittables_corpus_pass.py`. The
+full-execute branch (ac-06) is not yet wired — it errors with
+`error: full --execute mode is ac-06 (not yet wired); pass --dry-run`
+to make the boundary explicit.
+
+---
+
+## 2026-05-21 — ac-05 closed (DBpedia annotation extraction + mapping extension)
+
+Extracted DBpedia / Schema.org annotations from every parquet under
+`/Users/hugh/datasets/gittables/` via pyarrow's footer reader (no
+DuckDB subprocess overhead — ~12,000 files/sec across 16 jobs).
+
+Throughput: **1,018,286 parquets processed in 1.4 minutes** at
+`--jobs 16`. 509,943 measure-half files (49.98% — the partition is
+even by construction). Zero errors.
+
+Outputs:
+- `eval/gittables/corpus_pass/dbpedia_annotations.parquet`
+  (6,187,761 column rows; 96 MB; gitignored — regenerable).
+- `eval/gittables/dbpedia_coverage.json` (re-derived by the audit
+  script).
+
+### Coverage shape
+
+| Threshold | Distinct classes |
+|----------:|-----------------:|
+|      ≥10× |             1707 |
+|      ≥50× |             1136 |
+|     ≥100× |              895 |
+|     ≥500× |              434 |
+|    ≥1000× |              310 |
+|    ≥5000× |               89 |
+|   ≥10000× |               55 |
+
+### Mapping extension
+
+Extended `eval/gittables/dbpedia_finetype_mapping.tsv` from 98 rows
+(ac-02 spike) to **1,710 rows** — every ≥10× DBpedia class plus the
+small ac-02 carry-overs.
+
+Strategy: preserve the 98 hand-curated rows from ac-02, apply a
+deterministic heuristic (`scripts/extend_dbpedia_mapping.py`) to the
+1,612 new classes. Heuristic rules in `HEURISTIC_RULES` skew
+conservatively — a class falls through to `no_finetype_equivalent`
+unless a clear taxonomy match exists. False positives in the mapping
+would inflate the DBpedia lens vote count and weaken ac-09's
+corroboration noise control.
+
+Final status distribution: **60 direct, 171 partial, 1,476 no_fit**.
+~13.5% mappable rate. Realistic given DBpedia's ontology is much
+broader than FineType's column-type taxonomy.
+
+### Audit
+
+`scripts/audit_dbpedia_coverage.py` reads the annotations parquet and
+the mapping table, asserts every ≥10× class has a mapping row, and
+re-derives the coverage JSON. Latest run:
+`PASS: ≥10× classes: 1707; mapped: 1707; missing: 0`.
+
+### Caveats
+
+- **Heuristic mis-classification.** Spot-check of top 30 classes found
+  1/30 error (`teamName` → `no_fit` should likely be
+  `entity_name partial`; camelCase defeats `\bname\b`). Acceptable
+  noise level (~3%) for an auto-classified mapping. Hand-curated rows
+  from ac-02 are unaffected. Downstream review can correct specific
+  rows without re-running the auto-classifier.
+- **Long-tail bias.** Below ≥50× (571 classes between 10× and 50×),
+  heuristic accuracy is harder to verify — many obscure DBpedia
+  properties default to `no_finetype_equivalent`. This is the
+  diagnostic signal: every such class is a candidate FineType
+  taxonomy gap if it actually represents a real-world column pattern.
+
+### Artefacts
+
+- `scripts/extract_dbpedia_annotations.py` — pyarrow-based extractor.
+- `scripts/extend_dbpedia_mapping.py` — preserve-existing + heuristic-
+  classify new classes.
+- `scripts/audit_dbpedia_coverage.py` — mapping coverage audit.
+- `eval/gittables/dbpedia_finetype_mapping.tsv` (1,710 rows, tracked).
+- `eval/gittables/dbpedia_coverage.json` (re-derived, tracked).
+- `eval/gittables/corpus_pass/dbpedia_annotations.parquet` (96 MB,
+  gitignored).
+
+---
+
+## Future direction (captured 2026-05-21)
+
+Author flagged: after the full-corpus pass surfaces weak spots, YDF's
+single-model design has room to grow into **specialist lenses** — one
+YDF per domain (`finance.*`, `datetime.*`, etc.) or per failure mode
+(`validator_widening`, `enum_overfit`). The current generalist YDF
+(stats + char-bigram TF-IDF, single 240-class classifier at 0.4293
+top-1) is a baseline; specialist models targeted at known weak spots
+could materially improve corroboration in specific
+`(criterion × mechanism)` cells. **Not in this spec's scope** — flagged
+here so the next spec can pick it up. Memory:
+`ydf-specialist-models-future` (label: topology).

@@ -344,7 +344,7 @@ acceptance_criteria:
     subset or compute escalation) via `revision_note` before
     ac-06 begins.
   gate: false
-  checked: false
+  checked: true
   verification: |
     Files `eval/gittables/corpus_paths.txt` and
     `eval/gittables/corpus_paths.sha256` exist. `wc -l corpus_paths.txt`
@@ -385,7 +385,7 @@ acceptance_criteria:
     `no_finetype_equivalent` rows are themselves diagnostic signal —
     they candidate-flag taxonomy gaps.
   gate: false
-  checked: false
+  checked: true
   verification: |
     `eval/gittables/corpus_pass/dbpedia_annotations.parquet` exists.
     DuckDB query

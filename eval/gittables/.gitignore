@@ -29,3 +29,12 @@ inference_signals.tsv
 # stderr captures). Cycle summary persists in cycle_log.jsonl; the raw
 # per-cycle dumps are debugging aids written by the cron-firing agent.
 cycles/
+# Corpus index — regenerable via:
+#   find /Users/hugh/datasets/gittables -name '*.parquet' | sort > corpus_paths.txt
+#   shasum -a 256 corpus_paths.txt > corpus_paths.sha256
+# 64 MB; corpus_paths.sha256 stays tracked as the reproducibility anchor.
+corpus_paths.txt
+
+# Corpus-pass intermediates (large; regenerable from scripts/).
+# dbpedia_annotations.parquet (~96 MB) — scripts/extract_dbpedia_annotations.py
+corpus_pass/dbpedia_annotations.parquet
