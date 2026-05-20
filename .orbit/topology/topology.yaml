@@ -1,0 +1,9 @@
+subsystem: topology
+canonical_code:
+- orbit-state/crates/core/src/schema.rs
+decision_record:
+- '0025'
+operational_doc:
+- plugins/orb/skills/topology/SKILL.md
+test_surface:
+- orbit-state/crates/core/src/schema.rs

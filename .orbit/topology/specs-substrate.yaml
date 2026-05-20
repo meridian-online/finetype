@@ -1,0 +1,9 @@
+subsystem: specs-substrate
+canonical_code:
+- orbit-state/crates/core/src/schema.rs
+decision_record:
+- '0021'
+operational_doc:
+- plugins/orb/skills/spec/SKILL.md
+test_surface:
+- orbit-state/crates/core/src/schema.rs

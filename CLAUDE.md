@@ -101,3 +101,9 @@ orbit memory search <kw>    # Search prior memories
 - NEVER say "ready to push when you are" — YOU must push.
 - If push fails, resolve and retry until it succeeds.
 <!-- END ORBIT-STATE INTEGRATION -->
+
+
+@.orbit/METHOD.md
+
+
+@.orbit/STYLE.md

@@ -1,0 +1,9 @@
+subsystem: memories
+canonical_code:
+- orbit-state/crates/core/src/schema.rs
+decision_record:
+- '0015'
+operational_doc:
+- plugins/orb/skills/memo/SKILL.md
+test_surface:
+- orbit-state/crates/core/src/schema.rs

@@ -1,0 +1,9 @@
+subsystem: cards
+canonical_code:
+- orbit-state/crates/core/src/schema.rs
+decision_record:
+- '0016'
+operational_doc:
+- plugins/orb/skills/card/SKILL.md
+test_surface:
+- orbit-state/crates/core/src/schema.rs
