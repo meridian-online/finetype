@@ -1,0 +1,1250 @@
+topic	table	column	dbpedia_class	schema_class
+abstraction	%E6%96%B0%E4%B8%96%E7%BA%AA%E8%8B%B1%E8%AF%AD%E4%B8%93%E4%B8%9A%E7%BB%BC%E5%90%88%E6%95%99%E7%A8%8B5%EF%BC%88%E7%AC%AC2%E7%89%88%EF%BC%89.parquet	a. 寓言(或传说、神话)中的, 虚构的		schema:cvdNumC19Died
+abstraction	%E6%96%B0%E4%B8%96%E7%BA%AA%E8%8B%B1%E8%AF%AD%E4%B8%93%E4%B8%9A%E7%BB%BC%E5%90%88%E6%95%99%E7%A8%8B5%EF%BC%88%E7%AC%AC2%E7%89%88%EF%BC%89.parquet	﻿fabled		
+allegro_con_spirito	Aziende.parquet	69029105140		
+allegro_con_spirito	Aziende.parquet	ALIAMI03B00W404U		
+allegro_con_spirito	Aziende.parquet	Alessio		
+allegro_con_spirito	Aziende.parquet	Amerino		
+allegro_con_spirito	Aziende.parquet	Asl n1 triestina dipartimento salute mentale		
+allegro_con_spirito	Aziende.parquet	Trieste		
+allegro_con_spirito	Aziende.parquet	Via Aldo Barbaro		
+allegro_con_spirito	Aziende.parquet	ente pubblico		
+attrition_rate	%20capsaicin_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+attrition_rate	%20capsaicin_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+attrition_rate	%20capsaicin_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+attrition_rate	%20capsaicin_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+attrition_rate	%20capsaicin_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+attrition_rate	%20capsaicin_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+attrition_rate	%20capsaicin_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+attrition_rate	%20capsaicin_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+attrition_rate	%20capsaicin_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+attrition_rate	%20capsaicin_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+attrition_rate	%20capsaicin_wos.parquet	DOI		
+attrition_rate	%20capsaicin_wos.parquet	ECC		
+attrition_rate	%20capsaicin_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+attrition_rate	%20capsaicin_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+attrition_rate	%20capsaicin_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+attrition_rate	%20capsaicin_wos.parquet	Issue		schema:PublicationIssue
+attrition_rate	%20capsaicin_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+attrition_rate	%20capsaicin_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+attrition_rate	%20capsaicin_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+attrition_rate	%20capsaicin_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+attrition_rate	%20capsaicin_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+attrition_rate	%20capsaicin_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+attrition_rate	%20capsaicin_wos.parquet	Unnamed: 0		
+attrition_rate	%20capsaicin_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+attrition_rate	%20capsaicin_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+attrition_rate	%20capsaicin_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+beats_per_minute	$WBA_1.parquet	Sentiment		
+beats_per_minute	$WBA_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+beats_per_minute	$WBA_1.parquet	Unnamed: 0		
+beats_per_minute	$WBA_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+beauty_sleep	$WBA.parquet	Sentiment		
+beauty_sleep	$WBA.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+beauty_sleep	$WBA.parquet	Unnamed: 0		
+beauty_sleep	$WBA.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+bits_per_second	%E5%A4%96%E7%A0%94%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD%E9%80%89%E6%8B%A9%E6%80%A7%E5%BF%85%E4%BF%AE%E7%AC%AC%E4%BA%8C%E5%86%8C.parquet	n. an undivided or unbroken completeness or totality with nothing wanting 	http://dbpedia.org/ontology/isPartOf	schema:isAccessoryOrSparePartFor
+bits_per_second	%E5%A4%96%E7%A0%94%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD%E9%80%89%E6%8B%A9%E6%80%A7%E5%BF%85%E4%BF%AE%E7%AC%AC%E4%BA%8C%E5%86%8C.parquet	﻿integrity		
+cardiac_output	%20atropine_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+cardiac_output	%20atropine_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+cardiac_output	%20atropine_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+cardiac_output	%20atropine_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+cardiac_output	%20atropine_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+cardiac_output	%20atropine_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+cardiac_output	%20atropine_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+cardiac_output	%20atropine_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+cardiac_output	%20atropine_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+cardiac_output	%20atropine_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+cardiac_output	%20atropine_pubmed.parquet	DOI		
+cardiac_output	%20atropine_pubmed.parquet	ECC		
+cardiac_output	%20atropine_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+cardiac_output	%20atropine_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+cardiac_output	%20atropine_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+cardiac_output	%20atropine_pubmed.parquet	Issue		schema:PublicationIssue
+cardiac_output	%20atropine_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+cardiac_output	%20atropine_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+cardiac_output	%20atropine_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+cardiac_output	%20atropine_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+cardiac_output	%20atropine_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+cardiac_output	%20atropine_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+cardiac_output	%20atropine_pubmed.parquet	Unnamed: 0		
+cardiac_output	%20atropine_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+cardiac_output	%20atropine_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+cardiac_output	%20atropine_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+cease	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD11%20-%20%E9%80%89%E4%BF%AE.parquet	n. 奥克兰（新西兰港市）		
+cease	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD11%20-%20%E9%80%89%E4%BF%AE.parquet	﻿Auckland		
+centripetal_acceleration	%E6%96%B0%E6%89%98%E7%A6%8F%E5%90%AC%E5%8A%9B%E8%AF%8D%E6%B1%87%E5%B0%8F%E4%BC%B4%E4%BE%A3_1.parquet	n. 展览品；证据；展示会 		
+centripetal_acceleration	%E6%96%B0%E6%89%98%E7%A6%8F%E5%90%AC%E5%8A%9B%E8%AF%8D%E6%B1%87%E5%B0%8F%E4%BC%B4%E4%BE%A3_1.parquet	﻿exhibit	http://dbpedia.org/ontology/exhibition	schema:ExhibitionEvent
+channel_capacity	%20acetylcysteine_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+channel_capacity	%20acetylcysteine_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+channel_capacity	%20acetylcysteine_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+channel_capacity	%20acetylcysteine_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+channel_capacity	%20acetylcysteine_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+channel_capacity	%20acetylcysteine_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+channel_capacity	%20acetylcysteine_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+channel_capacity	%20acetylcysteine_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+channel_capacity	%20acetylcysteine_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+channel_capacity	%20acetylcysteine_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+channel_capacity	%20acetylcysteine_wos.parquet	DOI		
+channel_capacity	%20acetylcysteine_wos.parquet	ECC		
+channel_capacity	%20acetylcysteine_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+channel_capacity	%20acetylcysteine_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+channel_capacity	%20acetylcysteine_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+channel_capacity	%20acetylcysteine_wos.parquet	Issue		schema:PublicationIssue
+channel_capacity	%20acetylcysteine_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+channel_capacity	%20acetylcysteine_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+channel_capacity	%20acetylcysteine_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+channel_capacity	%20acetylcysteine_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+channel_capacity	%20acetylcysteine_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+channel_capacity	%20acetylcysteine_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+channel_capacity	%20acetylcysteine_wos.parquet	Unnamed: 0		
+channel_capacity	%20acetylcysteine_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+channel_capacity	%20acetylcysteine_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+channel_capacity	%20acetylcysteine_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+clotting_time	%23-A,%20medical%20abbreviations.parquet	Abbreviation/Shorthand	http://dbpedia.org/ontology/abbreviation	
+clotting_time	%23-A,%20medical%20abbreviations.parquet	Meaning	http://dbpedia.org/ontology/meaning	
+clotting_time	%23-A,%20medical%20abbreviations.parquet	More Info	http://dbpedia.org/ontology/otherInformation	schema:gettingTestedInfo
+command_processing_overhead_time	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD10%20-%20%E9%80%89%E4%BF%AE.parquet	n. any venturesome undertaking especially one with an uncertain outcome 	http://dbpedia.org/ontology/numberOfResourceWithType	schema:amountOfThisGood
+command_processing_overhead_time	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD10%20-%20%E9%80%89%E4%BF%AE.parquet	﻿venture		
+count_per_minute	%20aminophylline_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+count_per_minute	%20aminophylline_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+count_per_minute	%20aminophylline_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+count_per_minute	%20aminophylline_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+count_per_minute	%20aminophylline_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+count_per_minute	%20aminophylline_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+count_per_minute	%20aminophylline_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+count_per_minute	%20aminophylline_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+count_per_minute	%20aminophylline_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+count_per_minute	%20aminophylline_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+count_per_minute	%20aminophylline_wos.parquet	DOI		
+count_per_minute	%20aminophylline_wos.parquet	ECC		
+count_per_minute	%20aminophylline_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+count_per_minute	%20aminophylline_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+count_per_minute	%20aminophylline_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+count_per_minute	%20aminophylline_wos.parquet	Issue		schema:PublicationIssue
+count_per_minute	%20aminophylline_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+count_per_minute	%20aminophylline_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+count_per_minute	%20aminophylline_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+count_per_minute	%20aminophylline_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+count_per_minute	%20aminophylline_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+count_per_minute	%20aminophylline_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+count_per_minute	%20aminophylline_wos.parquet	Unnamed: 0		
+count_per_minute	%20aminophylline_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+count_per_minute	%20aminophylline_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+count_per_minute	%20aminophylline_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+crime_rate	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD%E9%80%89%E6%8B%A9%E6%80%A7%E5%BF%85%E4%BF%AE%E7%AC%AC%E4%B8%89%E5%86%8C.parquet	a. sharply exact or accurate or delimited		schema:lesserOrEqual
+crime_rate	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD%E9%80%89%E6%8B%A9%E6%80%A7%E5%BF%85%E4%BF%AE%E7%AC%AC%E4%B8%89%E5%86%8C.parquet	﻿precise		
+data_rate	$BABA_1.parquet	Sentiment		
+data_rate	$BABA_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+data_rate	$BABA_1.parquet	Unnamed: 0		
+data_rate	$BABA_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+dead_air	%E4%B8%BB%E7%BA%BF%E5%89%A7%E6%83%85%E7%AC%AC82%E7%AB%A0%E7%AC%AC4%E8%8A%82%E7%AC%AC2%E5%B9%95.parquet	en		
+dead_air	%E4%B8%BB%E7%BA%BF%E5%89%A7%E6%83%85%E7%AC%AC82%E7%AB%A0%E7%AC%AC4%E8%8A%82%E7%AC%AC2%E5%B9%95.parquet	jp		
+dead_air	%E4%B8%BB%E7%BA%BF%E5%89%A7%E6%83%85%E7%AC%AC82%E7%AB%A0%E7%AC%AC4%E8%8A%82%E7%AC%AC2%E5%B9%95.parquet	trans		schema:transFatContent
+dead_air	%E4%B8%BB%E7%BA%BF%E5%89%A7%E6%83%85%E7%AC%AC82%E7%AB%A0%E7%AC%AC4%E8%8A%82%E7%AC%AC2%E5%B9%95.parquet	﻿id	http://dbpedia.org/ontology/id	schema:identifier
+dogwatch	19-20.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+dogwatch	19-20.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+dogwatch	19-20.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+dogwatch	19-20.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+dogwatch	19-20.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+dogwatch	19-20.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+dogwatch	19-20.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+dogwatch	19-20.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+dogwatch	19-20.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+dogwatch	19-20.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+dogwatch	19-20.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+dose_rate	%20acetylcysteine_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+dose_rate	%20acetylcysteine_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+dose_rate	%20acetylcysteine_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+dose_rate	%20acetylcysteine_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+dose_rate	%20acetylcysteine_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+dose_rate	%20acetylcysteine_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+dose_rate	%20acetylcysteine_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+dose_rate	%20acetylcysteine_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+dose_rate	%20acetylcysteine_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+dose_rate	%20acetylcysteine_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+dose_rate	%20acetylcysteine_wos.parquet	DOI		
+dose_rate	%20acetylcysteine_wos.parquet	ECC		
+dose_rate	%20acetylcysteine_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+dose_rate	%20acetylcysteine_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+dose_rate	%20acetylcysteine_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+dose_rate	%20acetylcysteine_wos.parquet	Issue		schema:PublicationIssue
+dose_rate	%20acetylcysteine_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+dose_rate	%20acetylcysteine_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+dose_rate	%20acetylcysteine_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+dose_rate	%20acetylcysteine_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+dose_rate	%20acetylcysteine_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+dose_rate	%20acetylcysteine_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+dose_rate	%20acetylcysteine_wos.parquet	Unnamed: 0		
+dose_rate	%20acetylcysteine_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+dose_rate	%20acetylcysteine_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+dose_rate	%20acetylcysteine_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+dwarf	%20isoflurane_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+dwarf	%20isoflurane_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+dwarf	%20isoflurane_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+dwarf	%20isoflurane_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+dwarf	%20isoflurane_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+dwarf	%20isoflurane_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+dwarf	%20isoflurane_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+dwarf	%20isoflurane_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+dwarf	%20isoflurane_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+dwarf	%20isoflurane_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+dwarf	%20isoflurane_wos.parquet	DOI		
+dwarf	%20isoflurane_wos.parquet	ECC		
+dwarf	%20isoflurane_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+dwarf	%20isoflurane_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+dwarf	%20isoflurane_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+dwarf	%20isoflurane_wos.parquet	Issue		schema:PublicationIssue
+dwarf	%20isoflurane_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+dwarf	%20isoflurane_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+dwarf	%20isoflurane_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+dwarf	%20isoflurane_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+dwarf	%20isoflurane_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+dwarf	%20isoflurane_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+dwarf	%20isoflurane_wos.parquet	Unnamed: 0		
+dwarf	%20isoflurane_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+dwarf	%20isoflurane_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+dwarf	%20isoflurane_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_cla	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_dan	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_hip	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_jaz	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_pop	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_rhy	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_roc	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 genre_spe	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	 instrumental		
+entr'acte	ClaAggDarInsFasNot.parquet	 loudness		
+entr'acte	ClaAggDarInsFasNot.parquet	 not_danceable	http://dbpedia.org/ontology/notSolubleIn	schema:NotYetRecruiting
+entr'acte	ClaAggDarInsFasNot.parquet	 timbre_bright		
+entr'acte	ClaAggDarInsFasNot.parquet	 timbre_dark		
+entr'acte	ClaAggDarInsFasNot.parquet	 voice	http://dbpedia.org/ontology/voice	
+entr'acte	ClaAggDarInsFasNot.parquet	album	http://dbpedia.org/ontology/album	schema:album
+entr'acte	ClaAggDarInsFasNot.parquet	artist	http://dbpedia.org/ontology/artist	schema:artist
+entr'acte	ClaAggDarInsFasNot.parquet	bpm		
+entr'acte	ClaAggDarInsFasNot.parquet	danceability		
+entr'acte	ClaAggDarInsFasNot.parquet	danceable		
+entr'acte	ClaAggDarInsFasNot.parquet	genre	http://dbpedia.org/ontology/genre	schema:genre
+entr'acte	ClaAggDarInsFasNot.parquet	instrumental		
+entr'acte	ClaAggDarInsFasNot.parquet	mood	http://dbpedia.org/ontology/mood	
+entr'acte	ClaAggDarInsFasNot.parquet	mood_cluster1		
+entr'acte	ClaAggDarInsFasNot.parquet	mood_cluster2		
+entr'acte	ClaAggDarInsFasNot.parquet	mood_cluster3		
+entr'acte	ClaAggDarInsFasNot.parquet	mood_cluster4		
+entr'acte	ClaAggDarInsFasNot.parquet	mood_cluster5		
+entr'acte	ClaAggDarInsFasNot.parquet	spotify_url	http://dbpedia.org/ontology/fileURL	schema:URL
+entr'acte	ClaAggDarInsFasNot.parquet	tempo		
+entr'acte	ClaAggDarInsFasNot.parquet	timbre	http://dbpedia.org/ontology/tessitura	
+entr'acte	ClaAggDarInsFasNot.parquet	title	http://dbpedia.org/ontology/title	schema:title
+episcopate	07954.parquet	end	http://dbpedia.org/ontology/end	schema:endTime
+episcopate	07954.parquet	start	http://dbpedia.org/ontology/start	schema:startTime
+episcopate	07954.parquet	text	http://dbpedia.org/ontology/sourceText	schema:Text
+erythrocyte_sedimentation_rate	0000355.parquet	S		
+erythrocyte_sedimentation_rate	0000355.parquet	Unnamed: 3		
+erythrocyte_sedimentation_rate	0000355.parquet	nc	http://dbpedia.org/ontology/fc	
+erythrocyte_sedimentation_rate	0000355.parquet	nt	http://dbpedia.org/ontology/uRN	
+escape_velocity	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+escape_velocity	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+escape_velocity	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+escape_velocity	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+escape_velocity	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+escape_velocity	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+escape_velocity	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+escape_velocity	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+escape_velocity	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+escape_velocity	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+escape_velocity	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+fertile_period	%E4%BA%BA%E6%95%99%E7%89%88%E4%B8%89%E5%B9%B4%E7%BA%A7%E8%B5%B7%E7%82%B9%E5%85%AD%E5%B9%B4%E7%BA%A7%E4%B8%8A.parquet	n. a particular branch of scientific knowledge	http://dbpedia.org/ontology/isPartOfAnatomicalStructure	schema:branchOf
+fertile_period	%E4%BA%BA%E6%95%99%E7%89%88%E4%B8%89%E5%B9%B4%E7%BA%A7%E8%B5%B7%E7%82%B9%E5%85%AD%E5%B9%B4%E7%BA%A7%E4%B8%8A.parquet	﻿science		schema:LaboratoryScience
+graveyard_watch	01-02.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+graveyard_watch	01-02.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+graveyard_watch	01-02.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+graveyard_watch	01-02.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+graveyard_watch	01-02.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+graveyard_watch	01-02.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+graveyard_watch	01-02.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+graveyard_watch	01-02.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+graveyard_watch	01-02.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+graveyard_watch	01-02.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+graveyard_watch	01-02.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+growth_rate	$MSFT_1.parquet	Sentiment		
+growth_rate	$MSFT_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+growth_rate	$MSFT_1.parquet	Unnamed: 0		
+growth_rate	$MSFT_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+half_life	%20acetate_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+half_life	%20acetate_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+half_life	%20acetate_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+half_life	%20acetate_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+half_life	%20acetate_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+half_life	%20acetate_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+half_life	%20acetate_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+half_life	%20acetate_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+half_life	%20acetate_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+half_life	%20acetate_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+half_life	%20acetate_wos.parquet	DOI		
+half_life	%20acetate_wos.parquet	ECC		
+half_life	%20acetate_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+half_life	%20acetate_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+half_life	%20acetate_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+half_life	%20acetate_wos.parquet	Issue		schema:PublicationIssue
+half_life	%20acetate_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+half_life	%20acetate_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+half_life	%20acetate_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+half_life	%20acetate_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+half_life	%20acetate_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+half_life	%20acetate_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+half_life	%20acetate_wos.parquet	Unnamed: 0		
+half_life	%20acetate_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+half_life	%20acetate_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+half_life	%20acetate_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+halftime	01-02.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+halftime	01-02.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+halftime	01-02.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+halftime	01-02.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+halftime	01-02.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+halftime	01-02.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+halftime	01-02.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+halftime	01-02.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+halftime	01-02.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+halftime	01-02.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+halftime	01-02.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Add Date	http://dbpedia.org/ontology/dateUse	schema:Date
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Alt. Contact Email		schema:email
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Alt. Contact Name	http://dbpedia.org/ontology/informationName	schema:name
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Alt2. Contact Emails (GOLD)		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Alt2. Contact Names (GOLD)		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Altitude In Meters	http://dbpedia.org/ontology/altitude	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Amino Acid Sequence Length (aa)		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Biotic Relationships		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	COG		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Cell Arrangement		schema:musicArrangement
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Cell Shape	http://dbpedia.org/ontology/shape	schema:GeoShape
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Chlorophyll concentration		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Chromosome	http://dbpedia.org/ontology/chromosome	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Clade	http://dbpedia.org/ontology/clade	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Contact Email		schema:email
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Contact Name	http://dbpedia.org/ontology/informationName	schema:name
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Culture Type	http://dbpedia.org/ontology/type	schema:GenderType
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Cultured		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	DNA Sequence Length (bp)	http://dbpedia.org/ontology/length	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Depth In Meters	http://dbpedia.org/ontology/depth	schema:depth
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Diseases	http://dbpedia.org/ontology/disease	schema:InfectiousDisease
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Ecosystem		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Ecosystem Category	http://dbpedia.org/ontology/category	schema:category
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Ecosystem Subtype		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Ecosystem Type	http://dbpedia.org/ontology/type	schema:interactionType
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Ecotype		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	End Coord	http://dbpedia.org/ontology/end	schema:endOffset
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Energy Source	http://dbpedia.org/ontology/source	schema:Energy
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Enzyme		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Funding Program	http://dbpedia.org/ontology/projectBudgetFunding	schema:FundingScheme
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Funding Year	http://dbpedia.org/ontology/budgetYear	schema:FundingScheme
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	GOLD Sequencing Depth	http://dbpedia.org/ontology/depth	schema:depth
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	GOLD Sequencing Quality		schema:videoQuality
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	GOLD Sequencing Strategy		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	GPTS Proposal ID	http://dbpedia.org/ontology/id	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	GenBank Accession		schema:BankAccount
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Gene Product Name	http://dbpedia.org/ontology/geneReviewsName	schema:Product
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Gene Symbol	http://dbpedia.org/ontology/symbol	schema:tickerSymbol
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Genome ID	http://dbpedia.org/ontology/id	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Genome Name	http://dbpedia.org/ontology/name	schema:name
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Geographic Location	http://dbpedia.org/ontology/location	schema:location
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Gram Staining		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	HMP ID	http://dbpedia.org/ontology/id	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Habitat	http://dbpedia.org/ontology/species	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Host Gender	http://dbpedia.org/ontology/gender	schema:gender
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Host Name	http://dbpedia.org/ontology/name	schema:name
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	IMG Term		schema:DefinedTerm
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	ITS Proposal ID	http://dbpedia.org/ontology/projectReferenceID	schema:taxID
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	ITS SP ID	http://dbpedia.org/ontology/id	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Is Obsolete	http://dbpedia.org/ontology/isPartOf	schema:isProprietary
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Is Partial Gene	http://dbpedia.org/ontology/orthologousGene	schema:isVariantOf
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Is Pseudogene	http://dbpedia.org/ontology/isPartOf	schema:isVariantOf
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Is Public	http://dbpedia.org/ontology/isCityState	schema:isAccessibleForFree
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Is Published	http://dbpedia.org/ontology/isPeerReviewed	schema:publishedOn
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Isolation		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Isolation Country	http://dbpedia.org/ontology/country	schema:Country
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	KO	http://dbpedia.org/ontology/ko	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Latitude		schema:latitude
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Locus Tag	http://dbpedia.org/ontology/tag	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Locus Type	http://dbpedia.org/ontology/type	schema:encodingType
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Longhurst Code	http://dbpedia.org/ontology/iso31661Code	schema:acrissCode
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Longhurst Description	http://dbpedia.org/ontology/description	schema:description
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Longitude		schema:longitude
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Medical Record Number	http://dbpedia.org/ontology/trackNumber	schema:Number
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Metabolism		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Motility		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	NCBI Bioproject Accession		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	NCBI Biosample Accession		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Nitrate Concentration		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Oxygen Requirement	http://dbpedia.org/ontology/requirement	schema:physicalRequirement
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Oxygen concentration		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	PMO Project ID	http://dbpedia.org/ontology/projectReferenceID	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Pfam	http://dbpedia.org/ontology/pdb	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Phenotype		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Pressure	http://dbpedia.org/ontology/vaporPressure	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Project / Study Name	http://dbpedia.org/ontology/project	schema:ResearchProject
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal Isolation		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal Ocean	http://dbpedia.org/ontology/sea	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal Station	http://dbpedia.org/ontology/radioStation	schema:TrainStation
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal WOA Dissolved Oxygen	http://dbpedia.org/ontology/dissolved	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal WOA Nitrate		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal WOA Phosphate		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal WOA Salinity		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal WOA Silicate		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Proportal WOA Temperature	http://dbpedia.org/ontology/temperature	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Pubmed ID	http://dbpedia.org/ontology/id	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Relevance		schema:significance
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Salinity		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Salinity Concentration		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Sample Body Site	http://dbpedia.org/ontology/bodyDiscovered	schema:articleBody
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Sample Body Subsite	http://dbpedia.org/ontology/lunarSampleMass	schema:tissueSample
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Sample Collection Date 	http://dbpedia.org/ontology/collection	schema:cvdCollectionDate
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Sample Collection Temperature	http://dbpedia.org/ontology/collectionSize	schema:collectionSize
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Scaffold External Accession	http://dbpedia.org/ontology/externalOrnament	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Scaffold GC %		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Scaffold ID	http://dbpedia.org/ontology/id	schema:identifier
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Scaffold Length (bp)	http://dbpedia.org/ontology/length	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Scaffold Name	http://dbpedia.org/ontology/name	schema:name
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Scaffold Read Depth	http://dbpedia.org/ontology/depth	schema:depth
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Seq Status	http://dbpedia.org/ontology/status	schema:status
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Sequencing Method	http://dbpedia.org/ontology/detectionMethod	schema:DeliveryMethod
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Signal Peptides		schema:broadcastSignalModulation
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Specific Ecosystem		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Sporulation		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Start Coord	http://dbpedia.org/ontology/start	schema:startOffset
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Strand		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Temperature Range	http://dbpedia.org/ontology/temperature	schema:normalRange
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Tigrfam		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Transmembrane Helices		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Type Strain	http://dbpedia.org/ontology/type	schema:fuelType
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Uncultured Type	http://dbpedia.org/ontology/type	schema:touristType
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	Visits		schema:UserPageVisits
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	gene_oid	http://dbpedia.org/ontology/orthologousGene	
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	is_ca	http://dbpedia.org/ontology/isPartOf	schema:isVariantOf
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	is_dab1		
+heterotroph	082919_dabs_in_genomes_wo_ca.parquet	pH	http://dbpedia.org/ontology/dfE	schema:cvdNumC19HOPats
+hypervelocity	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+hypervelocity	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+hypervelocity	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+hypervelocity	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+hypervelocity	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+hypervelocity	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+hypervelocity	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+hypervelocity	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+hypervelocity	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+hypervelocity	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+hypervelocity	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+id	%20acetaminophen_scopus.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+id	%20acetaminophen_scopus.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+id	%20acetaminophen_scopus.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+id	%20acetaminophen_scopus.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+id	%20acetaminophen_scopus.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+id	%20acetaminophen_scopus.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+id	%20acetaminophen_scopus.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+id	%20acetaminophen_scopus.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+id	%20acetaminophen_scopus.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+id	%20acetaminophen_scopus.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+id	%20acetaminophen_scopus.parquet	DOI		
+id	%20acetaminophen_scopus.parquet	ECC		
+id	%20acetaminophen_scopus.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+id	%20acetaminophen_scopus.parquet	GSRank	http://dbpedia.org/ontology/rank	
+id	%20acetaminophen_scopus.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+id	%20acetaminophen_scopus.parquet	Issue		schema:PublicationIssue
+id	%20acetaminophen_scopus.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+id	%20acetaminophen_scopus.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+id	%20acetaminophen_scopus.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+id	%20acetaminophen_scopus.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+id	%20acetaminophen_scopus.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+id	%20acetaminophen_scopus.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+id	%20acetaminophen_scopus.parquet	Unnamed: 0		
+id	%20acetaminophen_scopus.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+id	%20acetaminophen_scopus.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+id	%20acetaminophen_scopus.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+in_time	$MCD_1.parquet	Sentiment		
+in_time	$MCD_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+in_time	$MCD_1.parquet	Unnamed: 0		
+in_time	$MCD_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+incubation_period	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+incubation_period	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+incubation_period	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+incubation_period	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+incubation_period	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+incubation_period	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+incubation_period	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+incubation_period	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+incubation_period	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+incubation_period	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+incubation_period	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+indiction	01-02.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+indiction	01-02.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+indiction	01-02.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+indiction	01-02.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+indiction	01-02.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+indiction	01-02.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+indiction	01-02.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+indiction	01-02.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+indiction	01-02.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+indiction	01-02.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+indiction	01-02.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+inflation_rate	%20capsaicin_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+inflation_rate	%20capsaicin_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+inflation_rate	%20capsaicin_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+inflation_rate	%20capsaicin_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+inflation_rate	%20capsaicin_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+inflation_rate	%20capsaicin_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+inflation_rate	%20capsaicin_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+inflation_rate	%20capsaicin_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+inflation_rate	%20capsaicin_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+inflation_rate	%20capsaicin_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+inflation_rate	%20capsaicin_wos.parquet	DOI		
+inflation_rate	%20capsaicin_wos.parquet	ECC		
+inflation_rate	%20capsaicin_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+inflation_rate	%20capsaicin_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+inflation_rate	%20capsaicin_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+inflation_rate	%20capsaicin_wos.parquet	Issue		schema:PublicationIssue
+inflation_rate	%20capsaicin_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+inflation_rate	%20capsaicin_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+inflation_rate	%20capsaicin_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+inflation_rate	%20capsaicin_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+inflation_rate	%20capsaicin_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+inflation_rate	%20capsaicin_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+inflation_rate	%20capsaicin_wos.parquet	Unnamed: 0		
+inflation_rate	%20capsaicin_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+inflation_rate	%20capsaicin_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+inflation_rate	%20capsaicin_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+interim	$MSFT_1.parquet	Sentiment		
+interim	$MSFT_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+interim	$MSFT_1.parquet	Unnamed: 0		
+interim	$MSFT_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+kilohertz	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+kilohertz	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+kilohertz	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+kilohertz	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+kilohertz	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+kilohertz	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+kilohertz	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+kilohertz	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+kilohertz	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+kilohertz	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+kilohertz	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+kilometers_per_hour	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+kilometers_per_hour	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+kilometers_per_hour	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+kilometers_per_hour	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+kilometers_per_hour	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+kilometers_per_hour	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+kilometers_per_hour	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+kilometers_per_hour	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+kilometers_per_hour	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+kilometers_per_hour	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+kilometers_per_hour	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+lapse	%20amphetamine_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+lapse	%20amphetamine_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+lapse	%20amphetamine_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+lapse	%20amphetamine_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+lapse	%20amphetamine_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+lapse	%20amphetamine_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+lapse	%20amphetamine_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+lapse	%20amphetamine_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+lapse	%20amphetamine_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+lapse	%20amphetamine_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+lapse	%20amphetamine_wos.parquet	DOI		
+lapse	%20amphetamine_wos.parquet	ECC		
+lapse	%20amphetamine_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+lapse	%20amphetamine_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+lapse	%20amphetamine_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+lapse	%20amphetamine_wos.parquet	Issue		schema:PublicationIssue
+lapse	%20amphetamine_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+lapse	%20amphetamine_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+lapse	%20amphetamine_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+lapse	%20amphetamine_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+lapse	%20amphetamine_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+lapse	%20amphetamine_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+lapse	%20amphetamine_wos.parquet	Unnamed: 0		
+lapse	%20amphetamine_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+lapse	%20amphetamine_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+lapse	%20amphetamine_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+last_gasp	%E6%96%B0%E6%A6%82%E5%BF%B5%E8%8B%B1%E8%AF%AD%E9%9D%92%E5%B0%91%E7%89%885B_1.parquet	n. 旷课者；懒惰的人 		
+last_gasp	%E6%96%B0%E6%A6%82%E5%BF%B5%E8%8B%B1%E8%AF%AD%E9%9D%92%E5%B0%91%E7%89%885B_1.parquet	﻿truant		
+latent_period	%20capsaicin_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+latent_period	%20capsaicin_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+latent_period	%20capsaicin_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+latent_period	%20capsaicin_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+latent_period	%20capsaicin_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+latent_period	%20capsaicin_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+latent_period	%20capsaicin_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+latent_period	%20capsaicin_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+latent_period	%20capsaicin_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+latent_period	%20capsaicin_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+latent_period	%20capsaicin_wos.parquet	DOI		
+latent_period	%20capsaicin_wos.parquet	ECC		
+latent_period	%20capsaicin_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+latent_period	%20capsaicin_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+latent_period	%20capsaicin_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+latent_period	%20capsaicin_wos.parquet	Issue		schema:PublicationIssue
+latent_period	%20capsaicin_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+latent_period	%20capsaicin_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+latent_period	%20capsaicin_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+latent_period	%20capsaicin_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+latent_period	%20capsaicin_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+latent_period	%20capsaicin_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+latent_period	%20capsaicin_wos.parquet	Unnamed: 0		
+latent_period	%20capsaicin_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+latent_period	%20capsaicin_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+latent_period	%20capsaicin_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+lead_time	$BABA.parquet	Sentiment		
+lead_time	$BABA.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+lead_time	$BABA.parquet	Unnamed: 0		
+lead_time	$BABA.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+living_thing	%E1%84%8B%E1%85%B2%E1%84%90%E1%85%B2%E1%84%87%E1%85%B3%E1%84%83%E1%85%A5%E1%86%BA%E1%84%80%E1%85%B3%E1%86%AF%2Blike.parquet	Unnamed: 0		
+living_thing	%E1%84%8B%E1%85%B2%E1%84%90%E1%85%B2%E1%84%87%E1%85%B3%E1%84%83%E1%85%A5%E1%86%BA%E1%84%80%E1%85%B3%E1%86%AF%2Blike.parquet	likes		schema:UserLikes
+living_thing	%E1%84%8B%E1%85%B2%E1%84%90%E1%85%B2%E1%84%87%E1%85%B3%E1%84%83%E1%85%A5%E1%86%BA%E1%84%80%E1%85%B3%E1%86%AF%2Blike.parquet	text	http://dbpedia.org/ontology/sourceText	schema:Text
+meno_mosso	16-17.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+meno_mosso	16-17.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+meno_mosso	16-17.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+meno_mosso	16-17.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+meno_mosso	16-17.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+meno_mosso	16-17.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+meno_mosso	16-17.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+meno_mosso	16-17.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+meno_mosso	16-17.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+meno_mosso	16-17.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+meno_mosso	16-17.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+menstrual_cycle	0000141.parquet	S		
+menstrual_cycle	0000141.parquet	Unnamed: 3		
+menstrual_cycle	0000141.parquet	nc	http://dbpedia.org/ontology/fc	
+menstrual_cycle	0000141.parquet	nt	http://dbpedia.org/ontology/uRN	
+metabolic_rate	%20testosterone_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+metabolic_rate	%20testosterone_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+metabolic_rate	%20testosterone_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+metabolic_rate	%20testosterone_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+metabolic_rate	%20testosterone_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+metabolic_rate	%20testosterone_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+metabolic_rate	%20testosterone_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+metabolic_rate	%20testosterone_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+metabolic_rate	%20testosterone_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+metabolic_rate	%20testosterone_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+metabolic_rate	%20testosterone_pubmed.parquet	DOI		
+metabolic_rate	%20testosterone_pubmed.parquet	ECC		
+metabolic_rate	%20testosterone_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+metabolic_rate	%20testosterone_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+metabolic_rate	%20testosterone_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+metabolic_rate	%20testosterone_pubmed.parquet	Issue		schema:PublicationIssue
+metabolic_rate	%20testosterone_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+metabolic_rate	%20testosterone_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+metabolic_rate	%20testosterone_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+metabolic_rate	%20testosterone_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+metabolic_rate	%20testosterone_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+metabolic_rate	%20testosterone_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+metabolic_rate	%20testosterone_pubmed.parquet	Unnamed: 0		
+metabolic_rate	%20testosterone_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+metabolic_rate	%20testosterone_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+metabolic_rate	%20testosterone_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+miles_per_hour	%E6%96%B0%E6%A6%82%E5%BF%B5%E8%8B%B1%E8%AF%AD%E9%9D%92%E5%B0%91%E7%89%885A_1.parquet	none		
+miles_per_hour	%E6%96%B0%E6%A6%82%E5%BF%B5%E8%8B%B1%E8%AF%AD%E9%9D%92%E5%B0%91%E7%89%885A_1.parquet	﻿save up	http://dbpedia.org/ontology/climbUpNumber	
+multistage	000002.parquet	0		
+multistage	000002.parquet	Unnamed: 1		
+musth	01-02.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+musth	01-02.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+musth	01-02.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+musth	01-02.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+musth	01-02.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+musth	01-02.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+musth	01-02.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+musth	01-02.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+musth	01-02.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+musth	01-02.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+musth	01-02.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+neonatal_mortality	%20folic_acid_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+neonatal_mortality	%20folic_acid_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+neonatal_mortality	%20folic_acid_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+neonatal_mortality	%20folic_acid_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+neonatal_mortality	%20folic_acid_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+neonatal_mortality	%20folic_acid_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+neonatal_mortality	%20folic_acid_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+neonatal_mortality	%20folic_acid_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+neonatal_mortality	%20folic_acid_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+neonatal_mortality	%20folic_acid_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+neonatal_mortality	%20folic_acid_pubmed.parquet	DOI		
+neonatal_mortality	%20folic_acid_pubmed.parquet	ECC		
+neonatal_mortality	%20folic_acid_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+neonatal_mortality	%20folic_acid_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+neonatal_mortality	%20folic_acid_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+neonatal_mortality	%20folic_acid_pubmed.parquet	Issue		schema:PublicationIssue
+neonatal_mortality	%20folic_acid_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+neonatal_mortality	%20folic_acid_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+neonatal_mortality	%20folic_acid_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+neonatal_mortality	%20folic_acid_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+neonatal_mortality	%20folic_acid_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+neonatal_mortality	%20folic_acid_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+neonatal_mortality	%20folic_acid_pubmed.parquet	Unnamed: 0		
+neonatal_mortality	%20folic_acid_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+neonatal_mortality	%20folic_acid_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+neonatal_mortality	%20folic_acid_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+object	%20clonidine_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+object	%20clonidine_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+object	%20clonidine_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+object	%20clonidine_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+object	%20clonidine_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+object	%20clonidine_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+object	%20clonidine_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+object	%20clonidine_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+object	%20clonidine_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+object	%20clonidine_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+object	%20clonidine_wos.parquet	DOI		
+object	%20clonidine_wos.parquet	ECC		
+object	%20clonidine_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+object	%20clonidine_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+object	%20clonidine_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+object	%20clonidine_wos.parquet	Issue		schema:PublicationIssue
+object	%20clonidine_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+object	%20clonidine_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+object	%20clonidine_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+object	%20clonidine_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+object	%20clonidine_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+object	%20clonidine_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+object	%20clonidine_wos.parquet	Unnamed: 0		
+object	%20clonidine_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+object	%20clonidine_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+object	%20clonidine_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+orbit_period	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD11%20-%20%E9%80%89%E4%BF%AE.parquet	n. the largest city and principal port of New Zealand	http://dbpedia.org/ontology/numberOfCity	schema:partOfSystem
+orbit_period	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD11%20-%20%E9%80%89%E4%BF%AE.parquet	﻿Auckland		
+organism	%20isoflurane_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+organism	%20isoflurane_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+organism	%20isoflurane_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+organism	%20isoflurane_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+organism	%20isoflurane_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+organism	%20isoflurane_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+organism	%20isoflurane_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+organism	%20isoflurane_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+organism	%20isoflurane_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+organism	%20isoflurane_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+organism	%20isoflurane_wos.parquet	DOI		
+organism	%20isoflurane_wos.parquet	ECC		
+organism	%20isoflurane_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+organism	%20isoflurane_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+organism	%20isoflurane_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+organism	%20isoflurane_wos.parquet	Issue		schema:PublicationIssue
+organism	%20isoflurane_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+organism	%20isoflurane_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+organism	%20isoflurane_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+organism	%20isoflurane_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+organism	%20isoflurane_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+organism	%20isoflurane_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+organism	%20isoflurane_wos.parquet	Unnamed: 0		
+organism	%20isoflurane_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+organism	%20isoflurane_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+organism	%20isoflurane_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+parent	%20gabapentin_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+parent	%20gabapentin_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+parent	%20gabapentin_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+parent	%20gabapentin_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+parent	%20gabapentin_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+parent	%20gabapentin_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+parent	%20gabapentin_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+parent	%20gabapentin_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+parent	%20gabapentin_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+parent	%20gabapentin_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+parent	%20gabapentin_wos.parquet	DOI		
+parent	%20gabapentin_wos.parquet	ECC		
+parent	%20gabapentin_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+parent	%20gabapentin_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+parent	%20gabapentin_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+parent	%20gabapentin_wos.parquet	Issue		schema:PublicationIssue
+parent	%20gabapentin_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+parent	%20gabapentin_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+parent	%20gabapentin_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+parent	%20gabapentin_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+parent	%20gabapentin_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+parent	%20gabapentin_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+parent	%20gabapentin_wos.parquet	Unnamed: 0		
+parent	%20gabapentin_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+parent	%20gabapentin_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+parent	%20gabapentin_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+peacetime	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+peacetime	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+peacetime	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+peacetime	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+peacetime	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+peacetime	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+peacetime	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+peacetime	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+peacetime	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+peacetime	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+peacetime	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+peculiar_velocity	%E5%A4%96%E7%A0%94%E7%89%88%E5%88%9D%E4%B8%AD%E8%8B%B1%E8%AF%AD%E4%B9%9D%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.parquet	n. a formation of aircraft in flight 	http://dbpedia.org/ontology/numberOfPersonInOccupation	schema:inSupportOf
+peculiar_velocity	%E5%A4%96%E7%A0%94%E7%89%88%E5%88%9D%E4%B8%AD%E8%8B%B1%E8%AF%AD%E4%B9%9D%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.parquet	﻿flight	http://dbpedia.org/ontology/maidenFlight	schema:Flight
+physical_entity	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+physical_entity	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+physical_entity	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+physical_entity	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+physical_entity	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+physical_entity	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+physical_entity	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+physical_entity	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+physical_entity	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+physical_entity	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+physical_entity	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+processing_time	%20acetylcysteine_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+processing_time	%20acetylcysteine_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+processing_time	%20acetylcysteine_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+processing_time	%20acetylcysteine_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+processing_time	%20acetylcysteine_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+processing_time	%20acetylcysteine_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+processing_time	%20acetylcysteine_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+processing_time	%20acetylcysteine_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+processing_time	%20acetylcysteine_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+processing_time	%20acetylcysteine_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+processing_time	%20acetylcysteine_pubmed.parquet	DOI		
+processing_time	%20acetylcysteine_pubmed.parquet	ECC		
+processing_time	%20acetylcysteine_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+processing_time	%20acetylcysteine_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+processing_time	%20acetylcysteine_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+processing_time	%20acetylcysteine_pubmed.parquet	Issue		schema:PublicationIssue
+processing_time	%20acetylcysteine_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+processing_time	%20acetylcysteine_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+processing_time	%20acetylcysteine_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+processing_time	%20acetylcysteine_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+processing_time	%20acetylcysteine_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+processing_time	%20acetylcysteine_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+processing_time	%20acetylcysteine_pubmed.parquet	Unnamed: 0		
+processing_time	%20acetylcysteine_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+processing_time	%20acetylcysteine_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+processing_time	%20acetylcysteine_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+question_time	$BABA_1.parquet	Sentiment		
+question_time	$BABA_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+question_time	$BABA_1.parquet	Unnamed: 0		
+question_time	$BABA_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+quick_time	$MSFT_1.parquet	Sentiment		
+quick_time	$MSFT_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+quick_time	$MSFT_1.parquet	Unnamed: 0		
+quick_time	$MSFT_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+radial_pulse	02-03.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+radial_pulse	02-03.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+radial_pulse	02-03.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+radial_pulse	02-03.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+radial_pulse	02-03.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+radial_pulse	02-03.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+radial_pulse	02-03.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+radial_pulse	02-03.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+radial_pulse	02-03.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+radial_pulse	02-03.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+radial_pulse	02-03.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+radial_velocity	001.parquet	BJD		
+radial_velocity	001.parquet	Radial_Velocity	http://dbpedia.org/ontology/escapeVelocity	
+radial_velocity	001.parquet	Radial_Velocity_Uncertainty	http://dbpedia.org/ontology/escapeVelocity	
+rainy_day	%E4%BA%BA%E6%95%99%E7%89%88%E4%B8%80%E5%B9%B4%E7%BA%A7%E8%B5%B7%E7%82%B9%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8B_1.parquet	na. 踢足球；对难办的事采取踢皮球的态度 		
+rainy_day	%E4%BA%BA%E6%95%99%E7%89%88%E4%B8%80%E5%B9%B4%E7%BA%A7%E8%B5%B7%E7%82%B9%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8B_1.parquet	﻿play football	http://dbpedia.org/ontology/soccerLeagueSeason	schema:Play
+rate_of_return	$BABA_1.parquet	Sentiment		
+rate_of_return	$BABA_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+rate_of_return	$BABA_1.parquet	Unnamed: 0		
+rate_of_return	$BABA_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+reaction_time	%20acetate_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+reaction_time	%20acetate_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+reaction_time	%20acetate_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+reaction_time	%20acetate_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+reaction_time	%20acetate_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+reaction_time	%20acetate_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+reaction_time	%20acetate_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+reaction_time	%20acetate_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+reaction_time	%20acetate_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+reaction_time	%20acetate_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+reaction_time	%20acetate_wos.parquet	DOI		
+reaction_time	%20acetate_wos.parquet	ECC		
+reaction_time	%20acetate_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+reaction_time	%20acetate_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+reaction_time	%20acetate_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+reaction_time	%20acetate_wos.parquet	Issue		schema:PublicationIssue
+reaction_time	%20acetate_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+reaction_time	%20acetate_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+reaction_time	%20acetate_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+reaction_time	%20acetate_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+reaction_time	%20acetate_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+reaction_time	%20acetate_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+reaction_time	%20acetate_wos.parquet	Unnamed: 0		
+reaction_time	%20acetate_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+reaction_time	%20acetate_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+reaction_time	%20acetate_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+real_time	$DIS_1.parquet	Sentiment		
+real_time	$DIS_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+real_time	$DIS_1.parquet	Unnamed: 0		
+real_time	$DIS_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+relaxation_time	%20bupivacaine_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+relaxation_time	%20bupivacaine_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+relaxation_time	%20bupivacaine_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+relaxation_time	%20bupivacaine_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+relaxation_time	%20bupivacaine_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+relaxation_time	%20bupivacaine_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+relaxation_time	%20bupivacaine_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+relaxation_time	%20bupivacaine_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+relaxation_time	%20bupivacaine_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+relaxation_time	%20bupivacaine_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+relaxation_time	%20bupivacaine_pubmed.parquet	DOI		
+relaxation_time	%20bupivacaine_pubmed.parquet	ECC		
+relaxation_time	%20bupivacaine_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+relaxation_time	%20bupivacaine_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+relaxation_time	%20bupivacaine_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+relaxation_time	%20bupivacaine_pubmed.parquet	Issue		schema:PublicationIssue
+relaxation_time	%20bupivacaine_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+relaxation_time	%20bupivacaine_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+relaxation_time	%20bupivacaine_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+relaxation_time	%20bupivacaine_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+relaxation_time	%20bupivacaine_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+relaxation_time	%20bupivacaine_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+relaxation_time	%20bupivacaine_pubmed.parquet	Unnamed: 0		
+relaxation_time	%20bupivacaine_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+relaxation_time	%20bupivacaine_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+relaxation_time	%20bupivacaine_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+respiratory_rate	%20acetylcysteine_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+respiratory_rate	%20acetylcysteine_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+respiratory_rate	%20acetylcysteine_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+respiratory_rate	%20acetylcysteine_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+respiratory_rate	%20acetylcysteine_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+respiratory_rate	%20acetylcysteine_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+respiratory_rate	%20acetylcysteine_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+respiratory_rate	%20acetylcysteine_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+respiratory_rate	%20acetylcysteine_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+respiratory_rate	%20acetylcysteine_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+respiratory_rate	%20acetylcysteine_wos.parquet	DOI		
+respiratory_rate	%20acetylcysteine_wos.parquet	ECC		
+respiratory_rate	%20acetylcysteine_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+respiratory_rate	%20acetylcysteine_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+respiratory_rate	%20acetylcysteine_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+respiratory_rate	%20acetylcysteine_wos.parquet	Issue		schema:PublicationIssue
+respiratory_rate	%20acetylcysteine_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+respiratory_rate	%20acetylcysteine_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+respiratory_rate	%20acetylcysteine_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+respiratory_rate	%20acetylcysteine_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+respiratory_rate	%20acetylcysteine_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+respiratory_rate	%20acetylcysteine_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+respiratory_rate	%20acetylcysteine_wos.parquet	Unnamed: 0		
+respiratory_rate	%20acetylcysteine_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+respiratory_rate	%20acetylcysteine_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+respiratory_rate	%20acetylcysteine_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+return_on_invested_capital	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD1%20-%20%E5%BF%85%E4%BF%AE.parquet	n. a detailed critical inspection 		schema:EvidenceLevelA
+return_on_invested_capital	%E4%BA%BA%E6%95%99%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD1%20-%20%E5%BF%85%E4%BF%AE.parquet	﻿survey		schema:study
+revolutions_per_minute	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+revolutions_per_minute	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+revolutions_per_minute	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+revolutions_per_minute	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+revolutions_per_minute	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+revolutions_per_minute	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+revolutions_per_minute	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+revolutions_per_minute	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+revolutions_per_minute	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+revolutions_per_minute	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+revolutions_per_minute	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+rotational_latency	%20dopamine_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+rotational_latency	%20dopamine_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+rotational_latency	%20dopamine_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+rotational_latency	%20dopamine_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+rotational_latency	%20dopamine_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+rotational_latency	%20dopamine_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+rotational_latency	%20dopamine_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+rotational_latency	%20dopamine_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+rotational_latency	%20dopamine_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+rotational_latency	%20dopamine_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+rotational_latency	%20dopamine_wos.parquet	DOI		
+rotational_latency	%20dopamine_wos.parquet	ECC		
+rotational_latency	%20dopamine_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+rotational_latency	%20dopamine_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+rotational_latency	%20dopamine_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+rotational_latency	%20dopamine_wos.parquet	Issue		schema:PublicationIssue
+rotational_latency	%20dopamine_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+rotational_latency	%20dopamine_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+rotational_latency	%20dopamine_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+rotational_latency	%20dopamine_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+rotational_latency	%20dopamine_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+rotational_latency	%20dopamine_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+rotational_latency	%20dopamine_wos.parquet	Unnamed: 0		
+rotational_latency	%20dopamine_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+rotational_latency	%20dopamine_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+rotational_latency	%20dopamine_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+running_time	%20acetate_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+running_time	%20acetate_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+running_time	%20acetate_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+running_time	%20acetate_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+running_time	%20acetate_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+running_time	%20acetate_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+running_time	%20acetate_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+running_time	%20acetate_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+running_time	%20acetate_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+running_time	%20acetate_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+running_time	%20acetate_pubmed.parquet	DOI		
+running_time	%20acetate_pubmed.parquet	ECC		
+running_time	%20acetate_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+running_time	%20acetate_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+running_time	%20acetate_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+running_time	%20acetate_pubmed.parquet	Issue		schema:PublicationIssue
+running_time	%20acetate_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+running_time	%20acetate_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+running_time	%20acetate_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+running_time	%20acetate_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+running_time	%20acetate_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+running_time	%20acetate_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+running_time	%20acetate_pubmed.parquet	Unnamed: 0		
+running_time	%20acetate_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+running_time	%20acetate_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+running_time	%20acetate_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+safe_period	%20buspirone_wos.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+safe_period	%20buspirone_wos.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+safe_period	%20buspirone_wos.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+safe_period	%20buspirone_wos.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+safe_period	%20buspirone_wos.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+safe_period	%20buspirone_wos.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+safe_period	%20buspirone_wos.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+safe_period	%20buspirone_wos.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+safe_period	%20buspirone_wos.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+safe_period	%20buspirone_wos.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+safe_period	%20buspirone_wos.parquet	DOI		
+safe_period	%20buspirone_wos.parquet	ECC		
+safe_period	%20buspirone_wos.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+safe_period	%20buspirone_wos.parquet	GSRank	http://dbpedia.org/ontology/rank	
+safe_period	%20buspirone_wos.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+safe_period	%20buspirone_wos.parquet	Issue		schema:PublicationIssue
+safe_period	%20buspirone_wos.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+safe_period	%20buspirone_wos.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+safe_period	%20buspirone_wos.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+safe_period	%20buspirone_wos.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+safe_period	%20buspirone_wos.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+safe_period	%20buspirone_wos.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+safe_period	%20buspirone_wos.parquet	Unnamed: 0		
+safe_period	%20buspirone_wos.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+safe_period	%20buspirone_wos.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+safe_period	%20buspirone_wos.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+sampling_frequency	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+sampling_frequency	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+sampling_frequency	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+sampling_frequency	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+sampling_frequency	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+sampling_frequency	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+sampling_frequency	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+sampling_frequency	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+sampling_frequency	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+sampling_frequency	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+sampling_frequency	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	DOI		
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	ECC		
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Issue		schema:PublicationIssue
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Unnamed: 0		
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+sampling_rate	%20hydrogen_peroxide_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+secretory_phase	%20testosterone_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+secretory_phase	%20testosterone_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+secretory_phase	%20testosterone_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+secretory_phase	%20testosterone_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+secretory_phase	%20testosterone_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+secretory_phase	%20testosterone_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+secretory_phase	%20testosterone_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+secretory_phase	%20testosterone_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+secretory_phase	%20testosterone_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+secretory_phase	%20testosterone_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+secretory_phase	%20testosterone_pubmed.parquet	DOI		
+secretory_phase	%20testosterone_pubmed.parquet	ECC		
+secretory_phase	%20testosterone_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+secretory_phase	%20testosterone_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+secretory_phase	%20testosterone_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+secretory_phase	%20testosterone_pubmed.parquet	Issue		schema:PublicationIssue
+secretory_phase	%20testosterone_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+secretory_phase	%20testosterone_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+secretory_phase	%20testosterone_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+secretory_phase	%20testosterone_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+secretory_phase	%20testosterone_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+secretory_phase	%20testosterone_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+secretory_phase	%20testosterone_pubmed.parquet	Unnamed: 0		
+secretory_phase	%20testosterone_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+secretory_phase	%20testosterone_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+secretory_phase	%20testosterone_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+seek_time	%20zinc_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+seek_time	%20zinc_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+seek_time	%20zinc_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+seek_time	%20zinc_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+seek_time	%20zinc_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+seek_time	%20zinc_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+seek_time	%20zinc_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+seek_time	%20zinc_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+seek_time	%20zinc_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+seek_time	%20zinc_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+seek_time	%20zinc_pubmed.parquet	DOI		
+seek_time	%20zinc_pubmed.parquet	ECC		
+seek_time	%20zinc_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+seek_time	%20zinc_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+seek_time	%20zinc_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+seek_time	%20zinc_pubmed.parquet	Issue		schema:PublicationIssue
+seek_time	%20zinc_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+seek_time	%20zinc_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+seek_time	%20zinc_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+seek_time	%20zinc_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+seek_time	%20zinc_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+seek_time	%20zinc_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+seek_time	%20zinc_pubmed.parquet	Unnamed: 0		
+seek_time	%20zinc_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+seek_time	%20zinc_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+seek_time	%20zinc_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+shiva	%E6%B1%9F%E8%A5%BF%E4%B8%AD%E5%8C%BB%E5%AD%A6%E9%99%A2.parquet	临床医学院		
+shiva	%E6%B1%9F%E8%A5%BF%E4%B8%AD%E5%8C%BB%E5%AD%A6%E9%99%A2.parquet	姚文豹		
+shiva	%E6%B1%9F%E8%A5%BF%E4%B8%AD%E5%8C%BB%E5%AD%A6%E9%99%A2.parquet	江西中医学院		
+show_time	$ROKU_1.parquet	Sentiment		
+show_time	$ROKU_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+show_time	$ROKU_1.parquet	Unnamed: 0		
+show_time	$ROKU_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+solar_constant	%E5%8C%97%E5%B8%88%E5%A4%A7%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD%E5%BF%85%E4%BF%AE%E6%A8%A1%E5%9D%973.parquet	v. share in something	http://dbpedia.org/ontology/shareOfAudience	schema:isSimilarTo
+solar_constant	%E5%8C%97%E5%B8%88%E5%A4%A7%E7%89%88%E9%AB%98%E4%B8%AD%E8%8B%B1%E8%AF%AD%E5%BF%85%E4%BF%AE%E6%A8%A1%E5%9D%973.parquet	﻿participate	http://dbpedia.org/ontology/participatingIn	
+speed_of_light	$ROKU_1.parquet	Sentiment		
+speed_of_light	$ROKU_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+speed_of_light	$ROKU_1.parquet	Unnamed: 0		
+speed_of_light	$ROKU_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+split_shift	%E5%9B%9B%E5%85%AD%E7%BA%A7%E5%B8%B8%E8%80%83%E6%A0%B8%E5%BF%83%E8%AF%8D%E7%BB%841500.parquet	none		
+split_shift	%E5%9B%9B%E5%85%AD%E7%BA%A7%E5%B8%B8%E8%80%83%E6%A0%B8%E5%BF%83%E8%AF%8D%E7%BB%841500.parquet	﻿abandon oneself to	http://dbpedia.org/ontology/ableToGrind	schema:SeekToAction
+steerageway	dictionary_words2_2.parquet	bi		
+steerageway	dictionary_words2_2.parquet	s		
+stopping_point	%E4%BA%BA%E6%95%99%E7%89%88%E4%B8%80%E5%B9%B4%E7%BA%A7%E8%B5%B7%E7%82%B9%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8A.parquet	n. the state of being in operation 	http://dbpedia.org/ontology/numberOfPersonInOccupation	schema:inSupportOf
+stopping_point	%E4%BA%BA%E6%95%99%E7%89%88%E4%B8%80%E5%B9%B4%E7%BA%A7%E8%B5%B7%E7%82%B9%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8A.parquet	﻿running	http://dbpedia.org/ontology/runningMate	
+terminal_velocity	%20clonidine_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+terminal_velocity	%20clonidine_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+terminal_velocity	%20clonidine_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+terminal_velocity	%20clonidine_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+terminal_velocity	%20clonidine_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+terminal_velocity	%20clonidine_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+terminal_velocity	%20clonidine_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+terminal_velocity	%20clonidine_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+terminal_velocity	%20clonidine_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+terminal_velocity	%20clonidine_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+terminal_velocity	%20clonidine_pubmed.parquet	DOI		
+terminal_velocity	%20clonidine_pubmed.parquet	ECC		
+terminal_velocity	%20clonidine_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+terminal_velocity	%20clonidine_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+terminal_velocity	%20clonidine_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+terminal_velocity	%20clonidine_pubmed.parquet	Issue		schema:PublicationIssue
+terminal_velocity	%20clonidine_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+terminal_velocity	%20clonidine_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+terminal_velocity	%20clonidine_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+terminal_velocity	%20clonidine_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+terminal_velocity	%20clonidine_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+terminal_velocity	%20clonidine_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+terminal_velocity	%20clonidine_pubmed.parquet	Unnamed: 0		
+terminal_velocity	%20clonidine_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+terminal_velocity	%20clonidine_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+terminal_velocity	%20clonidine_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+terminus_ad_quem	23-24.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+terminus_ad_quem	23-24.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+terminus_ad_quem	23-24.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+terminus_ad_quem	23-24.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+terminus_ad_quem	23-24.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+terminus_ad_quem	23-24.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+terminus_ad_quem	23-24.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+terminus_ad_quem	23-24.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+terminus_ad_quem	23-24.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+terminus_ad_quem	23-24.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+terminus_ad_quem	23-24.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+then	$BABA_1.parquet	Sentiment		
+then	$BABA_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+then	$BABA_1.parquet	Unnamed: 0		
+then	$BABA_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+thing	$DIS_1.parquet	Sentiment		
+thing	$DIS_1.parquet	Text	http://dbpedia.org/ontology/sourceText	schema:Text
+thing	$DIS_1.parquet	Unnamed: 0		
+thing	$DIS_1.parquet	User_flr	http://dbpedia.org/ontology/aircraftUser	schema:UserInteraction
+time-out	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+time-out	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+time-out	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+time-out	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+time-out	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+time-out	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+time-out	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+time-out	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+time-out	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+time-out	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+time-out	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+time_interval	%20isoflurane_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+time_interval	%20isoflurane_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+time_interval	%20isoflurane_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+time_interval	%20isoflurane_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+time_interval	%20isoflurane_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+time_interval	%20isoflurane_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+time_interval	%20isoflurane_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+time_interval	%20isoflurane_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+time_interval	%20isoflurane_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+time_interval	%20isoflurane_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+time_interval	%20isoflurane_pubmed.parquet	DOI		
+time_interval	%20isoflurane_pubmed.parquet	ECC		
+time_interval	%20isoflurane_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+time_interval	%20isoflurane_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+time_interval	%20isoflurane_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+time_interval	%20isoflurane_pubmed.parquet	Issue		schema:PublicationIssue
+time_interval	%20isoflurane_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+time_interval	%20isoflurane_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+time_interval	%20isoflurane_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+time_interval	%20isoflurane_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+time_interval	%20isoflurane_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+time_interval	%20isoflurane_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+time_interval	%20isoflurane_pubmed.parquet	Unnamed: 0		
+time_interval	%20isoflurane_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+time_interval	%20isoflurane_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+time_interval	%20isoflurane_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus
+time_slot	%E7%83%AD%E8%AF%8D%E7%BA%A2%E5%AE%9D%E4%B9%A6%20%E7%AC%AC1%E7%89%88.parquet	none		
+time_slot	%E7%83%AD%E8%AF%8D%E7%BA%A2%E5%AE%9D%E4%B9%A6%20%E7%AC%AC1%E7%89%88.parquet	﻿APEC blue	http://dbpedia.org/ontology/rgbCoordinateBlue	
+usance	DD_finetune_valid.parquet	id	http://dbpedia.org/ontology/id	schema:identifier
+usance	DD_finetune_valid.parquet	label	http://dbpedia.org/ontology/recordLabel	schema:recordLabel
+usance	DD_finetune_valid.parquet	query		schema:query
+usance	DD_finetune_valid.parquet	reply	http://dbpedia.org/ontology/comment	schema:ReplyAction
+usance	DD_finetune_valid.parquet	reply_len		schema:replyToUrl
+usance	DD_finetune_valid.parquet	reply_num_diverse_words		
+wartime	00-01.parquet	Author	http://dbpedia.org/ontology/author	schema:author
+wartime	00-01.parquet	Comments	http://dbpedia.org/ontology/comment	schema:comment
+wartime	00-01.parquet	Content	http://dbpedia.org/ontology/openAccessContent	schema:WebContent
+wartime	00-01.parquet	Created	http://dbpedia.org/ontology/created	schema:locationCreated
+wartime	00-01.parquet	ID	http://dbpedia.org/ontology/id	schema:identifier
+wartime	00-01.parquet	Parent	http://dbpedia.org/ontology/parent	schema:parent
+wartime	00-01.parquet	Points	http://dbpedia.org/ontology/careerPoints	schema:contactPoints
+wartime	00-01.parquet	Story	http://dbpedia.org/ontology/storyEditor	schema:ShortStory
+wartime	00-01.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+wartime	00-01.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+wartime	00-01.parquet	URL	http://dbpedia.org/ontology/fileURL	schema:URL
+whole	%20capsaicin_pubmed.parquet	Abstract	http://dbpedia.org/ontology/abstract	schema:abstract
+whole	%20capsaicin_pubmed.parquet	Age	http://dbpedia.org/ontology/age	schema:childMinAge
+whole	%20capsaicin_pubmed.parquet	ArticleURL	http://dbpedia.org/ontology/fileURL	schema:URL
+whole	%20capsaicin_pubmed.parquet	AuthorCount	http://dbpedia.org/ontology/author	schema:author
+whole	%20capsaicin_pubmed.parquet	Authors	http://dbpedia.org/ontology/author	schema:author
+whole	%20capsaicin_pubmed.parquet	CitationURL	http://dbpedia.org/ontology/fileURL	schema:citation
+whole	%20capsaicin_pubmed.parquet	Cites	http://dbpedia.org/ontology/cites	schema:mentions
+whole	%20capsaicin_pubmed.parquet	CitesPerAuthor	http://dbpedia.org/ontology/cites	schema:author
+whole	%20capsaicin_pubmed.parquet	CitesPerYear	http://dbpedia.org/ontology/passengersPerYear	schema:termsPerYear
+whole	%20capsaicin_pubmed.parquet	CitesURL	http://dbpedia.org/ontology/cites	schema:URL
+whole	%20capsaicin_pubmed.parquet	DOI		
+whole	%20capsaicin_pubmed.parquet	ECC		
+whole	%20capsaicin_pubmed.parquet	EndPage	http://dbpedia.org/ontology/end	schema:pageEnd
+whole	%20capsaicin_pubmed.parquet	GSRank	http://dbpedia.org/ontology/rank	
+whole	%20capsaicin_pubmed.parquet	ISSN	http://dbpedia.org/ontology/issn	schema:issn
+whole	%20capsaicin_pubmed.parquet	Issue		schema:PublicationIssue
+whole	%20capsaicin_pubmed.parquet	Publisher	http://dbpedia.org/ontology/publisher	schema:publisher
+whole	%20capsaicin_pubmed.parquet	QueryDate	http://dbpedia.org/ontology/date	schema:Date
+whole	%20capsaicin_pubmed.parquet	Source	http://dbpedia.org/ontology/source	schema:sourceOrganization
+whole	%20capsaicin_pubmed.parquet	StartPage	http://dbpedia.org/ontology/start	schema:pageStart
+whole	%20capsaicin_pubmed.parquet	Title	http://dbpedia.org/ontology/title	schema:title
+whole	%20capsaicin_pubmed.parquet	Type	http://dbpedia.org/ontology/type	schema:procedureType
+whole	%20capsaicin_pubmed.parquet	Unnamed: 0		
+whole	%20capsaicin_pubmed.parquet	Volume	http://dbpedia.org/ontology/volume	schema:volumeNumber
+whole	%20capsaicin_pubmed.parquet	Year	http://dbpedia.org/ontology/year	schema:yearBuilt
+whole	%20capsaicin_pubmed.parquet	generic_drug_name	http://dbpedia.org/ontology/name	schema:DrugPrescriptionStatus

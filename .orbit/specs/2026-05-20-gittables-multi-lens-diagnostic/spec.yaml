@@ -241,7 +241,7 @@ acceptance_criteria:
     corroboration; the CI gate prevents a single-point estimate
     near the boundary from flipping the design path.
   gate: false
-  checked: false
+  checked: true
   verification: |
     File `eval/gittables/dbpedia_overlap_spike.json` exists with
     `{sample_seed: 20260520, n_tables: 94, n_columns,

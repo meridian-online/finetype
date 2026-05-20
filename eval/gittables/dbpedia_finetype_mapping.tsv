@@ -1,0 +1,99 @@
+dbpedia_or_schemaorg_class	finetype_taxonomy_id	mapping_status	note
+http://dbpedia.org/ontology/cites		no_finetype_equivalent	citation reference; no non-trivial FineType type
+http://dbpedia.org/ontology/fileURL	technology.internet.url	direct	URL pointing to a file
+http://dbpedia.org/ontology/author	identity.person.full_name	direct	person's name
+http://dbpedia.org/ontology/type		no_finetype_equivalent	too generic
+http://dbpedia.org/ontology/title		no_finetype_equivalent	free-text title; trivial-only
+http://dbpedia.org/ontology/name	identity.person.full_name	partial	may be person or generic entity
+http://dbpedia.org/ontology/end	datetime.date.iso_8601	partial	end date; could be timestamp or other date subtype
+http://dbpedia.org/ontology/start	datetime.date.iso_8601	partial	start date; same as end
+http://dbpedia.org/ontology/source		no_finetype_equivalent	free-text source reference
+http://dbpedia.org/ontology/abstract		no_finetype_equivalent	free text; trivial-only
+http://dbpedia.org/ontology/age		no_finetype_equivalent	numeric age; FineType has no specific age type
+http://dbpedia.org/ontology/date	datetime.date.iso_8601	partial	date; specific format varies
+http://dbpedia.org/ontology/issn	identity.commerce.issn	direct	ISSN identifier
+http://dbpedia.org/ontology/passengersPerYear		no_finetype_equivalent	numeric count; trivial-only
+http://dbpedia.org/ontology/publisher	representation.text.entity_name	partial	organisation/publisher name
+http://dbpedia.org/ontology/rank		no_finetype_equivalent	ordinal numeric; trivial-only
+http://dbpedia.org/ontology/volume		no_finetype_equivalent	publishing volume; numeric trivial
+http://dbpedia.org/ontology/year	datetime.component.year	direct	4-digit year
+http://dbpedia.org/ontology/id	representation.identifier.alphanumeric_id	partial	generic identifier; specific subtype varies
+http://dbpedia.org/ontology/comment		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/careerPoints		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/created	datetime.timestamp.iso_8601	partial	creation timestamp
+http://dbpedia.org/ontology/openAccessContent		no_finetype_equivalent	boolean/categorical
+http://dbpedia.org/ontology/parent	identity.person.full_name	partial	parent name (kinship)
+http://dbpedia.org/ontology/storyEditor	identity.person.full_name	direct	person's name
+http://dbpedia.org/ontology/sourceText		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/aircraftUser	representation.text.entity_name	partial	organisation name
+http://dbpedia.org/ontology/genre		no_finetype_equivalent	categorical text
+http://dbpedia.org/ontology/isPartOf		no_finetype_equivalent	relation/reference
+http://dbpedia.org/ontology/depth		no_finetype_equivalent	measurement; no FineType type
+http://dbpedia.org/ontology/escapeVelocity		no_finetype_equivalent	physical measurement
+http://dbpedia.org/ontology/fc	representation.identifier.alphanumeric_id	partial	identifier code
+http://dbpedia.org/ontology/informationName	representation.text.entity_name	partial	named entity
+http://dbpedia.org/ontology/length		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/numberOfPersonInOccupation		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/orthologousGene		no_finetype_equivalent	biological identifier; no FineType match
+http://dbpedia.org/ontology/projectReferenceID	representation.identifier.alphanumeric_id	direct	identifier
+http://dbpedia.org/ontology/temperature		no_finetype_equivalent	measurement; no FineType type
+http://dbpedia.org/ontology/uRN	representation.identifier.alphanumeric_id	partial	URN; identifier shape
+http://dbpedia.org/ontology/abbreviation		no_finetype_equivalent	free-text abbreviation
+http://dbpedia.org/ontology/ableToGrind		no_finetype_equivalent	boolean
+http://dbpedia.org/ontology/album	representation.text.entity_name	partial	album title (entity name)
+http://dbpedia.org/ontology/altitude		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/artist	identity.person.full_name	direct	artist name
+http://dbpedia.org/ontology/bodyDiscovered	datetime.date.iso_8601	partial	date
+http://dbpedia.org/ontology/budgetYear	datetime.component.year	direct	year
+http://dbpedia.org/ontology/category		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/chromosome		no_finetype_equivalent	biological identifier
+http://dbpedia.org/ontology/clade		no_finetype_equivalent	biological classification
+http://dbpedia.org/ontology/climbUpNumber		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/collection		no_finetype_equivalent	entity reference
+http://dbpedia.org/ontology/collectionSize		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/country	geography.location.country	direct	country
+http://dbpedia.org/ontology/dateUse	datetime.date.iso_8601	partial	date use case
+http://dbpedia.org/ontology/description		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/detectionMethod		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/dfE		no_finetype_equivalent	ambiguous abbreviation
+http://dbpedia.org/ontology/disease		no_finetype_equivalent	medical concept; no FineType type
+http://dbpedia.org/ontology/dissolved	datetime.date.iso_8601	partial	date
+http://dbpedia.org/ontology/exhibition		no_finetype_equivalent	entity reference
+http://dbpedia.org/ontology/externalOrnament		no_finetype_equivalent	descriptive text
+http://dbpedia.org/ontology/gender	identity.person.gender	direct	gender
+http://dbpedia.org/ontology/geneReviewsName		no_finetype_equivalent	biological name; no FineType type
+http://dbpedia.org/ontology/isCityState		no_finetype_equivalent	boolean
+http://dbpedia.org/ontology/isPartOfAnatomicalStructure		no_finetype_equivalent	relation
+http://dbpedia.org/ontology/isPeerReviewed		no_finetype_equivalent	boolean
+http://dbpedia.org/ontology/iso31661Code	geography.location.country_code	direct	ISO 3166-1 country code
+http://dbpedia.org/ontology/ko		no_finetype_equivalent	ambiguous
+http://dbpedia.org/ontology/location	geography.location.city	partial	location (city/region varies)
+http://dbpedia.org/ontology/lunarSampleMass		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/maidenFlight	datetime.date.iso_8601	partial	date
+http://dbpedia.org/ontology/meaning		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/mood		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/notSolubleIn		no_finetype_equivalent	descriptive
+http://dbpedia.org/ontology/numberOfCity		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/numberOfResourceWithType		no_finetype_equivalent	numeric count
+http://dbpedia.org/ontology/otherInformation		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/participatingIn		no_finetype_equivalent	relation
+http://dbpedia.org/ontology/pdb	representation.identifier.alphanumeric_id	partial	PDB ID; identifier shape
+http://dbpedia.org/ontology/project	representation.text.entity_name	partial	project name
+http://dbpedia.org/ontology/projectBudgetFunding	finance.currency.amount	partial	monetary amount
+http://dbpedia.org/ontology/radioStation	representation.text.entity_name	partial	station name
+http://dbpedia.org/ontology/recordLabel	representation.text.entity_name	partial	record label name
+http://dbpedia.org/ontology/requirement		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/rgbCoordinateBlue		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/runningMate	identity.person.full_name	direct	person name
+http://dbpedia.org/ontology/sea		no_finetype_equivalent	geographic feature; no specific type
+http://dbpedia.org/ontology/shape		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/shareOfAudience	representation.numeric.percentage	direct	percentage
+http://dbpedia.org/ontology/soccerLeagueSeason		no_finetype_equivalent	season identifier
+http://dbpedia.org/ontology/species		no_finetype_equivalent	biological classification
+http://dbpedia.org/ontology/status		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/symbol		no_finetype_equivalent	free text
+http://dbpedia.org/ontology/tag		no_finetype_equivalent	categorical
+http://dbpedia.org/ontology/tessitura		no_finetype_equivalent	music range
+http://dbpedia.org/ontology/trackNumber		no_finetype_equivalent	numeric; trivial
+http://dbpedia.org/ontology/vaporPressure		no_finetype_equivalent	measurement
+http://dbpedia.org/ontology/voice		no_finetype_equivalent	categorical

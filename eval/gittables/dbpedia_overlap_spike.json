@@ -1,0 +1,17 @@
+{
+  "sample_seed": 20260520,
+  "n_tables": 94,
+  "n_columns_total": 1249,
+  "n_annotated_columns": 996,
+  "n_mappable_columns": 490,
+  "n_dbpedia_annotated_unmappable": 506,
+  "n_unknown_dbpedia_classes": 0,
+  "unknown_dbpedia_classes_top10": [],
+  "overlap_fraction": 0.392314,
+  "overlap_ci_lower": 0.365605,
+  "overlap_ci_upper": 0.419683,
+  "design_threshold": 0.2,
+  "design_path": "proceed",
+  "mapping_table_path": "eval/gittables/dbpedia_finetype_mapping.tsv",
+  "raw_data_path": "eval/gittables/dbpedia_overlap_spike_raw.tsv"
+}
