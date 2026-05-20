@@ -1,16 +1,24 @@
 id: 2026-05-20-gittables-multi-lens-diagnostic
 goal: |
   Build a multi-lens corpus diagnostic that runs the FineType pipeline
-  (Sense + validators + mechanism cascade) plus independent lenses (YDF,
-  DBpedia / Schema.org annotations) across the full gittables corpus,
-  measured under the two-criterion gate from `scripts/gittables_gate.py`
+  (Sense + validators + mechanism cascade) plus an independent YDF
+  lens across the full gittables corpus, measured under the
+  two-criterion gate from `scripts/gittables_gate.py`
   ((a) `non_trivial_pct ≥ 0.80`, (b) `reject_rate_non_trivial ≤ 0.01`)
-  and decomposed by the MADR 0075 + 0081 mechanism cascade. The output
-  is a ranked-gaps `report.md` — per (criterion × mechanism) cell, the
-  top-N corroborated gaps (≥2 independent lens agreement), each carrying
-  affected-column count, sample evidence, recommended action class, and
-  a candidate spec slug for downstream work. The diagnostic surfaces and
-  ranks; it does not fix.
+  and decomposed by the MADR 0075 + 0081 mechanism cascade.
+
+  The output is a two-part `report.md`. **Part 1** ranks corroborated
+  gaps per `(criterion × mechanism)` cell — gaps requiring agreement
+  from BOTH `{YDF, cascade}` (an AND filter; Sense is the subject of
+  corroboration, not a voter). Each gap entry carries affected-column
+  count, sample evidence, recommended action class, and a candidate
+  spec slug for downstream work. **Part 2** lists DBpedia-suggested
+  taxonomy gaps — DBpedia / Schema.org annotations that point at
+  semantic patterns in real columns for which FineType has no
+  equivalent type. DBpedia is NOT a corroboration lens (per design
+  revision 2026-05-21 — see ac-09 rationale); the annotations parquet
+  feeds Part 2 only. The diagnostic surfaces and ranks; it does not
+  fix.
 
   This spec supersedes m-19 (`2026-04-21-eval-expansion`) and becomes the
   eval-expansion milestone. m-19's three deliverables fold in as design
@@ -34,12 +42,21 @@ goal: |
      use of YDF (e.g. as a triangulator signal in the autonomous-inference
      module) is out of scope here and requires a separate MADR.
   3. **Corroboration filter is the noise-control mechanism at corpus
-     scale.** A gap MUST be flagged by ≥2 independent lenses (subset of
-     {Sense, YDF, DBpedia annotation, mechanism cascade}) to enter
-     `report.md`. Single-lens signals are tabulated in
-     `single_lens_signals.tsv` for the implementing agent's reference
-     but do not appear in ranked tables. Lens independence is the
-     precondition (ac-03 verifies it).
+     scale.** A gap MUST be flagged by BOTH lenses in
+     `{YDF, mechanism cascade}` (Sense is the subject of corroboration,
+     not a voter). The AND threshold over a 2-lens pool is structurally
+     tighter than a ≥2-of-3 OR; this is intentional — a research
+     diagnostic prefers precision over recall. Single-lens signals are
+     tabulated in `single_lens_signals.tsv` for the implementing
+     agent's reference but do not appear in ranked tables. Lens
+     independence is the precondition (ac-03 verifies it).
+     **DBpedia / Schema.org annotations are NOT a corroboration lens**
+     (design revision 2026-05-21 — see ac-09 rationale note). They
+     contribute to the "Candidate taxonomy gaps" section of
+     `report.md` via the `no_finetype_equivalent` mapping rows from
+     `dbpedia_finetype_mapping.tsv` — classes that have no FineType
+     equivalent and appear in real-world columns are candidate
+     taxonomy gaps. The annotations parquet stays as ac-05 produced it.
   4. **Mechanism vocabulary is the closed 10-token set from MADR 0075 +
      0081** — `format_diversity_path_a`, `format_diversity_path_b`,
      `code_vs_canonical_path_a`, `code_vs_canonical_path_b`,
@@ -128,8 +145,10 @@ goal: |
   - `mechanism` (enum) — one of the 10 closed tokens.
   - `affected_column_count` (int) — distinct (file_path, column_name)
     pairs in the measure-half corpus.
-  - `corroborating_lenses` (list, ≥2 entries; ≥3 if ac-02 downgraded
-    DBpedia) — `{lens_name, prediction_or_annotation, confidence}`.
+  - `corroborating_lenses` (list, exactly 2 entries — `ydf` and
+    `cascade` — since the AND filter requires both) —
+    `{lens_name, prediction_or_annotation, confidence}`. DBpedia is
+    NOT a corroboration lens per design revision 2026-05-21.
   - `sample_evidence` (list, ≥3 entries) — `{file_path, column_name,
     sample_values, sense_prediction, ydf_prediction,
     dbpedia_annotation_if_present}`.
@@ -160,8 +179,11 @@ goal: |
   - ac-01 disposition MADR `0087-gittables-diagnostic-absorbs-m19.yaml`
     accepted; references inserted into m-19's spec, MADR 0066, MADRs
     0083–0086.
-  - ac-02 overlap spike has run; design path recorded; ac-09 corroboration
-    rule amended if `design_path == "downgrade_dbpedia"`.
+  - ac-02 overlap spike has run; design_path recorded as an audit-trail
+    artefact (per design revision 2026-05-21, ac-09 no longer consumes
+    `design_path` — DBpedia is dropped from corroboration in both
+    modes; only the Part-2 taxonomy-gap section of `report.md`
+    consumes the annotations).
   - ac-03 through ac-13 pass per their verification clauses.
   - `report.md` shipped with every non-empty (criterion × mechanism) cell
     populated; empty cells explicitly noted.
@@ -231,15 +253,19 @@ acceptance_criteria:
     for what fraction of gittables columns does a DBpedia or Schema.org
     annotation exist AND map to a non-trivial FineType taxonomy ID?
     Compute the Wilson 95% confidence interval on `overlap_fraction`
-    from the 94-table sample. If the CI's **upper bound** is ≥ 0.20,
-    the full design proceeds (`design_path = "proceed"`). If the
-    upper bound is < 0.20 (statistically confident the rate is
-    below 20%), DBpedia downgrades to `validation_only` per ac-09's
-    downgrade branch (`design_path = "downgrade_dbpedia"`). The
-    0.20 anchor reflects: at lower overlap, DBpedia's coverage is
-    too thin for the lens to carry meaningful weight in
-    corroboration; the CI gate prevents a single-point estimate
-    near the boundary from flipping the design path.
+    from the 94-table sample.
+
+    **Original gate (now obsolete per design revision 2026-05-21):** if
+    CI upper ≥ 0.20, `design_path = "proceed"`; else
+    `design_path = "downgrade_dbpedia"`. The measured value was 0.392
+    (CI [0.366, 0.420]) — strongly "proceed". HOWEVER, ac-05's
+    full-corpus extraction surfaced that the heuristic-extended
+    mapping table is dominated by `no_finetype_equivalent` rows
+    (1,476 of 1,710 = 86%), and the author judged DBpedia's
+    corroboration value insufficient to justify its complexity cost.
+    DBpedia is no longer a corroboration lens (see ac-09 + constraint
+    3). The spike output and design_path field are retained for the
+    audit trail; downstream code ignores `design_path`.
   gate: false
   checked: true
   verification: |
@@ -249,9 +275,9 @@ acceptance_criteria:
     overlap_ci_lower, overlap_ci_upper, design_path: "proceed" |
     "downgrade_dbpedia"}`. CI bounds are Wilson 95%.
     `progress.md` records the dated spike result and design path.
-    If `design_path == "downgrade_dbpedia"`, this spec is updated
-    with a `revision_note` block immediately before ac-09
-    implementation.
+    Per design revision 2026-05-21, `design_path` is retained as an
+    audit-trail artefact but is no longer consumed by ac-09 — DBpedia
+    is dropped from corroboration in both modes.
   ac_type: observation
 - id: ac-03
   description: |
@@ -475,8 +501,16 @@ acceptance_criteria:
     spec's locked mapping table for every emitted row.
 - id: ac-09
   description: |
-    ≥2-lens corroboration filter applied to candidate gaps. Candidates
-    are clusters of columns sharing the same
+    Two-lens AND corroboration filter applied to candidate gaps.
+    **Design revision 2026-05-21:** DBpedia was dropped from
+    corroboration after ac-05's full-corpus extraction revealed that
+    the heuristic-extended mapping table is 86% `no_finetype_equivalent`
+    (1,476 of 1,710 rows). DBpedia's vote would reach only ~14% of
+    columns and would mostly duplicate YDF or cascade where it does
+    vote. The simplification removes the downgrade branch entirely
+    and removes auto-classified-mapping noise from the lens stack.
+
+    Candidates are clusters of columns sharing the same
     `(mechanism_token, taxonomy_signature, value_shape_signature)`
     triple, where:
 
@@ -503,70 +537,86 @@ acceptance_criteria:
 
     **Sense is the subject of corroboration, not a voter.** Sense's
     `x-finetype-label` is the prediction being challenged; the
-    corroborating-lens pool is `{YDF, DBpedia, cascade}` in default
-    mode, `{YDF, cascade}` in downgrade mode. The lens-vote
-    functions are: YDF votes its top-1 prediction when confidence
-    ≥0.5 (lower-confidence rows do not vote — the 0.5 threshold
-    matches the cascade's default and is sensitivity-checked in
-    `progress.md` against {0.3, 0.5, 0.7} on the calibrate half);
-    the DBpedia lens votes `mapping_table[dbpedia_semantic_class]`
-    when `mapping_status ∈ {direct, partial}` (otherwise does not
-    vote); the cascade votes by emitting any token other than
-    `prediction_confirmed`. A lens FLAGS a candidate gap iff its
-    vote disagrees with Sense's prediction (or, for cascade, iff
-    the token is not `prediction_confirmed`).
+    corroborating-lens pool is exactly `{YDF, cascade}`. The
+    lens-vote functions are: YDF votes its top-1 prediction when
+    confidence ≥0.5 (lower-confidence rows do not vote — the 0.5
+    threshold matches the cascade's default and is
+    sensitivity-checked in `progress.md` against {0.3, 0.5, 0.7} on
+    the calibrate half); the cascade votes by emitting any token
+    other than `prediction_confirmed`. A lens FLAGS a candidate gap
+    iff its vote disagrees with Sense's prediction (or, for cascade,
+    iff the token is not `prediction_confirmed`).
 
-    Only candidates with `corroborating_lens_count >= 2` enter
-    `report.md`. Single-lens candidates are written to
-    `eval/gittables/corpus_pass/single_lens_signals.tsv`. If ac-02's
-    spike returned `design_path == "downgrade_dbpedia"`,
-    `corroborating_lens_count` is computed over `{YDF, cascade}`
-    only (DBpedia agreement is recorded as `dbpedia_role =
-    'validation_only'` but does not increment the count); the
-    threshold stays at ≥2 — which over a 2-lens pool means both
-    YDF and cascade must flag. Downgrade-mode gaps carry a
-    `corroboration_fragility = true` flag in `report.md` to signal
-    that a single noisy lens prediction can produce the gap; the
-    attestor at ac-12 weights these gaps more sceptically.
+    Only candidates flagged by BOTH lenses enter `report.md` —
+    `corroborating_lens_count == 2` over the 2-lens pool, i.e. an
+    AND. Single-lens candidates (one lens flags, the other
+    doesn't) are written to
+    `eval/gittables/corpus_pass/single_lens_signals.tsv`.
   gate: false
   checked: false
   verification: |
     DuckDB query
     `SELECT COUNT(*) FROM corroborated_gaps WHERE
-    corroborating_lens_count < 2` returns 0 (applies in both
-    default and downgrade modes — the threshold is 2 in both
-    cases; the lens pool changes, not the count).
-    If downgrade mode, additional query
+    corroborating_lens_count != 2` returns 0 (every corroborated
+    gap has both YDF and cascade flagging; `corroborating_lens_count`
+    is computed over `{ydf, cascade}` only).
+    DuckDB query
     `SELECT COUNT(*) FROM corroborated_gaps WHERE
-    dbpedia_role IS NOT NULL AND dbpedia_role != 'validation_only'`
-    returns 0 — i.e. DBpedia agreement is recorded but never enters
-    the count. Row count of `single_lens_signals.tsv` logged in
-    `progress.md`.
+    'dbpedia' IN UNNEST(corroborating_lenses)` returns 0 — DBpedia
+    never appears as a corroborating lens.
+    Row count of `single_lens_signals.tsv` logged in `progress.md`.
 - id: ac-10
   description: |
-    Diagnostic report `eval/gittables/corpus_pass/report.md`. For each
-    non-empty (criterion × mechanism) cell, a section lists the
-    top-10 ranked gaps. Each gap entry carries: `gap_id`,
-    `affected_column_count`, `corroborating_lenses` (lens names +
-    verdicts), `sample_evidence` (≥3 example rows), `mechanism`,
-    `recommended_action_class` (from the locked mapping),
-    `candidate_spec_slug` (suggested follow-up slug or empty). Empty
-    cells are explicitly noted ("no corroborated gaps found").
+    Diagnostic report `eval/gittables/corpus_pass/report.md` has two
+    parts:
+
+    **Part 1 — Corroborated gaps (the headline diagnostic).** For each
+    non-empty (criterion × mechanism) cell, a section lists the top-10
+    ranked gaps. Each gap entry carries: `gap_id`,
+    `affected_column_count`, `corroborating_lenses` (exactly 2 entries:
+    `ydf` and `cascade`, with their verdicts), `sample_evidence`
+    (≥3 example rows; `dbpedia_annotation_if_present` is shown for
+    context but is not a vote), `mechanism`, `recommended_action_class`
+    (from the locked mapping), `candidate_spec_slug` (suggested
+    follow-up slug or empty). Empty cells are explicitly noted
+    ("no corroborated gaps found").
+
+    **Part 2 — Candidate taxonomy gaps from DBpedia coverage.** This
+    section consumes
+    `eval/gittables/corpus_pass/dbpedia_annotations.parquet` joined
+    against the `no_finetype_equivalent` rows of
+    `eval/gittables/dbpedia_finetype_mapping.tsv`. For each DBpedia
+    class with `mapping_status = no_finetype_equivalent` that appears
+    in ≥10 columns AND whose host columns were predicted as a
+    `trivial` type by Sense (criterion-a fallthroughs), surface the
+    class with: `dbpedia_class`, `affected_column_count`,
+    `sample_columns` (≥3 file_path + column_name pairs), and a note
+    inviting taxonomy-gap follow-up. This separates "DBpedia
+    suggests a real-world semantic pattern that FineType doesn't
+    model" from the lens-corroborated gaps in Part 1. The two
+    parts are independent — they live in the same markdown file but
+    do not cross-reference each other's GapEntry IDs.
+
     Frontmatter includes `model_sha`, `ydf_sha`,
-    `dbpedia_mapping_sha`, `cascade_version`, `corpus_index_sha`,
-    and `corpus_pass_id` (composite hash of the preceding five
-    fields, byte-stable across re-runs). NO wall-clock timestamp in
-    the frontmatter —
-    runtime metadata lives in `progress.md`.
+    `dbpedia_mapping_sha`, `cascade_version`, `corpus_index_sha`, and
+    `corpus_pass_id` (composite hash of the preceding five fields,
+    byte-stable across re-runs). NO wall-clock timestamp in the
+    frontmatter — runtime metadata lives in `progress.md`. The
+    DBpedia mapping SHA stays in the frontmatter as a reproducibility
+    anchor for Part 2 even though DBpedia no longer feeds Part 1.
   gate: false
   checked: false
   verification: |
-    File `eval/gittables/corpus_pass/report.md` exists. One section
-    per non-empty (criterion × mechanism) cell; empty cells noted
-    with the phrase "no corroborated gaps found". Frontmatter
-    contains exactly the six fields named above (no
-    `corpus_pass_timestamp`). Each gap entry includes all eight
-    gap_entry fields.
+    File `eval/gittables/corpus_pass/report.md` exists with two
+    `##` headings (or equivalent) covering Part 1 and Part 2. Part 1
+    has one section per non-empty (criterion × mechanism) cell;
+    empty cells noted with the phrase "no corroborated gaps found".
+    Part 2 lists `no_finetype_equivalent` DBpedia classes with
+    `affected_column_count ≥ 10` whose host columns landed in
+    criterion-a fallthroughs, each with ≥3 sample columns.
+    Frontmatter contains exactly the six fields named above (no
+    `corpus_pass_timestamp`). Part 1 gap entries include the eight
+    gap_entry fields; Part 2 entries include their four fields.
   ac_type: doc
 - id: ac-11
   description: |
@@ -622,11 +672,15 @@ acceptance_criteria:
     referenced in `progress.md`.
 - id: ac-12
   description: |
-    Per-cell spot-check. For each non-empty (criterion × mechanism)
-    cell in `report.md`, 3 random gaps are sampled using sampling
-    seed `20260520` (matching ac-02's sample seed, pre-declared
-    here so the spot-checker cannot re-roll until a favourable
-    sample appears).
+    Per-cell spot-check on Part 1 (corroborated gaps) of `report.md`.
+    Part 2 (DBpedia-derived taxonomy gaps) is not spot-checked under
+    this AC — its content is mechanically derived from the
+    `no_finetype_equivalent` rows of the audited mapping table.
+
+    For each non-empty (criterion × mechanism) cell in Part 1, 3
+    random gaps are sampled using sampling seed `20260520`
+    (matching ac-02's sample seed, pre-declared here so the
+    spot-checker cannot re-roll until a favourable sample appears).
 
     **Attestor:** `@hughcameron` (the project author), or a named
     delegate captured in `spot_check.md`'s frontmatter. The spot-
@@ -639,9 +693,11 @@ acceptance_criteria:
         mechanism (the column failure pattern matches the
         MADRs-0075/0081 definition of the assigned
         `mechanism_token`);
-    (b) the `corroborating_lenses` jointly disagree with the
-        column's `sense_prediction` — they point at the same gap,
-        not at each other;
+    (b) both `corroborating_lenses` (YDF + cascade) genuinely
+        disagree with the column's `sense_prediction` — they
+        independently point at the same gap (the AND filter
+        guarantees both flag, but the spot-checker verifies the
+        disagreement is non-spurious);
     (c) the assigned `mechanism_token` is correct for the sample
         evidence per the closed-set definition.
 

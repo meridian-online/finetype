@@ -312,6 +312,64 @@ re-derives the coverage JSON. Latest run:
 
 ---
 
+## 2026-05-21 — Design revision: DBpedia dropped from corroboration
+
+After ac-05's full-corpus extraction produced its coverage shape
+(1,476 of 1,710 ≥10× DBpedia classes mapped as
+`no_finetype_equivalent` — 86%), the author judged DBpedia's
+corroboration value insufficient to justify its complexity cost.
+
+**What changed:**
+
+- **Corroboration set** is now exactly `{YDF, cascade}`. The AND filter
+  over a 2-lens pool replaces the prior ≥2-of-3 OR over
+  `{YDF, DBpedia, cascade}`. Tighter precision; downgrade mode
+  collapses entirely (no special-casing).
+- **Constraint 3** rewritten to name the 2-lens AND directly.
+- **GapEntry** `corroborating_lenses` now has exactly 2 entries
+  (`ydf`, `cascade`).
+- **ac-09** rewritten — downgrade branch deleted; lens-vote functions
+  enumerate only YDF + cascade; DBpedia lens-vote function removed.
+- **ac-10** report structure split: **Part 1** (corroborated gaps,
+  unchanged in spirit) + **Part 2** (DBpedia-derived candidate
+  taxonomy gaps from `no_finetype_equivalent` rows).
+- **ac-12** spot-check scoped to Part 1 only; the AND filter still
+  needs verifying the disagreement is non-spurious.
+- **ac-02** kept as historical — spike result + design_path retained
+  for audit trail, but `design_path` is no longer consumed by
+  downstream code.
+
+**What stays:**
+
+- `eval/gittables/corpus_pass/dbpedia_annotations.parquet` and the
+  1,710-row mapping table — both still produced by ac-05 and consumed
+  by Part 2 of `report.md`.
+- The `no_finetype_equivalent` rows are the diagnostic surface for
+  Part 2; they were always the most valuable thing DBpedia gave us,
+  just in the wrong shape (corroboration vote vs. gap signal).
+- YDF lens design (stats + char-bigram TF-IDF, lens-independent from
+  Sense per ac-03) unchanged.
+
+**Rationale (one paragraph for the audit trail):** DBpedia annotation
+coverage in measure-half columns is 79.7%, but mappable-to-non-trivial
+coverage is only 39.2% (CI [0.366, 0.420]); per-class breakdown shows
+86% of the ≥10× DBpedia universe has no FineType equivalent. Where
+DBpedia would have voted (the 14% of columns with a mappable class),
+its vote mostly duplicates YDF or cascade. The auto-classified portion
+of the mapping table (1,612 of 1,710 rows, via heuristic) introduces
+mapping-accuracy noise into the lens stack. Dropping DBpedia from
+corroboration trades a small amount of lens diversity for a
+substantial reduction in noise + complexity; the diagnostic value of
+the `no_finetype_equivalent` rows is preserved by routing them to
+Part 2 of `report.md` instead.
+
+Spec sections amended: goal block (lens enumeration), constraint 3
+(corroboration set), GapEntry (corroborating_lenses), ac-02
+(design_path note), ac-09 (rewrite), ac-10 (two-part structure),
+ac-12 (Part-1 scope), exit conditions.
+
+---
+
 ## Future direction (captured 2026-05-21)
 
 Author flagged: after the full-corpus pass surfaces weak spots, YDF's
