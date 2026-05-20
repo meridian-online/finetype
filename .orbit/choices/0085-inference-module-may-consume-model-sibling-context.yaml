@@ -2,7 +2,7 @@ id: '0085'
 title: Inference module may consume model-internal sibling-context attention
 status: accepted
 date_created: 2026-05-04
-date_modified: 2026-05-04
+date_modified: 2026-05-20
 body: |
   # 0085. Inference module may consume model-internal sibling-context attention
 
@@ -171,4 +171,11 @@ body: |
     `crates/finetype-model` will be declared)
   - `crates/finetype-model/src/column.rs:435,546` (the `SiblingContextAttention`
     attribute the inference module will read)
+
+  ## Status note (2026-05-20)
+
+  Execution paused per MADR 0087 pending gittables multi-lens
+  diagnostic findings; decision content unchanged. The sibling-
+  context consumption permission stands; the Phase 2 build that
+  would exercise it is on hold.
 references: []

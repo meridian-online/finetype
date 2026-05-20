@@ -6,6 +6,17 @@ goal: >
   role separation. Phase A + B of a multi-phase programme; Phase C (edge-case
   coverage to reach ~400 columns) is explicitly out of scope.
 
+
+  **Status as of 2026-05-20: folded into
+  `2026-05-20-gittables-multi-lens-diagnostic` per MADR 0087.** The three
+  Phase A+B deliverables (realism standard + pre-screen, coverage floor
+  240/240, train/eval leakage firewall) are absorbed: realism becomes the
+  diagnostic's multi-lens corroboration filter, coverage is satisfied by
+  construction under the full-corpus pass, and leakage prevention (MADR
+  0056) extends to the measure-half partition. Existing curated rows in
+  `eval/datasets/` stay in tree. No further work proceeds under this
+  spec's identity; follow-up curation, if needed, lands in new specs.
+
 constraints:
   - "Audit methodology is programmatic pre-screen + human review — no LLM-as-judge for the final keep/augment/replace call. Reinforces CLAUDE.md Engineering Principle 3."
   - "All sourced data must be ethically obtained for research purposes, with machine-readable attribution (source_url, licence, fetched_date) per dataset."

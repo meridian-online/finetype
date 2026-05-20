@@ -2,7 +2,7 @@ id: '0083'
 title: Phase 1 inference signal scope lock
 status: accepted
 date_created: 2026-05-04
-date_modified: 2026-05-04
+date_modified: 2026-05-20
 body: |
   # 0083. Phase 1 inference signal scope lock
 
@@ -124,4 +124,11 @@ body: |
   - `.orbit/specs/2026-05-04-autonomous-type-inference/interview.md`
     (Q7)
   - `.orbit/choices/0079-triangulator-architecture-for-autonomous-inference.md`
+
+  ## Status note (2026-05-20)
+
+  Execution paused per MADR 0087 pending gittables multi-lens
+  diagnostic findings; decision content unchanged. Phase 1 inference
+  contract remains live; Phase 2 expansion (whether and which signals
+  to add) revisited after the diagnostic's `report.md` ships.
 references: []

@@ -2,7 +2,7 @@ id: '0066'
 title: v19 retrain hard gate
 status: accepted
 date_created: 2026-04-24
-date_modified: 2026-04-24
+date_modified: 2026-05-20
 body: |
   # 0066. v19 retrain hard gate
 
@@ -87,4 +87,11 @@ body: |
     retraining alone was not the lever for this family of failures.
   - **MADR 0067** — framing correction superseding v18 handover's
     "write per-subtype generators" guidance.
+  - **MADR 0087** (2026-05-20) — v19 gate trigger re-anchored: the
+    six promotion conditions (1)–(6) above stand in full, but v20
+    promotion is not attempted until the gittables multi-lens
+    diagnostic ships `report.md` AND surfaces ≥1 corroborated gap
+    in the `training_data_addition` recommended-action class. v20
+    promotion itself goes via a separate follow-up spec consuming
+    those gaps.
 references: []

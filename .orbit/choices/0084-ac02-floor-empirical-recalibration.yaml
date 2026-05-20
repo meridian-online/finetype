@@ -2,7 +2,7 @@ id: '0084'
 title: ac-02 floor recalibrated to 5% — empirical evidence amendment
 status: accepted
 date_created: 2026-05-04
-date_modified: 2026-05-04
+date_modified: 2026-05-20
 body: |
   # 0084. ac-02 floor recalibrated to 5% — empirical evidence amendment
 
@@ -161,4 +161,11 @@ body: |
     (Phase 2 expansion path)
   - finetype-7zi.2 (sub-bead, closed by this decision)
   - finetype-7zi.3 (sub-bead, filed by this decision — Phase 2)
+
+  ## Status note (2026-05-20)
+
+  Execution paused per MADR 0087 pending gittables multi-lens
+  diagnostic findings; decision content unchanged. The 5% floor and
+  its empirical justification stand; Phase 2 work that would alter
+  the floor is on hold.
 references: []

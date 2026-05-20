@@ -2,7 +2,7 @@ id: '0086'
 title: Phase 2 locked weights — w_v=0.2, w_h=0.4, w_g=0.3, w_s=0.1
 status: accepted
 date_created: 2026-05-04
-date_modified: 2026-05-04
+date_modified: 2026-05-20
 body: |
   # 0086. Phase 2 locked weights — w_v=0.2, w_h=0.4, w_g=0.3, w_s=0.1
 
@@ -176,4 +176,12 @@ body: |
   - `crates/finetype-core/src/infer.rs` (where Phase 1's locked weight
     constants live; Phase 2 amends additively)
   - `.orbit/cards/0016-phase-2-triangulator-signals.yaml` ac-03
+
+  ## Status note (2026-05-20)
+
+  Execution paused per MADR 0087 pending gittables multi-lens
+  diagnostic findings; decision content unchanged. The locked
+  weights (w_v=0.2, w_h=0.4, w_g=0.3, w_s=0.1) remain canonical
+  when Phase 2 execution resumes; pause covers the sweep + ship
+  work, not the weight values.
 references: []
