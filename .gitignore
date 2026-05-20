@@ -31,6 +31,15 @@ models/*.json
 models/*.md
 !models/.gitkeep
 
+# YDF lens artefacts under eval/gittables/models/ — regenerable from
+# scripts/train_ydf.py. The model binary directory is multi-GB and the
+# training-rows manifest is ~16 MB; the small JSON/vocab files stay tracked.
+eval/gittables/models/ydf.bin/
+eval/gittables/models/training_rows_manifest.tsv
+
+# Claude scheduled-task lock file (transient)
+.claude/scheduled_tasks.lock
+
 # Generated training data
 *.ndjson
 !eval/datasets/**/*.ndjson

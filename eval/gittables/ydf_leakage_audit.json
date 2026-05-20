@@ -1,0 +1,8 @@
+{
+  "n_training_rows": 102294,
+  "n_labelled_eval_rows": 189,
+  "n_overlap": 0,
+  "overlap_hashes": [],
+  "manifest_path": "/Users/hugh/github/meridian-online/finetype/eval/gittables/models/training_rows_manifest.tsv",
+  "labelled_eval_path": "/Users/hugh/github/meridian-online/finetype/.orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.tsv"
+}

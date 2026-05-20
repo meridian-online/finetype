@@ -1,0 +1,20 @@
+{
+  "n_rows_in_scope": 198,
+  "n_rows_out_of_scope": 0,
+  "n_correct": 85,
+  "top1_accuracy": 0.429293,
+  "sense_branches_used": [
+    "stats"
+  ],
+  "sense_branches_excluded": [
+    "char",
+    "embed",
+    "header",
+    "validation"
+  ],
+  "non_sense_categories_used": [
+    "tfidf_char_bigram"
+  ],
+  "model_path": "/Users/hugh/github/meridian-online/finetype/eval/gittables/models/ydf.bin",
+  "labelled_eval_path": "/Users/hugh/github/meridian-online/finetype/.orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.tsv"
+}

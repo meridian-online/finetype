@@ -1,0 +1,25 @@
+{
+  "samples_per_type": 200,
+  "seed": 42,
+  "n_training_columns": 108046,
+  "n_distilled_columns": 102096,
+  "n_synthetic_columns": 5950,
+  "n_distilled_excluded_for_leakage": 26,
+  "n_distinct_types": 274,
+  "tfidf_top_k": 500,
+  "tfidf_vocab_size": 500,
+  "samples_per_column": 8,
+  "train_acc": 0.829841,
+  "sense_branches_used": [
+    "stats"
+  ],
+  "sense_branches_excluded": [
+    "char",
+    "embed",
+    "header",
+    "validation"
+  ],
+  "non_sense_categories_used": [
+    "tfidf_char_bigram"
+  ]
+}
