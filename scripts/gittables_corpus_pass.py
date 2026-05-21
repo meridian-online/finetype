@@ -185,12 +185,16 @@ def _execute_one(path_str: str) -> tuple[FileResult, list[ColumnResult]]:
 
             _parquet_to_csv(parquet, csv_path, _WORKER_DUCKDB)
             _profile(csv_path, schema_path, _WORKER_FINETYPE)
-            # Validate consumes parquet directly (v0.6.20+) — schema names
-            # match parquet schema names (DuckDB COPY preserved them in the
-            # CSV profile read), and validate's read_parquet binding also
-            # preserves them, so SQL references resolve.
+            # Validate consumes the corpus pass's CSV (column names
+            # already normalised in _parquet_to_csv). v0.6.20's
+            # parquet-direct path also works, but at jobs=16 it adds a
+            # duckdb spawn per file inside validate, which raises peak
+            # concurrent duckdb processes high enough that macOS
+            # posix_spawnp intermittently fails with ENOENT (~2% of
+            # files in run-3). Staying on CSV here keeps the spawn
+            # count at run-1 baseline.
             summary = _validate(
-                parquet, schema_path, db_path, _WORKER_FINETYPE,
+                csv_path, schema_path, db_path, _WORKER_FINETYPE,
             )
 
             col_types = _column_types(schema_path)
@@ -354,12 +358,12 @@ def _measure_one(
             _profile(csv_path, schema_path, finetype_bin)
             out.profile_s = time.perf_counter() - t
 
-            # Validate consumes parquet directly (v0.6.20+) — same column
-            # names as profile saw (CSV header preserves parquet names
-            # verbatim), so the schema and validate's read_parquet binding
-            # agree. Avoids the DuckDB-CSV-reader whitespace-strip bug.
+            # Validate consumes the corpus pass's CSV; names already
+            # normalised in _parquet_to_csv (see run-3 regression notes
+            # in _execute_one for why we don't use validate's parquet
+            # path here).
             t = time.perf_counter()
-            summary = _validate(parquet, schema_path, db_path, finetype_bin)
+            summary = _validate(csv_path, schema_path, db_path, finetype_bin)
             out.validate_s = time.perf_counter() - t
             _ = summary  # full pass would consume this for the gate
 

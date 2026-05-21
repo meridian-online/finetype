@@ -149,12 +149,52 @@ def _model_identity(model_dir: Path) -> tuple[str, str, str]:
     return (tag, candidate.name, h.hexdigest())
 
 
+def _normalise_column_names(originals: list[str]) -> list[str]:
+    """Strip whitespace, dedupe, rename empty names.
+
+    DuckDB's CSV reader strips leading/trailing whitespace from column
+    names during read_csv binding; pyarrow/parquet preserve them
+    verbatim. Without normalisation, profile (Rust CSV parser) emits a
+    schema with leading-space names, but validate (DuckDB read_csv)
+    can't bind them → Binder Error. Normalising at the parquet→CSV
+    boundary keeps profile and validate in agreement. See gittables
+    corpus pass run-1: 8807/14112 errors (62%) all stem from this.
+    """
+    out: list[str] = []
+    seen: dict[str, int] = {}
+    for i, name in enumerate(originals):
+        clean = name.strip()
+        if not clean:
+            clean = f"_col_{i}"
+        if clean in seen:
+            seen[clean] += 1
+            clean = f"{clean}_{seen[clean]}"
+        else:
+            seen[clean] = 0
+        out.append(clean)
+    return out
+
+
 def _parquet_to_csv(
     parquet: Path, csv_out: Path, duckdb_bin: str = DEFAULT_DUCKDB
 ) -> None:
-    """COPY (SELECT * FROM read_parquet(p)) TO csv (HEADER, DELIMITER ',')."""
+    """COPY parquet → CSV with normalised column names in the header.
+
+    Explicit projection `"orig" AS "clean"` so the CSV emitted has
+    whitespace-stripped, dedup'd names. See `_normalise_column_names`
+    for the rules.
+    """
+    import pyarrow.parquet as pq  # type: ignore
+
+    schema = pq.read_schema(str(parquet))
+    originals = list(schema.names)
+    cleaned = _normalise_column_names(originals)
+    projection = ", ".join(
+        f"{_sql_ident(o)} AS {_sql_ident(c)}"
+        for o, c in zip(originals, cleaned)
+    ) or "*"
     sql = (
-        f"COPY (SELECT * FROM read_parquet({_sql_str(str(parquet))})) "
+        f"COPY (SELECT {projection} FROM read_parquet({_sql_str(str(parquet))})) "
         f"TO {_sql_str(str(csv_out))} (HEADER, DELIMITER ',', QUOTE '\"');"
     )
     res = subprocess.run(
@@ -165,6 +205,11 @@ def _parquet_to_csv(
         raise RuntimeError(
             f"duckdb parquet→csv failed (rc={res.returncode}): {res.stderr.strip()}"
         )
+
+
+def _sql_ident(s: str) -> str:
+    """SQL double-quoted identifier."""
+    return '"' + s.replace('"', '""') + '"'
 
 
 def _sql_str(s: str) -> str:
