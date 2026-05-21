@@ -113,25 +113,19 @@ TRIVIAL_TYPES: frozenset[str] = frozenset({
 SAMPLE_VALUE_MAX_LEN = 64
 SAMPLE_JOIN_SEP = "│"  # U+2502 — matches labelled_eval.tsv
 
-# Worker globals, populated by `_worker_init` in each process. Avoids
-# pickling the YDF model across worker boundaries (it isn't picklable
-# cheaply across forks; loading once per worker is acceptable).
-_WORKER_YDF = None
-_WORKER_VOCAB: list[str] = []
+# Worker globals, populated by `_worker_init` in each process.
+# Pass A (--execute) does NOT load the YDF model in workers — that was
+# the OOM root cause. YDF inference happens later in a single
+# sequential pass via `--fill-ydf`.
 _WORKER_FINETYPE = "finetype"
 _WORKER_DUCKDB = "duckdb"
 
 
 def _worker_init(
-    ydf_model_path: str,
-    ydf_vocab_path: str,
     finetype_bin: str,
     duckdb_bin: str,
 ) -> None:
-    global _WORKER_YDF, _WORKER_VOCAB, _WORKER_FINETYPE, _WORKER_DUCKDB
-    import ydf  # type: ignore
-    _WORKER_YDF = ydf.load_model(ydf_model_path)
-    _WORKER_VOCAB = json.loads(Path(ydf_vocab_path).read_text())
+    global _WORKER_FINETYPE, _WORKER_DUCKDB
     _WORKER_FINETYPE = finetype_bin
     _WORKER_DUCKDB = duckdb_bin
 
@@ -210,26 +204,20 @@ def _execute_one(path_str: str) -> tuple[FileResult, list[ColumnResult]]:
             )
 
             col_samples = _read_column_samples(csv_path, _WORKER_DUCKDB)
-            ydf_out: dict[str, tuple[str, float]] = {}
-            if _WORKER_YDF is not None and col_samples:
-                ydf_out = _ydf_predict_with_confidence(
-                    col_samples, _WORKER_YDF, _WORKER_VOCAB,
-                )
 
             for col_name, sense_label in col_types.items():
                 samples = col_samples.get(col_name, [])
                 truncated = SAMPLE_JOIN_SEP.join(
                     _truncate_value(v) for v in samples
                 )
-                ydf_label, ydf_conf = ydf_out.get(col_name, (None, None))
                 cols.append(ColumnResult(
                     file_path=path_str,
                     file_content_sha256=sha,
                     column_name=col_name,
                     sense_prediction=sense_label or None,
                     sense_confidence=None,  # JSON schema doesn't carry one
-                    ydf_prediction=ydf_label,
-                    ydf_confidence=ydf_conf,
+                    ydf_prediction=None,    # filled by `--fill-ydf` Pass B
+                    ydf_confidence=None,
                     sample_values_truncated=truncated,
                     is_trivial=(sense_label in TRIVIAL_TYPES),
                 ))
@@ -507,12 +495,7 @@ def _run_execute(args, paths: list[Path]) -> int:
     with cf.ProcessPoolExecutor(
         max_workers=args.jobs,
         initializer=_worker_init,
-        initargs=(
-            str(args.ydf_model),
-            str(args.ydf_vocab),
-            args.finetype_bin,
-            args.duckdb_bin,
-        ),
+        initargs=(args.finetype_bin, args.duckdb_bin),
     ) as pool:
         for fr, cols in pool.map(
             _execute_one,
@@ -588,6 +571,129 @@ def _run_execute(args, paths: list[Path]) -> int:
     return 0
 
 
+def _run_fill_ydf(args) -> int:
+    """Pass B — sequential YDF fill.
+
+    Reads `eval/gittables/corpus_pass/columns.parquet` (produced by
+    Pass A with ydf_prediction = NULL on every row). Loads YDF model
+    once in the main process, splits each row's
+    `sample_values_truncated` on U+2502 to recover the column's
+    sample values, computes features (stats + char-bigram TF-IDF),
+    predicts top-1 label + confidence, and writes a new
+    `columns.parquet`. The old file is renamed to
+    `columns.pre-ydf.parquet` as a checkpoint.
+
+    Single-process by design — avoids the per-worker model load
+    that crashed Pass A at jobs=16. YDF inference is fast (~10 ms
+    per column with stats+bigram features), so ~6M columns should
+    complete in ~8-12 hours single-core."""
+    try:
+        import pyarrow as pa  # type: ignore
+        import pyarrow.parquet as pq  # type: ignore
+        import ydf  # type: ignore
+        import pandas as pd  # type: ignore
+    except ImportError as exc:
+        print(f"error: dependency missing ({exc}). Activate venv.",
+              file=sys.stderr)
+        return 2
+
+    out_dir = args.out_dir / "corpus_pass"
+    cols_path = out_dir / "columns.parquet"
+    backup_path = out_dir / "columns.pre-ydf.parquet"
+    new_path = out_dir / "columns.with-ydf.parquet"
+
+    if not cols_path.exists():
+        print(f"error: {cols_path} not found — run --execute first.",
+              file=sys.stderr)
+        return 2
+
+    print(f"loading YDF model from {args.ydf_model}", file=sys.stderr)
+    model = ydf.load_model(str(args.ydf_model))
+    vocab = json.loads(args.ydf_vocab.read_text())
+    label_classes = list(model.label_classes())
+    print(f"  model loaded ({len(label_classes)} classes); "
+          f"vocab {len(vocab)} bigrams", file=sys.stderr)
+
+    print(f"reading {cols_path}", file=sys.stderr)
+    table = pq.read_table(cols_path)
+    n_rows = table.num_rows
+    print(f"  {n_rows} column rows to fill", file=sys.stderr)
+
+    sample_arr = table["sample_values_truncated"].to_pylist()
+    batch_size = args.batch_size or 10_000
+    ydf_pred: list[str | None] = [None] * n_rows
+    ydf_conf: list[float | None] = [None] * n_rows
+    n_filled = 0
+    n_empty = 0
+    t_start = time.perf_counter()
+
+    for batch_start in range(0, n_rows, batch_size):
+        batch_end = min(batch_start + batch_size, n_rows)
+        feat_rows = []
+        valid_idx: list[int] = []
+        for i in range(batch_start, batch_end):
+            raw = sample_arr[i] or ""
+            values = [v for v in raw.split(SAMPLE_JOIN_SEP) if v]
+            if not values:
+                n_empty += 1
+                continue
+            feat_rows.append(_features(values, vocab))
+            valid_idx.append(i)
+        if not feat_rows:
+            continue
+        df = pd.DataFrame(feat_rows)
+        preds = model.predict(df)
+        for k, i in enumerate(valid_idx):
+            probs = preds[k]
+            top_idx = max(range(len(probs)), key=lambda j: probs[j])
+            ydf_pred[i] = label_classes[top_idx]
+            ydf_conf[i] = float(probs[top_idx])
+            n_filled += 1
+
+        if batch_end % (batch_size * 10) == 0 or batch_end == n_rows:
+            elapsed = time.perf_counter() - t_start
+            rate = batch_end / elapsed if elapsed else 0
+            eta = (n_rows - batch_end) / rate if rate else 0
+            print(
+                f"  {batch_end}/{n_rows} "
+                f"({n_filled} filled, {n_empty} empty) "
+                f"@ {rate:.0f} rows/s — ETA {eta/3600:.2f} h",
+                file=sys.stderr,
+            )
+
+    print("rewriting columns.parquet with YDF predictions...",
+          file=sys.stderr)
+    new_table = table.set_column(
+        table.schema.get_field_index("ydf_prediction"),
+        "ydf_prediction",
+        pa.array(ydf_pred, type=pa.string()),
+    ).set_column(
+        table.schema.get_field_index("ydf_confidence"),
+        "ydf_confidence",
+        pa.array(ydf_conf, type=pa.float64()),
+    )
+    pq.write_table(new_table, new_path, compression="snappy")
+    cols_path.rename(backup_path)
+    new_path.rename(cols_path)
+
+    elapsed = time.perf_counter() - t_start
+    summary = {
+        "n_rows": n_rows,
+        "n_filled": n_filled,
+        "n_empty_samples": n_empty,
+        "elapsed_seconds": round(elapsed, 1),
+        "elapsed_hours": round(elapsed / 3600.0, 3),
+        "ydf_model": str(args.ydf_model),
+        "columns_parquet": str(cols_path),
+        "backup_pre_ydf_parquet": str(backup_path),
+    }
+    (out_dir / "fill_ydf_summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Gittables multi-lens corpus pass (ac-04 dry-run / ac-06 execute)"
@@ -609,8 +715,16 @@ def main() -> int:
     )
     mode.add_argument(
         "--execute", action="store_true",
-        help="ac-06 full execute. Writes files.parquet + columns.parquet "
-             "incrementally to --out-dir/corpus_pass/.",
+        help="ac-06 Pass A — profile + validate at high parallelism. "
+             "Writes files.parquet + columns.parquet (ydf_prediction "
+             "= NULL). Workers do NOT load the YDF model.",
+    )
+    mode.add_argument(
+        "--fill-ydf", action="store_true",
+        help="ac-06 Pass B — single-process sequential YDF fill. "
+             "Reads columns.parquet, computes features + predictions, "
+             "writes new columns.parquet (old kept as "
+             "columns.pre-ydf.parquet).",
     )
     parser.add_argument(
         "--out-dir", type=Path, default=DEFAULT_OUT_DIR,
@@ -633,6 +747,9 @@ def main() -> int:
               "source eval/gittables/.venv/bin/activate",
               file=sys.stderr)
         return 2
+
+    if args.fill_ydf:
+        return _run_fill_ydf(args)
 
     paths: list[Path] = []
     with args.corpus_index.open() as fh:
