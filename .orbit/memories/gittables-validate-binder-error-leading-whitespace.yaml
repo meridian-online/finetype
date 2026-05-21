@@ -1,0 +1,5 @@
+key: gittables-validate-binder-error-leading-whitespace
+body: 'finetype profile (Rust CSV parser) preserves leading whitespace in column names; DuckDB CSV reader strips it during read_csv binding. Profile''s emitted schema names with leading spaces → validate generates SELECT " name" SQL → DuckDB binds "name" → Binder Error. Surfaced in gittables corpus pass ac-06: 8807/14112 errors (62%). Workaround applied at scripts/gittables_gate.py:_parquet_to_csv — explicit projection trims+dedupes column names before CSV emission. Proper fix lives in finetype validate''s SQL generation or profile''s column-name normalisation. Reproducer: /Users/hugh/datasets/gittables/abstraction/Q6.14.parquet (columns include '' figure-number'', '' figure-caption'' with literal leading spaces).'
+timestamp: 2026-05-21T10:31:27.316891Z
+labels:
+- code-investigate

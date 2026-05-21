@@ -1,0 +1,5 @@
+key: gittables-validate-table-missing-cascade
+body: 'finetype validate fails with ''Catalog Error: Table with name finetype_... does not exist''. 102/14112 errors (1%) in gittables corpus pass ac-06. Cascading failure: an earlier statement in validate''s DuckDB script failed (e.g. CTAS hit a Binder Error), the transaction was aborted, but subsequent statements still reference the would-be-created table. Fix: validate''s DuckDB script should either fail-fast on first error or wrap each statement in its own transaction.'
+timestamp: 2026-05-21T10:31:47.797316Z
+labels:
+- code-investigate

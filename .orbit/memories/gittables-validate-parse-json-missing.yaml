@@ -1,0 +1,5 @@
+key: gittables-validate-parse-json-missing
+body: 'finetype validate runs ''parse_json(...)'' in generated SQL but the DuckDB instance loads no JSON extension → ''Catalog Error: Scalar Function with name parse_json does not exist! Did you mean parse_dirname?''. 1283/14112 errors (9%) in gittables corpus pass ac-06. Fix: ensure finetype validate''s DuckDB spawn either LOADs json extension or uses a builtin (DuckDB has json_extract / json_extract_string as builtins — parse_json is the JSON-extension entry point).'
+timestamp: 2026-05-21T10:31:38.369101Z
+labels:
+- code-investigate

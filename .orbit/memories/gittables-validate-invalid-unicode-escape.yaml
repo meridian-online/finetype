@@ -1,0 +1,5 @@
+key: gittables-validate-invalid-unicode-escape
+body: 'finetype validate fails with ''Invalid Input Error: invalid escape sequence: \u'' followed by ''TransactionContext Error: Current transaction is aborted'' and ''Catalog Error: Table with name finetype_... does not exist''. 181/14112 errors (1%) in gittables corpus pass ac-06. Trigger: column values containing malformed Unicode escape sequences (e.g. ''\u'' without four hex digits) being passed through to a DuckDB string literal context. Cascades into transaction abort + table-missing errors. Fix: validate''s SQL generation should sanitise or properly quote string values containing backslash sequences.'
+timestamp: 2026-05-21T10:31:45.056894Z
+labels:
+- code-investigate

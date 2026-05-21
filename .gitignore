@@ -41,6 +41,18 @@ eval/gittables/models/training_rows_manifest.tsv
 # scripts/extract_dbpedia_annotations.py against corpus_paths.txt.
 eval/gittables/corpus_pass/dbpedia_annotations.parquet
 
+# Corpus-pass outputs (multi-GB) and run logs — regenerable from
+# scripts/gittables_corpus_pass.py.
+eval/gittables/corpus_pass/files.parquet
+eval/gittables/corpus_pass/columns.parquet
+eval/gittables/corpus_pass/columns.pre-ydf.parquet
+eval/gittables/corpus_pass/execute_log.jsonl
+eval/gittables/corpus_pass/execute_summary.json
+eval/gittables/corpus_pass/fill_ydf_summary.json
+eval/gittables/corpus_pass*.log
+eval/gittables/corpus_pass*.run*.log
+eval/gittables/corpus_pass.run*-*/
+
 # Claude scheduled-task lock file (transient)
 .claude/scheduled_tasks.lock
 
