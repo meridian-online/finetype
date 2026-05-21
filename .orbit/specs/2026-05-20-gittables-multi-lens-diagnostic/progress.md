@@ -194,6 +194,54 @@ it to exclude.
 - ac-05 ✅ closed (2026-05-21)
 - ac-06..ac-13 pending. Chunk 3a complete.
 
+## 2026-05-21 — Chunk 3b in flight: ac-06 staged as two passes (OOM fix)
+
+**Status: ready to launch Pass A.** Two OOMs at `jobs=16` with the
+original per-worker YDF model load (16 × ~1 GB model = 16 GB RAM on a
+16 GB host → host reboot). Refactored to a staged design before
+launching the real ~10 h pass.
+
+### Design (committed `8b403ef`)
+
+- **Pass A (`--execute`)** — profile + validate + sample extraction at
+  high parallelism. Workers do NOT load the YDF model. Writes
+  `files.parquet` + `columns.parquet` with `ydf_prediction = NULL`.
+  Smoke at jobs=16 on 2000 files: 29.8 files/s, <1 GB total RSS, 0
+  errors. Full-corpus projection: **~9.5 h**.
+- **Pass B (`--fill-ydf`)** — single-process sequential YDF fill.
+  Loads model once in main process, streams `columns.parquet`,
+  computes features (stats + char-bigram TF-IDF), predicts in batches
+  of 10,000. Writes new `columns.parquet`; old kept as
+  `columns.pre-ydf.parquet` as a checkpoint. Smoke on 11,301 rows ran
+  in 3.2 s at 3,548 rows/s. Full-corpus projection: **~30 min**.
+
+Beelink considered and rejected: Intel N150, 15 GB RAM, 4 cores
+— worse on every dimension than the Mac. The Mac stays the host.
+
+GPU lift not available: `finetype profile+validate` already uses
+Metal (Candle `--features metal`); YDF Random Forest has no GPU
+inference path; DBpedia KV extraction is parquet-footer I/O. The
+remaining time is genuinely CPU-bound.
+
+### Launch commands (next session)
+
+```bash
+source eval/gittables/.venv/bin/activate
+# Pass A — ~9.5 h at jobs=16
+python3 scripts/gittables_corpus_pass.py --jobs 16 --execute
+# Pass B — ~30 min sequential
+python3 scripts/gittables_corpus_pass.py --fill-ydf
+```
+
+Outputs land at `eval/gittables/corpus_pass/files.parquet` and
+`eval/gittables/corpus_pass/columns.parquet`. Pass B keeps a
+checkpoint at `columns.pre-ydf.parquet`.
+
+### Open at end of session
+
+- ac-06 ready to launch (Pass A + Pass B).
+- ac-07..ac-13 pending after ac-06 completes.
+
 ## 2026-05-21 — ac-04 closed (corpus index + runtime dry-run)
 
 Built `eval/gittables/corpus_paths.txt` (1,018,286 parquets sorted
