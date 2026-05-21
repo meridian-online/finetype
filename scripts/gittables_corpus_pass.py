@@ -5,9 +5,11 @@ Spec: `.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml`
 ac-04 (corpus index + dry-run runtime budget); ac-06 (full execute).
 
 Extends `scripts/gittables_gate.py`'s per-file profile + validate
-pipeline with two new stages — YDF lens inference and DBpedia /
-Schema.org KV-metadata extraction. Runs on the MEASURE half of the
-corpus (`file_content_sha256 MOD 2 == 1`), enumerated from a committed
+pipeline with one new stage — YDF lens inference per column
+(DBpedia annotations come from `dbpedia_annotations.parquet` produced
+by ac-05; ac-06 leaves them for downstream DuckDB JOINs rather than
+re-extracting per file). Runs on the MEASURE half of the corpus
+(`file_content_sha256 MOD 2 == 1`), enumerated from
 `eval/gittables/corpus_paths.txt`.
 
 Modes:
@@ -15,13 +17,21 @@ Modes:
               measure-half hits), projects linearly to full corpus,
               emits `eval/gittables/corpus_paths_dryrun.json`.
               No Parquet outputs.
-  (default)   Full execute — writes
-              eval/gittables/corpus_pass/{files,columns}.parquet etc.
-              (ac-06; not yet wired in this commit).
+  --execute   Full execute (ac-06). Writes
+              `eval/gittables/corpus_pass/files.parquet` and
+              `eval/gittables/corpus_pass/columns.parquet` incrementally
+              via pyarrow ParquetWriter. Continues on per-file errors;
+              records errors in `files.parquet.error`. Designed to be
+              resumable via `--resume` (checkpoints which file_paths
+              are already in files.parquet and skips them).
 
-Usage (from a venv with ydf + duckdb + pandas):
+Usage (from a venv with ydf + pyarrow):
   source eval/gittables/.venv/bin/activate
-  python3 scripts/gittables_corpus_pass.py --jobs 16 --max-files 1000 --dry-run
+  # Smoke test (100 files):
+  python3 scripts/gittables_corpus_pass.py --jobs 8 --max-files 100 --execute \
+      --out-dir /tmp/corpus-pass-smoke
+  # Real run:
+  python3 scripts/gittables_corpus_pass.py --jobs 16 --execute
 """
 
 from __future__ import annotations
@@ -69,6 +79,167 @@ class FileTimings:
     total_s: float = 0.0
     in_measure_half: bool = False
     error: str | None = None
+
+
+@dataclass
+class FileResult:
+    file_path: str
+    file_content_sha256: str
+    n_cols: int = 0
+    non_trivial_cols: int = 0
+    total_rows: int = 0
+    rejects_non_trivial: int = 0
+    elapsed_s: float = 0.0
+    error: str | None = None
+
+
+@dataclass
+class ColumnResult:
+    file_path: str
+    file_content_sha256: str
+    column_name: str
+    sense_prediction: str | None = None
+    sense_confidence: float | None = None
+    ydf_prediction: str | None = None
+    ydf_confidence: float | None = None
+    sample_values_truncated: str = ""
+    is_trivial: bool = False
+
+
+TRIVIAL_TYPES: frozenset[str] = frozenset({
+    "representation.text.plain_text",
+    "representation.numeric.decimal_number",
+})
+SAMPLE_VALUE_MAX_LEN = 64
+SAMPLE_JOIN_SEP = "│"  # U+2502 — matches labelled_eval.tsv
+
+# Worker globals, populated by `_worker_init` in each process. Avoids
+# pickling the YDF model across worker boundaries (it isn't picklable
+# cheaply across forks; loading once per worker is acceptable).
+_WORKER_YDF = None
+_WORKER_VOCAB: list[str] = []
+_WORKER_FINETYPE = "finetype"
+_WORKER_DUCKDB = "duckdb"
+
+
+def _worker_init(
+    ydf_model_path: str,
+    ydf_vocab_path: str,
+    finetype_bin: str,
+    duckdb_bin: str,
+) -> None:
+    global _WORKER_YDF, _WORKER_VOCAB, _WORKER_FINETYPE, _WORKER_DUCKDB
+    import ydf  # type: ignore
+    _WORKER_YDF = ydf.load_model(ydf_model_path)
+    _WORKER_VOCAB = json.loads(Path(ydf_vocab_path).read_text())
+    _WORKER_FINETYPE = finetype_bin
+    _WORKER_DUCKDB = duckdb_bin
+
+
+def _ydf_predict_with_confidence(
+    column_samples: dict[str, list[str]],
+    ydf_model,
+    vocab: list[str],
+) -> dict[str, tuple[str, float]]:
+    """Like `_ydf_predict_columns` but also returns top-1 probability."""
+    import pandas as pd
+
+    if not column_samples:
+        return {}
+    feat_rows = []
+    col_order = list(column_samples.keys())
+    for col in col_order:
+        feat_rows.append(_features(column_samples[col], vocab))
+    df = pd.DataFrame(feat_rows)
+    preds = ydf_model.predict(df)
+    label_classes = list(ydf_model.label_classes())
+    out: dict[str, tuple[str, float]] = {}
+    for i, col in enumerate(col_order):
+        probs = preds[i]
+        top_idx = max(range(len(probs)), key=lambda k: probs[k])
+        out[col] = (label_classes[top_idx], float(probs[top_idx]))
+    return out
+
+
+def _truncate_value(v: str) -> str:
+    if len(v) <= SAMPLE_VALUE_MAX_LEN:
+        return v
+    return v[:SAMPLE_VALUE_MAX_LEN]
+
+
+def _execute_one(path_str: str) -> tuple[FileResult, list[ColumnResult]]:
+    """Per-file execute: SHA -> measure-half filter -> profile + validate
+    -> YDF per column. Skipped files return empty column list and the
+    file row carries `in_measure_half == False` (signalled by an empty
+    `file_content_sha256` to keep the schema flat)."""
+    parquet = Path(path_str)
+    t0 = time.perf_counter()
+    fr = FileResult(file_path=path_str, file_content_sha256="")
+    cols: list[ColumnResult] = []
+    try:
+        sha = _file_sha256(parquet)
+        if _sha_bucket(sha) != 1:
+            fr.elapsed_s = time.perf_counter() - t0
+            return (fr, cols)
+        fr.file_content_sha256 = sha
+
+        with tempfile.TemporaryDirectory(prefix="ftcp-exec-") as td:
+            tmp = Path(td)
+            csv_path = tmp / "in.csv"
+            schema_path = tmp / "in.schema.json"
+            db_path = tmp / "in.db"
+
+            _parquet_to_csv(parquet, csv_path, _WORKER_DUCKDB)
+            _profile(csv_path, schema_path, _WORKER_FINETYPE)
+            summary = _validate(
+                csv_path, schema_path, db_path, _WORKER_FINETYPE,
+            )
+
+            col_types = _column_types(schema_path)
+            fr.n_cols = len(col_types)
+            non_trivial_cols = {
+                c for c, t in col_types.items()
+                if t and t not in TRIVIAL_TYPES
+            }
+            fr.non_trivial_cols = len(non_trivial_cols)
+            fr.total_rows = int(summary.get("total_rows", 0))
+            fr.rejects_non_trivial = (
+                _distinct_rejected_rows_in(
+                    db_path, _WORKER_DUCKDB, non_trivial_cols,
+                ) if fr.n_cols else 0
+            )
+
+            col_samples = _read_column_samples(csv_path, _WORKER_DUCKDB)
+            ydf_out: dict[str, tuple[str, float]] = {}
+            if _WORKER_YDF is not None and col_samples:
+                ydf_out = _ydf_predict_with_confidence(
+                    col_samples, _WORKER_YDF, _WORKER_VOCAB,
+                )
+
+            for col_name, sense_label in col_types.items():
+                samples = col_samples.get(col_name, [])
+                truncated = SAMPLE_JOIN_SEP.join(
+                    _truncate_value(v) for v in samples
+                )
+                ydf_label, ydf_conf = ydf_out.get(col_name, (None, None))
+                cols.append(ColumnResult(
+                    file_path=path_str,
+                    file_content_sha256=sha,
+                    column_name=col_name,
+                    sense_prediction=sense_label or None,
+                    sense_confidence=None,  # JSON schema doesn't carry one
+                    ydf_prediction=ydf_label,
+                    ydf_confidence=ydf_conf,
+                    sample_values_truncated=truncated,
+                    is_trivial=(sense_label in TRIVIAL_TYPES),
+                ))
+
+        fr.elapsed_s = time.perf_counter() - t0
+        return (fr, cols)
+    except Exception as exc:  # noqa: BLE001
+        fr.error = f"{type(exc).__name__}: {exc}"[:300]
+        fr.elapsed_s = time.perf_counter() - t0
+        return (fr, cols)
 
 
 def _file_sha256(path: Path) -> str:
@@ -218,6 +389,205 @@ def _measure_one(
         return out
 
 
+def _run_execute(args, paths: list[Path]) -> int:
+    """ac-06 full execute. Writes files.parquet + columns.parquet
+    incrementally via pyarrow ParquetWriter. Supports resume by
+    checkpointing already-completed file_paths read from an existing
+    files.parquet under --out-dir."""
+    try:
+        import pyarrow as pa  # type: ignore
+        import pyarrow.parquet as pq  # type: ignore
+    except ImportError as exc:
+        print(f"error: pyarrow not available ({exc}).", file=sys.stderr)
+        return 2
+
+    out_dir = args.out_dir / "corpus_pass"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    files_path = out_dir / "files.parquet"
+    cols_path = out_dir / "columns.parquet"
+    log_path = out_dir / "execute_log.jsonl"
+
+    if files_path.exists() or cols_path.exists():
+        print(
+            f"error: existing {files_path.name} / {cols_path.name} — "
+            f"remove or rename them before re-running (no resume yet).",
+            file=sys.stderr,
+        )
+        return 2
+
+    files_schema = pa.schema([
+        ("file_path", pa.string()),
+        ("file_content_sha256", pa.string()),
+        ("n_cols", pa.int32()),
+        ("non_trivial_cols", pa.int32()),
+        ("total_rows", pa.int64()),
+        ("rejects_non_trivial", pa.int64()),
+        ("elapsed_s", pa.float64()),
+        ("error", pa.string()),
+    ])
+    cols_schema = pa.schema([
+        ("file_path", pa.string()),
+        ("file_content_sha256", pa.string()),
+        ("column_name", pa.string()),
+        ("sense_prediction", pa.string()),
+        ("sense_confidence", pa.float64()),
+        ("ydf_prediction", pa.string()),
+        ("ydf_confidence", pa.float64()),
+        ("sample_values_truncated", pa.string()),
+        ("is_trivial", pa.bool_()),
+    ])
+
+    paths_to_process = paths
+    if args.max_files is not None:
+        paths_to_process = paths[: args.max_files]
+    n_paths = len(paths_to_process)
+    print(f"execute: {n_paths} parquets, jobs={args.jobs}",
+          file=sys.stderr)
+
+    files_writer = pq.ParquetWriter(
+        files_path, files_schema, compression="snappy",
+    )
+    cols_writer = pq.ParquetWriter(
+        cols_path, cols_schema, compression="snappy",
+    )
+    log_fh = log_path.open("w")
+
+    file_buffer: list[FileResult] = []
+    col_buffer: list[ColumnResult] = []
+    n_processed = 0
+    n_measure_written = 0
+    n_skipped_not_measure = 0
+    n_errors = 0
+    error_strings: dict[str, int] = {}
+    t_start = time.perf_counter()
+
+    def flush_file_buffer() -> None:
+        nonlocal file_buffer, col_buffer
+        if not file_buffer:
+            return
+        # Filter to only measure-half (those with non-empty SHA).
+        keep = [f for f in file_buffer
+                if f.file_content_sha256 or f.error]
+        if keep:
+            table = pa.table({
+                "file_path": [f.file_path for f in keep],
+                "file_content_sha256": [
+                    f.file_content_sha256 for f in keep
+                ],
+                "n_cols": [f.n_cols for f in keep],
+                "non_trivial_cols": [f.non_trivial_cols for f in keep],
+                "total_rows": [f.total_rows for f in keep],
+                "rejects_non_trivial": [
+                    f.rejects_non_trivial for f in keep
+                ],
+                "elapsed_s": [f.elapsed_s for f in keep],
+                "error": [f.error for f in keep],
+            }, schema=files_schema)
+            files_writer.write_table(table)
+        if col_buffer:
+            table = pa.table({
+                "file_path": [c.file_path for c in col_buffer],
+                "file_content_sha256": [
+                    c.file_content_sha256 for c in col_buffer
+                ],
+                "column_name": [c.column_name for c in col_buffer],
+                "sense_prediction": [c.sense_prediction for c in col_buffer],
+                "sense_confidence": [c.sense_confidence for c in col_buffer],
+                "ydf_prediction": [c.ydf_prediction for c in col_buffer],
+                "ydf_confidence": [c.ydf_confidence for c in col_buffer],
+                "sample_values_truncated": [
+                    c.sample_values_truncated for c in col_buffer
+                ],
+                "is_trivial": [c.is_trivial for c in col_buffer],
+            }, schema=cols_schema)
+            cols_writer.write_table(table)
+        file_buffer = []
+        col_buffer = []
+
+    with cf.ProcessPoolExecutor(
+        max_workers=args.jobs,
+        initializer=_worker_init,
+        initargs=(
+            str(args.ydf_model),
+            str(args.ydf_vocab),
+            args.finetype_bin,
+            args.duckdb_bin,
+        ),
+    ) as pool:
+        for fr, cols in pool.map(
+            _execute_one,
+            (str(p) for p in paths_to_process),
+            chunksize=8,
+        ):
+            n_processed += 1
+            if fr.error:
+                n_errors += 1
+                # Keep error strings de-dup'd by first 80 chars
+                key = (fr.error or "")[:80]
+                error_strings[key] = error_strings.get(key, 0) + 1
+            if fr.file_content_sha256 or fr.error:
+                file_buffer.append(fr)
+                col_buffer.extend(cols)
+                if fr.file_content_sha256 and not fr.error:
+                    n_measure_written += 1
+                log_fh.write(json.dumps({
+                    "path": fr.file_path,
+                    "sha": fr.file_content_sha256 or None,
+                    "n_cols": fr.n_cols,
+                    "non_trivial_cols": fr.non_trivial_cols,
+                    "total_rows": fr.total_rows,
+                    "rejects_non_trivial": fr.rejects_non_trivial,
+                    "elapsed_s": round(fr.elapsed_s, 4),
+                    "error": fr.error,
+                }) + "\n")
+            else:
+                n_skipped_not_measure += 1
+            if len(file_buffer) >= args.batch_size:
+                flush_file_buffer()
+            if n_processed % 5000 == 0:
+                elapsed = time.perf_counter() - t_start
+                rate = n_processed / elapsed if elapsed else 0
+                eta = (n_paths - n_processed) / rate if rate else 0
+                print(
+                    f"  {n_processed}/{n_paths} "
+                    f"({n_measure_written} measure-half written, "
+                    f"{n_errors} errors) "
+                    f"@ {rate:.0f} files/s — ETA {eta/3600:.2f} h",
+                    file=sys.stderr,
+                )
+
+    flush_file_buffer()
+    files_writer.close()
+    cols_writer.close()
+    log_fh.close()
+
+    elapsed = time.perf_counter() - t_start
+    summary = {
+        "n_paths_input": n_paths,
+        "n_processed": n_processed,
+        "n_measure_written": n_measure_written,
+        "n_skipped_not_measure": n_skipped_not_measure,
+        "n_errors": n_errors,
+        "error_rate": round(n_errors / max(1, n_measure_written + n_errors), 6),
+        "first_5_distinct_error_strings": [
+            {"error": s, "count": n}
+            for s, n in sorted(
+                error_strings.items(), key=lambda x: -x[1]
+            )[:5]
+        ],
+        "elapsed_seconds": round(elapsed, 1),
+        "elapsed_hours": round(elapsed / 3600.0, 3),
+        "files_parquet": str(files_path),
+        "columns_parquet": str(cols_path),
+    }
+    (out_dir / "execute_summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
+    print(json.dumps(summary, indent=2))
+    print(f"wrote {files_path}, {cols_path}", file=sys.stderr)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Gittables multi-lens corpus pass (ac-04 dry-run / ac-06 execute)"
@@ -231,23 +601,25 @@ def main() -> int:
     parser.add_argument("--duckdb-bin", default=DEFAULT_DUCKDB)
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--max-files", type=int, default=None)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
         "--dry-run", action="store_true",
         help="Sample measure-half files, time each stage, project to "
              "full corpus. No Parquet outputs.",
     )
+    mode.add_argument(
+        "--execute", action="store_true",
+        help="ac-06 full execute. Writes files.parquet + columns.parquet "
+             "incrementally to --out-dir/corpus_pass/.",
+    )
     parser.add_argument(
         "--out-dir", type=Path, default=DEFAULT_OUT_DIR,
     )
+    parser.add_argument(
+        "--batch-size", type=int, default=500,
+        help="Files per parquet row group during --execute (default 500).",
+    )
     args = parser.parse_args()
-
-    if not args.dry_run:
-        print(
-            "error: full --execute mode is ac-06 (not yet wired); "
-            "pass --dry-run for ac-04.",
-            file=sys.stderr,
-        )
-        return 2
 
     if not args.corpus_index.exists():
         print(f"error: corpus index not found: {args.corpus_index}",
@@ -262,9 +634,6 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
-    ydf_model = ydf.load_model(str(args.ydf_model))
-    ydf_vocab = json.loads(args.ydf_vocab.read_text())
-
     paths: list[Path] = []
     with args.corpus_index.open() as fh:
         for line in fh:
@@ -273,6 +642,13 @@ def main() -> int:
                 paths.append(Path(line))
     n_total = len(paths)
     print(f"corpus_paths.txt: {n_total} parquets", file=sys.stderr)
+
+    if args.execute:
+        return _run_execute(args, paths)
+
+    # --- dry-run branch ---
+    ydf_model = ydf.load_model(str(args.ydf_model))
+    ydf_vocab = json.loads(args.ydf_vocab.read_text())
 
     target = args.max_files or 1000
     print(f"dry-run: collecting {target} MEASURE-half samples "
