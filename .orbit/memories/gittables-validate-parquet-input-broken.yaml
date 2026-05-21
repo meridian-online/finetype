@@ -1,5 +1,5 @@
 key: gittables-validate-parquet-input-broken
-body: 'finetype validate --help and external docs claim ''Input CSV or Parquet file'' but passing a parquet errors with ''could not read CSV headers: invalid utf-8''. Verified v0.6.19. The corpus pass is forced to round-trip through CSV for both profile and validate. Proper fix: finetype validate sniffs file extension/magic and dispatches to DuckDB''s read_parquet vs read_csv. Eliminates the parquet→CSV round-trip and the parser-inconsistency category of bug (incl. the leading-whitespace Binder bug).'
-timestamp: 2026-05-21T10:31:36.038046Z
+body: 'FIXED in v0.6.20 (this branch, not yet released). Fix B: finetype validate''s engine pre-pass now sniffs file extension and routes parquet through ''duckdb -c COPY ... read_parquet → temp CSV'' before csv::Reader. The materialise SQL path''s read_parquet branch was already there but unreachable; engine pre-pass now reaches it. Also added all-varchar staging projection for parquet (SELECT COLUMNS(*)::VARCHAR FROM read_parquet(...)) to match the CSV path''s all_varchar=true contract — typed transforms downstream (REGEXP_REPLACE, LIKE) assume VARCHAR staging. Tested on Q6.14.parquet and ClaDan.parquet: rc=0, 0 rejects. The 62% Binder Error bucket from gittables corpus pass run-1 is fully resolved. Remaining buckets (parse_json missing, strptime, unicode escape, cascade) are unrelated pre-existing bugs.'
+timestamp: 2026-05-21T11:05:47.265273Z
 labels:
 - code-investigate

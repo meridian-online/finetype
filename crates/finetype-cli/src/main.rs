@@ -232,7 +232,7 @@ enum Commands {
         output: OutputFormat,
     },
 
-    /// Validate CSV data against a JSON Schema — check-only by default,
+    /// Validate CSV or Parquet data against a JSON Schema — check-only by default,
     /// or pass --db/--table to materialise valid rows + reject sidecar.
     Validate {
         /// Input CSV or Parquet file
@@ -2958,13 +2958,67 @@ fn cmd_validate_table(
         }
     }
 
-    // ── Read input into memory (CSV path; Parquet deferred for this AC) ──────
-    //    The current implementation reads CSV directly in Rust so the
-    //    validation engine sees the same normalised Option<String> cells it
-    //    already expects. Parquet input flows through DuckDB's read_parquet
-    //    in a future iteration (tracked as ac-09 follow-up).
+    // ── Read input into memory (CSV-or-Parquet) ──────────────────────────────
+    //    Parquet inputs are streamed through DuckDB's read_parquet to a
+    //    temp CSV, then read by the same csv::Reader the CSV path uses —
+    //    so the validation engine sees the same normalised Option<String>
+    //    cells regardless of source. Column names flow through verbatim
+    //    (DuckDB COPY preserves parquet schema names), matching what the
+    //    materialise path's read_parquet binding sees later.
     eprintln!("Reading {}", file.display());
-    let mut rdr = match csv::Reader::from_path(&file) {
+    let is_parquet = file
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("parquet"))
+        .unwrap_or(false);
+    // Keep the temp file alive for the duration of the read (path borrowed below).
+    let _parquet_csv_tmp: Option<tempfile::NamedTempFile>;
+    let read_path: PathBuf = if is_parquet {
+        let tmp = match tempfile::Builder::new()
+            .prefix("finetype-validate-parquet-")
+            .suffix(".csv")
+            .tempfile()
+        {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("error: could not create temp file for parquet→csv: {}", e);
+                exit_with(2);
+            }
+        };
+        let copy_sql = format!(
+            "COPY (SELECT * FROM read_parquet({})) TO {} (HEADER, DELIMITER ',', QUOTE '\"');",
+            sql_quote(&file.to_string_lossy()),
+            sql_quote(&tmp.path().to_string_lossy()),
+        );
+        let out = std::process::Command::new("duckdb")
+            .arg("-c")
+            .arg(&copy_sql)
+            .output();
+        match out {
+            Ok(o) if o.status.success() => {}
+            Ok(o) => {
+                eprintln!(
+                    "error: duckdb parquet→csv failed: {}",
+                    String::from_utf8_lossy(&o.stderr).trim()
+                );
+                exit_with(2);
+            }
+            Err(e) => {
+                eprintln!(
+                    "error: could not invoke duckdb CLI (is duckdb on PATH?): {}",
+                    e
+                );
+                exit_with(2);
+            }
+        }
+        let path = tmp.path().to_path_buf();
+        _parquet_csv_tmp = Some(tmp);
+        path
+    } else {
+        _parquet_csv_tmp = None;
+        file.clone()
+    };
+    let mut rdr = match csv::Reader::from_path(&read_path) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("error: could not read input file {}: {}", file.display(), e);
@@ -3056,7 +3110,11 @@ fn cmd_validate_table(
             .map(|s| s.eq_ignore_ascii_case("parquet"))
             .unwrap_or(false)
         {
-            format!("read_parquet({})", input_literal)
+            // Cast every parquet column to VARCHAR so the staging table
+            // matches the CSV path's all_varchar=true contract — typed
+            // transforms (REGEXP_REPLACE, LIKE, TRY_CAST) downstream assume
+            // VARCHAR staging cells.
+            format!("(SELECT COLUMNS(*)::VARCHAR FROM read_parquet({}))", input_literal)
         } else {
             format!("read_csv({}, header=true, all_varchar=true)", input_literal)
         };

@@ -185,8 +185,12 @@ def _execute_one(path_str: str) -> tuple[FileResult, list[ColumnResult]]:
 
             _parquet_to_csv(parquet, csv_path, _WORKER_DUCKDB)
             _profile(csv_path, schema_path, _WORKER_FINETYPE)
+            # Validate consumes parquet directly (v0.6.20+) — schema names
+            # match parquet schema names (DuckDB COPY preserved them in the
+            # CSV profile read), and validate's read_parquet binding also
+            # preserves them, so SQL references resolve.
             summary = _validate(
-                csv_path, schema_path, db_path, _WORKER_FINETYPE,
+                parquet, schema_path, db_path, _WORKER_FINETYPE,
             )
 
             col_types = _column_types(schema_path)
@@ -350,8 +354,12 @@ def _measure_one(
             _profile(csv_path, schema_path, finetype_bin)
             out.profile_s = time.perf_counter() - t
 
+            # Validate consumes parquet directly (v0.6.20+) — same column
+            # names as profile saw (CSV header preserves parquet names
+            # verbatim), so the schema and validate's read_parquet binding
+            # agree. Avoids the DuckDB-CSV-reader whitespace-strip bug.
             t = time.perf_counter()
-            summary = _validate(csv_path, schema_path, db_path, finetype_bin)
+            summary = _validate(parquet, schema_path, db_path, finetype_bin)
             out.validate_s = time.perf_counter() - t
             _ = summary  # full pass would consume this for the gate
 
