@@ -77,6 +77,12 @@ eval/gittables/corpus_pass/mechanism_decomposition.parquet
 eval/gittables/corpus_pass/corroborated_gaps.parquet
 eval/gittables/corpus_pass/single_lens_signals.tsv
 
+# ac-13 reproducibility sub-pass outputs (calibrate half, 100 files).
+# Regenerable via scripts/test_corpus_pass_reproducibility.sh.
+# Same secret-scanner false-positive risk as the measure-half parquets.
+eval/gittables/corpus_pass_calibrate_reprocheck/
+eval/gittables/corpus_paths_calibrate_100.txt
+
 # Claude scheduled-task lock file (transient)
 .claude/scheduled_tasks.lock
 

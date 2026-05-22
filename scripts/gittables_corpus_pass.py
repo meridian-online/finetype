@@ -119,15 +119,23 @@ SAMPLE_JOIN_SEP = "│"  # U+2502 — matches labelled_eval.tsv
 # sequential pass via `--fill-ydf`.
 _WORKER_FINETYPE = "finetype"
 _WORKER_DUCKDB = "duckdb"
+# Partition selector — which SHA bucket to process.
+#   "measure"   → SHA bucket == 1 (the measure half, default for ac-06)
+#   "calibrate" → SHA bucket == 0 (the calibrate half, used by ac-13's
+#                  reproducibility sub-pass to keep measure-half
+#                  hygiene from debugging traffic)
+_WORKER_PARTITION = "measure"
 
 
 def _worker_init(
     finetype_bin: str,
     duckdb_bin: str,
+    partition: str = "measure",
 ) -> None:
-    global _WORKER_FINETYPE, _WORKER_DUCKDB
+    global _WORKER_FINETYPE, _WORKER_DUCKDB, _WORKER_PARTITION
     _WORKER_FINETYPE = finetype_bin
     _WORKER_DUCKDB = duckdb_bin
+    _WORKER_PARTITION = partition
 
 
 def _ydf_predict_with_confidence(
@@ -162,17 +170,23 @@ def _truncate_value(v: str) -> str:
 
 
 def _execute_one(path_str: str) -> tuple[FileResult, list[ColumnResult]]:
-    """Per-file execute: SHA -> measure-half filter -> profile + validate
+    """Per-file execute: SHA -> partition filter -> profile + validate
     -> YDF per column. Skipped files return empty column list and the
     file row carries `in_measure_half == False` (signalled by an empty
-    `file_content_sha256` to keep the schema flat)."""
+    `file_content_sha256` to keep the schema flat).
+
+    The partition the worker accepts is set by `_worker_init` via the
+    `_WORKER_PARTITION` global — "measure" (SHA % 2 == 1, default
+    ac-06 behaviour) or "calibrate" (SHA % 2 == 0, used by ac-13's
+    reproducibility sub-pass on the calibrate half)."""
     parquet = Path(path_str)
     t0 = time.perf_counter()
     fr = FileResult(file_path=path_str, file_content_sha256="")
     cols: list[ColumnResult] = []
     try:
         sha = _file_sha256(parquet)
-        if _sha_bucket(sha) != 1:
+        wanted_bucket = 0 if _WORKER_PARTITION == "calibrate" else 1
+        if _sha_bucket(sha) != wanted_bucket:
             fr.elapsed_s = time.perf_counter() - t0
             return (fr, cols)
         fr.file_content_sha256 = sha
@@ -507,7 +521,7 @@ def _run_execute(args, paths: list[Path]) -> int:
     with cf.ProcessPoolExecutor(
         max_workers=args.jobs,
         initializer=_worker_init,
-        initargs=(args.finetype_bin, args.duckdb_bin),
+        initargs=(args.finetype_bin, args.duckdb_bin, args.partition),
     ) as pool:
         for fr, cols in pool.map(
             _execute_one,
@@ -719,6 +733,14 @@ def main() -> int:
     parser.add_argument("--duckdb-bin", default=DEFAULT_DUCKDB)
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--max-files", type=int, default=None)
+    parser.add_argument(
+        "--partition", choices=("measure", "calibrate"), default="measure",
+        help="Which SHA partition to process. Default 'measure' (SHA %% 2 == 1) "
+             "is ac-06's full corpus pass. 'calibrate' (SHA %% 2 == 0) is "
+             "reserved for non-measurement traffic; ac-13's reproducibility "
+             "sub-pass runs against the calibrate half so debugging iterations "
+             "don't contaminate the measure half.",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--dry-run", action="store_true",

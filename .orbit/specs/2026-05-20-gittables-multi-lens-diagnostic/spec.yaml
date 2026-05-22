@@ -740,7 +740,7 @@ acceptance_criteria:
     already reserved for non-measurement traffic; this preserves
     measure-half hygiene from debugging iterations.
   gate: false
-  checked: false
+  checked: true
   verification: |
     `scripts/test_corpus_pass_reproducibility.sh` runs the corpus
     pass twice at `--max-files 100 --partition calibrate` and
