@@ -435,7 +435,7 @@ acceptance_criteria:
     measure-half files; higher rates trigger root-cause investigation
     before downstream ACs.
   gate: false
-  checked: false
+  checked: true
   verification: |
     `eval/gittables/corpus_pass/files.parquet` row count equals the
     measure-half file count from `corpus_paths.txt`. DuckDB query
@@ -454,7 +454,7 @@ acceptance_criteria:
     as `gate_score = files_passed / files_total`. Per-criterion
     failure counts emitted: files failing (a) only, (b) only, both.
   gate: false
-  checked: false
+  checked: true
   verification: |
     File `eval/gittables/corpus_pass/gate_summary.json` exists with
     `{files_total, files_passed, gate_score,

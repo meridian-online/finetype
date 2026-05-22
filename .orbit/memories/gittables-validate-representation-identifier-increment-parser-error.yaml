@@ -1,0 +1,5 @@
+key: gittables-validate-representation-identifier-increment-parser-error
+body: '164/4235 errors (4%) in gittables corpus pass run-5 fail with ''Parser Error: z'' on SQL fragment ''representation.identifier.increment'', NULL, CAST("" AS VARCHAR) FROM __finetype_staging_...''. Sample: /Users/hugh/datasets/gittables/cease/55.parquet. The taxonomy label ''representation.identifier.increment'' is being embedded as a SQL literal in a context where SQL syntax doesn''t accept it (looks like an INSERT VALUES position). Root cause: validate''s reject-INSERT SQL generation interpolates the label as if it''s an identifier rather than quoting it as a string. Empty-string CAST adjacent suggests a malformed reject row INSERT. Worth grepping the SQL generation in validate''s materialise path for ''representation.identifier'' to find the call site.'
+timestamp: 2026-05-22T05:08:22.983773Z
+labels:
+- code-investigate

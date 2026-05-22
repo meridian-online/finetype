@@ -1,0 +1,5 @@
+key: gittables-validate-binder-residual-post-fix-a
+body: 'After Fix A (column-name whitespace normalisation in scripts/gittables_gate.py:_parquet_to_csv), a residual 1441/4235 errors (34% of run-5 total error budget) still trip ''Binder Error: Referenced column ... not found in FROM clause''. These are NOT the leading-whitespace variant (already fixed). Sample: /Users/hugh/datasets/gittables/beauty_sleep/mcc.parquet, /Users/hugh/datasets/gittables/beats_per_minute/openquizzdb_175.parquet (the latter has candidate bindings with multi-line strings as column names like ''Combien de temps...''). Likely root cause: non-ASCII column names, multi-line column names, or columns whose names contain SQL-special characters that need further escaping or normalisation. Lower priority than the original Fix A bucket but quantitatively the largest remaining error category.'
+timestamp: 2026-05-22T05:08:19.062167Z
+labels:
+- code-investigate
