@@ -9,8 +9,8 @@ Per spec ac-02:
 
 This script:
   1. Reads failure_log.measure.tsv (produced by scripts/split_failure_log.py).
-  2. For each row, calls `finetype infer-type` over its (column_name,
-     predicted_type, observed_values_sample).
+  2. For each row, calls `finetype infer --mode column --batch --explain`
+     over its (column_name, predicted_type, observed_values_sample).
   3. Counts rows with `inferred_correct_type != "unknown"` AND
      `confidence >= 0.7`.
   4. Asserts the ratio ≥ 0.60. Prints summary numbers to stdout for
@@ -55,7 +55,10 @@ def run_inference(
     predicted_type: str,
     samples: list[str],
 ) -> dict:
-    """Invoke `finetype infer-type` once and return parsed JSON output."""
+    """Invoke `finetype infer --mode column --batch --explain` once and
+    return parsed JSON output. The explain cascade was historically
+    `finetype infer-type`; it now lives as the `--explain` flag on
+    `infer`. Wire shape unchanged."""
     payload = json.dumps(
         {
             "column_name": column_name,
@@ -64,7 +67,7 @@ def run_inference(
         }
     )
     res = subprocess.run(
-        [finetype_bin, "infer-type"],
+        [finetype_bin, "infer", "--mode", "column", "--batch", "--explain"],
         input=payload,
         capture_output=True,
         text=True,
@@ -72,7 +75,7 @@ def run_inference(
     )
     if res.returncode != 0:
         raise RuntimeError(
-            f"finetype infer-type failed: rc={res.returncode} stderr={res.stderr[:300]}"
+            f"finetype infer --explain failed: rc={res.returncode} stderr={res.stderr[:300]}"
         )
     return json.loads(res.stdout.strip())
 

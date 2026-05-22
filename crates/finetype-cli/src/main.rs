@@ -93,9 +93,27 @@ enum Commands {
 
         /// Read JSONL from stdin: {"header":"col_name","values":["v1","v2",...]}
         /// Outputs one JSON line per input with classification results.
-        /// Requires --mode column.
+        /// Requires --mode column. Combine with `--explain` to instead
+        /// run the diagnostic cascade (input: {"column_name","predicted_type","samples"},
+        /// output: {"inferred_correct_type","confidence","mechanism","signals"}).
         #[arg(long)]
         batch: bool,
+
+        /// Diagnostic cascade — given a column's Sense prediction and samples,
+        /// return the inferred correct type plus a mechanism token explaining
+        /// the predicted/actual relationship (one of ten closed tokens per
+        /// MADR 0075 + 0081). Requires `--mode column --batch`; stdin is
+        /// NDJSON of {"column_name","predicted_type","samples":[...]} and
+        /// stdout is NDJSON of {"inferred_correct_type","confidence",
+        /// "mechanism","signals":{...}}. Loads taxonomy + validators once
+        /// across the whole stream. Used by ac-08 of the gittables
+        /// multi-lens diagnostic.
+        #[arg(long)]
+        explain: bool,
+
+        /// Taxonomy file or directory (used with `--explain`).
+        #[arg(long, default_value = "labels")]
+        taxonomy: PathBuf,
     },
 
     /// Generate synthetic training data
@@ -394,17 +412,6 @@ enum Commands {
 
     /// Autonomous type-inference triangulator (bead finetype-7zi).
     ///
-    /// Reads JSON from stdin: {"column_name": str, "predicted_type": str,
-    /// "samples": [str]}. Truncates samples to N=8 (matches OBSERVED_SAMPLE_LIMIT
-    /// in scripts/cron_cycle_work.py). Returns JSON to stdout: {"inferred_correct_type",
-    /// "confidence", "mechanism", "signals": {...}}. Exit 0 on success.
-    #[command(name = "infer-type")]
-    InferType {
-        /// Taxonomy file or directory
-        #[arg(short, long, default_value = "labels")]
-        taxonomy: PathBuf,
-    },
-
     /// Extract multi-branch feature vectors from a column of values (stdin)
     #[command(name = "extract-features", hide = true)]
     ExtractFeatures {
@@ -515,6 +522,8 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
+            explain,
+            taxonomy,
         } => cmd_infer(
             input,
             file,
@@ -527,6 +536,8 @@ fn main() -> Result<()> {
             bench,
             header,
             batch,
+            explain,
+            taxonomy,
         ),
 
         Commands::Generate {
@@ -688,33 +699,45 @@ fn main() -> Result<()> {
             json,
             validation,
         } => cmd_extract_features(header, json, validation),
-
-        Commands::InferType { taxonomy } => cmd_infer_type(taxonomy),
     }
 }
 
-/// Autonomous type-inference triangulator (bead finetype-7zi).
+/// Run the diagnostic cascade over an NDJSON stream of (column_name,
+/// predicted_type, samples) inputs, emitting one JSON line per input with
+/// the inferred correct type, confidence, mechanism token, and signals.
 ///
-/// Reads a single JSON object from stdin and writes a single JSON object to
-/// stdout. The wire shape is defined in `finetype_core::infer::{InferInput,
-/// InferOutput}`. Exits 0 on success and non-zero on internal error (e.g.
-/// stdin parse failure, taxonomy load failure).
-fn cmd_infer_type(taxonomy_path: PathBuf) -> Result<()> {
+/// The taxonomy + validators load once across the whole stream — this is
+/// the batch-mode amortisation that makes corpus-scale attribution
+/// tractable. Wire shapes are defined in
+/// `finetype_core::infer::{InferInput, InferOutput}`.
+///
+/// Exposed via `finetype infer --mode column --batch --explain`; subsumes
+/// the historical `infer-type` subcommand (removed in the same change).
+fn cmd_infer_explain_batch(taxonomy_path: &std::path::Path) -> Result<()> {
     use finetype_core::infer::{infer, InferInput};
+    use std::io::{BufRead, Write};
 
-    // Read all of stdin
-    let mut buf = String::new();
-    io::stdin().read_to_string(&mut buf)?;
-    let input: InferInput = serde_json::from_str(&buf)
-        .map_err(|e| anyhow::anyhow!("failed to parse stdin JSON: {}", e))?;
-
-    // Load taxonomy + compile validators (same loader as cmd_validate)
-    let mut taxonomy = load_taxonomy(&taxonomy_path)?;
+    // Load taxonomy + compile validators (same loader as cmd_validate).
+    // Single load amortised across every line on stdin.
+    let mut taxonomy = load_taxonomy(&taxonomy_path.to_path_buf())?;
     taxonomy.compile_validators();
     taxonomy.compile_locale_validators();
 
-    let out = infer(&taxonomy, &input);
-    println!("{}", serde_json::to_string(&out)?);
+    let stdin = io::stdin();
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+
+    for line in stdin.lock().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let input: InferInput = serde_json::from_str(&line).map_err(|e| {
+            anyhow::anyhow!("failed to parse stdin JSON line ({}): {}", e, line)
+        })?;
+        let result = infer(&taxonomy, &input);
+        writeln!(out, "{}", serde_json::to_string(&result)?)?;
+    }
     Ok(())
 }
 
@@ -1229,9 +1252,21 @@ fn cmd_infer(
     bench: bool,
     header: Option<String>,
     batch: bool,
+    explain: bool,
+    taxonomy: PathBuf,
 ) -> Result<()> {
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
     use std::time::Instant;
+
+    // --explain: diagnostic cascade over an NDJSON stream. Subsumes the
+    // historical `infer-type` subcommand; lives on `infer` to keep the
+    // CLI surface flat.
+    if explain {
+        if !batch || !matches!(mode, InferenceMode::Column) {
+            anyhow::bail!("--explain requires --mode column --batch");
+        }
+        return cmd_infer_explain_batch(&taxonomy);
+    }
 
     let model = resolve_model_path();
 

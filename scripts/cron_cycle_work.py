@@ -121,7 +121,10 @@ def _infer_and_build_failure_row(
     harvest_samples: list[str],
     finetype_bin: str,
 ) -> tuple[dict, dict, dict]:
-    """Run `finetype infer-type` over (column_name, predicted_type, samples).
+    """Run `finetype infer --mode column --batch --explain` over
+    (column_name, predicted_type, samples). Historically `finetype
+    infer-type`; the verb was collapsed into a flag on `infer`. Wire
+    shape unchanged.
 
     Returns three dicts:
       - failure_row: 5 fields written to failure_log.tsv (joined with cycle/file
@@ -159,7 +162,7 @@ def _infer_and_build_failure_row(
     top_k_json = "[]"
     try:
         res = subprocess.run(
-            [finetype_bin, "infer-type"],
+            [finetype_bin, "infer", "--mode", "column", "--batch", "--explain"],
             input=payload,
             capture_output=True,
             text=True,

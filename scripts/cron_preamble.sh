@@ -134,7 +134,7 @@ fi
 # validator pass-rate ≥ 0.7. Failure halts the cycle (H05 family).
 if [[ -x "$FINETYPE_BIN" ]]; then
     SMOKE_INPUT='{"column_name":"email","predicted_type":"identity.person.email","samples":["alice@example.com","bob@example.com","carol@example.com","dave@example.org","eve@example.net","frank@example.com","grace@example.io","henry@example.com"]}'
-    SMOKE_OUT="$(printf '%s' "$SMOKE_INPUT" | "$FINETYPE_BIN" infer-type 2>/dev/null || true)"
+    SMOKE_OUT="$(printf '%s\n' "$SMOKE_INPUT" | "$FINETYPE_BIN" infer --mode column --batch --explain 2>/dev/null || true)"
     SMOKE_OK="$(printf '%s' "$SMOKE_OUT" | python3 -c "
 import json, sys
 try:
@@ -151,7 +151,7 @@ if out.get('mechanism') != 'prediction_confirmed':
 print('ok')
 ")"
     if [[ "$SMOKE_OK" != "ok" ]]; then
-        emit_halt "H05" "infer-type smoke gate failed: $SMOKE_OK (raw output: $SMOKE_OUT)"
+        emit_halt "H05" "infer --explain smoke gate failed: $SMOKE_OK (raw output: $SMOKE_OUT)"
         exit 1
     fi
 fi

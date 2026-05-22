@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Latency benchmark for `finetype infer-type` (ac-05).
+"""Latency benchmark for `finetype infer --mode column --batch --explain` (ac-05).
 
 Per spec ac-05:
     Median latency <100ms per column on M1 over a 1000-column benchmark
@@ -8,10 +8,14 @@ Per spec ac-05:
     subprocess invocation per column for subprocess form, OR one socket
     round-trip per column for server form.
 
-This script measures the SUBPROCESS form — one `finetype infer-type`
-invocation per column. p50 and p95 are reported. If p50 ≥ 100ms,
-the spec recommends escalating to a long-lived `finetype infer-server`
-form (Unix socket) — record the breach + escalation in progress.md.
+This script measures the SUBPROCESS form — one `finetype infer` invocation
+per column. p50 and p95 are reported. If p50 ≥ 100ms, the spec recommends
+escalating to a long-lived `finetype infer-server` form (Unix socket) —
+record the breach + escalation in progress.md.
+
+Note: the explain cascade was historically a separate `finetype infer-type`
+subcommand; it now lives as the `--explain` flag on `infer` (the verb was
+collapsed for CLI hygiene). The wire shape is identical.
 
 USAGE
     python scripts/bench_infer.py \
@@ -69,7 +73,7 @@ def time_one(finetype_bin: str, column_name: str, predicted: str, samples: list[
     )
     t0 = time.perf_counter()
     res = subprocess.run(
-        [finetype_bin, "infer-type"],
+        [finetype_bin, "infer", "--mode", "column", "--batch", "--explain"],
         input=payload,
         capture_output=True,
         text=True,
@@ -77,7 +81,9 @@ def time_one(finetype_bin: str, column_name: str, predicted: str, samples: list[
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
     if res.returncode != 0:
-        raise RuntimeError(f"finetype infer-type failed: {res.stderr[:200]}")
+        raise RuntimeError(
+            f"finetype infer --mode column --batch --explain failed: {res.stderr[:200]}"
+        )
     return elapsed_ms
 
 

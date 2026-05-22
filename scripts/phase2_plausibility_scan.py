@@ -2,7 +2,7 @@
 """Phase 2 plausibility scan — back-of-envelope for ac-01 of finetype-dnf.
 
 For each row in a deterministic sample of failure_log.measure.tsv:
-  1. Invoke `finetype infer-type` to capture per-signal scores under
+  1. Invoke `finetype infer --mode column --batch --explain` to capture per-signal scores under
      locked Phase 1 weights (w_v=0.4, w_h=0.6).
   2. Bin the row by Phase-1 outcome (≥0.7 / 0.5–0.7 / <0.5) and by
      signal pattern (header_match strong/weak; validator_pass_rate
@@ -79,7 +79,7 @@ def run_inference(
         }
     )
     res = subprocess.run(
-        [finetype_bin, "infer-type"],
+        [finetype_bin, "infer", "--mode", "column", "--batch", "--explain"],
         input=payload,
         capture_output=True,
         text=True,
@@ -87,7 +87,7 @@ def run_inference(
     )
     if res.returncode != 0:
         raise RuntimeError(
-            f"infer-type rc={res.returncode} stderr={res.stderr[:200]}"
+            f"infer --explain rc={res.returncode} stderr={res.stderr[:200]}"
         )
     return json.loads(res.stdout.strip())
 

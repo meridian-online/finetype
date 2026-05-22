@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-infer_labelled_eval.py — run `finetype infer-type` on each row of
+infer_labelled_eval.py — run `finetype infer --mode column --batch --explain` on each row of
 labelled_eval.unlabelled.tsv and write predictions to a separate file
 (NOT joined onto the labelled subset, per labelling_protocol.md
 anti-pattern: "Do not consult the inference module's output for any
@@ -74,14 +74,14 @@ def run_one(binary: Path, column_name: str, predicted_type: str, samples: list[s
         }
     )
     r = subprocess.run(
-        [str(binary), "infer-type"],
+        [str(binary), "infer", "--mode", "column", "--batch", "--explain"],
         input=payload,
         capture_output=True,
         text=True,
         check=False,
     )
     if r.returncode != 0:
-        raise RuntimeError(f"infer-type failed: {r.stderr.strip()}")
+        raise RuntimeError(f"infer --explain failed: {r.stderr.strip()}")
     return json.loads(r.stdout)
 
 

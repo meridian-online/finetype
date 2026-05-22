@@ -469,21 +469,24 @@ acceptance_criteria:
     Per-criterion failure decomposition by the mechanism cascade.
     For each criterion-(a) failure (low non-trivial), trivial-predicted
     columns are tagged with one of the 10 closed mechanism tokens (per
-    MADR 0075 + 0081) via `finetype infer-type`. For each
-    criterion-(b) failure (high reject rate), each rejected row
-    inherits its column's mechanism token — mechanism attribution
-    is per-column from `finetype infer-type` (one mechanism per
+    MADR 0075 + 0081) via `finetype infer --mode column --batch
+    --explain`. For each criterion-(b) failure (high reject rate), each
+    rejected row inherits its column's mechanism token — mechanism
+    attribution is per-column from the same command (one mechanism per
     column, verified at `crates/finetype-core/src/infer.rs`), and
-    rejected rows are tagged with their column's mechanism rather
-    than a per-row attribution. Each row also
-    receives a `recommended_action_class` derived from the mechanism
-    via the spec's locked mapping table (see goal §Mechanism token →
+    rejected rows are tagged with their column's mechanism rather than
+    a per-row attribution. Each row also receives a
+    `recommended_action_class` derived from the mechanism via the
+    spec's locked mapping table (see goal §Mechanism token →
     recommended action class). Output:
     `eval/gittables/corpus_pass/mechanism_decomposition.parquet`
     with rows `(file_path, criterion, column_name, mechanism_token,
     recommended_action_class, contributing_columns_count_or_reject_count)`.
-    The `finetype infer-type` subcommand (NOT `finetype infer`)
-    supplies the mechanism token per column.
+    The diagnostic cascade lives on `finetype infer` behind the
+    `--explain` flag (collapsed from the historical `finetype
+    infer-type` subcommand). Stdin is NDJSON; the model + taxonomy
+    load once per invocation, enabling corpus-scale batch
+    attribution.
   gate: false
   checked: false
   verification: |
