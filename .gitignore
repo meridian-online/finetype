@@ -62,6 +62,21 @@ eval/gittables/corpus_pass/per_column_rejects.parquet
 eval/gittables/corpus_pass/per_column_rejects_errors.jsonl
 eval/gittables/per_column_rejects.log
 
+# ac-08 mechanism attribution log + parquet (regenerable).
+# The parquet contains real gittables sample values; some incidentally
+# match GitHub's secret-scanner patterns (e.g. 20-char uppercase
+# alphanumeric strings parse as candidate AWS Access Key IDs).
+# Regenerable from scripts/build_mechanism_decomposition.py.
+eval/gittables/mechanism_decomposition.log
+eval/gittables/corpus_pass/mechanism_decomposition.parquet
+
+# ac-09 outputs (regenerable from scripts/build_corroborated_gaps.py).
+# corroborated_gaps.parquet carries sample_evidence with real
+# corpus values — same false-positive risk as mechanism_decomposition.
+# single_lens_signals.tsv is ~240MB / 2.6M rows.
+eval/gittables/corpus_pass/corroborated_gaps.parquet
+eval/gittables/corpus_pass/single_lens_signals.tsv
+
 # Claude scheduled-task lock file (transient)
 .claude/scheduled_tasks.lock
 

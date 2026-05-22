@@ -488,7 +488,7 @@ acceptance_criteria:
     load once per invocation, enabling corpus-scale batch
     attribution.
   gate: false
-  checked: false
+  checked: true
   verification: |
     DuckDB query
     `SELECT DISTINCT mechanism_token FROM
@@ -556,7 +556,7 @@ acceptance_criteria:
     doesn't) are written to
     `eval/gittables/corpus_pass/single_lens_signals.tsv`.
   gate: false
-  checked: false
+  checked: true
   verification: |
     DuckDB query
     `SELECT COUNT(*) FROM corroborated_gaps WHERE

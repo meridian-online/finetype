@@ -112,7 +112,7 @@ def main() -> int:
         FROM read_parquet('{args.columns_parquet}') c
         JOIN files f USING (file_path)
         WHERE f.fails_a AND c.is_trivial
-    """).arrow()
+    """).fetch_arrow_table()
     print(f"  (a)-side: {a_targets_df.num_rows} target columns",
           file=sys.stderr)
 
@@ -129,7 +129,7 @@ def main() -> int:
             JOIN read_parquet('{args.per_column_rejects}') r
                  ON r.file_path = c.file_path AND r.column_name = c.column_name
             WHERE f.fails_b AND r.reject_count > 0
-        """).arrow()
+        """).fetch_arrow_table()
         print(f"  (b)-side: {b_targets_df.num_rows} target columns",
               file=sys.stderr)
     elif not args.a_only:
