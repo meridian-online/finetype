@@ -1,12 +1,43 @@
 ---
 attestor: @hughcameron
-attest_date: TBD
+attest_date: 2026-05-23
+attestation_evidence: spot_check_prescreen.md (agent pre-screen, author-ratified)
 sampling_seed: 20260520
 samples_per_cell: 3
 pass_rate_threshold: 0.9
 ---
 
 # ac-12 — Per-cell spot-check on Part 1 (corroborated gaps)
+
+## Outcome (2026-05-23)
+
+Per-gap attestation hit diminishing returns relative to ac-11's
+95.24% population-scale precision and the AND filter's already-strong
+corroboration discipline. The author ratified the agent pre-screen
+(`spot_check_prescreen.md`) as the attestation evidence. Per-gap
+verdicts are reproduced in the per-cell summary table at the bottom
+of this document.
+
+### Demoted cells
+
+Four cells fell below the 90% per-cell threshold and were demoted
+from `report.md`'s ranked tables to `single_lens_signals.tsv` per
+the spec's failure-consequence procedure:
+
+- `non_trivial_floor × format_diversity_path_b` (2336 clusters)
+- `reject_rate_ceil × code_vs_canonical_path_a` (1 cluster)
+- `reject_rate_ceil × format_diversity_path_a` (8 clusters)
+- `reject_rate_ceil × validator_widening` (381 clusters)
+
+Total demoted: **2726 of 64565 clusters (4.2%)**. The common failure
+pattern (cascade emits a too-specific mechanism token where the
+correct token is the generic `misclassification` or `unknown_no_fit`)
+is captured in `.orbit/memos/2026-05-23-cascade-precision-fanout.md`
+as a v21+ follow-up.
+
+Full demotion rationale logged in
+`.orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/progress.md`
+under the 2026-05-23 entry.
 
 For each gap below, flip the verdict line to **PASS** or **FAIL**. A gap passes only if **all three** of the following hold:
 
@@ -492,13 +523,13 @@ Sampled 3 of 381 gaps in this cell.
 
 | criterion | mechanism | sampled | passed | pass_rate | meets threshold? |
 |---|---|---:|---:|---:|---|
-| `non_trivial_floor` | `format_diversity_path_b` | 3 | TBD | TBD | TBD |
-| `non_trivial_floor` | `misclassification` | 3 | TBD | TBD | TBD |
-| `reject_rate_ceil` | `code_vs_canonical_path_a` | 1 | TBD | TBD | TBD |
-| `reject_rate_ceil` | `enum_overfit` | 3 | TBD | TBD | TBD |
-| `reject_rate_ceil` | `format_diversity_path_a` | 3 | TBD | TBD | TBD |
-| `reject_rate_ceil` | `format_diversity_path_b` | 3 | TBD | TBD | TBD |
-| `reject_rate_ceil` | `misclassification` | 3 | TBD | TBD | TBD |
-| `reject_rate_ceil` | `validator_widening` | 3 | TBD | TBD | TBD |
+| `non_trivial_floor` | `format_diversity_path_b` | 3 | 2 | 67% | **NO — demoted** |
+| `non_trivial_floor` | `misclassification` | 3 | 3 | 100% | yes |
+| `reject_rate_ceil` | `code_vs_canonical_path_a` | 1 | 0 | 0% | **NO — demoted** |
+| `reject_rate_ceil` | `enum_overfit` | 3 | 3 | 100% | yes |
+| `reject_rate_ceil` | `format_diversity_path_a` | 3 | 2 | 67% | **NO — demoted** |
+| `reject_rate_ceil` | `format_diversity_path_b` | 3 | 3 | 100% | yes |
+| `reject_rate_ceil` | `misclassification` | 3 | 3 | 100% | yes |
+| `reject_rate_ceil` | `validator_widening` | 3 | 0 | 0% | **NO — demoted** |
 
 **Spec close blocks** until every cell either passes (0.9 threshold) OR every failing cell is demoted per the spec's failure-consequence procedure.

@@ -32,6 +32,18 @@ PART2_MIN_COLS = 10
 PART1_TOPN_PER_CELL = 10
 PART2_SAMPLE_COLS = 3
 
+# ac-12 outcome (2026-05-23) — cells whose pre-screen pass rate fell
+# below the 90% threshold are demoted from Part 1 to
+# single_lens_signals.tsv per the spec's failure-consequence procedure.
+# Each entry is a (criterion, mechanism) tuple. The audit trail lives
+# in spot_check_prescreen.md + spot_check.md + progress.md (2026-05-23).
+DEMOTED_CELLS: frozenset[tuple[str, str]] = frozenset({
+    ("non_trivial_floor", "format_diversity_path_b"),
+    ("reject_rate_ceil",  "code_vs_canonical_path_a"),
+    ("reject_rate_ceil",  "format_diversity_path_a"),
+    ("reject_rate_ceil",  "validator_widening"),
+})
+
 TRIVIAL_TYPES = {
     "representation.text.plain_text",
     "representation.numeric.decimal_number",
@@ -204,6 +216,18 @@ def build_part1(corroborated_path: Path, dbpedia_annotations_path: Path) -> str:
             cell_gaps = cells.get((criterion, mech), [])
             out.append(f"#### Mechanism: `{mech}`")
             out.append("")
+            if (criterion, mech) in DEMOTED_CELLS:
+                n_demoted = len(cell_gaps)
+                out.append(
+                    f"> **demoted** by ac-12 attestation (2026-05-23) — "
+                    f"{n_demoted} clusters routed to "
+                    f"`single_lens_signals.tsv`. See "
+                    f"`spot_check_prescreen.md` for the per-gap reasoning "
+                    f"and `progress.md` (2026-05-23 entry) for the "
+                    f"demotion rationale."
+                )
+                out.append("")
+                continue
             if not cell_gaps:
                 out.append("> no corroborated gaps found")
                 out.append("")

@@ -430,3 +430,102 @@ could materially improve corroboration in specific
 `(criterion × mechanism)` cells. **Not in this spec's scope** — flagged
 here so the next spec can pick it up. Memory:
 `ydf-specialist-models-future` (label: topology).
+
+---
+
+## 2026-05-23 — m-19 closes (ac-12 ratified via pre-screen; 4 cells demoted)
+
+ac-12 was closed by ratifying the agent pre-screen
+(`eval/gittables/corpus_pass/spot_check_prescreen.md`) as the
+attestation evidence after author review concluded that per-gap
+attestation had hit diminishing returns relative to ac-11's
+population-scale precision (95.24% on labelled_eval) and the AND
+filter's already-strong corroboration discipline.
+
+### Demoted cells
+
+Four `(criterion × mechanism)` cells fell below the 90% per-cell
+threshold in the pre-screen. Per the spec's failure-consequence
+procedure, all gaps in these cells are demoted from `report.md`'s
+ranked tables to `single_lens_signals.tsv`:
+
+1. `non_trivial_floor × format_diversity_path_b` — 2336 clusters demoted.
+   Sampled gaps:
+   - `a57a3a01a7a6…` PASS (sentence-like fill-in-the-blank text)
+   - `0c2f31b51309…` FAIL (token mismatch — email body labelled
+     format_diversity_path_b; YDF's entity_name read also off)
+   - `e0eb6890ae08…` PASS (MTG card rules text, sentence-shaped)
+2. `reject_rate_ceil × code_vs_canonical_path_a` — 1 cluster demoted.
+   Sampled gap:
+   - `839ed8e4221b…` FAIL (chemistry atom labels are a fixed enum;
+     token should be enum_overfit, not code/canonical)
+3. `reject_rate_ceil × format_diversity_path_a` — 8 clusters demoted.
+   Sampled gaps:
+   - `7925dc9e13e9…` PASS (Stripe customer IDs)
+   - `2453b24e2e5e…` PASS (date column with TRUE)
+   - `cd8ec93a4780…` FAIL (WEIGHT % column with -90/100 isn't person
+     weight; should be misclassification)
+4. `reject_rate_ceil × validator_widening` — 381 clusters demoted.
+   Sampled gaps (all FAIL):
+   - `75550339ad4b…` (EMAIL column containing full addresses;
+     widening the email validator can't make addresses valid emails)
+   - `099beb68241d…` (identical pattern; EMAIL with addresses)
+   - `dda85e6d07f2…` (URL column with bare integers; widening URL
+     validator can't accept integers)
+
+Total demoted: **2726 clusters** out of 64565 (4.2%).
+
+### Common pattern in demotions
+
+All four failing cells share one shape: **the cascade emits a
+too-specific mechanism token where the correct token is the generic
+`misclassification` or `unknown_no_fit`**. Filed as the cascade-
+precision follow-up (memo `2026-05-23-cascade-precision-fanout.md`).
+This is a known and bounded weakness; ac-11's 95.2% population
+precision shows it's an outlier-cell pattern, not a systemic flaw.
+
+### single_lens_signals.tsv row count
+
+`eval/gittables/corpus_pass/single_lens_signals.tsv`: 2,633,229 data
+rows (header + 2,633,229). Already in this file from ac-09's
+single-lens triage; the 2726 demoted clusters from ac-12 are not
+expanded into per-row entries here — the audit trail is the per-cell
+list above plus the cluster-level evidence in `spot_check.md` /
+`spot_check_prescreen.md` / `spot_check.tsv`.
+
+### Author observations (captured at ratification)
+
+The author noted three things during the TSV review:
+
+1. Some "corroborated gaps" aren't gaps — when Sense says
+   `geography.location.continent` and the value is `OECD90`, Sense
+   is approximately right; YDF's broader call (`full_address`,
+   `entity_name`) counts as "disagreement" formally but reflects
+   granularity, not type-wrongness. The AND filter doesn't currently
+   respect taxonomy-hierarchy relationships.
+2. YDF's specialist value isn't being harvested. The lens picks up
+   geography patterns Sense misses; the diagnostic uses YDF only as
+   a noise filter. The higher-value use is as a training-data signal
+   generator for the next Sense retrain — pull Sense-missed columns
+   that YDF labels confidently in a known domain, treat as candidate
+   training rows.
+3. Gap-level attestation has hit diminishing returns. The diagnostic's
+   value lives at cell / cluster scale, not per-gap. v21 should
+   report cell-level confidence rather than promising per-gap truth.
+
+These observations land as two follow-up artefacts (filed in this
+commit):
+
+- Card *"YDF specialist lens — geography first"* — turn the
+  diagnostic into a training-data extraction pipeline. The
+  `(Sense-missed, YDF-confident-in-geography)` cells are gold for
+  v20+ retrain.
+- MADR candidate *"AND filter should respect taxonomy hierarchy"* —
+  refine ac-09's lens-vote logic so YDF saying `geography.address.*`
+  when Sense said `geography.location.*` counts as *agreement on
+  domain* rather than *disagreement on type*. This would cut the
+  false-positive rate without losing real gaps.
+
+### Spec close
+
+All 13 ACs now closed. m-19 ships.

@@ -718,7 +718,7 @@ acceptance_criteria:
     cell passes OR every failing cell has been demoted; partial
     progress is not acceptable for close.
   gate: false
-  checked: false
+  checked: true
   verification: |
     File `eval/gittables/corpus_pass/spot_check.md` exists. Lists
     per cell: cell name, sampled gap_ids, per-gap pass/fail verdict,

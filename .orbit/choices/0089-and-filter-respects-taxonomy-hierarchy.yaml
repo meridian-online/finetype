@@ -1,0 +1,97 @@
+id: '0089'
+title: 'ac-09 AND filter should respect taxonomy hierarchy granularity'
+status: proposed
+date_created: 2026-05-23
+date_modified: 2026-05-23
+body: |
+  # 0089. ac-09 AND filter should respect taxonomy hierarchy granularity
+
+  ## Context and Problem Statement
+
+  m-19's ac-09 corroboration filter declares a candidate gap when
+  **both** lenses (YDF + cascade) disagree with Sense's prediction.
+  The AND filter at corpus scale produced 64,565 corroborated
+  clusters — strong precision discipline relative to the OR baseline,
+  validated at 95.24% on labelled_eval (ac-11).
+
+  But the author's TSV review (2026-05-23) surfaced a category of
+  false positives: **the AND filter treats taxonomy-sibling
+  predictions as disagreement**. Concrete example:
+
+  - Sense predicts `geography.location.continent` for a column.
+  - YDF predicts `geography.address.full_address` (high confidence).
+  - These are *not the same type*, but they're in the same domain
+    (`geography.*`) and reflect a *granularity* mismatch — YDF is
+    broader, Sense is finer. The AND filter records this as
+    "disagreement"; the spot-check verdict is "Sense was approximately
+    right".
+
+  A spot-check of the 22-gap ac-12 sample found ~40% of the cells my
+  pre-screen flagged as failing share this taxonomy-sibling pattern.
+  At corpus scale, the false-positive rate is likely meaningful
+  enough to warrant filter refinement before the v21 corpus pass.
+
+  ## Considered Options
+
+  - **A. Status quo.** Treat any non-equal pair as disagreement. AND
+    filter as currently implemented.
+  - **B. Domain-level agreement check.** Two lenses *agree* iff their
+    predictions share the same domain (top-level taxonomy node:
+    `geography`, `identity`, `datetime`, etc.). YDF + Sense
+    disagreeing on type *within* the same domain is treated as
+    agreement; cross-domain disagreement is the only true flag.
+  - **C. Hierarchy-aware "disagrees how" classification.** Three-way
+    output: `same_type` (no flag), `same_domain` (soft flag — log
+    but don't elevate to corroborated_gaps), `cross_domain` (hard
+    flag — enters corroborated_gaps). The corroboration filter
+    becomes a graded signal instead of a binary one.
+  - **D. Confidence-weighted disagreement.** YDF's prediction
+    counts as disagreement only when its confidence > some threshold
+    AND the prediction is not a taxonomy-ancestor or descendant of
+    Sense's prediction. Captures the "YDF is more confident but in a
+    broader sense" case as soft signal.
+
+  ## Decision Outcome
+
+  Recommend **option C — hierarchy-aware "disagrees how"
+  classification**, on three grounds:
+
+  1. It preserves m-19's existing precision discipline (the existing
+     AND filter is the `cross_domain` case in C — no regression on
+     ac-11's 95.24% precision claim).
+  2. It surfaces *more* signal, not less — the `same_domain` soft
+     flag is exactly what 0017-ydf-specialist-geography needs (those
+     are the YDF-confident-in-domain rows that drive training-data
+     extraction).
+  3. The closed-vocab taxonomy already encodes the hierarchy in
+     dotted-path labels (`geography.location.continent` →
+     `geography.location.*` → `geography.*`); the hierarchy check is
+     a string-prefix operation, not a new data structure.
+
+  Decision deferred to a future spec because m-19 ships before this
+  refinement lands; the decision is *recommended* not *accepted* so
+  the author can confirm in the v21 planning session.
+
+  ### Consequences
+
+  - Good, because the corroborated_gaps.parquet's false-positive
+    rate drops without losing real gaps — `cross_domain` is the
+    strongest signal, `same_domain` is a softer signal the
+    training-data extractor can use.
+  - Good, because the same hierarchy logic unlocks 0017's geography
+    specialist work — both consume the same enriched lens
+    disagreement output.
+  - Bad, because corroborated_gaps.parquet's schema grows by one
+    column (`disagreement_class`), requiring downstream consumers
+    (report.md generator, single_lens_signals.tsv writer) to handle
+    the new field. Migration cost is bounded.
+  - Neutral, because cross-domain disagreements stay in the existing
+    behaviour — v21's corroborated_gaps.parquet is a superset of
+    m-19's, not a different shape.
+
+references:
+  - 0064  # validate as DuckDB reject pipeline (lens infrastructure)
+  - 0075  # mechanism cascade
+  - 0081  # cascade extended
+  - 0087  # gittables diagnostic absorbs m-19
+  - 0088  # collapse infer-type into infer --explain
