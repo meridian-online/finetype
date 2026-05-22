@@ -7,7 +7,7 @@
 
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -905,5 +905,286 @@ fn golden_profile_json_schema_enum_threshold_titanic() {
     assert!(
         !enums_on.is_empty(),
         "at least one low-cardinality column should carry enum under --enum-threshold=50"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// `infer --mode column --batch --explain` — diagnostic cascade (NDJSON in/out)
+// Subsumed the historical `infer-type` subcommand in MADR 0088.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Closed mechanism vocabulary per MADR 0075 + 0081. The cascade MUST emit
+/// one of these tokens; any other value is a regression.
+const CLOSED_MECHANISMS: &[&str] = &[
+    "format_diversity_path_a",
+    "format_diversity_path_b",
+    "code_vs_canonical_path_a",
+    "code_vs_canonical_path_b",
+    "enum_overfit",
+    "misclassification",
+    "prediction_confirmed",
+    "validator_widening",
+    "unknown_no_fit",
+    "fallthrough",
+];
+
+/// Run `finetype infer --mode column --batch --explain` with NDJSON-on-stdin.
+/// Returns the parsed NDJSON output lines as a Vec<Value>.
+fn run_infer_explain_batch(input_lines: &[&str]) -> Vec<Value> {
+    let mut child = Command::new("cargo")
+        .args([
+            "run", "-p", "finetype-cli", "--",
+            "infer", "--mode", "column", "--batch", "--explain",
+        ])
+        .current_dir(workspace_root())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn finetype infer --explain");
+    {
+        use std::io::Write as _;
+        let stdin = child.stdin.as_mut().expect("piped stdin");
+        for line in input_lines {
+            writeln!(stdin, "{line}").expect("write stdin");
+        }
+    }
+    let out = child
+        .wait_with_output()
+        .expect("failed waiting for finetype infer --explain");
+    assert!(
+        out.status.success(),
+        "infer --explain failed (rc={:?}): {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).expect("invalid utf8");
+    stdout
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| serde_json::from_str(l)
+             .unwrap_or_else(|e| panic!("output line not JSON: {e} ({l})")))
+        .collect()
+}
+
+/// Single canonical email column round-trips through the cascade as
+/// `prediction_confirmed` (Sense was right). The smoke gate that fires from
+/// `scripts/cron_preamble.sh` depends on this exact mechanism for the same
+/// fixture — so this test also doubles as a regression guard on the cron
+/// preamble's H05 halt path.
+#[test]
+#[ignore]
+fn infer_explain_single_line_email_confirms() {
+    let input = r#"{"column_name":"email","predicted_type":"identity.person.email","samples":["alice@example.com","bob@example.com","carol@example.com","dave@example.org","eve@example.net","frank@example.com","grace@example.io","henry@example.com"]}"#;
+    let out = run_infer_explain_batch(&[input]);
+    assert_eq!(out.len(), 1, "expected 1 output line, got {}", out.len());
+    let r = &out[0];
+    assert_eq!(r["inferred_correct_type"], "identity.person.email");
+    assert_eq!(r["mechanism"], "prediction_confirmed");
+    assert!(
+        r["confidence"].as_f64().unwrap_or(0.0) >= 0.5,
+        "confidence {:?} below 0.5 for canonical email column",
+        r["confidence"]
+    );
+}
+
+/// A three-line NDJSON stream produces a three-line NDJSON response in
+/// the same order. Verifies the batch wire shape: one input → one output,
+/// model + taxonomy loaded once for the whole stream.
+#[test]
+#[ignore]
+fn infer_explain_batch_preserves_input_order() {
+    let inputs = &[
+        r#"{"column_name":"email","predicted_type":"identity.person.email","samples":["a@x.com","b@x.com","c@x.com"]}"#,
+        r#"{"column_name":"age","predicted_type":"representation.numeric.integer","samples":["25","30","45"]}"#,
+        r#"{"column_name":"weird","predicted_type":"identity.person.email","samples":["foo","bar","baz"]}"#,
+    ];
+    let out = run_infer_explain_batch(inputs);
+    assert_eq!(out.len(), 3, "expected 3 output lines, got {}", out.len());
+    for (i, r) in out.iter().enumerate() {
+        let mech = r["mechanism"].as_str().expect("mechanism present");
+        assert!(
+            CLOSED_MECHANISMS.contains(&mech),
+            "row {i}: mechanism {mech:?} not in closed 10-token set"
+        );
+        assert!(
+            r.get("inferred_correct_type").is_some(),
+            "row {i}: missing inferred_correct_type"
+        );
+        assert!(
+            r.get("signals").is_some(),
+            "row {i}: missing signals"
+        );
+    }
+}
+
+/// `--explain` without `--batch` must be rejected at startup. The flag
+/// requires NDJSON-on-stdin batch semantics by construction; allowing it
+/// without `--batch` would silently load the model and then hang or
+/// misinterpret single-line input.
+#[test]
+fn infer_explain_without_batch_is_rejected() {
+    let out = Command::new("cargo")
+        .args([
+            "run", "-p", "finetype-cli", "--",
+            "infer", "--mode", "column", "--explain",
+        ])
+        .current_dir(workspace_root())
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run finetype infer");
+    assert!(!out.status.success(),
+            "--explain without --batch must fail; got rc={:?}", out.status.code());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--explain requires --mode column --batch"),
+        "expected guard message in stderr; got: {stderr}"
+    );
+}
+
+/// `--explain` without `--mode column` is also rejected. Without column
+/// semantics, the cascade can't dispatch correctly.
+#[test]
+fn infer_explain_without_column_mode_is_rejected() {
+    let out = Command::new("cargo")
+        .args([
+            "run", "-p", "finetype-cli", "--",
+            "infer", "--batch", "--explain",
+        ])
+        .current_dir(workspace_root())
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run finetype infer");
+    assert!(!out.status.success(),
+            "--explain without --mode column must fail; got rc={:?}",
+            out.status.code());
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// `profile --files` — batch mode (model loads once per invocation)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Build a temp directory containing N small CSVs and a `paths.txt` listing
+/// them. Returns (tmp_root, paths_file, out_dir). The tmp_root is the
+/// caller's to keep alive as long as the files are needed.
+fn build_batch_fixture(n: usize) -> (tempfile::TempDir, PathBuf, PathBuf) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let in_dir = tmp.path().join("in");
+    let out_dir = tmp.path().join("schemas");
+    std::fs::create_dir_all(&in_dir).expect("mkdir in");
+    let mut paths = Vec::with_capacity(n);
+    for i in 0..n {
+        let p = in_dir.join(format!("t{i}.csv"));
+        std::fs::write(
+            &p,
+            format!("email,age\nalice@example.com,{}\nbob@example.com,{}\n", i, i + 1),
+        )
+        .expect("write csv");
+        paths.push(p.to_string_lossy().to_string());
+    }
+    let paths_file = tmp.path().join("paths.txt");
+    std::fs::write(&paths_file, paths.join("\n") + "\n").expect("write paths");
+    (tmp, paths_file, out_dir)
+}
+
+/// Batch mode produces one output file per input. Each output is valid
+/// JSON Schema with FineType extensions.
+#[test]
+#[ignore]
+fn profile_files_batch_produces_one_output_per_input() {
+    let (_tmp, paths, out_dir) = build_batch_fixture(3);
+    let out = Command::new("cargo")
+        .args([
+            "run", "-p", "finetype-cli", "--",
+            "profile",
+            "--files", paths.to_str().unwrap(),
+            "--out-dir", out_dir.to_str().unwrap(),
+            "-o", "json-schema",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to run profile --files");
+    assert!(
+        out.status.success(),
+        "profile --files failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    for i in 0..3 {
+        let schema_path = out_dir.join(format!("t{i}.json"));
+        assert!(schema_path.exists(),
+                "expected {} to exist", schema_path.display());
+        let body = std::fs::read_to_string(&schema_path).expect("read schema");
+        let v: Value = serde_json::from_str(&body)
+            .unwrap_or_else(|e| panic!("schema {i} not JSON: {e}\n{body}"));
+        assert!(
+            v.get("properties").and_then(|p| p.as_object()).is_some(),
+            "schema {i} missing properties: {body}"
+        );
+    }
+    // Model-load amortisation evidence: the classifier-loading lines fire
+    // once for the whole batch, not once per file. Sanity-check that we
+    // saw ≤1 "Loaded multi-branch classifier" line in stderr regardless
+    // of the 3-file batch size.
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let load_lines = stderr.matches("Loaded multi-branch classifier").count();
+    assert!(
+        load_lines <= 1,
+        "expected ≤1 'Loaded multi-branch classifier' line across batch \
+         of 3 (amortisation), got {load_lines}:\n{stderr}"
+    );
+}
+
+/// `--files` without `--out-dir` is rejected at clap. Without an output
+/// directory the per-file outputs have nowhere to land.
+#[test]
+fn profile_files_requires_out_dir() {
+    let (_tmp, paths, _out_dir) = build_batch_fixture(1);
+    let out = Command::new("cargo")
+        .args([
+            "run", "-p", "finetype-cli", "--",
+            "profile",
+            "--files", paths.to_str().unwrap(),
+            "-o", "json-schema",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to run profile --files");
+    assert!(
+        !out.status.success(),
+        "--files without --out-dir must fail; got rc={:?}", out.status.code()
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("out-dir"),
+        "expected clap error mentioning --out-dir; got: {stderr}"
+    );
+}
+
+/// Batch mode with non-`json-schema` output is rejected. The other format
+/// branches still write to stdout via `println!` and would interleave
+/// across files; refuse early until they're plumbed through the per-file
+/// writer.
+#[test]
+fn profile_files_rejects_non_json_schema_output() {
+    let (_tmp, paths, out_dir) = build_batch_fixture(1);
+    let out = Command::new("cargo")
+        .args([
+            "run", "-p", "finetype-cli", "--",
+            "profile",
+            "--files", paths.to_str().unwrap(),
+            "--out-dir", out_dir.to_str().unwrap(),
+            "-o", "plain",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to run profile --files");
+    assert!(
+        !out.status.success(),
+        "profile --files -o plain must fail; got rc={:?}", out.status.code()
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("json-schema"),
+        "expected clap error mentioning json-schema; got: {stderr}"
     );
 }
