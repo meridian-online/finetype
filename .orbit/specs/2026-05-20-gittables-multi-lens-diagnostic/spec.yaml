@@ -608,7 +608,7 @@ acceptance_criteria:
     DBpedia mapping SHA stays in the frontmatter as a reproducibility
     anchor for Part 2 even though DBpedia no longer feeds Part 1.
   gate: false
-  checked: false
+  checked: true
   verification: |
     File `eval/gittables/corpus_pass/report.md` exists with two
     `##` headings (or equivalent) covering Part 1 and Part 2. Part 1
