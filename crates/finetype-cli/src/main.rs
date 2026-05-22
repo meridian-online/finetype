@@ -270,9 +270,21 @@ enum Commands {
 
     /// Profile a CSV file — detect column types using column-mode inference
     Profile {
-        /// Input CSV file
-        #[arg(short, long)]
-        file: PathBuf,
+        /// Input CSV file (single-file mode). Mutually exclusive with --files.
+        #[arg(short, long, conflicts_with = "files")]
+        file: Option<PathBuf>,
+
+        /// File containing input paths (one per line) for batch mode. The
+        /// model + taxonomy load once, then each listed file is profiled in
+        /// turn. Requires `--out-dir`.
+        #[arg(long, conflicts_with = "file", requires = "out_dir")]
+        files: Option<PathBuf>,
+
+        /// Output directory for batch mode. One output per input is written
+        /// as `<out_dir>/<stem>.<ext>` where ext is .json for json /
+        /// json-schema, .csv for csv, etc. Only meaningful with `--files`.
+        #[arg(long, conflicts_with = "file")]
+        out_dir: Option<PathBuf>,
 
         /// Output format (plain, json, csv, markdown, arrow, json-schema)
         #[arg(short, long, default_value = "plain")]
@@ -581,6 +593,8 @@ fn main() -> Result<()> {
 
         Commands::Profile {
             file,
+            files,
+            out_dir,
             output,
             sample_size,
             delimiter,
@@ -601,8 +615,20 @@ fn main() -> Result<()> {
                 );
                 err.exit();
             }
+            // One of --file or --files must be supplied. clap enforces
+            // mutual exclusion; this catches "neither was given".
+            if file.is_none() && files.is_none() {
+                let mut cmd = <Cli as clap::CommandFactory>::command();
+                let err = cmd.error(
+                    clap::error::ErrorKind::MissingRequiredArgument,
+                    "one of --file or --files is required",
+                );
+                err.exit();
+            }
             cmd_profile(
                 file,
+                files,
+                out_dir,
                 output,
                 sample_size,
                 delimiter,
@@ -3474,7 +3500,9 @@ fn resolve_broad_type_display<'a>(
 
 #[allow(clippy::too_many_arguments)]
 fn cmd_profile(
-    file: PathBuf,
+    file: Option<PathBuf>,
+    files: Option<PathBuf>,
+    out_dir: Option<PathBuf>,
     output: OutputFormat,
     sample_size: usize,
     delimiter: Option<char>,
@@ -3486,6 +3514,54 @@ fn cmd_profile(
     raw_model: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+    use std::io::Write as _;
+
+    // Batch mode (--files) currently writes one output per input to
+    // <out_dir>/<stem>.<ext>. Stems are taken from the input file stem;
+    // ext is chosen per output format (json for json/json-schema, csv
+    // for csv, txt for plain, md for markdown, arrow for arrow).
+    let batch_mode = files.is_some();
+    let paths: Vec<PathBuf> = if let Some(ref single) = file {
+        vec![single.clone()]
+    } else {
+        let files_list = files.as_ref().expect("either file or files is required");
+        std::fs::read_to_string(files_list)
+            .map_err(|e| anyhow::anyhow!("could not read --files list {:?}: {}", files_list, e))?
+            .lines()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && !s.starts_with('#'))
+            .map(PathBuf::from)
+            .collect()
+    };
+    if paths.is_empty() {
+        return Err(anyhow::anyhow!("no input paths to profile"));
+    }
+    let batch_ext = match output {
+        OutputFormat::Json | OutputFormat::JsonSchema => "json",
+        OutputFormat::Csv => "csv",
+        OutputFormat::Plain => "txt",
+        OutputFormat::Markdown => "md",
+        OutputFormat::Arrow => "arrow",
+    };
+    if batch_mode {
+        // Batch mode currently routes only the json-schema output through
+        // the per-file writer. The other format branches still use
+        // `println!` to stdout, which would interleave outputs and ignore
+        // --out-dir. Refuse early until they're converted.
+        if !matches!(output, OutputFormat::JsonSchema) {
+            let mut cmd = <Cli as clap::CommandFactory>::command();
+            let err = cmd.error(
+                clap::error::ErrorKind::ArgumentConflict,
+                "--files currently requires -o json-schema (other formats not yet wired through the per-file writer)",
+            );
+            err.exit();
+        }
+        if let Some(ref od) = out_dir {
+            std::fs::create_dir_all(od).map_err(|e| {
+                anyhow::anyhow!("could not create --out-dir {:?}: {}", od, e)
+            })?;
+        }
+    }
 
     let model = resolve_model_path();
 
@@ -3553,6 +3629,29 @@ fn cmd_profile(
         column_classifier.set_skip_sharpen(true);
         eprintln!("WARNING: --raw-model active — Sharpen post-processing disabled");
     }
+
+    // Per-file loop. Model + taxonomy + classifier are loaded above and
+    // reused across iterations — that's the batch-mode amortisation
+    // point. Single-file mode (--file) runs this loop once with stdout
+    // as the writer; batch mode (--files + --out-dir) loops over the
+    // listed paths and routes each iteration's output to a file.
+    for path in &paths {
+        let file: &std::path::Path = path.as_path();
+        let mut writer: Box<dyn std::io::Write> = if batch_mode {
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("output");
+            let out_path = out_dir
+                .as_ref()
+                .expect("--out-dir is required with --files (clap-validated)")
+                .join(format!("{}.{}", stem, batch_ext));
+            Box::new(std::io::BufWriter::new(std::fs::File::create(&out_path).map_err(
+                |e| anyhow::anyhow!("could not create output {:?}: {}", out_path, e),
+            )?))
+        } else {
+            Box::new(std::io::BufWriter::new(std::io::stdout()))
+        };
 
     eprintln!("Reading {:?}", file);
 
@@ -4155,9 +4254,12 @@ fn cmd_profile(
                 enum_threshold,
             );
 
-            println!("{}", serde_json::to_string_pretty(&schema)?);
+            writeln!(writer, "{}", serde_json::to_string_pretty(&schema)?)?;
         }
     }
+
+    writer.flush()?;
+    } // end per-file loop
 
     Ok(())
 }
