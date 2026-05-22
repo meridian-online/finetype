@@ -658,7 +658,7 @@ acceptance_criteria:
     ledger). Precision on flagged rows =
     `sum(mechanism_correct) / n_flagged ≥ 0.80`.
   gate: false
-  checked: false
+  checked: true
   verification: |
     File `eval/gittables/corpus_pass/labelled_eval_per_row.tsv` exists
     with one row per flagged labelled_eval entry and the 9 columns

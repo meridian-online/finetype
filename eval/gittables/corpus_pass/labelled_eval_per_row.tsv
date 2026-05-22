@@ -1,0 +1,22 @@
+row_id	sense_prediction	ydf_prediction	dbpedia_annotation	mechanism_token	recommended_action_class	truth_inferred_type	truth_mechanism	mechanism_correct	ydf_correct
+21	datetime.component.periodicity		http://dbpedia.org/ontology/type	misclassification	training_data_addition	representation.discrete.categorical	misclassification	1	0
+22	datetime.component.periodicity			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+32	datetime.epoch.unix_seconds		http://dbpedia.org/ontology/facilityId	misclassification	training_data_addition	representation.identifier.numeric_code	misclassification	1	0
+41	representation.numeric.integer_number		http://dbpedia.org/ontology/field	misclassification	training_data_addition	representation.numeric.decimal_number	format_diversity_path_b	0	0
+52	technology.internet.user_agent			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+69	technology.cryptographic.jwt		http://dbpedia.org/ontology/fileExtension	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+77	datetime.component.day_of_week		http://dbpedia.org/ontology/tag	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+85	datetime.component.year		http://dbpedia.org/ontology/endYearOfSales	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+90	representation.boolean.terms			misclassification	training_data_addition	representation.discrete.categorical	misclassification	1	0
+91	representation.boolean.terms		http://dbpedia.org/ontology/id	misclassification	training_data_addition	representation.discrete.categorical	misclassification	1	0
+107	identity.person.phone_number		http://dbpedia.org/ontology/pronunciation	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+115	container.object.html		http://dbpedia.org/ontology/lyrics	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+117	container.object.html			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+140	technology.internet.hostname			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+142	technology.internet.hostname			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+143	technology.internet.hostname			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+175	technology.internet.user_agent		http://dbpedia.org/ontology/sourceText	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+178	technology.internet.hostname			misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0
+183	datetime.component.periodicity		http://dbpedia.org/ontology/recordLabel	misclassification	training_data_addition	representation.discrete.categorical	misclassification	1	0
+188	finance.currency.amount		http://dbpedia.org/ontology/temperature	misclassification	training_data_addition	representation.numeric.percentage	misclassification	1	0
+199	representation.scientific.rna_sequence		http://dbpedia.org/ontology/name	misclassification	training_data_addition	representation.text.plain_text	misclassification	1	0

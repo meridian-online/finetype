@@ -1,0 +1,10 @@
+{
+  "n_rows_total": 200,
+  "n_rows_excluded": 0,
+  "n_flagged_by_diagnostic": 21,
+  "n_mechanism_correct": 20,
+  "precision_on_flagged": 0.9524,
+  "ydf_accuracy_on_flagged": 0.0,
+  "precision_floor": 0.8,
+  "asserted_precision_on_flagged_passes": true
+}
