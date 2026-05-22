@@ -51,6 +51,7 @@ specs:
 - .orbit/specs/2026-04-28-validate-corpus-iter3/
 - .orbit/specs/2026-04-29-validate-corpus-iter4/
 - .orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/
+- .orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/spec.yaml
 relations: []
 references:
 - .orbit/specs/2026-04-28-validate-precision-corpus/interview.md

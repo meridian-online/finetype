@@ -200,7 +200,7 @@ goal: |
   ac-taxonomy convention).
 cards:
 - 0014-profile-validate-precision
-status: open
+status: closed
 labels:
 - eval-expansion
 - corpus-diagnostic
