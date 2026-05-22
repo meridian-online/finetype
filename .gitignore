@@ -53,6 +53,15 @@ eval/gittables/corpus_pass*.log
 eval/gittables/corpus_pass*.run*.log
 eval/gittables/corpus_pass.run*-*/
 
+# ac-08 — per-column reject extract + intermediate path lists.
+# Regenerable: criterion_b_failing_paths.txt from files.parquet via
+# scripts/gate_summary_sql.sql variant; per_column_rejects.parquet
+# from scripts/extract_per_column_rejects.py.
+eval/gittables/corpus_pass/criterion_b_failing_paths.txt
+eval/gittables/corpus_pass/per_column_rejects.parquet
+eval/gittables/corpus_pass/per_column_rejects_errors.jsonl
+eval/gittables/per_column_rejects.log
+
 # Claude scheduled-task lock file (transient)
 .claude/scheduled_tasks.lock
 
