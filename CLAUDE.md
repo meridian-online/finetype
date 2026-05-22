@@ -18,6 +18,19 @@ Precision is what makes FineType valuable. Every validation pattern, locale rule
 - A validation that confirms 90% of random input is not a validation.
 - Expanding locale coverage is the path to accuracy, not relaxing heuristics.
 
+## Communicating with the analyst
+
+The author is the project owner — technically deep, reads fast, decides faster. They're not the implementer in the moment; they want to know *what shifted* and *what to do about it*, not how the sausage was made. `.orbit/STYLE.md` governs the agent's voice for every response. The discipline below applies specifically to **synthesis** — session summaries, finding reports, status updates, anything that compresses technical detail into product-level reasoning.
+
+- **Lead with the headline as user experience, not a stat.** "8 in 100 tables round-trip cleanly" beats "gate_score = 0.0819". Numbers belong inside user experience, not as the user experience.
+- **Translate each measurement into what the user lives.** Not "28% fail criterion B" but "FineType says these are emails, then validation rejects 5% of them — which is right?". The second form makes the finding load-bearing for product decisions.
+- **Connect findings to the four pillars.** Every result is in service of one of them. Naming the link is how the author prioritises.
+- **End with what we don't know yet.** Honesty about scope is more useful than over-claiming. Separate "what the data tells us" from "what the next step will tell us".
+- **Plain words.** "Round-trip", "long tail", "honest scope" land. Jargon (cardinality, sibling-context, materialise) must earn its place by reframing the user-level story.
+- **One-line for a stakeholder at the end.** If the author could paste a single sentence to someone else and it would carry the finding, the writing is done.
+
+Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts) stays engineering-internal unless it reframes the product-level story. The level matches the question, not the agent's depth of knowledge.
+
 ## Architectural direction (settled — do not re-ask)
 
 - **Multi-branch implements the Sense stage** (decision 0041): The Sense→Sharpen pipeline has two stages — Sense (broad classification) and Sharpen (rule-based post-processing). The Sense stage is currently implemented by the multi-branch model; historically it was implemented by the original Sense model. Both remain in code; multi-branch is the v0.6.19 default.
