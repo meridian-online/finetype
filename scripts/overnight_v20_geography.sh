@@ -148,14 +148,26 @@ if [[ ! -f "$GEOGRAPHY_DISTILLED" ]]; then
     echo "      Generate with: python3 scripts/extract_ydf_specialist_training_data.py --domain geography"
     exit 1
 fi
-# Sanity-check header and row count.
-GEO_HEADER=$(gzip -dc < "$GEOGRAPHY_DISTILLED" | head -1)
+# Sanity-check header and row count. (Reading via Python so the pipeline
+# doesn't trip `set -o pipefail` — `gzip -dc | head -1` exits 141 because
+# head closes the pipe early, which aborts the script silently.)
+GEO_PROBE=$(python3 - <<PY
+import gzip, sys
+path = "$GEOGRAPHY_DISTILLED"
+with gzip.open(path, "rt") as f:
+    header = f.readline().rstrip("\n")
+    rows = sum(1 for _ in f)
+print(header)
+print(rows)
+PY
+)
+GEO_HEADER=$(printf '%s\n' "$GEO_PROBE" | sed -n '1p')
+GEO_ROWS=$(printf '%s\n' "$GEO_PROBE" | sed -n '2p')
 if [[ "$GEO_HEADER" != "final_label,sample_values,column_name" ]]; then
     echo "FAIL: Geography distilled has unexpected header: $GEO_HEADER"
     echo "      Expected: final_label,sample_values,column_name"
     exit 1
 fi
-GEO_ROWS=$(gzip -dc < "$GEOGRAPHY_DISTILLED" | tail -n +2 | wc -l | tr -d ' ')
 echo "[Pre-flight] Geography distilled: $GEO_ROWS rows (schema OK)"
 
 # Confirm leakage firewall ran cleanly on the geography artefact.
