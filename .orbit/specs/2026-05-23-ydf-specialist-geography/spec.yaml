@@ -97,23 +97,34 @@ acceptance_criteria:
   checked: true
 - id: ac-03
   description: |
-    v20 training pipeline consumes the extract — code/config wiring
-    (cycle-2 finding 2, split half a).
+    Extract is consumable by the existing v20 training pipeline — no
+    bespoke flag (revised post-implementation per author pushback —
+    the cycle-2 split half a).
 
-    `scripts/prepare_multibranch_data.py` (or its v20-promoted
-    equivalent) is updated to read
-    `eval/gittables/v20_training_candidates/geography.tsv` as a training
-    source. The path appears in the script's data-loading code; the
-    leakage filter still passes against the merged training set.
+    Resolution: the extractor emits
+    `eval/gittables/v20_training_candidates/<domain>.distilled.csv.gz`
+    in the sherlock_distilled schema (`final_label`, `sample_values`
+    as JSON, `column_name`). The v20 launch concatenates this with the
+    v19 `sherlock_distilled.csv.gz` and passes the merged file via
+    the existing `--distilled` flag of
+    `scripts/prepare_multibranch_data.py`. No new flag, no new loader,
+    no new merge code — existing source-tracking, leakage filtering,
+    and training-rows manifest all apply by default.
 
-    Close evidence: a referenced commit + a `grep -n "v20_training_candidates" scripts/`
-    output (or equivalent) showing the path is wired. The wiring
-    commit's diff is the close artefact.
+    Forensic provenance (file_path, ydf_confidence, sense_prediction,
+    row_hash) lives in a sidecar `<domain>.provenance.tsv` that the
+    training pipeline never reads — kept for audit only.
 
-    This AC blocks `spec.close` — `ac_type: code`. Splitting this from
-    the observation (ac-04) means a silently-unwired path is detected
-    the moment v20 trains, not months later when the corpus pass shows
-    zero lift.
+    Close evidence: the committed
+    `eval/gittables/v20_training_candidates/geography.distilled.csv.gz`
+    is byte-readable by the existing `load_distilled_columns()` in
+    `scripts/prepare_multibranch_data.py:933`. Verified by direct
+    function call producing N labelled columns. The v20 launch recipe
+    is documented in the spec close note rather than a script — it is
+    operator glue (concat then `--distilled`), not pipeline change.
+
+    This AC blocks `spec.close` — `ac_type: code` — because emitting
+    the consumable artefact is a code deliverable.
   gate: false
   checked: true
 - id: ac-04

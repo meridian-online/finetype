@@ -9,20 +9,34 @@ non-domain prediction is plausibly header-driven (the circular-precision
 guard — cue list grounded in `column.rs::header_hint()` via the audit
 TSV at `eval/gittables/ydf_extract_cue_audit.tsv`).
 
-Outputs three artefacts under `eval/gittables/v20_training_candidates/`:
+Outputs four artefacts per domain under
+`eval/gittables/v20_training_candidates/`:
 
-  - `<domain>.tsv`              — one row per surviving column
-  - `<domain>.leakage.json`     — row-hash overlap check (ac-02)
+  - `<domain>.distilled.csv.gz`   — sherlock-distilled-shape rows
+                                    (`final_label`, `sample_values` as JSON,
+                                    `column_name`). This is the training-data
+                                    artefact: the v20 launch concatenates it
+                                    with the v19 sherlock_distilled.csv.gz and
+                                    passes the merged file to existing
+                                    `prepare_multibranch_data.py --distilled`.
+                                    No new flag — existing source-tracking
+                                    applies.
+  - `<domain>.provenance.tsv`     — forensics sidecar (file_path,
+                                    column_name, ydf_prediction,
+                                    ydf_confidence, sense_prediction,
+                                    candidate_target_label, row_hash,
+                                    extract_row_index). Never read by
+                                    training; survives for audit.
+  - `<domain>.leakage.json`       — row-hash overlap check (ac-02)
   - `<domain>.extract_stats.json` — exclusion counts (ac-01)
 
-Per-column `row_hash` field: comma-separated list of per-value hex
-hashes (one per value in sample_values), computed via the canonical
-`scripts/eval_leakage/__init__.py::row_hash(header, value)`. The
-leakage check (ac-02) interprets this as: any per-value hash overlap
-with `eval/row_hashes.tsv` counts as leakage. This matches the
-production filter `filter_eval_leakage()` in
-`scripts/prepare_multibranch_data.py:843` (call sites at lines 3087
-and 3088 — cycle-3 review finding M, pinned per drive note).
+`row_hash` in the provenance TSV is a comma-separated list of per-value
+hex hashes computed via the canonical
+`scripts/eval_leakage/__init__.py::row_hash(header, value)`. The ac-02
+leakage check interprets any per-value hash overlap with
+`eval/row_hashes.tsv` as leakage, matching the production filter
+`filter_eval_leakage()` in `scripts/prepare_multibranch_data.py:843`
+(call sites at lines 3087 and 3088).
 
 Domain-agnostic by construction (ac-05): all per-domain knobs
 (prediction prefix) live in
@@ -35,6 +49,8 @@ empty.
 from __future__ import annotations
 
 import argparse
+import csv
+import gzip
 import hashlib
 import json
 import os
@@ -268,7 +284,8 @@ def main() -> int:
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tsv_path = out_dir / f"{domain}.tsv"
+    distilled_path = out_dir / f"{domain}.distilled.csv.gz"
+    provenance_path = out_dir / f"{domain}.provenance.tsv"
     stats_path = out_dir / f"{domain}.extract_stats.json"
     leakage_path = out_dir / f"{domain}.leakage.json"
 
@@ -291,7 +308,14 @@ def main() -> int:
 
     dropped_due_to_overlap = 0
     emitted = 0
-    rows_for_tsv: list[list[str]] = []
+    # Each emitted column produces one row in each of:
+    #   distilled_rows  — (final_label, sample_values_json, column_name)
+    #   provenance_rows — (extract_row_index, file_path, column_name,
+    #                      ydf_prediction, ydf_confidence, sense_prediction,
+    #                      candidate_target_label, row_hash)
+    # extract_row_index correlates the two files.
+    distilled_rows: list[tuple[str, str, str]] = []
+    provenance_rows: list[list[str]] = []
 
     for i in range(n_total):
         if cols["is_trivial"][i]:
@@ -330,14 +354,20 @@ def main() -> int:
             continue
 
         rel_path = relativise(file_path, gittables_root)
-        rows_for_tsv.append([
+        candidate_target_label = ydf  # YDF's high-confidence call
+        distilled_rows.append((
+            candidate_target_label,
+            json.dumps(values, ensure_ascii=False),
+            header,
+        ))
+        provenance_rows.append([
+            str(emitted),
             rel_path,
             header,
-            sample_values_raw,
             ydf,
             f"{conf:.6f}",
             sense,
-            ydf,  # candidate_target_label = YDF's high-confidence call
+            candidate_target_label,
             ",".join(per_value_hashes),
         ])
         emitted += 1
@@ -364,16 +394,26 @@ def main() -> int:
         file=sys.stderr,
     )
 
-    # Write TSV.
-    header_cols = [
-        "file_path", "column_name", "sample_values", "ydf_prediction",
+    # Write the distilled csv.gz (training-data artefact, sherlock shape).
+    # csv.writer with default QUOTE_MINIMAL escapes commas/quotes correctly;
+    # gzip the stream so the file is drop-in-mergeable with sherlock_distilled.
+    with gzip.open(distilled_path, "wt", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["final_label", "sample_values", "column_name"])
+        for label, sample_values_json, header_cell in distilled_rows:
+            writer.writerow([label, sample_values_json, header_cell])
+    print(f"wrote {emitted:,} distilled rows to {distilled_path}", file=sys.stderr)
+
+    # Write the provenance TSV (forensics sidecar — never read by training).
+    provenance_header = [
+        "extract_row_index", "file_path", "column_name", "ydf_prediction",
         "ydf_confidence", "sense_prediction", "candidate_target_label", "row_hash",
     ]
-    with tsv_path.open("w") as f:
-        f.write("\t".join(header_cols) + "\n")
-        for row in rows_for_tsv:
+    with provenance_path.open("w") as f:
+        f.write("\t".join(provenance_header) + "\n")
+        for row in provenance_rows:
             f.write("\t".join(tsv_escape(c) for c in row) + "\n")
-    print(f"wrote {emitted:,} rows to {tsv_path}", file=sys.stderr)
+    print(f"wrote provenance to {provenance_path}", file=sys.stderr)
 
     with stats_path.open("w") as f:
         json.dump(stats, f, indent=2)

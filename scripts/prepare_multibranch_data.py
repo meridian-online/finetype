@@ -1009,69 +1009,6 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
     return dict(columns_by_type), ordered_columns, stats
 
 
-# Per spec 2026-05-23-ydf-specialist-geography ac-03: load YDF-specialist
-# training-data extracts produced by scripts/extract_ydf_specialist_training_data.py.
-# Each TSV row becomes one column in the per-type distilled dict, labelled by
-# `candidate_target_label` (YDF's high-confidence call). Downstream leakage
-# filter still runs against the merged set — the extractor's per-value
-# row_hash check + this filter are belt-and-braces.
-SAMPLE_DELIM_SPECIALIST = "│"  # U+2502; matches extract_ydf_specialist_training_data.py
-
-
-def load_gittables_specialist_columns(tsv_path, min_values, label_remap=None):
-    """Load a per-domain YDF-specialist extract TSV as columns_by_type.
-
-    Returns (columns_by_type, ordered_columns, stats) matching the
-    load_distilled_columns contract.
-    """
-    columns_by_type = defaultdict(list)
-    ordered_columns = []
-    label_remap = label_remap or {}
-    stats = {
-        "tsv_path": tsv_path,
-        "total_rows": 0,
-        "qualifying_rows": 0,
-        "sparse_rows": 0,
-        "excluded_column_types": 0,
-        "remapped_labels": 0,
-        "total_values": 0,
-    }
-
-    path = Path(tsv_path)
-    if not path.exists():
-        print(f"  gittables-extract TSV {tsv_path} not found — skipping", file=sys.stderr)
-        return dict(columns_by_type), ordered_columns, stats
-
-    with path.open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f, delimiter="\t")
-        for row in reader:
-            stats["total_rows"] += 1
-            label = (row.get("candidate_target_label") or "").strip()
-            if not label:
-                continue
-            if label in label_remap:
-                label = label_remap[label]
-                stats["remapped_labels"] += 1
-            if label in COLUMN_LEVEL_TYPES:
-                stats["excluded_column_types"] += 1
-                continue
-            header = (row.get("column_name") or "").strip()
-            raw_values = (row.get("sample_values") or "")
-            # TSV escape decode (matches extractor's tsv_escape inverse)
-            raw_values = raw_values.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r").replace("\\\\", "\\")
-            values = [v for v in raw_values.split(SAMPLE_DELIM_SPECIALIST) if v]
-            clean_vals = [str(v).strip() for v in values if str(v).strip()]
-            if len(clean_vals) < min_values:
-                stats["sparse_rows"] += 1
-                continue
-            stats["qualifying_rows"] += 1
-            columns_by_type[label].append((clean_vals, header))
-            ordered_columns.append((label, clean_vals, header))
-            stats["total_values"] += len(clean_vals)
-
-    return dict(columns_by_type), ordered_columns, stats
-
-
 def load_v4_distilled_columns(v4_dir, min_values, column_size, rng):
     """Load v4 per-type distilled CSVs and chunk them into columns (v17 ac-04).
 
@@ -2610,11 +2547,6 @@ def main():
     eval_row_hashes_path = "eval/row_hashes.tsv"
     no_dedup = False
 
-    # spec 2026-05-23-ydf-specialist-geography ac-03: optional YDF-specialist
-    # extract TSVs (e.g. eval/gittables/v20_training_candidates/geography.tsv)
-    # to merge into the distilled training set. Repeatable.
-    gittables_extracts: list[str] = []
-
     i = 0
     while i < len(args):
         if args[i] == "--distilled":
@@ -2698,12 +2630,6 @@ def main():
             i += 2
         elif args[i] == "--eval-row-hashes":
             eval_row_hashes_path = args[i + 1]
-            i += 2
-        elif args[i] == "--gittables-extract":
-            # spec 2026-05-23-ydf-specialist-geography ac-03 — path to a
-            # per-domain YDF-specialist extract TSV
-            # (eval/gittables/v20_training_candidates/<domain>.tsv). Repeatable.
-            gittables_extracts.append(args[i + 1])
             i += 2
         elif args[i] == "--no-dedup":
             # Emergency rollback / diagnostics escape hatch (ac-07).
@@ -2837,36 +2763,6 @@ def main():
               f"{len(distilled)} types")
     else:
         print(f"  No v4 data loaded (directory empty or absent)")
-
-    # ─── Load YDF-specialist gittables extracts (v20+ — spec 2026-05-23) ──
-    # Per spec 2026-05-23-ydf-specialist-geography ac-03: merge per-domain
-    # extracts produced by scripts/extract_ydf_specialist_training_data.py
-    # (e.g. eval/gittables/v20_training_candidates/geography.tsv) into the
-    # distilled training set. The extractor's per-value row_hash leakage
-    # firewall already filters against eval/row_hashes.tsv; the downstream
-    # filter at line ~2983 below is belt-and-braces.
-    if gittables_extracts:
-        print(f"\nLoading YDF-specialist gittables extracts (ac-03)...")
-        for ext_path in gittables_extracts:
-            print(f"  loading {ext_path}")
-            ext_cols, ext_ordered, ext_stats = load_gittables_specialist_columns(
-                ext_path, min_values, label_remap
-            )
-            print(f"    {ext_stats['total_rows']} TSV rows → "
-                  f"{ext_stats['qualifying_rows']} qualifying columns "
-                  f"across {len(ext_cols)} types ({ext_stats['total_values']} values)")
-            if ext_stats["sparse_rows"]:
-                print(f"    {ext_stats['sparse_rows']} sparse rows skipped (< {min_values} values)")
-            if ext_stats["excluded_column_types"]:
-                print(f"    {ext_stats['excluded_column_types']} column-level type rows skipped")
-            for type_key, cols in ext_cols.items():
-                distilled.setdefault(type_key, []).extend(cols)
-            ordered_distilled.extend(ext_ordered)
-        total_d_cols = sum(len(cols) for cols in distilled.values())
-        print(f"  Post-merge distilled (incl. gittables): {total_d_cols} columns across "
-              f"{len(distilled)} types")
-    else:
-        print(f"\nNo --gittables-extract specified (ac-03 wiring inactive)")
 
     # ─── Per-value subtype decontamination (v14 AC-01) ────────────
     if decontaminate:

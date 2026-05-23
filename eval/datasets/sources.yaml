@@ -390,7 +390,7 @@ sources:
     role: train
     licence: mixed-source-corpus
     fetched_date: 2026-05-23
-    attribution: "YDF-specialist training-data candidates extracted from GitTables corpus by scripts/extract_ydf_specialist_training_data.py. Per-domain TSVs ((geography|finance|datetime|identity|...).tsv) carry (file_path, column_name, sample_values, ydf_prediction, ydf_confidence, sense_prediction, candidate_target_label, row_hash). Holdout-filtered + row-hash-firewalled at extraction time; downstream consumer is scripts/prepare_multibranch_data.py via --gittables-extract."
+    attribution: "YDF-specialist training-data candidates extracted from GitTables corpus by scripts/extract_ydf_specialist_training_data.py. Per-domain `<domain>.distilled.csv.gz` files emit in the sherlock_distilled schema (`final_label`, `sample_values` JSON, `column_name`) so the v20 launch concats them with the v19 sherlock_distilled and passes the merged file via the existing `prepare_multibranch_data.py --distilled` flag — no bespoke loader, existing source-tracking applies. Forensic columns (file_path, ydf_confidence, sense_prediction, row_hash) live in sidecar `<domain>.provenance.tsv`. Holdout-filtered + row-hash-firewalled at extraction time."
     datasets: [gittables_ydf_specialist]
 
   - source_url: repo://eval/gittables/holdout_paths.txt
