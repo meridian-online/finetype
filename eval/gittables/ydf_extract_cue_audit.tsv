@@ -1,0 +1,346 @@
+# source_sha256: 647306027549b03ddbb31e709482e4422bbd623ed86cd6f9b1d47118f02c9a39
+# source_file: crates/finetype-model/src/column.rs
+# generator: scripts/audit_sense_header_cues.py
+# row_count: 341
+header_cue	match_kind	sense_type	source_line
+acceleration	substring	representation.numeric.decimal_number	4255
+active	exact	representation.boolean.binary	3971
+address	substring	geography.address.full_address	4146
+address	substring	geography.address.street_address	4146
+age	exact	representation.numeric.integer_number	3882
+alive	exact	representation.boolean.binary	3971
+alpha 2	exact	geography.location.country_code	3942
+alpha 3	exact	geography.location.country_code	3942
+alt	exact	representation.numeric.integer_number	3895
+altitude	exact	representation.numeric.integer_number	3895
+amount	substring	finance.currency.amount	4214
+amount acc	exact	finance.currency.amount_accounting	4051
+amount accounting	exact	finance.currency.amount_accounting	4051
+amount apostrophe	exact	finance.currency.amount_apostrophe	4054
+amount code	exact	finance.currency.amount_code_prefix	4057
+amount code prefix	exact	finance.currency.amount_code_prefix	4057
+amount comma	exact	finance.currency.amount_comma	4060
+amount comma suffix	exact	finance.currency.amount_comma_suffix	4063
+amount crypto	exact	finance.currency.amount_crypto	4066
+amount indian	exact	finance.currency.amount_lakh	4069
+amount lakh	exact	finance.currency.amount_lakh	4069
+amount multi sym	exact	finance.currency.amount_multisym	4072
+amount multiple symbols	exact	finance.currency.amount_multisym	4072
+amount multisym	exact	finance.currency.amount_multisym	4072
+amount neg trailing	exact	finance.currency.amount_neg_trailing	4075
+amount negative trailing	exact	finance.currency.amount_neg_trailing	4075
+amount no decimal	exact	finance.currency.amount_nodecimal	4078
+amount nodecimal	exact	finance.currency.amount_nodecimal	4078
+amount space	exact	finance.currency.amount_space	4081
+amount with code	exact	finance.currency.amount_code_prefix	4057
+approved	exact	representation.boolean.binary	3971
+arena	exact	representation.text.entity_name	3986
+attendance	exact	representation.numeric.integer_number	3906
+author	exact	identity.person.full_name	4004
+author name	exact	identity.person.full_name	4004
+authors	exact	identity.person.full_name	4004
+barcode	exact	identity.commerce.ean	4011
+berth	exact	representation.alphanumeric.alphanumeric_id	4038
+bic	exact	finance.banking.swift_bic	3993
+bic code	exact	finance.banking.swift_bic	3993
+biccode	exact	finance.banking.swift_bic	3993
+birth	substring	datetime.date.iso	4167
+boarded	exact	representation.discrete.categorical	4031
+born	substring	datetime.date.iso	4167
+bourse	exact	representation.discrete.categorical	3930
+bpm	exact	representation.numeric.integer_number	3910
+breed	exact	representation.discrete.categorical	3926
+budget	substring	finance.currency.amount	4214
+building	exact	representation.text.entity_name	3986
+bytes	substring	representation.numeric.integer_number	4281
+cabin	exact	representation.alphanumeric.alphanumeric_id	4038
+cabin	substring	representation.alphanumeric.alphanumeric_id	4242
+capacitance	substring	representation.numeric.decimal_number	4255
+capacity	exact	representation.numeric.integer_number	3906
+charge	exact	finance.currency.amount	4042
+charge	substring	finance.currency.amount	4247
+children	exact	representation.numeric.integer_number	3961
+city	exact	geography.location.city	3946
+city name	exact	geography.location.city	3946
+class	exact	representation.discrete.ordinal	3966
+class	substring	representation.discrete.ordinal	4237
+client ip	exact	technology.internet.ip_v4	3871
+company	exact	representation.text.entity_name	3986
+compartment	exact	representation.alphanumeric.alphanumeric_id	4038
+complete	substring	identity.person.full_name	4131
+cost	substring	finance.currency.amount	4214
+count	substring	representation.numeric.integer_number	4228
+country	exact	geography.location.country	3939
+country code	exact	geography.location.country_code	3942
+country iso	exact	geography.location.country_code	3942
+country name	exact	geography.location.country	3939
+crowd size	exact	representation.numeric.integer_number	3906
+crypto amount	exact	finance.currency.amount_crypto	4066
+currency	exact	identity.financial.currency_code	3955
+currency code	exact	identity.financial.currency_code	3955
+customer age	exact	representation.numeric.integer_number	3882
+date	substring	datetime.timestamp.iso_8601	4190
+datetime	substring	datetime.timestamp.iso_8601	4190
+datetime	substring	datetime.timestamp.sql_standard	4178
+day	substring	identity.person.full_name	4134
+dead	exact	representation.boolean.binary	3971
+deceased	exact	representation.boolean.binary	3971
+deleted	exact	representation.boolean.binary	3971
+density	substring	representation.numeric.decimal_number	4255
+departed	exact	representation.discrete.categorical	4031
+dependents	exact	representation.numeric.integer_number	3961
+destination ip	exact	technology.internet.ip_v4	3871
+disabled	exact	representation.boolean.binary	3971
+discipline	exact	representation.discrete.categorical	3922
+dob	substring	datetime.date.iso	4167
+dst ip	exact	technology.internet.ip_v4	3871
+duration	substring	representation.numeric.integer_number	4273
+duration hours	exact	representation.numeric.integer_number	3901
+duration hrs	exact	representation.numeric.integer_number	3901
+duration min	exact	representation.numeric.integer_number	3901
+duration minutes	exact	representation.numeric.integer_number	3901
+duration ms	exact	representation.numeric.integer_number	3901
+duration sec	exact	representation.numeric.integer_number	3901
+duration seconds	exact	representation.numeric.integer_number	3901
+e mail	exact	identity.person.email	3865
+e mail	substring	identity.person.email	4091
+ean	exact	identity.commerce.ean	4011
+elapsed	exact	representation.numeric.integer_number	3901
+elapsed	substring	representation.numeric.integer_number	4273
+elapsed time	exact	representation.numeric.integer_number	3901
+elev	exact	representation.numeric.integer_number	3895
+elevation	exact	representation.numeric.integer_number	3895
+email	exact	identity.person.email	3865
+email	substring	identity.person.email	4091
+email address	exact	identity.person.email	3865
+emailaddress	exact	identity.person.email	3865
+embarked	exact	representation.discrete.categorical	4031
+employer	exact	representation.text.entity_name	3986
+enabled	exact	representation.boolean.binary	3971
+epoch	exact	datetime.epoch.unix_seconds	3886
+epoch	substring	datetime.epoch.unix_milliseconds	4184
+epoch	substring	datetime.epoch.unix_seconds	4184
+epoch milliseconds	exact	datetime.epoch.unix_milliseconds	3891
+epoch ms	exact	datetime.epoch.unix_milliseconds	3891
+epoch s	exact	datetime.epoch.unix_seconds	3886
+epoch seconds	exact	datetime.epoch.unix_seconds	3886
+epoch time	exact	datetime.epoch.unix_seconds	3886
+event type	exact	representation.discrete.categorical	3922
+exchange	exact	representation.discrete.categorical	3930
+expense	substring	finance.currency.amount	4214
+facility	exact	representation.text.entity_name	3986
+family	substring	identity.person.last_name	4125
+fare	exact	finance.currency.amount	4042
+fare	substring	finance.currency.amount	4247
+fax	substring	identity.person.phone_number	4097
+fee	exact	finance.currency.amount	4042
+fee	substring	finance.currency.amount	4247
+first	substring	identity.person.first_name	4122
+flagged	exact	representation.boolean.binary	3971
+frequency	substring	representation.numeric.decimal_number	4255
+full	substring	identity.person.full_name	4131
+game type	exact	representation.discrete.categorical	3922
+gate	exact	representation.discrete.categorical	4031
+gender	exact	identity.person.gender	3878
+genus	exact	representation.discrete.categorical	3926
+given	substring	identity.person.first_name	4122
+gmt offset	exact	datetime.offset.utc	3976
+gmtoffset	exact	datetime.offset.utc	3976
+grade	exact	representation.discrete.ordinal	3966
+grade	substring	representation.discrete.ordinal	4237
+gtin	exact	identity.commerce.ean	4011
+guid	exact	technology.identifier.uuid	3875
+headcount	exact	representation.numeric.integer_number	3906
+heart rate	exact	representation.numeric.integer_number	3910
+heartrate	exact	representation.numeric.integer_number	3910
+height	substring	identity.person.height	4205
+homepage	exact	technology.internet.url	3868
+hospital	exact	representation.text.entity_name	3986
+hotel	exact	representation.text.entity_name	3986
+hr	exact	representation.numeric.integer_number	3910
+href	exact	technology.internet.url	3868
+href	substring	technology.internet.url	4211
+iana timezone	exact	datetime.offset.iana	3981
+iana tz	exact	datetime.offset.iana	3981
+icao	exact	geography.transportation.icao_code	4000
+icao code	exact	geography.transportation.icao_code	4000
+income	substring	finance.currency.amount	4214
+inductance	substring	representation.numeric.decimal_number	4255
+ip	ends_with	technology.internet.ip_v4	4113
+ip	exact	technology.internet.ip_v4	3871
+ip	starts_with	technology.internet.ip_v4	4113
+ip	substring	technology.internet.ip_v4	4113
+ip addr	exact	technology.internet.ip_v4	3871
+ip address	exact	technology.internet.ip_v4	3871
+ipaddress	exact	technology.internet.ip_v4	3871
+ipv6	substring	technology.internet.ip_v6	4106
+iso alpha 2	exact	geography.location.country_code	3942
+iso alpha 3	exact	geography.location.country_code	3942
+iso country	exact	geography.location.country_code	3942
+issn	exact	identity.commerce.issn	3996
+job	exact	representation.discrete.categorical	4022
+job title	exact	representation.discrete.categorical	4022
+jobtitle	exact	representation.discrete.categorical	4022
+lakh amount	exact	finance.currency.amount_lakh	4069
+lang	exact	representation.discrete.categorical	3918
+language	exact	representation.discrete.categorical	3918
+last	substring	identity.person.last_name	4125
+lat	exact	geography.coordinate.latitude	3933
+latency	substring	representation.numeric.integer_number	4273
+latitude	exact	geography.coordinate.latitude	3933
+level	exact	representation.discrete.ordinal	3966
+link	exact	technology.internet.url	3868
+link	substring	technology.internet.url	4211
+lng	exact	geography.coordinate.longitude	3936
+local ip	exact	technology.internet.ip_v4	3871
+lon	exact	geography.coordinate.longitude	3936
+long	exact	geography.coordinate.longitude	3936
+longitude	exact	geography.coordinate.longitude	3936
+manufacturer	exact	representation.text.entity_name	3986
+market	exact	representation.discrete.categorical	3930
+milli	substring	datetime.epoch.unix_milliseconds	4184
+milli	substring	datetime.epoch.unix_seconds	4184
+mobile	substring	identity.person.phone_number	4097
+month	substring	identity.person.full_name	4134
+ms	substring	datetime.epoch.unix_milliseconds	4184
+ms	substring	datetime.epoch.unix_seconds	4184
+name	ends_with	identity.person.full_name	4134
+name	substring	identity.person.first_name	4122
+name	substring	identity.person.full_name	4131
+name	substring	identity.person.last_name	4125
+npi	exact	identity.medical.npi	4008
+npi number	exact	identity.medical.npi	4008
+num	ends_with	representation.numeric.integer_number	4228
+num	starts_with	representation.numeric.integer_number	4228
+num	substring	representation.numeric.integer_number	4228
+num pages	exact	representation.numeric.integer_number	3914
+occupation	exact	representation.discrete.categorical	4022
+olson timezone	exact	datetime.offset.iana	3981
+operating system	exact	technology.development.os	4018
+organisation	exact	representation.text.entity_name	3986
+organization	exact	representation.text.entity_name	3986
+os	exact	technology.development.os	4018
+page count	exact	representation.numeric.integer_number	3914
+pages	exact	representation.numeric.integer_number	3914
+parch	exact	representation.numeric.integer_number	3961
+parents	exact	representation.numeric.integer_number	3961
+participants	exact	representation.numeric.integer_number	3906
+passwd	substring	identity.credential.password	4208
+password	substring	identity.credential.password	4208
+patient age	exact	representation.numeric.integer_number	3882
+payload	substring	representation.numeric.integer_number	4281
+pclass	exact	representation.discrete.ordinal	3966
+phone	substring	identity.person.phone_number	4097
+platform	exact	technology.development.os	4018
+position	exact	representation.discrete.categorical	4022
+posix time	exact	datetime.epoch.unix_seconds	3886
+postal	substring	geography.address.postal_code	4119
+postcode	substring	geography.address.postal_code	4119
+pressure	substring	representation.numeric.decimal_number	4255
+price	substring	finance.currency.amount	4214
+priority	exact	representation.discrete.ordinal	3966
+profession	exact	representation.discrete.categorical	4022
+programming language	exact	representation.discrete.categorical	3918
+province	exact	geography.location.state	3949
+published by	exact	representation.text.entity_name	3986
+publisher	exact	representation.text.entity_name	3986
+publishing house	exact	representation.text.entity_name	3986
+pulse	exact	representation.numeric.integer_number	3910
+qty	exact	representation.numeric.integer_number	3961
+quantity	exact	representation.numeric.integer_number	3961
+quantity	substring	representation.numeric.integer_number	4228
+rank	exact	representation.discrete.ordinal	3966
+rank	substring	representation.discrete.ordinal	4237
+rating	exact	representation.discrete.ordinal	3966
+remote ip	exact	technology.internet.ip_v4	3871
+resistance	substring	representation.numeric.decimal_number	4255
+restaurant	exact	representation.text.entity_name	3986
+revenue	substring	finance.currency.amount	4214
+rfc 2822	substring	datetime.timestamp.rfc_2822	4172
+rfc 3339	substring	datetime.timestamp.rfc_3339	4175
+rfc2822	substring	datetime.timestamp.rfc_2822	4172
+rfc3339	substring	datetime.timestamp.rfc_3339	4175
+role	exact	representation.discrete.categorical	4022
+room	exact	representation.alphanumeric.alphanumeric_id	4038
+room	substring	representation.alphanumeric.alphanumeric_id	4242
+salary	substring	finance.currency.amount	4214
+school	exact	representation.text.entity_name	3986
+score	exact	representation.discrete.ordinal	3966
+seat	exact	representation.alphanumeric.alphanumeric_id	4038
+seat	substring	representation.alphanumeric.alphanumeric_id	4242
+server ip	exact	technology.internet.ip_v4	3871
+sex	exact	identity.person.gender	3878
+siblings	exact	representation.numeric.integer_number	3961
+sibsp	exact	representation.numeric.integer_number	3961
+size	substring	representation.numeric.integer_number	4281
+source ip	exact	technology.internet.ip_v4	3871
+species	exact	representation.discrete.categorical	3926
+spoken language	exact	representation.discrete.categorical	3918
+sport	exact	representation.discrete.categorical	3922
+sql	substring	datetime.timestamp.sql_standard	4178
+src ip	exact	technology.internet.ip_v4	3871
+stadium	exact	representation.text.entity_name	3986
+state	exact	geography.location.state	3949
+station	exact	representation.text.entity_name	3986
+station name	exact	representation.text.entity_name	3986
+stock exchange	exact	representation.discrete.categorical	3930
+street	substring	geography.address.full_address	4146
+street	substring	geography.address.street_address	4146
+street	substring	geography.address.street_address	4164
+sur	substring	identity.person.last_name	4125
+survived	exact	representation.boolean.binary	3971
+swift	exact	finance.banking.swift_bic	3993
+swift code	exact	finance.banking.swift_bic	3993
+swiftcode	exact	finance.banking.swift_bic	3993
+taxon	exact	representation.discrete.categorical	3926
+tel	substring	identity.person.phone_number	4097
+temperature	substring	representation.numeric.decimal_number	4255
+terminal	exact	representation.discrete.categorical	4031
+theater	exact	representation.text.entity_name	3986
+theatre	exact	representation.text.entity_name	3986
+ticket	exact	representation.alphanumeric.alphanumeric_id	4035
+ticket	substring	representation.alphanumeric.alphanumeric_id	4242
+ticket number	exact	representation.alphanumeric.alphanumeric_id	4035
+ticketno	exact	representation.alphanumeric.alphanumeric_id	4035
+tier	exact	representation.discrete.ordinal	3966
+tier	substring	representation.discrete.ordinal	4237
+time zone	exact	datetime.offset.iana	3981
+timestamp	substring	datetime.timestamp.iso_8601	4190
+timestamp	substring	datetime.timestamp.sql_standard	4178
+timezone	exact	datetime.offset.iana	3981
+timezone offset	exact	datetime.offset.utc	3976
+toll	exact	finance.currency.amount	4042
+toll	substring	finance.currency.amount	4247
+total pages	exact	representation.numeric.integer_number	3914
+tz	exact	datetime.offset.iana	3981
+tz offset	exact	datetime.offset.utc	3976
+university	exact	representation.text.entity_name	3986
+unix	substring	datetime.epoch.unix_milliseconds	4184
+unix	substring	datetime.epoch.unix_seconds	4184
+unix epoch	exact	datetime.epoch.unix_seconds	3886
+unix epoch seconds	exact	datetime.epoch.unix_seconds	3886
+unix milliseconds	exact	datetime.epoch.unix_milliseconds	3891
+unix ms	exact	datetime.epoch.unix_milliseconds	3891
+unix seconds	exact	datetime.epoch.unix_seconds	3886
+unix time	exact	datetime.epoch.unix_seconds	3886
+unix timestamp	exact	datetime.epoch.unix_seconds	3886
+upc	exact	identity.commerce.upc	4014
+uri	exact	technology.internet.url	3868
+url	exact	technology.internet.url	3868
+url	substring	technology.internet.url	4211
+user age	exact	representation.numeric.integer_number	3882
+utc offset	exact	datetime.offset.utc	3976
+utcoffset	exact	datetime.offset.utc	3976
+uuid	exact	technology.identifier.uuid	3875
+v6	substring	technology.internet.ip_v6	4106
+variety	exact	representation.discrete.categorical	3926
+velocity	substring	representation.numeric.decimal_number	4255
+venue	exact	representation.text.entity_name	3986
+verified	exact	representation.boolean.binary	3971
+voltage	substring	representation.numeric.decimal_number	4255
+wage	substring	finance.currency.amount	4214
+website	exact	technology.internet.url	3868
+weekday	substring	identity.person.full_name	4134
+weight	substring	identity.person.weight	4202
+year	substring	datetime.component.year	4199
+zip	substring	geography.address.postal_code	4119

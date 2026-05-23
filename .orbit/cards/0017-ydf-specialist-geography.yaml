@@ -1,3 +1,4 @@
+id: 0017-ydf-specialist-geography
 feature: YDF as geography specialist — training-data extraction for v20+ Sense retrain
 as_a: FineType maintainer using m-19's corpus diagnostic to plan v20 retraining
 i_want: the gittables diagnostic's corroborated gaps to feed a training-data extraction pipeline, starting with geography — pulling columns where YDF is high-confidence on a geography subtype (`address.full_address`, `address.postal_code`, `location.continent`, etc.) and Sense's prediction misses by a domain-sibling
@@ -8,7 +9,7 @@ scenarios:
 - name: Geography training-data extract produced
   given: m-19's diagnostic outputs at eval/gittables/corpus_pass/ (columns.parquet, mechanism_decomposition.parquet, corroborated_gaps.parquet) and the FineType taxonomy's geography domain (25 types across location / address / coordinate categories)
   when: I run scripts/extract_ydf_specialist_training_data.py --domain geography
-  then: a TSV emitted at eval/gittables/v20_training_candidates/geography.tsv with rows `(file_path, column_name, sample_values, ydf_prediction, ydf_confidence, sense_prediction_missed, candidate_target_label)` — one row per column where YDF predicts a `geography.*` type with confidence ≥ 0.7 AND Sense's prediction is either non-geography or a domain-sibling within geography
+  then: a TSV emitted at eval/gittables/v20_training_candidates/geography.tsv with rows `(file_path, column_name, sample_values, ydf_prediction, ydf_confidence, sense_prediction, candidate_target_label, row_hash)` — one row per column where YDF predicts a `geography.*` type with confidence ≥ 0.7 AND Sense's prediction is either non-geography or a domain-sibling within geography
   gate: false
 - name: v20 retrain consumes the extract
   given: a geography.tsv from the extractor, plus the existing v19 training data
@@ -20,10 +21,11 @@ scenarios:
   when: I run --domain finance (or datetime, or identity)
   then: same shape of extract — the pattern generalises without code changes per domain
   gate: false
-pillars:
-  - agent_self_learning  # the cascade improves its training data by consuming its own diagnostic outputs
-  - long_running_rd      # extract runs against corpus-scale outputs the agent already produces
-follow_up_from:
-  - .orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/  (m-19; author observation 2026-05-23)
-related_memories:
-  - ydf-specialist-models-future  (label: topology; 2026-05-21)
+specs:
+- .orbit/specs/2026-05-23-ydf-specialist-geography/spec.yaml
+relations: []
+references:
+- .orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/  (m-19; author observation 2026-05-23 motivated this card)
+- ydf-specialist-models-future  (memory key, label topology, captured 2026-05-21)
+notes:
+- Pillars served (informally — `pillars` is not a canonical card field) — agent_self_learning (the cascade improves its training data by consuming its own diagnostic outputs) + long_running_rd (extract runs against corpus-scale outputs the agent already produces).

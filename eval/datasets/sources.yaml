@@ -377,3 +377,25 @@ sources:
     fetched_date: 2026-04-28
     attribution: "OECD Infra-Annual Labour Statistics 2023-2024 — sdmx.oecd.org SDMX REST API under CC-BY-4.0. ~270k rows capped at 5000, 34 cols; broad code-vs-canonical surface — 9 dimensions emit CODE/LABEL pairs (REF_AREA/Reference area, MEASURE/Measure, etc.) plus heterogeneous TIME_PERIOD column."
     datasets: [oecd_employment]
+
+  # ─── GitTables — m-19 corpus + v20 training-data extracts ─────────
+  # Per spec 2026-05-23-ydf-specialist-geography ac-02 (leakage firewall).
+  # The GitTables raw corpus (1,018,286 parquets) is split:
+  #   - 2,008 files frozen as the autonomy-contract gate holdout (role: eval)
+  #   - everything else is fair game for YDF-specialist training extracts
+  #     (role: train), filtered through the extractor's circular-precision
+  #     guard + per-value row_hash leakage check against eval/row_hashes.tsv.
+
+  - source_url: repo://eval/gittables/v20_training_candidates/
+    role: train
+    licence: mixed-source-corpus
+    fetched_date: 2026-05-23
+    attribution: "YDF-specialist training-data candidates extracted from GitTables corpus by scripts/extract_ydf_specialist_training_data.py. Per-domain TSVs ((geography|finance|datetime|identity|...).tsv) carry (file_path, column_name, sample_values, ydf_prediction, ydf_confidence, sense_prediction, candidate_target_label, row_hash). Holdout-filtered + row-hash-firewalled at extraction time; downstream consumer is scripts/prepare_multibranch_data.py via --gittables-extract."
+    datasets: [gittables_ydf_specialist]
+
+  - source_url: repo://eval/gittables/holdout_paths.txt
+    role: eval
+    licence: dataset-index
+    fetched_date: 2026-05-03
+    attribution: "Frozen 2,008-file GitTables holdout (autonomy-contract gate corpus); seed 20260503; root /Users/hugh/datasets/gittables. Regenerable via scripts/gittables_holdout_freeze.py. Excluded from all training extracts by the YDF-specialist extractor (ac-02 leakage firewall)."
+    datasets: [gittables_gate_holdout]

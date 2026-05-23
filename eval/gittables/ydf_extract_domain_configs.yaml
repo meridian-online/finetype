@@ -1,0 +1,35 @@
+# Per-domain configuration for scripts/extract_ydf_specialist_training_data.py
+#
+# Per spec 2026-05-23-ydf-specialist-geography ac-05: the script is
+# domain-agnostic. Every per-domain knob lives here; running with a new
+# --domain requires editing this YAML, not the script. The ac-05 close
+# evidence is `git diff scripts/` showing zero changes between domain
+# runs.
+#
+# Each block under `domains` defines:
+#   domain_prefix  — the YDF / Sense prediction-string prefix that
+#                    marks "in-domain" (e.g. "geography.") The trailing
+#                    dot is mandatory — it prevents "geography_extra."
+#                    style accidents.
+
+domains:
+  geography:
+    domain_prefix: geography.
+
+  finance:
+    domain_prefix: finance.
+
+  datetime:
+    domain_prefix: datetime.
+
+  identity:
+    domain_prefix: identity.
+
+  technology:
+    domain_prefix: technology.
+
+  representation:
+    domain_prefix: representation.
+
+  container:
+    domain_prefix: container.

@@ -1,0 +1,17 @@
+{
+  "domain": "finance",
+  "domain_prefix": "finance.",
+  "min_confidence": 0.7,
+  "input_rows": 6590432,
+  "excluded_trivial": 2347948,
+  "excluded_ydf_below_threshold": 11633,
+  "excluded_ydf_not_in_domain": 4228354,
+  "excluded_sense_same_as_ydf": 2461,
+  "excluded_holdout": 0,
+  "excluded_cue_guard": 4,
+  "emitted_rows": 32,
+  "column_rs_sha256": "647306027549b03ddbb31e709482e4422bbd623ed86cd6f9b1d47118f02c9a39",
+  "cue_audit_sha256": "ce380471b5e39eff226cdc098e971c57d7603d1fb5fde24b5058f65b386748b9",
+  "row_hashes_sha256": "b394ba6dc34e33f273f442e2e3842f571e4b35cf9e49a0be40320543d67fe3d2",
+  "dropped_due_to_overlap": 0
+}
