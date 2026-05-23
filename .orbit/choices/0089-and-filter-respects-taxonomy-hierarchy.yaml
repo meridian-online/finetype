@@ -1,5 +1,5 @@
 id: '0089'
-title: 'ac-09 AND filter should respect taxonomy hierarchy granularity'
+title: ac-09 AND filter should respect taxonomy hierarchy granularity
 status: proposed
 date_created: 2026-05-23
 date_modified: 2026-05-23
@@ -88,10 +88,9 @@ body: |
   - Neutral, because cross-domain disagreements stay in the existing
     behaviour — v21's corroborated_gaps.parquet is a superset of
     m-19's, not a different shape.
-
 references:
-  - 0064  # validate as DuckDB reject pipeline (lens infrastructure)
-  - 0075  # mechanism cascade
-  - 0081  # cascade extended
-  - 0087  # gittables diagnostic absorbs m-19
-  - 0088  # collapse infer-type into infer --explain
+- '0064'
+- '0075'
+- '0081'
+- '0087'
+- '0088'

@@ -87,8 +87,7 @@ body: |
   - Neutral, because the underlying logic in
     `crates/finetype-core/src/infer.rs` is unchanged; only the
     CLI entry point moves.
-
 references:
-  - 0075
-  - 0081
-  - 0087
+- '0075'
+- '0081'
+- '0087'

@@ -1,3 +1,4 @@
+id: 0013-intelligent-enum-inference
 feature: Intelligent ENUM inference
 as_a: data analyst
 i_want: FineType to recognise low-cardinality columns and map them to DuckDB ENUMs, with the model understanding categorical patterns better

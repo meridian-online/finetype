@@ -1,3 +1,4 @@
+id: 0014-profile-validate-precision
 feature: Profile-validate precision corpus
 as_a: data analyst working with FineType
 i_want: profile and validate to behave as a self-consistent pair — when I profile a clean CSV and validate the same CSV against its inferred schema, most rows pass — and when they don't, the failure attributes to a named, fixable mechanism

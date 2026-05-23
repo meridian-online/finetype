@@ -1,3 +1,4 @@
+id: 0011-agent-ready-skills
 feature: Agent-ready skills
 as_a: developer using AI coding agents
 i_want: my agent to know the complete FineType pipeline — when to investigate, what to do with invalid rows, how to interpret schemas — without configuring an MCP server

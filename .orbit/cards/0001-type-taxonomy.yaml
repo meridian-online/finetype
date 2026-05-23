@@ -1,3 +1,4 @@
+id: 0001-type-taxonomy
 feature: Type taxonomy with transformation contracts
 as_a: data analyst
 i_want: a browsable, searchable taxonomy of semantic types where each type is a contract that guarantees a DuckDB cast will succeed

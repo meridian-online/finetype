@@ -1,3 +1,4 @@
+id: 0006-command-line-interface
 feature: Command-line interface
 as_a: data analyst
 i_want: a tight set of CLI verbs for type detection, profiling, validation, and taxonomy exploration

@@ -1,3 +1,4 @@
+id: 0008-mcp-server
 feature: MCP server for AI agents
 as_a: developer integrating AI agents with data pipelines
 i_want: to expose FineType's type inference to AI agents via Model Context Protocol

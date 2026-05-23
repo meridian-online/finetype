@@ -1,3 +1,4 @@
+id: 0002-semantic-type-detection
 feature: Semantic type detection
 as_a: data analyst
 i_want: to classify text values into precise semantic types from a taxonomy spanning 7 domains (datetime, representation, technology, identity, finance, geography, container)

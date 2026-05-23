@@ -1,3 +1,4 @@
+id: 0003-tabular-data-profiling
 feature: Tabular data profiling
 as_a: data analyst
 i_want: to profile a CSV or Parquet file and get the detected semantic type for every column — and optionally export the result as a JSON Schema I can edit and feed back into validate

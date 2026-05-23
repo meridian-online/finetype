@@ -1,3 +1,4 @@
+id: 0004-type-safe-duckdb-loading
 feature: Type-safe DuckDB loading
 as_a: data analyst
 i_want: to generate a runnable DuckDB CREATE TABLE statement from a CSV file, with correct column types inferred automatically

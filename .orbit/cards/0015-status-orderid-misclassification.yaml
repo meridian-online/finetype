@@ -1,3 +1,4 @@
+id: 0015-status-orderid-misclassification
 feature: Status / order_id misclassification fixes
 as_a: data analyst running profile→validate on transactional CSVs
 i_want: the model to predict `representation.discrete.status` for order-state / payment-state / account-state columns, and `representation.discrete.identifier` (or equivalent) for prefix-shaped order IDs

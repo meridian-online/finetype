@@ -1,3 +1,4 @@
+id: 0016-phase-2-triangulator-signals
 feature: Phase 2 triangulator signals — generator-shape and sibling-context
 as_a: FineType cycle worker (and the auditor reading its failure_log + inference_signals sidecar)
 i_want: the autonomous type-inference module to triangulate over four signals (validator pass-rate, header-name match, generator-shape, sibling-context) instead of two, with score = w_v·v + w_h·h + w_g·g + w_s·s and w_v + w_h + w_g + w_s = 1.0

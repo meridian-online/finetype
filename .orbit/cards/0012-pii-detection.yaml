@@ -1,3 +1,4 @@
+id: 0012-pii-detection
 feature: PII detection
 as_a: data engineer responsible for compliance
 i_want: to know which columns in a dataset contain personally identifiable information as a byproduct of type profiling

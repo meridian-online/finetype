@@ -1,3 +1,4 @@
+id: 0007-duckdb-sql-extension
 feature: DuckDB SQL extension
 as_a: data analyst working in DuckDB
 i_want: to detect, classify, validate, and cast column types directly in SQL queries

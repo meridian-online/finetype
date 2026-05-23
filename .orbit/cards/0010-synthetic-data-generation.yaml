@@ -1,3 +1,4 @@
+id: 0010-synthetic-data-generation
 feature: Synthetic data generation
 as_a: data analyst, developer, or AI agent
 i_want: to generate realistic sample values for any type in the taxonomy

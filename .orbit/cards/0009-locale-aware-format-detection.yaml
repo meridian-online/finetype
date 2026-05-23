@@ -1,3 +1,4 @@
+id: 0009-locale-aware-format-detection
 feature: Locale-aware format detection
 as_a: data analyst working with international data
 i_want: FineType to detect which region a value belongs to using locale-specific validation

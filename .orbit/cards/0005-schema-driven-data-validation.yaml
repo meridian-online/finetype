@@ -1,3 +1,4 @@
+id: 0005-schema-driven-data-validation
 feature: Schema-driven data validation
 as_a: data analyst
 i_want: one verb that takes a CSV plus a schema and gives me a typed DuckDB table with rejected rows in a sidecar — and the same validation engine inside DuckDB SQL when I want it there
