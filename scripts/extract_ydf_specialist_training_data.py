@@ -20,8 +20,9 @@ hashes (one per value in sample_values), computed via the canonical
 `scripts/eval_leakage/__init__.py::row_hash(header, value)`. The
 leakage check (ac-02) interprets this as: any per-value hash overlap
 with `eval/row_hashes.tsv` counts as leakage. This matches the
-production filter in `prepare_multibranch_data.py:2983` (cycle-3 review
-finding M, pinned per drive note).
+production filter `filter_eval_leakage()` in
+`scripts/prepare_multibranch_data.py:843` (call sites at lines 3087
+and 3088 — cycle-3 review finding M, pinned per drive note).
 
 Domain-agnostic by construction (ac-05): all per-domain knobs
 (prediction prefix) live in
