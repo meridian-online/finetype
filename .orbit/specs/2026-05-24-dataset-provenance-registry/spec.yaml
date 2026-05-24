@@ -1,0 +1,166 @@
+id: 2026-05-24-dataset-provenance-registry
+goal: Extend the existing `eval/datasets/sources.yaml` (role manifest for train↔eval leakage, choice 0056) into a full provenance registry — every contributing dataset has a snapshot file recording per-file SHA256 + size + fetched-date, with tooling to register a new source and verify an existing one. Backfill Sherlock, GitTables, CLDR. New sources (starting with GeoNames in spec 2026-05-24-v21-geonames-geography) register via the same pattern. The spec deliberately scopes to datasets that contribute to the FineType codebase — not every dataset stored on the maintainer's machine.
+cards:
+- 0018-dataset-provenance-registry
+status: open
+labels: []
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Schema extension to `eval/datasets/sources.yaml`.
+
+    Each `sources[].` entry gains three fields:
+      - `local_path`: the canonical filesystem path where the data lives
+        (absolute path for external datasets like
+        `/Users/hugh/datasets/geonames`; `repo://` URI for in-repo data
+        like `repo://data/cldr/`). Existing `repo://` entries keep their
+        URI; new external entries use the absolute path.
+      - `snapshot`: path to a per-source snapshot JSON, relative to repo
+        root (e.g. `eval/datasets/snapshots/sherlock-2026-05-24.json`).
+      - `dataset_version`: a stable identifier — a date for daily-rotating
+        sources (GeoNames), a release tag for versioned sources (CLDR
+        46.0), or a content hash for monolithic sources where the upstream
+        doesn't version (Sherlock HF revision SHA).
+
+    All existing entries (eval CSVs, validate-corpus URLs, GitTables
+    holdout + training extracts) gain the three fields. The role manifest
+    semantics from choice 0056 are preserved — `role: train|eval|validate|
+    both-forbidden` keeps its existing meaning and the leakage firewall
+    keeps reading the same field.
+
+    Close evidence: `eval/datasets/sources.yaml` validates against a
+    YAML schema check (`scripts/validate_sources_yaml.py` — small
+    schemathesis-style validator) and every entry has the three new
+    fields populated (or explicitly `null` with a comment for entries
+    awaiting backfill in later ACs).
+
+    `ac_type: code` — schema + validator are code deliverables.
+- id: ac-02
+  description: |
+    `scripts/dataset_register.py <name> <local_path>` produces a snapshot.
+
+    The script walks `<local_path>` (or `repo://` resolved to repo root),
+    computes SHA256 + size per file (skipping `.DS_Store` and similar
+    OS noise per a small ignore list), and writes
+    `eval/datasets/snapshots/<name>-<dataset_version>.json` with shape:
+
+      {
+        "dataset": "<name>",
+        "dataset_version": "<stable identifier>",
+        "snapshot_date": "YYYY-MM-DD",
+        "registered_by": "scripts/dataset_register.py@<git-sha>",
+        "local_path": "<resolved absolute path or repo:// URI>",
+        "total_size_bytes": <int>,
+        "file_count": <int>,
+        "files": {
+          "<relative path>": {"size_bytes": <int>, "sha256": "<hex>"},
+          ...
+        },
+        "row_counts": {<optional per-file>}  // populated by per-source hooks
+      }
+
+    A `--dry-run` flag prints the snapshot to stdout without writing.
+    A `--update-registry` flag (default true) appends or replaces the
+    `sources.yaml` entry; `--no-update-registry` writes only the snapshot.
+
+    For very large datasets (GitTables: 1M+ parquets), the script supports
+    `--mode index-only` which hashes only the path-list file (e.g.
+    `eval/gittables/corpus_paths.txt`) plus per-file metadata sampled
+    from a deterministic 1k-file subset. The snapshot records which mode
+    was used; full-tree snapshots and index-only snapshots are not
+    interchangeable.
+
+    Close evidence: invoking the script on GeoNames at
+    `/Users/hugh/datasets/geonames` (once populated) writes a valid
+    snapshot, and the round-trip
+    `dataset_register.py --dry-run | jq` produces the same content as
+    the on-disk snapshot.
+
+    `ac_type: code`.
+- id: ac-03
+  description: |
+    `scripts/dataset_verify.py <name>` validates an existing snapshot.
+
+    Reads `eval/datasets/sources.yaml` for the named source, loads the
+    referenced snapshot JSON, re-hashes every file under `local_path`
+    (or path-list + sample for `mode: index-only` snapshots), and
+    reports:
+      - Files in snapshot but missing on disk → `missing` (exit 2)
+      - Files on disk but not in snapshot → `extra` (exit 2, unless
+        `--ignore-extra` is passed)
+      - Files whose SHA differs → `drift` (exit 2)
+      - All match → `OK` (exit 0)
+
+    Output is line-oriented machine-readable plus a human summary.
+    Designed to be called from training launchers as a pre-flight check:
+
+      python3 scripts/dataset_verify.py sherlock gittables cldr geonames \
+        || { echo "dataset drift — abort"; exit 1; }
+
+    Close evidence: a verify run against the four backfilled datasets
+    (ac-04) exits 0; a deliberate corruption (touch a file, change one
+    byte) exits 2 with the affected file named.
+
+    `ac_type: code`.
+- id: ac-04
+  description: |
+    Backfill snapshots for the four currently-contributing datasets.
+
+    For each of: `sherlock`, `gittables`, `cldr`, plus the new
+    `geonames` once fetched in spec 2026-05-24-v21-geonames-geography
+    ac-01 — register the dataset, write the snapshot, and add or update
+    the `sources.yaml` entry.
+
+    Notes per dataset:
+      - `sherlock`: local_path is `repo://output/distillation-v3/sherlock_distilled.csv.gz`
+        (in-repo single-file cache). dataset_version is the HuggingFace
+        revision SHA of `meridian-online/sherlock-annotated` at fetch
+        time (resolvable via `huggingface_hub`).
+      - `gittables`: local_path is the absolute path to the 1M+ parquet
+        tree on the maintainer's machine. dataset_version is the SHA256
+        of `eval/gittables/corpus_paths.txt` (the canonical file
+        manifest). Snapshot uses `mode: index-only` because hashing 1M
+        parquets is impractical for routine verify.
+      - `cldr`: local_path is `repo://data/cldr/` (in-repo TSV cache).
+        dataset_version is the CLDR release tag (e.g. `46.0`) recorded
+        in `data/cldr/README.md` — backfill that README field if it
+        isn't already there.
+      - `geonames`: deferred to v21-geonames-geography ac-01 — that
+        spec's fetch produces the snapshot.
+
+    Close evidence: `dataset_verify.py sherlock gittables cldr` exits 0.
+    `eval/datasets/sources.yaml` has the three new fields populated for
+    every Sherlock/GitTables/CLDR entry.
+
+    `ac_type: code`.
+- id: ac-05
+  description: |
+    `datasets/README.md` documents the registry contract — what a
+    dataset entry must declare, how to register a new one, how the
+    leakage-firewall fields (`role`) interact with the integrity fields
+    (`snapshot`, `dataset_version`), and the policy on private/external
+    datasets (only datasets contributing to FineType code are
+    registered; downstream/private datasets stay out).
+
+    Close evidence: the README exists, links to choice 0056 (leakage
+    rule) and choice [new]-dataset-provenance-pattern (this spec's
+    architectural record), and a fresh contributor can register a new
+    source by following it without reading the script source.
+
+    `ac_type: doc`.
+- id: ac-06
+  description: |
+    MADR choice recording the architectural decision.
+
+    Write `.orbit/choices/[next]-dataset-provenance-pattern.yaml`
+    documenting: (a) extending `sources.yaml` rather than creating a
+    parallel registry, (b) the snapshot-JSON shape choice (per-source
+    file vs single monolithic file), (c) the `index-only` mode for
+    very-large path-list datasets, (d) the explicit out-of-scope policy
+    (private external datasets are not registered).
+
+    Close evidence: the choice file exists, follows the MADR template
+    used by the existing `.orbit/choices/` entries, and is referenced
+    by `datasets/README.md` and by spec 2026-05-24-v21-geonames-geography.
+
+    `ac_type: doc`.

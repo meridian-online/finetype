@@ -1,0 +1,212 @@
+id: 2026-05-24-v21-geonames-geography
+goal: |
+  Build v21 around an authoritative-gazetteer (GeoNames) training source for the geography domain, replacing the v20 YDF-specialist approach that failed ac-04 (cell 2 at −1.1% reduction vs the −20% threshold; cell 1 at −3.0% reduction vs the −20% threshold). Diagnosis from 2026-05-24 cross-tab — city accounts for 62% of cell-2 misses (55,385 of 89,000 rows) but the v20 extractor's `--min-confidence 0.7` filter passed only 11 of 55,281 candidate city columns; YDF itself is uncertain about city (median confidence 0.31). The methodology assumed YDF would be a high-confidence oracle; for the dominant failure class, it isn't. GeoNames sidesteps the issue — direct authoritative coverage of city + region + country + postal_code + admin divisions, plus multilingual alternate names for the locale offering. Pair with a noise generator so training reflects messy real-world inputs, not clean reference lists. Target cell 2 ≥ 20% reduction; cell 1 will get incidental lift from full_address + postal_code coverage but isn't the primary aim.
+cards:
+- 0010-synthetic-data-generation
+status: open
+labels: []
+acceptance_criteria:
+- id: ac-01
+  description: |
+    GeoNames snapshot fetched and registered.
+
+    `scripts/fetch_geonames.sh` (idempotent) downloads the required
+    GeoNames dumps to `/Users/hugh/datasets/geonames/<YYYY-MM-DD>/`:
+      - allCountries.zip
+      - alternateNamesV2.zip
+      - cities500.zip
+      - admin1CodesASCII.txt
+      - admin2Codes.txt
+      - countryInfo.txt
+      - postalCodes/allCountries.zip (separate URL)
+      - featureCodes.txt
+
+    On completion the script invokes
+    `scripts/dataset_register.py geonames /Users/hugh/datasets/geonames/<date>`
+    (depends on spec 2026-05-24-dataset-provenance-registry ac-02)
+    producing the snapshot at
+    `eval/datasets/snapshots/geonames-<date>.json` and adding a
+    `sources.yaml` entry with `role: train`, `licence: CC-BY-4.0`,
+    `dataset_version: <date>`, and an attribution string crediting
+    GeoNames per the CC-BY terms.
+
+    Close evidence: re-running the fetch script is a no-op (idempotency);
+    `dataset_verify.py geonames` exits 0; `sources.yaml` entry shows the
+    snapshot pointer.
+
+    `ac_type: code`.
+- id: ac-02
+  description: |
+    Per-type generator over GeoNames produces training columns.
+
+    `scripts/generate_geonames_geography.py` reads the registered
+    GeoNames snapshot and emits
+    `output/distillation-v21-geonames/geonames_geography.csv.gz` in
+    the sherlock_distilled schema (`final_label`, `sample_values` JSON,
+    `column_name`) — same shape v20 used so the existing
+    `prepare_multibranch_data.py --distilled` flag consumes it without
+    pipeline changes.
+
+    Per-type coverage at minimum:
+      - geography.location.city          (cities500 + alternateNamesV2)
+      - geography.location.region        (admin1CodesASCII + ADM1 from allCountries)
+      - geography.location.country       (countryInfo)
+      - geography.location.country_code  (countryInfo iso/iso3/fips)
+      - geography.location.county        (admin2Codes)
+      - geography.location.continent     (derived from countryInfo)
+      - geography.location.us_state      (admin1 filtered to country_code=US)
+      - geography.address.postal_code    (postalCodes/allCountries)
+      - geography.coordinate.latitude    (allCountries lat column)
+      - geography.coordinate.longitude   (allCountries lon column)
+
+    Per-type sample volume target: 3,000 synthetic columns / type after
+    blending (vs current 1,200 cap for non-geography). The
+    prepare-multibranch cap is raised explicitly for the geography
+    domain via a config edit, not a global change.
+
+    Generator configuration lives in three YAML files committed under
+    `eval/geonames/`:
+      - `type_mapping.yaml`     — finetype type ↔ GeoNames feature_code(s)
+      - `locale_targets.yaml`   — locale → {country_codes, isolanguages}
+      - `header_pools.yaml`     — per-locale header name pool
+
+    Generator behaviour is single-pass deterministic from a `--seed`
+    flag — same seed → byte-identical output.
+
+    Close evidence: the csv.gz exists, has the expected per-type row
+    counts (recorded in `output/distillation-v21-geonames/manifest.json`),
+    and is byte-readable by `load_distilled_columns()` in
+    `scripts/prepare_multibranch_data.py:933` (same loader path v20 used).
+
+    `ac_type: code`.
+- id: ac-03
+  description: |
+    Noise generator produces realistic column shapes, not clean lists.
+
+    A separate noise-recipes module
+    (`scripts/geonames_noise_recipes.py`) consumes clean GeoNames-derived
+    value lists and emits column-shaped values that approximate
+    real-world messiness. Recipes (sample rate in parens — tune in the
+    YAML referenced by ac-04):
+
+      - mixed_case        — "new york", "NEW YORK", "New york" (10%)
+      - abbreviated       — "NYC", "L.A.", "S.F." for major cities (5%)
+      - city_state        — "Springfield, IL" (15%)
+      - city_country      — "Paris (France)" (8%)
+      - partial_value     — "New Yo" (truncation) (3%)
+      - mixed_language    — column with 70% en + 30% es values (5%)
+      - whitespace_noise  — leading/trailing/multi-space (5%)
+      - empty_interspersed — 5–10% of values are "" or "NULL" (10%)
+      - canonical         — clean reference values (39%, the residual)
+
+    Recipe coverage is per-domain — postal_code recipes include format
+    variants (with/without space in "SW1A 1AA"), latitude/longitude
+    include DD vs "lat,lon" string formats and DMS notation. Recipe set
+    per type is config, not hardcoded in the script.
+
+    Close evidence: a sample of 50 generated city columns shows ≥ 6
+    distinct recipe applications (not all canonical); a sample of
+    50 postal_code columns shows ≥ 4 format variants present. Both
+    sanity checks live in `tests/test_geonames_noise_recipes.py`.
+
+    `ac_type: code`.
+- id: ac-04
+  description: |
+    Locale-aware multilingual coverage — the precision-principle delivery.
+
+    `eval/geonames/locale_targets.yaml` ships with v21-launch locales:
+      en_US, en_GB, fr_FR, es_ES, es_419 (Spanish-speaking Americas),
+      de_DE, it_IT, pt_BR, ja_JP, zh_CN, ko_KR, ar_SA, ru_RU, nl_NL,
+      pl_PL — 15 locales covering ~85% of GitTables-observable content
+      based on m-19 corpus-pass observations.
+
+    For each locale, the generator emits columns where values are drawn
+    from the alternateNamesV2 entries matching the locale's isolanguage
+    set, mapped to the locale's country_codes for geographic
+    plausibility. ~30% of all generated columns are
+    `mixed_locale: true` (per-recipe in ac-03) — columns that
+    intentionally mix locales to model real-world messiness.
+
+    Close evidence: `output/distillation-v21-geonames/manifest.json`
+    reports per-locale column counts non-zero for all 15 launch
+    locales; spot-check 5 random ja_JP city columns contain Kanji
+    place names; spot-check 5 random ar_SA city columns contain Arabic
+    script.
+
+    `ac_type: code`.
+- id: ac-05
+  description: |
+    Train v21 — three ReLU seeds, baseline-comparable hyperparameters.
+
+    `scripts/overnight_v21_geography.sh` orchestrates:
+      1. dataset_verify.py geonames           (pre-flight integrity)
+      2. fetch_geonames.sh                    (if snapshot missing/stale)
+      3. generate_geonames_geography.py       (produces csv.gz + manifest)
+      4. merge with v19 sherlock_distilled    (same merge step v20 used)
+      5. prepare_multibranch_data.py --distilled <merged>
+                                              (FTMB build)
+      6. train-multi-branch × 3 seeds (42, 43, 44) at the v13 ReLU+BN
+         config (matches v19/v20 — only the training data differs)
+      7. cherry-pick best seed → symlink models/default
+
+    The launcher preserves v19 and v20 model directories
+    (`models/sherlock-v19-relu-s42/`, `models/sherlock-v20-geography-relu-s42/`)
+    untouched; v21 lives at
+    `models/sherlock-v21-geonames-geography-relu-s{42,43,44}/`.
+
+    Close evidence: three trained model dirs each containing
+    `model.safetensors`, `results.json`, `epochs.jsonl`; FTMB manifest
+    records the GeoNames snapshot reference.
+
+    `ac_type: code`.
+- id: ac-06
+  description: |
+    v21 corpus pass — measure AC-04 cells against v19 (m-19) baseline.
+
+    After v21 trains and models/default points at the v21 cherry-pick,
+    run the full corpus pass to a fresh output directory
+    (`output/corpus-pass-v21/`), preserving the v19 m-19 baseline at
+    `eval/gittables/corpus_pass/` and the v20 baseline at
+    `output/corpus-pass-v20/`. Use the same cell-2 proxy query
+    methodology validated by spec 2026-05-23-ydf-specialist-geography
+    ac-04's full-run comparison (sense_prediction NOT LIKE
+    'geography.%' AND ydf_prediction LIKE 'geography.%', normalised per
+    1000 files).
+
+    Three-way delta table written to
+    `output/corpus-pass-v21/cell_deltas.md` showing v19 / v20 / v21
+    per-1000-file rates for both cells, with %change vs v19 baseline.
+
+    Close evidence: the delta table exists and is human-readable;
+    v21's cell-2 rate is recorded.
+
+    `ac_type: code`.
+- id: ac-07
+  description: |
+    Cell-2 lift ≥ 20% vs v19 baseline — the falsifiable target.
+
+    Cell 2 (`non_trivial_floor × misclassification`, filtered to rows
+    where `ydf_prediction LIKE 'geography.%'`): v21's per-1000-file
+    rate is ≤ 80% of v19's per-1000-file rate (160.245 / 1000 baseline
+    → v21 must hit ≤ 128.20 / 1000).
+
+    Cell 1 (`reject_rate_ceil × format_diversity_path_b`): tracked but
+    not gating for v21. The methodology pivot is aimed at the missed-
+    geography class (cell 2). If cell 1 also lifts ≥ 20% incidentally,
+    note in the close report and consider closing ac-04 of the v20
+    spec retroactively. If cell 1 regresses materially (>10% increase),
+    that's a follow-up investigation but does not block v21 close.
+
+    Partial-close path (per the v20 spec's precedent): if cell 2 lift
+    is in the 10–20% band, the AC partially closes and a follow-up
+    spec investigates the residual gap — likely OSM street data or
+    DBpedia overlay for the address.* types.
+
+    If cell 2 lift is < 10%, halt and re-investigate before any further
+    geography-augmentation specs — the GeoNames hypothesis has failed
+    and the diagnosis needs to be re-derived.
+
+    Close evidence: the cell_deltas.md row for cell 2 shows v21 / v19
+    ratio with the per-1000-file rates and the %change.
+
+    `ac_type: observation`.

@@ -127,6 +127,12 @@ eval/datasets/csv/*.schema.json
 output/spike-training/
 output/spike-results/
 
+# v20 retrain artefacts (per spec 2026-05-23-ydf-specialist-geography).
+# Multi-GB corpus-pass parquets + the merged distilled training input
+# are regenerable from scripts/overnight_v20_geography.sh.
+output/distillation-v20/
+output/corpus-pass-v20/
+
 # Distillation batch files (rolled into *_distilled.csv.gz)
 output/distillation-v3/sherlock_batch_*.csv
 output/distillation-v3/sherlock_batch_*.done
