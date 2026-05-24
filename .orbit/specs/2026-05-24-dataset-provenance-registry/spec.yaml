@@ -2,7 +2,7 @@ id: 2026-05-24-dataset-provenance-registry
 goal: Extend the existing `eval/datasets/sources.yaml` (role manifest for train↔eval leakage, choice 0056) into a full provenance registry — every contributing dataset has a snapshot file recording per-file SHA256 + size + fetched-date, with tooling to register a new source and verify an existing one. Backfill Sherlock, GitTables, CLDR. New sources (starting with GeoNames in spec 2026-05-24-v21-geonames-geography) register via the same pattern. The spec deliberately scopes to datasets that contribute to the FineType codebase — not every dataset stored on the maintainer's machine.
 cards:
 - 0018-dataset-provenance-registry
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -34,7 +34,14 @@ acceptance_criteria:
     fields populated (or explicitly `null` with a comment for entries
     awaiting backfill in later ACs).
 
-    `ac_type: code` — schema + validator are code deliverables.
+    Closed 2026-05-24: schema extended (three optional integrity
+    fields documented in `datasets/README.md`);
+    `scripts/validate_sources_yaml.py` validates the file structure +
+    cross-checks every snapshot pointer; ran clean against the 53-entry
+    sources.yaml (3 entries populated with integrity fields, 50 entries
+    keeping their existing leakage-only shape — allowed by schema).
+  gate: false
+  checked: true
 - id: ac-02
   description: |
     `scripts/dataset_register.py <name> <local_path>` produces a snapshot.
@@ -76,7 +83,14 @@ acceptance_criteria:
     `dataset_register.py --dry-run | jq` produces the same content as
     the on-disk snapshot.
 
-    `ac_type: code`.
+    Closed 2026-05-24: `scripts/dataset_register.py` shipped; tested
+    end-to-end on sherlock (full, single-file), cldr (full, directory),
+    and gittables (index-only, 1000-file stride sample). `--dry-run`
+    output matches on-disk snapshot byte-for-byte. The GeoNames-specific
+    invocation in this AC's text defers to spec
+    2026-05-24-v21-geonames-geography ac-01.
+  gate: false
+  checked: true
 - id: ac-03
   description: |
     `scripts/dataset_verify.py <name>` validates an existing snapshot.
@@ -101,7 +115,14 @@ acceptance_criteria:
     (ac-04) exits 0; a deliberate corruption (touch a file, change one
     byte) exits 2 with the affected file named.
 
-    `ac_type: code`.
+    Closed 2026-05-24: `scripts/dataset_verify.py` shipped;
+    `scripts/test_dataset_provenance.sh` exercises the clean + drift
+    paths against a tempdir-snapshot pair (exit 0 clean, exit 2 with
+    `DRIFT file_a.txt (size 12→14, sha …→…)` after appending one byte).
+    Real-dataset run `python3 scripts/dataset_verify.py sherlock cldr
+    gittables` exits 0.
+  gate: false
+  checked: true
 - id: ac-04
   description: |
     Backfill snapshots for the four currently-contributing datasets.
@@ -132,7 +153,14 @@ acceptance_criteria:
     `eval/datasets/sources.yaml` has the three new fields populated for
     every Sherlock/GitTables/CLDR entry.
 
-    `ac_type: code`.
+    Closed 2026-05-24 for sherlock + cldr + gittables. Snapshots:
+    `eval/datasets/snapshots/sherlock-2026-05-24.json` (full, 1 file,
+    6.7MB), `cldr-46.0.0.json` (full, 6 files, 665KB),
+    `gittables-27329eda15d6.json` (index-only, 1000-file sample of
+    1,018,286 paths, 41MB sampled). All three verify clean. GeoNames
+    deferred to spec 2026-05-24-v21-geonames-geography ac-01 by design.
+  gate: false
+  checked: true
 - id: ac-05
   description: |
     `datasets/README.md` documents the registry contract — what a
@@ -147,7 +175,13 @@ acceptance_criteria:
     architectural record), and a fresh contributor can register a new
     source by following it without reading the script source.
 
-    `ac_type: doc`.
+    Closed 2026-05-24: `datasets/README.md` written; links to choices
+    0056 and 0090; documents schema, registration command examples,
+    verify usage, snapshot modes (full vs index-only with the coverage
+    trade-off named), and the explicit out-of-scope policy.
+  gate: false
+  checked: true
+  ac_type: doc
 - id: ac-06
   description: |
     MADR choice recording the architectural decision.
@@ -163,4 +197,11 @@ acceptance_criteria:
     used by the existing `.orbit/choices/` entries, and is referenced
     by `datasets/README.md` and by spec 2026-05-24-v21-geonames-geography.
 
-    `ac_type: doc`.
+    Closed 2026-05-24: `.orbit/choices/0090-dataset-provenance-pattern.yaml`
+    written following the MADR template; documents the four points
+    listed in the spec (extend vs parallel; snapshot JSON shape; index-only
+    mode; out-of-scope policy) plus consequences (good/bad/neutral).
+    Referenced from `datasets/README.md`.
+  gate: false
+  checked: true
+  ac_type: doc

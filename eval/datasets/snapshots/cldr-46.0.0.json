@@ -1,0 +1,36 @@
+{
+  "dataset": "cldr",
+  "dataset_version": "46.0.0",
+  "snapshot_date": "2026-05-24",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@33b15eb39a46",
+  "local_path": "repo://data/cldr",
+  "total_size_bytes": 664871,
+  "file_count": 6,
+  "files": {
+    "README.md": {
+      "size_bytes": 7028,
+      "sha256": "0fec697c9321d249a5c61b7f04869c11c4141055676104c8cb88fa2ab929e242"
+    },
+    "cldr_date_patterns.tsv": {
+      "size_bytes": 216808,
+      "sha256": "520acad5d93eaf0f8c4d311dc59db3633f890ef0b43aaff544c880d743c617fd"
+    },
+    "cldr_mapping_report.txt": {
+      "size_bytes": 7648,
+      "sha256": "de7fb160451e6eabd5c534839e84e8d66f64bb5c58b53146fd762e0d7115eb09"
+    },
+    "cldr_month_names.tsv": {
+      "size_bytes": 157345,
+      "sha256": "06e0e7415e1e01071295d9592579fe4150d3b3c4128b72e4894ccb6da29084b4"
+    },
+    "cldr_time_patterns.tsv": {
+      "size_bytes": 173716,
+      "sha256": "2223c6c71c461a10f5206071afa0655a8bb2ea6e1f08dcf0687734c4f93b46ca"
+    },
+    "cldr_weekday_names.tsv": {
+      "size_bytes": 102326,
+      "sha256": "900c19657bedda20f87216443e5a9066818f978a16636ff440c0472bd707a80f"
+    }
+  }
+}

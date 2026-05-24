@@ -1,0 +1,4016 @@
+{
+  "dataset": "gittables",
+  "dataset_version": "27329eda15d6",
+  "snapshot_date": "2026-05-24",
+  "snapshot_mode": "index-only",
+  "registered_by": "scripts/dataset_register.py@33b15eb39a46",
+  "local_path": "/Users/hugh/datasets/gittables",
+  "index_file": "repo://eval/gittables/corpus_paths.txt",
+  "index_file_sha256": "27329eda15d6e6b9e2d94231b0c271855489c0463b5a5e9611b2478104e750ec",
+  "index_file_size_bytes": 66942249,
+  "n_paths_in_index": 1018286,
+  "sample_size": 1000,
+  "sample_total_size_bytes": 41067345,
+  "sample_files": {
+    "/Users/hugh/datasets/gittables/abstraction/%E6%96%B0%E4%B8%96%E7%BA%AA%E8%8B%B1%E8%AF%AD%E4%B8%93%E4%B8%9A%E7%BB%BC%E5%90%88%E6%95%99%E7%A8%8B5%EF%BC%88%E7%AC%AC2%E7%89%88%EF%BC%89.parquet": {
+      "size_bytes": 39520,
+      "sha256": "1a16f64d8e4ed06d940f9fa497a1b467b7fdcdc1b7442ec59b39ca6a4a81d187"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/07-08_129.parquet": {
+      "size_bytes": 53059,
+      "sha256": "512bdb3586da24c25cf1adbcb9fc0cc7c4ee697b676ca836cac1f88847de524b"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/13-14_37.parquet": {
+      "size_bytes": 57275,
+      "sha256": "20249b392b88db3cb8968c55fccc7c78f33dd6c4ab33a5fd193ea79204e582ec"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_AVCamManual_DesignSmells.parquet": {
+      "size_bytes": 18325,
+      "sha256": "3a28ba7ede3181c4ac2786a4db148233373cdf2b3bb493e5844ea1464894554b"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_Bifrost.Ninject(net461)_DesignSmells.parquet": {
+      "size_bytes": 18217,
+      "sha256": "045ea388449fc0cf64dd44e0c4a7421622cf39be51399e8d6382b49a18b03a30"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_Common.Logging.Log4Net1213.Tests.2010_DesignSmells.parquet": {
+      "size_bytes": 18594,
+      "sha256": "fdeb4abae9c3a2cb42832ef487470fe805cd1da8b44e67bd7b4752bc59ba18c0"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_DotNetDBF.Enumerable(net40)_DesignSmells.parquet": {
+      "size_bytes": 18510,
+      "sha256": "49ba6d28602cdaa32fa30dbda54965d9f3dfe769374171c82048942f0b175474"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_FooTests_DesignSmells.parquet": {
+      "size_bytes": 17948,
+      "sha256": "02a1d66a5c410cbc23db0d3b17803817fbc0ad11dbb71d033456a8eed904e9e4"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_ImageResizer.Storage_DesignSmells.parquet": {
+      "size_bytes": 19603,
+      "sha256": "3f8048a3db028ad02d7d6e69b106af38b1dbfcfca6fa84a528c0287946d5f417"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_Manager_DesignSmells.parquet": {
+      "size_bytes": 19449,
+      "sha256": "8311b6d29cad208f7d1990f010f4bcfa22e7308eeaf75cccfd88e35bab20281a"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_MupApps.MvvmCross.Plugins.ControlsNavigation_DesignSmells.parquet": {
+      "size_bytes": 19368,
+      "sha256": "872c14356c09770c36e86ea7dde9b5ce296ea94782461d97406e2a7d6ad90934"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_OpenRasta.Plugins.Caching(netstandard2.0)_DesignSmells.parquet": {
+      "size_bytes": 20239,
+      "sha256": "e43e82aa6fcc0008716faf2972bc61afcf6aa0e6ede3a74aa46d5e0ac38d65d2"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_RaptorDBServer_DesignSmells.parquet": {
+      "size_bytes": 18242,
+      "sha256": "76a42ac911fa7c76a4300d3e3e1e65903752ec84e89a86078675c0a6d1c03bc0"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_Senparc.Weixin.Cache.Redis.Tests.NetCore3_DesignSmells.parquet": {
+      "size_bytes": 18915,
+      "sha256": "b03e4fd16b6cc91cf8dd155f21f3fd83b20246c04e325218621c75ec77d32414"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_Squared.Task_DesignSmells.parquet": {
+      "size_bytes": 20682,
+      "sha256": "2a0894af6003c887d25a38d074e09c7d60f06384a3a8ce0c96e53f6e44ca3a2a"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_Toml_DesignSmells.parquet": {
+      "size_bytes": 18875,
+      "sha256": "13b3eed5269512e740c1a580d4ee61aabc9a1f5352d1a68943ad2fc384df437e"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/Designite_WorkingWithNavigation_DesignSmells.parquet": {
+      "size_bytes": 18535,
+      "sha256": "70d9489c7b31a35d65dc2d4702c9e0ae7b61046e5647e19220f0b0334bb8daad"
+    },
+    "/Users/hugh/datasets/gittables/abstraction/MergedArtworksPreview.parquet": {
+      "size_bytes": 67828,
+      "sha256": "52b140d5effc088653984c8190dc97f0c75cac44386ee0a55a51301c4958656c"
+    },
+    "/Users/hugh/datasets/gittables/beauty_sleep/01-02_23.parquet": {
+      "size_bytes": 48836,
+      "sha256": "dcdd16d05dce7d114f2900e67796eda11f99ed6609da28a5cb2f31992c1e5f60"
+    },
+    "/Users/hugh/datasets/gittables/beauty_sleep/part-00002-138dbd91-623d-400c-a199-4a93a7d20304.parquet": {
+      "size_bytes": 14505,
+      "sha256": "fbc35fc54b016c39f7f8d2ac112546b326f24c2411ab894c985fdd4d7f91de61"
+    },
+    "/Users/hugh/datasets/gittables/bits_per_second/05-06_54.parquet": {
+      "size_bytes": 61926,
+      "sha256": "68c864b162472a3b804959780d0119754c42dfdf89096a7ef4e00b841c507fd1"
+    },
+    "/Users/hugh/datasets/gittables/bits_per_second/12-13_28.parquet": {
+      "size_bytes": 54537,
+      "sha256": "5b5f990280b28beaa59441187c8a2ce17076e3991d8a92ea453115131ce68996"
+    },
+    "/Users/hugh/datasets/gittables/bits_per_second/Designite_SCANsat_MethodMetrics.parquet": {
+      "size_bytes": 23208,
+      "sha256": "87c376cf31f425a03f5160c68de3ce08835b2db81cb6436f3038fbdf5e655c58"
+    },
+    "/Users/hugh/datasets/gittables/cease/01-02_4.parquet": {
+      "size_bytes": 59607,
+      "sha256": "6b2744a25c8930935862391f41af3b9ff72332ec8c9c964c11f4996f4504bd05"
+    },
+    "/Users/hugh/datasets/gittables/cease/test_16.parquet": {
+      "size_bytes": 36372,
+      "sha256": "b1de7bd4c9f8f4389b5fc254a61f62403a2d3d8e0d3365a02dd93c862d54404e"
+    },
+    "/Users/hugh/datasets/gittables/channel_capacity/fengjiachun%23JCTools.parquet": {
+      "size_bytes": 57679,
+      "sha256": "dcb16c51b3b123aedd9a869ef923cc9040c7d7c89a377190959635024640ffe7"
+    },
+    "/Users/hugh/datasets/gittables/count_per_minute/04-05_12.parquet": {
+      "size_bytes": 53293,
+      "sha256": "612cc83942a5fd449aec785f0054ea4f1b1a7ca5bf83c20c7a986d05cf33b3f8"
+    },
+    "/Users/hugh/datasets/gittables/count_per_minute/StatisticalDebugging_coverage_sd_19.parquet": {
+      "size_bytes": 15645,
+      "sha256": "7833c8ea6b4c1dd4c4819d4fb8db664e470137ec9822e650c935072716ca5740"
+    },
+    "/Users/hugh/datasets/gittables/crime_rate/06-07_109.parquet": {
+      "size_bytes": 50589,
+      "sha256": "c7edf0f471093ca86944ef8f7e200a86d7f5267ad25da47852ce1ee8c48ae8b3"
+    },
+    "/Users/hugh/datasets/gittables/crime_rate/15-16_20.parquet": {
+      "size_bytes": 65385,
+      "sha256": "70a117e1d976395c47acf6c5c6a3efecb39fdb15eff9e8dbb4aaf0e86866aca4"
+    },
+    "/Users/hugh/datasets/gittables/crime_rate/d4edc3ef-12a7-488d-85ff-d48c105b8794_text.parquet": {
+      "size_bytes": 41061,
+      "sha256": "7111bda1ecb982ffd5ec5b5693ed0c93bdb91a40d6d95afdd059b33e596f6dc7"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/01-02_236.parquet": {
+      "size_bytes": 62145,
+      "sha256": "a80ff8dc1ad39df65b8cbd685121d3aecb0d2f32fabd793b019ab851f16a9a30"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/03-04_261.parquet": {
+      "size_bytes": 62125,
+      "sha256": "8e8407061b4d3a47564dba374bba4a0d433cccd9f512eb9e46c95d854fd25860"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/05-06_127.parquet": {
+      "size_bytes": 54026,
+      "sha256": "3ea307a9d58cd67d46b36b9abb67357157a166cafe745514d3632bfadc69c19c"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/06-07_421.parquet": {
+      "size_bytes": 51140,
+      "sha256": "6528aeb32dc4f8339fc78e21fbeed0dfc8cbc63bacf8eb54b5a2d5c8b0e880f6"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/08-09_117.parquet": {
+      "size_bytes": 44044,
+      "sha256": "f2dc8b5b9f4f596b3cc901416f33fa67212a954b4caa5a440b2614a08f8ba89f"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/09-10_501.parquet": {
+      "size_bytes": 51621,
+      "sha256": "2fb777cf6ce4aa35402ec01014a47f0ccb93461b2be89547fa18f000e817c87b"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/11-12_392.parquet": {
+      "size_bytes": 68330,
+      "sha256": "d8a25c48a435add434055cf6a7827052bc266ef42c3dca3e2517f49bc8038e7b"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/14-15_134.parquet": {
+      "size_bytes": 61359,
+      "sha256": "37fd64923de67b1f3238519f2d3710dd473bdacc02b63d69a9b2f672028903d1"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/17-18_58.parquet": {
+      "size_bytes": 56346,
+      "sha256": "5da063682d3ddd4cc785fc100895801b872e06874b16d46914264155f78ff1c0"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/2020-04-05_top_2000terms.parquet": {
+      "size_bytes": 30728,
+      "sha256": "399dedc5315c9ebad68758b036e58c164e8a08e0a50e28e2e9091b5554eca05a"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/21-22_245.parquet": {
+      "size_bytes": 66685,
+      "sha256": "6cc7bba5e12d8a6363c1755f6c96c91734773ab9848625dcb58fded9ac5d52d6"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/A00-2018_40.parquet": {
+      "size_bytes": 40953,
+      "sha256": "af8f4f041c057e5896ac1e9c8b5e335f847a75f37e3d00438d04098203b7dc12"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/CAS%20Token_20190925-132230.parquet": {
+      "size_bytes": 50896,
+      "sha256": "a90c55c2aef29c0ff0fda32472f08d9c6e7c317ea6f5d2719e1a34dd15d1aa42"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/Designite_RateMyAppSL81_DesignSmells.parquet": {
+      "size_bytes": 18040,
+      "sha256": "123cf4d33131fe1085fdcc4e219dfdb49a8a3ee6f9728e7232442d0cd49a92c2"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/EHO_20190924-220411.parquet": {
+      "size_bytes": 53992,
+      "sha256": "1c5ec482050011333eabeacbaa2b8570eaf511ed598eaf351c42d44232270c0a"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/GPIW.parquet": {
+      "size_bytes": 358299,
+      "sha256": "d6cad87c5e7d0417b635b703478ed8f3ad07fcd914a8251a811dd2aa30374a87"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/IRCC.parquet": {
+      "size_bytes": 350926,
+      "sha256": "edb9eee8bdaa13115dd6a9ccddc3e93c354b05d0c34bc3c795940a2c80c5aae4"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/MultiSpeakerBRIR_18.parquet": {
+      "size_bytes": 16319,
+      "sha256": "5aa8aa18dc1d32e701daae9d0c526357f879253c2d7929ca1459653efbfe24c0"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/SYV.DE.parquet": {
+      "size_bytes": 429430,
+      "sha256": "4ff8b65a0a6c2c6534d24a727ee7cec8c592e1e587dfc13ec533f2543aabb1cb"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/W11-2123_aakansha_53.parquet": {
+      "size_bytes": 37374,
+      "sha256": "7857d607a4eeca6b31dbf8792aec247932a341adf1773fb1f0368613df5f36de"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/btraw.parquet": {
+      "size_bytes": 123712,
+      "sha256": "e218bed7c053eb92a3b158cb57f363ca5b31cadc0d9227b81d12a8ccae6131bc"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/experimental_results.parquet": {
+      "size_bytes": 24968,
+      "sha256": "36f89f6c0f370a7bd2f57f88132ec1387c62bbe396864b96b651c7c575a12a8c"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/indicators_list.parquet": {
+      "size_bytes": 26202,
+      "sha256": "4dc1025b8802ddde826e4d3a70aceee6018a1b0c09c28610bb1318d3c9d0c283"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/metrics_C_D.parquet": {
+      "size_bytes": 39892,
+      "sha256": "2126af95d584597f0b901b91b41369d5cdf7545605daa894dc2139e7ba55c415"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/quick_example_dataframe_postprocessed_1.parquet": {
+      "size_bytes": 45062,
+      "sha256": "48fbb856f90858253c6f8b31bc53aa7c187413921993efe90b75d344e2b9f401"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/section1all_xls_10108%20Qtr$_93.parquet": {
+      "size_bytes": 238164,
+      "sha256": "53b38af09af0d704d6f831511fb9c67ea436c3ea0d68e808fdcfc82531ab5098"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/section3all_xls_30902%20Qtr$_73.parquet": {
+      "size_bytes": 247185,
+      "sha256": "b35fc65f2348afd9fc2a5b4514f3f49ef6b867bf6bd5f1d88a48283a61576a2e"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/section5all_xls_50402A%20Ann$_47.parquet": {
+      "size_bytes": 76212,
+      "sha256": "0f8260d4d04a3cbc3dcbfce960f0ecfb690b4b4707f857c87f193e01605c1b68"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/sr_sp_57.parquet": {
+      "size_bytes": 64274,
+      "sha256": "fca40cfa3fcbcfab19c8e1f5015a5b90c279ab4123a9150cac830a3d4d4b0c58"
+    },
+    "/Users/hugh/datasets/gittables/data_rate/tpsection5all_xls_50306%20Qtr$_27.parquet": {
+      "size_bytes": 77827,
+      "sha256": "8ddb7da0f748221101a968ff14e75384c8e8abef54b0b290d64f9de68c249e9a"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/03-04_65.parquet": {
+      "size_bytes": 67683,
+      "sha256": "bed7dd6787ad1455bd8579b5a85b47d9c99e653d0556419acb68f438ccd511f9"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/10-11_64.parquet": {
+      "size_bytes": 53637,
+      "sha256": "fcf5c1529748f298a8ceb51e8d7b913692e854026ea834c89d41782c2f126b2a"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/20170209_articles.parquet": {
+      "size_bytes": 30369,
+      "sha256": "360c8149424aa936fb77148c894925aa5b28f00bf74df601381ba94225f2d75d"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/Abdomari.parquet": {
+      "size_bytes": 9705,
+      "sha256": "339dff10e254c2f5cfb9e62b31934c820f92e1850a1b288a6f3484cc2aaf1959"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/AnimeFarmer25.parquet": {
+      "size_bytes": 15905,
+      "sha256": "a5f3fd1eabb84844ff2d9cd11a2748581a3332cb9323f9396b168e3fb0cababd"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/acev.parquet": {
+      "size_bytes": 21805,
+      "sha256": "193d6cb50c4fe9e8ac34ac5fec5035a13a2d808548e54e8403aaf495611d96fb"
+    },
+    "/Users/hugh/datasets/gittables/dead_air/khmer.parquet": {
+      "size_bytes": 23392,
+      "sha256": "d7dcb0349c293ebfcbb3aaf0ab71a9975f8e4479d0425d44c0c7d771323066f7"
+    },
+    "/Users/hugh/datasets/gittables/dogwatch/wordforms-en-celex_38.parquet": {
+      "size_bytes": 75307,
+      "sha256": "260480fba850f40147bad316f9e115a571c7f057f0c7a5ca53707e5e7479c602"
+    },
+    "/Users/hugh/datasets/gittables/dwarf/03-04_2.parquet": {
+      "size_bytes": 53407,
+      "sha256": "8d64b00d78dce4f8ff86ac3d89663247d6726b445a1173db7dc7fef8f9201459"
+    },
+    "/Users/hugh/datasets/gittables/dwarf/2010-09-01_1.parquet": {
+      "size_bytes": 10722,
+      "sha256": "1936edc6c293342d15753f8f2ade6c8a4c8f3f4c507223b22249598b22187c9f"
+    },
+    "/Users/hugh/datasets/gittables/dwarf/topic_4_23.parquet": {
+      "size_bytes": 14800,
+      "sha256": "bddb75223cbccc4232349d254184a1afa26f1a3fd414d0d207971f615bd386a8"
+    },
+    "/Users/hugh/datasets/gittables/escape_velocity/Configuration1_window9_split12_typetest_projectvelocity1.5.parquet": {
+      "size_bytes": 36821,
+      "sha256": "81e9860835939a4a537de5db97beadb698f81129231b813c4db4de81af7eee8f"
+    },
+    "/Users/hugh/datasets/gittables/escape_velocity/Configuration4_window0_split2_typetest_projectvelocity1.6.parquet": {
+      "size_bytes": 37258,
+      "sha256": "cfd920ac7c9caf77571f45a5028b13989c3b3ced16f501717313f243f7c1289e"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/02-03_43.parquet": {
+      "size_bytes": 56521,
+      "sha256": "4cba5a4f45e1950aa93ce320765f9932b4afa0827112ddf3176602dd56f4d371"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/06-07_92.parquet": {
+      "size_bytes": 63754,
+      "sha256": "ee858db80c3cbcaabb5f312ddb64489509756c0747d3c7cd67cde2773f909bcb"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/11-12_32.parquet": {
+      "size_bytes": 48122,
+      "sha256": "b28078e3041e0e76831d25082d512b5999d6e0fc08b347bcf228d51f08e26884"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/20-21_32.parquet": {
+      "size_bytes": 58931,
+      "sha256": "a948f104bea21fd99f8284f1935e7ee5410906f3bfb29bd0dfa7b60ecdf51cfa"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/2020-08-03_2020-08-22_counties_sq_errs.parquet": {
+      "size_bytes": 17213,
+      "sha256": "d415929a62a5e83315da99b838d04301be16e576230ffc1f8396e443edf81c72"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/2021-01-04_2021-02-06_states_abs_errs.parquet": {
+      "size_bytes": 17349,
+      "sha256": "1add8bac4e485a4f9e31d898dbd9194054662d9f63462c85db99443b3ecbedcd"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/CYTR.parquet": {
+      "size_bytes": 378037,
+      "sha256": "ed159af67c8d6f4e6871a7eb10ce279e7e715438fc51cdf761d4346d0b539d19"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/MorrisIndices_Total%20Population%20Indicator_sc1500_t2100_test.parquet": {
+      "size_bytes": 15334,
+      "sha256": "2d1d2c3e2a9af465af476a947d12102485c53f739691d91b89cd17455fbd55e9"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/climatescope-tz_1.parquet": {
+      "size_bytes": 8666,
+      "sha256": "7ac9e23e8a86e8cab606d70db332834c025dac64005995b237b58370ef9f4e21"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/masterDF.parquet": {
+      "size_bytes": 55886,
+      "sha256": "c51c97614204313bc5215a72dcde8b23e440aafcc11418c352b90bfbb726887e"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/section1all_xls_10506%20Qtr$_2.parquet": {
+      "size_bytes": 70308,
+      "sha256": "b695399be49a4cde9711c2a84b041c7e4dcdd055f966498fa8156786350eaef0"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/sentiment_13.parquet": {
+      "size_bytes": 12675,
+      "sha256": "0776a0689ba09f9dee629fc71634b89abb4082b0bcc70f4a7472fcf441fd18db"
+    },
+    "/Users/hugh/datasets/gittables/growth_rate/text_603.parquet": {
+      "size_bytes": 23965,
+      "sha256": "7ffa54da856071284c944ae1541c360e7e95a1cec0ad42bb817e0b1b3d1b0242"
+    },
+    "/Users/hugh/datasets/gittables/half_life/00-01_24.parquet": {
+      "size_bytes": 45270,
+      "sha256": "72c23b3857b80af40c9b3ead2bed08be8fd7532a3f7727766a104ec718fea6ad"
+    },
+    "/Users/hugh/datasets/gittables/half_life/02-03_249.parquet": {
+      "size_bytes": 60387,
+      "sha256": "499267f311a1b547bfad3a2943593e66f93dbe03fcf392803213e924c407c151"
+    },
+    "/Users/hugh/datasets/gittables/half_life/04-05_154.parquet": {
+      "size_bytes": 56647,
+      "sha256": "c736ac41d3c2cccc2257f9a8f90aa645f1e3a72d81079832932ecf73fae6ca7b"
+    },
+    "/Users/hugh/datasets/gittables/half_life/05-06_468.parquet": {
+      "size_bytes": 50756,
+      "sha256": "8b4de756551df2acae75c7171ea6d1097bf0e2c5bf28070f82a7927ba61e3483"
+    },
+    "/Users/hugh/datasets/gittables/half_life/06-07_75.parquet": {
+      "size_bytes": 42860,
+      "sha256": "7321db95566c816cdbb2bfcfd31a80df0895cbd5e52845f0ca0f399f5e0e2311"
+    },
+    "/Users/hugh/datasets/gittables/half_life/08-09_277.parquet": {
+      "size_bytes": 58728,
+      "sha256": "efdc0d91dfa0439101d659eedbd8eb5fb84ff34c95e626af4bdfaf7b1e9eea21"
+    },
+    "/Users/hugh/datasets/gittables/half_life/09-10_586.parquet": {
+      "size_bytes": 51613,
+      "sha256": "46f63554925c6c8452c302f52f76ebeca7118a32eefc64c49618f3b546f42f23"
+    },
+    "/Users/hugh/datasets/gittables/half_life/11-12_289.parquet": {
+      "size_bytes": 61410,
+      "sha256": "02c165f346129920f26fef862f66f999e442d9a01159a30cf9a92e31ba30b55d"
+    },
+    "/Users/hugh/datasets/gittables/half_life/13-14_252.parquet": {
+      "size_bytes": 65654,
+      "sha256": "10cb7722f0488efad63e23053a38dc9b8e27e936e7732b9fb79b18155918750b"
+    },
+    "/Users/hugh/datasets/gittables/half_life/16-17_2.parquet": {
+      "size_bytes": 40721,
+      "sha256": "9438e631f6bc194cd365a7415d25abe2f01252712eb833438d662fd466b20806"
+    },
+    "/Users/hugh/datasets/gittables/half_life/1975-02-08_2.parquet": {
+      "size_bytes": 20953,
+      "sha256": "972a40c0f7562c7bd9d225cb5424c0cf330d3c749ca4b7f023e1da9a6bb0bfbf"
+    },
+    "/Users/hugh/datasets/gittables/half_life/2020-09-01_top1000terms.parquet": {
+      "size_bytes": 16505,
+      "sha256": "8ef7dcfca7e8fce58a49ace19bfa6f8f4a98b7960cfd218877a097df2cf9e0df"
+    },
+    "/Users/hugh/datasets/gittables/half_life/23-24_149.parquet": {
+      "size_bytes": 58200,
+      "sha256": "f894283418376a76303dc07b0c4c094af3a5651f762fc42e6ee4c63d0879e10e"
+    },
+    "/Users/hugh/datasets/gittables/half_life/Arrvilja.parquet": {
+      "size_bytes": 33323,
+      "sha256": "91e2f5eddffcbcf17a2bca01d9ca8760355c22ec273a24f68bd01460ddf35ae6"
+    },
+    "/Users/hugh/datasets/gittables/half_life/SP_500_Finanznet_urls.parquet": {
+      "size_bytes": 13040,
+      "sha256": "4a089e4e6c82ac31e8a8b6d5ffaa750bb3649df3577186540352b4965560b36e"
+    },
+    "/Users/hugh/datasets/gittables/half_life/cmihai.parquet": {
+      "size_bytes": 21418,
+      "sha256": "387b952a00cdd50589225688fb26c01d0c6cad3a50cd60669b15b5d049796397"
+    },
+    "/Users/hugh/datasets/gittables/half_life/ign-2019-games.parquet": {
+      "size_bytes": 9955,
+      "sha256": "1a048300c978a3feef1b46fd1a564b5c4530807006ad18bfc5b70b6d07c86dcf"
+    },
+    "/Users/hugh/datasets/gittables/half_life/rccsf1950_1979_0_2.parquet": {
+      "size_bytes": 36484,
+      "sha256": "31d168bb54cd785a68b5c986a67187b7f9c024280f740cbe0caa5e6ec7d80f62"
+    },
+    "/Users/hugh/datasets/gittables/half_life/top1000_2020-04-13_1grams.parquet": {
+      "size_bytes": 15943,
+      "sha256": "0ea92af3261c441569452ca9ba48a5ea94c857b15af1064cc2ce71c05aa64f7f"
+    },
+    "/Users/hugh/datasets/gittables/id/%E3%81%93%E3%81%93%E3%82%8D%E3%81%AF%E3%82%A2%E3%83%B3%E3%83%80%E3%83%B3%E3%83%86%E3%81%A7.parquet": {
+      "size_bytes": 17073,
+      "sha256": "26e2433a9c5e13d5d5a011532d91f3ecec91efd0fe331346c44e122fbd14f976"
+    },
+    "/Users/hugh/datasets/gittables/id/%E5%86%AC%E3%81%AE%E3%81%A8%E3%81%8A%E3%82%8A%E9%81%93.parquet": {
+      "size_bytes": 19946,
+      "sha256": "3e80a52dea6b70925606e7a2d7820a778e95627ac072947422145c5aeb780994"
+    },
+    "/Users/hugh/datasets/gittables/id/0011500014_2.parquet": {
+      "size_bytes": 42556,
+      "sha256": "1d2484ed7d1c3f091899f10229efa02e48806655a3f054d254ddbf82b250595c"
+    },
+    "/Users/hugh/datasets/gittables/id/0021500398.parquet": {
+      "size_bytes": 43003,
+      "sha256": "79cbb73650c6c77ed9c760649e1ab350566c77ead828d8431a8721f75fe29540"
+    },
+    "/Users/hugh/datasets/gittables/id/0021600016.parquet": {
+      "size_bytes": 42939,
+      "sha256": "cf0de31e72931ad050c7b48bfb915a5cdfa868f1f1cca1792865bb035751eb67"
+    },
+    "/Users/hugh/datasets/gittables/id/0021600187_6.parquet": {
+      "size_bytes": 59030,
+      "sha256": "21cf8dca038f7e0b20ef1795c636e08ad3fbf763580d1995ad7b0f08715f60a6"
+    },
+    "/Users/hugh/datasets/gittables/id/0021600356_1.parquet": {
+      "size_bytes": 57240,
+      "sha256": "75e5fc7022fb30561a77b4540492a91f9a4879041287a3b3986fe820690d49c1"
+    },
+    "/Users/hugh/datasets/gittables/id/0021600528_2.parquet": {
+      "size_bytes": 57495,
+      "sha256": "883efad58394a1d0a327d0b8b062a3024c308dcec9b4a26f7374f79787d3292b"
+    },
+    "/Users/hugh/datasets/gittables/id/0021600696_1.parquet": {
+      "size_bytes": 57611,
+      "sha256": "300ebe6965fd8a7a168cae2a567949e83e834f7a1764a86723578d022bda785d"
+    },
+    "/Users/hugh/datasets/gittables/id/0021600860_2.parquet": {
+      "size_bytes": 57838,
+      "sha256": "96762d778a77e4453519f8e7dabf5228fa8dda5ec863cc25d317f28499e52e8c"
+    },
+    "/Users/hugh/datasets/gittables/id/0021601029_2.parquet": {
+      "size_bytes": 57662,
+      "sha256": "9162d0c42c3948a245a230d92d1f12f4753615006dd4ae33a31dc3c3b6125773"
+    },
+    "/Users/hugh/datasets/gittables/id/0021601197.parquet": {
+      "size_bytes": 43060,
+      "sha256": "308ae8d058e2f6c0da474b34fe6dc6690e2e5f634163ace73efe8f4300ace0e5"
+    },
+    "/Users/hugh/datasets/gittables/id/0021700148_2.parquet": {
+      "size_bytes": 57893,
+      "sha256": "e195a586e01479ef69845ca5e738d0766336782a64e213db3be48ec49ed2cbd4"
+    },
+    "/Users/hugh/datasets/gittables/id/0021700329_3.parquet": {
+      "size_bytes": 57461,
+      "sha256": "5830d4582e7f639399c70d47acfc4d7acf0d75ac059bd162c2d6e50549a62788"
+    },
+    "/Users/hugh/datasets/gittables/id/0021700507.parquet": {
+      "size_bytes": 42703,
+      "sha256": "689b9f3203c5c91890608fb067498a6a315bbe01ad85ce9dab4b3e419e6ab97e"
+    },
+    "/Users/hugh/datasets/gittables/id/0021700695.parquet": {
+      "size_bytes": 42936,
+      "sha256": "8dc0809b9bdf329d5f16159cbcbc3b4f4615c52154de3b90bbd67b14cff3fb4c"
+    },
+    "/Users/hugh/datasets/gittables/id/0021700874_4.parquet": {
+      "size_bytes": 58071,
+      "sha256": "c44cc728ee64a76061720620f8b29a1c46ddc2674bfb1e6a5a2e7aebb496ec0e"
+    },
+    "/Users/hugh/datasets/gittables/id/0021701059_9.parquet": {
+      "size_bytes": 59179,
+      "sha256": "3c0ef803d01d9f8a2ed02ed3aadc7d3eeeca0400672a2dc2db968f8091b86e45"
+    },
+    "/Users/hugh/datasets/gittables/id/0021800012_1_1.parquet": {
+      "size_bytes": 57482,
+      "sha256": "b1c6a7d73aa79e4dd100f41f78ba714355b0f9a057e30aa0af84a12ea63c0fde"
+    },
+    "/Users/hugh/datasets/gittables/id/0021800202_8.parquet": {
+      "size_bytes": 42853,
+      "sha256": "3c8765fd332b89025efcfd4c545fbd1ef59572b809a5038f2911a1b84b67d1a6"
+    },
+    "/Users/hugh/datasets/gittables/id/0021800384_2.parquet": {
+      "size_bytes": 57857,
+      "sha256": "707ec1a21d9be62c79a960a15685486eac9d340e5b2e290572a1b0c889ef7c8b"
+    },
+    "/Users/hugh/datasets/gittables/id/0021800564_7.parquet": {
+      "size_bytes": 59259,
+      "sha256": "64c93bc13dab66659cf95884a1865fc022aa6a27e9562fd041bdb2408a6afe4e"
+    },
+    "/Users/hugh/datasets/gittables/id/0021800742_4.parquet": {
+      "size_bytes": 57873,
+      "sha256": "06062dd17689d929fa74c4b2d097aa04e49a9975b878cb58b1419e98698c863a"
+    },
+    "/Users/hugh/datasets/gittables/id/0021800920.parquet": {
+      "size_bytes": 42964,
+      "sha256": "35933841cf94106b1f090cf643fa64994deed8a2eef774460b82d25594badcad"
+    },
+    "/Users/hugh/datasets/gittables/id/0021801097_4.parquet": {
+      "size_bytes": 57206,
+      "sha256": "3c90c0b5439391a15b6db6cf330b1f9cecbd8fa24d19f99c843b44d87c7f2233"
+    },
+    "/Users/hugh/datasets/gittables/id/0021900044_9.parquet": {
+      "size_bytes": 59254,
+      "sha256": "421f656f273261511167676eff8db63e0ef833522513b6d2f92b55d4cec302bc"
+    },
+    "/Users/hugh/datasets/gittables/id/0021900214_1.parquet": {
+      "size_bytes": 58093,
+      "sha256": "7e7e180ab2410e2bcd2c67b1ca1d3e35abc5efcd2b2bf15461d449b21105cce6"
+    },
+    "/Users/hugh/datasets/gittables/id/0021900387_2.parquet": {
+      "size_bytes": 57898,
+      "sha256": "e6b9b4676a7157d580446972b5fa01fd99ad451d954ab064dee9674a101b1fca"
+    },
+    "/Users/hugh/datasets/gittables/id/0021900562_4_1.parquet": {
+      "size_bytes": 57683,
+      "sha256": "c7439bd7ee17c3dd15ae57706cc9a6f61058d705252b88ec93b4cee2e24c50d4"
+    },
+    "/Users/hugh/datasets/gittables/id/0021900730_2_1.parquet": {
+      "size_bytes": 58150,
+      "sha256": "70eb131f482cb04cb5f3beafe2c611dc4fb2999b76b89069f65232713d0f957b"
+    },
+    "/Users/hugh/datasets/gittables/id/0021900901.parquet": {
+      "size_bytes": 42981,
+      "sha256": "48fd8a462ee8cfb0010740a7b96ef848620aebbcf69c30532e0bd8695d230aac"
+    },
+    "/Users/hugh/datasets/gittables/id/0022000010_1_1.parquet": {
+      "size_bytes": 57904,
+      "sha256": "245b7171d15f940592ed2d472e0eec8d92bab0ae6b9d8f6a99691b423291a306"
+    },
+    "/Users/hugh/datasets/gittables/id/0022000196_4_1.parquet": {
+      "size_bytes": 58041,
+      "sha256": "ffdfd770e7bb3d92617d0e6946e13d3747368cbf7840ebfd4ba357764a76dc69"
+    },
+    "/Users/hugh/datasets/gittables/id/0022000384_2.parquet": {
+      "size_bytes": 57875,
+      "sha256": "f525f381aec8314178840dd92280d19edde0c358fcb758db9f80d30a230cb6fb"
+    },
+    "/Users/hugh/datasets/gittables/id/0022000571.parquet": {
+      "size_bytes": 41912,
+      "sha256": "4326f564d3fdcb8b903011f78f615dbb5aaf3d09545faf4e0ebb25e6497b31db"
+    },
+    "/Users/hugh/datasets/gittables/id/0022000755_2.parquet": {
+      "size_bytes": 59381,
+      "sha256": "dd290292695d4c45dd0a5fd9427a32bfb2ed8230e3be0b5a538254701592cb82"
+    },
+    "/Users/hugh/datasets/gittables/id/0022000945_4.parquet": {
+      "size_bytes": 57165,
+      "sha256": "ec7c6ed60bd504cbfd7228c2009c569de2471a8a9e4d9c524a9ddf3e61a5cf5b"
+    },
+    "/Users/hugh/datasets/gittables/id/0041700231.parquet": {
+      "size_bytes": 42180,
+      "sha256": "83378d23d763c96489673b8b74e91b47c75dbd96eed00c3c882e1bf3f2dc9388"
+    },
+    "/Users/hugh/datasets/gittables/id/05CH482_3.parquet": {
+      "size_bytes": 24138,
+      "sha256": "3052060ea17839f595a60af835d7e2a1fde58d7796f15e17dd515b586d1ec1fa"
+    },
+    "/Users/hugh/datasets/gittables/id/10.1038_ncomms7750_1.parquet": {
+      "size_bytes": 328301,
+      "sha256": "357c5c0340deb378ba64898cd14e99005c3f6596b3de1004b629b0408516837c"
+    },
+    "/Users/hugh/datasets/gittables/id/1135082039999-EW.parquet": {
+      "size_bytes": 17017,
+      "sha256": "649ee61b41cd21cbfef4f5b280e83a89ced7a31c67ab66fe1608c65292829815"
+    },
+    "/Users/hugh/datasets/gittables/id/15-52-59.parquet": {
+      "size_bytes": 35596,
+      "sha256": "f363f12ad6cd2d4b706c0a22945fc2a263ee284cb0d565e5b4b9ac9e17e99ed4"
+    },
+    "/Users/hugh/datasets/gittables/id/1626154_3.parquet": {
+      "size_bytes": 50384,
+      "sha256": "a0b7f4a66ef810c10174aeecd9a035beaa5b14f3361c5ef609a52bb6551a48c0"
+    },
+    "/Users/hugh/datasets/gittables/id/1629152.parquet": {
+      "size_bytes": 35513,
+      "sha256": "4e6216c6c168392da5c3a427f82ddad273ba19a278fa01a89ecc7e758382bea6"
+    },
+    "/Users/hugh/datasets/gittables/id/19-26-35.parquet": {
+      "size_bytes": 35648,
+      "sha256": "872504318025c8f90871cefdec159930f98fa5277830fd8034e2db4339c70b45"
+    },
+    "/Users/hugh/datasets/gittables/id/2-s2.0-84901405005_1.parquet": {
+      "size_bytes": 19532,
+      "sha256": "712e0b42c61f73e2a35ba29feb6c210a5cb9c4ecac5d37f724eeda48181e264c"
+    },
+    "/Users/hugh/datasets/gittables/id/2014_partidas_1.parquet": {
+      "size_bytes": 18638,
+      "sha256": "e5b2085f6f598bca3155074d0337b8bf6dd1d8e32076ff5a8a962250d32db012"
+    },
+    "/Users/hugh/datasets/gittables/id/2017-01-05_00_00_00_40.parquet": {
+      "size_bytes": 21966,
+      "sha256": "b599277d873c3c9234d49a5f5fbf3e9525d5298c6f7f38253431f5f5cf230878"
+    },
+    "/Users/hugh/datasets/gittables/id/2019-11-15_fs5_val_cresh07_1.parquet": {
+      "size_bytes": 47161,
+      "sha256": "e490126a824c1f834538d0293ea430e21d735580f4877338c0e199d3e2fa3890"
+    },
+    "/Users/hugh/datasets/gittables/id/202339_2.parquet": {
+      "size_bytes": 38656,
+      "sha256": "7eab24b96f2da60b593fa6d528c6d3bd3dce7c1f27e6f67eae0ea038c8114cbf"
+    },
+    "/Users/hugh/datasets/gittables/id/203521_2.parquet": {
+      "size_bytes": 37443,
+      "sha256": "376f2e5491613e96a528481378e0384d6f2399a7bff87d351111a1bbd4e82624"
+    },
+    "/Users/hugh/datasets/gittables/id/23-05-15.parquet": {
+      "size_bytes": 35573,
+      "sha256": "45509e46dc6a07dc0f1da66b2fffcdc9ad9fc187189fce87ad0273832ca331dd"
+    },
+    "/Users/hugh/datasets/gittables/id/30063.parquet": {
+      "size_bytes": 18401,
+      "sha256": "b8db8d85471ce0c8d344f180f709d2dee63ea01150334f218af4881b9db197a2"
+    },
+    "/Users/hugh/datasets/gittables/id/3d4a16ecd5bd5ece32bff5b3ab7d80e2179ee146020a5737c74f5d8cb8f6df9b_10.parquet": {
+      "size_bytes": 61926,
+      "sha256": "96c8310eaf322307f4d88c2b60c4e09eb205824f2e9a6a9f9f3a93e83cff701e"
+    },
+    "/Users/hugh/datasets/gittables/id/614761.parquet": {
+      "size_bytes": 21744,
+      "sha256": "f193bcf1a47e56946316a487cfef80638d5772f6385d04158ff2fe1974efd583"
+    },
+    "/Users/hugh/datasets/gittables/id/8174.parquet": {
+      "size_bytes": 13851,
+      "sha256": "2c617e7b28d94bad9d06e9fe7811f6f70b98094257ec74ac077cc05feb2a6cde"
+    },
+    "/Users/hugh/datasets/gittables/id/ACT_20190923-061901.parquet": {
+      "size_bytes": 43300,
+      "sha256": "6d3724c74291aa3370ff255eab574655f68fac5af6709dce352b2654c6309e93"
+    },
+    "/Users/hugh/datasets/gittables/id/Albosynnema.parquet": {
+      "size_bytes": 55066,
+      "sha256": "0dd32dc3c8d67721254939ce01147c462c4b54b097f6977b00652ab8956693b1"
+    },
+    "/Users/hugh/datasets/gittables/id/Anthorrhiza_2.parquet": {
+      "size_bytes": 55497,
+      "sha256": "84b824e17f87ed7f939c027aa84d6a724cc306cd92029a1696f8a08fdadca235"
+    },
+    "/Users/hugh/datasets/gittables/id/Atichia_1.parquet": {
+      "size_bytes": 56221,
+      "sha256": "d9ce182906b187b1fa6cbed921cd33b66d611732b11301c5c94967b386b37920"
+    },
+    "/Users/hugh/datasets/gittables/id/Beecham2014npany_5e-6_Wells2019hdiff_mrpresso_MRdat.parquet": {
+      "size_bytes": 39577,
+      "sha256": "8cafc26ccb545953aa7d5d7482786ab2d0f1ffc63d5079514b29d63cabc4aaef"
+    },
+    "/Users/hugh/datasets/gittables/id/Bryan_Dunne_3_reviews.parquet": {
+      "size_bytes": 58320,
+      "sha256": "ac506a70ebbc2847195709c635e436d25dc1e7c5e4bb76df37ffb3ac5e422a05"
+    },
+    "/Users/hugh/datasets/gittables/id/Calpidisca_2.parquet": {
+      "size_bytes": 56232,
+      "sha256": "b45cc3f744ce84987f75cda40dc0ea662aee0588140e9333cd8aa09f93392550"
+    },
+    "/Users/hugh/datasets/gittables/id/Chaetostachydium_1.parquet": {
+      "size_bytes": 55769,
+      "sha256": "530b4efc065b6d35f4ad900d6888a8e30230459fa1ca712bed82e814b15697cf"
+    },
+    "/Users/hugh/datasets/gittables/id/Clypeolella_1.parquet": {
+      "size_bytes": 57698,
+      "sha256": "7116d18f8a65b044c01afcb25d5d770d6ff0bdacbd35174dcd7e9c8aea5f5ad5"
+    },
+    "/Users/hugh/datasets/gittables/id/Configuration2_window18_split6_typetest_projectpbeans2.0.parquet": {
+      "size_bytes": 28521,
+      "sha256": "432f4bed473b8c12045f5d9d65e22739530d983916f74c6d7abd7dd93be62266"
+    },
+    "/Users/hugh/datasets/gittables/id/Crossoglossa.parquet": {
+      "size_bytes": 57391,
+      "sha256": "449216f37afdf4e96e9d457883c63890d26508fe2b5a419bcf77e91999c115e3"
+    },
+    "/Users/hugh/datasets/gittables/id/DIGIT_20190926-004413.parquet": {
+      "size_bytes": 41915,
+      "sha256": "feaad1e6c6658aa8944ae8464d77d1ceabc696bee9ab3dfd564cfe21bd95ab21"
+    },
+    "/Users/hugh/datasets/gittables/id/Dendrophysellum.parquet": {
+      "size_bytes": 54987,
+      "sha256": "3ad537acd46ecfe9cf6e5824b291a41fbd5a7ddca4dda64110bc29ef2d883148"
+    },
+    "/Users/hugh/datasets/gittables/id/Designite_Eve.Tests_DesignSmells.parquet": {
+      "size_bytes": 18503,
+      "sha256": "cfdb749b940d6936048d7343a7907632d803dbb3a24b6018349a438b757e1df4"
+    },
+    "/Users/hugh/datasets/gittables/id/Designite_Newtonsoft.Json.Net35_NamespaceMetrics.parquet": {
+      "size_bytes": 17086,
+      "sha256": "74e95d258f64346b51019e4ad19d2f91b9ace649a9d9994e45edf7611e74e227"
+    },
+    "/Users/hugh/datasets/gittables/id/Designite_StackOverflowSamples_MethodMetrics.parquet": {
+      "size_bytes": 12653,
+      "sha256": "573b855fae06ad9653faa65d9e59a2721fcb5a414fc882ae83c7a0e765ad9b75"
+    },
+    "/Users/hugh/datasets/gittables/id/Dicladiella.parquet": {
+      "size_bytes": 55344,
+      "sha256": "a7fe549b2ce7c119769bf2ad4306bdd175fc38d5517fa0392fd83a4a68c6858d"
+    },
+    "/Users/hugh/datasets/gittables/id/E-Jung_Choi_1_reviews.parquet": {
+      "size_bytes": 58360,
+      "sha256": "42e97ac0c125f59110c4f99e408369def9d98bbf8096e03c598f96d5e69cfdea"
+    },
+    "/Users/hugh/datasets/gittables/id/Epipogium_1.parquet": {
+      "size_bytes": 57550,
+      "sha256": "3574856b6ff76d30fa7b88113a04d73e06544b923d06b685140a708b33d7234e"
+    },
+    "/Users/hugh/datasets/gittables/id/Favostroma_1.parquet": {
+      "size_bytes": 54991,
+      "sha256": "2270e8ad708587977069f9bb0ab5cb4fef6dcf51256ed3c5a94ce3b392ff3db8"
+    },
+    "/Users/hugh/datasets/gittables/id/Gary_Gladding_1_reviews.parquet": {
+      "size_bytes": 59850,
+      "sha256": "7607339faff28a317b1fc3ffb8315bb04b7227d87a749c5a120e2c326196ab51"
+    },
+    "/Users/hugh/datasets/gittables/id/Gymnascella.parquet": {
+      "size_bytes": 56555,
+      "sha256": "bea84320cdf6b5bca486528308d02e087620349470de506ed2916fe70e7338ad"
+    },
+    "/Users/hugh/datasets/gittables/id/Hemidictyum_2.parquet": {
+      "size_bytes": 56317,
+      "sha256": "2abd43cf9fd7a73ac94b01e3b5d48e7f42b81855d8746a1d9b3eb03257c2fa7c"
+    },
+    "/Users/hugh/datasets/gittables/id/Hymenogyne_1.parquet": {
+      "size_bytes": 55287,
+      "sha256": "a2b09b8c3849dc42ee45a21cec606c5ac66b9968018acb65e31262609ef90147"
+    },
+    "/Users/hugh/datasets/gittables/id/Iryce_Baron_1_reviews.parquet": {
+      "size_bytes": 61494,
+      "sha256": "dc0edebc7cdd579ef4fb153553f828904b22c5b059c3db6111c44484b6b77b0c"
+    },
+    "/Users/hugh/datasets/gittables/id/KRIM_RSP_ATTR_DATA_T_7.parquet": {
+      "size_bytes": 19997,
+      "sha256": "8e6a921272d16ef60e8e414f0bf6459a18b4683e7d91331e7b3552ff30f89736"
+    },
+    "/Users/hugh/datasets/gittables/id/LYM_Biches-head-single.parquet": {
+      "size_bytes": 17091,
+      "sha256": "5a24365c58b60236c7c0a84b008ef29e045db59126f1d745b9fb5500f73e0958"
+    },
+    "/Users/hugh/datasets/gittables/id/Leptothyrella.parquet": {
+      "size_bytes": 57284,
+      "sha256": "1f4559d5d7648b4a521bab03cd49c1a8092d3c5951c7d0f83277862cc7428d4e"
+    },
+    "/Users/hugh/datasets/gittables/id/MED605_coords_1.parquet": {
+      "size_bytes": 27776,
+      "sha256": "e6afc15f67eae7d8105bd11f9bad614b3e4b7ba3d2f2d4f62bdd35bb98496b03"
+    },
+    "/Users/hugh/datasets/gittables/id/Mage_Usa_78.parquet": {
+      "size_bytes": 11300,
+      "sha256": "a888a8000bb272929c2920c817de7b0e2903f03f404c4bf33539d859088056a0"
+    },
+    "/Users/hugh/datasets/gittables/id/Melzerodontia.parquet": {
+      "size_bytes": 55128,
+      "sha256": "9538df28622ecf3383f4533ffa20b9f5636b479c282202fae809e140540be185"
+    },
+    "/Users/hugh/datasets/gittables/id/MorenoStokoe2020_data_selection.parquet": {
+      "size_bytes": 19915,
+      "sha256": "64c02ce6ee601a0499d10137c8c1189ec7b20363dc1c386cc4a79623bb887dd5"
+    },
+    "/Users/hugh/datasets/gittables/id/NegativeControls_50.parquet": {
+      "size_bytes": 17754,
+      "sha256": "a79bdb9676b1c73ab312dbb425d60e1a8192bf1e22dfbf0f66fece846f56829a"
+    },
+    "/Users/hugh/datasets/gittables/id/Odontospermum.parquet": {
+      "size_bytes": 57213,
+      "sha256": "fee01fbf47a5165494bfe68ee530087eadeeab79b2d88233f1d899026a51bb7f"
+    },
+    "/Users/hugh/datasets/gittables/id/Orthothecium_2.parquet": {
+      "size_bytes": 58982,
+      "sha256": "9e4fe412012b38409ca5afa512664f0b7a2b5020231aed9e1946c3362d7754ed"
+    },
+    "/Users/hugh/datasets/gittables/id/PHISICS_RELAP5_MHTGR-350_power_dens_sub_1.parquet": {
+      "size_bytes": 14688,
+      "sha256": "d804f6e9f80904ab5c223250439272bd13c3063b00cad0f04c49890cb9f58923"
+    },
+    "/Users/hugh/datasets/gittables/id/PennsylvaniaUnemploymentInsurance_linkages_mynoa.parquet": {
+      "size_bytes": 16797,
+      "sha256": "93ade771c0521269670ba745f6fcbef2c72df44e81bba4837f4ba74f8f7112f2"
+    },
+    "/Users/hugh/datasets/gittables/id/Physopsis_1.parquet": {
+      "size_bytes": 55566,
+      "sha256": "f9612e5ef0f6004a7c9e31257d5141f761a31bd8cc6af745ec7ff778e50f9e42"
+    },
+    "/Users/hugh/datasets/gittables/id/Pomataphytum_1.parquet": {
+      "size_bytes": 54802,
+      "sha256": "3a21f44b1a03635e382e619b96e98a340b09c4e2616cfaa3f4470d2b4527257e"
+    },
+    "/Users/hugh/datasets/gittables/id/Psorella.parquet": {
+      "size_bytes": 56154,
+      "sha256": "657b8aeb52a2eadac0f2bbbdf38a6ae3f0bc58dd03d677719f379e9addb26268"
+    },
+    "/Users/hugh/datasets/gittables/id/RegisteredIn_1.parquet": {
+      "size_bytes": 20225,
+      "sha256": "8287122c9a573d775b6df27b4d35da1a7de85a12996c30a3f1e449586c6ed74a"
+    },
+    "/Users/hugh/datasets/gittables/id/Ryparobius.parquet": {
+      "size_bytes": 58152,
+      "sha256": "0ed0971f2174524934739dd3f7e26a790e87f6d44c8bb1b0fc0d305c1c59f903"
+    },
+    "/Users/hugh/datasets/gittables/id/ScheduleC_25.parquet": {
+      "size_bytes": 43960,
+      "sha256": "54f8629175608512a9760127ae04e61290eb50d8df15c01adc140c43718898bc"
+    },
+    "/Users/hugh/datasets/gittables/id/Sextonia.parquet": {
+      "size_bytes": 55310,
+      "sha256": "0fe08a765f6716b80537351eb905238822a1a7cf371d4015316aec421729bf2c"
+    },
+    "/Users/hugh/datasets/gittables/id/Sporocephalum_1.parquet": {
+      "size_bytes": 55612,
+      "sha256": "9ed07c0de82369604d9c28301d6bece47643e2c2e512813e3ae0d218d78c8c06"
+    },
+    "/Users/hugh/datasets/gittables/id/StockSharp.Binance_9.parquet": {
+      "size_bytes": 5751,
+      "sha256": "4091ec305dc75874fb95ff6d1114e83336a64825fcc73161a0a7383a6d51d0d3"
+    },
+    "/Users/hugh/datasets/gittables/id/Suksdorfia.parquet": {
+      "size_bytes": 55943,
+      "sha256": "4e7ea5b37c0858100d9165b3d1737f93b845370842e081eede0eae77c592644e"
+    },
+    "/Users/hugh/datasets/gittables/id/Tapeinostemon_2.parquet": {
+      "size_bytes": 56589,
+      "sha256": "4e4131df19ccdb5b3051ddc4daba94bd45055af0a67e734bef0797c4e8910c7e"
+    },
+    "/Users/hugh/datasets/gittables/id/Test_SortDiversionRights_out_1.parquet": {
+      "size_bytes": 16957,
+      "sha256": "48850754896a03325110da7804181209a22d5b0f472367e0739616ce83c6bf31"
+    },
+    "/Users/hugh/datasets/gittables/id/Traxara.parquet": {
+      "size_bytes": 54697,
+      "sha256": "329875cc5f21b92a33420e67c3a4563771cebc85cf6a38d3d7581c1a142ff133"
+    },
+    "/Users/hugh/datasets/gittables/id/US000233_review_abstract_1.parquet": {
+      "size_bytes": 10160,
+      "sha256": "818fd64354c0f8a1029b8ff9f923ae7b153aa155ede89f8c4f07ddde1120c241"
+    },
+    "/Users/hugh/datasets/gittables/id/Villouratea.parquet": {
+      "size_bytes": 55318,
+      "sha256": "b9aaefbf239f2051055b3c2ef06ea646b8b1f3129c3eaa85a8a2f4560a9c3f30"
+    },
+    "/Users/hugh/datasets/gittables/id/Yua_1.parquet": {
+      "size_bytes": 55704,
+      "sha256": "d08ed8817dbfca883b907e3224ee192e5396f1b0cc89f6400292a813be0664fc"
+    },
+    "/Users/hugh/datasets/gittables/id/account.fiscal.position.tax.template_531.parquet": {
+      "size_bytes": 14584,
+      "sha256": "9d21b1140a121c5f9bab5f5adaa699fff7cb21af41d8acb76ac2beb0e9af075c"
+    },
+    "/Users/hugh/datasets/gittables/id/account.tax.template_3849.parquet": {
+      "size_bytes": 44752,
+      "sha256": "19e6d38d879467b778475919db99631abdafa6d3a0199e344bf4b79b1793b2a1"
+    },
+    "/Users/hugh/datasets/gittables/id/account_journal_41.parquet": {
+      "size_bytes": 34926,
+      "sha256": "fe8c5467d2d94b2df7f1183186e4bf3124c62f579d0d4beeabcfbdeb751a168b"
+    },
+    "/Users/hugh/datasets/gittables/id/atorvastatin_scopus.parquet": {
+      "size_bytes": 64320,
+      "sha256": "c1cabcff0699b90adbdd7f6d6f38b5b08299620765ab590524ed8f0adb49c955"
+    },
+    "/Users/hugh/datasets/gittables/id/base_template_15.parquet": {
+      "size_bytes": 40137,
+      "sha256": "71f27154cf9bd4643fdaae5be659cc754bc5ecccdf71f4875a30b7ebbbd2f88e"
+    },
+    "/Users/hugh/datasets/gittables/id/books_6.parquet": {
+      "size_bytes": 17388,
+      "sha256": "2cb07b00e878defe96a59dd41f5889a694d2b0ae0d09b89f593c7bea8c5bccd3"
+    },
+    "/Users/hugh/datasets/gittables/id/boxscore_0021400807.parquet": {
+      "size_bytes": 42840,
+      "sha256": "33b7269a9968a45ab7bdba17fc1d4c8e51711ae242d5d787de068fcd09a1583f"
+    },
+    "/Users/hugh/datasets/gittables/id/boxscore_0021500453.parquet": {
+      "size_bytes": 42505,
+      "sha256": "338c85004881849d7835dfd89355c0a163db908abe3417240a22edcb83ebd579"
+    },
+    "/Users/hugh/datasets/gittables/id/boxscore_0021600114_2.parquet": {
+      "size_bytes": 42926,
+      "sha256": "38304a1a101839efdf08a6150542e6c76f6912dcf8627929b1feae5a2eaef965"
+    },
+    "/Users/hugh/datasets/gittables/id/boxscore_0021601027_1.parquet": {
+      "size_bytes": 42942,
+      "sha256": "a23aad5bbae61cffe16301f0d89bd4cd9e78cffa19e05f3c671b26142405e791"
+    },
+    "/Users/hugh/datasets/gittables/id/boxscore_0021700696_1.parquet": {
+      "size_bytes": 42897,
+      "sha256": "a495c4706ffe80d00900cd18a2a030875739abf52560c938cf7103a6ca354050"
+    },
+    "/Users/hugh/datasets/gittables/id/boxscore_0021800390.parquet": {
+      "size_bytes": 42828,
+      "sha256": "cc0090022a1dda48d8f1aa84ac91166c5fa1e7b5374b58cd4e418ca74a793954"
+    },
+    "/Users/hugh/datasets/gittables/id/campaign_tracker_vip_exception_list_20170703_1.parquet": {
+      "size_bytes": 26784,
+      "sha256": "6e7a9e3681d3c19d32dc9a516decd05524ba507e7623756099a8b7c78e64a687"
+    },
+    "/Users/hugh/datasets/gittables/id/cms_blocks.parquet": {
+      "size_bytes": 33911,
+      "sha256": "b75447d7d8ec45c45905b75b31073a31fdfb9bf884b899db39863e9677a55282"
+    },
+    "/Users/hugh/datasets/gittables/id/congress_votes_114-2016_s163_2.parquet": {
+      "size_bytes": 9866,
+      "sha256": "ec837c0fb84c7c9d81c128c9e304b32b44b2009380376d976d9fc42a074e67e2"
+    },
+    "/Users/hugh/datasets/gittables/id/country_2706.parquet": {
+      "size_bytes": 17294,
+      "sha256": "f688c330e6955979d78dc38f51dd2382046edda6ea769147bf1ec4dad3d80b40"
+    },
+    "/Users/hugh/datasets/gittables/id/country_7090.parquet": {
+      "size_bytes": 10835,
+      "sha256": "59e88f674f6d940ebd33c4402bf12bbeb5e3e52d3fed492d819ffd4f144a114d"
+    },
+    "/Users/hugh/datasets/gittables/id/csd-contribution-174_1.parquet": {
+      "size_bytes": 33757,
+      "sha256": "24be42f33ab4c9b0a13762adbb9b8430ee1c8a7c8bcbf0a3235356085a305552"
+    },
+    "/Users/hugh/datasets/gittables/id/dAte%20with%20T%20%E2%98%86_2.parquet": {
+      "size_bytes": 19469,
+      "sha256": "26d7f99d5dc6c84b8775e7f4778290a2f402e8fa7c0ff745afa42301fac372ab"
+    },
+    "/Users/hugh/datasets/gittables/id/density_binary_32.parquet": {
+      "size_bytes": 30717,
+      "sha256": "ba281343bf3a398c921e1ac8dd8474665e2d56f82354ce83117a5f63d4227626"
+    },
+    "/Users/hugh/datasets/gittables/id/dtb_delivery_fee_118.parquet": {
+      "size_bytes": 17788,
+      "sha256": "2e95548d814d1fe18e8d95472c44f11422e056e7f9cbf2832e00f00e242bfda9"
+    },
+    "/Users/hugh/datasets/gittables/id/emp_industries_counts.parquet": {
+      "size_bytes": 41528,
+      "sha256": "dbb267c05877d66643a75066ffc7b8e8fe29829069e6fcaba3ee90a7e45e2eed"
+    },
+    "/Users/hugh/datasets/gittables/id/es-CL_309.parquet": {
+      "size_bytes": 15686,
+      "sha256": "2190b744c6ae324211c42d484d70a34adcea86b2e23fdf7b98af1ca249e6c220"
+    },
+    "/Users/hugh/datasets/gittables/id/exampleMRdata_icons.parquet": {
+      "size_bytes": 17849,
+      "sha256": "1779b2f61ca0c6aebae55c40ef9e5047b7570b3a9d9c1c8ea47276daa589e018"
+    },
+    "/Users/hugh/datasets/gittables/id/fm_summary_map_113.parquet": {
+      "size_bytes": 29569,
+      "sha256": "9487f4ff77a05454de1bdfc52bf0db22134a13b7b797c2d175f76b4ca5c25339"
+    },
+    "/Users/hugh/datasets/gittables/id/fr-CA_110.parquet": {
+      "size_bytes": 12289,
+      "sha256": "7766f3d1345322431b7babec63f111e18099548da94df43d0f0b27344104557f"
+    },
+    "/Users/hugh/datasets/gittables/id/gameId=0021801208.parquet": {
+      "size_bytes": 27025,
+      "sha256": "808224e163ba3ac2b9319d51372ac0cac1c275dc262a296ffab77ea1276f8113"
+    },
+    "/Users/hugh/datasets/gittables/id/gbp_research_income.nuts2_1.parquet": {
+      "size_bytes": 14135,
+      "sha256": "86ece7a6b744dc306b2a67e0bb442201a93059fc4febdb57a5c062388daf940c"
+    },
+    "/Users/hugh/datasets/gittables/id/groups_import_423.parquet": {
+      "size_bytes": 8948,
+      "sha256": "b18eeaa9828ec1a5d5436b5624a5ba2b55cd89058aac65a53c2927e092684987"
+    },
+    "/Users/hugh/datasets/gittables/id/gw_15534.parquet": {
+      "size_bytes": 106277,
+      "sha256": "95021c2ba8f3573d362b3589f7358faf61467e377195d3ee90a61a0e647ffebc"
+    },
+    "/Users/hugh/datasets/gittables/id/gw_26899.parquet": {
+      "size_bytes": 106651,
+      "sha256": "e818931f4c5c31d8c0b26e764b0a09db03e4a588599c63cdea9cc202e9d4efb0"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85004067175_particle_ID.parquet": {
+      "size_bytes": 18315,
+      "sha256": "0b718eabb396c45995a41a8d2d9ec3cec15ae7c561f4e1db6fa85827ba0ce927"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85004584810_particle_ID_1.parquet": {
+      "size_bytes": 17633,
+      "sha256": "be9304a15a9f10e08d0b9dbdafdbcce74ab924802a2673345a63b654aa08f8b8"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85005046139_particle_ID.parquet": {
+      "size_bytes": 17155,
+      "sha256": "26792a21373bcab86acdc2067836c08e0f5de2251d7c7387bfa70d9438e8908a"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85005496507_particle_ID.parquet": {
+      "size_bytes": 16773,
+      "sha256": "8c9036b7e5015de4314d83f53fd8cd90356536448b2e1311e0f0337924175eac"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85005961962_particle_ID.parquet": {
+      "size_bytes": 16347,
+      "sha256": "6ddd7294337efee2f044a00c5d978032e3870facf53b1a713bf18fa770a8c465"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85006388511_particle_ID.parquet": {
+      "size_bytes": 15976,
+      "sha256": "7c872a939229c468c8fa0378f1931a90aa7c4c1b2b93f7f83c91987eb4b69fea"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85006829972_particle_ID.parquet": {
+      "size_bytes": 15762,
+      "sha256": "69b80a75406c41a87f885bd8584d7c3c4a961ad43451bf7876715232917503ae"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85007262037_particle_ID_1.parquet": {
+      "size_bytes": 15568,
+      "sha256": "78a322ec8c63ba21c0726dee11d128582f5e4a47dc41c42bbbcea5798fa855dd"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85007701508_particle_ID.parquet": {
+      "size_bytes": 15370,
+      "sha256": "102e2cef59b034bc92eed4fe7ab909054be08b331b9706a95b8b16b614d7d11f"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85008124628_particle_ID.parquet": {
+      "size_bytes": 15221,
+      "sha256": "d04f8de377e87a6120e3e244d057c024c7739c15294f60b2524c88141dc4ee2e"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85008522021_particle_ID.parquet": {
+      "size_bytes": 15073,
+      "sha256": "f3db66ee787293be8a19864f4344a7422b5e6f1e25566947bf7ae2f227d2a180"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85009204281_particle_ID.parquet": {
+      "size_bytes": 14767,
+      "sha256": "4e178713061c29f3e26c1e0dc764973ab0be163727e12cd42b950444ca27f285"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85009929106_particle_ID.parquet": {
+      "size_bytes": 14595,
+      "sha256": "f7269c0741c0854e67110113e6a19f254295a9883dac6fd1b45257e760372b4a"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85010829587_particle_ID.parquet": {
+      "size_bytes": 14256,
+      "sha256": "db13f9bcbcde21b3296576227e68c81d9f81fcab8db07559e60b7010c3a35af2"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85011670067_particle_ID.parquet": {
+      "size_bytes": 14047,
+      "sha256": "070c04ac884d8e3d8f07c4a988fb642a446cac28d673b3fee4aff6a4f153b6b5"
+    },
+    "/Users/hugh/datasets/gittables/id/halo_85012658287_particle_ID.parquet": {
+      "size_bytes": 13806,
+      "sha256": "dd117620ad99dad01eb9bf7505143d642c300d2fb1028ee1b8b712379f6acf31"
+    },
+    "/Users/hugh/datasets/gittables/id/hipc_gene_23844129_2_1.parquet": {
+      "size_bytes": 89726,
+      "sha256": "a2317b0cb5661a2d6dfea1a1a67a4182aec81207ed1ab772b74e0f8a4cc42065"
+    },
+    "/Users/hugh/datasets/gittables/id/import-20180717085049-1_CSV_Laptop_code17.1.parquet": {
+      "size_bytes": 273665,
+      "sha256": "5202b68fdfe0950b41ce039f7bba2e2a79a2d88648e87c0891bfdeb39169e5fd"
+    },
+    "/Users/hugh/datasets/gittables/id/input_nodes_n25_s397_cb2.parquet": {
+      "size_bytes": 46166,
+      "sha256": "59662bd30d4b5724e0a6360486cb3ae7b933b92e06a3354d5ea525bc3dae2c06"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_101365.parquet": {
+      "size_bytes": 22281,
+      "sha256": "fee8c5e5116d342581a7c5dbdfd7a65a9cbd215263abba05cf26d5e9e48dee63"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_12589.parquet": {
+      "size_bytes": 20603,
+      "sha256": "db2b5940ae9a09308f4ea81e40434eb9aa3057c278e81b1639ce79b1d683cb07"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_1591.parquet": {
+      "size_bytes": 20360,
+      "sha256": "497ed5e035e77a7c30775fef87b65a6ab94c1534cb51ca97e8c16b1304441244"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_22023.parquet": {
+      "size_bytes": 20543,
+      "sha256": "a1451f2c5d38fe6c20a56fba62bebc695cbd7414d931c06dc7a8deb75fbfcf89"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_27643.parquet": {
+      "size_bytes": 20599,
+      "sha256": "6ef37b9c93c53eb74992798aecdccff227607a617800c53cd41e4694a0e02b6a"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_32392.parquet": {
+      "size_bytes": 20839,
+      "sha256": "5e64a6ef1bdabd68cd924a3f5ccb2787afde8387d37882473b8977dd8fb5c5a8"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_38238.parquet": {
+      "size_bytes": 20841,
+      "sha256": "7e9a5a0ca2d84f6f7a726fd742efd59d401d7274bdfcc7649f33af91f59d1318"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_42231.parquet": {
+      "size_bytes": 20750,
+      "sha256": "aa24b773240a4723b473266bdf971f38636acd12bb048e28eb3e0848f3de53fe"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_46608.parquet": {
+      "size_bytes": 20933,
+      "sha256": "654a2a4c3bc3945f538756ce6ecb26f6e6953772ad99a223a30925bdab02d250"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_51029.parquet": {
+      "size_bytes": 20890,
+      "sha256": "efa2b19e1034c50befc9041259437f91c402c6198e580223d5ecac70a25bdfe0"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_56448.parquet": {
+      "size_bytes": 20632,
+      "sha256": "4621bdc5a8b849ba18989595be78d38eaefade9166792781c831c6d2923f16e1"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_59616.parquet": {
+      "size_bytes": 20759,
+      "sha256": "29c3d5f2aaa701e4f7fb30fb650041a69c5a9fe6c7d4796c1ebc96c283f2394e"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_65056.parquet": {
+      "size_bytes": 21134,
+      "sha256": "6360f17937f8937a6036ede96501e0082108c69ec20dac051e25744faac3e32c"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_70647.parquet": {
+      "size_bytes": 20911,
+      "sha256": "262b7ebc6e0f303f046c490373cc45c7946440c9948a24f5df3c727fea9810ac"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_76128.parquet": {
+      "size_bytes": 20997,
+      "sha256": "543335d0244963fefbaa625b45d0d2541ce82ef6ed7b762dc976e2b1cdc1af3f"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_80953.parquet": {
+      "size_bytes": 21027,
+      "sha256": "c1ba4bdec096c58eeed31edf845b1b807d82fda612bbfd330669bf5bb31f438e"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_86336.parquet": {
+      "size_bytes": 21361,
+      "sha256": "a6e5458b0f9d2f87bae62dcc397298f035f4d49fc10e7416b6c3ffe4230043c2"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_91160.parquet": {
+      "size_bytes": 21546,
+      "sha256": "7c1d044d6f2e4db4b812673fe93d2c5b02ea87e98da5edd7e8e2df25eb209224"
+    },
+    "/Users/hugh/datasets/gittables/id/ir.model.access_9755.parquet": {
+      "size_bytes": 20366,
+      "sha256": "1e86e5f4924ead4103c903964240e2352d3ab4e6badf384329d1710a555a657a"
+    },
+    "/Users/hugh/datasets/gittables/id/jos_finder_links_termsc_7.parquet": {
+      "size_bytes": 11853,
+      "sha256": "b86cea4528b9e96f9c15a0805695271a0954013be6dcabb07e5a8d575d79b721"
+    },
+    "/Users/hugh/datasets/gittables/id/language_12023.parquet": {
+      "size_bytes": 22444,
+      "sha256": "c25b7ce75d03daf9ee9bd554de3af3fae6fa9202faf55084d893e99393078476"
+    },
+    "/Users/hugh/datasets/gittables/id/language_8760.parquet": {
+      "size_bytes": 22704,
+      "sha256": "5223deb81f153539deee2b3f0be197f6e12c64f4a7e10c0572d63ed94ad5fd6c"
+    },
+    "/Users/hugh/datasets/gittables/id/lv-advertisers-by-recent-rm2.parquet": {
+      "size_bytes": 36648,
+      "sha256": "7bcd9fb79fe47188ae6c64acabf8bf6607f6459c1528f85be1432f237b0d3a00"
+    },
+    "/Users/hugh/datasets/gittables/id/messages_nl_78.parquet": {
+      "size_bytes": 14801,
+      "sha256": "64b64e4106207458f416dccfb2d85569493ec88bd789d5bbe77044c0d64d68a5"
+    },
+    "/Users/hugh/datasets/gittables/id/mt-advertisers%2B.parquet": {
+      "size_bytes": 32524,
+      "sha256": "9e4c15e6a713c29016c5d2412e7a0252be83e04e3aa6091a3b9f695446453db3"
+    },
+    "/Users/hugh/datasets/gittables/id/org.parquet": {
+      "size_bytes": 50510,
+      "sha256": "77702a02d82d95a22ec07598879476bf461714a8aea3948242233c8edd0d7154"
+    },
+    "/Users/hugh/datasets/gittables/id/permit-2012-3039_formatted.parquet": {
+      "size_bytes": 19491,
+      "sha256": "97c316c4052578949060a34b4f3f417df89d4e1767dc5e2537b8cfd43b52a6be"
+    },
+    "/Users/hugh/datasets/gittables/id/production_billOfMaterial_39.parquet": {
+      "size_bytes": 37610,
+      "sha256": "e305a2e1ff26c1693a4f05f8793b64b83917ea2a65c58840288cc717cb8ea0f0"
+    },
+    "/Users/hugh/datasets/gittables/id/ratified-indian-treaties_132015565.parquet": {
+      "size_bytes": 31423,
+      "sha256": "1f202be4757d0e434d2ad0c4eade545a99faac0987086b04627c894516ee5d1a"
+    },
+    "/Users/hugh/datasets/gittables/id/requested_services_265.parquet": {
+      "size_bytes": 22123,
+      "sha256": "6b1fc428fabde62422687c3bb72bb468fe51e563d24f2a0ef3f3dda3bd36b8e8"
+    },
+    "/Users/hugh/datasets/gittables/id/results-48.8515804157905-2.40698630136986-52.5.parquet": {
+      "size_bytes": 24114,
+      "sha256": "f97fed67c39d8392904928ac296e3a57f213422614120bb077ebc7ecf7191d13"
+    },
+    "/Users/hugh/datasets/gittables/id/results-48.87473315-2.351609589-52.5.parquet": {
+      "size_bytes": 23944,
+      "sha256": "7a12b03abc73a801756de6428d162975c48a52426ad2c62c106ce69cdf8a176b"
+    },
+    "/Users/hugh/datasets/gittables/id/results-48.89363334-2.34010274-52.5.parquet": {
+      "size_bytes": 25723,
+      "sha256": "d43d1fa7c57232f9a661ac73edb8da539fc44e1125423ebd2411b3da55882032"
+    },
+    "/Users/hugh/datasets/gittables/id/sale_saleOrder_114.parquet": {
+      "size_bytes": 49139,
+      "sha256": "6a16d1dc19f06fe0f520bac908741c7feb9e537fb79764a16c6acd0a6f6c24de"
+    },
+    "/Users/hugh/datasets/gittables/id/scene_evt170531_cp5_q1_s10.parquet": {
+      "size_bytes": 17707,
+      "sha256": "81367d2847a9d131c72736f4e82860013c83da4fc4388074a0a98cfca26f5332"
+    },
+    "/Users/hugh/datasets/gittables/id/semi_harmonic_869.parquet": {
+      "size_bytes": 44585,
+      "sha256": "af72c31e441952d9d362bebd0874dc73a556f008ab9fde229c521a90b3931ba9"
+    },
+    "/Users/hugh/datasets/gittables/id/sim_K20_N16_T50_M200_G0_H10_C40_run6.truth_frequencies_1.parquet": {
+      "size_bytes": 21538,
+      "sha256": "5ea3e302e07e61b3e5038ee6b835fa113430184a3ce71964ef9f4ecb4673b97c"
+    },
+    "/Users/hugh/datasets/gittables/id/standard_player_pitching_stats_1873.parquet": {
+      "size_bytes": 57609,
+      "sha256": "1f0fbba36223c85bee4bb3712982ea6e85b8c06ae3d4252cb9b43129d0a843b1"
+    },
+    "/Users/hugh/datasets/gittables/id/tablets-uploading-data-KITKIT_2018-07-06.parquet": {
+      "size_bytes": 16823,
+      "sha256": "c3185c133c3a6137e9576ae68c280c233c1840f4ad7b0b3b7d82cef69a594f62"
+    },
+    "/Users/hugh/datasets/gittables/id/technician_shifts_114.parquet": {
+      "size_bytes": 17161,
+      "sha256": "fcc734c3df2db3cf764b1f99dc16e72f0078a8b830e840e236b918fcbaaf4eca"
+    },
+    "/Users/hugh/datasets/gittables/id/testOutput_43.parquet": {
+      "size_bytes": 21441,
+      "sha256": "8714d76cdeb06cc1bfb9c110c76717d94f84b951123a6ec6e4f1d2a871426834"
+    },
+    "/Users/hugh/datasets/gittables/id/truth.valid_3.parquet": {
+      "size_bytes": 71521,
+      "sha256": "f026656d4117eeca98104cb09c74b77e4a11e27cd967bbd64071d6e4ef57bdea"
+    },
+    "/Users/hugh/datasets/gittables/id/user_2404bef4e3792548ff4bd2ce9f3492359a8d3bab.parquet": {
+      "size_bytes": 28002,
+      "sha256": "50390195dd50bb7a6f6fc67de29007e03eba6946bd196029dfb14d9ccae5dba5"
+    },
+    "/Users/hugh/datasets/gittables/id/wc-20140618-210231_16.parquet": {
+      "size_bytes": 24288,
+      "sha256": "eb70749bafdf5c24f14b7339a9f2af9ed1be180be5a10ff6366c0eadeaaf8a94"
+    },
+    "/Users/hugh/datasets/gittables/id/zipcodes.parquet": {
+      "size_bytes": 6387,
+      "sha256": "cd5413abba9195e232259fe49ec3e16a6052fece3ec354d1d88ef3d5085d3d47"
+    },
+    "/Users/hugh/datasets/gittables/in_time/0131_141429_InitializeSampleRD.parquet": {
+      "size_bytes": 8109,
+      "sha256": "55c4bae87f9debd515a2992b3fb8d478c9069247a7500970faef59df129feb0c"
+    },
+    "/Users/hugh/datasets/gittables/in_time/0201_184618_InitializeSampleRD.parquet": {
+      "size_bytes": 7851,
+      "sha256": "afe777a9033f9461950199febf2b6db79ae090f76c3a0cebb38a502d43f980c2"
+    },
+    "/Users/hugh/datasets/gittables/in_time/0204_012239_InitializeSampleRD.parquet": {
+      "size_bytes": 8139,
+      "sha256": "9dd6cf63c26761cc9fa9a66a05eb1a25fd10924da7b4f5ec2737ef905412cad4"
+    },
+    "/Users/hugh/datasets/gittables/in_time/0210_043029_InitializeSampleRD_1.parquet": {
+      "size_bytes": 7620,
+      "sha256": "69f733c9d9f0b9472cbeeb26445985c8fd33fadad7d6641f54211e9380f56a7b"
+    },
+    "/Users/hugh/datasets/gittables/in_time/0222_164803_InitializeSampleCC.parquet": {
+      "size_bytes": 7767,
+      "sha256": "01ed8f854ace86968f03802c964dfd032404094a0e05bc7c51b07a7daef364cd"
+    },
+    "/Users/hugh/datasets/gittables/in_time/04-05_47.parquet": {
+      "size_bytes": 38287,
+      "sha256": "bf683394451c769597b2a7351325208cace9920db8542fe12016098ab863b3a7"
+    },
+    "/Users/hugh/datasets/gittables/in_time/1114am_msg_1.parquet": {
+      "size_bytes": 7370,
+      "sha256": "fafd22aed9ba640ac20af08209f132e192ccc3d767c3d9b2c14c98d0c8cf4921"
+    },
+    "/Users/hugh/datasets/gittables/in_time/1996-Week-1_Sep-2,-1996_Dallas-Cowboys_Chicago-Bears.parquet": {
+      "size_bytes": 10962,
+      "sha256": "67113bcf5ff7f4849744e0cb7bfd17457f6b136dee5fb9c14e103fb8f5b4bc96"
+    },
+    "/Users/hugh/datasets/gittables/in_time/2018-07-20_6.parquet": {
+      "size_bytes": 11924,
+      "sha256": "10e8f1353f3f06ceb8c90c87961b070aa66ff1c7ee0b5f456f68465d86090a46"
+    },
+    "/Users/hugh/datasets/gittables/in_time/656477inns2_wickets.parquet": {
+      "size_bytes": 12563,
+      "sha256": "95c7b8c9b4324a51f0a866fdc7156fd6e202617dc7f00a01230c234e116b5ee4"
+    },
+    "/Users/hugh/datasets/gittables/in_time/Daily2012-09-09.parquet": {
+      "size_bytes": 21485,
+      "sha256": "8bff969922615fa3851d26632c20a9d2ea510408e428ed2e8d1c4bbdd9791463"
+    },
+    "/Users/hugh/datasets/gittables/in_time/Designite_Nancy.Authentication.Forms(netstandard2.0)_ImpSmells.parquet": {
+      "size_bytes": 19714,
+      "sha256": "d42c471fc8428b9ddc6a9bf9743aadf58b974b2fc53fa7f349ece8b272b8f5d6"
+    },
+    "/Users/hugh/datasets/gittables/in_time/HIPO_20190926-161418.parquet": {
+      "size_bytes": 48106,
+      "sha256": "2b561ba974fb4edf7e8e6ba91fa0bf6bcb75bde84debf02a0c39eda97b7bc7e3"
+    },
+    "/Users/hugh/datasets/gittables/in_time/PARTICIPANT_ITC_SDRD_Builder_2019-12-17_07h32.37.509.parquet": {
+      "size_bytes": 52152,
+      "sha256": "0e1e3d90a7dc29d0ed45a3763943b30fe9a91df80cee0408476fa9f6e3872c02"
+    },
+    "/Users/hugh/datasets/gittables/in_time/StockSharp.Hotbit_1.parquet": {
+      "size_bytes": 4958,
+      "sha256": "3c520f7bdb0c72486aab9107334a0f0f034202185be9cf92782b13ac38456a0f"
+    },
+    "/Users/hugh/datasets/gittables/in_time/annawilliams_btamail_net_cn.parquet": {
+      "size_bytes": 20496,
+      "sha256": "d90e1bee9053840e4c95e509661f52cdb9969da5e93963a5286db5eeae779d23"
+    },
+    "/Users/hugh/datasets/gittables/in_time/cohortDescription_75.parquet": {
+      "size_bytes": 16662,
+      "sha256": "b1a39af7b63fc74c2f1270606db69bdc0d1d65378117d6152425cb29ce90eff3"
+    },
+    "/Users/hugh/datasets/gittables/in_time/email_query_10.parquet": {
+      "size_bytes": 14131,
+      "sha256": "110daae1b21f09e18d3c2326572ed7fe57f93296ca0ebf4da442809b40fdd4a7"
+    },
+    "/Users/hugh/datasets/gittables/in_time/gameId=0022000103_1.parquet": {
+      "size_bytes": 26395,
+      "sha256": "a70f233437ef22aade0fc2ddfe24e1571a76a7c2c4fdcf339431f322ad29a600"
+    },
+    "/Users/hugh/datasets/gittables/in_time/gw_9325.parquet": {
+      "size_bytes": 65905,
+      "sha256": "9c0be244859aa25357ccf1fa722a8c7dc981c3099bfbacd5511bd99b8f6b4c11"
+    },
+    "/Users/hugh/datasets/gittables/in_time/lgdsfi1146_yahoo_com.parquet": {
+      "size_bytes": 18130,
+      "sha256": "0d9f51a5cf827dc7082e89183cb81436517d274cc193e86679063b0705263332"
+    },
+    "/Users/hugh/datasets/gittables/in_time/output_pandas.parquet": {
+      "size_bytes": 27292,
+      "sha256": "0c0239e6d65efba665fafb846717db00aab1f16c337ecca974a11b481aea6d2f"
+    },
+    "/Users/hugh/datasets/gittables/in_time/permit-2009-2274_formatted.parquet": {
+      "size_bytes": 7548,
+      "sha256": "737ffbdcec47821a557e1cc6e5fae8bcea6818bfd67a2b4c8c61d269ae6528c8"
+    },
+    "/Users/hugh/datasets/gittables/in_time/permit-2014-361_formatted.parquet": {
+      "size_bytes": 13769,
+      "sha256": "04ffa4ba79ddfd6344ec8dbfba08c306558447e7ce66a959134f06f4ff2338eb"
+    },
+    "/Users/hugh/datasets/gittables/in_time/rena_f_chaney_reliantenergy_com.parquet": {
+      "size_bytes": 14564,
+      "sha256": "d8c5c37eb168d4d4387dcac2507a1115aa6fd73bcdde95eb7cbc00f672281552"
+    },
+    "/Users/hugh/datasets/gittables/in_time/shuffled0Mind%20Lyrics.parquet": {
+      "size_bytes": 17253,
+      "sha256": "9ebf63f754c7b357c7876ce58716200affaab04accaad6da65d4f1bc27f86be8"
+    },
+    "/Users/hugh/datasets/gittables/in_time/text_54.parquet": {
+      "size_bytes": 10272,
+      "sha256": "dfc755ac940552cd11f874ea6b3a34eaa4d427a0512ddee52911c293bc9b4b02"
+    },
+    "/Users/hugh/datasets/gittables/in_time/weather-2012-07-23_132.parquet": {
+      "size_bytes": 32709,
+      "sha256": "a2939a4996628c42adfdbc54f00bd06a9e1a37410f74c5dda9bcc972a4cbfc34"
+    },
+    "/Users/hugh/datasets/gittables/in_time/weather-2013-11-27_162.parquet": {
+      "size_bytes": 33203,
+      "sha256": "837f16e2f67428064d7f4c3dfbb0fa15287fa6614560c5adaccda6e38b94b9a1"
+    },
+    "/Users/hugh/datasets/gittables/in_time/weather-2014-12-23_166.parquet": {
+      "size_bytes": 32976,
+      "sha256": "b7d81375b77dbbf7063ed22a6abed6662e5edf78db8ec8b7ced5dc630a50a9e6"
+    },
+    "/Users/hugh/datasets/gittables/in_time/weatherDataScraped2015-03-15.parquet": {
+      "size_bytes": 19535,
+      "sha256": "d8501d9bee6fccd55f35cbb03e14611872d547fee0fd757afdecb8dbf96a0c9d"
+    },
+    "/Users/hugh/datasets/gittables/in_time/weatherDataScraped2018-12-13_1.parquet": {
+      "size_bytes": 19334,
+      "sha256": "43d8c7f3dbf2561890d71f58228f43d207eb687d0aee5a1c868cb15803e30e05"
+    },
+    "/Users/hugh/datasets/gittables/in_time/wunderground_1995_05_24_1.parquet": {
+      "size_bytes": 32733,
+      "sha256": "2c882ac9574e26e151a973768264799891c4b58ac8128914713f8bd041f40b1f"
+    },
+    "/Users/hugh/datasets/gittables/in_time/wunderground_2003_03_01.parquet": {
+      "size_bytes": 32517,
+      "sha256": "9e1052a58a366a514dbd68708af16d2ab312430df6a46515d40d67c15dd1bc0d"
+    },
+    "/Users/hugh/datasets/gittables/incubation_period/05-06_2.parquet": {
+      "size_bytes": 47057,
+      "sha256": "8e2cde00f16554a632d98eeff24eccbe787e9ff0a4a07b1e6f0b004e4a60f918"
+    },
+    "/Users/hugh/datasets/gittables/inflation_rate/05-06_9.parquet": {
+      "size_bytes": 55342,
+      "sha256": "79796d9de2fb4640f58d4596487a9737cdbfc450419909312a15dbab3cbd6db8"
+    },
+    "/Users/hugh/datasets/gittables/inflation_rate/AllSensorTypeCounts.parquet": {
+      "size_bytes": 4372,
+      "sha256": "5e9d9525f8a855c0873d59d44858e59425039bbf948602d5a773df172923de54"
+    },
+    "/Users/hugh/datasets/gittables/interim/1c66835c22dbfedf24b2fe2581e59a266e87f7cfbb711a1d5047d02c8f0350a0.parquet": {
+      "size_bytes": 63074,
+      "sha256": "ceb60eaa3be906064191f3ad2e36649a425e889b07b6ab6372000cf902d51e45"
+    },
+    "/Users/hugh/datasets/gittables/interim/text_20.parquet": {
+      "size_bytes": 20299,
+      "sha256": "67a5ddff51391d01968c4285db0d5ec088500012ac469745c211bf8617883b3f"
+    },
+    "/Users/hugh/datasets/gittables/last_gasp/12-13.parquet": {
+      "size_bytes": 41739,
+      "sha256": "50b87dfc0787d642d356ac5047507b2ff193be55a38dbfe0f1b869cf186797b7"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/0028_10.parquet": {
+      "size_bytes": 18517,
+      "sha256": "2905e60393e12a485c2563175293f33740d5a5c0f9f218fba464c9ee06f601a7"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/03-04_131.parquet": {
+      "size_bytes": 52626,
+      "sha256": "c47c7efbccc3d2228c1c9bd6490120f9e3139064373318b61dc9a3cc7bd1aa10"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/04-05_545.parquet": {
+      "size_bytes": 67074,
+      "sha256": "9495fce19942e7a3e5ad7754348f573a771705822ce4d82a8ed80c8c01b38f1f"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/06-07_320.parquet": {
+      "size_bytes": 50498,
+      "sha256": "051121095ca6a1eddc6fe05ab355d56128cf0911bacc8851c6e11301ba392aa0"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/07-08_628.parquet": {
+      "size_bytes": 66428,
+      "sha256": "ed71bb6c7a8e4177a402014ea825b53bc264a94c45b1064abb865d6f1b7989b3"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/09-10_310.parquet": {
+      "size_bytes": 62721,
+      "sha256": "31115d067713317f4b5ec5ae3fcad270b3aac8b76b13c79044bd93a1c618fc2a"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/1010_17.parquet": {
+      "size_bytes": 28555,
+      "sha256": "bb909d74df3a334a7d550ce8daa16bb8f88244a550721847ad3cc20288cdff97"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/13-14_138.parquet": {
+      "size_bytes": 56918,
+      "sha256": "259fe922bf1ecb01b279a2dd3a0525006519c6fa06e9b5be3515be720c3491c7"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/16-17_100.parquet": {
+      "size_bytes": 56333,
+      "sha256": "cdfedb2befea9770ec7cf76df972160db3385b93700dd6fae179db628dd21b1b"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/19-20_82.parquet": {
+      "size_bytes": 53395,
+      "sha256": "f6d9b04c8fb1950e91eff7cdd2b6ba45422091b7793801f1fbc4e9b77e8562c2"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/2021-04-25-2021-04-25-firefox-creator-answers-desktop-all-locales.parquet": {
+      "size_bytes": 60864,
+      "sha256": "50d1488075b9a4e4c754b90cbdbc23c170e191e51ada01986848cafb6e06591b"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/290_tweets_with_labels_model1.parquet": {
+      "size_bytes": 31049,
+      "sha256": "7834173cb37541ece9a9a9a77cb85207643cb781ab8cbf965fcedbc35b95ecad"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/J01-2004_135.parquet": {
+      "size_bytes": 46488,
+      "sha256": "6f1ddd139505123ac3166af8bcf89cd38e97266f989d462c4a8b56e665efa9dc"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/akh_5.parquet": {
+      "size_bytes": 11439,
+      "sha256": "1c1ea101e5c027af016ec71afbaed1b09f2c377262404480d9aa99eddcb3313f"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/dwbfpricesusawin01022016.parquet": {
+      "size_bytes": 42146,
+      "sha256": "8d7f58509d2d8d05c4092233417e3a3b1dbe54145d83e27bf82f108ef0599fba"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/kanji-J4.parquet": {
+      "size_bytes": 18033,
+      "sha256": "cd35a192acfe956c89dc90bb1637a0a33ab599029d96a993ba124fd2fb41cf8e"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/permit-2013-591_formatted.parquet": {
+      "size_bytes": 32610,
+      "sha256": "60b1cb63dd12409a2ce06128325ca778d37949aa4dabd50c5cdf05185111b3b4"
+    },
+    "/Users/hugh/datasets/gittables/lead_time/test_example1_1.parquet": {
+      "size_bytes": 26728,
+      "sha256": "33b309d140777e64cf852ba111b53d9e9622b42c599ab0a949dc0790b9090be6"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/00-01_126.parquet": {
+      "size_bytes": 52996,
+      "sha256": "df35f6b3aafcbc65d66e3ab0b26002e85f0ec258b7a493094c1ab4371f9ef3f4"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/01-02_61.parquet": {
+      "size_bytes": 46836,
+      "sha256": "ded3678ea8274405153e371fa6af9d168cdd34cfd6be1ed4e6df4381b541ef38"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/03-04_265.parquet": {
+      "size_bytes": 60528,
+      "sha256": "c88ab71260e97f684943711c968ac60601c9af81a6e1bdb0697b7a8ce0a55a1e"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/04-05_499.parquet": {
+      "size_bytes": 66574,
+      "sha256": "fa0f56717e69d173c87f5dfb43585883f7738c04ff984f8ff3fe99c2fcd14720"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/05-06_7.parquet": {
+      "size_bytes": 43307,
+      "sha256": "2142bb6f3dc51c8053ccfbfef9fa985343ced11f1c3d90caa2cac8b01914ce5d"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/0615_7.parquet": {
+      "size_bytes": 22211,
+      "sha256": "d7ac370f9b292d6e098fd18e4a243d994a17ebaa4a4fd86ec35a8e936e225069"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/08-09_140.parquet": {
+      "size_bytes": 44571,
+      "sha256": "ad3eb7e94e5910545915c3e074377bf869c82c1dc5a2c0d94b5f5c35afb85c02"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/09-10_257.parquet": {
+      "size_bytes": 58611,
+      "sha256": "70f7ed00cc3145c25e76e591736ea6680df4fd4ea7166dcb523dc25b7d8a5eb3"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/10-11_387.parquet": {
+      "size_bytes": 60207,
+      "sha256": "8506e73170cf81f8a612a578a13ae69b876776f9a236aa05bf7dcbd966935247"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/11-12_588.parquet": {
+      "size_bytes": 67669,
+      "sha256": "fb88f450eba27e0f6eb5e328290c8ddd7a3cd013a73f8fc2022e2e33dd8822bb"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/13-14_364.parquet": {
+      "size_bytes": 53284,
+      "sha256": "5b3c6bc99b82ede00ebde22ed40645ca8fbd6931e98dd6cdf7898bed04a29bd3"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/16-17_169.parquet": {
+      "size_bytes": 61438,
+      "sha256": "fd8f190cb6e65765565621c3e96083e03eae5701fc75c232c1fcb4094d02fac9"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/19-20_206.parquet": {
+      "size_bytes": 64496,
+      "sha256": "85a81769de32fcfd589efb849cf9210c729bfdd70fd71c588e02ab5701ade9db"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/2016_85.parquet": {
+      "size_bytes": 52161,
+      "sha256": "2b375db979a1f8a021ca12c679f478cdd25c644024134a27205283b2e1c9af48"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/23-24_305.parquet": {
+      "size_bytes": 67942,
+      "sha256": "d881a6c9ddb63803a824760f577afc47af2c52f70b87e79c48c7955efd035cb2"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/MSNBC.201208_1.parquet": {
+      "size_bytes": 22870,
+      "sha256": "5b42f478a7a3349db6b7f87ba676ab63f0ae17974c18374959a66133a578ef1f"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/cleanpredictbio19402017-10-15.coefs.parquet": {
+      "size_bytes": 34024,
+      "sha256": "0f1be47c48187c3aab610f8859f1a692fbfbc8b9f12dae820adb185286a4f693"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/items_bak.parquet": {
+      "size_bytes": 48093,
+      "sha256": "bdd7d41f4e3d39a1714c40fc15473790eb7f2943c07df87a35ff76434e72cf49"
+    },
+    "/Users/hugh/datasets/gittables/living_thing/smurg.parquet": {
+      "size_bytes": 30392,
+      "sha256": "c0e6dbe4729742af170e15e6dbd82f309b737c4f8545005b48f679bf57a22e55"
+    },
+    "/Users/hugh/datasets/gittables/meno_mosso/op_politician_birth_locations.parquet": {
+      "size_bytes": 192021,
+      "sha256": "90961971bf5e7090ee05ad5985fee670f7080f02a1de7ae45fd50a23f87ed754"
+    },
+    "/Users/hugh/datasets/gittables/miles_per_hour/11-12_26.parquet": {
+      "size_bytes": 66382,
+      "sha256": "2907b25fa3dc82afc5f53fd0b72d95c6b500436a14fc3c7157d6e021b1cdbe74"
+    },
+    "/Users/hugh/datasets/gittables/object/-MysticEyes.parquet": {
+      "size_bytes": 8796,
+      "sha256": "d8f64f52dc372e335c093bfb1e86caf2795c5586ec0bde83719d1076f1805f9d"
+    },
+    "/Users/hugh/datasets/gittables/object/00005-089.parquet": {
+      "size_bytes": 26559,
+      "sha256": "1cac58da8690ddfc6a12134e2531621cca1c032f58b7f70652fe7383fef38535"
+    },
+    "/Users/hugh/datasets/gittables/object/00015-481.parquet": {
+      "size_bytes": 26458,
+      "sha256": "af1d243a25dfb2ff3fa24c4127ead3e713f82ff08f3c465ebc92e89758a0067e"
+    },
+    "/Users/hugh/datasets/gittables/object/01-02_238.parquet": {
+      "size_bytes": 67265,
+      "sha256": "17c8274167cdeefb8bfbf4c8a84506e887f510ca4e34806cf42522b8bbadc1ba"
+    },
+    "/Users/hugh/datasets/gittables/object/04-05_112.parquet": {
+      "size_bytes": 53802,
+      "sha256": "675f19c917933cea6c4503e6818360e88cf2382d49093528730cb8d056465fb3"
+    },
+    "/Users/hugh/datasets/gittables/object/06-07_26.parquet": {
+      "size_bytes": 47158,
+      "sha256": "9438a713f5488b371cbc67f2a2d0f89ada8f298309050a01ec40172eff0cc407"
+    },
+    "/Users/hugh/datasets/gittables/object/08-09_306.parquet": {
+      "size_bytes": 61033,
+      "sha256": "e8be3c78b62013439dff9f163759965b7c88cf18b38ad4734b8f8ad56240d857"
+    },
+    "/Users/hugh/datasets/gittables/object/10-11_303.parquet": {
+      "size_bytes": 63363,
+      "sha256": "b21b1d65a6e817d3a8147a429e39b040c16607a37b9aef0ed02e25a5f15e51e9"
+    },
+    "/Users/hugh/datasets/gittables/object/12-13_64.parquet": {
+      "size_bytes": 50866,
+      "sha256": "0a300627a2cbdce3082e4ca7c53b49dda8fbd1226a828e54be14c43d7f640447"
+    },
+    "/Users/hugh/datasets/gittables/object/16-17_179.parquet": {
+      "size_bytes": 68617,
+      "sha256": "f78451ab30547d9809b34a56a660352695f2ad964acc7c8ecaa9ab91e1cfdcab"
+    },
+    "/Users/hugh/datasets/gittables/object/20-21_132.parquet": {
+      "size_bytes": 60473,
+      "sha256": "22c1ceaa9202781bb75f89e05cbe0279533bb8c260dfd51ee5ee817f6f406e3e"
+    },
+    "/Users/hugh/datasets/gittables/object/21-22_83.parquet": {
+      "size_bytes": 57466,
+      "sha256": "93bda72e27b79391bd10b5b78fa8035cd824a869eb15d5b19d57856971b6b13c"
+    },
+    "/Users/hugh/datasets/gittables/object/40f.0.testMap_1.parquet": {
+      "size_bytes": 16331,
+      "sha256": "8d956ca0f52d01a87ecedc90f7ff798149b15face32e6a9553c124c1c2f7efc4"
+    },
+    "/Users/hugh/datasets/gittables/object/ActionCenter.dll.csv__3907087459__.parquet": {
+      "size_bytes": 17861,
+      "sha256": "5927a34365ca8d41ce37e5f82540f9eeeaaef8ae3e6b90b5666844a61ff43ba1"
+    },
+    "/Users/hugh/datasets/gittables/object/Barinel_coverage_sd_1186.parquet": {
+      "size_bytes": 15308,
+      "sha256": "b7663a341f2196529659823631767889248d40c197f1d3f32e2d10107671889a"
+    },
+    "/Users/hugh/datasets/gittables/object/Barinel_coverage_sd_910.parquet": {
+      "size_bytes": 15194,
+      "sha256": "441c674face0c6da65dac56e04f4627a0b13c0fb39140a5ad4f59ff80be56e7d"
+    },
+    "/Users/hugh/datasets/gittables/object/Comparison_of_programming_languages_(syntax)_1_3.parquet": {
+      "size_bytes": 9429,
+      "sha256": "1fe9c639fc51caafa11c75fada77759f3654539115e9263d44e113d58933f88b"
+    },
+    "/Users/hugh/datasets/gittables/object/Configuration1_window16_split7_typetypetest_projectsynapse1.2.parquet": {
+      "size_bytes": 35335,
+      "sha256": "91417c613d3f29e482868b794c2b857429ab32fe9249b14ea74186ae54e4794f"
+    },
+    "/Users/hugh/datasets/gittables/object/Configuration2_window11_split3_typetest_projectlog4j1.2.parquet": {
+      "size_bytes": 36754,
+      "sha256": "d74f05af7f4398c02a82b1bd1434229f4a6b5460976cf5cc90b3474b3064b6b0"
+    },
+    "/Users/hugh/datasets/gittables/object/Configuration3_window13_split3_typetest_projectcame1.0.parquet": {
+      "size_bytes": 41383,
+      "sha256": "29f54079934a19fd9f1ea72faa0728ff8ca47d297ed2fbb6be6baf44a0749ba0"
+    },
+    "/Users/hugh/datasets/gittables/object/Configuration4_window0_split1_typetest_projectsynapse.parquet": {
+      "size_bytes": 33906,
+      "sha256": "0f9e4750f2c95c51aceb84eea9e2204f0cce7b858ed40e7a5c25a8956adc8c80"
+    },
+    "/Users/hugh/datasets/gittables/object/DStar_coverage_sd_2174.parquet": {
+      "size_bytes": 16008,
+      "sha256": "da9bb10d3e84691da10c38024718553e4ab1acfa70b0578045252baced60008d"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_AngryNinjas.Ouya_ClassMetrics.parquet": {
+      "size_bytes": 23459,
+      "sha256": "d5afd89d792d41794e5a8bb43f81b8bf44e864cd3a37b61f764afd03ce75f915"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_CSharpResultProvider.CoreSystem_ImpSmells.parquet": {
+      "size_bytes": 21520,
+      "sha256": "e1675de45cafa79541582eb39fae15ab8d88fec467bd8bf21f1a50f047d17e4a"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_DDDPPP.Chap21.NHibernateExample.Application_MethodMetrics.parquet": {
+      "size_bytes": 13797,
+      "sha256": "3b347ab0c1f20224f440979c6e75d893c8109fd2615124f786bead83a6527b85"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_FakeN.Web_DesignSmells.parquet": {
+      "size_bytes": 18675,
+      "sha256": "bbb60b4db751edbee8638008538dbf819e3d0722942907fb5856cf51d13831f8"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_IronPigeon.Relay.Tests_MethodMetrics.parquet": {
+      "size_bytes": 13272,
+      "sha256": "f7d0b9e1f50345b27e0a532dd6e93f47f89f44d21b6285e866821153ea773602"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_Microsoft.Azure.Batch.Integration.Tests(netcoreapp2.1)_DesignSmells.parquet": {
+      "size_bytes": 21393,
+      "sha256": "8dfe3d84e75958674433ac776aa5a29dbb2040d47bbe856c37ea013eee15aaa8"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_NGitHub.Test_ImpSmells.parquet": {
+      "size_bytes": 20425,
+      "sha256": "25d24755ac3933e2ef75e2d59a145bf2282032fde0e1b99148d922957a4219bd"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_Options_ImpSmells_2.parquet": {
+      "size_bytes": 20642,
+      "sha256": "63b481aefab424d860400b2cf950304e0093de5bfcf0e7daf0935d665d58c37d"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_Restful_MethodMetrics.parquet": {
+      "size_bytes": 12916,
+      "sha256": "ccb6cbfb64b119e3b4c7de37ffa09e951f6a710046875e066a45bb4cf51494b8"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_SmartCoffee.iOS_NamespaceMetrics.parquet": {
+      "size_bytes": 13343,
+      "sha256": "0f10d3e640fa3ababadbeed14ead5c57bd4047b64d1d68675dad8e009c98748e"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_ThriftSharp_ImpSmells.parquet": {
+      "size_bytes": 23643,
+      "sha256": "01a114af23b24d9bb96fd4dec1b3f9fa6fb967693928ab02407c7a934057c85b"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_XLabs.IOC.TinyIOC.Net45_MethodMetrics.parquet": {
+      "size_bytes": 14590,
+      "sha256": "5be4c6677f6a40de7950e22c0a7098ced0b055c7f9fe29b82120c2942ab8de20"
+    },
+    "/Users/hugh/datasets/gittables/object/Designite_xSaliceReligionAIO_ClassMetrics.parquet": {
+      "size_bytes": 24867,
+      "sha256": "ead781fe944c9b973b8b0b54efb7c287d640832fa93213e0b5b87aba378908a3"
+    },
+    "/Users/hugh/datasets/gittables/object/Finnish_data.parquet": {
+      "size_bytes": 44139,
+      "sha256": "177a661572e1b88e32c48a835c1d35abe58da6c021c3eddcfedda73c7b87a432"
+    },
+    "/Users/hugh/datasets/gittables/object/LayoutTesting_16.parquet": {
+      "size_bytes": 22207,
+      "sha256": "8353fe4a8c847e81ca74c996b55404fbe1a40457d56dc7eaa9671988795df331"
+    },
+    "/Users/hugh/datasets/gittables/object/ModelDesign_105.parquet": {
+      "size_bytes": 9271,
+      "sha256": "86ea9e9beb789db68350d98b978e3f2ba3cd65950fe433ee0cbe52f7eac60fc6"
+    },
+    "/Users/hugh/datasets/gittables/object/Ochiai_coverage_sd_1682.parquet": {
+      "size_bytes": 15876,
+      "sha256": "3b1c8c9e0a14b6e04b067b77b7ec18dd0cc6084fecc8ef09dd19af650330b205"
+    },
+    "/Users/hugh/datasets/gittables/object/Op2_coverage_sd_1148.parquet": {
+      "size_bytes": 15066,
+      "sha256": "e2f6338a277c2b9f2afcdc412c06da9c129bf1e083b5a83ca18e75326ddb5ee3"
+    },
+    "/Users/hugh/datasets/gittables/object/Op2_coverage_sd_822.parquet": {
+      "size_bytes": 15099,
+      "sha256": "69db6f1ba5804d351afd5712237a44e0139a55e2117746df434ebc2732ecee9b"
+    },
+    "/Users/hugh/datasets/gittables/object/OriginalStatisticalDebugging_coverage_sd_248.parquet": {
+      "size_bytes": 14954,
+      "sha256": "abf8978da99e89bd0370d2ef49ca2b5aab45e54ed0cc190c34271e34446c8b0c"
+    },
+    "/Users/hugh/datasets/gittables/object/PREDICTION_Software%20Engineering%20Project%20I_31.parquet": {
+      "size_bytes": 53554,
+      "sha256": "7ca50453fee5e369cd32036e5dade81e0389a64b2a110c4d5fb379f7627eb956"
+    },
+    "/Users/hugh/datasets/gittables/object/SetNetworkLocationFlyout.dll.csv__3799999871__.parquet": {
+      "size_bytes": 17000,
+      "sha256": "b6e879ac149fc4707e427a6bb5560e0f4e324ac42c78c668e921f8c51b95167f"
+    },
+    "/Users/hugh/datasets/gittables/object/StatisticalDebugging_coverage_sd_1877.parquet": {
+      "size_bytes": 15852,
+      "sha256": "23c4e4f6c675577238b824226b588c6bee3933de2a3ccd0acff78052a3fc042b"
+    },
+    "/Users/hugh/datasets/gittables/object/SysResetErr.exe.csv__358385114__.parquet": {
+      "size_bytes": 17665,
+      "sha256": "994745905b1b54c7f672ef312532812099e0ef5eb694deaa1a77d188b18dc5c2"
+    },
+    "/Users/hugh/datasets/gittables/object/Tarantula_coverage_sd_358.parquet": {
+      "size_bytes": 14827,
+      "sha256": "57b7e955d2bbf2457c8d96c30bbe031f9f56eef849b15cc867a21a1f638867fc"
+    },
+    "/Users/hugh/datasets/gittables/object/WOZ_kadastraalobject_20170721.parquet": {
+      "size_bytes": 14288,
+      "sha256": "240092f94eaf2bd652156b5924803fd67277eb586ad2e2b7f1c1510221ed0f7c"
+    },
+    "/Users/hugh/datasets/gittables/object/afunix.sys.csv__3350215713__.parquet": {
+      "size_bytes": 13490,
+      "sha256": "3863283c44ef311ecd4ce57caa8d9cd0acc579596c823a7637b71d5dcdf1f9b1"
+    },
+    "/Users/hugh/datasets/gittables/object/base_permission_10.parquet": {
+      "size_bytes": 23299,
+      "sha256": "9a1799cf34cbb8369aa3e96d2f10453c96d857b436afe439d64fae097dd44879"
+    },
+    "/Users/hugh/datasets/gittables/object/collision_graspedObject_19_0_Pause_2_1.parquet": {
+      "size_bytes": 11684,
+      "sha256": "c1aad446615231129e190e0e8ccf48fd45ad692c56ab4a51ec7df0b27c1bc0a6"
+    },
+    "/Users/hugh/datasets/gittables/object/data-14000-15000.parquet": {
+      "size_bytes": 36230,
+      "sha256": "262be23756d853cce03fb134b6d77bc4dded812ad2660081fd91f15f8b390004"
+    },
+    "/Users/hugh/datasets/gittables/object/down0302--resource-template.json.parquet": {
+      "size_bytes": 10066,
+      "sha256": "03f551af373babb2023ff1a2cc11858f2f86dae891f20e42c12410f568d675ec"
+    },
+    "/Users/hugh/datasets/gittables/object/features_4.parquet": {
+      "size_bytes": 29346,
+      "sha256": "f4e4d23f8aaa0b0ed06ab7b6b31f193840e95cc810785545dcae591861d9c88f"
+    },
+    "/Users/hugh/datasets/gittables/object/geometry_57.parquet": {
+      "size_bytes": 26074,
+      "sha256": "824fc06f1fff3be201b1acc5a1f9c0c81f0ca7df542a6495283eae5f44ead854"
+    },
+    "/Users/hugh/datasets/gittables/object/iccvid.dll.csv__3435907162__.parquet": {
+      "size_bytes": 15130,
+      "sha256": "a805c57cd30542bc199d5e6f2583e5aa59129599c6b480d0f871130bbbbde743"
+    },
+    "/Users/hugh/datasets/gittables/object/interaction_log_T031_5.parquet": {
+      "size_bytes": 22139,
+      "sha256": "1e6481c80d4b65f985ae97fd1f336eab64ddb9c4037ca53d73fe8abac6bc4fbe"
+    },
+    "/Users/hugh/datasets/gittables/object/interaction_log_T074_8.parquet": {
+      "size_bytes": 22070,
+      "sha256": "fdc3fe9b7f93c815d0581cabdd45b81c88e5a050ce33dd716fccef56d85c3110"
+    },
+    "/Users/hugh/datasets/gittables/object/interaction_log_T118_11.parquet": {
+      "size_bytes": 22306,
+      "sha256": "0a46f5dedc8699c7b0e17bd80b26a0c4cd3a1626e6f43a0dcff7c472133deece"
+    },
+    "/Users/hugh/datasets/gittables/object/kmr0877__Realtime-Object-Tracking-using-Opencv.parquet": {
+      "size_bytes": 14615,
+      "sha256": "874c4d1d836b66a3593dba771e30110f4c7cc34126b2a63bac5758fb9a9aa030"
+    },
+    "/Users/hugh/datasets/gittables/object/messages_pl_28.parquet": {
+      "size_bytes": 17606,
+      "sha256": "ce01afefe87d480fe1959b85dc1070fe1b538ea3a2198efc7c6198a7087228c5"
+    },
+    "/Users/hugh/datasets/gittables/object/mraut.dll.csv__1553176405__.parquet": {
+      "size_bytes": 17958,
+      "sha256": "472db72ebdefdc66ce568a3022bc681a5f5e7af73c718ba7d6c5b5ccad27a36f"
+    },
+    "/Users/hugh/datasets/gittables/object/mutants_info_563.parquet": {
+      "size_bytes": 9311,
+      "sha256": "2995c10056d5d1fc6ea81ae476bf4f6856a9a544ef69f76601f8d7e3a8a9cb0a"
+    },
+    "/Users/hugh/datasets/gittables/object/objects.config.parquet": {
+      "size_bytes": 7493,
+      "sha256": "e7a191308a11d470a22913462f534a5bdd17c1095c769577ff854cd8c1e5fa1b"
+    },
+    "/Users/hugh/datasets/gittables/object/properties_63.parquet": {
+      "size_bytes": 13817,
+      "sha256": "6ff4a2728038593276fe5d1c3bfb730efa3bb215c1141f913cd81bd306095f56"
+    },
+    "/Users/hugh/datasets/gittables/object/repos_38.parquet": {
+      "size_bytes": 43000,
+      "sha256": "d0f3c4f4c9b2e0c388220cb1588981d3852acf1277da9069fdf6d685f10d88f0"
+    },
+    "/Users/hugh/datasets/gittables/object/scene_layout_T085_3.parquet": {
+      "size_bytes": 19740,
+      "sha256": "4c1fc4463857ebfc23128f663c05b19d27ef650994aeb4146d27afb07142a4b0"
+    },
+    "/Users/hugh/datasets/gittables/object/session_6_9.parquet": {
+      "size_bytes": 16630,
+      "sha256": "597ceb128c91940d12f2aa63e4f0cbc3682169a04da2d3dd6ceffcc5ea9ee07e"
+    },
+    "/Users/hugh/datasets/gittables/object/statisticspsi.oasis-open.org_iso_639_.nt.gz.hdt.parquet": {
+      "size_bytes": 6162,
+      "sha256": "a7fa6c4cd518587c515570d92f2855a5b09b087780a5d85114c0444ff2cb7527"
+    },
+    "/Users/hugh/datasets/gittables/object/temperature_445.parquet": {
+      "size_bytes": 26815,
+      "sha256": "b7c12807bb7820edcc5713659301a8430dbf517e188a833bb494e4deddf6922c"
+    },
+    "/Users/hugh/datasets/gittables/object/topic_31_5.parquet": {
+      "size_bytes": 13726,
+      "sha256": "bd7e8858dab981124ec1cd9b1d35fcb266f925d8fe69a4da6580cb428d23e89e"
+    },
+    "/Users/hugh/datasets/gittables/object/veh_ObjectOffCarriageway.parquet": {
+      "size_bytes": 8704,
+      "sha256": "fb0cd5fb2ca012c923086e5fae5ec4a772e0c76998deb62714ad931b3c08ffc4"
+    },
+    "/Users/hugh/datasets/gittables/object/wsmplpxy.dll.csv__1299688564__.parquet": {
+      "size_bytes": 15290,
+      "sha256": "9cd431a2fb874bb821952991fa8a22f00876e6afc2bb3b0f252e966297c77bd7"
+    },
+    "/Users/hugh/datasets/gittables/organism/08-09_3.parquet": {
+      "size_bytes": 46918,
+      "sha256": "e09183ed2d81c81a30af2a9941ec243b7d88e9e9f72de1a0ea6f9eb6cf12b1fa"
+    },
+    "/Users/hugh/datasets/gittables/organism/cultural-nn_overlaps-25.parquet": {
+      "size_bytes": 8240,
+      "sha256": "4af95db6aa6efee5f875a205f3289b85fce6105f153616fdbd29e3af320b46a6"
+    },
+    "/Users/hugh/datasets/gittables/parent/-6201563118651141339_2.parquet": {
+      "size_bytes": 12618,
+      "sha256": "73537eae02b0183269bed01520dc5f54d9c9b827199a08c6053772de326728ac"
+    },
+    "/Users/hugh/datasets/gittables/parent/00-01_508.parquet": {
+      "size_bytes": 48899,
+      "sha256": "1b3e2b09f6f875fdbbab5bcdec764eb6e346000d68226000f77062bf07674205"
+    },
+    "/Users/hugh/datasets/gittables/parent/01-02_1385.parquet": {
+      "size_bytes": 66077,
+      "sha256": "e1b217946af5917b5b24063c75ad6398ad870c0a4e058f3a4657824ce4b4c3ee"
+    },
+    "/Users/hugh/datasets/gittables/parent/01-02_819.parquet": {
+      "size_bytes": 53667,
+      "sha256": "e5d2c68f708c948fdb2cedcf5c35163c671b7f5dfecd230a0bc6bfe6d2d4b55b"
+    },
+    "/Users/hugh/datasets/gittables/parent/02-03_168.parquet": {
+      "size_bytes": 39764,
+      "sha256": "3d91b6993fc0794476a613353e507f1c2fadbb00a024d00749f90e930698c536"
+    },
+    "/Users/hugh/datasets/gittables/parent/03-04_1044.parquet": {
+      "size_bytes": 55091,
+      "sha256": "8d1bb92e21f33465646e355c7c2198ba644eaa983ad816aeaec7d5cd420743bd"
+    },
+    "/Users/hugh/datasets/gittables/parent/03-04_329.parquet": {
+      "size_bytes": 42281,
+      "sha256": "6cdf20dde684e84c8798215f39f64fcb35b9be72246f8dce94918b53dcb663c4"
+    },
+    "/Users/hugh/datasets/gittables/parent/04-05_1240.parquet": {
+      "size_bytes": 61569,
+      "sha256": "9499551ebf4df29710d6ef8ef2d1ae3572a43703aba0385a11b7fadb18a97271"
+    },
+    "/Users/hugh/datasets/gittables/parent/04-05_431.parquet": {
+      "size_bytes": 43277,
+      "sha256": "2c2d7db374664c583411122b987da9fa18b1ef5e668cc6351f661b56af77ce79"
+    },
+    "/Users/hugh/datasets/gittables/parent/05-06_1332.parquet": {
+      "size_bytes": 46103,
+      "sha256": "b5fe6aa061bf58dfefd4222c62f8f16e82bb84fbf9c70eac31c0fcd72866f5d1"
+    },
+    "/Users/hugh/datasets/gittables/parent/05-06_321.parquet": {
+      "size_bytes": 42647,
+      "sha256": "0866a783ab2318988c60b3db8f08a0d1b8e63c2408c348dec7f68f3cc3b29973"
+    },
+    "/Users/hugh/datasets/gittables/parent/06-07_1187.parquet": {
+      "size_bytes": 45070,
+      "sha256": "242e1932f228336b076068c916829371c29c979e2b10e499d1fba6f2b604a002"
+    },
+    "/Users/hugh/datasets/gittables/parent/06-07_2104.parquet": {
+      "size_bytes": 67983,
+      "sha256": "f310c611d4cdaac1084a29f10c3889492b03dd9928396313f670cc628580defe"
+    },
+    "/Users/hugh/datasets/gittables/parent/06-07_96.parquet": {
+      "size_bytes": 38454,
+      "sha256": "3671e01f099eefe46aa2f3f5d2465c5d0c5834a49beb1f0fb9c22d3d3ae93ec1"
+    },
+    "/Users/hugh/datasets/gittables/parent/07-08_1858.parquet": {
+      "size_bytes": 53519,
+      "sha256": "4f7306d5c029e81f0cf06e380478996c2aee9620b51beddd870ed7e12ab3d8ff"
+    },
+    "/Users/hugh/datasets/gittables/parent/07-08_693.parquet": {
+      "size_bytes": 43816,
+      "sha256": "a7856929bc83241774be6b782ede334c6f1d4d5d63a0d0aef1d9d6710eb29f07"
+    },
+    "/Users/hugh/datasets/gittables/parent/08-09_1560.parquet": {
+      "size_bytes": 58801,
+      "sha256": "f19f57070a16c53daaa739840159d786c6d2ddd899148a2f67cf803492fbf5b8"
+    },
+    "/Users/hugh/datasets/gittables/parent/08-09_41.parquet": {
+      "size_bytes": 36754,
+      "sha256": "db2d6cfe719d16ec0f954ef14e733ad461ba61ee01db51b8c07c8be1a2f0c548"
+    },
+    "/Users/hugh/datasets/gittables/parent/09-10_1299.parquet": {
+      "size_bytes": 55721,
+      "sha256": "57a247f860a3ff502e1a1d3823339c917d855d6b3b05ece24a02d17a37a4bc40"
+    },
+    "/Users/hugh/datasets/gittables/parent/09-10_2217.parquet": {
+      "size_bytes": 73591,
+      "sha256": "c97fceed39c9f06089934e2f78619347504dc61802881c70c5a6046ded72fd19"
+    },
+    "/Users/hugh/datasets/gittables/parent/10-11_1069.parquet": {
+      "size_bytes": 43659,
+      "sha256": "33140869d8eb00b5d2e75dcc9eaf22b5a7f9f960d2007df3b03fe1fa8db7abc6"
+    },
+    "/Users/hugh/datasets/gittables/parent/10-11_1992.parquet": {
+      "size_bytes": 51842,
+      "sha256": "4cd0a0156530e7e280e12b7683b5ec5c8aa02cf0b981729e479bf214f5275763"
+    },
+    "/Users/hugh/datasets/gittables/parent/10-11_925.parquet": {
+      "size_bytes": 47306,
+      "sha256": "5dd176aa0d211eba19d029cf75c58941e884170c5cd81df1c6ca474109abb14e"
+    },
+    "/Users/hugh/datasets/gittables/parent/11-12_1781.parquet": {
+      "size_bytes": 63260,
+      "sha256": "756663268f03e4c610f8cf458785f1c1211c18b6530abb909f3a308bb24f85ac"
+    },
+    "/Users/hugh/datasets/gittables/parent/11-12_798.parquet": {
+      "size_bytes": 46881,
+      "sha256": "9db6abd1f370b67b755a8daf4c1f6794c1439ab3beabf2c30842f2b59c7047a0"
+    },
+    "/Users/hugh/datasets/gittables/parent/12-13_1666.parquet": {
+      "size_bytes": 66272,
+      "sha256": "06ee5e48a725c52d260a7e7f714f2e3b6088f9457152b64084a483e1dd63cd2a"
+    },
+    "/Users/hugh/datasets/gittables/parent/12-13_96.parquet": {
+      "size_bytes": 37845,
+      "sha256": "fee1a75d81966d9c44cf12fb642de525ab4060c01497939d99b66dfdb736da35"
+    },
+    "/Users/hugh/datasets/gittables/parent/13-14_430.parquet": {
+      "size_bytes": 42509,
+      "sha256": "383b69e7d357ea22ca8237b8b3674bae9fb7b4fba2a8185ef4217d43be8cef60"
+    },
+    "/Users/hugh/datasets/gittables/parent/14-15_146.parquet": {
+      "size_bytes": 38463,
+      "sha256": "87d82182cd1111ca3fd681f28cac74181bec0580818d2ccd261fa6892b01f498"
+    },
+    "/Users/hugh/datasets/gittables/parent/1402008_hhRelMale.parquet": {
+      "size_bytes": 20910,
+      "sha256": "0cbf9cf70671e247e5f57bc0b5a1b42e6f7b9c97699bda7a3fe636b3fca5a31d"
+    },
+    "/Users/hugh/datasets/gittables/parent/15-16_517.parquet": {
+      "size_bytes": 46113,
+      "sha256": "c141eb37067ab1bb6f2ee0ad4dbbd48398c69ae24263565ecdbc6216a2a1163f"
+    },
+    "/Users/hugh/datasets/gittables/parent/16-17_51.parquet": {
+      "size_bytes": 36576,
+      "sha256": "c40ff884bb00bd1fbc59b54c1815cb2f15afa904e505bf7d2dc0abe93f8902d2"
+    },
+    "/Users/hugh/datasets/gittables/parent/17-18_519.parquet": {
+      "size_bytes": 51823,
+      "sha256": "a47d24a4ad7c7e6dd61986ec4effcb465dbd2081dcea4e18a38d3dd813990662"
+    },
+    "/Users/hugh/datasets/gittables/parent/18-19_568.parquet": {
+      "size_bytes": 52706,
+      "sha256": "67f8695e20b0954584b95365f4dadaf13ffaa86eb471cb562ff590e256e51ca0"
+    },
+    "/Users/hugh/datasets/gittables/parent/19-20_627.parquet": {
+      "size_bytes": 55328,
+      "sha256": "5c1c512ddceb0f8422e63e96afd451675997fd6b9a52bd54f7d65f2705e30c83"
+    },
+    "/Users/hugh/datasets/gittables/parent/20-21_59.parquet": {
+      "size_bytes": 39640,
+      "sha256": "c783c52185d30722bd66c14bf99abf06ff32d0261bbb0f49bf64153b82510ed9"
+    },
+    "/Users/hugh/datasets/gittables/parent/2018-03-28_12.parquet": {
+      "size_bytes": 62286,
+      "sha256": "6847f533f5d4c07b59087e58b36fe9cb8c330d1f6700d5ddc115ded793cefead"
+    },
+    "/Users/hugh/datasets/gittables/parent/21-22_743.parquet": {
+      "size_bytes": 58746,
+      "sha256": "63bb0f168b4f6b6e3afacdb6f671a6001b86f5b0b4da502e7f02caed5425372a"
+    },
+    "/Users/hugh/datasets/gittables/parent/22-23_617.parquet": {
+      "size_bytes": 55598,
+      "sha256": "49bb7805adb997f021ca9ba1fbf49fbd9b2fd6c84f930be389cc2ee64251f94a"
+    },
+    "/Users/hugh/datasets/gittables/parent/23-24_391.parquet": {
+      "size_bytes": 48366,
+      "sha256": "8b390a471db8f3ccf07867cab6ac815035f86c0f5a12972847162cc8b37fbb4f"
+    },
+    "/Users/hugh/datasets/gittables/parent/6148205857420913129_1.parquet": {
+      "size_bytes": 12563,
+      "sha256": "0551d225392abcd2d223182c28a03ecc8bc8af149a16059476f3e14801c0f34a"
+    },
+    "/Users/hugh/datasets/gittables/parent/Android-CleanArchitecture-Package_1.parquet": {
+      "size_bytes": 97235,
+      "sha256": "92e78a268fa5f8340a5aadd11eae157106aec5053797c9baf371c813fd020c6d"
+    },
+    "/Users/hugh/datasets/gittables/parent/Configuration1_window10_split9_typetypetest_projecttomcat.parquet": {
+      "size_bytes": 36058,
+      "sha256": "d092d3a52683523702f9166ebdbe6b854b3417ba1065445502b4e062172f902e"
+    },
+    "/Users/hugh/datasets/gittables/parent/Configuration2_window11_split7_typetest_projectpoi1.5.parquet": {
+      "size_bytes": 38451,
+      "sha256": "cf9d09a70e8b25fb00db7e15e1d205e57d1bde2bf5b69fbe26418c6cbe51820d"
+    },
+    "/Users/hugh/datasets/gittables/parent/Designite_Bumblebee.IntegrationTests_MethodMetrics.parquet": {
+      "size_bytes": 20986,
+      "sha256": "c4afd8a48b797d03ca518a2eb86081937438202d55ae4a248dfeb6330dba70ba"
+    },
+    "/Users/hugh/datasets/gittables/parent/Designite_Microsoft.Test.Taupo.OData.WCFService_ImpSmells.parquet": {
+      "size_bytes": 24460,
+      "sha256": "18e85edeeff01da410fdf9f9fbd619d929a25989d4d4cbe8d5f32e687da0125b"
+    },
+    "/Users/hugh/datasets/gittables/parent/Designite_Tvl.VisualStudio.Shell.Implementation_ClassMetrics.parquet": {
+      "size_bytes": 24180,
+      "sha256": "4337ee454a25ac808b3be2c73aceadb83d7d1accd724027a223969698af7009f"
+    },
+    "/Users/hugh/datasets/gittables/parent/GO_AllLists_1.parquet": {
+      "size_bytes": 38399,
+      "sha256": "ac2a67d44e473eaa04521374377a5bc7373dd7c3e766daa520920455892dd591"
+    },
+    "/Users/hugh/datasets/gittables/parent/Mage_Core_2834.parquet": {
+      "size_bytes": 20714,
+      "sha256": "cfb2eac3bb0a02cb7ecc6d237ab2a3bf4239f4620b9497e2f7fd7f4298dc28fd"
+    },
+    "/Users/hugh/datasets/gittables/parent/OriginalStatisticalDebugging_coverage_sd_383.parquet": {
+      "size_bytes": 15947,
+      "sha256": "4f8ee21b9aa1cf3a709cbf114b2c72b4e5fff99abdb362dca03248c5dcff8068"
+    },
+    "/Users/hugh/datasets/gittables/parent/SKUOnShelfPlacement_7.parquet": {
+      "size_bytes": 15556,
+      "sha256": "61778140c50fc0fbf53c9caad2c3b3aff761606e0e3944d209a86ddcde84e011"
+    },
+    "/Users/hugh/datasets/gittables/parent/StatisticalDebugging_coverage_sd_862.parquet": {
+      "size_bytes": 16732,
+      "sha256": "e4a39c6a03ee04cf509769d17b130d8c06891bd2a349aafb884ee4fb9cdd50c9"
+    },
+    "/Users/hugh/datasets/gittables/parent/WirecardEE_PaymentGateway_7.parquet": {
+      "size_bytes": 20182,
+      "sha256": "1faa2072ff5d32532a2d401a0481c621d7c3d1f7c447ce99e5274f718af7313f"
+    },
+    "/Users/hugh/datasets/gittables/parent/account.account.template_684.parquet": {
+      "size_bytes": 30208,
+      "sha256": "d1558ae8c512a7e91b9d6ddb967e409053aa31497738dcff9b0bd4fa3fb7f2ee"
+    },
+    "/Users/hugh/datasets/gittables/parent/account.tax.code.template_71.parquet": {
+      "size_bytes": 19257,
+      "sha256": "2cdb4f05817fdb95ee270d07161352a9b219cb33c0fba1bd0dcd3920345fafd7"
+    },
+    "/Users/hugh/datasets/gittables/parent/account.tax.template_890.parquet": {
+      "size_bytes": 51552,
+      "sha256": "9c2fdd9b20c58bd3430e2c7d2a76b27f8217789fa85a6bcdb7f6b29e9555b3b0"
+    },
+    "/Users/hugh/datasets/gittables/parent/chapters_4.parquet": {
+      "size_bytes": 25060,
+      "sha256": "0efdf0fec1a6efdb5d9ee6526d857c574a0f0f755727e65231a21b226cd95ccd"
+    },
+    "/Users/hugh/datasets/gittables/parent/csv_test_sequence_266.parquet": {
+      "size_bytes": 309392,
+      "sha256": "22d21f785c404375fbffd5dfe91a2a9105e1741fdaaa2950c82b9fa6fc62a874"
+    },
+    "/Users/hugh/datasets/gittables/parent/description_1.parquet": {
+      "size_bytes": 18260,
+      "sha256": "15e6c82ad831a95cd190d6b839e5a83ca574ab7ed84b2de3058768f0fb001b45"
+    },
+    "/Users/hugh/datasets/gittables/parent/en_US_1248.parquet": {
+      "size_bytes": 6713,
+      "sha256": "a3606f325c63d3a131281e23f2f284452c13333942a367519bb113d475916dcd"
+    },
+    "/Users/hugh/datasets/gittables/parent/example_799.parquet": {
+      "size_bytes": 47807,
+      "sha256": "7f2f207b94bb87ac86b17c14314fe1efa77025750ebc58f6700353c0868e91ef"
+    },
+    "/Users/hugh/datasets/gittables/parent/industries-hrchy_1.parquet": {
+      "size_bytes": 33125,
+      "sha256": "cc2b48e1f623e90d392abe9c9d095f34762ee6fc9f992f5534cfe1233c13c4f9"
+    },
+    "/Users/hugh/datasets/gittables/parent/l10n_br_account.service.type_6.parquet": {
+      "size_bytes": 33871,
+      "sha256": "da64a17184328154b71b135f1797b090132b951f65c38d56a2d34350cbd9d474"
+    },
+    "/Users/hugh/datasets/gittables/parent/mdl_question_95.parquet": {
+      "size_bytes": 43851,
+      "sha256": "5d4bae3be6292564acaa348303fbc914db929b112ff43740597c769a5909e6f7"
+    },
+    "/Users/hugh/datasets/gittables/parent/messages_pl_29.parquet": {
+      "size_bytes": 16779,
+      "sha256": "4d4b17104b582d9d452f2480484400e97f4a745b9b8f6abce17761eb81d56b04"
+    },
+    "/Users/hugh/datasets/gittables/parent/output_57.parquet": {
+      "size_bytes": 38713,
+      "sha256": "16440e44e0b0d5df7b772c0b6e4752478796db0e62fc7bad539a3e63325ccf39"
+    },
+    "/Users/hugh/datasets/gittables/parent/rdd_75.parquet": {
+      "size_bytes": 42366,
+      "sha256": "654720547886e4ee46b96dec8fdf73c2efc08f5de655f619d916df4b67ae7d6b"
+    },
+    "/Users/hugh/datasets/gittables/parent/standard_player_batting_stats_1899.parquet": {
+      "size_bytes": 70486,
+      "sha256": "f0144319dcc77e69619f9c25f7241f5bf8787e79bf4154248e0061df54b5164a"
+    },
+    "/Users/hugh/datasets/gittables/parent/topics_9.parquet": {
+      "size_bytes": 37960,
+      "sha256": "eef386dcb382a78d90f0afb1f44e96cbc637733702adc6e8f06ab9902111846d"
+    },
+    "/Users/hugh/datasets/gittables/physical_entity/01-02_24.parquet": {
+      "size_bytes": 48106,
+      "sha256": "50ddfe2bac84b2d9c3a69abc3891c94eda217e3bd95ab9b044af1eb152793361"
+    },
+    "/Users/hugh/datasets/gittables/physical_entity/EDCD.d04a_7.parquet": {
+      "size_bytes": 23253,
+      "sha256": "618e5a4cfd50d5ab5d3a465f250d79ae4f22f5cfb2d02ab3e6bf3a37f83fe993"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/00-01_88.parquet": {
+      "size_bytes": 58858,
+      "sha256": "6c5c38de0096918ecefe7e4dad9dc7f34c37df208c947388d9534ed23ba4ff21"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/04-05_166.parquet": {
+      "size_bytes": 64044,
+      "sha256": "cddcf23bf6674c8da61eee9ddf1068382f2f6a562870ddf32f795151e94d6f76"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/07-08_114.parquet": {
+      "size_bytes": 53025,
+      "sha256": "7aaacbb2a8cd2d885615f4aad881370d37eb18a1ca5853afab83bceec11f92cc"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/09-10_315.parquet": {
+      "size_bytes": 49291,
+      "sha256": "853f3df5fb8897a9dc7c2f949c2493c0f4533363803dae2a375d0300fbe20243"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/12-13_94.parquet": {
+      "size_bytes": 56071,
+      "sha256": "7fd75bb11068ff9ce36ff6f62fb7cf43393fa1024e8b71f696d63036bc4a9f0a"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/18-19_22.parquet": {
+      "size_bytes": 48073,
+      "sha256": "5bc067c2e3a9108573ba619ceccd05167e9455a1b65f3d84c903f25df7f01e0e"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/23-24_204.parquet": {
+      "size_bytes": 69464,
+      "sha256": "778a029a2ffe4b92778b3f667c6b309d08ca6bf6d8cae45f7147f6bf3f81ee13"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/Designite_Hl7.Fhir.Core(net45)_ArchSmells.parquet": {
+      "size_bytes": 32597,
+      "sha256": "9cef2e2a10bcf6541a9de80572bdf9f5d41abd5a0f64cccd6790164872c2f581"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/EDED.d95b_4.parquet": {
+      "size_bytes": 17460,
+      "sha256": "7db45b6612f68d06439bae9f0ea854e8c3938dc258db67d11fc6282a0b07cb1e"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/J01-2004_swastika_155.parquet": {
+      "size_bytes": 40564,
+      "sha256": "045dc915c306aee188f922de897f321a175d5a3157f7cd7ef6fa1984fe5033df"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/P05-1013_731.parquet": {
+      "size_bytes": 42978,
+      "sha256": "2cec0516d4a2c18a6ea00f8fec48672332c1c0f8dc35dac25a92359ce4e3cca1"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/P11-1061.annv3_31.parquet": {
+      "size_bytes": 43463,
+      "sha256": "a5bcfbe5389b0df7e0b4100746a624da9f4a42bebe50079f41779a07e8d332a4"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/W06-2932_vardha_151.parquet": {
+      "size_bytes": 38760,
+      "sha256": "56abe12644e2cdc1b8222275426a4f1190ccffb722c5a9b6c66b7badf1ebc648"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/customer_call_transcriptions_1.parquet": {
+      "size_bytes": 13285,
+      "sha256": "5e28cccb67c946516eaf091de4cdf1e317567be5a5da77eed90989d92618aeb8"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/lsa-volume06-issue06_1.parquet": {
+      "size_bytes": 34823,
+      "sha256": "4cdeee9936bc2b1f78878827eda8995307fe0fdc263dd1a242f090e88edc8935"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/phil_lowry_enron_com.parquet": {
+      "size_bytes": 23433,
+      "sha256": "1ab4663f39ec468488ca4655cba78e02e66aa1ad7aff47eba4b2b6af4b20db3b"
+    },
+    "/Users/hugh/datasets/gittables/processing_time/study_2.parquet": {
+      "size_bytes": 28438,
+      "sha256": "a7e40d35f64961548cf09528fe201645b9212b295dd92846c64ebfadc776fb0b"
+    },
+    "/Users/hugh/datasets/gittables/question_time/00-01_380.parquet": {
+      "size_bytes": 55115,
+      "sha256": "392c56cf610739869cb66fad750dc869852c360086705410dadd3a38f9f90f02"
+    },
+    "/Users/hugh/datasets/gittables/question_time/01-02_369.parquet": {
+      "size_bytes": 54371,
+      "sha256": "b617fb2aa1e0f1b23ab6fbf93da17134b29b1ec85e1c560676c39c68813b133c"
+    },
+    "/Users/hugh/datasets/gittables/question_time/02-03_238.parquet": {
+      "size_bytes": 54697,
+      "sha256": "130de4a857343f4448f5d61497030e36d906411b2d24154a1c81c139f3d081fd"
+    },
+    "/Users/hugh/datasets/gittables/question_time/03-04_1084.parquet": {
+      "size_bytes": 52218,
+      "sha256": "72bb3f4d8fcf160ea40fede61af4225cc7059235fd71930acaba30f6dd5e49b1"
+    },
+    "/Users/hugh/datasets/gittables/question_time/03-04_96.parquet": {
+      "size_bytes": 45584,
+      "sha256": "26c5754112cfe9ff3875ec2ef9d62d1c13813c45458411ad2ea498fbe65527b7"
+    },
+    "/Users/hugh/datasets/gittables/question_time/04-05_697.parquet": {
+      "size_bytes": 63339,
+      "sha256": "6d47ecbdcd4f2ffde27116a5d5b0e06bca6e39f6cd7998db2efbdb3a56553134"
+    },
+    "/Users/hugh/datasets/gittables/question_time/05-06_341.parquet": {
+      "size_bytes": 51389,
+      "sha256": "2f328afc05918e421ae597b2b25921133b4ba41f5c98613208dd7d0cf18e01bb"
+    },
+    "/Users/hugh/datasets/gittables/question_time/06-07_119.parquet": {
+      "size_bytes": 43985,
+      "sha256": "928d958238cf0105cd8797e446401a93cffc442f9ef2293fa526174427bc145d"
+    },
+    "/Users/hugh/datasets/gittables/question_time/06-07_851.parquet": {
+      "size_bytes": 61781,
+      "sha256": "c64e22a33401905c17eacad19234ad2b40961c5b86d397168672103c15b859bc"
+    },
+    "/Users/hugh/datasets/gittables/question_time/07-08_443.parquet": {
+      "size_bytes": 53435,
+      "sha256": "cdad7c28b070ca90fc5b13dbf4141ad089ec33909c3954eec0b67128f7bbe679"
+    },
+    "/Users/hugh/datasets/gittables/question_time/08-09_1294.parquet": {
+      "size_bytes": 52820,
+      "sha256": "0e0b60ab24e0df419c0965274c6cbf671d84e05276258b673ff3e80013711db4"
+    },
+    "/Users/hugh/datasets/gittables/question_time/08-09_993.parquet": {
+      "size_bytes": 45599,
+      "sha256": "9537e5112008f2ddbe675f363ac2f87787a3d95c3ea101cef523fc812e1c187e"
+    },
+    "/Users/hugh/datasets/gittables/question_time/09-10_679.parquet": {
+      "size_bytes": 60950,
+      "sha256": "82f03b53a4559673865ba74df5c0573ef0107f4f5a5a6abfa9effb9a98616893"
+    },
+    "/Users/hugh/datasets/gittables/question_time/10-11_357.parquet": {
+      "size_bytes": 51377,
+      "sha256": "98e187598f381fba5afd80cf3e66dcdb882ef00eddf37ce0b762f4de66d983b4"
+    },
+    "/Users/hugh/datasets/gittables/question_time/11-12_117.parquet": {
+      "size_bytes": 48025,
+      "sha256": "79ce55f684ae421565ffe45a830ff87ba9613dd5ef1ad3fa75ca84d1b8b6808c"
+    },
+    "/Users/hugh/datasets/gittables/question_time/1186_xvid.parquet": {
+      "size_bytes": 45797,
+      "sha256": "daf1ce63515afd345bd30394f88b4eae97572be6fad9b1b6965888876e95049b"
+    },
+    "/Users/hugh/datasets/gittables/question_time/12-services-helsinki-ai-register_3.parquet": {
+      "size_bytes": 71115,
+      "sha256": "186020ae4b59ff439e99e80a747aa769ab5fa3f774911cae5c033de51eccfebc"
+    },
+    "/Users/hugh/datasets/gittables/question_time/14-15_224.parquet": {
+      "size_bytes": 53647,
+      "sha256": "da2ce5fc8d3d5ec0b45d185b286455fa87612f0befec693ea1fb19834a3c59f2"
+    },
+    "/Users/hugh/datasets/gittables/question_time/15-16_465.parquet": {
+      "size_bytes": 61708,
+      "sha256": "1f44f727b88f99dfe4b1b48dde0dd0cafea560ace6aee34bcaf5f26f9adea07a"
+    },
+    "/Users/hugh/datasets/gittables/question_time/17-18_156.parquet": {
+      "size_bytes": 50034,
+      "sha256": "e9c5ca872473b5bd2b30e96652fa32e506c7b3404926a076996f6bca82cc53aa"
+    },
+    "/Users/hugh/datasets/gittables/question_time/18-19_524.parquet": {
+      "size_bytes": 68223,
+      "sha256": "bd577a534b97e71c1ed1e0db210bf3460bc3e05bed26878f5f1533132e34fb4d"
+    },
+    "/Users/hugh/datasets/gittables/question_time/20-21_196.parquet": {
+      "size_bytes": 51394,
+      "sha256": "95929640dc4cca8bbede4672b9bd95f7690ba71c55993aed5d04aad9407508f8"
+    },
+    "/Users/hugh/datasets/gittables/question_time/2021-03-17-2021-03-17-firefox-creator-answers-desktop-all-locales.parquet": {
+      "size_bytes": 62089,
+      "sha256": "1cdc74970049a3a3014a8ebc69de6bcf0d9b9907e4ad1f523bc0925eeadb9d26"
+    },
+    "/Users/hugh/datasets/gittables/question_time/22-23_340.parquet": {
+      "size_bytes": 56415,
+      "sha256": "d0b99ad6d93605c3c7aeaf44a9e02c7118a9bc7c05e4df2654d42c5892584d5f"
+    },
+    "/Users/hugh/datasets/gittables/question_time/23-24_653.parquet": {
+      "size_bytes": 50997,
+      "sha256": "e48f2a31cc1289c89b24112b8f83e433e79c1dd69cf154df132e78d97e253e78"
+    },
+    "/Users/hugh/datasets/gittables/question_time/AMS219A_questions.parquet": {
+      "size_bytes": 19204,
+      "sha256": "c69246330de2aad34fa4a3d649c8f4ff0961a9a3fbe95e680672a9e86d7f6b75"
+    },
+    "/Users/hugh/datasets/gittables/question_time/FAQ_3.parquet": {
+      "size_bytes": 7370,
+      "sha256": "251f5493e3b0791f001877c3af57b6cb2cad6ae12b3a9d920c091f814c3aa305"
+    },
+    "/Users/hugh/datasets/gittables/question_time/PRT-WorkshopCoding%20-%20Code%20Manager.parquet": {
+      "size_bytes": 44910,
+      "sha256": "acb7747f19c3167438e2292eba7b5a89870eab1afb7d6290487793cd0e3d4ec5"
+    },
+    "/Users/hugh/datasets/gittables/question_time/b0ea8b8a-7738-40a2-a1ec-dd391ffff805_text.parquet": {
+      "size_bytes": 46341,
+      "sha256": "3d4c4455440ee76dfb7bb09de61a867336cc1b8150661213406b84092b4671d7"
+    },
+    "/Users/hugh/datasets/gittables/question_time/dictEpisode-359-Untitled.parquet": {
+      "size_bytes": 6206,
+      "sha256": "ca32619ad939aa468323785c23c586d7836434ec2742a14fe67b1e6ade1b8425"
+    },
+    "/Users/hugh/datasets/gittables/question_time/image_terms_other.parquet": {
+      "size_bytes": 24459,
+      "sha256": "ca4ac4e7b3dd730ab0d21b3825eabdd7f93c252508bd7c82a9ccdc0adbc50e44"
+    },
+    "/Users/hugh/datasets/gittables/question_time/nphys-volume08-issue10.parquet": {
+      "size_bytes": 17282,
+      "sha256": "dd2f7cf564afef9cdfc524556c3b27b91bac1024b3f07b76591c1040ce5033d2"
+    },
+    "/Users/hugh/datasets/gittables/question_time/subsus_rhaygood_darbylaw_com.parquet": {
+      "size_bytes": 38764,
+      "sha256": "1c97080b920572fc07f5a747fdb6d0867349b5982ad76b8502c34df8a5fcc8c1"
+    },
+    "/Users/hugh/datasets/gittables/question_time/text_165.parquet": {
+      "size_bytes": 13843,
+      "sha256": "5f68a667dfa21f057a9b12509ede5a0c1a53ada3c8ac8435100bd5266718eb3d"
+    },
+    "/Users/hugh/datasets/gittables/question_time/tokens_62.parquet": {
+      "size_bytes": 17890,
+      "sha256": "e18743b1adb6256556ce47109e13b43382bd73fdd383e729f6cec781da1f7f42"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/00-01_293.parquet": {
+      "size_bytes": 63845,
+      "sha256": "f37b69c765508d1f22afecc500667e28aa4de29121d50dcd4c8a7452f926a491"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/02-03_399.parquet": {
+      "size_bytes": 50956,
+      "sha256": "dfcf69eb6dea4f7e45675d7e5e25f6a433de36ce75d08709a4a087c00f81cafc"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/04-05_420.parquet": {
+      "size_bytes": 66519,
+      "sha256": "87c5abf94ba3c9d49633a111144d4e15e51aaef2c26dd99a4a09eed1b7ae1e6e"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/06-07_301.parquet": {
+      "size_bytes": 44881,
+      "sha256": "e296ed6014b925de1058a35d35c37deff87f065e76b09e058c660f0be93f97b1"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/08-09_109.parquet": {
+      "size_bytes": 43558,
+      "sha256": "2db8f57a702721d256d8b552e2134d568b8815b41f58f3fe101e21026b308f59"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/09-10_497.parquet": {
+      "size_bytes": 53418,
+      "sha256": "a20c9e71b46dc11a7f12cee30aaf0fbe40da9361fd4d5e5ff99b44360b461e6a"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/11-12_378.parquet": {
+      "size_bytes": 52964,
+      "sha256": "3d6eefc81a3d12b46da53dd8521258bbf43a902f5cdcd190d1d38410911df5a7"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/13-14_79.parquet": {
+      "size_bytes": 51183,
+      "sha256": "9b8cbbbdc6987bba4ca5d8dc36e3475333cfecd5dc465634518eaace56e14c45"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/17-18_190.parquet": {
+      "size_bytes": 69328,
+      "sha256": "cb5b908a5df65ccd749c23453cc8a443079cff51c134d63ab57a21cfcc30c739"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/2008_nissan_xterra.parquet": {
+      "size_bytes": 56408,
+      "sha256": "166e5b7596833be8fa27d631b30f7c183afb2b1436a7faeaa7277cd7769d4624"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/22-23_254.parquet": {
+      "size_bytes": 68104,
+      "sha256": "ca22ff10530b57c9cb7555fcbe01cbb5b869b41fa6c2251013fe0b65aeb52c17"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/Alex_Lo_1_reviews.parquet": {
+      "size_bytes": 60777,
+      "sha256": "4e5e2bc85f285dc423f1ff07ef6e3f970cc777f0a46bd724dc2cb5cb28055c44"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/Overlapping-Hyponyms-Lemma.parquet": {
+      "size_bytes": 41644,
+      "sha256": "b8afe9390665614a6cd12a3d50502499cd8183b1dcc24b4211ca1c8d7574f5a8"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/books_5.parquet": {
+      "size_bytes": 6873,
+      "sha256": "8fe8072423b690288f379249721c64cf13bf8bec8ab3455bd48b49fa989f0f86"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/dwbfpricesusawin16112012.parquet": {
+      "size_bytes": 37983,
+      "sha256": "9963f58433ac86a89c74b814a09ffccf748d0cce70fe708eaa97357474edea4d"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/funcs_by_name_242.parquet": {
+      "size_bytes": 31589,
+      "sha256": "35a101c7191056f6bfcef47947191da326e158e0bf8c17f14d580e4e3bac231e"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/main_data_stars_desc.parquet": {
+      "size_bytes": 34539,
+      "sha256": "8a94ac577fa9eadaa85dfe543abc09dfc63ede6cef38c5ae3cb6f8aaa3fca86e"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/pred_BS_RM_NRet_forLogisticRegression.parquet": {
+      "size_bytes": 16359,
+      "sha256": "d0d3777713cf756e28410961174bc90e68f1a7c81075cf3485ad1100214e280f"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/recipe_981.parquet": {
+      "size_bytes": 44442,
+      "sha256": "84c43706071c298913dc1753ce46082137cfaba5afa08a3f949acc1bc8a0db42"
+    },
+    "/Users/hugh/datasets/gittables/quick_time/testData_3.parquet": {
+      "size_bytes": 31745,
+      "sha256": "2ef0b750b02b8337728ed643f8db5ffe5edaaccc1d322545351de7a04983ac0f"
+    },
+    "/Users/hugh/datasets/gittables/radial_velocity/hubble_data%20(1).parquet": {
+      "size_bytes": 9297,
+      "sha256": "3902d219c86c5b2406dd2b79d3eb9b0eaa2166ad95aa3ab8fe4925442809a826"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/$BABA_1.parquet": {
+      "size_bytes": 21175,
+      "sha256": "e8822e6c7202b4915c4865badd30d0bfaf9df6ec972aa22f722245f8f806fdcc"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/04-05_150.parquet": {
+      "size_bytes": 51350,
+      "sha256": "90a54951c5f2a5a5b8fd34592d2e0830a09168cb7f41c809e4825abd4e45cf78"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/07-08_271.parquet": {
+      "size_bytes": 71567,
+      "sha256": "64869b5c55d551fa90a850855ba0bab5a4d7a4b50f667f133a942c175dd96b24"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/11-12_216.parquet": {
+      "size_bytes": 51863,
+      "sha256": "121ccd3c4654c2deb61f23ced6ffedb493c3e6436959286a69313b225a8819bf"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/18-19_6.parquet": {
+      "size_bytes": 45750,
+      "sha256": "7547b6f74aeefd6332f60e4c8e8043abdc2502f21d2ce538246be78257b9602f"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/343cameronh.parquet": {
+      "size_bytes": 56289,
+      "sha256": "911caa7e8087742db10d3d0a92c1b528b980fe4c93ed8cf3dcb602d1d602a14b"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/Mage_Api2_1596.parquet": {
+      "size_bytes": 10336,
+      "sha256": "9bf91afd9f5370cda217f8ee44daf9a9e9ee1067f5e00bea052c5c2b55eda6f5"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/inflections.parquet": {
+      "size_bytes": 17207,
+      "sha256": "4a01121212effa847e83981cecb495fd5bf44fe085473f1ec3330a56c7dc4b23"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/news_48.parquet": {
+      "size_bytes": 28610,
+      "sha256": "a53f47b6dc520c85f7ad70c804c714e464f2d0ea9d45bec821b64590e1376090"
+    },
+    "/Users/hugh/datasets/gittables/rate_of_return/twin__0_5_infer_data.parquet": {
+      "size_bytes": 31800,
+      "sha256": "036c746b1278bb4e5f6ecb5713df9cc741f1b52129578f7180187c1371c625e4"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/03-04_79.parquet": {
+      "size_bytes": 58750,
+      "sha256": "a3ae5c1d3a3388d9f4bc4432188816cb923793c3a0489aab6ea9f7c0900ff542"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/07-08_74.parquet": {
+      "size_bytes": 59723,
+      "sha256": "3ed35b89c00806473998fe7f7854c52381d195cbf62f4de1e259f50a35d97f2b"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/11-12_78.parquet": {
+      "size_bytes": 47993,
+      "sha256": "ed6f98b56c39e3cf818eaca0b3a2e2a387a206dbb0fd59c05f145c4e1b4a298f"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/19-20_46.parquet": {
+      "size_bytes": 58269,
+      "sha256": "3d3a051af3327319f3f24ea47c91400c56d25a8022bc78ff3ad67dd3da26f2e4"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/MTURK-771_25.parquet": {
+      "size_bytes": 20597,
+      "sha256": "6a5e83eefc7582dfe56f5407cd247128e954e9ed2fe7e2e289d47ebd873fd841"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/nnano-volume13-issue08.parquet": {
+      "size_bytes": 63894,
+      "sha256": "1c6de4a2cdd0b4bdc3686ddb545632e5478eab5c99660cb96410afb6e40b9e37"
+    },
+    "/Users/hugh/datasets/gittables/reaction_time/trump_news_data_39.parquet": {
+      "size_bytes": 12027,
+      "sha256": "f184979830858d16391d1763835c763074dacb583204eb1b480cfb42da192579"
+    },
+    "/Users/hugh/datasets/gittables/real_time/00-01_800.parquet": {
+      "size_bytes": 69043,
+      "sha256": "d6bb1fcb04feeb9d61c85ae84510c579fa50a28c9e69eaa347d26ac7522ffb24"
+    },
+    "/Users/hugh/datasets/gittables/real_time/01-02_589.parquet": {
+      "size_bytes": 60388,
+      "sha256": "6b5c3a9d8e3fcd7eec9fce7dcc831f4e99e617967a128a7294a3eaaf04894f29"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0130_162320_InitializeSampleGD.parquet": {
+      "size_bytes": 7659,
+      "sha256": "f15fe3c771ca7695263a3c2a45c28b93bd3feeb6798ea37a0b4f4162f8abee14"
+    },
+    "/Users/hugh/datasets/gittables/real_time/02-03_230.parquet": {
+      "size_bytes": 52281,
+      "sha256": "74cd74d49d94e863279846cabb6806f7a6dd01a4ef1182fb46d83439de741f67"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0201_052016_InitializeSampleRD.parquet": {
+      "size_bytes": 7774,
+      "sha256": "1b717408c18952f80a74ca6856def1bb8fb2fc8de983fda1a19e3ed7702076e5"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0202_163913_InitializeSampleHD.parquet": {
+      "size_bytes": 7879,
+      "sha256": "90419b649365041db5c1bed1f98b1189aa192d1df196e8622f1a4b834b998c4f"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0205_022455_InitializeSampleHD.parquet": {
+      "size_bytes": 8204,
+      "sha256": "cddaa70492bf18ad620332b6ebdf4bb068938bc3f9d304144cbe0d027044059c"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0210_084938_InitializeSampleRD.parquet": {
+      "size_bytes": 7916,
+      "sha256": "9924b3dc1ae640231e540f78a753d3bd9ec1a5e81bb1f1d3c38d1a8b9b4e3e87"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0223_121452_InitializeSampleCC.parquet": {
+      "size_bytes": 7937,
+      "sha256": "a86bec1352b25bc426e3e1edb914b6d68218d7311b9e62202d8b8c1ab76287f1"
+    },
+    "/Users/hugh/datasets/gittables/real_time/03-04_1100.parquet": {
+      "size_bytes": 50654,
+      "sha256": "7cb24fa408e41bc0704c6741be6c7104e91cd4c9ff20c92dc34a88d08c72443a"
+    },
+    "/Users/hugh/datasets/gittables/real_time/03-04_969.parquet": {
+      "size_bytes": 66256,
+      "sha256": "d4559a05cd4515ee5924fb90227cead672398912b0d4b419d26d9d22a5cae77d"
+    },
+    "/Users/hugh/datasets/gittables/real_time/04-05_580.parquet": {
+      "size_bytes": 58320,
+      "sha256": "fce43ffe684150125591c8cfa7b11f9add74f6975da980915a62799ddb5b8a67"
+    },
+    "/Users/hugh/datasets/gittables/real_time/05-06_123.parquet": {
+      "size_bytes": 44611,
+      "sha256": "ef84456ec6735d52ed197f4438d7e42b154883666ef13e14f8dc3b84d9f46cd9"
+    },
+    "/Users/hugh/datasets/gittables/real_time/05-06_960.parquet": {
+      "size_bytes": 64161,
+      "sha256": "e57bb7f6d21337fd39c4b284927f31f6aad846adcada4f60f85cf8a284f4fade"
+    },
+    "/Users/hugh/datasets/gittables/real_time/06-07_34.parquet": {
+      "size_bytes": 42655,
+      "sha256": "6985d53d39fa3382dc35055691a9a27675bc233a45b68a772e2181d3120eb415"
+    },
+    "/Users/hugh/datasets/gittables/real_time/07-08_1019.parquet": {
+      "size_bytes": 50332,
+      "sha256": "c9c3db5b03a336e088d68dc5c20fb2ea3a28fb8c531e5e05f5f5a673687a8022"
+    },
+    "/Users/hugh/datasets/gittables/real_time/07-08_67.parquet": {
+      "size_bytes": 42297,
+      "sha256": "48078757fe6f44ff5398a6710597f724c5696e4309f50b387efa7b0841cece66"
+    },
+    "/Users/hugh/datasets/gittables/real_time/08-09_170.parquet": {
+      "size_bytes": 48289,
+      "sha256": "e7a38479af0860393f255579274acad625672f3126056bef468d4587ffe121d5"
+    },
+    "/Users/hugh/datasets/gittables/real_time/0825_7.parquet": {
+      "size_bytes": 27645,
+      "sha256": "7dbf7a470e790bf6b86b997779ed43abc1b0b2adefe2fcd5a91df1a0c7f53917"
+    },
+    "/Users/hugh/datasets/gittables/real_time/09-10_597.parquet": {
+      "size_bytes": 55149,
+      "sha256": "2cdb9c41427d550397b28b8158fa5042f622bcbce0b9a52498f832e3bd0316c0"
+    },
+    "/Users/hugh/datasets/gittables/real_time/10-11_1152.parquet": {
+      "size_bytes": 68824,
+      "sha256": "e6d76d537d8feae05b8fe7f7d5cb3c2fd9123a070692597baa112d2f26413ad1"
+    },
+    "/Users/hugh/datasets/gittables/real_time/10-11_923.parquet": {
+      "size_bytes": 64761,
+      "sha256": "1bfc15804a844674e59349c0b9a1a8a712b6e294de9d49840230bb772ea14b2d"
+    },
+    "/Users/hugh/datasets/gittables/real_time/11-12_478.parquet": {
+      "size_bytes": 53143,
+      "sha256": "4bcff776f69f3c39bab5084f02e0110ad3e20ddff86da54cbef4b5580c6beddd"
+    },
+    "/Users/hugh/datasets/gittables/real_time/12-13_429.parquet": {
+      "size_bytes": 54619,
+      "sha256": "53cf2ece7ba3f6341a25b5c04d0a74e678cc850c42b2b49bf2faaf779fb73afa"
+    },
+    "/Users/hugh/datasets/gittables/real_time/13-14_394.parquet": {
+      "size_bytes": 52765,
+      "sha256": "064b4d637db7368a6bf330e6cbe56d551661d164fec8edad454519539ecc8cb9"
+    },
+    "/Users/hugh/datasets/gittables/real_time/14-15_499.parquet": {
+      "size_bytes": 64114,
+      "sha256": "0adc09281f3cd079bf4e009cff0bd05a0ffe2556711b49fde4263ef9f7e5dc71"
+    },
+    "/Users/hugh/datasets/gittables/real_time/15764.parquet": {
+      "size_bytes": 19463,
+      "sha256": "dcacc40351d14f74266d5386e2571fde61fd85226181976f35fc474985dc0f61"
+    },
+    "/Users/hugh/datasets/gittables/real_time/17-18_407.parquet": {
+      "size_bytes": 62117,
+      "sha256": "08f6442f777c5c17af1d9dc9ebd094e406004a9579715bd5ea37bf2e7baff774"
+    },
+    "/Users/hugh/datasets/gittables/real_time/19-20_274.parquet": {
+      "size_bytes": 52246,
+      "sha256": "87d19b34365e1a523b9859d2d1249024d3a9d293401ccb1228a9c652ec331a3e"
+    },
+    "/Users/hugh/datasets/gittables/real_time/1993-3.parquet": {
+      "size_bytes": 17026,
+      "sha256": "4a8fbb08c959570d2c1b73f4fa2e4441987068118354b2023088762afbfba60d"
+    },
+    "/Users/hugh/datasets/gittables/real_time/2003_boxofficemojo_rankings.parquet": {
+      "size_bytes": 39884,
+      "sha256": "a9e119d7cdb95e77d91db24c0990b9beed86dc7c3080d241282ee6b85151d365"
+    },
+    "/Users/hugh/datasets/gittables/real_time/2020-11-15-2020-11-15-firefox-creator-answers-desktop-all-locales.parquet": {
+      "size_bytes": 60363,
+      "sha256": "7282accf742f2c288d2cfb02eee591c21a6c785d1a8569b464665764792cb041"
+    },
+    "/Users/hugh/datasets/gittables/real_time/22-23_213.parquet": {
+      "size_bytes": 49389,
+      "sha256": "4b1bcc08b031f01251d893fbfd375ef86002eec6397a28a43767ada988352f89"
+    },
+    "/Users/hugh/datasets/gittables/real_time/23-24_511.parquet": {
+      "size_bytes": 63142,
+      "sha256": "e2010bae0a8629932ee1cc75594e5d93fe96f2cd38af0206b904b4d1eb844ba1"
+    },
+    "/Users/hugh/datasets/gittables/real_time/7a716468-4ef2-47f9-bcac-0dcf8abcfee3_tags.parquet": {
+      "size_bytes": 14422,
+      "sha256": "3e0945addeccc315816e3855e59414a4d56fb216d88cd5911ef67f147bb905d8"
+    },
+    "/Users/hugh/datasets/gittables/real_time/BVLC_AlexNet_143.parquet": {
+      "size_bytes": 12770,
+      "sha256": "bf0bd88a9c665108b0eb10aa00cccb238be28d3dd69acfed7b4a246654195bbf"
+    },
+    "/Users/hugh/datasets/gittables/real_time/Barinel_coverage_sd_19.parquet": {
+      "size_bytes": 15137,
+      "sha256": "4b93895da622a89748c0674be55e2fe183338288ce074d7fa16e378e85861091"
+    },
+    "/Users/hugh/datasets/gittables/real_time/DenseNet-121_92.parquet": {
+      "size_bytes": 19365,
+      "sha256": "a7579ecd907800b132c0401b22577431d0aada030de50a9a7ed06b4464289120"
+    },
+    "/Users/hugh/datasets/gittables/real_time/Fake_news_site.parquet": {
+      "size_bytes": 15458,
+      "sha256": "11e6b320bc14f5372fc7c52d695bf309c33b62d155fb9ea45e321213b1dc602e"
+    },
+    "/Users/hugh/datasets/gittables/real_time/KualaLumpur_reviews_16.parquet": {
+      "size_bytes": 36437,
+      "sha256": "52f87b1bb0b28fa769272a3001a7e907e442930f39539e8f2a9fbd08823af722"
+    },
+    "/Users/hugh/datasets/gittables/real_time/MobileNet-v2_58.parquet": {
+      "size_bytes": 14270,
+      "sha256": "125fb938b699b52efd48dbd1c53ad9e737d70999f35eed5c81f75f603913b62e"
+    },
+    "/Users/hugh/datasets/gittables/real_time/Ports%20List.parquet": {
+      "size_bytes": 14339,
+      "sha256": "c947079787684b39c698437e943a02885f931c27c1c72c5b31fb31d5a026fb3f"
+    },
+    "/Users/hugh/datasets/gittables/real_time/ResNet034-v1_265.parquet": {
+      "size_bytes": 14048,
+      "sha256": "518016f4a9c135dee72a6803b11d848401c99d81cefda9c4ee4273ced0c3422f"
+    },
+    "/Users/hugh/datasets/gittables/real_time/ResNet050-v1_71.parquet": {
+      "size_bytes": 13764,
+      "sha256": "4822407dd4d1081fe268304459fce00e071497542483ccd1854cf923b31e9a9a"
+    },
+    "/Users/hugh/datasets/gittables/real_time/Shufflenet_221.parquet": {
+      "size_bytes": 14540,
+      "sha256": "5d7da3ddbac95421effb3b6e0abcbbf41953b0d40c49767bf9b031094ef1b0b6"
+    },
+    "/Users/hugh/datasets/gittables/real_time/Tiny_YOLO-v2_228.parquet": {
+      "size_bytes": 13104,
+      "sha256": "98b7b7bb9e280867f552069486438cf26c91add43df11248a48707c799b1189c"
+    },
+    "/Users/hugh/datasets/gittables/real_time/VGG19-BN_301.parquet": {
+      "size_bytes": 13620,
+      "sha256": "7b94d8e98fd142d14a1cc8e6da36401c623029d409762ae5ae65cc8aa869104c"
+    },
+    "/Users/hugh/datasets/gittables/real_time/Zfnet512_44.parquet": {
+      "size_bytes": 12012,
+      "sha256": "8956806955279ed304a9b1a44aace1da7b0b9b42ae10e728418c0868297987cb"
+    },
+    "/Users/hugh/datasets/gittables/real_time/big-sur-holy-bud.parquet": {
+      "size_bytes": 6631,
+      "sha256": "de5ee05b48af6cf626c300313a22b4ec1c678bee3164df13a9bfbc1c20f3d69d"
+    },
+    "/Users/hugh/datasets/gittables/real_time/competitors_321.parquet": {
+      "size_bytes": 17410,
+      "sha256": "0a15c4a67772327025e13e03b79b1cacb4c9f0b75e90e1891656169679bd9612"
+    },
+    "/Users/hugh/datasets/gittables/real_time/diagnosticMethod_2.parquet": {
+      "size_bytes": 8107,
+      "sha256": "c35a43d7acd3ff5467c3c3f286690e336bd3e3562e81001df94fecd7a9fa7361"
+    },
+    "/Users/hugh/datasets/gittables/real_time/events_69225_shot.parquet": {
+      "size_bytes": 81277,
+      "sha256": "3220c76dc7f6d3c59a27478d5cbf616a5eefbcb33af4d48b0dba4cf517b76ba8"
+    },
+    "/Users/hugh/datasets/gittables/real_time/i_description.parquet": {
+      "size_bytes": 7528,
+      "sha256": "7511ad88db0b7a2bb3214aff8379997cf0a9495445ee97be9b5e51a53deee963"
+    },
+    "/Users/hugh/datasets/gittables/real_time/maa_mattarito.parquet": {
+      "size_bytes": 26937,
+      "sha256": "709f477194a31e3551395a05aab97a78546dc9849814a19dca6050fc954a02d0"
+    },
+    "/Users/hugh/datasets/gittables/real_time/nnano-volume02-issue02_1.parquet": {
+      "size_bytes": 61272,
+      "sha256": "b9a01db73aa28c4e5cb693d59349cd99cc0097d033d5769f704a3a8677470ef2"
+    },
+    "/Users/hugh/datasets/gittables/real_time/permit-2009-1263_plain.parquet": {
+      "size_bytes": 30382,
+      "sha256": "25f75fad86acfeab8f05072fcdc72c0fd510794a390de9fa79daa9b44260f07e"
+    },
+    "/Users/hugh/datasets/gittables/real_time/permit-2014-983_plain.parquet": {
+      "size_bytes": 26210,
+      "sha256": "be67472f29627833e41221e94da014af8b99d0557012590f096fae7985020b70"
+    },
+    "/Users/hugh/datasets/gittables/real_time/relativeEntropy_reward_low_FP_rate_scores_17.parquet": {
+      "size_bytes": 20684,
+      "sha256": "c9c5751f18a4f5b3d01fad8b8a71226cb0b0784ec039a6dd98619b0fc511268f"
+    },
+    "/Users/hugh/datasets/gittables/real_time/section6all_hist_60500B%20Ann$_22.parquet": {
+      "size_bytes": 37090,
+      "sha256": "38f5d0f2c75d2ab90dbc27bcf7a995064a836780c5d99d5e779906d580427b86"
+    },
+    "/Users/hugh/datasets/gittables/real_time/section6all_xls_60500C%20Ann$_87.parquet": {
+      "size_bytes": 27576,
+      "sha256": "c092a532285b7006680794bb93c99c9051482c988e7d259287b9a9643be884fa"
+    },
+    "/Users/hugh/datasets/gittables/real_time/section6all_xls_609C%20Ann$.parquet": {
+      "size_bytes": 19878,
+      "sha256": "7093de63b3bbe29dbbe0bb863deb65d8648fbd99826dc8dea1c7c5d55d66581e"
+    },
+    "/Users/hugh/datasets/gittables/real_time/susp-ignored_515.parquet": {
+      "size_bytes": 18578,
+      "sha256": "bfda37440b955a7fe068cbbc69762e7615b770a54adcc42299eb494114311bad"
+    },
+    "/Users/hugh/datasets/gittables/real_time/sw_1096_3346.utt_3.parquet": {
+      "size_bytes": 32078,
+      "sha256": "db83f95c0498747772220fb818b2208299d646b8ec56db40d24a541a419fc907"
+    },
+    "/Users/hugh/datasets/gittables/real_time/tokens_149.parquet": {
+      "size_bytes": 12910,
+      "sha256": "27a38d5473c3b27f624494e1bff37e822d0009aacfa17b6f438b9b5f49150afc"
+    },
+    "/Users/hugh/datasets/gittables/real_time/varsovie.parquet": {
+      "size_bytes": 22408,
+      "sha256": "a507cec90b5889c15fa5341fda07d00ebd499771e16c5cf5ce298abdd088a588"
+    },
+    "/Users/hugh/datasets/gittables/relaxation_time/black-label-kush.parquet": {
+      "size_bytes": 6949,
+      "sha256": "2b6e07400a94e7724351eebc6e9ec3f3f1032480a74500080a3a49a015878f82"
+    },
+    "/Users/hugh/datasets/gittables/respiratory_rate/18756_episode1_timeseries.parquet": {
+      "size_bytes": 41412,
+      "sha256": "cec7057a7a17773fcb44065629e51250cbd66d12bd4614a5b6d11ee1554656a3"
+    },
+    "/Users/hugh/datasets/gittables/respiratory_rate/colic0-198-numericOnly-T-Pcba-A-mci=-1.parquet": {
+      "size_bytes": 13490,
+      "sha256": "b75a326c55bd952ff0ae6a59e061056b8e2d2f58a114f42622ee25fbec9d6bac"
+    },
+    "/Users/hugh/datasets/gittables/revolutions_per_minute/12-13_2.parquet": {
+      "size_bytes": 59404,
+      "sha256": "08b954c3f0074d9f4ad563fee1cdc5a2c0ac389dbbd38c0d9a53e7f443e6174e"
+    },
+    "/Users/hugh/datasets/gittables/running_time/0067_9.parquet": {
+      "size_bytes": 26137,
+      "sha256": "ea99fd7d40ad6f58b24d6c2d05ccb667b7f13f130606bbe2d069f59ffe0610f5"
+    },
+    "/Users/hugh/datasets/gittables/running_time/02-03_26.parquet": {
+      "size_bytes": 43737,
+      "sha256": "753988950c912686394907d6b096026f400489bf0ac88768c1fb30149a1dcc43"
+    },
+    "/Users/hugh/datasets/gittables/running_time/03-04_405.parquet": {
+      "size_bytes": 61376,
+      "sha256": "2bcd72a8b17571e4a87800c1db227bb98d41e2afdf9eb38c2ffac206d52cade1"
+    },
+    "/Users/hugh/datasets/gittables/running_time/04-05_519.parquet": {
+      "size_bytes": 62000,
+      "sha256": "b94e9273e0a5cc7e4a71475e1ac4bc6e0f69ee2f404199b3113c5047953eea0e"
+    },
+    "/Users/hugh/datasets/gittables/running_time/05-06_532.parquet": {
+      "size_bytes": 48049,
+      "sha256": "7932656318bd3df5160d5de4c22fb2c2d9a2d8c42667ec3a21a5e41970581bcc"
+    },
+    "/Users/hugh/datasets/gittables/running_time/06-07_48.parquet": {
+      "size_bytes": 42674,
+      "sha256": "88329706a5a419ad4bb4dc924e2c134e0e4c12dd042f4f6d5667f5f2deeb1183"
+    },
+    "/Users/hugh/datasets/gittables/running_time/07-08_400.parquet": {
+      "size_bytes": 46661,
+      "sha256": "43628cb4691cc24f8d6aeb355cef9aa1799c0fd9b4b8854253cbce45caca355c"
+    },
+    "/Users/hugh/datasets/gittables/running_time/08-09_384.parquet": {
+      "size_bytes": 48907,
+      "sha256": "2b04dbaf6fc610112a13dee3bc2155fe85ea9b6c807c9e7724852501bbfe74d2"
+    },
+    "/Users/hugh/datasets/gittables/running_time/09-10_368.parquet": {
+      "size_bytes": 55723,
+      "sha256": "1c45e52612b71f7ad12a2f28f259b8ca396de9042514c981fcebda81c7cf1a9b"
+    },
+    "/Users/hugh/datasets/gittables/running_time/10-11_339.parquet": {
+      "size_bytes": 52324,
+      "sha256": "f3020ead3116a4af27cd5b394a906c4f40b7a5647fe0e4b64a50e7b9ba28e48a"
+    },
+    "/Users/hugh/datasets/gittables/running_time/11-12_345.parquet": {
+      "size_bytes": 56267,
+      "sha256": "da12aaf0e9d6e1793a42b6cbae6802fe0c28d978b1b540b15c19fe6d0060b771"
+    },
+    "/Users/hugh/datasets/gittables/running_time/12-13_450.parquet": {
+      "size_bytes": 64111,
+      "sha256": "e85549a92dd5f23a6ace5ffcb5c522f409b8ddc196db7c5392980b575297af16"
+    },
+    "/Users/hugh/datasets/gittables/running_time/14-15_174.parquet": {
+      "size_bytes": 54607,
+      "sha256": "e4dff8f0aaab5fd0a1d0c7df161597def35b0b924a79c53b00de7b877e75402b"
+    },
+    "/Users/hugh/datasets/gittables/running_time/16-17_234.parquet": {
+      "size_bytes": 59587,
+      "sha256": "955ba49b3a5725c31f45afb517ab6c4e564cb0a048586624984ef2793b813bb6"
+    },
+    "/Users/hugh/datasets/gittables/running_time/18-19_49.parquet": {
+      "size_bytes": 50113,
+      "sha256": "18cac32f6661cb702419759d07b34cc849c81033ec244a68b8aedfbf90ed0ff1"
+    },
+    "/Users/hugh/datasets/gittables/running_time/20-21_240.parquet": {
+      "size_bytes": 58476,
+      "sha256": "dbc1d0b2148ffa57e3b94144ee3c65e551531ba6e001085bff0c05e41a60fd81"
+    },
+    "/Users/hugh/datasets/gittables/running_time/2021-01-02_top_2000terms.parquet": {
+      "size_bytes": 29242,
+      "sha256": "aeba864ae5f062830d7224aba69e0701199673385e40f636efbc0f9fa2562f5f"
+    },
+    "/Users/hugh/datasets/gittables/running_time/22-23_306.parquet": {
+      "size_bytes": 48241,
+      "sha256": "db5eacf5f1743a1336f1e102d6c34772264b6ebe6ca1903bea99b1ef21f5cfa8"
+    },
+    "/Users/hugh/datasets/gittables/running_time/87ef7faf-8ccb-4e20-86c8-f9bc669749ea_text.parquet": {
+      "size_bytes": 31535,
+      "sha256": "061499ff104e59413ef5d6023d22c2586417c3fff553ad6d668df53e0c9300bc"
+    },
+    "/Users/hugh/datasets/gittables/running_time/Epsilon_2016-01-01_2020-12-01_3.parquet": {
+      "size_bytes": 29117,
+      "sha256": "37d21ef3dbe60a3fcf8f825a1e429fad94833cc6bb1e8cb7f576531644882f57"
+    },
+    "/Users/hugh/datasets/gittables/running_time/PandR.parquet": {
+      "size_bytes": 49440,
+      "sha256": "0afd2b4756c267ad964503c7fde4d82e87f8556cd6ad255013b77c12b7eab78f"
+    },
+    "/Users/hugh/datasets/gittables/running_time/bike%20reviews_5.parquet": {
+      "size_bytes": 48556,
+      "sha256": "c3dc56163f06237212eeae01ea92eabbffaa8ce7d1048d7eefd5aef96bd6f5fb"
+    },
+    "/Users/hugh/datasets/gittables/running_time/dwbfpricesusaplace28062013.parquet": {
+      "size_bytes": 34372,
+      "sha256": "5a50f90e744bd333eaee194faa30ab74044678d6d63f68a4192901941d873197"
+    },
+    "/Users/hugh/datasets/gittables/running_time/jos_ucm_content_95.parquet": {
+      "size_bytes": 87283,
+      "sha256": "600cc9264533752d3b62f33cf1d3626270794ac2620464ca5e73e1fcc0fb915b"
+    },
+    "/Users/hugh/datasets/gittables/running_time/participant302keysequencedata_2020-01-14-14_46_42-jonathan.parquet": {
+      "size_bytes": 63751,
+      "sha256": "4a23c2fd53a302daea4ceedea863f8d073db51a95a2d9bbe307b725930f6a1b8"
+    },
+    "/Users/hugh/datasets/gittables/running_time/results_01e15fb3cab04245_2020.05.01_200928.parquet": {
+      "size_bytes": 17030,
+      "sha256": "df5584f970d32a66bf9c147437054c174c4d5ba956e637e69f6683fe7e277524"
+    },
+    "/Users/hugh/datasets/gittables/running_time/sw_0700_2586.utt_4.parquet": {
+      "size_bytes": 42572,
+      "sha256": "7bdcb359dbc291c908e239fb21a62ec98c5cad376093141d980f3fde9aa89d8c"
+    },
+    "/Users/hugh/datasets/gittables/running_time/topic_20_1.parquet": {
+      "size_bytes": 18833,
+      "sha256": "e80b0b20941f1c8bffb3020f03dbd5f9cca61e5351aa12074c8815cee701876e"
+    },
+    "/Users/hugh/datasets/gittables/safe_period/04-05_116.parquet": {
+      "size_bytes": 48722,
+      "sha256": "4af95ba64266e328daa3e4e213626ddbe2c7ca933ea13cd6a170f9d7e8e18990"
+    },
+    "/Users/hugh/datasets/gittables/safe_period/10-11_73.parquet": {
+      "size_bytes": 48790,
+      "sha256": "28e768a89c0a2c13a4a8a12494d0a0d183ab6c9df3fb45ab28c27e327ee539d8"
+    },
+    "/Users/hugh/datasets/gittables/safe_period/2021-06-23_top_2000terms.parquet": {
+      "size_bytes": 29125,
+      "sha256": "11ff50812deaf1e5c309879bb1601472cc4d0164d5f768560fdd20c4b07f57d5"
+    },
+    "/Users/hugh/datasets/gittables/safe_period/StructureDefinition-IHE.MHD.UnContained.Comprehensive.SubmissionSet.parquet": {
+      "size_bytes": 116323,
+      "sha256": "174a98ea8b9c55eaaa7f2b87ab328b88af86a1bca2826e6b0c24776a67058fb1"
+    },
+    "/Users/hugh/datasets/gittables/safe_period/funcs_by_name_197.parquet": {
+      "size_bytes": 33605,
+      "sha256": "41afe87ac7f809974a3ca73908f68e3b9c80e01f7d3f0788aa4699c5715bfdff"
+    },
+    "/Users/hugh/datasets/gittables/sampling_frequency/04-05_5.parquet": {
+      "size_bytes": 67067,
+      "sha256": "c85ddfe4ee2736bac38602f9042133283ae2fb14fce7ea71a4a7cd75dc091170"
+    },
+    "/Users/hugh/datasets/gittables/sampling_rate/EDSD.d97a_2.parquet": {
+      "size_bytes": 35841,
+      "sha256": "88e08e87da84679e0dbe8986bec52b3fe9dfa8305c022f53f610e43223afff06"
+    },
+    "/Users/hugh/datasets/gittables/sampling_rate/nphoton-volume11-issue11_1.parquet": {
+      "size_bytes": 68128,
+      "sha256": "391372efaf520d87b8ea9ead9e264386cb49f0839c21d15f281e51f68cd6317a"
+    },
+    "/Users/hugh/datasets/gittables/secretory_phase/new_3728120_3728202_c_perGene_table.parquet": {
+      "size_bytes": 30183,
+      "sha256": "83cf40eb44b1700de48eba8b00cfc1b5b83ceb689c9ea845bed7d1ea534a43cf"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/06-07_114.parquet": {
+      "size_bytes": 63896,
+      "sha256": "b6d8d372c91f30c4a1f8bc31c8ea69f09df45c823746695aa8478251ff087399"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/14-15_23.parquet": {
+      "size_bytes": 52635,
+      "sha256": "3d54ea4f7f8171f1da234c2ebe3243e6262e28dee06a8a2cba5c06a7705ce3ef"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/A03424.headed-ubiq-tokens.parquet": {
+      "size_bytes": 22437,
+      "sha256": "86615f385acc16e4790bdea4396e974d8e68c238abcfbf9cf2b4f219ccd62fe7"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1311LAG3E4LH.parquet": {
+      "size_bytes": 32015,
+      "sha256": "5d9d2d3f4283dd3cca0cc45eb34a9689d8216a1befb2ee8acd30bc9b06bd0825"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1331LAGRYZ0H.parquet": {
+      "size_bytes": 35287,
+      "sha256": "2f322459a4fac15d23cd1cc540b56f9632c486846cc01b28c1641f36ffb1f2db"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1331LAGSHXZH.parquet": {
+      "size_bytes": 35792,
+      "sha256": "e955ffa66d28631c0913147eedf3ff6cf2c5e0d6f1c23b2febb97aa7ca416997"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1331LAGTGLGH.parquet": {
+      "size_bytes": 33668,
+      "sha256": "2d5f0a34e5ee33bef78136f3ec6dbace18bb9092508acf01bec21e0ce0b8946d"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1331LAH1896H.parquet": {
+      "size_bytes": 26085,
+      "sha256": "bb089ecf01e5ba889cfeab2dc3a5c23e7475fa0c6b14db81acc42afdab08cb7c"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1331LAHD20NH_1.parquet": {
+      "size_bytes": 25310,
+      "sha256": "9e28e2df5b4ce3c2a379c740521febfcaf3ebd77d24d142e674d3c848c31a4f1"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL1331LAHDYZNH.parquet": {
+      "size_bytes": 25087,
+      "sha256": "d311dbd098f76d8654918bc6675d5d8b98bb594ddf145243e7c43e1b8eb121a0"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL2331LAGMTZ2J.parquet": {
+      "size_bytes": 34964,
+      "sha256": "e335126a6a0f1fc84d19be2c133999da3e35d46630a39c69e3a7bd985ff08e73"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL2331LAGRX78J.parquet": {
+      "size_bytes": 34950,
+      "sha256": "8a844b92b85f008f117ee7c6c2e22b73eaed898e9a733b06e88740acab8b360b"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL2331LAGUDL1J.parquet": {
+      "size_bytes": 33811,
+      "sha256": "ead6524a59c9058e13ecd95effebe84d697e7d8a8e374d8e927f994e0c8f5f19"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL2331LAH42AGJ.parquet": {
+      "size_bytes": 25769,
+      "sha256": "5f99a5b3a29aa2cd9f0d77f3a971b59a240bb56f5dc261d59dfd06b743ba06e9"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL2331LAHDASGJ.parquet": {
+      "size_bytes": 24756,
+      "sha256": "20bdf3e8fde29c2c3c4a4fb8e11ed1545db8c4ba85a895e2a3e4378e4490c7bc"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/PL2331LAHDX7DJ.parquet": {
+      "size_bytes": 25774,
+      "sha256": "874de8903b8472cb80f4d6ce6971a2978bf5e47c9218b107c5b98437b8bf3b30"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/WD-WCC1T1089230.parquet": {
+      "size_bytes": 30927,
+      "sha256": "bbc85dcf683f9399e25d104e46b2f09acf7532879617d3c17b22c4219bb0ed29"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/WD-WX21D9421ZSE.parquet": {
+      "size_bytes": 33958,
+      "sha256": "39ffcbd65560668d1e6e34c05dc7b0fc24356542f2da7bab9692dba4a0ae329a"
+    },
+    "/Users/hugh/datasets/gittables/seek_time/npzresources.parquet": {
+      "size_bytes": 40125,
+      "sha256": "00846004d5cf45730d71d1589ce405f44e6b4da65f31b64430c188188af6701c"
+    },
+    "/Users/hugh/datasets/gittables/shiva/076.parquet": {
+      "size_bytes": 20362,
+      "sha256": "51c62cbb32aaeb24d5fa2fd207b55ada634c3a69750b25bdfd5ba50c471af48c"
+    },
+    "/Users/hugh/datasets/gittables/show_time/00-01_13.parquet": {
+      "size_bytes": 38477,
+      "sha256": "15808d4d61554a149ede3e4aa147db043ba43743615d3f93129f45c5d97bd0b5"
+    },
+    "/Users/hugh/datasets/gittables/show_time/01-02_293.parquet": {
+      "size_bytes": 55951,
+      "sha256": "b201ccd0059770e7f0aa9a1bf405ad8e9822dfdc6d9fed9e1a1c78e773c5d6ef"
+    },
+    "/Users/hugh/datasets/gittables/show_time/02-03_323.parquet": {
+      "size_bytes": 58680,
+      "sha256": "b8375111215b69770553850e3b722c6758c19b7714311fe97e85961accbd9649"
+    },
+    "/Users/hugh/datasets/gittables/show_time/03-04_387.parquet": {
+      "size_bytes": 58323,
+      "sha256": "54375a4705eea4fb32338dfc30d3a338bb361d9079cbdae32e4c8681bb006518"
+    },
+    "/Users/hugh/datasets/gittables/show_time/04-05_360.parquet": {
+      "size_bytes": 57574,
+      "sha256": "2376127668f85169b9587806a2f42ce28bfd8ebc719b2a492ef2183d392b5bb6"
+    },
+    "/Users/hugh/datasets/gittables/show_time/05-06_191.parquet": {
+      "size_bytes": 48887,
+      "sha256": "b130817be928f4e50556796ba3deb197e252ac169eec9c5c0ecfcbdd7aa9cdfb"
+    },
+    "/Users/hugh/datasets/gittables/show_time/06-07_1023.parquet": {
+      "size_bytes": 50104,
+      "sha256": "b23eb90282f1a0568039276a462489f005543ad323489b6348ca792d0b8630f4"
+    },
+    "/Users/hugh/datasets/gittables/show_time/06-07_884.parquet": {
+      "size_bytes": 64102,
+      "sha256": "4f38bab8e96f781668e7a1a0d51b2868b4cdc9e6c860f34769bc1fc72f09e78b"
+    },
+    "/Users/hugh/datasets/gittables/show_time/07-08_662.parquet": {
+      "size_bytes": 49039,
+      "sha256": "aeb422d3640f667ecea7047c59d516214982d4808fdd15e2083b973e92b36f87"
+    },
+    "/Users/hugh/datasets/gittables/show_time/08-09_510.parquet": {
+      "size_bytes": 56909,
+      "sha256": "1a3999c0b761b2532fb7cb021758090e458dac1ce9b41c7c3122353763b4f09b"
+    },
+    "/Users/hugh/datasets/gittables/show_time/09-10_380.parquet": {
+      "size_bytes": 46359,
+      "sha256": "c2b523f62759fb299aacf2e68662e264e0069d6bcd632be093db9efe24a70f45"
+    },
+    "/Users/hugh/datasets/gittables/show_time/10-11_164.parquet": {
+      "size_bytes": 47260,
+      "sha256": "7bc822d6063b2415c4eddbf5dfdbb9fec1b3c788902abce1f2ea65e0c0e5432b"
+    },
+    "/Users/hugh/datasets/gittables/show_time/1048_12.parquet": {
+      "size_bytes": 20460,
+      "sha256": "3ee0c62f137ccac9862d90a98b8346ce5d9d7facbd1644a0a7f341f51c5d1388"
+    },
+    "/Users/hugh/datasets/gittables/show_time/11-12_96.parquet": {
+      "size_bytes": 44659,
+      "sha256": "6295658001e0afacf0d69a095b2b042434777a9933406ac38930dac283046ca6"
+    },
+    "/Users/hugh/datasets/gittables/show_time/13-14_165.parquet": {
+      "size_bytes": 52156,
+      "sha256": "2c1cf78d48dacffe37bf7b8cda9dbb882397192e9885f2f9d94b2aa5f7a31342"
+    },
+    "/Users/hugh/datasets/gittables/show_time/14-15_439.parquet": {
+      "size_bytes": 63389,
+      "sha256": "0122eae882787f4c340898506bae2743a2e64b6a3a419d85b8a9d6c39886c03c"
+    },
+    "/Users/hugh/datasets/gittables/show_time/16-17_279.parquet": {
+      "size_bytes": 61002,
+      "sha256": "bf6e221935489bf640e934b41ccaaff252e7ac9a4b436eba1fc2cd62ccb79bef"
+    },
+    "/Users/hugh/datasets/gittables/show_time/18-19_33.parquet": {
+      "size_bytes": 42921,
+      "sha256": "834ca503b696e3f2b60dccd194b4d938900c26e6a67b3f7b137f52b8dc4e15f9"
+    },
+    "/Users/hugh/datasets/gittables/show_time/1991-09-21.parquet": {
+      "size_bytes": 20609,
+      "sha256": "2552a46218ce4dbb495cce1397db638bbe850b9722245a3b0434eb81b4561413"
+    },
+    "/Users/hugh/datasets/gittables/show_time/2014_1007.parquet": {
+      "size_bytes": 49770,
+      "sha256": "a2ec7d3005a7affb1aa27d872aedab85ff3da7340907d70ac2cbda8c9fe2489e"
+    },
+    "/Users/hugh/datasets/gittables/show_time/2021-07-22_top_2000terms.parquet": {
+      "size_bytes": 30117,
+      "sha256": "9e0e9cf21211a107a976ac3151ab712ba13729c82a69c05553da2547423d89d4"
+    },
+    "/Users/hugh/datasets/gittables/show_time/22-23_81.parquet": {
+      "size_bytes": 48923,
+      "sha256": "5f17c41f46a6cf08ab8e632ae88f87d1b6122f66a80f5cdc5e6d15eacab48312"
+    },
+    "/Users/hugh/datasets/gittables/show_time/58950---58950_1.parquet": {
+      "size_bytes": 20909,
+      "sha256": "aeb37e3d1f8b1f440d282fedfa6ad8a59c5f8596e455581b9b1545e16e7aea08"
+    },
+    "/Users/hugh/datasets/gittables/show_time/Barinel_coverage_sd_21.parquet": {
+      "size_bytes": 16145,
+      "sha256": "f61faf906e3aaf0ee754a19a14de69d47902ac1f3ccd51ce88072ed5b04e9d6a"
+    },
+    "/Users/hugh/datasets/gittables/show_time/Designite_GameStarterKit.iOS_ImpSmells.parquet": {
+      "size_bytes": 19731,
+      "sha256": "46d7166f161d8b90619ec4d71ba54e8849eeb76f253b117d65391914267738d1"
+    },
+    "/Users/hugh/datasets/gittables/show_time/Emotions_Data.parquet": {
+      "size_bytes": 29365,
+      "sha256": "351a2ff226b9197a5b3577e23b913d6bbb350fe7336032d793428c06c79180ba"
+    },
+    "/Users/hugh/datasets/gittables/show_time/J01-2004_aakansha_185.parquet": {
+      "size_bytes": 41334,
+      "sha256": "3daff92a291eb47404218fe46784890ca348ab5e83c51d1934f09ca0f55fce10"
+    },
+    "/Users/hugh/datasets/gittables/show_time/MSNBC.201807_13.parquet": {
+      "size_bytes": 15811,
+      "sha256": "42f2dc9ac0c3e305f03e526dcf2cf60a5827c20fe540a5744ee31405e0aba42d"
+    },
+    "/Users/hugh/datasets/gittables/show_time/P05-1013_aakansha_119.parquet": {
+      "size_bytes": 40178,
+      "sha256": "3bec407b87e8f86ae459041217246d84dd565ae5172ced5aff52258dfe2b8305"
+    },
+    "/Users/hugh/datasets/gittables/show_time/P87-1015_swastika_63.parquet": {
+      "size_bytes": 40292,
+      "sha256": "b30d83032befe99dc93908995245e156b87f0688cbd60b5a6e11819d8fdb0b79"
+    },
+    "/Users/hugh/datasets/gittables/show_time/SubGenreBasedOnMovieName_2.parquet": {
+      "size_bytes": 21700,
+      "sha256": "230dff7859280fb6a3827dbab0647ec8440a8f6dedadc675db489f6620a0edfc"
+    },
+    "/Users/hugh/datasets/gittables/show_time/W99-0623_swastika_130.parquet": {
+      "size_bytes": 35870,
+      "sha256": "9db8dd1be5e3661996c319c950a59bf904de8b560de924ef7a0d0efd34ca9991"
+    },
+    "/Users/hugh/datasets/gittables/show_time/artists_13.parquet": {
+      "size_bytes": 51454,
+      "sha256": "e84aad6aefa818e8336d7418011af87a7d8c7a1b772b9c56dd795c1551855a3d"
+    },
+    "/Users/hugh/datasets/gittables/show_time/competitors_186.parquet": {
+      "size_bytes": 17608,
+      "sha256": "cec629933d93a041ea86744ff1226c1d6eaeb32391b3a75eaed6f5846a3626f5"
+    },
+    "/Users/hugh/datasets/gittables/show_time/dbo_runtime-104-small_1.parquet": {
+      "size_bytes": 34652,
+      "sha256": "d439583875c3b3baa74f6b9c3a1f5d189e867126097543205b5afdfe05d41687"
+    },
+    "/Users/hugh/datasets/gittables/show_time/ebffc3ae-be2e-470c-859b-6cd9ceb3badf_text.parquet": {
+      "size_bytes": 42419,
+      "sha256": "d0644f9494135290839cf0d875e71b6506c8c3813ba3ebd95fd744af36627b2e"
+    },
+    "/Users/hugh/datasets/gittables/show_time/example_90.parquet": {
+      "size_bytes": 47768,
+      "sha256": "4492690a8453fd23fab83ba56a44963d4659d42d035b83403cbd48074aad5b88"
+    },
+    "/Users/hugh/datasets/gittables/show_time/funcs_by_name_238.parquet": {
+      "size_bytes": 35070,
+      "sha256": "e21593e6c3c7821c8852dce0476fbdca35d3c9b0a065e7ac567816ebc31acbd1"
+    },
+    "/Users/hugh/datasets/gittables/show_time/it-IT_34.parquet": {
+      "size_bytes": 21742,
+      "sha256": "283ca93e3dbfe91f38c79eb4e1121a09dfdc964001f0bb5a9dce9b6d5a23e0e5"
+    },
+    "/Users/hugh/datasets/gittables/show_time/lists_createoradd_6.parquet": {
+      "size_bytes": 23585,
+      "sha256": "579875196a97a258e540f696e951a7a33ce37311ea29932a10b98ddfafc696f2"
+    },
+    "/Users/hugh/datasets/gittables/show_time/meta_helpEN_38.parquet": {
+      "size_bytes": 16078,
+      "sha256": "05303c8ce49b01101960d1599d234fb68af00cb099e4b576b184ece9a712c5dc"
+    },
+    "/Users/hugh/datasets/gittables/show_time/nphys-volume13-issue09.parquet": {
+      "size_bytes": 22649,
+      "sha256": "6bd9b205df77b51bc6d8e807215470caeee1c1a3e27053d277feeb966cb509ea"
+    },
+    "/Users/hugh/datasets/gittables/show_time/randy_bhatia_enron_com.parquet": {
+      "size_bytes": 24376,
+      "sha256": "bd1d3c037f76eab2fb2e6d1593ac526bab246be70c9ed0568e8e8a9bb8701c90"
+    },
+    "/Users/hugh/datasets/gittables/show_time/sraix.aiml_114.parquet": {
+      "size_bytes": 7947,
+      "sha256": "2a48fd23e6f14135eca3272a0079ddcdead7195cdd05025383acedfdb64fabb8"
+    },
+    "/Users/hugh/datasets/gittables/show_time/the_mueller_100000_ulmfit.parquet": {
+      "size_bytes": 22514,
+      "sha256": "ab47d71e8d5066707ab96c24421fb2d5460b3eed7d3b6281d5d7d8871be9358f"
+    },
+    "/Users/hugh/datasets/gittables/show_time/upload10_39.parquet": {
+      "size_bytes": 22332,
+      "sha256": "55b731ebd9c924d300ab3709adcfe8b4a2af78b9aa5ee3be0e2c393100cc712c"
+    },
+    "/Users/hugh/datasets/gittables/solar_constant/10-11_20.parquet": {
+      "size_bytes": 51430,
+      "sha256": "e002c99b168384c8eea70b8dfdfaedd56a9e4b86e5bff3aa1294484ee589ec86"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/03-04_89.parquet": {
+      "size_bytes": 62931,
+      "sha256": "47c8f74a44bf9e86e2c8a6b086fa835363987a66aeee23e78c5eac19042f37fa"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/09-10_74.parquet": {
+      "size_bytes": 61344,
+      "sha256": "4a709cfd5c58edb81a1fce78901e5574c4c7cda631106429335d277868c4e59f"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/1942_original.parquet": {
+      "size_bytes": 28590,
+      "sha256": "fd0ed6756c94d08e5a886ceacdad89278d5cd4f9aec9af7b6f7b8cb63cd97471"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/ConvenientCop_1.parquet": {
+      "size_bytes": 35912,
+      "sha256": "61b182dd66cdd1215c45f255e8c17ea552e28fc66ce93067b519e84f4fdecbad"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/data-10300-10700.parquet": {
+      "size_bytes": 29689,
+      "sha256": "01f99a4841745dc459453b091811374274e72181aeff1487894d8020b2e8f97b"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/funcs_by_name_346.parquet": {
+      "size_bytes": 34019,
+      "sha256": "bc0d6441614d66f99d30c242dc8631671a1a5c6c0fd74ddf37e3d6311c87de9c"
+    },
+    "/Users/hugh/datasets/gittables/speed_of_light/sw_0733_4940.utt_11.parquet": {
+      "size_bytes": 31824,
+      "sha256": "44d3c148e07856dfc986df50281bc82304b48aa5f5eb2c3d32f2f6032f0ebc62"
+    },
+    "/Users/hugh/datasets/gittables/split_shift/06-07_35.parquet": {
+      "size_bytes": 59041,
+      "sha256": "ab0dc23f73ecd7b868ee99c62cd681f22ca001e3d5b94584f3ae3c94e814d92a"
+    },
+    "/Users/hugh/datasets/gittables/split_shift/StatisticalDebugging_coverage_sd_35.parquet": {
+      "size_bytes": 14974,
+      "sha256": "918a58894181f2b9badd72f2bd3e91a67837fc67dc2972977ec598a82c82773f"
+    },
+    "/Users/hugh/datasets/gittables/stopping_point/04-05_79.parquet": {
+      "size_bytes": 52046,
+      "sha256": "57f0c7fe4db793e07e0e03b240ce50d8a9e26c6f023ea12b91ddf8eb7528878d"
+    },
+    "/Users/hugh/datasets/gittables/stopping_point/12-13_80.parquet": {
+      "size_bytes": 69068,
+      "sha256": "b91869f543a6263c00a310f105d977dea4966c35bdbb134781719bb3c8d5d319"
+    },
+    "/Users/hugh/datasets/gittables/stopping_point/Twitter-sentiments.parquet": {
+      "size_bytes": 40178,
+      "sha256": "495e762619bf4808c56748ec6f0ad70b8641cc9a34f35896436951c4047e14c7"
+    },
+    "/Users/hugh/datasets/gittables/then/%E4%B8%BB%E7%BA%BF%E5%89%A7%E6%83%85%E7%AC%AC82%E7%AB%A0%E7%AC%AC4%E8%8A%82%E7%AC%AC1%E5%B9%95_1.parquet": {
+      "size_bytes": 24827,
+      "sha256": "a253bc3f751f3094e083803c3292244e0f009542e59a5e6ed3f9fd72c01c8d5c"
+    },
+    "/Users/hugh/datasets/gittables/then/00-01_832.parquet": {
+      "size_bytes": 63574,
+      "sha256": "acb70cf7f0151da81357e921a25f83f0afe29dc10e525b8d7be478faee9174c0"
+    },
+    "/Users/hugh/datasets/gittables/then/01-02_1261.parquet": {
+      "size_bytes": 67534,
+      "sha256": "a3bf2cf7b9e027578ead5428a2e89f4e7228db0f135b1af221b603bb61dc74c3"
+    },
+    "/Users/hugh/datasets/gittables/then/0110_5.parquet": {
+      "size_bytes": 18417,
+      "sha256": "2cad6c7ff4762ab78147b864e837815970efd77a7a077e37007825188dec37c7"
+    },
+    "/Users/hugh/datasets/gittables/then/02-03_283.parquet": {
+      "size_bytes": 45495,
+      "sha256": "2f2ac4ba44649b043babdf3823671e00de763881aa34ac0ec6dea9ac99ff1110"
+    },
+    "/Users/hugh/datasets/gittables/then/0250_10.parquet": {
+      "size_bytes": 19472,
+      "sha256": "dbe03b3ecc8ebeb442c60384c2a59e94ca318322615e3ebc1ec1148d4af509d0"
+    },
+    "/Users/hugh/datasets/gittables/then/03-04_37.parquet": {
+      "size_bytes": 37356,
+      "sha256": "6d4fbfdbfc427f1701b326486c216cf021020fa893345424b1eb63510e7b4b8e"
+    },
+    "/Users/hugh/datasets/gittables/then/0366_2.parquet": {
+      "size_bytes": 23256,
+      "sha256": "123b516019e9fa5f3ffc49493b4c0c76229d885e3eff5a19c4b1fd933841dd01"
+    },
+    "/Users/hugh/datasets/gittables/then/04-05_370.parquet": {
+      "size_bytes": 48034,
+      "sha256": "1bc5b3b3c8bb5f13863b4a0e143640bd42c4472e738b987ec17b85b1bd917afc"
+    },
+    "/Users/hugh/datasets/gittables/then/0457_13.parquet": {
+      "size_bytes": 17929,
+      "sha256": "2e7f72f531704c0ccadc94573f26204bac02c7be381d40c4d084a21feb5af601"
+    },
+    "/Users/hugh/datasets/gittables/then/05-06_221.parquet": {
+      "size_bytes": 48021,
+      "sha256": "7e94bf72c130c59dcd4a01613c5c687b7f5b1edcb03c06cfe098573aaba30195"
+    },
+    "/Users/hugh/datasets/gittables/then/0535_9.parquet": {
+      "size_bytes": 18078,
+      "sha256": "4120d6b2d768b2883b8c7e6db242a538967a9739c6594275229f76012515e2f9"
+    },
+    "/Users/hugh/datasets/gittables/then/06-07_1672.parquet": {
+      "size_bytes": 49103,
+      "sha256": "f246553b24f31285e5b69d288ba9924ffe053fd101c27d9629bf860ca4ae4030"
+    },
+    "/Users/hugh/datasets/gittables/then/0602_11.parquet": {
+      "size_bytes": 20194,
+      "sha256": "6b1d2ef3faa84d56d2431fa6cd2194a65029fcf79b41665660607d31985810f1"
+    },
+    "/Users/hugh/datasets/gittables/then/07-08_1522.parquet": {
+      "size_bytes": 47947,
+      "sha256": "3223b8a8e83d4242506953e486f1027658f69f1882673ad281fbf13961ace8aa"
+    },
+    "/Users/hugh/datasets/gittables/then/07-08_859.parquet": {
+      "size_bytes": 45291,
+      "sha256": "c914b277b8483795f6c462af827f76f15d107fc793bb76b9bad0c1d202d62e4f"
+    },
+    "/Users/hugh/datasets/gittables/then/08-09_1273.parquet": {
+      "size_bytes": 48056,
+      "sha256": "f2b775f752394e945483bbdc5b372d7cb50cbf957123fd36a0e456ba5a0329d0"
+    },
+    "/Users/hugh/datasets/gittables/then/08-09_654.parquet": {
+      "size_bytes": 50418,
+      "sha256": "771687c96d2772a982e64c29f02f3dce80027f47500cc20ef760158706cf9df2"
+    },
+    "/Users/hugh/datasets/gittables/then/0891_11.parquet": {
+      "size_bytes": 18976,
+      "sha256": "34350b967e836e19566101645b76c47104557c75f3dac7c9b97ce01f64561234"
+    },
+    "/Users/hugh/datasets/gittables/then/09-10_347.parquet": {
+      "size_bytes": 46358,
+      "sha256": "d17b50173821fdb9b8ac8c39a19120e6deedce312e8b8bc6075521b328691574"
+    },
+    "/Users/hugh/datasets/gittables/then/0946_6.parquet": {
+      "size_bytes": 17383,
+      "sha256": "12bcaa789e1f3f42e040c888d990f9a24f0c9db7cde2a1ded0b05ea78a7b486f"
+    },
+    "/Users/hugh/datasets/gittables/then/10-11_1559.parquet": {
+      "size_bytes": 67607,
+      "sha256": "ea3983df6d174984b6af59545869afec818d99d33966a9c511a1935f2563023f"
+    },
+    "/Users/hugh/datasets/gittables/then/10-11_986.parquet": {
+      "size_bytes": 59587,
+      "sha256": "ea757d99fdb31cba8587836e7fb5968397007d16ca4e01e552caac8e123c4d60"
+    },
+    "/Users/hugh/datasets/gittables/then/11-12_1378.parquet": {
+      "size_bytes": 49473,
+      "sha256": "d81e8daea32168401160a555f980f01aca5288a561061708e51648778b0b3b9f"
+    },
+    "/Users/hugh/datasets/gittables/then/11-12_945.parquet": {
+      "size_bytes": 49605,
+      "sha256": "c7ff071b877acc5f3d43c98ad909fd74dc6a2a512fac23bdd3187c1b0e5130ab"
+    },
+    "/Users/hugh/datasets/gittables/then/12-13_509.parquet": {
+      "size_bytes": 51865,
+      "sha256": "8c11ebddf4bd44527cd867703ba943eb57d24b5461f25025b08316ae3265ca31"
+    },
+    "/Users/hugh/datasets/gittables/then/13-14_279.parquet": {
+      "size_bytes": 45531,
+      "sha256": "09bf92e4478cd214325477d19469c06129948c8f23afaceb4af125cf35a3a67e"
+    },
+    "/Users/hugh/datasets/gittables/then/14-15_168.parquet": {
+      "size_bytes": 45136,
+      "sha256": "7b4d4caa9fa33b4a34f7c71c48964cac945639155836db9eb3bfcc1f782d1c75"
+    },
+    "/Users/hugh/datasets/gittables/then/15-16_115.parquet": {
+      "size_bytes": 38110,
+      "sha256": "fa13b12d91abbc11aae2ca83202a5d96047ed762000bcd4ff21722771b76d430"
+    },
+    "/Users/hugh/datasets/gittables/then/16-17_131.parquet": {
+      "size_bytes": 45935,
+      "sha256": "98f32dc5fd712eb56f01cbd3be65e535d743df60701c64869b2b3ff4c82133ab"
+    },
+    "/Users/hugh/datasets/gittables/then/17-18_155.parquet": {
+      "size_bytes": 46534,
+      "sha256": "8be64dfa87d8d1bc33bdacbb32611ed77826809bae503688174626912d26206b"
+    },
+    "/Users/hugh/datasets/gittables/then/18-19_376.parquet": {
+      "size_bytes": 54879,
+      "sha256": "7cb5a3d306ee86f5c99ebb793c9746b309fd1160d06c968634b8907d88f5cc3b"
+    },
+    "/Users/hugh/datasets/gittables/then/19-20_625.parquet": {
+      "size_bytes": 66171,
+      "sha256": "a17f03c0420e58ec788a2c5b9bb64be255d5583753cfaedb1b9dcddb20e958ce"
+    },
+    "/Users/hugh/datasets/gittables/then/20-21_707.parquet": {
+      "size_bytes": 67088,
+      "sha256": "a7833fdd7a706ee5ac9615c85e9d47c23c7f9c222aa9bb8f3820d0ee9dd0d6ce"
+    },
+    "/Users/hugh/datasets/gittables/then/2021-06-26_top_2000terms.parquet": {
+      "size_bytes": 28911,
+      "sha256": "729fd1b6156279804f5c5f3dfb60cae72e3899eb505ab1bd9ec1c53b13509636"
+    },
+    "/Users/hugh/datasets/gittables/then/21-22_82.parquet": {
+      "size_bytes": 42936,
+      "sha256": "541032a08947f49fb91507112f9aff04b64da832639ebe50111029426e86ab90"
+    },
+    "/Users/hugh/datasets/gittables/then/23-24_188.parquet": {
+      "size_bytes": 45973,
+      "sha256": "724ea5173779635382d25c3db81969d9578acdac001ec4d835c68b67d7935b21"
+    },
+    "/Users/hugh/datasets/gittables/then/2F%20Human%20Like%20Random%20Hero%20(200%20troops)_2.parquet": {
+      "size_bytes": 13159,
+      "sha256": "309c2b1d50800f4a6c6298dba9adc8ea175f56ebb69f5b8fd823fb4629d61249"
+    },
+    "/Users/hugh/datasets/gittables/then/A00-2018.annv3_88.parquet": {
+      "size_bytes": 46116,
+      "sha256": "a7f49b491a551d010556c27f9969f3c39fa28c0d7e7ede6cc9bfffde56703c0a"
+    },
+    "/Users/hugh/datasets/gittables/then/A97-1014.annv3_44.parquet": {
+      "size_bytes": 41438,
+      "sha256": "ee5e6dbf27189f867043b2149de757613bb6e2a9441475ce98572ef5aca5e06e"
+    },
+    "/Users/hugh/datasets/gittables/then/Bangkok_reviews_18.parquet": {
+      "size_bytes": 38940,
+      "sha256": "c1bcd6b2e2361194bc15e3b194f6bd747c549bdd0bf1dcae2bef7bd63578690d"
+    },
+    "/Users/hugh/datasets/gittables/then/D09-1092_529.parquet": {
+      "size_bytes": 41444,
+      "sha256": "a512642d9d42112e4f2e7fccd59076d38942476e19cfc630c93732d139a3b9c4"
+    },
+    "/Users/hugh/datasets/gittables/then/David_Sinow_1_reviews.parquet": {
+      "size_bytes": 60396,
+      "sha256": "5727d3d2b04054ce18698868af35f7c78b3566d69132d41dac46bff5153a7c3b"
+    },
+    "/Users/hugh/datasets/gittables/then/Designite_WcfRestContrib_ImpSmells.parquet": {
+      "size_bytes": 23073,
+      "sha256": "06206c55deff3f26e97e96f1bbbfadcb40a8c0a5bdb84af9c56aae5f018c9a60"
+    },
+    "/Users/hugh/datasets/gittables/then/FldObj_RockZoraRelief_A_M_01_ma.parquet": {
+      "size_bytes": 10239,
+      "sha256": "f5b5b39035bd5f98973b0953959933da52f9c69abf7becc087b11d992601feba"
+    },
+    "/Users/hugh/datasets/gittables/then/In%20Your%20Wake%20Lyrics.parquet": {
+      "size_bytes": 17506,
+      "sha256": "e122934b24d21b40d2c8d81840ddee24384e637893be1841d194ac2a3ed7bc6c"
+    },
+    "/Users/hugh/datasets/gittables/then/Lec31_MIT18.03DifferentialEquations,Spring2006-UJG0f0BSX14.en.parquet": {
+      "size_bytes": 42475,
+      "sha256": "c1f1ab5bb15a6c82a33b5c81d885d6a8439242b2c1a9f7ef2aa5b3835f0b3b0d"
+    },
+    "/Users/hugh/datasets/gittables/then/P04-1036_540.parquet": {
+      "size_bytes": 37925,
+      "sha256": "2df450cedae20907c696dbc4e5116ebeb2f8e2cc0bfde61697b5eb46fc5d1e3d"
+    },
+    "/Users/hugh/datasets/gittables/then/P08-1028.annv3_3.parquet": {
+      "size_bytes": 43663,
+      "sha256": "2868b21fb24cbc44a6aabb5238c7edb7a132b2a1ad3adb81dde47439f4e3a7f2"
+    },
+    "/Users/hugh/datasets/gittables/then/P08-1102_aakansha_17.parquet": {
+      "size_bytes": 36508,
+      "sha256": "8b3896a05cb05a7bf3fa5cf4f405168546e747fac591cff72898f407f61120b6"
+    },
+    "/Users/hugh/datasets/gittables/then/P11-1061_sweta_55.parquet": {
+      "size_bytes": 40565,
+      "sha256": "84357cfd8bde59e9d4ca261929a5994ed1522e85d950d1794c38bbce4ab50447"
+    },
+    "/Users/hugh/datasets/gittables/then/Stephen_Farrand_1_reviews.parquet": {
+      "size_bytes": 61965,
+      "sha256": "36989f1cf110bf934d0f51e4093a9381502a95c9ba162e8ac2cf79b0539463f5"
+    },
+    "/Users/hugh/datasets/gittables/then/W06-3114_58.parquet": {
+      "size_bytes": 40381,
+      "sha256": "9759099be9fbc10853258e1639d0e11a8b8154e8d3f24eb3c6a4e4e8d7624877"
+    },
+    "/Users/hugh/datasets/gittables/then/W99-0623_swastika_54.parquet": {
+      "size_bytes": 35865,
+      "sha256": "4a8b6119b72e219c3cce4d13f424c93fb33d0bf265d917fa4ee5368fa416b16d"
+    },
+    "/Users/hugh/datasets/gittables/then/ayyouforgottosaveafterclosing.parquet": {
+      "size_bytes": 23791,
+      "sha256": "31ad8700d1af5974befb1a69fc4418735a8943ebf26b0fc84293b7e54c02296c"
+    },
+    "/Users/hugh/datasets/gittables/then/citeSents_nltk_38.parquet": {
+      "size_bytes": 14876,
+      "sha256": "3d0905dab36dd567f7941b230ff38e002e94a9d6f4951274a7cb524f8b2dbbdd"
+    },
+    "/Users/hugh/datasets/gittables/then/dialects022.parquet": {
+      "size_bytes": 16627,
+      "sha256": "903bb7f6d22f6b8091bbc5bf18912a28c3f4d57063faf1cb955792b43c19d938"
+    },
+    "/Users/hugh/datasets/gittables/then/ep3.parquet": {
+      "size_bytes": 42222,
+      "sha256": "f02d2c53d7c8c2b53441e4e3a961ce77357416aa6f3f8c254ab783745ff278c7"
+    },
+    "/Users/hugh/datasets/gittables/then/fi-FI_37.parquet": {
+      "size_bytes": 17742,
+      "sha256": "8d91ec5b581c7c452b4028f2618c455d629fa568471e6526284930bbdd33bfb3"
+    },
+    "/Users/hugh/datasets/gittables/then/instagram_reach_25.parquet": {
+      "size_bytes": 26336,
+      "sha256": "cf1391d722de5c4df9a19210cda04ef5c917295ff666db3178ba4fd05e40d30b"
+    },
+    "/Users/hugh/datasets/gittables/then/l12%20(Stealth%20Cruiser%20A%20-%20NORMAL%20AE).parquet": {
+      "size_bytes": 414365,
+      "sha256": "791649b4396b9bf68478ff0f783807d95ec850546bd5119344c793f2987a7d2a"
+    },
+    "/Users/hugh/datasets/gittables/then/n4_.parquet": {
+      "size_bytes": 39770,
+      "sha256": "8f6c555ca25b73b7d55ee24e00a7a7dc9ea60687598fd2648429bddae171ece0"
+    },
+    "/Users/hugh/datasets/gittables/then/player-joined-phrases.parquet": {
+      "size_bytes": 11715,
+      "sha256": "3f3690c844db8ed9b1f9c1dd3eed8a7e17a3078d9e17f51fbdc200124e4fa5a3"
+    },
+    "/Users/hugh/datasets/gittables/then/rules_17.parquet": {
+      "size_bytes": 33567,
+      "sha256": "0abf902e68edc20513299df63e9921356bd3783cbb9176af3bf138c250dbb56a"
+    },
+    "/Users/hugh/datasets/gittables/then/shuffled0The%20Resume%20Lyrics.parquet": {
+      "size_bytes": 19939,
+      "sha256": "b226fc37663959604172e96fe6eecf32419eef7d5fe0978e08374b40d4a2106b"
+    },
+    "/Users/hugh/datasets/gittables/then/sw_0060_4038.utt_3.parquet": {
+      "size_bytes": 41804,
+      "sha256": "57915a878e519772e745b62b7e730b1d5d735930b303f4f5b670811ad40ee1e1"
+    },
+    "/Users/hugh/datasets/gittables/then/sw_0746_2448.utt_15.parquet": {
+      "size_bytes": 39482,
+      "sha256": "fb64425016564c047076cdd12851e2b67a2e0cc7b0f025dbeb332790eaa0ebd2"
+    },
+    "/Users/hugh/datasets/gittables/then/sw_1109_2842.utt.parquet": {
+      "size_bytes": 33534,
+      "sha256": "ea2fb63d2a60c1b384bfed681b297f72c8b8670e88dcc6247bca1ab9740eb047"
+    },
+    "/Users/hugh/datasets/gittables/then/test_trademarks_7.parquet": {
+      "size_bytes": 8289,
+      "sha256": "ffee021b8df5318ff861825d80eb80819e313c73afa8ed3bbd9342aa694cb0ac"
+    },
+    "/Users/hugh/datasets/gittables/then/text_951.parquet": {
+      "size_bytes": 25143,
+      "sha256": "e3179ce152da531a5479f4dc9aa93b991d78e501e5833391e6b9daa430f4a374"
+    },
+    "/Users/hugh/datasets/gittables/then/tokens_1709.parquet": {
+      "size_bytes": 17780,
+      "sha256": "272a543e8c85e55b06d396e57d4649f2083c4088d5a4f1d375ad36184d81941e"
+    },
+    "/Users/hugh/datasets/gittables/then/tokens_815.parquet": {
+      "size_bytes": 11439,
+      "sha256": "c2d47501959f68759b9f628d3eb5381c99df93ef1502892e4fbf3955fa5a2030"
+    },
+    "/Users/hugh/datasets/gittables/then/wafflefellow.parquet": {
+      "size_bytes": 18627,
+      "sha256": "a72e6cab5de7c9e66b6917fdc3019698a7008adfc81c7acfa259641314e6328d"
+    },
+    "/Users/hugh/datasets/gittables/thing/00-01_191.parquet": {
+      "size_bytes": 43977,
+      "sha256": "0ed9f2f91fb07fe5361718ad3d526394e81419d9d69583d4e5a865bf12a6985a"
+    },
+    "/Users/hugh/datasets/gittables/thing/0021_15.parquet": {
+      "size_bytes": 20045,
+      "sha256": "a6756b811f9b8eb3446b9e0842d1f000e004cf4dd37aa76b9309be091cd754d5"
+    },
+    "/Users/hugh/datasets/gittables/thing/01-02_22.parquet": {
+      "size_bytes": 37082,
+      "sha256": "57e332b509d641bf0c59bdf168fd789b1a14d6593a3643b96572619793dabc45"
+    },
+    "/Users/hugh/datasets/gittables/thing/0122_8.parquet": {
+      "size_bytes": 26902,
+      "sha256": "645332f7c96fab28951409c0e899653dd2e875cd5881dc2531692cfd994045d7"
+    },
+    "/Users/hugh/datasets/gittables/thing/02-03_1500.parquet": {
+      "size_bytes": 69068,
+      "sha256": "8c71e543696f1f26cc4a3bb6907bf1552c55da7ffe28483012b7e6a3d2a32597"
+    },
+    "/Users/hugh/datasets/gittables/thing/02-03_996.parquet": {
+      "size_bytes": 61861,
+      "sha256": "df6a68d34a2d84a38c5c4e10eeb55ec1efaba131749753c74bac1a5e2a4e9b70"
+    },
+    "/Users/hugh/datasets/gittables/thing/03-04_1423.parquet": {
+      "size_bytes": 54335,
+      "sha256": "2db1d5dae18841ed312ea81e7ccf5bb1ea40e79e78f32116035eeabfd858e93f"
+    },
+    "/Users/hugh/datasets/gittables/thing/03-04_854.parquet": {
+      "size_bytes": 60034,
+      "sha256": "ccaa5e26560cb11b965d4f8b655e5d2bdf1b2c5df89e3b78faa91ce1cd42637b"
+    },
+    "/Users/hugh/datasets/gittables/thing/04-05_1318.parquet": {
+      "size_bytes": 51705,
+      "sha256": "3f7115272b890ebe9f7d7a061b5cd9bbd882bbe2e2607e40cda3dfb46bf85c72"
+    },
+    "/Users/hugh/datasets/gittables/thing/04-05_626.parquet": {
+      "size_bytes": 50648,
+      "sha256": "d3958c308de4d0fb9da00837d6420b738443b273b6da0f4cb65931e38759ec3a"
+    },
+    "/Users/hugh/datasets/gittables/thing/05-06_1099.parquet": {
+      "size_bytes": 59447,
+      "sha256": "a330ffe22e6cbd06d7d2d32398ec2778fc2746b86f0369fd4429b7e8871cd46e"
+    },
+    "/Users/hugh/datasets/gittables/thing/05-06_311.parquet": {
+      "size_bytes": 44940,
+      "sha256": "33864cfe0ba8e81321face7d73844a33a914599eada9b58f1523a8bbadae3a68"
+    },
+    "/Users/hugh/datasets/gittables/thing/0553_18.parquet": {
+      "size_bytes": 17353,
+      "sha256": "402c9025169e7446053a30f394304e08cda5dcd4a017f94ef3cf09b9806f68f7"
+    },
+    "/Users/hugh/datasets/gittables/thing/06-07_1709.parquet": {
+      "size_bytes": 64707,
+      "sha256": "285aa913a78883de472f1d83d5cba77ddc009a9eaf34055a7058d892397cb6ca"
+    },
+    "/Users/hugh/datasets/gittables/thing/06-07_790.parquet": {
+      "size_bytes": 53293,
+      "sha256": "96c27c232ef0854c6b9373ba3302ab4d259024731f3dd825bf4bac3141d1d425"
+    },
+    "/Users/hugh/datasets/gittables/thing/07-08_1226.parquet": {
+      "size_bytes": 58057,
+      "sha256": "f41ed9974174bb9bf642f75a5307aa0de871d6ffdf66e94710df66fe7f0e9883"
+    },
+    "/Users/hugh/datasets/gittables/thing/07-08_253.parquet": {
+      "size_bytes": 42177,
+      "sha256": "18dced3163cd6c3135a0ee86a9bd033291110cfa492397f87e5c77585e5e7cc3"
+    },
+    "/Users/hugh/datasets/gittables/thing/0748_7.parquet": {
+      "size_bytes": 18470,
+      "sha256": "07e185f2bc3129e09d7a0236ff91bcdd7387e76d0921c7cce962fd153ffb20e0"
+    },
+    "/Users/hugh/datasets/gittables/thing/08-09_165.parquet": {
+      "size_bytes": 39687,
+      "sha256": "ac73fb0cb23aa500630472b8338d778fceb4a9a3daa9017cbf44f0ffd132177a"
+    },
+    "/Users/hugh/datasets/gittables/thing/08-09_792.parquet": {
+      "size_bytes": 55249,
+      "sha256": "9050475a2aa265722ea3dce799b3a4d0ced4d1193000bc93777ea0ffd524a8ba"
+    },
+    "/Users/hugh/datasets/gittables/thing/09-10_1252.parquet": {
+      "size_bytes": 59921,
+      "sha256": "c7d7a768cd72616bf19c3ac08943a39ea512d15dee8365d4f7322712a6570f06"
+    },
+    "/Users/hugh/datasets/gittables/thing/09-10_419.parquet": {
+      "size_bytes": 45878,
+      "sha256": "21820704820dec49d98e667fa3b2b2ef7dbb706fbf9cc380502b6abd54776e24"
+    },
+    "/Users/hugh/datasets/gittables/thing/0970_7.parquet": {
+      "size_bytes": 19693,
+      "sha256": "16604106ffc64ac18e631a6385dc5b3453aef506e94e1c915fa4b24eccd2279f"
+    },
+    "/Users/hugh/datasets/gittables/thing/10-11_1682.parquet": {
+      "size_bytes": 53638,
+      "sha256": "c2ecf8bed9645dc1aaa61ad31e51c391d81e8e475f4d53f8e7276e96b5207fcf"
+    },
+    "/Users/hugh/datasets/gittables/thing/10-11_864.parquet": {
+      "size_bytes": 46518,
+      "sha256": "e593c794349f042b7d5556ae5f4b05a3dd91fe62784a31d1de754afe86d1143d"
+    },
+    "/Users/hugh/datasets/gittables/thing/11-12_1377.parquet": {
+      "size_bytes": 51286,
+      "sha256": "09df8794d13cce557c01bb4213b2bcb3ee4d507ed359fccecf3ba4cedadcb462"
+    },
+    "/Users/hugh/datasets/gittables/thing/11-12_723.parquet": {
+      "size_bytes": 55773,
+      "sha256": "42de229cf75fa1ac4ea229bc9ab12ba2518e114f0523a793a5bc9ab97b060e8a"
+    },
+    "/Users/hugh/datasets/gittables/thing/12-13_236.parquet": {
+      "size_bytes": 44928,
+      "sha256": "63a834463e30433004ddccd39b3457db36566ec40a445da52035a9f09d3ac7ff"
+    },
+    "/Users/hugh/datasets/gittables/thing/13-14_1141.parquet": {
+      "size_bytes": 52280,
+      "sha256": "380070bcd4d24a60cdf8eca6505bc0e6a73ca4f301a6a76df6e47ad4c5187183"
+    },
+    "/Users/hugh/datasets/gittables/thing/13-14_97.parquet": {
+      "size_bytes": 41937,
+      "sha256": "a934183a003fa5e700e6633eba3081db24fdf42c061426917c57ee6352e5919e"
+    },
+    "/Users/hugh/datasets/gittables/thing/14-15_899.parquet": {
+      "size_bytes": 65659,
+      "sha256": "9c3efc3d78d72d85de8f3c66baaecf77f2db80b100b83a0705e7613f901c10c1"
+    },
+    "/Users/hugh/datasets/gittables/thing/15-16_901.parquet": {
+      "size_bytes": 68374,
+      "sha256": "f39d57a60d4c4f0bc6620fb57d27f7e6cd561b8ff4a3e5ae384ab6331b572663"
+    },
+    "/Users/hugh/datasets/gittables/thing/17-18_133.parquet": {
+      "size_bytes": 44218,
+      "sha256": "3458245b02f47deed848f967fe827aae3a42219cfc0fda0731eb6581e4037efc"
+    },
+    "/Users/hugh/datasets/gittables/thing/18-19_294.parquet": {
+      "size_bytes": 53850,
+      "sha256": "301defe74a6291a6a74ca6975d6609cd2cc5b6f89eb8c4c86e3dd7d987d7ddd6"
+    },
+    "/Users/hugh/datasets/gittables/thing/19-20_461.parquet": {
+      "size_bytes": 55349,
+      "sha256": "efa14813985c90d9549f056ea3b8e5964444cdfccb5d80d58893bd3d776fc986"
+    },
+    "/Users/hugh/datasets/gittables/thing/1981-07-18_1.parquet": {
+      "size_bytes": 20483,
+      "sha256": "4ce361160e4c53008d530bf4a34f021ea7b6d560b737cc56ae7cc30e6f88ed0c"
+    },
+    "/Users/hugh/datasets/gittables/thing/2-1892579-1.html_1.parquet": {
+      "size_bytes": 5053,
+      "sha256": "c192b5e6966f09f8aaed86bb0847b26d378e81e02d118a8aca7a7198c353b740"
+    },
+    "/Users/hugh/datasets/gittables/thing/2002-05-25_1.parquet": {
+      "size_bytes": 20258,
+      "sha256": "8379c66f31e58a942aa39d8033051911f2f440a714e7a266d68efb494d1ff0df"
+    },
+    "/Users/hugh/datasets/gittables/thing/2017%E6%81%8B%E7%BB%83%E6%9C%89%E8%AF%8D%E8%80%83%E7%A0%94%E8%AF%8D%E7%BB%84%E8%83%8C%E5%A4%9A%E5%88%86.parquet": {
+      "size_bytes": 48102,
+      "sha256": "ffc3a79c2dccc2b32413f218e87811a1568db1053c0240240bb67f6386f83b8c"
+    },
+    "/Users/hugh/datasets/gittables/thing/21-22_276.parquet": {
+      "size_bytes": 47572,
+      "sha256": "b49bf0c685fedf2ffbe9cc4d7962c4f4f1f92b83c65e32bf1eca9573cc241a42"
+    },
+    "/Users/hugh/datasets/gittables/thing/22-23_356.parquet": {
+      "size_bytes": 50531,
+      "sha256": "5f5d44a43321cdbed428d291d800e331dc944bc46dbfa2c694b6b87d5a123da0"
+    },
+    "/Users/hugh/datasets/gittables/thing/23-24_269.parquet": {
+      "size_bytes": 47009,
+      "sha256": "5947840aff3404a973e857eacd8c9f8a5ca7fc586d0cc87bdde286b4db2f9f77"
+    },
+    "/Users/hugh/datasets/gittables/thing/33058542_1.parquet": {
+      "size_bytes": 25777,
+      "sha256": "0a19cf8ca98329896e5a792d518ab9897314dd7768f634f0ca4fe1622b8ff524"
+    },
+    "/Users/hugh/datasets/gittables/thing/93b54d35-b994-46ee-b651-3838c209ae75_text.parquet": {
+      "size_bytes": 29502,
+      "sha256": "f576c47cadd9f4402ba1af9625e94979797a4b6b63814d60def8913f5353ddbd"
+    },
+    "/Users/hugh/datasets/gittables/thing/CNN.201201_11.parquet": {
+      "size_bytes": 15609,
+      "sha256": "b24afbb91ce424c63b2f0ce74b3da5deb254433febfacf9e589d3c62ad76a30f"
+    },
+    "/Users/hugh/datasets/gittables/thing/FOXNEWS.201011.parquet": {
+      "size_bytes": 24908,
+      "sha256": "bfbddbfc433699b88261244973f1b0f202ebd8721db73e46f335373beb80b23e"
+    },
+    "/Users/hugh/datasets/gittables/thing/Movie-Ratings_18.parquet": {
+      "size_bytes": 28291,
+      "sha256": "ba5884f44081afcc6b64ca5db0075f250018c1d8836b68d5168db98be844e56a"
+    },
+    "/Users/hugh/datasets/gittables/thing/Supportive%20-%20Praise_5.parquet": {
+      "size_bytes": 35375,
+      "sha256": "9c6935455b780de46709cd1b478586b78faa3d1d1c496a527170e04c7a122231"
+    },
+    "/Users/hugh/datasets/gittables/thing/amazon-music-cv-0-unigrams-normalized.parquet": {
+      "size_bytes": 8620,
+      "sha256": "c387e61085b4d6abf50622f70ec7c8b50e920172e9bbb2ce22286397e8a1a27f"
+    },
+    "/Users/hugh/datasets/gittables/thing/cam777.parquet": {
+      "size_bytes": 19812,
+      "sha256": "7ac24b442a7720e3815479fc963c8c4b61661752a5822f1e001bb7eb286f0f6d"
+    },
+    "/Users/hugh/datasets/gittables/thing/dictEpisode-13-Primal-Desires---The.parquet": {
+      "size_bytes": 6259,
+      "sha256": "c396e6011eb55575419a0720285e5ee397f1fedb26b5abecc5a384914cae7bab"
+    },
+    "/Users/hugh/datasets/gittables/thing/eric1511.parquet": {
+      "size_bytes": 19667,
+      "sha256": "ba4a2160dec48158cd1fb2d4d20446054cf44103a455ee0b4c783a9d2f29bc63"
+    },
+    "/Users/hugh/datasets/gittables/thing/integrate_6.parquet": {
+      "size_bytes": 35066,
+      "sha256": "c12039a6086c8c4cfdc57078849e6043f914e672fcfc9c9725c5ab696b0bed3b"
+    },
+    "/Users/hugh/datasets/gittables/thing/nevarre.parquet": {
+      "size_bytes": 17965,
+      "sha256": "95fbcd5ff976e611379d57f5fb645812a8dad4d63cadcd09af44f373046f73fb"
+    },
+    "/Users/hugh/datasets/gittables/thing/quique2.parquet": {
+      "size_bytes": 17615,
+      "sha256": "7c55cab0ef4857184600d69a7da2911f1ea363ef73c321bc9399cae523da709c"
+    },
+    "/Users/hugh/datasets/gittables/thing/shuffled0Monki%20Lyrics.parquet": {
+      "size_bytes": 16551,
+      "sha256": "8dbeb285673beb47023a80f2fb17db6a3a89089450ca705dac6a523c5ba93beb"
+    },
+    "/Users/hugh/datasets/gittables/thing/sw_0514_4174.utt_20.parquet": {
+      "size_bytes": 41313,
+      "sha256": "c339581ea344c9123655edc6707679b5c9defbc0635d1555dd00048236890394"
+    },
+    "/Users/hugh/datasets/gittables/thing/sw_1012_3527.utt.parquet": {
+      "size_bytes": 34536,
+      "sha256": "47e60b75dde2cbd42a7091dbb497a7db666d33dbf26df58cd2b338171bfe459a"
+    },
+    "/Users/hugh/datasets/gittables/thing/text_578.parquet": {
+      "size_bytes": 18563,
+      "sha256": "eb209630dde361fc1e05a5da6b879cba4162ababb21702f2983e02b6096766fa"
+    },
+    "/Users/hugh/datasets/gittables/thing/tokens_1377.parquet": {
+      "size_bytes": 21060,
+      "sha256": "e606dd0d8bc897bd5a9473d7e03583038cf5b32599730c936e85c5cf22c263b3"
+    },
+    "/Users/hugh/datasets/gittables/thing/tokens_980.parquet": {
+      "size_bytes": 12609,
+      "sha256": "b18b8d38bac1fd279fcf32dc289bdf847bcb78bcd6c79568868b9e7ae53b12b4"
+    },
+    "/Users/hugh/datasets/gittables/thing/webhose_2019-05-03_02:36:42 3.parquet": {
+      "size_bytes": 27533,
+      "sha256": "948aaea6968a8a35bbd136c5ea256c2efbdc10ad1df70e78698adb9fd6e2d5c2"
+    },
+    "/Users/hugh/datasets/gittables/time_interval/17-18.parquet": {
+      "size_bytes": 47250,
+      "sha256": "d60caf030ece15d92d0e6b3aa73647f494e51b1b048d21ddbdd3aca41791c5c7"
+    },
+    "/Users/hugh/datasets/gittables/time_interval/Designite_XenServerHealthCheck_ImpSmells.parquet": {
+      "size_bytes": 21068,
+      "sha256": "dffb21408a09d5a15eb5b9e188a7f37c95876728e17a677ecc9f3e5e9736a8c4"
+    },
+    "/Users/hugh/datasets/gittables/time_interval/Test_CalculateTimeSeriesStatistic_Year_DeficitSeqLengthMean_out.parquet": {
+      "size_bytes": 5850,
+      "sha256": "96c54ed49ccc3b095dbca436f0f162baf3849fad30d2ee861be5f326657b32cf"
+    },
+    "/Users/hugh/datasets/gittables/time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-29-NV-2020-05-24.parquet": {
+      "size_bytes": 238250,
+      "sha256": "6213b873dc82e2f316b53edaa394cb78d31fdc9386b52f96ed9347f094c99e57"
+    },
+    "/Users/hugh/datasets/gittables/time_interval/parkinsons_updrs_names.parquet": {
+      "size_bytes": 10652,
+      "sha256": "01e01942ac81e7b4a3ccf7f09cd69d91eeae46a5d6065d2a14ff4874c97b8999"
+    },
+    "/Users/hugh/datasets/gittables/time_slot/01-02_17.parquet": {
+      "size_bytes": 71172,
+      "sha256": "6808efb0a71ca3e4931d3c856813892637462c434576a8295c24843755dafb32"
+    },
+    "/Users/hugh/datasets/gittables/time_slot/RobotAverages.parquet": {
+      "size_bytes": 67622,
+      "sha256": "bf7305bbbd4987f5616ef636b76eff5e5003983115cf1a572c9ee835cf58ed16"
+    },
+    "/Users/hugh/datasets/gittables/wartime/rccsf1930_1959_3_2.parquet": {
+      "size_bytes": 34705,
+      "sha256": "59a602db3a21f1f9595acd85ce0a3cbcce926123c92d5e38599420d4531eb93b"
+    },
+    "/Users/hugh/datasets/gittables/whole/0001824.parquet": {
+      "size_bytes": 9521,
+      "sha256": "eaa0d02463f0b8b9fd4beb74805727176e3011ef7223f9838b822807858ed0eb"
+    },
+    "/Users/hugh/datasets/gittables/whole/01-02_683.parquet": {
+      "size_bytes": 63666,
+      "sha256": "75a3faf1152831b3a80d2ee5f0fce8dd2bfca83ed3ee288d49fa686bd6fe29db"
+    },
+    "/Users/hugh/datasets/gittables/whole/02-03_382.parquet": {
+      "size_bytes": 46759,
+      "sha256": "26378a0b402a8a5f6504d6214315be097b11d1a5a4347c43c7de9718aff0662a"
+    },
+    "/Users/hugh/datasets/gittables/whole/03-04_1030.parquet": {
+      "size_bytes": 72047,
+      "sha256": "f9c9835389406dd36503307c89e2c2a4d490a51aa1bf386d428b152a0d098a0b"
+    },
+    "/Users/hugh/datasets/gittables/whole/03-04_901.parquet": {
+      "size_bytes": 48805,
+      "sha256": "c99d582080fda11499c5dd4b91413cb4bb746af18b05c5513985a565bc177c92"
+    },
+    "/Users/hugh/datasets/gittables/whole/04-05_410.parquet": {
+      "size_bytes": 58183,
+      "sha256": "ede13c9b7bfa786ec75d9dcc27d207241c26b9e5e940f69d0b2f761a35d779c0"
+    },
+    "/Users/hugh/datasets/gittables/whole/05-06_1097.parquet": {
+      "size_bytes": 67163,
+      "sha256": "eb6e62e859237866fd26047ab19fec30fba83d1703457ce1db9e0286a4b75f4f"
+    },
+    "/Users/hugh/datasets/gittables/whole/05-06_760.parquet": {
+      "size_bytes": 59594,
+      "sha256": "2893e1e9c951c65781b1cd8868593f06c5058fa6d6900e763ec31ad2b1b3d91c"
+    },
+    "/Users/hugh/datasets/gittables/whole/06-07_1388.parquet": {
+      "size_bytes": 53721,
+      "sha256": "92721bc36156502340397c9b940c10208f02fe02682e8c568436dd135d0262ac"
+    },
+    "/Users/hugh/datasets/gittables/whole/06-07_979.parquet": {
+      "size_bytes": 63337,
+      "sha256": "e5d30e10855b57f903d9475a6c727563edc52e2962cc6b50e7c337b87e7a340e"
+    },
+    "/Users/hugh/datasets/gittables/whole/07-08_251.parquet": {
+      "size_bytes": 48892,
+      "sha256": "2b7321eb66154f8fee977a2341e0e186beaf4cd70757ae8234cd7c7b218446fe"
+    },
+    "/Users/hugh/datasets/gittables/whole/0768_10.parquet": {
+      "size_bytes": 17564,
+      "sha256": "d78de411c5fe5d20c1fa4f56953d8180fe8cbdc7b37441e93ccf64be50245e20"
+    },
+    "/Users/hugh/datasets/gittables/whole/08-09_571.parquet": {
+      "size_bytes": 56432,
+      "sha256": "efbde9f9a01df89abc02684f07b7da806120e706ce238b7a296701481e57042b"
+    },
+    "/Users/hugh/datasets/gittables/whole/09-10_1182.parquet": {
+      "size_bytes": 52138,
+      "sha256": "4f3f75fa2fe95b0a7186f54e27f1c54047bed0a56e794f10b08e908a95be031c"
+    },
+    "/Users/hugh/datasets/gittables/whole/09-10_900.parquet": {
+      "size_bytes": 51118,
+      "sha256": "408ad23787cd5a60bd9ed25ca3f94ee0644edb609a92dc2fd02ed2ad73d0cb6b"
+    },
+    "/Users/hugh/datasets/gittables/whole/10-11_251.parquet": {
+      "size_bytes": 46497,
+      "sha256": "8f9d097f66a5e7356e685cef21e09403af13b68535daa3ba4112b6e09a5df3f7"
+    },
+    "/Users/hugh/datasets/gittables/whole/1055_13.parquet": {
+      "size_bytes": 19153,
+      "sha256": "6ba72543c2085af5a5d582eb59dd5574dc2fbaaae941eb8f1243005fb212238d"
+    },
+    "/Users/hugh/datasets/gittables/whole/11-12_725.parquet": {
+      "size_bytes": 47565,
+      "sha256": "e56ae0f2fc5f5c5ada6cfd1c421abab3627511c7f1f1363dac3f5c43cec294a5"
+    },
+    "/Users/hugh/datasets/gittables/whole/12-13_594.parquet": {
+      "size_bytes": 60469,
+      "sha256": "22497e84ed12c97df645fb60c9307f0a42b59608fced66a2773562eac0b580e6"
+    },
+    "/Users/hugh/datasets/gittables/whole/13-14_546.parquet": {
+      "size_bytes": 63725,
+      "sha256": "a4f8c330b9217995c30f155ec7bbe8356191e2d8ebc15d04bb5e8229c7407795"
+    },
+    "/Users/hugh/datasets/gittables/whole/14-15_650.parquet": {
+      "size_bytes": 52777,
+      "sha256": "4ce25ab141ec3e3b0fcef8efa4cdb7586990c9495fa0acfc48ea2d630fdf3c4d"
+    },
+    "/Users/hugh/datasets/gittables/whole/16-17_173.parquet": {
+      "size_bytes": 49107,
+      "sha256": "0c66b3d03fed6874cfa4624d27c881b2ab168d0d1da37f8f79ee4d6bd90252d7"
+    },
+    "/Users/hugh/datasets/gittables/whole/17-18_478.parquet": {
+      "size_bytes": 66648,
+      "sha256": "db775721f48e3cfefc388bb41972cc105ecc058ae5e1a361dca833f50c183c14"
+    },
+    "/Users/hugh/datasets/gittables/whole/19-20_34.parquet": {
+      "size_bytes": 42562,
+      "sha256": "4d4c99b1dfb9be83c01e47861643a3092b42336052dfd507eddae37399636879"
+    },
+    "/Users/hugh/datasets/gittables/whole/20-21_193.parquet": {
+      "size_bytes": 51713,
+      "sha256": "960bc08d3176ea096434f275bbf55d82539f7df46f3bb066e78c168fbe9021e7"
+    },
+    "/Users/hugh/datasets/gittables/whole/2019-12-29.parquet": {
+      "size_bytes": 45810,
+      "sha256": "863f4db59feaf6e9975528c1361e8139fc8ae58ca2a681d87311679265130b65"
+    },
+    "/Users/hugh/datasets/gittables/whole/22-23_126.parquet": {
+      "size_bytes": 47383,
+      "sha256": "d50f266aa03610e2660dfe9e150c5aa63caae18e6daf354078390ef340b7dbd1"
+    },
+    "/Users/hugh/datasets/gittables/whole/23-24_419.parquet": {
+      "size_bytes": 58201,
+      "sha256": "c4b270b33380881c08ab64b966a364e6eb2332e69a04747837846ebfa9c23c35"
+    },
+    "/Users/hugh/datasets/gittables/whole/5885d053-3885-492c-a59c-ea0ac6054e56_text.parquet": {
+      "size_bytes": 24799,
+      "sha256": "33e2f5028919b0edef5d9b20a6bd7e507bd5c74c537396cd6412abbca56db2a9"
+    },
+    "/Users/hugh/datasets/gittables/whole/Allen_leakdata_2013.parquet": {
+      "size_bytes": 45845,
+      "sha256": "90b90476b31a40b11ac66987ac563486467f428b534239f7e773d4328d664923"
+    },
+    "/Users/hugh/datasets/gittables/whole/Designite_Coypu.Drivers.Tests_MethodMetrics.parquet": {
+      "size_bytes": 16357,
+      "sha256": "6b783434c720b5bed90b645c3ddd558575b2ba7b2baf2df2d1f4aa1a99063f72"
+    },
+    "/Users/hugh/datasets/gittables/whole/LipsThatGrip.parquet": {
+      "size_bytes": 37860,
+      "sha256": "45c8ca35d22100f851c47a0c1152f612a34f186e410d066adc96bb7aab50f0a4"
+    },
+    "/Users/hugh/datasets/gittables/whole/P08-1028_aakansha_127.parquet": {
+      "size_bytes": 41771,
+      "sha256": "f80ec0c3f21202584ab96fbf6657f4d8a9a926cafbd8952799806773b69f67ba"
+    },
+    "/Users/hugh/datasets/gittables/whole/SP_main.parquet": {
+      "size_bytes": 46049,
+      "sha256": "76e1852a0dd267d7e06eca342ad9bae12d5f95c5d4ca5eb84e4aa0e70baf5373"
+    },
+    "/Users/hugh/datasets/gittables/whole/amazon-movies_&_tv-cv-7-unigrams.parquet": {
+      "size_bytes": 9556,
+      "sha256": "37b50564c2324c5c0737af784d212ba6b493434c37fdf3875096a7eb41008592"
+    },
+    "/Users/hugh/datasets/gittables/whole/categories_import_124.parquet": {
+      "size_bytes": 28831,
+      "sha256": "a4097a5d6d687827d8c4a06a30da6f3f781cb2ad4b62048c8a532045cbd55b14"
+    },
+    "/Users/hugh/datasets/gittables/whole/deadterrorist.parquet": {
+      "size_bytes": 24109,
+      "sha256": "4d5fc32e2c26dc48f628909aaf13835c0817310d4ad1c206cbbba88cfd3b033c"
+    },
+    "/Users/hugh/datasets/gittables/whole/ext-pending-properties_6.parquet": {
+      "size_bytes": 53420,
+      "sha256": "5e3195b2f521044c61439c2c5d06bc8c8026e3f00d0196f34a67d04ba099e092"
+    },
+    "/Users/hugh/datasets/gittables/whole/funcs_by_name_369.parquet": {
+      "size_bytes": 36262,
+      "sha256": "f360fabe63244785452ee17b81f4916a14368a6e74c4b40d3c2b2c1a9d034753"
+    },
+    "/Users/hugh/datasets/gittables/whole/kdean1943_juno_com.parquet": {
+      "size_bytes": 22460,
+      "sha256": "3480ff38c28d2a7bbbaf98fb48b2608a7cb2b87c2998a77f802ce8f83d85d1fa"
+    },
+    "/Users/hugh/datasets/gittables/whole/nnano-volume05-issue04.parquet": {
+      "size_bytes": 62772,
+      "sha256": "7f720fb20d557ffca5dba0e692176add0ea5df25a13529c92095a0f32ac4a01d"
+    },
+    "/Users/hugh/datasets/gittables/whole/permit-2011-2550_plain.parquet": {
+      "size_bytes": 32274,
+      "sha256": "87306b77b8e6df5c993f7829d582706e84f0b54bbe40155060129463c406b4d6"
+    },
+    "/Users/hugh/datasets/gittables/whole/plays-2020-09-14.parquet": {
+      "size_bytes": 29414,
+      "sha256": "96958df43473a5281aaac4cd2be8886cc1edbb1891ad630ce07a28c6d3b8bc0d"
+    },
+    "/Users/hugh/datasets/gittables/whole/shuffled0Funky%20Period%20Lyrics.parquet": {
+      "size_bytes": 18907,
+      "sha256": "dd1dc0a00a59c9a1ca6837c5badddccb63c85138e3efa06c20051ee5a3831f8b"
+    },
+    "/Users/hugh/datasets/gittables/whole/sw_0845_3754.utt_10.parquet": {
+      "size_bytes": 33122,
+      "sha256": "e84f7f9b0607bd934c72b472599ffd908996cd2c8cc80ef52d3ffdf431c9f5c9"
+    },
+    "/Users/hugh/datasets/gittables/whole/text_130.parquet": {
+      "size_bytes": 15383,
+      "sha256": "6b355587ccfd42f8b7835273b4e3ad43cdb0907034b97d7d6c3d2d63a33c1795"
+    },
+    "/Users/hugh/datasets/gittables/whole/tokens_476.parquet": {
+      "size_bytes": 13376,
+      "sha256": "f926d6d90970ebf2487358619a027e5d5dcb234237d77e6f63294988823dd52d"
+    }
+  }
+}

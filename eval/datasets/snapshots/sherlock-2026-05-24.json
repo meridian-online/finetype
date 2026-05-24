@@ -1,0 +1,16 @@
+{
+  "dataset": "sherlock",
+  "dataset_version": "2026-05-24",
+  "snapshot_date": "2026-05-24",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@33b15eb39a46",
+  "local_path": "repo://output/distillation-v3/sherlock_distilled.csv.gz",
+  "total_size_bytes": 6772229,
+  "file_count": 1,
+  "files": {
+    "sherlock_distilled.csv.gz": {
+      "size_bytes": 6772229,
+      "sha256": "2a72199446533a3ae414cf0cd2b97a243af2ed5a1f6db18b275bcbbde809ebdf"
+    }
+  }
+}
