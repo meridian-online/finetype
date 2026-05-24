@@ -1,0 +1,156 @@
+# eval/geonames/header_pools.yaml — Curated minimal header pools per locale.
+#
+# Per spec 2026-05-24-v21-geonames-geography ac-02 / ac-04.
+#
+# Strategy: minimal, authentic, no guesses. For each (pool, type) we list
+# 3-6 column-header strings that real-world spreadsheets in that locale
+# commonly use for that data. The noise generator (geonames_noise_recipes.py)
+# layers case/spacing/separator variants on top — these pools provide the
+# *vocabulary*, not the form variations.
+#
+# Non-Latin scripts deliberately ship both native-script forms and the
+# English equivalent (most real-world non-English spreadsheets use a mix —
+# observed pattern in GitTables corpus pass).
+#
+# `english` covers en_US, en_GB, and other en_* locales unless overridden.
+# Cross-locale header reuse is fine — the generator picks one header per
+# generated column.
+
+pools:
+  english:
+    geography.location.city:          [city, city_name, town, municipality, place, locality]
+    geography.location.region:        [state, region, province, county, admin_region]
+    geography.location.country:       [country, country_name, nation, land]
+    geography.location.country_code:  [country_code, country_iso, country_iso2, iso2, cc]
+    geography.location.continent:     [continent, continent_code]
+    geography.location.county:        [county, district, county_name]
+    geography.location.us_state:      [state, us_state, state_code, state_name]
+    geography.address.postal_code:    [postal_code, zip, zip_code, postcode, post_code]
+    geography.coordinate.latitude:    [latitude, lat, y, gps_lat]
+    geography.coordinate.longitude:   [longitude, lng, lon, x, gps_lon]
+
+  french:
+    geography.location.city:          [ville, commune, localité, city]
+    geography.location.region:        [région, département, region, province]
+    geography.location.country:       [pays, country, nation]
+    geography.location.country_code:  [code_pays, country_code, iso]
+    geography.location.continent:     [continent]
+    geography.location.county:        [arrondissement, district, county]
+    geography.address.postal_code:    [code_postal, cp, postal_code]
+    geography.coordinate.latitude:    [latitude, lat]
+    geography.coordinate.longitude:   [longitude, lng, lon]
+
+  spanish:
+    geography.location.city:          [ciudad, municipio, localidad, city, población]
+    geography.location.region:        [región, provincia, estado, region]
+    geography.location.country:       [país, country, nación]
+    geography.location.country_code:  [código_país, country_code, iso]
+    geography.location.continent:     [continente]
+    geography.location.county:        [condado, distrito, county]
+    geography.address.postal_code:    [código_postal, cp, postal_code, codpostal]
+    geography.coordinate.latitude:    [latitud, lat, latitude]
+    geography.coordinate.longitude:   [longitud, lng, longitude]
+
+  german:
+    geography.location.city:          [stadt, ort, gemeinde, city, ortschaft]
+    geography.location.region:        [bundesland, region, land, kanton]
+    geography.location.country:       [land, country, staat]
+    geography.location.country_code:  [ländercode, country_code, iso]
+    geography.location.continent:     [kontinent, continent]
+    geography.location.county:        [landkreis, kreis, bezirk]
+    geography.address.postal_code:    [plz, postleitzahl, postal_code]
+    geography.coordinate.latitude:    [breitengrad, breite, lat]
+    geography.coordinate.longitude:   [längengrad, länge, lng]
+
+  italian:
+    geography.location.city:          [città, comune, city, località]
+    geography.location.region:        [regione, provincia, region]
+    geography.location.country:       [paese, country, nazione]
+    geography.location.country_code:  [codice_paese, country_code, iso]
+    geography.location.continent:     [continente]
+    geography.address.postal_code:    [cap, codice_postale, postal_code]
+    geography.coordinate.latitude:    [latitudine, lat]
+    geography.coordinate.longitude:   [longitudine, lng]
+
+  portuguese:
+    geography.location.city:          [cidade, município, city, localidade]
+    geography.location.region:        [estado, região, província, region]
+    geography.location.country:       [país, country, nação]
+    geography.location.country_code:  [código_país, country_code, iso]
+    geography.location.continent:     [continente]
+    geography.address.postal_code:    [cep, código_postal, postal_code]
+    geography.coordinate.latitude:    [latitude, lat]
+    geography.coordinate.longitude:   [longitude, lng]
+
+  japanese:
+    geography.location.city:          [city, 都市, 市, 市区町村, city_name]
+    geography.location.region:        [region, 都道府県, 県, 州]
+    geography.location.country:       [country, 国, 国名]
+    geography.location.country_code:  [country_code, 国コード, iso]
+    geography.location.continent:     [continent, 大陸]
+    geography.location.county:        [county, 郡]
+    geography.address.postal_code:    [postal_code, 郵便番号, 〒, zip]
+    geography.coordinate.latitude:    [latitude, 緯度, lat]
+    geography.coordinate.longitude:   [longitude, 経度, lng]
+
+  chinese:
+    geography.location.city:          [city, 城市, 市, 市名]
+    geography.location.region:        [region, 省, 州, 行政区]
+    geography.location.country:       [country, 国家, 国别]
+    geography.location.country_code:  [country_code, 国家代码, iso]
+    geography.location.continent:     [continent, 大洲, 洲]
+    geography.location.county:        [county, 县, 区]
+    geography.address.postal_code:    [postal_code, 邮政编码, 邮编, zip]
+    geography.coordinate.latitude:    [latitude, 纬度, lat]
+    geography.coordinate.longitude:   [longitude, 经度, lng]
+
+  korean:
+    geography.location.city:          [city, 도시, 시, city_name]
+    geography.location.region:        [region, 도, 시도, 행정구역]
+    geography.location.country:       [country, 국가, 나라]
+    geography.location.country_code:  [country_code, 국가코드, iso]
+    geography.location.continent:     [continent, 대륙]
+    geography.location.county:        [county, 군, 구]
+    geography.address.postal_code:    [postal_code, 우편번호, zip]
+    geography.coordinate.latitude:    [latitude, 위도, lat]
+    geography.coordinate.longitude:   [longitude, 경도, lng]
+
+  arabic:
+    geography.location.city:          [city, مدينة, اسم_المدينة]
+    geography.location.region:        [region, منطقة, محافظة, ولاية]
+    geography.location.country:       [country, دولة, بلد]
+    geography.location.country_code:  [country_code, رمز_الدولة, iso]
+    geography.location.continent:     [continent, قارة]
+    geography.address.postal_code:    [postal_code, الرمز_البريدي, zip]
+    geography.coordinate.latitude:    [latitude, خط_العرض, lat]
+    geography.coordinate.longitude:   [longitude, خط_الطول, lng]
+
+  russian:
+    geography.location.city:          [city, город, город_название, населённый_пункт]
+    geography.location.region:        [region, область, регион, край, республика]
+    geography.location.country:       [country, страна, государство]
+    geography.location.country_code:  [country_code, код_страны, iso]
+    geography.location.continent:     [continent, континент]
+    geography.address.postal_code:    [postal_code, индекс, почтовый_индекс, zip]
+    geography.coordinate.latitude:    [latitude, широта, lat]
+    geography.coordinate.longitude:   [longitude, долгота, lng]
+
+  dutch:
+    geography.location.city:          [stad, plaats, gemeente, city, woonplaats]
+    geography.location.region:        [provincie, regio, region]
+    geography.location.country:       [land, country]
+    geography.location.country_code:  [landcode, country_code, iso]
+    geography.location.continent:     [continent, werelddeel]
+    geography.address.postal_code:    [postcode, postal_code]
+    geography.coordinate.latitude:    [breedtegraad, latitude, lat]
+    geography.coordinate.longitude:   [lengtegraad, longitude, lng]
+
+  polish:
+    geography.location.city:          [miasto, miejscowość, gmina, city]
+    geography.location.region:        [województwo, region, prowincja]
+    geography.location.country:       [kraj, country, państwo]
+    geography.location.country_code:  [kod_kraju, country_code, iso]
+    geography.location.continent:     [kontynent, continent]
+    geography.address.postal_code:    [kod_pocztowy, postal_code]
+    geography.coordinate.latitude:    [szerokość_geograficzna, latitude, lat]
+    geography.coordinate.longitude:   [długość_geograficzna, longitude, lng]

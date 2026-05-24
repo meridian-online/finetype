@@ -1,0 +1,48 @@
+{
+  "dataset": "geonames",
+  "dataset_version": "2026-05-24",
+  "snapshot_date": "2026-05-24",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@82f46847f985",
+  "local_path": "/Users/hugh/datasets/geonames/2026-05-24",
+  "total_size_bytes": 2737772428,
+  "file_count": 9,
+  "files": {
+    "admin1CodesASCII.txt": {
+      "size_bytes": 151342,
+      "sha256": "9fcaae918f0de6da4f4f13cfa6c0e722bf8ce36b8b0a92e76430ef708bdfdcaf"
+    },
+    "admin2Codes.txt": {
+      "size_bytes": 2370368,
+      "sha256": "4836ab3e90a460db8a40c574f5e9e6484ffb16c623c11194c280e23b5f744f09"
+    },
+    "allCountries.txt": {
+      "size_bytes": 1778885215,
+      "sha256": "6ee65df22ecb081e1448df5c083e2be47ae45c917b4d2e45fbcb84dfff91b913"
+    },
+    "alternateNamesV2.txt": {
+      "size_bytes": 775220641,
+      "sha256": "df581c3c2210ebf35c0d7010c6e516b0cafe3ea91134c6d73ea8e77ef9599648"
+    },
+    "cities500.txt": {
+      "size_bytes": 40326055,
+      "sha256": "015282f48c732e2b955ec54231c9a0d1eb3c2d5269a32d488e071a4f45a4be0f"
+    },
+    "countryInfo.txt": {
+      "size_bytes": 31678,
+      "sha256": "34895dbc79f50a05758bbabe5b5545567e7dd6c7f6e45cb79087a54790c0d97a"
+    },
+    "featureCodes_en.txt": {
+      "size_bytes": 58642,
+      "sha256": "d44f129c1cffdeabf759c99fe7ea5b84f615c7f3e7366fb76ccf990f408f6af7"
+    },
+    "iso-languagecodes.txt": {
+      "size_bytes": 137908,
+      "sha256": "cb0d34f492775deec8ec5713da6efa4463dad99b5e7ba2172bd094cfdcb76571"
+    },
+    "postal/allCountries.txt": {
+      "size_bytes": 140590579,
+      "sha256": "69e2541727bb33067bd67f4e8017dd1f179e3f95263ad8c9e64a9232da6aa2b4"
+    }
+  }
+}

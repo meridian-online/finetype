@@ -1452,12 +1452,23 @@ def decontaminate_subtypes(columns_by_type, min_values=5):
 # the 70/30 blend.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+DOMAIN_CAP_OVERRIDES = {
+    # Per-domain overrides to the global --distilled-cap, applied when
+    # the per-domain budget needs to differ from the default for
+    # data-quality reasons. Per spec 2026-05-24-v21-geonames-geography
+    # ac-02 — geography raised so the GeoNames-derived training rows
+    # aren't capped down to the v19 base of 600.
+    "geography": 3000,
+}
+
+
 def cap_distilled_columns(columns_by_type, max_per_type, rng):
     """Cap distilled columns per type to max_per_type via random sampling.
 
     Args:
         columns_by_type: dict[str, list[tuple[list[str], str]]]
-        max_per_type: maximum distilled columns per type (e.g. 600)
+        max_per_type: default maximum distilled columns per type (e.g. 600);
+                      domains in DOMAIN_CAP_OVERRIDES use their override instead.
         rng: random.Random instance for reproducible sampling
 
     Returns:
@@ -1470,11 +1481,13 @@ def cap_distilled_columns(columns_by_type, max_per_type, rng):
 
     for type_key in list(columns_by_type.keys()):
         cols = columns_by_type[type_key]
-        if len(cols) > max_per_type:
+        domain = type_key.split(".")[0] if "." in type_key else type_key
+        cap: int = DOMAIN_CAP_OVERRIDES.get(domain) or max_per_type
+        if len(cols) > cap:
             original_count = len(cols)
-            columns_by_type[type_key] = rng.sample(cols, max_per_type)
-            dropped = original_count - max_per_type
-            stats["capped_types"].append((type_key, original_count, max_per_type))
+            columns_by_type[type_key] = rng.sample(cols, cap)
+            dropped = original_count - cap
+            stats["capped_types"].append((type_key, original_count, cap))
             stats["total_dropped_columns"] += dropped
 
     return columns_by_type, stats

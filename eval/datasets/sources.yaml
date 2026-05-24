@@ -263,125 +263,123 @@ sources:
   role: validate
   licence: public-domain
   fetched_date: 2026-04-28
-  attribution: "Pokemon dataset (Generations 1\u20136) \u2014 public-domain gist by\
-    \ armgilles. 800 rows \xD7 13 columns; categorical-heavy (Type 1, Type 2, Generation,\
-    \ Legendary)."
+  attribution: Pokemon dataset (Generations 1–6) — public-domain gist by armgilles.
+    800 rows × 13 columns; categorical-heavy (Type 1, Type 2, Generation, Legendary).
   datasets:
   - pokemon
 - source_url: https://raw.githubusercontent.com/flother/rio2016/master/athletes.csv
   role: validate
   licence: public-domain
   fetched_date: 2026-04-28
-  attribution: "Rio 2016 Olympic athletes \u2014 public-domain dataset by flother.\
-    \ ~10k rows capped at 5000; nationality column is 3-letter NOC code (code-vs-canonical\
-    \ seam)."
+  attribution: Rio 2016 Olympic athletes — public-domain dataset by flother. ~10k
+    rows capped at 5000; nationality column is 3-letter NOC code (code-vs-canonical
+    seam).
   datasets:
   - rio2016_athletes
 - source_url: https://raw.githubusercontent.com/hadley/data-baby-names/master/baby-names.csv
   role: validate
   licence: public-domain
   fetched_date: 2026-04-28
-  attribution: "US baby names by year and sex \u2014 Hadley Wickham's public-domain\
-    \ dataset. ~258k rows capped at 5000."
+  attribution: US baby names by year and sex — Hadley Wickham's public-domain dataset.
+    ~258k rows capped at 5000.
   datasets:
   - us_baby_names
 - source_url: https://raw.githubusercontent.com/datasets/co2-fossil-by-nation/main/data/fossil-fuel-co2-emissions-by-nation.csv
   role: validate
   licence: PDDL-1.0
   fetched_date: 2026-04-28
-  attribution: "CO2 emissions by nation, fossil fuels \u2014 github.com/datasets curated\
-    \ CSV under PDDL-1.0. ~18k rows capped at 5000; Country uppercase non-canonical\
-    \ (code-vs-canonical seam)."
+  attribution: CO2 emissions by nation, fossil fuels — github.com/datasets curated
+    CSV under PDDL-1.0. ~18k rows capped at 5000; Country uppercase non-canonical
+    (code-vs-canonical seam).
   datasets:
   - co2_emissions_by_nation
 - source_url: https://raw.githubusercontent.com/datasets/population/master/data/population.csv
   role: validate
   licence: PDDL-1.0
   fetched_date: 2026-04-28
-  attribution: "World population by country and year \u2014 github.com/datasets curated\
-    \ CSV under PDDL-1.0. ~17k rows capped at 5000; Country Code is canonical ISO\
-    \ 3166-1 alpha-3 (control)."
+  attribution: World population by country and year — github.com/datasets curated
+    CSV under PDDL-1.0. ~17k rows capped at 5000; Country Code is canonical ISO 3166-1
+    alpha-3 (control).
   datasets:
   - world_population
 - source_url: https://raw.githubusercontent.com/datasets/un-locode/master/data/code-list.csv
   role: validate
   licence: PDDL-1.0
   fetched_date: 2026-04-28
-  attribution: "UN/LOCODE location codes \u2014 github.com/datasets curated CSV under\
-    \ PDDL-1.0. ~116k rows capped at 5000; Date yyMM short-form, Coordinates DDMMNS\
-    \ DDDMMEW packed format (format-diversity playground)."
+  attribution: UN/LOCODE location codes — github.com/datasets curated CSV under PDDL-1.0.
+    ~116k rows capped at 5000; Date yyMM short-form, Coordinates DDMMNS DDDMMEW packed
+    format (format-diversity playground).
   datasets:
   - un_locode
 - source_url: https://raw.githubusercontent.com/datasets/global-temp/master/data/annual.csv
   role: validate
   licence: PDDL-1.0
   fetched_date: 2026-04-28
-  attribution: "Global annual mean temperature anomaly (GISTEMP and GCAG) \u2014 github.com/datasets\
-    \ curated CSV under PDDL-1.0. 319 rows; clean control with 2-value categorical\
-    \ Source."
+  attribution: Global annual mean temperature anomaly (GISTEMP and GCAG) — github.com/datasets
+    curated CSV under PDDL-1.0. 319 rows; clean control with 2-value categorical Source.
   datasets:
   - global_temp_annual
 - source_url: https://datahub.io/core/s-and-p-500-companies/r/constituents.csv
   role: validate
   licence: PDDL-1.0
   fetched_date: 2026-04-28
-  attribution: "S&P 500 constituents \u2014 datahub.io curated CSV under PDDL-1.0.\
-    \ 503 rows \xD7 8 cols; GICS Sector is the load-bearing code-vs-canonical slot\
-    \ (categorical industry-classification scheme)."
+  attribution: S&P 500 constituents — datahub.io curated CSV under PDDL-1.0. 503 rows
+    × 8 cols; GICS Sector is the load-bearing code-vs-canonical slot (categorical
+    industry-classification scheme).
   datasets:
   - sp500_constituents
 - source_url: https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet
   role: validate
   licence: public-domain
   fetched_date: 2026-04-28
-  attribution: "NYC TLC yellow taxi trips January 2024 \u2014 NYC Taxi & Limousine\
-    \ Commission, public domain. ~2.9M rows capped at 5000; SQL-standard timestamp\
-    \ variant exercises format_diversity vs iter-1's ISO-only datetime samples."
+  attribution: NYC TLC yellow taxi trips January 2024 — NYC Taxi & Limousine Commission,
+    public domain. ~2.9M rows capped at 5000; SQL-standard timestamp variant exercises
+    format_diversity vs iter-1's ISO-only datetime samples.
   datasets:
   - nyc_taxi
 - source_url: http://data.gdeltproject.org/events/20240115.export.CSV.zip
   role: validate
   licence: CC0-1.0
   fetched_date: 2026-04-28
-  attribution: "GDELT Event 1.0 daily export 2024-01-15 \u2014 gdeltproject.org under\
-    \ CC0-1.0. ~122k rows capped at 5000, 58 cols; SQLDATE/MonthYear/Year/DATEADDED\
-    \ carry compact-integer date formats (format_diversity); 32 categorical CAMEO\
-    \ actor/event-code columns (code-vs-canonical surface)."
+  attribution: GDELT Event 1.0 daily export 2024-01-15 — gdeltproject.org under CC0-1.0.
+    ~122k rows capped at 5000, 58 cols; SQLDATE/MonthYear/Year/DATEADDED carry compact-integer
+    date formats (format_diversity); 32 categorical CAMEO actor/event-code columns
+    (code-vs-canonical surface).
   datasets:
   - gdelt_events
 - source_url: https://raw.githubusercontent.com/sharmaroshan/FIFA-2019-Analysis/master/Footballer.csv
   role: validate
   licence: CC-BY-SA-4.0
   fetched_date: 2026-04-28
-  attribution: "FIFA 2019 player attributes \u2014 github.com/sharmaroshan/FIFA-2019-Analysis\
-    \ mirror, original Kaggle dataset under EA Sports community licence (CC-BY-SA-4.0\
-    \ fallback for SPDX allowlist). ~18k rows capped at 5000, 89 cols; 26 position-rating\
-    \ columns carry '88+2'-style code-vs-canonical formats; Value/Wage use M/K-suffixed\
-    \ currency."
+  attribution: FIFA 2019 player attributes — github.com/sharmaroshan/FIFA-2019-Analysis
+    mirror, original Kaggle dataset under EA Sports community licence (CC-BY-SA-4.0
+    fallback for SPDX allowlist). ~18k rows capped at 5000, 89 cols; 26 position-rating
+    columns carry '88+2'-style code-vs-canonical formats; Value/Wage use M/K-suffixed
+    currency.
   datasets:
   - fifa_players
 - source_url: https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_LFS@DF_IALFS_INDIC,/........?format=csvfilewithlabels&startPeriod=2023&endPeriod=2024
   role: validate
   licence: CC-BY-4.0
   fetched_date: 2026-04-28
-  attribution: "OECD Infra-Annual Labour Statistics 2023-2024 \u2014 sdmx.oecd.org\
-    \ SDMX REST API under CC-BY-4.0. ~270k rows capped at 5000, 34 cols; broad code-vs-canonical\
-    \ surface \u2014 9 dimensions emit CODE/LABEL pairs (REF_AREA/Reference area,\
-    \ MEASURE/Measure, etc.) plus heterogeneous TIME_PERIOD column."
+  attribution: OECD Infra-Annual Labour Statistics 2023-2024 — sdmx.oecd.org SDMX
+    REST API under CC-BY-4.0. ~270k rows capped at 5000, 34 cols; broad code-vs-canonical
+    surface — 9 dimensions emit CODE/LABEL pairs (REF_AREA/Reference area, MEASURE/Measure,
+    etc.) plus heterogeneous TIME_PERIOD column.
   datasets:
   - oecd_employment
 - source_url: repo://eval/gittables/v20_training_candidates/
   role: train
   licence: mixed-source-corpus
   fetched_date: 2026-05-23
-  attribution: "YDF-specialist training-data candidates extracted from GitTables corpus\
-    \ by scripts/extract_ydf_specialist_training_data.py. Per-domain `<domain>.distilled.csv.gz`\
-    \ files emit in the sherlock_distilled schema (`final_label`, `sample_values`\
-    \ JSON, `column_name`) so the v20 launch concats them with the v19 sherlock_distilled\
-    \ and passes the merged file via the existing `prepare_multibranch_data.py --distilled`\
-    \ flag \u2014 no bespoke loader, existing source-tracking applies. Forensic columns\
-    \ (file_path, ydf_confidence, sense_prediction, row_hash) live in sidecar `<domain>.provenance.tsv`.\
-    \ Holdout-filtered + row-hash-firewalled at extraction time."
+  attribution: YDF-specialist training-data candidates extracted from GitTables corpus
+    by scripts/extract_ydf_specialist_training_data.py. Per-domain `<domain>.distilled.csv.gz`
+    files emit in the sherlock_distilled schema (`final_label`, `sample_values` JSON,
+    `column_name`) so the v20 launch concats them with the v19 sherlock_distilled
+    and passes the merged file via the existing `prepare_multibranch_data.py --distilled`
+    flag — no bespoke loader, existing source-tracking applies. Forensic columns (file_path,
+    ydf_confidence, sense_prediction, row_hash) live in sidecar `<domain>.provenance.tsv`.
+    Holdout-filtered + row-hash-firewalled at extraction time.
   datasets:
   - gittables_ydf_specialist
 - source_url: repo://eval/gittables/holdout_paths.txt
@@ -410,10 +408,10 @@ sources:
   role: train
   licence: Unicode-DFS-2016
   fetched_date: '2026-05-24'
-  attribution: "Unicode Common Locale Data Repository (CLDR) v46.0 \u2014 date/time\
-    \ format patterns, month/weekday names, postal-code regex patterns (via Google\
-    \ libaddressinput, Apache-2.0). Extracted by scripts/extract_cldr_patterns.py\
-    \ per data/cldr/README.md. Drives locale-specific generation + validation in FineType."
+  attribution: Unicode Common Locale Data Repository (CLDR) v46.0 — date/time format
+    patterns, month/weekday names, postal-code regex patterns (via Google libaddressinput,
+    Apache-2.0). Extracted by scripts/extract_cldr_patterns.py per data/cldr/README.md.
+    Drives locale-specific generation + validation in FineType.
   datasets:
   - cldr
   local_path: repo://data/cldr
@@ -423,13 +421,28 @@ sources:
   role: train
   licence: various-open-source
   fetched_date: '2026-05-24'
-  attribution: "GitTables corpus \u2014 1,018,286 tabular parquet files harvested\
-    \ from public GitHub repositories. Maintained at https://gittables.github.io/.\
-    \ Each file inherits its parent repository's licence. Used by FineType as the\
-    \ evaluation + YDF-specialist training corpus; the 2,008-file holdout (eval/gittables/holdout_paths.txt)\
-    \ is reserved for the autonomy-contract gate per choice 0056."
+  attribution: GitTables corpus — 1,018,286 tabular parquet files harvested from public
+    GitHub repositories. Maintained at https://gittables.github.io/. Each file inherits
+    its parent repository's licence. Used by FineType as the evaluation + YDF-specialist
+    training corpus; the 2,008-file holdout (eval/gittables/holdout_paths.txt) is
+    reserved for the autonomy-contract gate per choice 0056.
   datasets:
   - gittables
   local_path: /Users/hugh/datasets/gittables
   snapshot: eval/datasets/snapshots/gittables-27329eda15d6.json
   dataset_version: 27329eda15d6
+- source_url: dataset://geonames
+  role: train
+  licence: CC-BY-4.0
+  fetched_date: '2026-05-24'
+  attribution: 'GeoNames gazetteer (2026-05-24 snapshot) — global gazetteer of geographic
+    features (cities, admin divisions, postal codes, multilingual alternate names)
+    sourced from geonames.org under CC-BY 4.0. Used by FineType as the v21+ training-data
+    source for geography.location.* and geography.address.postal_code types per spec
+    2026-05-24-v21-geonames-geography. Attribution: ''Source: GeoNames (geonames.org),
+    CC BY 4.0''.'
+  datasets:
+  - geonames
+  local_path: /Users/hugh/datasets/geonames/2026-05-24
+  snapshot: eval/datasets/snapshots/geonames-2026-05-24.json
+  dataset_version: '2026-05-24'

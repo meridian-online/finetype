@@ -1,0 +1,98 @@
+# eval/geonames/locale_targets.yaml — Per-locale generation config
+#
+# Per spec 2026-05-24-v21-geonames-geography ac-04.
+#
+# Each locale block tells the generator:
+#   country_codes — ISO2 codes whose data is "in scope" for this locale
+#                   (city values are sampled from these countries' rows)
+#   isolanguages  — alternateNames `isolanguage` codes to substitute when
+#                   the type has `localize: true` in type_mapping.yaml
+#   header_pool   — which key in header_pools.yaml supplies generic
+#                   column header strings for this locale
+#
+# Locale identifiers follow BCP-47 conventions (en_US, fr_FR, etc.).
+# Languages can include script subtags (e.g. ja-Hira, ja-Kana) — the
+# generator passes the literal string to GeoNames' isolanguage column.
+#
+# mixed_locale.fraction tells the generator what fraction of output
+# columns should mix locales (real-world messy data — a column with
+# 70% English + 30% Spanish city names, for example).
+
+mixed_locale:
+  fraction: 0.30      # 30% of generated columns mix locales per recipe spec
+
+locales:
+  en_US:
+    country_codes: [US]
+    isolanguages: [en]
+    header_pool: english
+
+  en_GB:
+    country_codes: [GB]
+    isolanguages: [en]
+    header_pool: english
+
+  fr_FR:
+    country_codes: [FR]
+    isolanguages: [fr]
+    header_pool: french
+
+  es_ES:
+    country_codes: [ES]
+    isolanguages: [es]
+    header_pool: spanish
+
+  es_419:
+    country_codes: [MX, AR, CL, CO, PE, VE, EC, GT, CU, BO, DO, HN, PY, NI, SV, CR, PA, UY]
+    isolanguages: [es]
+    header_pool: spanish
+
+  de_DE:
+    country_codes: [DE, AT, CH]
+    isolanguages: [de]
+    header_pool: german
+
+  it_IT:
+    country_codes: [IT]
+    isolanguages: [it]
+    header_pool: italian
+
+  pt_BR:
+    country_codes: [BR, PT]
+    isolanguages: [pt, pt-BR]
+    header_pool: portuguese
+
+  ja_JP:
+    country_codes: [JP]
+    isolanguages: [ja, ja-Hira, ja-Kana]
+    header_pool: japanese
+
+  zh_CN:
+    country_codes: [CN, HK, MO, TW]
+    isolanguages: [zh, zh-Hans, zh-Hant, zh-CN, zh-HK, zh-MO]
+    header_pool: chinese
+
+  ko_KR:
+    country_codes: [KR]
+    isolanguages: [ko]
+    header_pool: korean
+
+  ar_SA:
+    country_codes: [SA, AE, EG, MA, DZ, IQ, JO, LB, KW, QA, BH, OM, YE, TN, SY]
+    isolanguages: [ar]
+    header_pool: arabic
+
+  ru_RU:
+    country_codes: [RU, BY, KZ, UA]
+    isolanguages: [ru]
+    header_pool: russian
+
+  nl_NL:
+    country_codes: [NL, BE]
+    isolanguages: [nl]
+    header_pool: dutch
+
+  pl_PL:
+    country_codes: [PL]
+    isolanguages: [pl]
+    header_pool: polish

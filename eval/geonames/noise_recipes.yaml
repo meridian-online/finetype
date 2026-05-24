@@ -1,0 +1,65 @@
+# eval/geonames/noise_recipes.yaml — Column-shaping recipes + sample rates.
+#
+# Per spec 2026-05-24-v21-geonames-geography ac-03.
+#
+# Each recipe takes a clean list of canonical values (from the GeoNames
+# generator) and emits column-shaped values that approximate real-world
+# messiness. Recipes are applied per-column (not per-value) — one column
+# gets one recipe's treatment for all its values.
+#
+# `default` weights apply when a type doesn't override them. Per-type
+# overrides at the bottom handle types whose noise space differs
+# materially (coordinates, postal codes).
+
+default:
+  canonical:           0.39   # clean — no transformation
+  mixed_case:          0.10   # "new york", "NEW YORK", "New York" mixed in column
+  abbreviated:         0.05   # "NYC", "L.A." — applied to top-population cities only
+  city_state:          0.15   # "Springfield, IL"  (cities only; degrades for non-cities)
+  city_country:        0.08   # "Paris (France)"
+  partial_value:       0.03   # "New Yo" — truncated to 60% of original
+  mixed_language:      0.05   # 70% locale-native + 30% alternateNames sampled
+  whitespace_noise:    0.05   # leading/trailing/multi-space
+  empty_interspersed:  0.10   # 5–10% of values become "" or "NULL"
+
+# Per-type overrides — sum to 1.0 per type.
+per_type:
+  geography.address.postal_code:
+    canonical:               0.40
+    with_space:              0.20   # "SW1A 1AA" vs "SW1A1AA"
+    with_hyphen:             0.10   # "10001-1234" (US+4)
+    country_prefixed:        0.10   # "GB-SW1A 1AA"
+    mixed_case:              0.05
+    whitespace_noise:        0.05
+    empty_interspersed:      0.10
+
+  geography.coordinate.latitude:
+    decimal_degrees:         0.40   # 45.5234
+    decimal_degrees_short:   0.15   # 45.52
+    signed_decimal:          0.20   # -45.5234
+    dms_notation:            0.10   # "45°31'24\" N"
+    csv_pair:                0.05   # "45.5234, -122.6789"
+    whitespace_noise:        0.05
+    empty_interspersed:      0.05
+
+  geography.coordinate.longitude:
+    decimal_degrees:         0.40
+    decimal_degrees_short:   0.15
+    signed_decimal:          0.20
+    dms_notation:            0.10
+    csv_pair:                0.05
+    whitespace_noise:        0.05
+    empty_interspersed:      0.05
+
+  geography.location.country_code:
+    canonical:               0.55   # ISO codes are clean
+    mixed_case:              0.20   # "us", "US", "Us"
+    whitespace_noise:        0.10
+    empty_interspersed:      0.15
+
+  geography.location.continent:
+    # Continent is a 7-value pool; aggressive noise only
+    canonical:               0.50
+    mixed_case:              0.20
+    with_full_name:          0.20   # "EU (Europe)"
+    empty_interspersed:      0.10

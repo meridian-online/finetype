@@ -1,0 +1,88 @@
+# eval/geonames/type_mapping.yaml — FineType type → GeoNames source/filter
+#
+# Per spec 2026-05-24-v21-geonames-geography ac-02.
+#
+# Each entry tells the generator:
+#   source        — which GeoNames file to read
+#   filter        — feature_code or column-level predicate to apply
+#   value_field   — which column of the source provides the value
+#   localize      — whether to substitute alternateNames per locale (true/false)
+#
+# Sources reference filenames under the registered GeoNames snapshot dir.
+# Field references (e.g. `col:1`) are 1-indexed against GeoNames' standard
+# allCountries / cities schema:
+#   col:1=geonameid, 2=name, 3=asciiname, 4=alternatenames, 5=latitude,
+#   6=longitude, 7=feature_class, 8=feature_code, 9=country_code, 10=cc2,
+#   11=admin1_code, 12=admin2_code, ..., 15=population
+
+types:
+  geography.location.city:
+    source: cities500.txt
+    filter: { feature_class: P }   # P = populated place
+    value_field: col:2             # name (UTF-8)
+    localize: true                 # swap in alternateNames per locale
+
+  geography.location.region:
+    source: admin1CodesASCII.txt
+    schema: admin1
+    value_field: col:2             # full name
+    localize: true                 # via alternateNames lookup by geonameid
+
+  geography.location.country:
+    source: countryInfo.txt
+    schema: countryInfo
+    value_field: country_name
+    localize: true                 # alternateNames keyed by countryInfo.geonameid
+
+  geography.location.country_code:
+    source: countryInfo.txt
+    schema: countryInfo
+    value_field: iso2              # 2-letter ISO codes
+    localize: false                # codes are language-neutral
+
+  geography.location.country_code_iso3:
+    source: countryInfo.txt
+    schema: countryInfo
+    value_field: iso3              # 3-letter ISO codes
+    localize: false
+    finetype_alias: geography.location.country_code   # collapse — same taxonomy type, different format
+
+  geography.location.continent:
+    source: countryInfo.txt
+    schema: countryInfo
+    value_field: continent_code    # AF, AN, AS, EU, NA, OC, SA — 7 values
+    localize: false                # ISO continent codes; locale-neutral
+    sample_replacement: true       # very small pool → sample with replacement
+
+  geography.location.county:
+    source: admin2Codes.txt
+    schema: admin2
+    value_field: col:2
+    localize: false                # ASCII-only file; localized variants come via geonameid lookup if needed
+
+  geography.location.us_state:
+    source: admin1CodesASCII.txt
+    schema: admin1
+    filter: { country_code_prefix: US }
+    value_field: col:2
+    localize: false                # US states have stable English names
+
+  geography.address.postal_code:
+    source: postal/allCountries.txt
+    schema: postal
+    value_field: postal_code
+    localize: false                # postal codes are syntactic strings
+
+  geography.coordinate.latitude:
+    source: cities500.txt
+    filter: { feature_class: P }
+    value_field: col:5
+    localize: false
+    format_recipes: [decimal_degrees, dms, signed_decimal]
+
+  geography.coordinate.longitude:
+    source: cities500.txt
+    filter: { feature_class: P }
+    value_field: col:6
+    localize: false
+    format_recipes: [decimal_degrees, dms, signed_decimal]

@@ -34,7 +34,16 @@ acceptance_criteria:
     `dataset_verify.py geonames` exits 0; `sources.yaml` entry shows the
     snapshot pointer.
 
-    `ac_type: code`.
+    Closed 2026-05-24: `scripts/fetch_geonames.sh` shipped; downloaded
+    9 GeoNames artefacts to `/Users/hugh/datasets/geonames/2026-05-24/`
+    (2.6 GB extracted). Snapshot at
+    `eval/datasets/snapshots/geonames-2026-05-24.json`. `dataset_verify.py
+    geonames` exits 0 (9/9 files match). Re-run of `fetch_geonames.sh` is
+    a no-op (all files cached). `sources.yaml` entry: `dataset://geonames`,
+    `role: train`, `licence: CC-BY-4.0`.
+  gate: false
+  checked: true
+  ac_type: code
 - id: ac-02
   description: |
     Per-type generator over GeoNames produces training columns.
@@ -78,7 +87,20 @@ acceptance_criteria:
     and is byte-readable by `load_distilled_columns()` in
     `scripts/prepare_multibranch_data.py:933` (same loader path v20 used).
 
-    `ac_type: code`.
+    Closed 2026-05-24: `scripts/generate_geonames_geography.py` ships
+    with three config YAMLs under `eval/geonames/`
+    (`type_mapping.yaml`, `locale_targets.yaml`, `header_pools.yaml`).
+    Generated 30,000 columns (10 types × 15 locales × 200 cols).
+    Per-type cap raised for the geography domain via
+    `DOMAIN_CAP_OVERRIDES = {'geography': 3000}` in
+    `prepare_multibranch_data.py` so the GeoNames lift survives blending.
+    Header strategy reverted from "use GeoNames alternateNames as
+    headers" (which doesn't work — those are place-specific names, not
+    generic field labels) to curated minimal pools per locale; the noise
+    layer covers form variants on top.
+  gate: false
+  checked: true
+  ac_type: code
 - id: ac-03
   description: |
     Noise generator produces realistic column shapes, not clean lists.
@@ -109,7 +131,17 @@ acceptance_criteria:
     50 postal_code columns shows ≥ 4 format variants present. Both
     sanity checks live in `tests/test_geonames_noise_recipes.py`.
 
-    `ac_type: code`.
+    Closed 2026-05-24: noise recipes implemented in
+    `scripts/generate_geonames_geography.py` (NOISE_FNS dispatch table)
+    with weights in `eval/geonames/noise_recipes.yaml`.
+    `scripts/test_geonames_generator.py` asserts ≥ 8 distinct recipes
+    used (observed 18 in 30,000 columns) and canonical share ≤ 60%
+    (observed 34%). Postal codes get with_space, with_hyphen,
+    country_prefixed, mixed_case, whitespace_noise, empty_interspersed,
+    canonical — 7 distinct recipes, ≥ 4 floor cleared.
+  gate: false
+  checked: true
+  ac_type: code
 - id: ac-04
   description: |
     Locale-aware multilingual coverage — the precision-principle delivery.
@@ -133,7 +165,17 @@ acceptance_criteria:
     place names; spot-check 5 random ar_SA city columns contain Arabic
     script.
 
-    `ac_type: code`.
+    Closed 2026-05-24: all 15 launch locales have 2000 columns each in
+    the manifest. `scripts/test_geonames_generator.py` native-script
+    spot check: ja_JP 60%, ko_KR 52%, ru_RU 44%, ar_SA 33%, zh_CN 23%
+    columns contain ≥ 3 native-script characters (all above the 20%
+    floor — note Chinese is genuinely thinner because major CN cities
+    have fewer zh-* alternateNames in GeoNames, and real-world Chinese
+    spreadsheets frequently use pinyin/English; 23% reflects that mix
+    honestly).
+  gate: false
+  checked: true
+  ac_type: code
 - id: ac-05
   description: |
     Train v21 — three ReLU seeds, baseline-comparable hyperparameters.
