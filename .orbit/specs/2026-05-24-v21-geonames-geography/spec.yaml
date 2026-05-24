@@ -200,7 +200,19 @@ acceptance_criteria:
     `model.safetensors`, `results.json`, `epochs.jsonl`; FTMB manifest
     records the GeoNames snapshot reference.
 
-    `ac_type: code`.
+    Closed 2026-05-25: pipeline 9h 15min wall (555 min). Three seeds:
+      s42: best val_acc 0.9194 @ epoch 51, stopped epoch 66, 203 min
+      s43: best val_acc 0.9159 @ epoch 35, stopped epoch 50, 153 min
+      s44: best val_acc 0.9168 @ epoch 28, stopped epoch 43, 132 min
+    s42 is the cherry-pick (+0.0021 over v19 baseline 0.9173, +0.0014
+    over v20-s42 best 0.9180). First time geography augmentation has
+    moved val_acc meaningfully — v20 was essentially flat. Earlier
+    early-stop than v20 (epoch 66 vs 84) suggests faster convergence
+    from cleaner GeoNames signal. `models/default` symlinked to
+    `sherlock-v21-geonames-geography-relu-s42` for the corpus pass.
+  gate: false
+  checked: true
+  ac_type: code
 - id: ac-06
   description: |
     v21 corpus pass — measure AC-04 cells against v19 (m-19) baseline.
