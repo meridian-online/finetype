@@ -1,0 +1,275 @@
+id: 2026-05-25-v22-boundary-training
+goal: |
+  Teach the model the boundary, not just one side of it. v20 and v21 both failed AC-04/AC-07 on the same root cause — the dominant failure class (`geography.location.city`, 62% of cell-2 misses) needs disambiguation, not more positive examples. v21 added 30,000 GeoNames-derived city columns; city misses moved 1.6%. The bottleneck is data composition, not model capacity: every training cycle so far has shown the model what IS a city; none has shown it what looks like a city but isn't.
+
+  v22 changes data composition with three additions on top of the v21 GeoNames baseline (which is retained — its lifts on continent, postal_code, country_code, iso6346 are real). (1) Hard negatives — Wikidata Q5 person-name columns and city-looking-text columns mined from the v21 corpus-pass output where Sense currently misclassifies. (2) Real-world positive labels from `corpus_pass/corroborated_gaps.parquet` — clusters where YDF + DBpedia + sample-content agree, giving the model trusted labels on actual GitTables columns. (3) A branch-utilisation diagnostic that proves whether the Model2Vec embed branch is finally carrying weight on city-vs-name disambiguation, or whether the architecture itself caps progress.
+
+  Target: cell-2 lift ≥ 20% vs v19 baseline (rate 160.245/1000 → ≤ 128.20/1000). If the lift lands and the diagnostic shows the embed branch is doing work, the methodology generalises to other domains. If the lift lands but the embed branch still shows zero contribution, that's a finding pointing at architectural surgery. If neither, we've exhausted training-data interventions and the next move is the multi-branch architecture itself.
+cards:
+- 0010-synthetic-data-generation
+status: open
+labels: []
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Wikidata Q5 person-name corpus fetched + registered as a training source.
+
+    `scripts/fetch_wikidata_persons.sh` (idempotent, matching the
+    `fetch_geonames.sh` pattern) downloads a curated subset of Wikidata
+    Q5 (Human) entities — at minimum English-language `given_name +
+    family_name` pairs and `label` strings — to
+    `/Users/hugh/datasets/wikidata/<YYYY-MM-DD>/persons.tsv`. Target ≥
+    2M person-name records (a sample large enough to dominate the
+    geography-confusable subset).
+
+    On completion the script invokes `scripts/dataset_register.py
+    wikidata_q5` per choice 0090, producing
+    `eval/datasets/snapshots/wikidata_q5-<date>.json` with `role:
+    train`, `licence: CC0-1.0` (Wikidata's standard licence), and
+    attribution.
+
+    Close evidence: `dataset_verify.py wikidata_q5` exits 0; snapshot
+    references record source URL (typically a SPARQL query against
+    `query.wikidata.org` or a Wikidata dump file).
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-02
+  description: |
+    Hard negatives mined from the v21 corpus-pass output.
+
+    `scripts/mine_v21_hard_negatives.py` reads
+    `output/corpus-pass-v21/corpus_pass/columns.parquet` and
+    `output/corpus-pass-v21/corpus_pass/per_column_rejects.parquet`
+    (the latter regenerated if missing via
+    `scripts/extract_per_column_rejects.py`). Emits columns where:
+
+      - `sense_prediction` starts with `geography.` (model thinks
+        geography), AND
+      - `ydf_prediction` does NOT start with `geography.` (the YDF lens
+        disagrees), AND
+      - the value sample passes the validation check for YDF's
+        prediction class (a positive corroboration that YDF is right
+        and Sense is wrong).
+
+    These are *real* GitTables columns the v21 model misclassifies as
+    geography. The correct label is YDF's prediction. Output:
+    `output/distillation-v22/hard_negatives_mined.csv.gz` in the
+    sherlock_distilled schema (final_label, sample_values JSON,
+    column_name).
+
+    Target volume: ≥ 5,000 mined hard-negative columns. Stop earlier if
+    the corpus exhausts.
+
+    Wikidata Q5 names (ac-01) feed a separate generator
+    (`scripts/generate_wikidata_person_columns.py`) that emits
+    `output/distillation-v22/wikidata_persons.csv.gz` — synthetic
+    columns of person names labelled
+    `identity.person.full_name`. Together these provide both
+    real-world and synthetic hard negatives.
+
+    Close evidence: both csv.gz files exist; per-label counts written
+    to `output/distillation-v22/hard_negatives_manifest.json`. Spot
+    check: 5 random mined hard-negative columns show values that
+    plausibly look city-like but are correctly labelled non-geography.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    Real-world positive labels mined from corroborated_gaps.
+
+    `scripts/mine_corroborated_gaps_training.py` reads
+    `eval/gittables/corpus_pass/corroborated_gaps.parquet` (m-19's
+    ac-09 output, 61,068 clusters where multiple lenses agree).
+    Filters to clusters where:
+
+      - `recommended_action_class` is `training_data_addition` (the
+        cluster represents a real labelling gap, not a validator or
+        taxonomy fix), AND
+      - the corroborated label is in the FineType taxonomy.
+
+    For each surviving cluster, expands to per-column training rows by
+    walking `mechanism_decomposition.parquet` for the columns
+    contributing to the cluster, pulling `sample_values_truncated` from
+    `columns.parquet`. Output:
+    `output/distillation-v22/corroborated_gaps_distilled.csv.gz`.
+
+    Per-cluster cap: 50 columns (avoids any one cluster dominating).
+    Per-type cap: 3,000 (matches the geography DOMAIN_CAP_OVERRIDES
+    from v21 ac-02; non-geography clusters use the standard 600 cap).
+
+    Target volume: ≥ 30,000 corroborated-positive training rows
+    spanning ≥ 30 distinct FineType types.
+
+    Close evidence: csv.gz exists; per-type and per-cluster counts in
+    `output/distillation-v22/corroborated_manifest.json`. Spot check: 5
+    random sample columns show values consistent with the corroborated
+    label.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    v22 distillation blend.
+
+    `scripts/build_v22_distilled.py` (or a launcher Step 0 inline)
+    merges, in this order, into a single distilled CSV:
+
+      1. v19 sherlock_distilled.csv.gz                     (102,461 rows)
+      2. v21 geonames_geography.csv.gz                     (~30,000 rows)
+      3. corroborated_gaps_distilled.csv.gz (ac-03)        (≥ 30,000 rows)
+      4. hard_negatives_mined.csv.gz (ac-02)               (≥ 5,000 rows)
+      5. wikidata_persons.csv.gz (ac-02)                   (≥ 5,000 rows)
+
+    Output:
+    `output/distillation-v22/sherlock_distilled_v22.csv.gz`. The
+    distilled-cap stage of `prepare_multibranch_data.py` will reduce
+    over-represented types per the DOMAIN_CAP_OVERRIDES (geography:
+    3000, default: 600); this is by design — the cap selects randomly
+    so the blended sources contribute proportionally.
+
+    Audit gate (inline check, fails the launcher if not met):
+      - Total rows: ≥ 170,000 before cap
+      - identity.person.full_name has ≥ 5,000 hard-negative rows
+        present
+      - At least 30 distinct corroborated-gap source types contribute
+        rows
+
+    Close evidence: the csv.gz file plus a `v22_blend_manifest.json`
+    summarising rows-per-source and rows-per-final-label.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-05
+  description: |
+    Train v22 — three ReLU seeds, baseline-comparable hyperparameters.
+
+    `scripts/overnight_v22_boundary.sh` orchestrates pre-flight
+    (`dataset_verify.py sherlock cldr geonames wikidata_q5` — all four
+    sources verified) → Step -1 (regenerate v22 distillation sources
+    via ac-01/02/03 scripts if outputs are missing) → Step 0 (build v22
+    blend per ac-04) → Step 1 (`prepare_multibranch_data.py
+    --distilled output/distillation-v22/sherlock_distilled_v22.csv.gz`)
+    → Step 1.5 (audit gate, identical structure to v21) → Step 2 (3
+    ReLU seeds at the v13 config — architecture and hyperparameters
+    identical to v19/v20/v21 so the comparison isolates the
+    data-composition effect) → cherry-pick best seed → log summary.
+
+    Models at
+    `models/sherlock-v22-boundary-relu-s{42,43,44}/`. v19, v20, v21
+    directories preserved untouched.
+
+    Close evidence: three trained model dirs each containing
+    `model.safetensors`, `results.json`, `epochs.jsonl`.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-06
+  description: |
+    Embed-branch utilisation diagnostic — does Model2Vec finally help?
+
+    `scripts/branch_ablation_diagnostic.py` runs inference on a
+    curated probe set of 200 columns drawn from the v21 corpus-pass:
+    100 columns where `ydf_prediction = geography.location.city` AND
+    `sense_prediction != geography.*` (the city-misses), plus 100
+    columns where `sense_prediction = identity.person.full_name` AND
+    values look city-like (the confusables that hard negatives aim to
+    address).
+
+    For each column, runs inference under three branch
+    configurations:
+      - all branches active                         (default)
+      - embed branch ablated (zeroed)                (char-only signal)
+      - char branch ablated (zeroed)                 (embed-only signal)
+
+    Reports per-configuration accuracy on the probe set, for both v21
+    and v22. The load-bearing claim: v22 with full branches beats v22
+    with embed ablated by a meaningful margin on the probe set; the
+    same comparison on v21 should show little difference (consistent
+    with v21's failure mode — the embed branch wasn't carrying weight).
+
+    Close evidence: a delta table at
+    `output/branch-ablation-v22/probe_results.md` showing accuracy by
+    (model × ablation × probe partition) and a short narrative reading
+    of what the comparison says about the embed branch.
+
+    `ac_type: code` — the diagnostic is a code deliverable; the
+    *interpretation* of the result is the close note.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-07
+  description: |
+    v22 corpus pass + four-way cell deltas.
+
+    After v22 trains and `models/default` is symlinked to the cherry-
+    pick, run the full corpus pass to `output/corpus-pass-v22/`
+    (preserving v19 / v20 / v21 outputs). Use the same Pass A
+    (`--execute`) → Pass B (`--fill-ydf`) two-stage flow as v20/v21.
+
+    Cell deltas written to
+    `output/corpus-pass-v22/cell_deltas.md` as a four-way table
+    (v19/v20/v21/v22) for both cells, plus a per-subtype cell-2
+    breakdown analogous to v21's `cell_deltas.md`. Specifically expect
+    to see in the breakdown:
+
+      - city misses: v22 << v21 if hard negatives worked
+      - person.full_name misses: unchanged or slightly improved
+      - non-geography types: unchanged (no regression — verify)
+      - already-working geography subtypes (continent, postal_code,
+        country_code, iso6346): retain v21's lift (no regression)
+
+    Close evidence: cell_deltas.md exists and is human-readable.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-08
+  description: |
+    Cell-2 lift ≥ 20% vs v19 baseline — the falsifiable target.
+
+    Cell 2 (`non_trivial_floor × misclassification`, filtered to rows
+    where `ydf_prediction LIKE 'geography.%'`): v22's per-1000-file
+    rate must hit ≤ 128.20 / 1000 (20% reduction from the 160.245 / 1000
+    v19 baseline).
+
+    Three falsification bands:
+
+      - **Met (≥ 20%)** — boundary-training methodology validated.
+        Generalise the pattern (mine corroborated_gaps + hard negatives)
+        to other under-performing domains in a follow-up spec.
+      - **Partial (10–20%)** — methodology is right but blend
+        composition or hard-negative scope is undertuned. Follow-up
+        spec investigates: more Wikidata hard negatives, additional
+        confusable sources (Wikidata Q4830453 businesses, Q43229
+        organisations), per-locale hard negatives.
+      - **Failed (< 10%)** — training-data interventions have reached
+        their ceiling. The remaining problem is architectural. Read
+        ac-06's branch-ablation diagnostic to decide between (a) an
+        architectural spec re-weighting the multi-branch heads, or (b)
+        an explicit city-vs-name discriminator in the Sharpen stage.
+
+    Whichever band lands, the next-spec direction is determined by
+    ac-06's diagnostic + this AC's number — not by another retraining
+    cycle of the same shape.
+
+    Close evidence: the cell_deltas.md row for cell 2 shows v22/v19
+    ratio with per-1000-file rates and %change. Spec close note
+    records which band landed and the chosen next-spec direction.
+
+    `ac_type: observation`.
+  gate: false
+  checked: false
+  ac_type: observation
