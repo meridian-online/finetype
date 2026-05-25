@@ -141,6 +141,15 @@ output/distillation-v21-geonames/
 output/distillation-v21/
 output/corpus-pass-v21/
 
+# v22 boundary-training retrain artefacts (per spec 2026-05-25-v22-boundary-training).
+# Regenerable from scripts/overnight_v22_boundary.sh — the mining scripts
+# (mine_corroborated_gaps_training.py, mine_v21_hard_negatives.py,
+# generate_wikidata_person_columns.py) ARE tracked; the bulk CSVs they
+# emit are not.
+output/distillation-v22/
+output/corpus-pass-v22/
+output/branch-ablation-v22/
+
 # Distillation batch files (rolled into *_distilled.csv.gz)
 output/distillation-v3/sherlock_batch_*.csv
 output/distillation-v3/sherlock_batch_*.done

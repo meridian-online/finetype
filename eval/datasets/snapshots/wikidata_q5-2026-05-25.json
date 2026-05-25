@@ -1,0 +1,24 @@
+{
+  "dataset": "wikidata_q5",
+  "dataset_version": "2026-05-25",
+  "snapshot_date": "2026-05-25",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@bd0e729aef8a",
+  "local_path": "/Users/hugh/datasets/wikidata/2026-05-25",
+  "total_size_bytes": 959272,
+  "file_count": 3,
+  "files": {
+    "family_names.tsv": {
+      "size_bytes": 477450,
+      "sha256": "3dd66561d7295208eb5bbed20b888a938ad183c5ba8d30f457d6982c54fcd9f4"
+    },
+    "given_names.tsv": {
+      "size_bytes": 481812,
+      "sha256": "6ef934814dec896b507d340235b2b9aca90075e036b5e55fe0ee9e81d9c0c865"
+    },
+    "persons.tsv": {
+      "size_bytes": 10,
+      "sha256": "4b26e72fa310b56be9c636c08dee0edcb32fd507699f15eed0ce8166f93a10b5"
+    }
+  }
+}

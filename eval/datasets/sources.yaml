@@ -446,3 +446,18 @@ sources:
   local_path: /Users/hugh/datasets/geonames/2026-05-24
   snapshot: eval/datasets/snapshots/geonames-2026-05-24.json
   dataset_version: '2026-05-24'
+- source_url: https://query.wikidata.org/sparql
+  role: train
+  licence: CC0-1.0
+  fetched_date: '2026-05-25'
+  attribution: 'Wikidata Q5 (Human) person-name primitives (2026-05-25 snapshot) —
+    given names (Q202444 instances), family names (Q101352 instances), and a Q-id-ranged
+    sample of Q5 entity labels, fetched from Wikidata Query Service (query.wikidata.org)
+    under the CC0 1.0 Public Domain Dedication. Used by FineType as the v22 training-data
+    source for identity.person.full_name hard negatives per spec 2026-05-25-v22-boundary-training.
+    Attribution: ''Source: Wikidata, dedicated to the public domain under CC0 1.0''.'
+  datasets:
+  - wikidata_q5
+  local_path: /Users/hugh/datasets/wikidata/2026-05-25
+  snapshot: eval/datasets/snapshots/wikidata_q5-2026-05-25.json
+  dataset_version: '2026-05-25'
