@@ -28,6 +28,7 @@ scenarios:
   gate: false
 specs:
 - .orbit/specs/2026-04-27-cli-visibility-cleanup/
+- .orbit/specs/2026-05-24-v21-geonames-geography/spec.yaml
 relations: []
 references:
 - CLAUDE.md

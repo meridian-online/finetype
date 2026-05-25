@@ -3,7 +3,7 @@ goal: |
   Build v21 around an authoritative-gazetteer (GeoNames) training source for the geography domain, replacing the v20 YDF-specialist approach that failed ac-04 (cell 2 at −1.1% reduction vs the −20% threshold; cell 1 at −3.0% reduction vs the −20% threshold). Diagnosis from 2026-05-24 cross-tab — city accounts for 62% of cell-2 misses (55,385 of 89,000 rows) but the v20 extractor's `--min-confidence 0.7` filter passed only 11 of 55,281 candidate city columns; YDF itself is uncertain about city (median confidence 0.31). The methodology assumed YDF would be a high-confidence oracle; for the dominant failure class, it isn't. GeoNames sidesteps the issue — direct authoritative coverage of city + region + country + postal_code + admin divisions, plus multilingual alternate names for the locale offering. Pair with a noise generator so training reflects messy real-world inputs, not clean reference lists. Target cell 2 ≥ 20% reduction; cell 1 will get incidental lift from full_address + postal_code coverage but isn't the primary aim.
 cards:
 - 0010-synthetic-data-generation
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -43,7 +43,6 @@ acceptance_criteria:
     `role: train`, `licence: CC-BY-4.0`.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-02
   description: |
     Per-type generator over GeoNames produces training columns.
@@ -100,7 +99,6 @@ acceptance_criteria:
     layer covers form variants on top.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-03
   description: |
     Noise generator produces realistic column shapes, not clean lists.
@@ -141,7 +139,6 @@ acceptance_criteria:
     canonical — 7 distinct recipes, ≥ 4 floor cleared.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-04
   description: |
     Locale-aware multilingual coverage — the precision-principle delivery.
@@ -175,7 +172,6 @@ acceptance_criteria:
     honestly).
   gate: false
   checked: true
-  ac_type: code
 - id: ac-05
   description: |
     Train v21 — three ReLU seeds, baseline-comparable hyperparameters.
@@ -212,7 +208,6 @@ acceptance_criteria:
     `sherlock-v21-geonames-geography-relu-s42` for the corpus pass.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-06
   description: |
     v21 corpus pass — measure AC-04 cells against v19 (m-19) baseline.
@@ -234,7 +229,12 @@ acceptance_criteria:
     Close evidence: the delta table exists and is human-readable;
     v21's cell-2 rate is recorded.
 
-    `ac_type: code`.
+    Closed 2026-05-25: corpus pass ran 10h 32min wall. Three-way delta
+    table at `output/corpus-pass-v21/cell_deltas.md` records v19 / v20 /
+    v21 per-1000-file rates plus a per-subtype cell-2 breakdown showing
+    where v21 moved the needle vs where it didn't.
+  gate: false
+  checked: true
 - id: ac-07
   description: |
     Cell-2 lift ≥ 20% vs v19 baseline — the falsifiable target.
@@ -263,4 +263,29 @@ acceptance_criteria:
     Close evidence: the cell_deltas.md row for cell 2 shows v21 / v19
     ratio with the per-1000-file rates and the %change.
 
-    `ac_type: observation`.
+    Closed 2026-05-25 — outcome observed, threshold not met. Cell 2 lift
+    was 2.3% (rate 160.245 → 156.590 per 1000 files); falls in the
+    "halt and re-investigate" band (< 10%) per spec text. Cell 1
+    regressed 0.4%.
+
+    Per-subtype diagnostic (cell_deltas.md) is the load-bearing finding:
+    syntactically distinctive subtypes moved 13–40% (continent −37.3%,
+    transportation.iso6346 −39.9%, country_code −25.7%, postal_code
+    −13.1%) but the dominant failure class — city, 62% of cell-2 misses
+    — moved only 1.6%. The methodology adds positive examples; the
+    failure pattern needs boundary disambiguation (what isn't a city,
+    not just more cities).
+
+    Halt invoked. Next iteration direction captured in orbit memory
+    `v22-direction-hard-negatives` — train with explicit non-city text
+    that shares city-like patterns (person surnames from Wikidata Q5,
+    business names, place-name-but-not-city features) plus a look at
+    whether the multi-branch sibling-context branch is contributing to
+    city disambiguation. New spec to be drafted before any further
+    geography-augmentation work runs.
+
+    `models/default` reverted to `sherlock-v19-relu-s42` — v21 is
+    preserved on disk but not the active Sense model.
+  gate: false
+  checked: true
+  ac_type: observation
