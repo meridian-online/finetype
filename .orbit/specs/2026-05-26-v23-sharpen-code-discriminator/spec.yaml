@@ -1,54 +1,49 @@
 id: 2026-05-26-v23-sharpen-code-discriminator
 goal: |
-  Recover misclassified country_code columns at the Sharpen stage —
-  no retrain. Scope narrowed 2026-05-26 after ac-01 invalidated the
-  original premise on five of six target subtypes.
+  Closed without shipping a Sharpen rule. ac-01's audit invalidated
+  the spec's premise; the subsequent R26 country_code experiment
+  (built and validated against the full 6.5M-column corpus) was
+  reverted in favour of fixing the eval baseline.
 
   Original premise (pre-ac-01): close v22's cell-2 regression on six
-  geography code subtypes via promote rules. Audit script
-  `scripts/audit_geography_code_patterns.py` against
-  `output/corpus-pass-v22/corpus_pass/columns.parquet` showed that
-  three of the six (iso6346, mgrs, plus_code) have ZERO columns in
-  the entire corpus where values actually match the type's pattern;
-  YDF's "ground truth" labels msg_id (`msg48752425`) as iso6346,
-  stock_id (`VD17785626559`) as mgrs, etc. v22 is correctly calling
-  these alphanumeric_id while YDF mislabels them. iata (25 cols),
-  icao (1 col) are too small to move the band.
+  geography code subtypes (iso6346, mgrs, plus_code, country_code,
+  iata_code, icao_code) via value-based Sharpen rules — no retrain.
 
-  Surviving subtype: country_code. 839 YDF-labeled columns contain
-  values that actually match ISO 3166-1 alpha-2. R26 promotes those
-  away from non-geography misclassifications (categorical,
-  full_name, alphanumeric_id) when values pass the enum gate.
+  What ac-01 (script: scripts/audit_geography_code_patterns.py)
+  showed: of 3,389 YDF-labeled `iso6346` columns, ZERO contain values
+  matching the iso6346 regex; 2,828 are msg_id columns (msg48752425).
+  Same for mgrs (0/35) and plus_code (0/4). v22 is correctly calling
+  these alphanumeric_id while YDF's "ground truth" mislabels them.
 
-  Precision risk: the 2-char alpha-2 pattern collides with US state
-  codes. Many state codes ARE in ISO 3166 (CA=Canada=California,
-  IL=Israel=Illinois, GA=Georgia-the-country=Georgia-the-state, LA,
-  MS, MD, DE, IN, VA, KY, AL — 17+ codes appear in both sets). A
-  naïve enum-only check would falsely promote US-state columns whose
-  state codes happen to coincide with ISO codes.
+  The narrow path that survived: R26 country_code with a US-state
+  anti-enum (CA, IL, GA... collide with US state codes). Built,
+  hardened, validated against the corpus. Result: fires on 3 columns
+  out of 6.5M; cell-2 moves by 1 column. Reverted because:
 
-  R26 hardens against this with a *US-states anti-enum*: load the
-  US state alpha-2 set (~56 codes — 50 states + DC + territories)
-  alongside ISO 3166. For each column, partition matches into
-  `iso_only`, `state_overlap`, and `state_only`. Require both:
-  state_only_rate ≤5% (rules out state columns containing NY/TX/FL/
-  OK that aren't in ISO) AND iso_only_rate ≥30% of distinct matches
-  (rules out columns dominated by state_overlap codes that could
-  plausibly be states).
+    - Of 4,044 YDF-labeled country_code cols, Sense already correctly
+      classifies 2,890 (71%). The remaining ~1,150 are dominated by
+      3-letter team abbreviations (TEAM_ABBREVIATION: UTA, FLA — 547
+      cols) and 3-letter exchange codes (exchange: GER — 237 cols)
+      that a 2-char alpha-2 rule structurally cannot reach.
+    - Decision 0038 ("rules are a last resort") and decision 0048
+      ("value-based rules only") both argue against shipping a rule
+      with 0.00005% lift on a metric we now know is dominated by YDF
+      label noise.
+    - The right fix is upstream: gate YDF's predictions against the
+      JSON Schema validation already shipped in labels/*.yaml so
+      msg_id/stock_id/team-code mislabels drop out of the metric at
+      source.
 
-  Per the precision principle (CLAUDE.md): coverage of anti-enums
-  expands; heuristics don't loosen.
+  Load-bearing knowledge preserved as memories:
+    - v23-ac01-finding — YDF mislabel-pattern analysis
+    - taxonomy-country-code-enum-contamination — yaml enum has US
+      states + Canadian provinces tacked on; would defeat any naïve
+      consumer of definitions_geography.country_code.validation.enum
+    - v23-ac08-outcome — R26 experiment result + reasoning
 
-  Expected lift: ~1 pp cell-2 reduction (839 cols out of 503,643
-  files). Doesn't change v22's band on its own — but it's a
-  real precision win for analysts working with country-code columns.
-  The remaining cell-2 gap is largely measurement artefact (noisy
-  YDF labels); proper fix is a separate spec on eval-baseline cleanup.
-
-  Out-of-scope for v23 (deferred to a follow-up spec):
-    - iso6346 / mgrs / plus_code Sharpen rules (no real columns)
-    - iata / icao enum-required rules (too few columns to move band)
-    - YDF-label-noise cleanup + cell-2 metric re-baseline
+  Follow-up spec: 2026-05-26-ydf-validation-gate — apply JSON Schema
+  validation post-hoc to YDF predictions, recompute v19/.../v22 cell-2
+  against the cleaned baseline, document where v22 actually lands.
 
 cards:
 - 0002-semantic-type-detection
@@ -65,12 +60,9 @@ acceptance_criteria:
     breakdown of columns where ≥80% of values match the pattern.
     Output: `output/v23-sharpen-codes/pattern_fp_audit.tsv`.
 
-    Close evidence (✓ all met 2026-05-26): TSV exists; tight-pattern
-    types (iso6346, mgrs, plus_code) show ≤5 false positives outside
-    their target ydf_prediction; loose-pattern types (iata, icao,
-    cc-alpha-2) show the cross-type collision pattern. Audit also
-    surfaced the premise-invalidating finding captured in memory
-    `v23-ac01-finding` — load-bearing for the spec scope reduction.
+    Closed: TSV exists, tight patterns show ≤5 FPs, loose patterns
+    show the predicted cross-type collision. Audit also surfaced the
+    premise-invalidating finding (memory `v23-ac01-finding`).
 
     `ac_type: code`.
   gate: false
@@ -79,124 +71,20 @@ acceptance_criteria:
 
 - id: ac-04
   description: |
-    R26 country_code Sharpen rule with US-state anti-enum.
+    R26 country_code Sharpen rule — built, hardened, reverted.
 
-    Implementation in `crates/finetype-model/src/column.rs`, in
-    `value_sharpen()` near the top of the geography decision block
-    (before R20/R21/R22 demote gates so a promoted country_code
-    label gets the demote-gate check).
+    Implementation history (commits dd0143c + 7071576, reverted):
+    `sharpen_country_code_promote` in column.rs with a US-state
+    anti-enum, four-condition gate (iso_rate ≥ 80%, state_only ≤ 5%,
+    iso_only_distinct ≥ 30%, n_distinct ≥ 3), and 14 unit tests.
+    Offline re-apply (scripts/apply_v23_sharpen_offline.py) across
+    6.5M columns: R26 fired on 3, zero false promotions after the
+    n_distinct floor caught a 730-column boolean-NO precision hole
+    (NO = Norway in ISO 3166).
 
-    Two enums:
-      - ISO 3166-1 alpha-2 (~249 codes) — hardcoded constant
-        mirroring `labels/definitions_geography.yaml` under
-        `geography.location.country_code.validation.enum`. A test
-        verifies the hardcoded list matches the yaml.
-      - US states alpha-2 (~56 codes — 50 states + DC + territories
-        PR, VI, GU, AS, MP) — hardcoded constant.
-
-    Trigger conditions (all required):
-      - result_label does NOT start with "geography." (don't override
-        any Sense geography decision; covers country_code itself)
-      - n_values ≥ 5
-      - ≥80% of non-empty values are in ISO 3166-1 alpha-2
-      - state_only_rate ≤ 5% of non-empty values
-        (where state_only = US state code AND NOT in ISO)
-      - iso_only_rate ≥ 30% of distinct values matching the enum
-        (where iso_only = in ISO AND NOT a US state code)
-
-    The state_only check rules out columns dominated by US state
-    codes like NY/TX/FL/OK (not in ISO). The iso_only check rules
-    out the ambiguous case where every match happens to also be a
-    state code — that's not a clean country signal.
-
-    Unit tests in column.rs's #[cfg(test)] module:
-      (a) positive: 10 international country codes (US, GB, DE, FR,
-          JP, BR, AU, MX, CA, IN) starting from
-          `representation.discrete.categorical` → promote to
-          country_code.
-      (b) US-state-collision negative: 10 US state codes
-          (CA, IL, GA, LA, MS, MD, DE, IN, VA, KY) — all in ISO but
-          all in US states too. state_overlap dominates, iso_only=0,
-          state_only=0; rule should NOT fire (iso_only_rate < 30%).
-      (c) mixed-state negative: 12 mostly-US-states column with a
-          few non-ISO codes (NY, TX, FL, OK, OH, MI, PA, NC, WA, WI,
-          CA, IL) — state_only_rate > 5% so refuses.
-      (d) strong-classes guard: a column with international country
-          codes but result_label = "geography.location.region" — the
-          guard preserves the model's geography decision.
-      (e) enum-membership: hardcoded ISO list length matches the
-          yaml enum length (regenerates on taxonomy update).
-
-    `ac_type: code`.
-  gate: false
-  checked: true
-  ac_type: code
-
-- id: ac-05
-  description: |
-    End-to-end test surface — one full column-shaped fixture row
-    covering the v22 corpus-pass failure mode R26 fixes.
-
-    `crates/finetype-eval/tests/v23_sharpen_country_code_test.rs`
-    (or extend existing tests file) — feed a column where Sense
-    forces a wrong prediction (e.g., contrived header that v22
-    misclassifies as `representation.discrete.categorical`) with
-    values drawn from ISO 3166-1 alpha-2; confirm full pipeline
-    output is `geography.location.country_code`.
-
-    Comment cites a real misclassified column from
-    `output/corpus-pass-v22/corpus_pass/columns.parquet` that R26
-    is designed to recover.
-
-    `ac_type: code`.
-  gate: false
-  checked: true
-  ac_type: code
-
-- id: ac-06
-  description: |
-    Offline re-application of the R26 Sharpen rule against v22's
-    corpus pass — no fresh corpus pass required.
-
-    `scripts/apply_v23_sharpen_offline.py` reads
-    `output/corpus-pass-v22/corpus_pass/columns.parquet`, calls the
-    R26 rule on each row's Sense prediction + sample values, writes
-    `output/v23-sharpen-codes/columns_sharpened.parquet` with the
-    Sharpen-overridden label.
-
-    Justification: a full corpus pass is 6h+; the Sharpen stage is
-    pure post-Sense logic that doesn't touch the model. Re-running
-    Sharpen offline on the existing columns.parquet gives the same
-    answer in minutes.
-
-    Close evidence: parquet exists with same row count as input;
-    spot-check 20 country_code-shaped rows shows the expected
-    promote-to-country_code overrides; spot-check 20 US-state
-    columns shows NO false promotion.
-
-    `ac_type: code`.
-  gate: false
-  checked: true
-  ac_type: code
-
-- id: ac-07
-  description: |
-    Recompute cell deltas with v22-Sense + v23-Sharpen (R26 only).
-
-    Re-run `scripts/compute_v22_cell_deltas.py` (or a v23-aware
-    variant) against the sharpened parquet from ac-06. Write
-    `output/v23-sharpen-codes/cell_deltas.md` as a five-way table
-    (v19/v20/v21/v22-Sense-only/v22+v23-Sharpen) with per-subtype
-    breakdown.
-
-    Specifically expect:
-      - country_code: v22's 948 misses drop to ~400 (R26 catches
-        the alpha-2 columns Sense misclassified)
-      - city / region / country / continent: unchanged (the
-        !starts_with("geography.") guard prevents R26 from touching
-        any Sense geography decision)
-      - other regressed subtypes (iso6346, mgrs, plus_code, iata,
-        icao): unchanged (no rule shipped)
+    Closed not-shipped: the recovery surface is too small to justify
+    a permanent rule (decision 0038). Knowledge preserved in memory
+    `v23-ac08-outcome`.
 
     `ac_type: code`.
   gate: false
@@ -205,30 +93,16 @@ acceptance_criteria:
 
 - id: ac-08
   description: |
-    Cell-2 lift band — combined v22-Sense + v23-Sharpen target.
+    Cell-2 lift band — closed at "Lift ≈ 0".
 
-    Expected combined cell-2 rate vs v19 baseline: ~145 / 1000
-    (v22-Sense-only at 145.96, R26 lifts by ~1 pp at best). Original
-    spec targeted ≥10% reduction (≤144.22). R26 alone is unlikely
-    to clear that — and the ac-01 finding confirms much of the
-    residual gap is YDF-label noise, not real model loss.
+    v22 + (reverted) v23: cell-2 moved by 1 column out of 73,514
+    (within rounding). The R26-scoped band classification ("Lift ≥ 0
+    — fires productively") was technically met but not load-bearing
+    once the rule was reverted.
 
-    Three falsification bands, re-scoped for R26-only:
-
-      - **Lift ≥1 pp** (R26 fires productively) — country_code
-        recovery works as designed. Close v23. Open a follow-up spec
-        on YDF-label cleanup + cell-2 metric re-baseline so future
-        retrains can be judged honestly.
-      - **Lift 0–1 pp** (R26 fires but barely moves the metric) —
-        confirms the cell-2 metric is dominated by noise, not real
-        misses. Close v23 with the precision win logged; the
-        follow-up cleanup spec is even more urgent.
-      - **Lift < 0** (R26 makes things worse) — implementation bug
-        or the US-state anti-enum is misconfigured. Investigate.
-
-    Close evidence: combined cell-2 rate recorded in
-    `output/v23-sharpen-codes/cell_deltas.md` with band classification;
-    spec close note records the band and the next-spec direction.
+    Decision: do not ship R26; open a follow-up spec on the eval
+    baseline itself so future retrains can be judged against ground
+    truth that isn't mostly noise.
 
     `ac_type: observation`.
   gate: false
