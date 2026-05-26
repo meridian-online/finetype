@@ -698,7 +698,54 @@ def _run_fill_ydf(args) -> int:
         "ydf_confidence",
         pa.array(ydf_conf, type=pa.float64()),
     )
-    pq.write_table(new_table, new_path, compression="snappy")
+
+    # JSON Schema validation gate on YDF predictions (per spec
+    # 2026-05-26-ydf-validation-gate ac-06). Adds two columns:
+    #   ydf_validation_pass_rate: fraction of values matching the
+    #     predicted label's JSON Schema (1.0 when no applicable
+    #     validation or no samples).
+    #   ydf_prediction_gated: NULL when pass_rate < 0.5, else the
+    #     original prediction. Downstream consumers prefer this
+    #     column; the raw ydf_prediction stays for lens-disagreement
+    #     diagnostics.
+    print("applying YDF JSON Schema validation gate...", file=sys.stderr)
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from apply_ydf_validation_gate import (  # noqa: E402
+            PASS_RATE_THRESHOLD, evaluate, load_validations,
+        )
+    except ImportError as exc:
+        print(f"warn: validation gate import failed ({exc}); "
+              "writing parquet WITHOUT gate columns.", file=sys.stderr)
+        pq.write_table(new_table, new_path, compression="snappy")
+    else:
+        specs = load_validations()
+        pass_rates: list[float | None] = [None] * n_rows
+        gated: list[str | None] = [None] * n_rows
+        n_refused = 0
+        for i in range(n_rows):
+            label = ydf_pred[i]
+            if label is None:
+                continue
+            spec = specs.get(label)
+            raw = sample_arr[i] or ""
+            values = [v for v in raw.split(SAMPLE_JOIN_SEP) if v]
+            rate = evaluate(spec, values)
+            pass_rates[i] = rate
+            if rate < PASS_RATE_THRESHOLD:
+                n_refused += 1
+            else:
+                gated[i] = label
+        new_table = new_table.append_column(
+            "ydf_validation_pass_rate",
+            pa.array(pass_rates, type=pa.float64()),
+        ).append_column(
+            "ydf_prediction_gated", pa.array(gated, type=pa.string()),
+        )
+        print(f"  gate refused {n_refused:,} of {n_filled:,} YDF "
+              f"predictions ({n_refused / max(n_filled, 1) * 100:.2f}%)",
+              file=sys.stderr)
+        pq.write_table(new_table, new_path, compression="snappy")
     cols_path.rename(backup_path)
     new_path.rename(cols_path)
 

@@ -50,6 +50,15 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 
 **m-19 IN FLIGHT — eval-corpus expansion (Phase A+B).** Three deliverables: realism standard + pre-screen, coverage floor (240/240 types), train/eval leakage firewall (sources.yaml + row-hash SHA256). v18 retrain block enforced until Phase A+B ships. Spec: `.orbit/specs/2026-04-21-eval-expansion/`. Decisions 0055/0056/0057.
 
+## Eval baseline — gated YDF is canonical
+
+The corpus-pass scoring lens is `ydf_prediction_gated` (per spec `2026-05-26-ydf-validation-gate`). The `--fill-ydf` phase of `scripts/gittables_corpus_pass.py` writes two columns:
+
+- `ydf_prediction` — raw YDF top-1 label (kept for lens-disagreement diagnostics).
+- `ydf_prediction_gated` — same prediction with NULLs substituted when fewer than 50% of the column's sample values pass the predicted label's JSON Schema validation. Stops the metric from penalising Sense for disagreeing with demonstrably-wrong YDF labels (msg_id → iso6346, stock_id → mgrs, team-codes → country_code).
+
+When scoring v22 against the gated baseline, v22 lands at **−10.4% cell-2 vs v19 (Partial band)** — up from the noisy baseline's −8.9% (Failed). See `output/ydf-validation-gate/v22_re_baseline.md`. Cell-delta scripts (`compute_v22_cell_deltas.py`) prefer the gated column when present.
+
 ## Decision register
 
 48 architectural decisions in `.orbit/choices/` (MADR format). Browse: `ls .orbit/choices/` or Ctrl+B (fzf + glow preview).

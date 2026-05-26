@@ -61,7 +61,7 @@ goal: |
 
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -101,7 +101,7 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-02
@@ -124,7 +124,7 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-03
@@ -146,7 +146,7 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-04
@@ -173,7 +173,7 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-05
@@ -191,7 +191,7 @@ acceptance_criteria:
 
     `ac_type: doc`.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 
 - id: ac-06
@@ -215,5 +215,5 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code

@@ -70,17 +70,27 @@ def main() -> int:
             print(f"warn: {name} parquet unreadable ({exc}); skipping",
                   file=sys.stderr)
             continue
-        print(f"reading {name}: {path}", file=sys.stderr)
+        # Prefer the gated YDF column when present (per spec
+        # 2026-05-26-ydf-validation-gate ac-06). Falls back to raw
+        # ydf_prediction for pre-gate corpus passes.
+        schema_cols = con.execute(
+            f"SELECT * FROM read_parquet('{path.as_posix()}') LIMIT 0"
+        ).fetchdf().columns.tolist()
+        ydf_col = ("ydf_prediction_gated"
+                   if "ydf_prediction_gated" in schema_cols
+                   else "ydf_prediction")
+        print(f"reading {name}: {path}  (ydf column: {ydf_col})",
+              file=sys.stderr)
         r = con.execute(f"""
             SELECT COUNT(DISTINCT file_path) AS files,
                    COUNT(*) FILTER (
-                       WHERE ydf_prediction = 'geography.address.full_address'
+                       WHERE {ydf_col} = 'geography.address.full_address'
                          AND (sense_prediction IS NULL
                               OR sense_prediction != 'geography.address.full_address')
                    ) AS cell1,
                    COUNT(*) FILTER (
                        WHERE sense_prediction NOT LIKE 'geography.%'
-                         AND ydf_prediction LIKE 'geography.%'
+                         AND {ydf_col} LIKE 'geography.%'
                    ) AS cell2
             FROM read_parquet('{path.as_posix()}')
         """).fetchone()
@@ -95,10 +105,10 @@ def main() -> int:
         # Per-subtype cell 2 breakdown — ydf_prediction LIKE 'geography.%'
         # AND sense_prediction NOT LIKE 'geography.%'.
         rows = con.execute(f"""
-            SELECT ydf_prediction, COUNT(*) AS n
+            SELECT {ydf_col} AS ydf, COUNT(*) AS n
               FROM read_parquet('{path.as_posix()}')
              WHERE sense_prediction NOT LIKE 'geography.%'
-               AND ydf_prediction LIKE 'geography.%'
+               AND {ydf_col} LIKE 'geography.%'
              GROUP BY 1
              ORDER BY n DESC
         """).fetchall()
