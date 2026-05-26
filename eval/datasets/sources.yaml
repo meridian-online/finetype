@@ -461,3 +461,18 @@ sources:
   local_path: /Users/hugh/datasets/wikidata/2026-05-25
   snapshot: eval/datasets/snapshots/wikidata_q5-2026-05-25.json
   dataset_version: '2026-05-25'
+- source_url: repo://output/v23-precision-retrain/hard_negatives.parquet
+  role: train
+  licence: various-open-source
+  fetched_date: '2026-05-27'
+  attribution: v23 precision-retrain hard negatives extracted from the gittables
+    measure-half corpus pass (file_content_sha256 MOD 2 == 1) per spec
+    2026-05-27-v23-precision-retrain ac-01. 114,301 columns matching the six top
+    corroborated false-positive (sense_prediction, ydf_prediction) pairs from the
+    multi-lens diagnostic's report.md, deduped against eval/row_hashes.tsv per
+    MADR 0056 (75 collisions excluded). Underlying licence inherits from gittables
+    (various open source); extraction is derivative and noncommercial-research per
+    the parent dataset entry `dataset://gittables`.
+  datasets:
+  - v23_precision_hard_negatives
+  local_path: output/v23-precision-retrain/hard_negatives.parquet

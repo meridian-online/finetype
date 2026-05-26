@@ -108,7 +108,7 @@ acceptance_criteria:
     committed; row-hash overlap with the eval set is 0 (verified
     by the existing leakage-firewall check).
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     v23 model trained.

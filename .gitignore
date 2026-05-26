@@ -150,6 +150,15 @@ output/distillation-v22/
 output/corpus-pass-v22/
 output/branch-ablation-v22/
 
+# v23 precision-retrain artefacts (per spec 2026-05-27-v23-precision-retrain).
+# Regenerable from scripts/extract_v23_hard_negatives.py +
+# scripts/build_v23_distilled.py + scripts/overnight_v23_precision.sh.
+# hard_negatives.parquet (1.3 MB) IS tracked under output/v23-precision-retrain/
+# — small enough and the per-spec ac-01 artefact; the larger blend csv.gz
+# (23 MB) and corpus-pass parquets are not.
+output/distillation-v23/
+output/corpus-pass-v23/
+
 # YDF-validation-gate parquets — regenerable from
 # scripts/apply_ydf_validation_gate.py against the four corpus passes.
 # ~300 MB each; the markdown reports (cell_deltas_gated.md,
