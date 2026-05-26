@@ -1,0 +1,219 @@
+id: 2026-05-26-ydf-validation-gate
+goal: |
+  Fix the eval baseline: gate YDF's per-column predictions against
+  the JSON Schema validation already shipped in `labels/*.yaml`,
+  recompute cell-2 against the cleaned baseline, and document where
+  v22 (and earlier retrains) actually land when ground truth isn't
+  mostly noise.
+
+  Why now. Spec 2026-05-26-v23-sharpen-code-discriminator closed
+  without shipping a rule because its ac-01 audit showed the cell-2
+  metric is dominated by YDF mislabels. Concrete examples from the
+  v22 corpus pass:
+
+    - 2,828 of 3,389 YDF-`iso6346` columns are msg_id columns
+      (values like `msg48752425`). The iso6346 pattern is
+      `^[A-Z]{3}[UJZ]\d{7}$` — these values match 0% of it.
+    - 547 YDF-`country_code` columns are 3-letter team
+      abbreviations (TEAM_ABBREVIATION: UTA, FLA, ATL). The
+      country_code pattern is alpha-2 — these values match 0%.
+    - 237 YDF-`country_code` columns are 3-letter exchange codes
+      (exchange: GER) — same shape, same 0% match.
+
+  YDF is intentionally lens-independent from Sense (decision: it
+  excludes char, embed, header, AND validation branches per
+  scripts/train_ydf.py — keeps only stats + char-bigram TF-IDF).
+  That independence is load-bearing for the diagnostic. We are NOT
+  retraining YDF or adding validation as a YDF feature.
+
+  Instead: at inference time, after YDF predicts label L on column
+  C, evaluate L's validation pattern against C's sample values. If
+  fewer than X% pass, **refuse the YDF prediction** (treat as
+  unknown / null). Refused predictions don't contribute to cell-2.
+
+  Mechanism. The validation patterns live in
+  `crates/finetype-core/src/taxonomy.rs::Validation` and are already
+  loaded into the taxonomy at runtime. The check is a pattern-match
+  per value; for `pattern` types, the per-value regex; for `enum`
+  types, set-membership; for `minimum`/`maximum`, range checks.
+  Pure existing-infrastructure reuse — no new validation engine.
+
+  Expected outcome (qualitative). YDF prediction "iso6346" on a
+  `msg_id` column fails (`msg48752425` doesn't match the pattern) →
+  refused → drops out of cell-2. Same for stock_id-as-mgrs,
+  team-code-as-country_code, exchange-as-country_code. The cleaned
+  cell-2 metric measures real Sense errors, not YDF noise.
+
+  Numeric prediction: v22 currently sits at -8.9% cell-2 vs v19 on
+  the noisy baseline. On the clean baseline we expect v22 to land
+  in or above the Met band (-20%) — possibly without any further
+  Sense work. That re-baselining is the load-bearing deliverable;
+  it makes future Sense retrains judgeable.
+
+  Out of scope:
+    - YDF retraining of any kind.
+    - Adding validation as a YDF training feature.
+    - Sense Sharpen rules of any kind.
+    - The taxonomy-yaml country_code enum contamination
+      (memory `taxonomy-country-code-enum-contamination`) — separate
+      follow-up; doesn't block this spec because we read the
+      validation `pattern`, not the contaminated `enum`.
+
+cards:
+- 0002-semantic-type-detection
+status: open
+labels: []
+acceptance_criteria:
+- id: ac-01
+  description: |
+    YDF validation-gate logic — implementation + tests.
+
+    `scripts/apply_ydf_validation_gate.py` (or equivalent in-process
+    SQL — implementer's call) takes a corpus-pass parquet and:
+      1. For each row, looks up the taxonomy validation for
+         `ydf_prediction`.
+      2. Evaluates the validation against the column's sample values
+         (`sample_values_truncated`, │-delimited).
+      3. Computes `ydf_validation_pass_rate` ∈ [0, 1].
+      4. Emits `ydf_prediction_gated`: NULL when pass_rate < 0.5,
+         original prediction otherwise.
+
+    The 50% threshold mirrors `is_hs_code_format`'s gate elsewhere
+    in column.rs — generous enough not to penalise dirty real-world
+    columns, strict enough to drop the msg_id-as-iso6346 case (0%).
+
+    Coverage rules (which validations the gate evaluates):
+      - `validation.pattern`: per-value regex match → fraction.
+      - `validation.enum`: set membership → fraction. (Note: skip
+        country_code's `validation.enum` until the contamination
+        memory is addressed; use country_code's `validation.pattern`
+        instead.)
+      - `validation_by_locale`: union of all locale patterns;
+         pass if value matches ANY locale.
+      - `minimum`/`maximum` (numeric): per-value parse + range.
+      - Types with no validation specified: pass_rate = 1.0
+        (never gated — we don't refuse on absence of evidence).
+
+    Close evidence: script exists; unit-tested against fixture
+    columns covering each validation kind; running against
+    `output/corpus-pass-v22/corpus_pass/columns.parquet` produces
+    a gated parquet with the same row count.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+
+- id: ac-02
+  description: |
+    Apply the gate to v19/v20/v21/v22 corpus passes.
+
+    Produce gated parquets:
+      output/ydf-validation-gate/v19_gated.parquet
+      output/ydf-validation-gate/v20_gated.parquet
+      output/ydf-validation-gate/v21_gated.parquet
+      output/ydf-validation-gate/v22_gated.parquet
+
+    Each gated parquet preserves all original columns and adds
+    `ydf_validation_pass_rate` (DOUBLE) + `ydf_prediction_gated`
+    (VARCHAR, nullable).
+
+    Close evidence: four parquets exist; row counts match the input
+    corpora; summary printed showing % of YDF predictions refused
+    per corpus-pass version.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+
+- id: ac-03
+  description: |
+    Per-type coverage report — what does the gate refuse?
+
+    `output/ydf-validation-gate/coverage_report.md` shows, per YDF
+    label, the count of (a) predictions made, (b) predictions
+    refused by the gate, and (c) refusal rate. Sorted by absolute
+    refusal count descending.
+
+    Expected to surface the noisy YDF labels (iso6346, mgrs,
+    plus_code, country_code) at the top — the same set ac-01 of
+    the v23 spec found. Acts as a sanity check on the gate.
+
+    Close evidence: report exists; iso6346/mgrs/plus_code refusal
+    rates near 100%; types with clean YDF predictions (e.g.
+    representation.numeric.decimal_number) have low refusal rates.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+
+- id: ac-04
+  description: |
+    Recompute cell deltas against the cleaned baseline.
+
+    `scripts/compute_cell_deltas_gated.py` (variant of
+    compute_v22_cell_deltas.py) uses `ydf_prediction_gated` instead
+    of `ydf_prediction` for the cell-2 proxy:
+
+      cell-2 = sense NOT LIKE 'geography.%'
+             AND ydf_prediction_gated LIKE 'geography.%'
+
+    Output: `output/ydf-validation-gate/cell_deltas_gated.md` with
+    a four-way table (v19/v20/v21/v22) and per-subtype breakdown,
+    matching the structure of `output/corpus-pass-v22/cell_deltas.md`
+    so direct visual comparison is possible.
+
+    Close evidence: gated cell-deltas markdown exists; per-subtype
+    breakdown shows iso6346/mgrs/plus_code dropping to near-zero
+    counts in BOTH v19 and v22 (because YDF's mislabels were
+    inflating both equally — they cancel from the Δ but should
+    barely register in absolute counts after gating).
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
+
+- id: ac-05
+  description: |
+    Document where v22 lands against the cleaned baseline.
+
+    `output/ydf-validation-gate/v22_re_baseline.md` records:
+      - v22 cell-2 rate against the GATED baseline.
+      - Δ vs v19 gated baseline.
+      - Band classification (Met ≥ 20% / Partial 10–20% / Failed
+        < 10%, mirroring the original v22 ac-08 bands).
+      - One paragraph: "what changed and why" — explicitly
+        contrasts the noisy and clean baselines so a reader can see
+        the eval-infra effect separated from the model effect.
+
+    `ac_type: doc`.
+  gate: false
+  checked: false
+  ac_type: doc
+
+- id: ac-06
+  description: |
+    Adoption — wire the gate into the corpus-pass pipeline so
+    future runs are gated by default.
+
+    Modify `scripts/gittables_corpus_pass.py` (the --fill-ydf phase)
+    to emit `ydf_prediction_gated` alongside `ydf_prediction`. All
+    downstream consumers (cell-delta scripts, diagnostic
+    decomposition, mining scripts) should prefer the gated column.
+
+    Backwards compatibility: keep the raw `ydf_prediction` column
+    in the parquet for diagnostic purposes; consumers that need raw
+    YDF for lens-disagreement diagnostics still have access.
+
+    Close evidence: corpus-pass script writes both columns; at
+    least one downstream script (compute cell deltas) updated to
+    prefer the gated column; CLAUDE.md updated to describe the
+    gated baseline as the canonical scoring lens.
+
+    `ac_type: code`.
+  gate: false
+  checked: false
+  ac_type: code
