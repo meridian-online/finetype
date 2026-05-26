@@ -42,7 +42,7 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 
 **Version:** 0.6.19
 **Taxonomy:** 240 definitions across 7 domains (container 11, datetime 84, finance 28, geography 25, identity 33, representation 33, technology 26) — all generators pass, 100% alignment.
-**Default Sense-stage model:** Multi-branch (sherlock-v19-relu-s42) inside the Sense→Sharpen pipeline. 5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9173. Single forward pass per column. Profile eval **369/448 (82.4% label)** on 36 datasets. Original Sense implementation remains in code as an alternative.
+**Default Sense-stage model:** Multi-branch (sherlock-v22-boundary-relu-s44) inside the Sense→Sharpen pipeline. 5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9305. Single forward pass per column. Gated cell-2 vs v19: **−10.4% (Partial band)** on 503k columns — country **−31.5%**, region −12.8%, city −10.2% per `output/v22-direction-review/`. v19 baseline profile eval (369/448 on the 448-row manifest) stands; a fresh v22 profile eval has not been run. Original Sense implementation remains in code as an alternative.
 **Codebase:** ~20k lines of Rust across 9 crates. Zero Python dependencies (build + runtime).
 **Distribution:** GitHub releases (Linux x86/arm, macOS x86/arm, Windows), Homebrew tap, crates.io (core + model), DuckDB community extension (v0.2.0 merged), MCP server.
 

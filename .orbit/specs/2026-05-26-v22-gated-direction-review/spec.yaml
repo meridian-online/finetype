@@ -42,10 +42,9 @@ goal: |
     - YDF retraining or feature changes (the gate is the corrective).
     - Multi-branch architectural surgery (ac-06's ablation closed
       this door — the embed branch is doing work in v22).
-
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -72,9 +71,7 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-02
   description: |
     Enumerate the candidate next moves.
@@ -113,9 +110,8 @@ acceptance_criteria:
 
     `ac_type: doc`.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
-
 - id: ac-03
   description: |
     Pick one. The decision AC.
@@ -133,9 +129,8 @@ acceptance_criteria:
 
     `ac_type: doc`.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
-
 - id: ac-04
   description: |
     Act on the decision.
@@ -161,9 +156,7 @@ acceptance_criteria:
 
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-05
   description: |
     Post-decision observation window — does the gated baseline hold?
@@ -185,3 +178,4 @@ acceptance_criteria:
   gate: false
   checked: false
   ac_type: observation
+closed_at: 2026-05-26T11:33:28.440323Z
