@@ -196,6 +196,15 @@ else
     echo " Recipe: v22 boundary recipe verbatim, v23 distilled as input"
     echo "================================================================"
 
+    # --distilled-cap raised from 600 → 1800 vs the v22 recipe.
+    # Per-type record budget (--samples-per-type 1200) is unchanged so
+    # training time is unchanged; the cap lift only widens the distilled
+    # pool from which the blender draws 840 rows/type. For the two v23
+    # target correct_labels (integer_number, discrete.categorical), the
+    # combined v22+v23 pool exceeds 1800 → the blender picks ~840
+    # distilled instead of being forced down to ~600 (and back-filled
+    # with synthetic). Net effect: ~200 more hard-negative training rows
+    # per target label without any training-time cost.
     python3 scripts/prepare_multibranch_data.py \
         --distilled "$V23_DISTILLED" \
         --finetype ./target/release/finetype \
@@ -207,7 +216,7 @@ else
         --augmentation-rate 0.35 \
         --filter-distilled \
         --decontaminate \
-        --distilled-cap 600 \
+        --distilled-cap 1800 \
         --hard-negatives 75 \
         --accounting-negatives 50 \
         --status-negatives 25 \
