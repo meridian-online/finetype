@@ -17,7 +17,6 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 
 from apply_ydf_validation_gate import (  # noqa: E402
-    ENUM_SKIP_LABELS,
     PASS_RATE_THRESHOLD,
     ValidationSpec,
     _compile_spec,
@@ -27,7 +26,10 @@ from apply_ydf_validation_gate import (  # noqa: E402
 
 
 class CompileSpecTests(unittest.TestCase):
-    def test_pattern_takes_priority(self):
+    def test_pattern_and_enum_jointly_applied(self):
+        # When both pattern and enum are present, the spec carries
+        # both and `passes()` requires both to hold. `kind` records
+        # the most-constraining attached check (enum here).
         body = {
             "validation": {
                 "type": "string",
@@ -36,33 +38,49 @@ class CompileSpecTests(unittest.TestCase):
             },
         }
         spec = _compile_spec("test", body)
+        self.assertEqual(spec.kind, "enum")
+        self.assertIsNotNone(spec.pattern_re)
+        self.assertIsNotNone(spec.enum_set)
+        # Joint semantics: pattern-matching but not in enum → fails.
+        self.assertTrue(spec.passes("US"))
+        self.assertFalse(spec.passes("FR"))  # passes pattern, not in enum
+        self.assertFalse(spec.passes("usa"))  # passes enum-ish, not pattern
+
+    def test_pattern_only(self):
+        body = {"validation": {"pattern": "^[A-Z]{2}$"}}
+        spec = _compile_spec("test", body)
         self.assertEqual(spec.kind, "pattern")
         self.assertIsNotNone(spec.pattern_re)
+        self.assertIsNone(spec.enum_set)
 
-    def test_enum_fallback(self):
+    def test_enum_only(self):
         body = {"validation": {"type": "string", "enum": ["yes", "no"]}}
         spec = _compile_spec("test", body)
         self.assertEqual(spec.kind, "enum")
         assert spec.enum_set is not None
         self.assertIn("yes", spec.enum_set)
+        self.assertIsNone(spec.pattern_re)
 
-    def test_country_code_enum_skipped(self):
-        # Per memory taxonomy-country-code-enum-contamination — country_code
-        # yaml enum is polluted with US states + Canadian provinces.
-        # _compile_spec should refuse to use it as a gate.
-        body = {"validation": {"enum": ["US", "GB", "CA", "NY", "TX"]}}
-        spec = _compile_spec("geography.location.country_code", body)
-        self.assertNotEqual(spec.kind, "enum")
-
-    def test_country_code_uses_pattern_when_present(self):
+    def test_country_code_enum_rejects_state_codes(self):
+        # The contamination workaround is gone — the yaml's enum is
+        # canonical 249 ISO 3166-1 alpha-2 codes. With joint pattern+
+        # enum application, US-state-shaped values that aren't in the
+        # ISO list are rejected.
         body = {
             "validation": {
                 "pattern": "^[A-Z]{2}$",
-                "enum": ["US", "GB", "NY", "TX"],
+                "enum": ["US", "GB", "AL", "CA"],  # AL=Albania, CA=Canada
             },
         }
         spec = _compile_spec("geography.location.country_code", body)
-        self.assertEqual(spec.kind, "pattern")
+        self.assertEqual(spec.kind, "enum")
+        # ISO codes pass:
+        self.assertTrue(spec.passes("US"))
+        self.assertTrue(spec.passes("AL"))  # Albania
+        # State codes not in ISO list fail enum, even though they
+        # match the alpha-2 pattern:
+        self.assertFalse(spec.passes("UT"))
+        self.assertFalse(spec.passes("NY"))
 
     def test_locale_union(self):
         body = {
@@ -200,12 +218,19 @@ class LoadValidationsTests(unittest.TestCase):
         self.assertEqual(
             self.specs["geography.coordinate.plus_code"].kind, "pattern")
 
-    def test_country_code_is_pattern_not_enum(self):
-        # The contamination check — country_code MUST use its pattern,
-        # not its (polluted) enum.
+    def test_country_code_uses_enum_jointly_with_pattern(self):
+        # The enum is canonical 249 ISO 3166-1 alpha-2 codes; the
+        # spec carries both pattern and enum and applies them
+        # jointly (matches `CompiledValidator` in finetype-core).
         spec = self.specs["geography.location.country_code"]
-        self.assertEqual(spec.kind, "pattern")
-        self.assertIn("geography.location.country_code", ENUM_SKIP_LABELS)
+        self.assertEqual(spec.kind, "enum")
+        self.assertIsNotNone(spec.pattern_re)
+        self.assertIsNotNone(spec.enum_set)
+        # ISO codes pass; state-shaped non-ISO codes fail.
+        self.assertTrue(spec.passes("US"))
+        self.assertTrue(spec.passes("ZW"))
+        self.assertFalse(spec.passes("UT"))  # Utah — not ISO
+        self.assertFalse(spec.passes("OK"))  # Oklahoma — not ISO
 
 
 if __name__ == "__main__":

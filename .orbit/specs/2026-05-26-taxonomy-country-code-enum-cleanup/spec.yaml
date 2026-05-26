@@ -38,10 +38,9 @@ goal: |
       yaml-only or yaml + duplicated Rust constant is the
       load-bearing call inside ac-03 (file a MADR if duplicated).
     - `cargo test --workspace` passes before and after.
-
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -65,9 +64,7 @@ acceptance_criteria:
     Close evidence: `consumers.md` in this spec folder.
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-02
   description: |
     Audit every other `enum:` in `labels/definitions_*.yaml` for
@@ -89,9 +86,7 @@ acceptance_criteria:
     Close evidence: `enum_audit.md` exists.
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-03
   description: |
     Clean `geography.location.country_code.validation.enum` to
@@ -123,9 +118,7 @@ acceptance_criteria:
     `cargo build --workspace` succeeds.
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-04
   description: |
     Regenerate any artefacts that derive from the enum.
@@ -139,9 +132,7 @@ acceptance_criteria:
     passes.
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-05
   description: |
     Remove `ENUM_SKIP_LABELS` from
@@ -168,9 +159,7 @@ acceptance_criteria:
     country_code_cleanup_delta.md`.
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-06
   description: |
     Regression test guarding against re-contamination.
@@ -193,9 +182,7 @@ acceptance_criteria:
     on post-cleanup yaml.
     `ac_type: code`.
   gate: false
-  checked: false
-  ac_type: code
-
+  checked: true
 - id: ac-07
   description: |
     Triage ac-02's audit findings.
@@ -207,5 +194,6 @@ acceptance_criteria:
     nothing else: append "audit clean" note to `enum_audit.md`.
     `ac_type: doc`.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-05-26T11:53:47.467106Z

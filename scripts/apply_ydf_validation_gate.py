@@ -14,20 +14,32 @@ and emit two new columns:
     NULL when pass_rate < 0.5 (the YDF prediction is structurally
     contradicted by the values), otherwise the original prediction.
 
-Validation kinds (priority order — first match wins):
-  1. validation.pattern           per-value regex (re.fullmatch)
-  2. validation.enum              set membership — SKIPPED for
-                                  geography.location.country_code per
-                                  memory `taxonomy-country-code-enum-contamination`
-  3. validation_by_locale         union of per-locale patterns; value
-                                  passes if it matches ANY locale
-  4. validation.minimum/maximum   per-value parse + numeric range
-  5. (no applicable validation)   pass_rate = 1.0, prediction kept
+Validation kinds:
+  1. validation.pattern + validation.enum    when both present, a value
+                                             must pass BOTH the regex
+                                             AND be in the enum set —
+                                             mirrors the taxonomy's
+                                             jsonschema-rs semantics
+                                             (CompiledValidator)
+  2. validation.pattern                      per-value regex (fullmatch)
+  3. validation.enum                         set membership
+  4. validation_by_locale                    union of per-locale patterns
+                                             (value passes if any locale
+                                             matches), only when no
+                                             top-level pattern/enum
+  5. validation.minimum/maximum              per-value parse + range
+  6. (no applicable validation)              pass_rate = 1.0; kept
 
 Length-only validations (minLength/maxLength alone) are intentionally
 NOT used — they're too weak to be useful (most strings pass any
 length check). The high-leverage types we care about (iso6346, mgrs,
 plus_code, country_code) all have patterns.
+
+Pattern + enum joint application matters for country_code: the alpha-2
+pattern `^[A-Z]{2}$` accepts 676 codes, but the ISO 3166-1 enum
+contains only 249. Without the joint check, the gate would accept
+YDF's `country_code` label on US-state-shaped values like `UT`, `OK`,
+`OR`, `OH`, `IA` — none of which are real country codes.
 
 The gate is symmetric and label-agnostic: it never decides "this
 column IS X", only "the YDF prediction X is contradicted by the
@@ -67,17 +79,15 @@ DEFAULT_OUT = REPO / "output/ydf-validation-gate/v22_gated.parquet"
 
 PASS_RATE_THRESHOLD = 0.5
 
-# Skip the country_code enum — the yaml's enum is contaminated with
-# US state + Canadian province codes. Use its pattern instead.
-ENUM_SKIP_LABELS = frozenset(["geography.location.country_code"])
-
-
 @dataclass
 class ValidationSpec:
-    """A label's compiled validation criteria, normalised across kinds.
+    """A label's compiled validation criteria.
 
-    Only ONE kind is active per spec — the first non-empty kind in
-    priority order. `kind` records which one for diagnostics.
+    `kind` records the primary diagnostic kind. A spec may carry both
+    a `pattern_re` and an `enum_set` — when both are set, `passes()`
+    requires the value to satisfy BOTH, matching the joint semantics
+    of the taxonomy's JSON Schema export (see
+    `crates/finetype-core/src/validator.rs::CompiledValidator`).
     """
     label: str
     kind: str  # 'pattern' | 'enum' | 'locale' | 'range' | 'none'
@@ -88,10 +98,15 @@ class ValidationSpec:
     maximum: float | None = None
 
     def passes(self, value: str) -> bool:
-        if self.kind == "pattern" and self.pattern_re is not None:
-            return self.pattern_re.fullmatch(value) is not None
-        if self.kind == "enum" and self.enum_set is not None:
-            return value in self.enum_set
+        if self.kind in ("pattern", "enum"):
+            # Joint application — when both attached, both must pass.
+            if (self.pattern_re is not None
+                    and self.pattern_re.fullmatch(value) is None):
+                return False
+            if (self.enum_set is not None
+                    and value not in self.enum_set):
+                return False
+            return True
         if self.kind == "locale":
             return any(p.fullmatch(value) is not None
                        for p in self.locale_patterns)
@@ -148,19 +163,26 @@ def _compile_spec(label: str, body: dict) -> ValidationSpec:
     minimum = v.get("minimum")
     maximum = v.get("maximum")
 
+    pattern_re: re.Pattern | None = None
+    enum_set: frozenset[str] | None = None
+
     if pattern:
         try:
-            return ValidationSpec(
-                label=label, kind="pattern",
-                pattern_re=re.compile(_normalise_pattern(pattern)))
+            pattern_re = re.compile(_normalise_pattern(pattern))
         except re.error as exc:
             print(f"warn: {label} pattern uncompilable ({exc}); skipping",
                   file=sys.stderr)
+    if enum_vals:
+        enum_set = frozenset(str(x) for x in enum_vals)
 
-    if enum_vals and label not in ENUM_SKIP_LABELS:
+    if pattern_re is not None or enum_set is not None:
+        # `kind` records the most-constraining attached check for
+        # diagnostics — enum wins when both are present (it's the
+        # tighter check for fixed-domain types like country_code).
+        kind = "enum" if enum_set is not None else "pattern"
         return ValidationSpec(
-            label=label, kind="enum",
-            enum_set=frozenset(str(x) for x in enum_vals))
+            label=label, kind=kind,
+            pattern_re=pattern_re, enum_set=enum_set)
 
     if by_locale:
         compiled: list[re.Pattern] = []

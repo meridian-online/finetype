@@ -42,6 +42,7 @@ specs:
 - .orbit/specs/2026-04-25-v19-paired-retrain/
 - .orbit/specs/2026-04-27-sharpen-rule-audit/
 - .orbit/specs/2026-05-26-v22-gated-direction-review/spec.yaml
+- .orbit/specs/2026-05-26-taxonomy-country-code-enum-cleanup/spec.yaml
 relations: []
 references:
 - README.md

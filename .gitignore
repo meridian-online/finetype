@@ -154,7 +154,7 @@ output/branch-ablation-v22/
 # scripts/apply_ydf_validation_gate.py against the four corpus passes.
 # ~300 MB each; the markdown reports (cell_deltas_gated.md,
 # coverage_report.md, v22_re_baseline.md) ARE tracked.
-output/ydf-validation-gate/*_gated.parquet
+output/ydf-validation-gate/*.parquet
 
 # Distillation batch files (rolled into *_distilled.csv.gz)
 output/distillation-v3/sherlock_batch_*.csv

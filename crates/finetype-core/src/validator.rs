@@ -1289,4 +1289,81 @@ datetime.timestamp.iso_8601:
         assert!(!validator.is_valid("U"), "single char fails pattern");
         assert!(!validator.is_valid("USA"), "3 chars fails pattern");
     }
+
+    /// Re-contamination guard. The country_code enum has historically
+    /// risked drift toward including US state codes and CA province
+    /// codes (both alpha-2-shaped, both colliding with real ISO 3166-1
+    /// codes for some letters). This test asserts size + load-bearing
+    /// negatives so a re-contamination of the yaml fails CI.
+    ///
+    /// Per spec 2026-05-26-taxonomy-country-code-enum-cleanup ac-06.
+    #[test]
+    fn ac06_country_code_enum_rejects_state_and_province_codes() {
+        let labels_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("labels");
+        let mut taxonomy = Taxonomy::from_directory(&labels_dir).unwrap();
+        taxonomy.compile_validators();
+
+        let def = taxonomy
+            .get("geography.location.country_code")
+            .expect("country_code label should exist");
+        let enum_vals = def
+            .validation
+            .as_ref()
+            .and_then(|v| v.enum_values.as_ref())
+            .expect("country_code should have an enum");
+
+        // Size guard — the officially-assigned ISO 3166-1 alpha-2 set
+        // (excluding user-assigned, reserved, and deprecated codes)
+        // is 249. Pinning the count catches accidental additions or
+        // removals at PR review time.
+        assert_eq!(
+            enum_vals.len(),
+            249,
+            "country_code enum should contain exactly 249 ISO 3166-1 alpha-2 codes"
+        );
+
+        let validator = taxonomy
+            .get_validator("geography.location.country_code")
+            .expect("country_code should have a validator");
+
+        // Negative — US state codes NOT in ISO 3166-1. (Codes like
+        // AL=Albania, CA=Canada, GA=Georgia, IN=India, MA=Morocco,
+        // MN=Mongolia, TN=Tunisia etc. ARE valid ISO codes and
+        // intentionally NOT in this rejection set.)
+        for code in [
+            "AK", "FL", "HI", "IA", "KS", "MI", "ND", "NH", "NJ", "NM", "NV", "NY", "OH", "OK",
+            "OR", "RI", "TX", "UT", "VT", "WA", "WI", "WV", "WY", "DC",
+        ] {
+            assert!(
+                !validator.is_valid(code),
+                "{code} is a US state code not in ISO 3166-1; should be rejected"
+            );
+        }
+
+        // Negative — Canadian province codes NOT in ISO 3166-1.
+        // (NL=Netherlands, NU=Niue, PE=Peru, SK=Slovakia, YT=Mayotte
+        // ARE valid ISO codes and intentionally NOT in this set.)
+        for code in ["AB", "BC", "MB", "NB", "NS", "ON", "QC"] {
+            assert!(
+                !validator.is_valid(code),
+                "{code} is a CA province code not in ISO 3166-1; should be rejected"
+            );
+        }
+
+        // Positive — codes that ARE both valid ISO 3166-1 and happen
+        // to be state/province codes. The test makes the load-bearing
+        // distinction explicit: rejection is about the ISO list, not
+        // about whether the code happens to be a state code.
+        for code in ["AL", "CA", "GA", "IN", "MA", "MN", "NL", "NU", "PE", "SK", "TN"] {
+            assert!(
+                validator.is_valid(code),
+                "{code} IS a valid ISO 3166-1 code (collides with a state/province code); should be accepted"
+            );
+        }
+    }
 }
