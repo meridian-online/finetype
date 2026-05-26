@@ -9,6 +9,7 @@ pub mod char_distribution;
 pub mod char_training;
 pub mod column;
 pub mod column_stats;
+pub mod country_code_enums;
 pub mod embedding_aggregation;
 pub mod entity;
 pub mod features;
