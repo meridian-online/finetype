@@ -1,12 +1,14 @@
 ---
-name: package
-description: Package a trained FineType model for distribution (tar.gz + SHA256)
-user-invocable: true
+description: Package a trained FineType model for distribution — produces `finetype-<model-name>.tar.gz` plus SHA256 ready for HuggingFace upload and Homebrew tap update.
+when_to_use: User says "package the model", "build a distributable", "prep for release", or names a model dir and asks how to ship it. Typically follows a passing `/eval` and precedes `/release`.
+argument-hint: "<model-dir>"
+arguments: model_dir
+allowed-tools: Bash, Read
 ---
 
 # Package a FineType Model
 
-Run from the finetype repo root (`~/github/noon-org/finetype/`).
+Run from the finetype repo root (`~/github/meridian-online/finetype/`).
 
 ## Quick Start
 

@@ -1,9 +1,8 @@
 ---
-name: finetype-pipeline
-description: >
-  Use when profiling, typing, or materialising CSV/TSV data. Guides the full FineType
-  pipeline: profile → schema → validate (typed materialisation built in). Ensures
-  agents complete all steps rather than stopping after profile.
+description: >-
+  Guide the full FineType pipeline — profile → schema → validate (typed materialisation built in) — so agents complete all four steps rather than stopping after profile. Covers confidence-as-data-quality-signal, the reject-sidecar audit trail, and the v0.6.19 schema-verb retirement.
+when_to_use: User shares a CSV/TSV/Parquet file and asks to profile, type, schema, validate, materialise, or load it into DuckDB. Also use when an agent has run `finetype profile` and is about to stop — push them through schema + validate before reporting done.
+paths: "*.csv,*.tsv,*.parquet,*.psv"
 ---
 
 # FineType Pipeline — Profile to Typed Table

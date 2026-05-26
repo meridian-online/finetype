@@ -1,8 +1,7 @@
 ---
-name: finetype-cli
-description: >
-  FineType CLI reference — all commands, flags, and output formats.
-  Use when you need to look up a specific command or flag.
+description: >-
+  FineType CLI reference — every command (`profile`, `validate`, `infer`, `taxonomy`, `generate`, `check`, `mcp`), all flags, exit codes, and output formats for v0.6.19. Authoritative source for the post–schema-verb-retirement surface (MADR 0070 / 0071).
+when_to_use: Agent or author needs to look up a specific FineType CLI flag, command surface, exit-code semantics, or output format. Reference-only — do not invoke for general "how do I profile" guidance; the `finetype-pipeline` skill is the workflow guide.
 user-invocable: false
 ---
 

@@ -1,12 +1,14 @@
 ---
-name: eval
-description: Evaluate a FineType model against the full eval suite (profile + actionability + report)
-user-invocable: true
+description: Evaluate a FineType model against the full eval suite (profile + actionability + report). Saves the current default-model symlink, swaps in the model under test, runs the suite, and restores the symlink on exit.
+when_to_use: User says "eval", "evaluate", "score the model", "run the eval suite", or names a model dir and asks how it stacks up. Also use after `/train` completes when the author wants accuracy numbers before deciding on `models/default`.
+argument-hint: "[model-path]"
+arguments: model_path
+allowed-tools: Bash, Read
 ---
 
 # Evaluate a FineType Model
 
-Run from the finetype repo root (`~/github/noon-org/finetype/`).
+Run from the finetype repo root (`~/github/meridian-online/finetype/`).
 
 ## Quick Start
 

@@ -1,9 +1,10 @@
 ---
-name: release
-description: >
-  Release FineType — model publish to HuggingFace, GitHub release with
-  cross-platform binaries, Homebrew tap update.
-user-invocable: true
+description: >-
+  Release FineType — `model <dir>` publishes trained weights to HuggingFace and swaps the default symlink; `binary` bumps the workspace version, tags, and triggers the GitHub release workflow that produces cross-platform binaries + Homebrew tap update; no-arg form does both. Network + git push, so run pre-flight checks first and stop on any failure.
+when_to_use: User says "release", "ship", "cut a release", "publish the model", "tag a version", or names a model dir and asks to upload it. Treat as a deliberate, reviewed action — never auto-fire mid-task.
+argument-hint: "[model <model-dir> | binary]"
+arguments: mode target
+allowed-tools: Bash, Read, Edit
 ---
 
 # /release
@@ -83,7 +84,7 @@ ln -sfn {model_name} models/default
 
 If eval results exist (check `<model_dir>/eval/` or `eval/eval_output/profile_results.json`):
 
-1. **Card 0002** — update the `goal:` field with the new eval baseline
+1. **Card 0002** (`.orbit/cards/0002-semantic-type-detection.yaml`) — update the `goal:` field with the new eval baseline
 2. **CLAUDE.md** — update the `Default model:` line and `Profile eval:` numbers in both Current State and Evaluation infrastructure sections
 
 If no eval results exist, note this and skip — the eval must run before CLAUDE.md can be updated.
@@ -92,7 +93,7 @@ If no eval results exist, note this and skip — the eval must run before CLAUDE
 
 Stage and commit:
 ```bash
-git add models/default cards/0002-semantic-type-detection.yaml CLAUDE.md
+git add models/default .orbit/cards/0002-semantic-type-detection.yaml CLAUDE.md
 git commit -m "Publish {model_name} to HuggingFace, update default model"
 git push
 ```
