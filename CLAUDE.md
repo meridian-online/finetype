@@ -48,7 +48,9 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 
 ## Current sprint
 
-**m-19 IN FLIGHT — eval-corpus expansion (Phase A+B).** Three deliverables: realism standard + pre-screen, coverage floor (240/240 types), train/eval leakage firewall (sources.yaml + row-hash SHA256). v18 retrain block enforced until Phase A+B ships. Spec: `.orbit/specs/2026-04-21-eval-expansion/`. Decisions 0055/0056/0057.
+**Multi-lens diagnostic SHIPPED — next Sense retrain bets follow.** Spec `2026-05-20-gittables-multi-lens-diagnostic` closed 13/13 ACs (commit `31fe887`); it superseded m-19 via MADR 0087 and folded the three m-19 deliverables in as design constraints (realism = corroboration filter; coverage = full-corpus pass; leakage firewall = `file_content_sha256 MOD 2` partition). The v18+ retrain block is lifted.
+
+The diagnostic's deliverable is `eval/gittables/corpus_pass/report.md` — a ranked list of corroborated `(criterion × mechanism)` gaps. Each gap entry carries `action: {training_data_addition, model_retrain, validator_widening, taxonomy_addition, fallback_adjustment}`. Top gaps under `reject_rate_ceil × misclassification` are dominated by v22 false positives (`identity.person.gender_code` on basketball `START_POSITION`, `datetime.offset.utc` on integer columns) — these are the load-bearing input for the next v22+ patch retrain spec. Decisions 0055/0056/0057/0066/0087.
 
 ## Eval baseline — gated YDF is canonical
 
