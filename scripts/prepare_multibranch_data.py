@@ -930,7 +930,8 @@ def load_label_remap(remap_path):
     return remap
 
 
-def load_distilled_columns(distilled_path, min_values, label_remap=None):
+def load_distilled_columns(distilled_path, min_values, label_remap=None,
+                            include_column_level_types=False):
     """Load distilled data as columns (groups of values per type).
 
     Each column is a (values, header) tuple where header is the original
@@ -943,6 +944,13 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
 
     Args:
         label_remap: dict mapping non-canonical labels to canonical equivalents.
+        include_column_level_types: when True, rows whose label is in
+            `COLUMN_LEVEL_TYPES` are KEPT instead of dropped. Default is
+            to drop them (legacy behaviour; protects against negative
+            transfer in flat single-value classifiers). v23 precision-
+            retrain sets this to True so the boundary training rows
+            for `representation.discrete.categorical` are not silently
+            discarded — per spec 2026-05-27-v23-precision-retrain.
 
     Returns:
         columns_by_type: dict[str, list[tuple[list[str], str]]] — each type has
@@ -981,8 +989,10 @@ def load_distilled_columns(distilled_path, min_values, label_remap=None):
                 label = label_remap[label]
                 stats["remapped_labels"] += 1
 
-            # Skip column-level types
-            if label in COLUMN_LEVEL_TYPES:
+            # Skip column-level types — unless include_column_level_types
+            # is set (v23 precision-retrain wants boundary training rows
+            # for representation.discrete.categorical).
+            if label in COLUMN_LEVEL_TYPES and not include_column_level_types:
                 stats["excluded_column_types"] += 1
                 continue
 
@@ -2555,6 +2565,7 @@ def main():
     hard_negatives = 0  # AC-05: number of hard-negative decimal_number columns
     accounting_negatives = 0  # v14 AC-02b: accounting-context hard negatives
     status_negatives = 0  # v14 AC-02c: status code hard negatives
+    include_column_level_types = False  # v23 ac-02: keep categorical/ordinal/increment rows
 
     # ac-07 (spec 2026-04-21-eval-expansion): leakage filter
     eval_row_hashes_path = "eval/row_hashes.tsv"
@@ -2641,6 +2652,15 @@ def main():
         elif args[i] == "--status-negatives":
             status_negatives = int(args[i + 1])
             i += 2
+        elif args[i] == "--include-column-level-types":
+            # v23 precision-retrain: keep `representation.discrete.*` and
+            # `representation.identifier.increment` rows in the distilled
+            # blend so the model gets boundary training on the F/C/G,
+            # Q1/Q2/Q3/Q4, TEAM_ABBREVIATION false-positive clusters.
+            # Default (False) preserves legacy "no negative transfer"
+            # behaviour for all other retrains.
+            include_column_level_types = True
+            i += 1
         elif args[i] == "--eval-row-hashes":
             eval_row_hashes_path = args[i + 1]
             i += 2
@@ -2705,7 +2725,8 @@ def main():
     # ─── Load distilled data ───────────────────────────────────────
     print(f"\nLoading distilled data (min_values={min_values})...")
     distilled, ordered_distilled, d_stats = load_distilled_columns(
-        distilled_path, min_values, label_remap
+        distilled_path, min_values, label_remap,
+        include_column_level_types=include_column_level_types,
     )
     print(f"  {d_stats['total_rows']} total rows")
     print(f"  {d_stats['qualifying_rows']} qualifying rows")

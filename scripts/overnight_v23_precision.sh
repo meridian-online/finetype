@@ -199,12 +199,16 @@ else
     # --distilled-cap raised from 600 → 1800 vs the v22 recipe.
     # Per-type record budget (--samples-per-type 1200) is unchanged so
     # training time is unchanged; the cap lift only widens the distilled
-    # pool from which the blender draws 840 rows/type. For the two v23
-    # target correct_labels (integer_number, discrete.categorical), the
-    # combined v22+v23 pool exceeds 1800 → the blender picks ~840
-    # distilled instead of being forced down to ~600 (and back-filled
-    # with synthetic). Net effect: ~200 more hard-negative training rows
-    # per target label without any training-time cost.
+    # pool from which the blender draws 840 rows/type.
+    #
+    # --include-column-level-types is the load-bearing v23 flag. Three
+    # of the six target clusters have correct_label = discrete.categorical
+    # (basketball START_POSITION, periodicity, TEAM_ABBREVIATION). The
+    # default behaviour of prepare_multibranch_data.py drops every
+    # COLUMN_LEVEL_TYPES row (categorical, ordinal, increment) to avoid
+    # "negative transfer" — which would silently discard ~50k v23 hard
+    # negatives. The flag opts in to boundary training on these types,
+    # per spec 2026-05-27-v23-precision-retrain ac-02.
     python3 scripts/prepare_multibranch_data.py \
         --distilled "$V23_DISTILLED" \
         --finetype ./target/release/finetype \
@@ -220,6 +224,7 @@ else
         --hard-negatives 75 \
         --accounting-negatives 50 \
         --status-negatives 25 \
+        --include-column-level-types \
         --format v4 \
         --seed 42 \
         --workers 8
