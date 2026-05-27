@@ -124,7 +124,7 @@ acceptance_criteria:
     `output/branch-ablation-v22/`) shows the embed branch still
     carrying weight on the geography subtypes that v22 unlocked.
   gate: false
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     Corpus pass + gated cell-2 eval against v22.
