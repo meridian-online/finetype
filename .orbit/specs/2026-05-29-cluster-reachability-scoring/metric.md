@@ -129,14 +129,19 @@ Why k-NN min-distance rather than mean to the whole baseline:
   isolated and safe.
 
 Baseline construction: from `columns.parquet`, take 1000 columns
-where `ydf_prediction == correct_label` (or `sense_prediction ==
-correct_label` and the column is not in the cluster's
-`(sense_prediction, ydf_prediction)` pair) AND `file_content_sha256`
-falls in the held-out partition (`MOD 2 == 0`, the multi-lens
-diagnostic's leakage firewall). Reservoir-sample with seed 44 for
+where `ydf_prediction == correct_label` AND `sense_prediction !=
+fp_label` (i.e. same correct label, different Sense prediction —
+outside the cluster). Reservoir-sample with seed 44 for
 reproducibility. If fewer than 200 baseline candidates exist for the
-correct_label, the cluster's specificity is emitted as null with
-error string `"baseline < 200 columns for correct_label X"`.
+correct_label outside the cluster, the cluster's specificity is
+emitted as null with error string `"baseline < 200 columns for
+correct_label X outside cluster"`.
+
+Note on partitioning: `columns.parquet` is the multi-lens diagnostic's
+MEASURE half (`file_content_sha256 MOD 2 == 1`) — the training-vs-eval
+leakage firewall lives upstream of this artefact, so within the
+eval set the cluster/baseline split is the only firewall the metric
+needs. No column appears in both cluster and baseline by construction.
 
 ### Combined reachability
 

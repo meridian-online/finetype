@@ -37,6 +37,7 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 - **Regex header hints deprecated** (decision 0042): Hardcoded regex `header_hint()` rules are deprecated in favour of learned approaches — multi-branch header branch (Model2Vec), sibling-context attention, semantic matching.
 - **Value-based rules only** (decision 0048): New disambiguation rules check actual column values, not header metadata.
 - **Strength through simplification** (decision 0038): Prefer retraining over adding disambiguation rules. Rules are a last resort.
+- **`training_data_addition` retrains need a reachability pre-flight** (spec `2026-05-29-cluster-reachability-scoring`, Path C): v23 closed Failed because three of its six diagnostic-surfaced clusters trained cleanly into their FP targets while pulling 48k v22 geography columns into categorical. The v1 reachability metric mis-scored two of six v23 fixture clusters and did not ship; the redesign is scoped at `output/cluster-reachability/redesign_memo.md` (neighbour-label composition algorithm + worked predictions). Until a v2 metric passes its v23 fixture, no `training_data_addition` retrain may rely on per-cluster FP-rate Met alone — it must additionally include a Sense-distribution pre/post check across the correct_label and its nearest neighbours. Precedent: `output/v23-precision-retrain/relitigation_memo.md`.
 
 ## Project state
 

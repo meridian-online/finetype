@@ -87,6 +87,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   diagnostic access. Full post-mortem at
   `output/v23-precision-retrain/relitigation_memo.md`. Successor
   bet: spec `2026-05-29-cluster-reachability-scoring`.
+- **cluster-reachability-scoring v1 (spec
+  `2026-05-29-cluster-reachability-scoring`).** Closed Path C
+  (Mismatch) at ac-04. The v1 metric (char 3-gram + length + char-
+  class embedding, cosine distance, tightness × specificity)
+  correctly ranked four of the six v23 fixture clusters but
+  mis-scored two: `datetime.offset.utc → integer_number` (HIGH-
+  expected) landed at rank 6 / 6, below all three LOW-expected
+  clusters. Root cause: the utc cluster's actual values are
+  predominantly all-zero integer columns Sense mislabelled as
+  `datetime.offset.utc`, so the cluster IS the integer_number
+  population — specificity reads "indistinguishable from
+  correct_label" as risk when in fact it means training will be
+  absorbed harmlessly. v1 score is NOT folded into
+  `corroborated_gaps.parquet`. Redesign at
+  `output/cluster-reachability/redesign_memo.md` proposes a v2
+  neighbour-label composition metric (per cluster column, fraction
+  of 100 NN whose ydf_prediction equals correct_label) with worked
+  predictions against the v23 fixture. Until v2 ships, CLAUDE.md's
+  architectural-direction section requires every
+  `training_data_addition` retrain to include a Sense-distribution
+  pre/post check on the correct_label and its neighbours.
 
 ### Fixed
 

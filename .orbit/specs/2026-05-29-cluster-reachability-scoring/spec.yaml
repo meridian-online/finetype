@@ -196,9 +196,19 @@ acceptance_criteria:
     error string explaining why — e.g. "cluster size < 5 columns,
     embedding unstable").
 
+    Closed: `output/cluster-reachability/cluster_scores.parquet`
+    carries 64,565 rows (one per gap_id, 878 unique (fp, correct)
+    pairs). 40,152 rows carry non-null reachability; 24,413 rows
+    carry an explicit error string (dominated by "baseline < 200
+    columns" for narrow correct_labels like
+    `representation.text.sentence`). The script caches at the
+    (fp_label, correct_label) layer — all gap_ids sharing a pair
+    receive the same score, since the metric is a property of the
+    label-flow direction.
+
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-03
@@ -238,9 +248,14 @@ acceptance_criteria:
     Close evidence: `v23_fixture.md` exists and explicitly tags
     the verdict as Clean / Near-miss / Mismatch.
 
+    Verdict: **Mismatch** — three crossovers in the six-cluster
+    fixture; `datetime.offset.utc → integer_number` (HIGH-expected)
+    scored rank 6 / 6 below all three LOW-expected clusters. See
+    `output/cluster-reachability/v23_fixture.md`.
+
     `ac_type: code`.
   gate: true
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-04
@@ -274,9 +289,16 @@ acceptance_criteria:
     Close evidence: for A or B, threshold.md exists; for C,
     redesign_memo.md exists.
 
+    Path C taken (Mismatch). `output/cluster-reachability/
+    redesign_memo.md` proposes a v2 metric (neighbour-label
+    composition: per cluster column, fraction of 100 NN whose
+    ydf_prediction equals correct_label) with worked predictions
+    against the v23 fixture, plus a secondary Sense-embedding
+    alternative and a training-signal-size adjunct.
+
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-05
@@ -302,9 +324,16 @@ acceptance_criteria:
     has a `reachability_score` column; for C, append "deferred —
     see redesign_memo.md" to this spec's notes and close.
 
+    Deferred — see `output/cluster-reachability/redesign_memo.md`.
+    v1 reachability_score is NOT folded into corroborated_gaps;
+    the column is reserved for whichever v2 metric closes its own
+    fixture test. `output/cluster-reachability/cluster_scores.
+    parquet` carries the v1 scores as a standalone artefact for
+    redesign-memo reference.
+
     `ac_type: code`.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 
 - id: ac-06
@@ -320,7 +349,13 @@ acceptance_criteria:
     Close evidence: the doc has a paragraph naming the rule and
     pointing at the threshold (or the redesign memo).
 
+    Closed: CLAUDE.md's "Architectural direction (settled — do not
+    re-ask)" section gained a paragraph naming reachability scoring
+    as a `training_data_addition` precondition, citing both
+    `output/v23-precision-retrain/relitigation_memo.md` and
+    `output/cluster-reachability/redesign_memo.md`.
+
     `ac_type: doc`.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
