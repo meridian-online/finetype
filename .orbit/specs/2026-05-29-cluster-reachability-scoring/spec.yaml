@@ -165,7 +165,7 @@ acceptance_criteria:
 
     `ac_type: doc`.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 
 - id: ac-02
