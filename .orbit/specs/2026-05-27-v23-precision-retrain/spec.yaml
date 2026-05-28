@@ -51,7 +51,7 @@ goal: |
   Sense retrains pending a different intervention class.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - precision
 - retrain
@@ -153,7 +153,7 @@ acceptance_criteria:
     Close evidence: the three artefacts exist; the band verdict is
     recorded in `output/v23-precision-retrain/eval_summary.md`.
   gate: false
-  checked: false
+  checked: true
 - id: ac-05
   description: |
     Promote-or-not decision.
@@ -182,7 +182,7 @@ acceptance_criteria:
     updated; for B, partial_band_review.md exists and is
     greppable; for C, relitigation_memo.md exists.
   gate: false
-  checked: false
+  checked: true
 - id: ac-06
   description: |
     Post-promotion soak (observation-deferred).
@@ -203,5 +203,6 @@ acceptance_criteria:
     Close evidence (after soak window OR immediately for B/C):
     `output/v23-precision-retrain/post_promotion_soak.md` exists.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
+closed_at: 2026-05-28T13:24:06.082701Z

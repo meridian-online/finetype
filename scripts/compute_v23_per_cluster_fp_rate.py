@@ -146,10 +146,16 @@ def main() -> int:
         sense_short = fp_label.replace("representation.", "rep.")
         ydf_short = correct_label.replace("representation.", "rep.")
         bold = "**" if c["drop_pct"] >= BAND_MET_DROP_PCT else ""
+        # Sign-aware formatting — drop is positive when v22 > v23 (good);
+        # drop_pct can be negative (regression). Use plain math signs.
+        d = c["drop"]
+        dp = c["drop_pct"]
+        d_str = f"−{d:,}" if d >= 0 else f"+{abs(d):,}"
+        dp_str = f"−{dp:.1f}%" if dp >= 0 else f"+{abs(dp):.1f}%"
         lines.append(
             f"| `{cluster_id}…` | `{sense_short}` | `{ydf_short}` | "
             f"{expected:,} | {c['v22']:,} | {bold}{c['v23']:,}{bold} | "
-            f"−{c['drop']:,} | {bold}−{c['drop_pct']:.1f}%{bold} |\n"
+            f"{d_str} | {bold}{dp_str}{bold} |\n"
         )
     lines.append("\n")
 
