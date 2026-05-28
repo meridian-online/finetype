@@ -7,6 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **v22 boundary-training Sense model promoted to default (spec
+  `2026-05-26-v22-gated-direction-review`, card 0002).** Multi-branch
+  `sherlock-v22-boundary-relu-s44` becomes `models/default`. Gated
+  cell-2 vs v19 lands at **−10.4% (Partial band)** on 503k columns of
+  the gittables corpus pass; per-subtype gains: country **−31.5%**,
+  region −12.8%, city −10.2%, longitude −14.3% (the four monotone-
+  movers absorb 95% of v19 cell-2 misses). val_acc 0.9305 (+0.0132
+  over v19). The v19→v20→v21→v22 ratchet is monotone on the
+  dominant subtypes; no v22-jumpers — the recipe works as a campaign,
+  not a v22-only spike. Trajectory at
+  `output/v22-direction-review/per_subtype_trajectory.md`.
+- **Gated YDF baseline is the canonical scoring lens (spec
+  `2026-05-26-ydf-validation-gate`).** `scripts/apply_ydf_validation_gate.py`
+  writes `ydf_prediction_gated` alongside the raw `ydf_prediction`:
+  NULL when fewer than 50% of a column's sample values pass the
+  predicted label's JSON Schema validation. Stops the metric from
+  penalising Sense for disagreeing with demonstrably-wrong YDF labels
+  (msg_id → iso6346, stock_id → mgrs, team-codes → country_code).
+  Wired into `scripts/gittables_corpus_pass.py --fill-ydf`. v22's
+  position shifts from Failed (−8.9% noisy) to Partial (−10.4% gated).
+- **YDF validation gate applies pattern AND enum jointly (spec
+  `2026-05-26-taxonomy-country-code-enum-cleanup`).** Removed the
+  dead `ENUM_SKIP_LABELS` workaround in
+  `scripts/apply_ydf_validation_gate.py`. The gate now matches the
+  joint semantics already in
+  `crates/finetype-core/src/validator.rs::CompiledValidator` and the
+  taxonomy's `to_json_schema()`. New regression test
+  `ac06_country_code_enum_rejects_state_and_province_codes` pins the
+  country_code enum at exactly 249 ISO 3166-1 alpha-2 codes and
+  asserts rejection of US state / CA province codes that are NOT in
+  ISO (AK, FL, OK, UT, AB, BC, ON, QC, ...) while accepting the
+  collision set that IS in ISO (AL=Albania, CA=Canada, MN=Mongolia,
+  TN=Tunisia, NL=Netherlands, ...).
+- **Broad audit of every `validation.enum` in
+  `labels/definitions_*.yaml`** (same spec, ac-02). All 13 universal
+  blocks audit clean; no contamination, no duplicates, no deprecated
+  members in any locale-keyed enum either. Audit at
+  `.orbit/specs/2026-05-26-taxonomy-country-code-enum-cleanup/enum_audit.md`.
+
+### Changed
+
+- **CLAUDE.md sprint section refreshed.** m-19 (eval-corpus expansion)
+  shipped under successor spec `2026-05-20-gittables-multi-lens-diagnostic`
+  per MADR 0087 (13/13 ACs closed). The v18+ retrain block is lifted.
+  The corroborated-gaps report at `eval/gittables/corpus_pass/report.md`
+  is now the load-bearing input for the next Sense retrain bet.
+- **Card 0002 goal updated to v22.** Reflects current default model,
+  gated cell-2 numbers, and the long-tail subtypes (full_address,
+  street_name, postal_code) deferred pending a different intervention
+  class.
+
+### Closed without shipping
+
+- **v23-sharpen-code-discriminator (spec
+  `2026-05-26-v23-sharpen-code-discriminator`).** R26 country_code
+  Sharpen rule reverted in commit `000b2cd`. ac-01 audit revealed
+  premise invalidation: of YDF-labeled `iso6346` cols (the "biggest
+  regression" at +40.3%), ZERO match the iso6346 regex — they're
+  dominated by `msg_id` columns that YDF mislabeled. R26 shipped to
+  a 3-column footprint after anti-collision guards; not worth
+  keeping. Surfaced the need for the gated baseline (which the next
+  spec delivered).
+- **v23-precision-retrain (spec
+  `2026-05-27-v23-precision-retrain`).** Closed Failed at ac-04 →
+  ac-05 Path C. FP-rate component Met (top-6 corroborated clusters
+  dropped **−70.8%**, three by 92–96%), but cell-2 component Failed:
+  v23 gated cell-2 vs v19 regressed to **+5.1%** (worse than v19
+  baseline). v22's monotone-mover gains all collapsed: country
+  **+70.3%**, region +29.0%, city +14.1%. Mechanism: opt-in
+  `--include-column-level-types` let the 50k
+  `representation.discrete.categorical` hard negatives train the
+  model to fire categorical on 548k columns (+529.6% vs v22), drawing
+  ~48k of those from columns v22 classified as
+  `geography.location.city`. v22 remains the default; v23 candidates
+  (`models/sherlock-v23-precision-relu-s{42,43,44}`) stay in tree for
+  diagnostic access. Full post-mortem at
+  `output/v23-precision-retrain/relitigation_memo.md`. Successor
+  bet: spec `2026-05-29-cluster-reachability-scoring`.
+
+### Fixed
+
+- **Gate-script alignment with codebase joint pattern+enum semantics**
+  (spec `2026-05-26-taxonomy-country-code-enum-cleanup` ac-05). The
+  gate's `_compile_spec` previously picked one validation kind in
+  priority order (pattern > enum > locale > range), diverging from
+  `CompiledValidator`. Now applies pattern AND enum together when
+  both attached. Cell-2 delta from the alignment was −6 columns
+  refused; v22's headline cell-2 unchanged.
+
+### Infrastructure
+
+- **`--include-column-level-types` flag in
+  `scripts/prepare_multibranch_data.py`.** Opt-in (default OFF
+  preserves all prior retrain behaviour). When set, distilled rows
+  whose `final_label` is in `COLUMN_LEVEL_TYPES` (categorical,
+  ordinal, increment) are kept rather than dropped. Used by
+  v23-precision-retrain; documented as a known negative-transfer
+  risk lever in spec `2026-05-29-cluster-reachability-scoring`.
+- **New scripts.** `scripts/extract_v23_hard_negatives.py` (corpus-
+  pass-derived hard-negative extractor with MADR 0056 leakage
+  firewall integration), `scripts/build_v23_distilled.py` (additive
+  blend builder), `scripts/overnight_v23_precision.sh` (v23 training
+  pipeline), `scripts/compute_v23_per_cluster_fp_rate.py` +
+  `scripts/compute_v23_cell_deltas.py` (ac-04 band components),
+  `scripts/compute_per_subtype_trajectory.py` (v19→v22 four-way
+  per-subtype trajectory for the direction-review spec).
+- **`eval/datasets/sources.yaml`.** Added provenance entry for the
+  v23 hard-negative parquet inheriting from the parent
+  `dataset://gittables` source.
+
 ## [0.6.20] - 2026-04-29
 
 ### Added
