@@ -1,0 +1,374 @@
+id: 2026-05-30-reachability-metric-v2
+goal: |
+  Implement the v2 reachability metric proposed in
+  `output/cluster-reachability/redesign_memo.md` — neighbour-label
+  composition over value-shape embeddings — and ship the
+  `reachability_score` column into `corroborated_gaps.parquet` IF
+  the v2 metric cleanly separates the six v23 fixture clusters into
+  HIGH and LOW reachability bands per their ground-truth v23
+  outcomes.
+
+  ## Why now
+
+  Spec `2026-05-29-cluster-reachability-scoring` closed Path C —
+  the v1 metric (cluster vs correct_label distance) mis-scored two
+  of six v23 fixture clusters. The redesign memo named the
+  replacement algorithm AND wrote down its predicted score band for
+  every fixture cluster. Implementing v2 is the next move because:
+
+    1. v22 stays the default Sense model. Every future
+       `training_data_addition` retrain bet has the v23 blind spot
+       until reachability gates the ranking. CLAUDE.md's current
+       requirement — "every training_data_addition retrain must
+       include a Sense-distribution pre/post check" — works as a
+       fallback but doesn't pre-filter the diagnostic; v2 puts the
+       check at the right layer.
+
+    2. The redesign memo committed to predictions BEFORE
+       implementation. v2 either delivers them or doesn't — a
+       crisper falsification setup than v1 had.
+
+    3. The v1 embedding pipeline carries over directly. Only the
+       per-column aggregation step changes (from "distance to
+       correct_label baseline" to "what does YDF say about the
+       100 nearest neighbours"). Net new code is ~150 lines.
+
+  ## The v2 algorithm — committed by the redesign memo
+
+  For each cluster (a `(fp_label, correct_label)` pair from a
+  corroborated gap):
+
+    Build value-shape embeddings for every column in
+    `columns.parquet` (same embedding as v1 — char 3-gram hashed
+    (1024) + length percentiles + char-class summary).
+
+    For each cluster column c, find its 100 nearest neighbours in
+    the corpus EXCLUDING the cluster's own columns (no fp_label /
+    correct_label restriction — the NN are drawn from the global
+    column pool).
+
+    Bucket the neighbours by `ydf_prediction`. Define two
+    per-column scores:
+
+      absorption_c = (count of NN where ydf_prediction ==
+                      correct_label) / 100
+      risk_c       = (count of NN where ydf_prediction !=
+                      correct_label AND
+                      sense_prediction != correct_label) / 100
+
+    Average across the cluster:
+
+      absorption = mean(absorption_c)
+      risk       = mean(risk_c)
+      reachability_v2 = absorption * (1 - risk), clipped [0, 1]
+
+  Interpretation:
+    - High absorption + low risk → cluster lives inside a region of
+      the corpus where YDF agrees with correct_label; training is
+      safely absorbed (the utc case the redesign memo names).
+    - Low absorption + high risk → cluster lives in a region where
+      YDF disagrees with correct_label; training will pull the
+      disagreeing population into the cluster's training direction
+      (the v23 categorical-bleed mechanism, made measurable).
+    - Low absorption + low risk → cluster's value-shape neighbours
+      are scarce in the corpus; training has little leverage (the
+      v23 url case).
+
+  ## Pre-committed predictions
+
+  From `output/cluster-reachability/redesign_memo.md`, the v2 metric
+  should land the v23 fixture as:
+
+  | cluster | v1 reach | v2 prediction | expected band |
+  |---|---:|---|---|
+  | utc → integer_number | 0.002 (rank 6) | absorption≈1, risk≈0 → reachability≈1 | HIGH |
+  | gender_code → categorical | 0.100 (rank 1) | absorption≈0.4, risk≈0.3 → reachability≈0.28 | HIGH |
+  | alphanumeric_id → categorical | 0.050 (rank 2) | absorption high, risk low → HIGH | HIGH |
+  | periodicity → categorical | 0.005 (rank 5) | risk HIGH → LOW | LOW |
+  | boolean.binary → integer_number | 0.018 (rank 3) | risk HIGH (binary cols correctly labelled) → LOW | LOW |
+  | url → integer_number | 0.010 (rank 4) | absorption low (URL nbrs not integer) → LOW | LOW |
+
+  If the actual v2 scores match these directions cleanly (three
+  HIGH above three LOW), the metric ships. If not, ac-04 routes
+  to redesign or back to Path C.
+
+  ## Pillar defence
+
+  Pillar 4 (long-running R&D) and Pillar 2 (agent self-learning),
+  same defence as the v1 spec. The metric is the substrate every
+  Sense retrain depends on; building it once amortises across
+  every iteration.
+
+  ## Out of scope
+
+  - Any v24+ Sense retrain (v2 is a precondition, not a trigger).
+  - Sharpen-rule design for low-reachability clusters (separate
+    follow-up; this spec only flags which clusters need that
+    treatment).
+  - Re-running the multi-lens corpus pass.
+  - Replacing the value-shape embedding with Sense's char-branch
+    activations (the redesign memo's alternative; deferred to v3
+    if v2 fails its fixture).
+  - Adding a training-signal-size dimension to the score (the
+    redesign memo's adjunct; deferred — implementations can add
+    it as a separate CLI flag, not part of the score itself).
+
+  ## Successor
+
+  If v2 ships, the next retrain spec consumes `report.md`'s
+  extended schema with the v2 score and picks clusters above the
+  threshold. The relitigation memo's Sharpen-rule candidate becomes
+  well-defined: high-reachability clusters whose direction was
+  right but whose retrain budget is better spent elsewhere.
+
+  If v2 fails its fixture, the redesign memo's Sense-embedding
+  alternative becomes the v3 starting point.
+
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- diagnostic
+- retrain-prep
+acceptance_criteria:
+- id: ac-01
+  description: |
+    v2 algorithm ratification + edge-case calls.
+
+    Write `.orbit/specs/2026-05-30-reachability-metric-v2/metric.md`
+    that:
+
+      (i) Ratifies the absorption/risk/reachability_v2 formulae from
+          the redesign memo verbatim, OR explains any deviation in
+          one paragraph with the rationale.
+
+      (ii) Commits to a nearest-neighbour search algorithm. Default
+           candidate: down-sample columns.parquet to a 50,000-row
+           neighbour pool (reservoir sample, seed 44, stratified by
+           ydf_prediction so rare correct_labels stay represented),
+           then exact cosine k-NN per cluster column against the
+           pool. Alternative: full ANN index (hnswlib) over all
+           6.6M columns — names the dependency and the
+           index-build budget if chosen.
+
+      (iii) Names the k for nearest-neighbour search (default: 100
+            per the redesign memo) and the rationale for any
+            deviation.
+
+      (iv) Names the cluster-size floor below which the score is
+           emitted as null with an explicit error (default: 5
+           columns, same as v1).
+
+      (v) Names the global-neighbour-pool floor below which the
+          per-cluster score is null with an error (default: 1000
+          columns in the stratified pool for the cluster's
+          correct_label; below that, the absorption term is too
+          noisy).
+
+      (vi) Names how the per-cluster k-NN search excludes the
+           cluster's own columns (file_path + column_name match,
+           not just label match — the NN search must not return
+           the column being queried).
+
+    `ac_type: doc`.
+  gate: false
+  checked: true
+  ac_type: doc
+
+- id: ac-02
+  description: |
+    v2 scoring script.
+
+    `scripts/compute_cluster_reachability_v2.py` reads:
+      - `eval/gittables/corpus_pass/corroborated_gaps.parquet`
+        (cluster definitions)
+      - `eval/gittables/corpus_pass/columns.parquet` (per-column
+        sample values, sense_prediction, ydf_prediction,
+        file_path, column_name)
+
+    For each (fp_label, correct_label) pair across the gaps:
+      1. Embed all cluster columns (sense=fp, ydf=correct) and the
+         50k stratified neighbour pool (per ac-01 spec).
+      2. For each cluster column, k-NN search against the pool
+         (excluding cluster columns by file_path + column_name).
+      3. Compute absorption_c, risk_c, average to absorption,
+         risk, reachability_v2.
+
+    Emit:
+      `output/cluster-reachability/cluster_scores_v2.parquet`
+        — one row per gap_id, columns:
+          gap_id, criterion, mechanism, fp_label, correct_label,
+          affected_column_count, n_cluster_columns,
+          n_neighbour_pool, absorption, risk,
+          reachability_score, error.
+
+    Default invocation runs on the full corroborated-gaps set; a
+    `--gap-ids <id1,id2,...>` flag narrows to specific clusters.
+
+    Caches embeddings per (fp_label, correct_label) like v1 — one
+    score per pair, applied to every gap_id sharing that pair.
+
+    Close evidence: parquet exists with one row per gap_id in
+    `corroborated_gaps.parquet`; absorption/risk/reachability are
+    non-null on every row (or carry an explicit error string).
+
+    Closed: `output/cluster-reachability/cluster_scores_v2.parquet`
+    carries 64,565 rows (one per gap_id, 878 unique (fp, correct)
+    pairs). 63,118 rows non-null reachability; 1,447 rows carry
+    error strings (cluster size < 5 or pool < 1000 for the
+    correct_label). Coverage improved over v1 (1,447 nulls vs v1's
+    24,413) because the stratified pool keeps rare correct_labels
+    well-represented.
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-03
+  description: |
+    v23 validation fixture — score the six v23 clusters and check
+    against ground truth.
+
+    Run `compute_cluster_reachability_v2.py` with the same six
+    `--gap-ids 721b890ea74d,1b858e0d073b,3f2aa8465552,20803deffbad,81b63a52e3ef,cdde5d05b73a`
+    on the v22 `corroborated_gaps.parquet`. Emit:
+
+      `output/cluster-reachability/v23_fixture_v2.md`
+
+    The report:
+      - Shows reachability_score_v2 per cluster alongside its v23
+        outcome AND the v1 score (so the comparison is visible).
+      - Names the candidate threshold (midpoint between
+        min(HIGH-band) and max(LOW-band) if clean).
+      - Records the pre-committed predictions from the redesign
+        memo and notes which predictions held vs missed.
+      - Tags the verdict as Clean / Near-miss / Mismatch.
+
+    Pre-committed reachability bands (same as v1):
+      - **Clean separation** — the three HIGH-expected clusters
+        (gender_code, alphanumeric_id, utc) all score above all
+        three LOW-expected clusters (boolean.binary, url,
+        periodicity). Threshold = midpoint. Ship threshold.
+      - **Near-miss** — at most ONE crossover in either direction.
+        Threshold = score that minimises classification error.
+        Ship with caveat.
+      - **Mismatch** — two or more crossovers. v2 doesn't ship;
+        ac-04 routes to "redesign v3" via a memo.
+
+    Close evidence: `v23_fixture_v2.md` exists and explicitly tags
+    the verdict.
+
+    Verdict: **Mismatch** — six crossovers in the six-cluster
+    fixture. Both gender_code → categorical (rank 5) and
+    alphanumeric_id → categorical (rank 6, score 0.173) sit below
+    all three LOW-expected clusters (boolean.binary 0.856, url
+    0.824, periodicity 0.468). The absorption term tracks
+    correct_label density rather than cluster specificity, so
+    integer_number-target clusters dominate the ranking regardless
+    of cluster-specific risk. See
+    `output/cluster-reachability/v23_fixture_v2.md`.
+
+    `ac_type: code`.
+  gate: true
+  checked: true
+  ac_type: code
+
+- id: ac-04
+  description: |
+    Disposition of the v23 fixture verdict — ship-or-redesign,
+    gated by ac-03.
+
+    Path A (Clean) — write
+    `output/cluster-reachability/threshold_v2.md` recording the
+    threshold value, the six clusters' scores, and the rule for
+    future retrain specs: "clusters with reachability_score ≥ T
+    are candidates for `training_data_addition`; below T, route to
+    Sharpen rule or taxonomy work."
+
+    Path B (Near-miss) — same as Path A but with a `caveats`
+    section naming the single crossover and the metric weakness it
+    exposes.
+
+    Path C (Mismatch) — write
+    `output/cluster-reachability/redesign_memo_v3.md` proposing the
+    next iteration. The redesign memo for v1 (currently in repo)
+    already names the Sense-embedding alternative as a v3 candidate
+    if v2 fails; the v3 memo confirms or refines that direction.
+
+    Close evidence: for A or B, `threshold_v2.md` exists; for C,
+    `redesign_memo_v3.md` exists.
+
+    Path C taken. `output/cluster-reachability/redesign_memo_v3.md`
+    proposes splitting reachability into safety_score (= 1 - v2's
+    risk term) and a per-spec leverage judgement. v3 ships as an
+    advisory column rather than a hard gate. Implementation is the
+    next spec's work (`2026-05-31-reachability-safety-score` or
+    similar).
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-05
+  description: |
+    Integrate the v2 score into the corroborated-gaps artefact.
+
+    Gated by ac-04 — runs ONLY if Path A or B taken.
+
+    Add a post-processing step (sibling script or extension of
+    `scripts/gittables_corpus_pass.py`) so
+    `corroborated_gaps.parquet` carries a `reachability_score`
+    column populated from `cluster_scores_v2.parquet`.
+    `eval/gittables/corpus_pass/report.md` is regenerated to
+    include the score in each cluster's header line:
+
+      `Rank #1 — gap_id... — N cols — action: ... — reachability: 0.NN`
+
+    If Path C: this AC closes as "deferred; reachability column
+    not added to corroborated_gaps.parquet until v3 metric ships."
+
+    Close evidence: for A/B, `corroborated_gaps.parquet` has a
+    `reachability_score` column AND `report.md` mentions it in
+    cluster headers; for C, "deferred — see redesign_memo_v3.md"
+    note appended.
+
+    Deferred — see `output/cluster-reachability/redesign_memo_v3.md`.
+    v2 score does NOT fold into corroborated_gaps.parquet. The
+    column is reserved for v3's `safety_score` whenever the next
+    spec ships it.
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-06
+  description: |
+    Update CLAUDE.md guidance.
+
+    Path A/B — replace the current
+    "`training_data_addition` retrains need a reachability
+    pre-flight" paragraph in CLAUDE.md's "Architectural direction
+    (settled — do not re-ask)" section with a paragraph naming v2
+    as the gate, citing `threshold_v2.md`, and dropping the
+    interim "Sense-distribution pre/post check" requirement
+    (which v2 now subsumes).
+
+    Path C — extend the existing paragraph with the v3 redesign
+    pointer; the interim "Sense-distribution pre/post check"
+    requirement STAYS.
+
+    Close evidence: CLAUDE.md paragraph reflects the verdict.
+
+    Closed (Path C): CLAUDE.md's existing
+    `training_data_addition` paragraph has been extended to cite
+    both the v1 and v2 Path C closures plus the v3 redesign memo;
+    the interim Sense-distribution pre/post check requirement
+    STAYS until v3 ships.
+
+    `ac_type: doc`.
+  gate: false
+  checked: true
+  ac_type: doc

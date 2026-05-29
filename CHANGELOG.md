@@ -87,6 +87,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   diagnostic access. Full post-mortem at
   `output/v23-precision-retrain/relitigation_memo.md`. Successor
   bet: spec `2026-05-29-cluster-reachability-scoring`.
+- **cluster-reachability-scoring v2 (spec
+  `2026-05-30-reachability-metric-v2`).** Closed Path C (Mismatch)
+  at ac-04. v2 implemented the redesign memo's neighbour-label
+  composition algorithm (absorption × (1 - risk) over 100-NN from
+  a 50,000-row stratified pool). v23 fixture: six crossovers.
+  Both `gender_code → categorical` (rank 5) and
+  `alphanumeric_id → categorical` (rank 6, score 0.173) sit below
+  all three LOW-expected clusters (boolean.binary 0.856, url
+  0.824, periodicity 0.468). Root cause: the absorption term
+  tracks structural correct_label density rather than cluster
+  specificity — integer_number-target clusters dominate the
+  ranking regardless of cluster-specific risk. v3 redesign at
+  `output/cluster-reachability/redesign_memo_v3.md` proposes
+  splitting the score: drop absorption, keep risk, ship
+  `safety_score` (= 1 - risk) as an advisory column rather than a
+  hard gate. v2's `cluster_scores_v2.parquet` ships as reference;
+  `reachability_score` column is NOT folded into corroborated_gaps.
+  CLAUDE.md's `training_data_addition` paragraph extended to cite
+  both v1 and v2 Path C closures + the v3 redesign pointer; the
+  interim Sense-distribution pre/post check requirement STAYS until
+  v3 ships.
 - **cluster-reachability-scoring v1 (spec
   `2026-05-29-cluster-reachability-scoring`).** Closed Path C
   (Mismatch) at ac-04. The v1 metric (char 3-gram + length + char-
