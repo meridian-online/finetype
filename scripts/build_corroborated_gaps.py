@@ -17,7 +17,18 @@ Outputs:
             recommended_action_class, rank_within_cell,
             corroborating_lenses (list<struct>),
             sample_evidence (list<struct>),
-            candidate_spec_slug
+            candidate_spec_slug,
+            safety_score [appended by post-step — see below]
+
+Post-step (spec 2026-05-31-reachability-safety-score):
+  After this script writes corroborated_gaps.parquet, run
+    scripts/compute_cluster_safety_score.py
+    scripts/augment_corroborated_gaps_with_safety.py
+  to append the v3 `safety_score` advisory column. The augmentation
+  is idempotent (drops existing safety_score before re-joining).
+  CLAUDE.md's training_data_addition guidance assumes the column is
+  present; regenerations of corroborated_gaps.parquet must re-run
+  the post-step to preserve the diagnostic surface.
   eval/gittables/corpus_pass/single_lens_signals.tsv
     audit trail of columns where exactly one lens flagged
 

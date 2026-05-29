@@ -1,0 +1,253 @@
+id: 2026-05-31-reachability-safety-score
+goal: |
+  Ship the v3 `safety_score` advisory column from
+  `output/cluster-reachability/redesign_memo_v3.md` into
+  `eval/gittables/corpus_pass/corroborated_gaps.parquet` and into
+  the cluster headers of `eval/gittables/corpus_pass/report.md`.
+
+  ## Why now
+
+  Two reachability metrics (v1, v2) have closed Path C against the
+  v23 six-cluster fixture. v3's redesign memo names the path
+  forward: split reachability into safety (cluster-leakage risk)
+  and leverage (cluster size × Sense-distribution context), keep
+  leverage as a per-retrain-spec author judgement, ship safety as
+  a non-gating advisory column. v2's `risk` term is the metric
+  v3 ships: `safety_score = clip(1 - risk, 0, 1)`.
+
+  Difference from v1/v2 specs: v3 does NOT gate on a fixture
+  verdict. One labelled retrain outcome (v23) is illustration, not
+  validation. v3 ships unconditionally and gathers ground truth
+  from the next two or three retrain bets.
+
+  ## What ships
+
+  - `safety_score` column on `corroborated_gaps.parquet` (one
+    value per gap_id, derived from the (fp_label, correct_label)
+    pair's risk computation, identical across gaps sharing a pair).
+  - `safety: 0.NN` segment in each cluster header in `report.md`.
+  - Updated CLAUDE.md guidance: spec authors consult `safety_score`
+    as an input to the Sense-distribution pre/post check, not as a
+    replacement for it.
+  - A v23 fixture illustration report (six clusters with
+    safety_score + v23 outcomes) — for reference, not for gating.
+
+  ## Pillar defence
+
+  Pillar 4 (long-running R&D). v3 is the third iteration on the
+  reachability metric question; shipping advisory rather than
+  blocking gets the substrate in front of the next retrain decision
+  while validation accrues from real bets.
+
+  Pillar 2 (agent self-learning). Future agents reading
+  `report.md` see safety_score alongside affected_column_count and
+  recommended_action_class; the diagnostic surface carries the new
+  signal without a separate lookup.
+
+  ## Out of scope
+
+  - Any Sense retrain.
+  - Sharpen-rule design for low-safety clusters.
+  - Re-running the multi-lens corpus pass.
+  - A leverage_score column. The redesign memo names leverage as a
+    per-spec author judgement, not a substrate-level number.
+  - A v3 fixture pass/fail gate.
+
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- diagnostic
+- retrain-prep
+acceptance_criteria:
+- id: ac-01
+  description: |
+    v3 algorithm ratification.
+
+    Write `.orbit/specs/2026-05-31-reachability-safety-score/
+    metric.md` that:
+
+      (i) Ratifies `safety_score = clip(1 - risk, 0, 1)` from the
+          redesign memo as the v3 metric.
+      (ii) Reuses v2's neighbour-pool and k-NN search verbatim
+           (50,000-row stratified pool, k=100, cluster exclusion
+           by (file_path, column_name)).
+      (iii) Names the threshold interpretation bands:
+              safety_score ≥ 0.8 → safe candidate for
+                                   training_data_addition
+              0.5–0.8 → moderate risk, author judgement + Sense-
+                       distribution pre/post check
+              < 0.5 → high risk, prefer Sharpen rule or taxonomy
+                      intervention
+            These thresholds are advisory, not blocking. Spec
+            authors apply them with judgement.
+      (iv) Names the v23 fixture safety scores (derived from v2's
+           risk values, no fresh metric design needed) as
+           illustration.
+
+    `ac_type: doc`.
+  gate: false
+  checked: true
+  ac_type: doc
+
+- id: ac-02
+  description: |
+    Safety-score scoring script.
+
+    `scripts/compute_cluster_safety_score.py` reuses v2's pool
+    construction and k-NN code path but emits only one numeric
+    output: `safety_score`. Writes
+    `output/cluster-reachability/cluster_safety_scores.parquet`
+    with columns:
+      gap_id, criterion, mechanism, fp_label, correct_label,
+      affected_column_count, n_cluster_columns,
+      n_neighbour_pool, risk, safety_score, error.
+
+    Default invocation runs on the full corroborated-gaps set; a
+    `--gap-ids <id1,id2,...>` flag narrows for fixture testing.
+
+    Close evidence: parquet exists with one row per gap_id in
+    `corroborated_gaps.parquet`; safety_score is non-null on every
+    row (or carries an explicit error string with the same
+    handling as v2).
+
+    Closed: `output/cluster-reachability/cluster_safety_scores
+    .parquet` carries 64,565 rows (878 unique (fp, correct) pairs).
+    63,118 non-null safety; 1,447 explained nulls (same coverage
+    as v2). Distribution: min 0.007, max 1.0, mean 0.595.
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-03
+  description: |
+    v23 fixture illustration (non-gating).
+
+    Run `compute_cluster_safety_score.py` with the same six
+    `--gap-ids 721b890ea74d,1b858e0d073b,3f2aa8465552,20803deffbad,81b63a52e3ef,cdde5d05b73a`
+    and write
+    `output/cluster-reachability/v23_fixture_safety.md` showing:
+
+      - safety_score per cluster
+      - v23 outcome (Met / Flat / Regressed)
+      - cluster size (proxy for leverage)
+      - one-paragraph interpretation per cluster naming both
+        safety and leverage signals
+
+    This is illustration only — it does NOT route ac-04 to a
+    Path. ac-04 runs regardless of fixture outcome because v3
+    ships as advisory.
+
+    Close evidence: `v23_fixture_safety.md` exists.
+
+    Closed: `output/cluster-reachability/v23_fixture_safety.md`
+    written. Integer_number-target clusters (utc/boolean.binary/url)
+    score 0.91-0.95 HIGH; categorical-target clusters
+    (periodicity/gender_code/alphanumeric_id) span 0.70/0.60/0.43
+    MODERATE-to-LOW. The categorical bands correctly flag the
+    categorical-bleed risk that drove v23's aggregate Failed.
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-04
+  description: |
+    Fold safety_score into corroborated_gaps.parquet.
+
+    `scripts/augment_corroborated_gaps_with_safety.py` reads:
+      - `eval/gittables/corpus_pass/corroborated_gaps.parquet`
+      - `output/cluster-reachability/cluster_safety_scores.parquet`
+
+    Performs a LEFT JOIN on `gap_id`, writes the augmented
+    parquet back to
+    `eval/gittables/corpus_pass/corroborated_gaps.parquet`
+    (in-place augmentation; the original schema's columns are
+    preserved, `safety_score` is appended).
+
+    For gap_ids with a null safety_score in the input (cluster
+    too small or pool floor unmet), the output safety_score is
+    NULL — preserves the "no signal" semantics.
+
+    Close evidence: `corroborated_gaps.parquet` carries a
+    `safety_score` column; row count unchanged from 64,565.
+
+    Closed: `scripts/augment_corroborated_gaps_with_safety.py`
+    runs the LEFT JOIN and atomic swap; corroborated_gaps.parquet
+    now ends with a `safety_score` double column. Row count
+    unchanged (64,565). All original columns preserved (gap_id,
+    criterion, mechanism, affected_column_count,
+    recommended_action_class, rank_within_cell,
+    corroborating_lenses, sample_evidence, candidate_spec_slug).
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-05
+  description: |
+    Regenerate report.md with safety_score in cluster headers.
+
+    Modify `scripts/build_diagnostic_report.py` so that each
+    cluster header line includes a safety: 0.NN segment:
+
+      `##### Rank #N — gap_id[:12]… — N cols — action: ... — safety: 0.NN`
+
+    Null safety_score renders as `safety: n/a`.
+
+    Re-run the script to refresh
+    `eval/gittables/corpus_pass/report.md`.
+
+    Close evidence: `report.md` headers include the safety
+    segment; verified for at least the top-3 clusters across all
+    nine criterion×mechanism cells in the report.
+
+    Closed: `scripts/build_diagnostic_report.py` modified to
+    append `— safety: 0.NN` (or `— safety: n/a`) to each cluster
+    header. Re-ran the script; `report.md` now carries safety
+    info on all 34 cluster headers across the report.
+
+    `ac_type: code`.
+  gate: false
+  checked: true
+  ac_type: code
+
+- id: ac-06
+  description: |
+    Update CLAUDE.md training_data_addition guidance.
+
+    Extend the existing
+    `training_data_addition` paragraph in CLAUDE.md's
+    "Architectural direction (settled — do not re-ask)" section
+    to:
+
+      - Cite v3 as shipped (advisory column on
+        corroborated_gaps.parquet).
+      - Direct spec authors to read safety_score AND cluster size
+        AND Sense-distribution context as inputs to their retrain
+        bet decision.
+      - Keep the Sense-distribution pre/post check requirement
+        (v3 does not replace it; safety_score is an input to it).
+      - Cite this spec as the precedent for "advisory diagnostic
+        column shipping while validation accrues" — the model for
+        future metric work.
+
+    Close evidence: paragraph reflects the v3 shipping state.
+
+    Closed: CLAUDE.md's training_data_addition paragraph rewritten
+    to cite v3 as shipped (advisory `safety_score` on
+    corroborated_gaps.parquet), name the three advisory bands,
+    and require spec authors to keep the Sense-distribution
+    pre/post check as mandatory (v3 does not replace it). The
+    paragraph also cites this spec as the precedent for advisory-
+    column shipping under "one labelled outcome is insufficient
+    ground truth" conditions.
+
+    `ac_type: doc`.
+  gate: false
+  checked: true
+  ac_type: doc

@@ -87,6 +87,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   diagnostic access. Full post-mortem at
   `output/v23-precision-retrain/relitigation_memo.md`. Successor
   bet: spec `2026-05-29-cluster-reachability-scoring`.
+- **cluster-reachability v3 / safety_score (spec
+  `2026-05-31-reachability-safety-score`).** Ships the v3
+  `safety_score` advisory column on
+  `eval/gittables/corpus_pass/corroborated_gaps.parquet` and into
+  the cluster headers of `eval/gittables/corpus_pass/report.md`
+  (format: `Rank #N — gap_id… — N cols — action: ... — safety: 0.NN`).
+  Algorithm: `safety_score = clip(1 - risk, 0, 1)` where `risk` is
+  v2's risk term (mean fraction of cluster columns' 100 NN where
+  ydf disagrees with correct_label AND sense also disagrees), over
+  v2's 50,000-row stratified neighbour pool. Bands: ≥ 0.80 HIGH
+  (safe candidate), 0.50–0.80 MODERATE (requires the Sense-
+  distribution pre/post check), < 0.50 LOW (prefer Sharpen rule
+  or taxonomy). v23 fixture illustration: integer_number-target
+  clusters score 0.91–0.95 (HIGH), categorical-target clusters
+  span 0.43–0.70 (LOW to MODERATE) — correctly flagging the
+  categorical-bleed risk that the v23 retrain didn't see. v3 ships
+  as **advisory** rather than blocking gate; one labelled retrain
+  outcome (v23) is illustration not validation, so true validation
+  accrues from the next two or three retrain bets. CLAUDE.md
+  paragraph updated; `safety_score` is an input to the Sense-
+  distribution pre/post check, which stays mandatory.
 - **cluster-reachability-scoring v2 (spec
   `2026-05-30-reachability-metric-v2`).** Closed Path C (Mismatch)
   at ac-04. v2 implemented the redesign memo's neighbour-label

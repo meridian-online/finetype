@@ -255,10 +255,14 @@ def build_part1(corroborated_path: Path, dbpedia_annotations_path: Path) -> str:
                     for l in lenses
                 )
                 slug = g.get("candidate_spec_slug") or ""
+                safety = g.get("safety_score")
+                safety_str = (f"safety: {safety:.2f}"
+                              if safety is not None else "safety: n/a")
 
                 out.append(
                     f"##### Rank #{rank} — `{gid[:12]}…` — "
-                    f"{affected} columns — action: `{rec_action}`"
+                    f"{affected} columns — action: `{rec_action}` — "
+                    f"{safety_str}"
                 )
                 out.append("")
                 out.append(f"- **Corroborating lenses**: {lens_str}")

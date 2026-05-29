@@ -1,10 +1,10 @@
 ---
-model_sha: 11f0a570e74aa3d0183e14906da0436e53238469880de0cf1a244c171bddcb57
+model_sha: cb0cece97728f12f5411f1aa359b8d7431d26e6c97e6dfdaef938544f72af96c
 ydf_sha: 413f2d8767f2a5fc08770dca9a7a2b79648240ad4fd64345a658359481d4d2ce
 dbpedia_mapping_sha: ee1f6bbe791156df32826199f3ee0776aff6dae26c2e7a9142e5cb729078e2a7
 cascade_version: b931b5936a1e05d1
 corpus_index_sha: 27329eda15d6e6b9e2d94231b0c271855489c0463b5a5e9611b2478104e750ec
-corpus_pass_id: e86d9af603afb71715aa9566297afbc97b692bb821a3e5dc7ba0f5a7f7bd1a4e
+corpus_pass_id: e5e9830d6023847d23e6f1d67c65282eaf1899eefe3c7a7fab41c1947693b808
 ---
 
 # Gittables multi-lens corpus diagnostic — report
@@ -41,7 +41,7 @@ Each section below is one `(criterion × mechanism)` cell. Top-10 ranked gap clu
 
 Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 below cover 24430 columns (19.3% of cell).
 
-##### Rank #1 — `e0756c995049…` — 17610 columns — action: `training_data_addition`
+##### Rank #1 — `e0756c995049…` — 17610 columns — action: `training_data_addition` — safety: n/a
 
 - **Corroborating lenses**: **ydf** = `datetime.component.year` (conf 0.57) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -54,7 +54,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `parent/section4all_xls_40300B%20Ann$_40.parquet` | `Table 4` | `representation.numeric.decimal_number` | `datetime.component.year` | `2008.0` `1277.0` | `` |
 | `parent/section4all_xls_40300B%20Ann$_69.parquet` | `__index_level_25__` | `representation.numeric.decimal_number` | `datetime.component.year` | `2007.0` `1164.0` | `` |
 
-##### Rank #2 — `f4c025140768…` — 1826 columns — action: `training_data_addition`
+##### Rank #2 — `f4c025140768…` — 1826 columns — action: `training_data_addition` — safety: 0.07
 
 - **Corroborating lenses**: **ydf** = `representation.text.plain_text` (conf 0.52) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -67,7 +67,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `time_interval/participant101keysequencedata_2020-01-15-09_31_57-joachim.parquet` | `InterTrialIntervalSeconds` | `representation.numeric.decimal_number` | `representation.text.plain_text` | `2.5` | `http://dbpedia.org/ontology/minTime` |
 | `time_interval/participant101keysequencedata_2020-01-15-09_31_57-joachim_1.parquet` | `InterTrialIntervalSeconds` | `representation.numeric.decimal_number` | `representation.text.plain_text` | `2.5` | `http://dbpedia.org/ontology/minTime` |
 
-##### Rank #3 — `9a5a75088c13…` — 1088 columns — action: `training_data_addition`
+##### Rank #3 — `9a5a75088c13…` — 1088 columns — action: `training_data_addition` — safety: 0.51
 
 - **Corroborating lenses**: **ydf** = `representation.text.entity_name` (conf 0.76) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -80,7 +80,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `data_rate/CWSFF.parquet` | `quoteSourceName` | `representation.text.plain_text` | `representation.text.entity_name` | `Delayed Quote` `Delayed Quote` `Delayed Quote` | `http://dbpedia.org/ontology/quote` |
 | `data_rate/CWVLF.parquet` | `quoteSourceName` | `representation.text.plain_text` | `representation.text.entity_name` | `Delayed Quote` `Delayed Quote` `Delayed Quote` | `http://dbpedia.org/ontology/quote` |
 
-##### Rank #4 — `d10050d245ea…` — 877 columns — action: `training_data_addition`
+##### Rank #4 — `d10050d245ea…` — 877 columns — action: `training_data_addition` — safety: 0.51
 
 - **Corroborating lenses**: **ydf** = `representation.text.entity_name` (conf 0.57) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -93,7 +93,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `processing_time/E03-1005_sweta_108.parquet` | `Discourse Facet` | `representation.text.plain_text` | `representation.text.entity_name` | `Method Citation` `Method Citation` `Method Citation` | `` |
 | `processing_time/E03-1005_sweta_11.parquet` | `Discourse Facet` | `representation.text.plain_text` | `representation.text.entity_name` | `Method Citation` `Method Citation` `Method Citation` | `` |
 
-##### Rank #5 — `644d4c0fb5e4…` — 673 columns — action: `training_data_addition`
+##### Rank #5 — `644d4c0fb5e4…` — 673 columns — action: `training_data_addition` — safety: 0.46
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.integer_number` (conf 0.98) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -106,7 +106,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `seek_time/PL2311LAG1Y9SC_1.parquet` | `Smart 194: Temperature_Celsius (Raw Value)` | `representation.numeric.decimal_number` | `representation.numeric.integer_number` | `28` `28` `28` | `` |
 | `seek_time/PL2321LAGASNRJ.parquet` | `Smart 194: Temperature_Celsius (Raw Value)` | `representation.numeric.decimal_number` | `representation.numeric.integer_number` | `30` `30` `30` | `` |
 
-##### Rank #6 — `022debba8a26…` — 508 columns — action: `training_data_addition`
+##### Rank #6 — `022debba8a26…` — 508 columns — action: `training_data_addition` — safety: 0.51
 
 - **Corroborating lenses**: **ydf** = `representation.text.entity_name` (conf 0.57) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -119,7 +119,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `show_time/example_115.parquet` | `Scale values` | `representation.text.plain_text` | `representation.text.entity_name` | `Not yet competent,Competent` | `http://dbpedia.org/ontology/scale` |
 | `show_time/example_121.parquet` | `Scale values` | `representation.text.plain_text` | `representation.text.entity_name` | `Not yet competent,Competent` | `http://dbpedia.org/ontology/scale` |
 
-##### Rank #7 — `8ad55f498be9…` — 508 columns — action: `training_data_addition`
+##### Rank #7 — `8ad55f498be9…` — 508 columns — action: `training_data_addition` — safety: 0.77
 
 - **Corroborating lenses**: **ydf** = `representation.text.sentence` (conf 0.63) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -132,7 +132,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `show_time/example_115.parquet` | `Description` | `representation.text.plain_text` | `representation.text.sentence` | `<p>The Core Competencies summarise the capabilities that ar…` `<p>Each level of the Core Competencies has behavioural indi…` `<p>Level 1 is typically associated with jobs such as Assist…` | `http://dbpedia.org/ontology/description` |
 | `show_time/example_121.parquet` | `Description` | `representation.text.plain_text` | `representation.text.sentence` | `<p>The Core Competencies summarise the capabilities that ar…` `<p>Each level of the Core Competencies has behavioural indi…` `<p>Level 1 is typically associated with jobs such as Assist…` | `http://dbpedia.org/ontology/description` |
 
-##### Rank #8 — `e0fa5a1ea315…` — 455 columns — action: `training_data_addition`
+##### Rank #8 — `e0fa5a1ea315…` — 455 columns — action: `training_data_addition` — safety: 0.77
 
 - **Corroborating lenses**: **ydf** = `representation.text.sentence` (conf 0.54) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -145,7 +145,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `abstraction/Designite_1TobiiTobii_DesignSmells.parquet` | `Cause` | `representation.text.plain_text` | `representation.text.sentence` | `The tool detected the smell in this class because this clas…` `The tool detected the smell in this class because the class…` | `http://dbpedia.org/ontology/deathCause` |
 | `abstraction/Designite_A1_DesignSmells.parquet` | `Cause` | `representation.text.plain_text` | `representation.text.sentence` | `The tool detected the smell in this class because the class…` `The tool detected the smell in this class because this clas…` `The tool detected the smell in this class because this clas…` | `http://dbpedia.org/ontology/deathCause` |
 
-##### Rank #9 — `414130dd67c2…` — 443 columns — action: `training_data_addition`
+##### Rank #9 — `414130dd67c2…` — 443 columns — action: `training_data_addition` — safety: 0.51
 
 - **Corroborating lenses**: **ydf** = `representation.text.entity_name` (conf 0.55) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -158,7 +158,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 | `id/ir.model.access_21606.parquet` | `group_id:id` | `representation.text.plain_text` | `representation.text.entity_name` | `base.group_system` `base.group_system` `base.group_user` | `http://dbpedia.org/ontology/elementGroup` |
 | `id/ir.model.access_21768.parquet` | `group_id:id` | `representation.text.plain_text` | `representation.text.entity_name` | `base.group_system` `base.group_system` `base.group_user` | `http://dbpedia.org/ontology/elementGroup` |
 
-##### Rank #10 — `7e0ecb31fabb…` — 442 columns — action: `training_data_addition`
+##### Rank #10 — `7e0ecb31fabb…` — 442 columns — action: `training_data_addition` — safety: 0.77
 
 - **Corroborating lenses**: **ydf** = `representation.text.sentence` (conf 0.70) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -193,7 +193,7 @@ Total clusters in cell: **30865** (126796 distinct columns affected). Top-10 bel
 
 Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below cover 3222 columns (60.3% of cell).
 
-##### Rank #1 — `2129fe8b10c7…` — 1320 columns — action: `model_retrain`
+##### Rank #1 — `2129fe8b10c7…` — 1320 columns — action: `model_retrain` — safety: 0.12
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.70) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -206,7 +206,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `show_time/20151118MINORL.parquet` | `period` | `datetime.period.quarter` | `representation.discrete.categorical` | `Q4` `Q4` `Q4` | `http://dbpedia.org/ontology/period` |
 | `show_time/20151130BOSMIA.parquet` | `period` | `datetime.period.quarter` | `representation.discrete.categorical` | `Q4` `Q4` `Q4` | `http://dbpedia.org/ontology/period` |
 
-##### Rank #2 — `1343378923ae…` — 530 columns — action: `model_retrain`
+##### Rank #2 — `1343378923ae…` — 530 columns — action: `model_retrain` — safety: 0.84
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.decimal_number` (conf 0.98) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -219,7 +219,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-AZ-2020-06-14.parquet` | `Number of Ventilators in Use for COVID-19` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `2.0` | `` |
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-AZ-2020-08-09.parquet` | `Number of Ventilators in Use for COVID-19` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `0.0` | `` |
 
-##### Rank #3 — `667cd51c18f7…` — 504 columns — action: `model_retrain`
+##### Rank #3 — `667cd51c18f7…` — 504 columns — action: `model_retrain` — safety: n/a
 
 - **Corroborating lenses**: **ydf** = `identity.person.gender_code` (conf 0.98) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -232,7 +232,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `parent/train_83.parquet` | `gender` | `identity.person.gender` | `identity.person.gender_code` | `M` `F` `M` | `http://dbpedia.org/ontology/gender` |
 | `parent/uds-saarland_participants.parquet` | `gender` | `identity.person.gender` | `identity.person.gender_code` | `M` `M` `F` | `http://dbpedia.org/ontology/gender` |
 
-##### Rank #4 — `20f7a63b946a…` — 258 columns — action: `model_retrain`
+##### Rank #4 — `20f7a63b946a…` — 258 columns — action: `model_retrain` — safety: 0.84
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.decimal_number` (conf 0.99) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -245,7 +245,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-AZ-2020-08-02.parquet` | `Number of All Beds` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `180.0` `109.0` `115.0` | `http://dbpedia.org/ontology/numberOfRooms` |
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-AZ-2020-08-09.parquet` | `Number of All Beds` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `100.0` `24.0` `103.0` | `http://dbpedia.org/ontology/numberOfRooms` |
 
-##### Rank #5 — `8684ba9e2904…` — 206 columns — action: `model_retrain`
+##### Rank #5 — `8684ba9e2904…` — 206 columns — action: `model_retrain` — safety: n/a
 
 - **Corroborating lenses**: **ydf** = `geography.location.region` (conf 0.77) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -258,7 +258,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `speed_of_light/2016-10-01.parquet` | `ADDRESS STATE` | `geography.address.full_address` | `representation.discrete.categorical` | `TX` `TX` `TX` | `http://dbpedia.org/ontology/state` |
 | `speed_of_light/2016-10-14.parquet` | `ADDRESS STATE` | `geography.address.full_address` | `representation.discrete.categorical` | `TX` `TX` `TX` | `http://dbpedia.org/ontology/state` |
 
-##### Rank #6 — `5d497fbaeac4…` — 100 columns — action: `model_retrain`
+##### Rank #6 — `5d497fbaeac4…` — 100 columns — action: `model_retrain` — safety: 0.34
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.75) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -271,7 +271,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `object/DM_Attributes_1.parquet` | `Entity_Name` | `identity.person.full_name` | `representation.discrete.categorical` | `P` `P` `P` | `http://dbpedia.org/ontology/name` |
 | `id/contract_89.parquet` | `class_name` | `identity.person.full_name` | `identity.person.gender_code` | `F` `F` `F` | `http://dbpedia.org/ontology/class` |
 
-##### Rank #7 — `c1101aeb2474…` — 97 columns — action: `model_retrain`
+##### Rank #7 — `c1101aeb2474…` — 97 columns — action: `model_retrain` — safety: 0.84
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.decimal_number` (conf 0.98) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -284,7 +284,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-NV-2020-06-14.parquet` | `Number of Ventilators in Facility` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `19.0` | `http://dbpedia.org/ontology/numberOfRooms` |
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-NV-2020-06-14.parquet` | `Number of Ventilators in Use for COVID-19` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `17.0` | `` |
 
-##### Rank #8 — `5a7732688996…` — 76 columns — action: `model_retrain`
+##### Rank #8 — `5a7732688996…` — 76 columns — action: `model_retrain` — safety: 0.38
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.52) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -297,7 +297,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `processing_time/Big-Data-Developers-in-Detroit_events_past.parquet` | `venue_country` | `geography.location.country_code` | `representation.discrete.categorical` | `us` `us` `us` | `http://dbpedia.org/ontology/country` |
 | `processing_time/Big-Data-Developers-in-Houston_events_past.parquet` | `venue_country` | `geography.location.country_code` | `representation.discrete.categorical` | `us` `us` `us` | `http://dbpedia.org/ontology/country` |
 
-##### Rank #9 — `f007ca304919…` — 71 columns — action: `model_retrain`
+##### Rank #9 — `f007ca304919…` — 71 columns — action: `model_retrain` — safety: n/a
 
 - **Corroborating lenses**: **ydf** = `geography.location.region` (conf 0.60) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -310,7 +310,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-ND-2020-06-21.parquet` | `Provider State` | `geography.location.country_code` | `geography.location.region` | `ND` `ND` `ND` | `http://dbpedia.org/ontology/state` |
 | `time_interval/covid-19-nursing-home-dataset-week-ending-2020-11-22-ND-2020-06-28.parquet` | `Provider State` | `geography.location.country_code` | `geography.location.region` | `ND` `ND` `ND` | `http://dbpedia.org/ontology/state` |
 
-##### Rank #10 — `0c95caa04538…` — 60 columns — action: `model_retrain`
+##### Rank #10 — `0c95caa04538…` — 60 columns — action: `model_retrain` — safety: 0.84
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.decimal_number` (conf 0.98) · **cascade** = `format_diversity_path_b` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -335,7 +335,7 @@ Total clusters in cell: **767** (5339 distinct columns affected). Top-10 below c
 
 Total clusters in cell: **4** (5 distinct columns affected). Top-4 below cover 5 columns (100.0% of cell).
 
-##### Rank #1 — `ecd834154222…` — 2 columns — action: `validator_widening`
+##### Rank #1 — `ecd834154222…` — 2 columns — action: `validator_widening` — safety: 0.29
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.53) · **cascade** = `enum_overfit` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -345,7 +345,7 @@ Total clusters in cell: **4** (5 distinct columns affected). Top-4 below cover 5
 | `beats_per_minute/data.parquet` | `unit.symbol` | `representation.scientific.measurement_unit` | `representation.discrete.categorical` | `kg` `g` `lbs` | `` |
 | `data_rate/data_4.parquet` | `unit.symbol` | `representation.scientific.measurement_unit` | `representation.discrete.categorical` | `kg` `g` `lbs` | `` |
 
-##### Rank #2 — `211c7d391798…` — 1 columns — action: `validator_widening`
+##### Rank #2 — `211c7d391798…` — 1 columns — action: `validator_widening` — safety: 0.73
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.63) · **cascade** = `enum_overfit` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -354,7 +354,7 @@ Total clusters in cell: **4** (5 distinct columns affected). Top-4 below cover 5
 |---|---|---|---|---|---|
 | `show_time/client_globals_2.parquet` | `BooleanValue` | `representation.boolean.terms` | `representation.discrete.categorical` | `boolean` `FALSE` | `http://dbpedia.org/ontology/value` |
 
-##### Rank #3 — `cad66a91096d…` — 1 columns — action: `validator_widening`
+##### Rank #3 — `cad66a91096d…` — 1 columns — action: `validator_widening` — safety: 0.73
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.62) · **cascade** = `enum_overfit` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -363,7 +363,7 @@ Total clusters in cell: **4** (5 distinct columns affected). Top-4 below cover 5
 |---|---|---|---|---|---|
 | `time_interval/client_globals_26.parquet` | `BooleanValue` | `representation.boolean.terms` | `representation.discrete.categorical` | `boolean` `TRUE` | `http://dbpedia.org/ontology/value` |
 
-##### Rank #4 — `cdf4571a30e4…` — 1 columns — action: `validator_widening`
+##### Rank #4 — `cdf4571a30e4…` — 1 columns — action: `validator_widening` — safety: 0.29
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.68) · **cascade** = `enum_overfit` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -376,7 +376,7 @@ Total clusters in cell: **4** (5 distinct columns affected). Top-4 below cover 5
 
 Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 below cover 84920 columns (33.8% of cell).
 
-##### Rank #1 — `721b890ea74d…` — 22952 columns — action: `training_data_addition`
+##### Rank #1 — `721b890ea74d…` — 22952 columns — action: `training_data_addition` — safety: 0.60
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.98) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -389,7 +389,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `id/0021600722_3_1.parquet` | `START_POSITION` | `identity.person.gender_code` | `representation.discrete.categorical` | `F` `F` `C` | `http://dbpedia.org/ontology/start` |
 | `id/0021600723.parquet` | `START_POSITION` | `identity.person.gender_code` | `representation.discrete.categorical` | `F` `F` `C` | `http://dbpedia.org/ontology/start` |
 
-##### Rank #2 — `1b858e0d073b…` — 21956 columns — action: `training_data_addition`
+##### Rank #2 — `1b858e0d073b…` — 21956 columns — action: `training_data_addition` — safety: 0.95
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.integer_number` (conf 0.73) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -402,7 +402,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `abstraction/00-01_51.parquet` | `Comments` | `datetime.offset.utc` | `representation.numeric.integer_number` | `0` `0` `0` | `http://dbpedia.org/ontology/comment` |
 | `abstraction/00-01_52.parquet` | `Comments` | `datetime.offset.utc` | `representation.numeric.integer_number` | `0` `0` `0` | `http://dbpedia.org/ontology/comment` |
 
-##### Rank #3 — `20803deffbad…` — 9779 columns — action: `training_data_addition`
+##### Rank #3 — `20803deffbad…` — 9779 columns — action: `training_data_addition` — safety: 0.91
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.integer_number` (conf 0.73) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -415,7 +415,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `abstraction/ir.model.access_8.parquet` | `perm_unlink` | `technology.internet.url` | `representation.numeric.integer_number` | `1` `1` `1` | `` |
 | `time_slot/ir.model.access_2.parquet` | `perm_unlink` | `technology.internet.url` | `representation.boolean.binary` | `1` `0` `1` | `` |
 
-##### Rank #4 — `81b63a52e3ef…` — 8649 columns — action: `training_data_addition`
+##### Rank #4 — `81b63a52e3ef…` — 8649 columns — action: `training_data_addition` — safety: 0.94
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.integer_number` (conf 0.73) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -428,7 +428,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `time_interval/PDS4_PARTICLE_1G00_2010_1.parquet` | `Maximum Cardinality` | `representation.boolean.binary` | `representation.numeric.integer_number` | `1` `1` | `http://dbpedia.org/ontology/maximumTemperature` |
 | `time_interval/StructureDefinition-cdm-appointment.parquet` | `Base Path` | `representation.boolean.binary` | `representation.numeric.integer_number` | `0` `0` `0` | `http://dbpedia.org/ontology/routeLine` |
 
-##### Rank #5 — `cdde5d05b73a…` — 5764 columns — action: `training_data_addition`
+##### Rank #5 — `cdde5d05b73a…` — 5764 columns — action: `training_data_addition` — safety: 0.68
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.88) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -441,7 +441,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `abstraction/03-04_27.parquet` | `Type` | `datetime.component.periodicity` | `representation.discrete.categorical` | `comment` `story` `comment` | `http://dbpedia.org/ontology/type` |
 | `abstraction/03-04_43.parquet` | `Type` | `datetime.component.periodicity` | `representation.discrete.categorical` | `comment` `comment` `story` | `http://dbpedia.org/ontology/type` |
 
-##### Rank #6 — `3f2aa8465552…` — 4835 columns — action: `training_data_addition`
+##### Rank #6 — `3f2aa8465552…` — 4835 columns — action: `training_data_addition` — safety: 0.41
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.96) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -454,7 +454,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `id/0021600723.parquet` | `TEAM_ABBREVIATION` | `representation.identifier.alphanumeric_id` | `representation.discrete.categorical` | `MEM` `MEM` `MEM` | `http://dbpedia.org/ontology/teamName` |
 | `id/0021600723_3.parquet` | `TEAM_ABBREVIATION` | `representation.identifier.alphanumeric_id` | `representation.discrete.categorical` | `MEM` `MEM` `MEM` | `http://dbpedia.org/ontology/teamName` |
 
-##### Rank #7 — `cc9a17251cae…` — 3457 columns — action: `training_data_addition`
+##### Rank #7 — `cc9a17251cae…` — 3457 columns — action: `training_data_addition` — safety: 0.95
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.integer_number` (conf 0.97) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -467,7 +467,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `abstraction/04-05_49.parquet` | `Comments` | `datetime.offset.utc` | `representation.numeric.integer_number` | `0` `0` `0` | `http://dbpedia.org/ontology/comment` |
 | `abstraction/05-06_134.parquet` | `Comments` | `datetime.offset.utc` | `representation.numeric.integer_number` | `0` `16` `3` | `http://dbpedia.org/ontology/comment` |
 
-##### Rank #8 — `7285286a0655…` — 2869 columns — action: `training_data_addition`
+##### Rank #8 — `7285286a0655…` — 2869 columns — action: `training_data_addition` — safety: 0.72
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.97) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -480,7 +480,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `parent/tokens_11.parquet` | `Unnamed: 2` | `identity.person.blood_type` | `representation.discrete.categorical` | `s` `s` `s` | `` |
 | `parent/tokens_18.parquet` | `s` | `identity.person.blood_type` | `representation.discrete.categorical` | `s` `s` `s` | `` |
 
-##### Rank #9 — `08f6c4cbfefd…` — 2488 columns — action: `training_data_addition`
+##### Rank #9 — `08f6c4cbfefd…` — 2488 columns — action: `training_data_addition` — safety: 0.84
 
 - **Corroborating lenses**: **ydf** = `representation.numeric.decimal_number` (conf 0.99) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
@@ -493,7 +493,7 @@ Total clusters in cell: **30203** (251335 distinct columns affected). Top-10 bel
 | `lead_time/JUG_UA_events_past.parquet` | `waitlist_count` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `0.0` `0.0` `0.0` | `http://dbpedia.org/ontology/elevatorCount` |
 | `lead_time/Loc-Overlapping-Synset-Lemma.parquet` | `Count_s_A` | `representation.numeric.integer_number` | `representation.numeric.decimal_number` | `1.0` `0.0` `1.0` | `http://dbpedia.org/ontology/aSide` |
 
-##### Rank #10 — `9f5141836073…` — 2171 columns — action: `training_data_addition`
+##### Rank #10 — `9f5141836073…` — 2171 columns — action: `training_data_addition` — safety: 0.47
 
 - **Corroborating lenses**: **ydf** = `representation.discrete.categorical` (conf 0.72) · **cascade** = `misclassification` (conf 1.00)
 - **Candidate spec slug**: _(none — to be assigned downstream)_
