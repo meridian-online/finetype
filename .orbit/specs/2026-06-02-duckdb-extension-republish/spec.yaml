@@ -78,7 +78,6 @@ goal: |
   Implements choice 0063 (Consolidate DuckDB Extension In-Tree, Repoint
   Community-Extensions Registry — accepted). ac-01 may amend 0063 or add a new
   choice recording the pin strategy.
-
 cards:
 - 0007-duckdb-sql-extension
 status: open
@@ -95,7 +94,7 @@ acceptance_criteria:
     maintenance commitment either choice implies, and confirm Option B
     (consolidate) still beats Option A (deregister) given that cost.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |
@@ -107,8 +106,7 @@ acceptance_criteria:
     `crates/finetype-duckdb/src/`. `cargo build -p finetype_duckdb --release`
     succeeds.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-03
   description: |
     Built artifact loads and functions work on current DuckDB. `make
@@ -117,8 +115,7 @@ acceptance_criteria:
     finetype(), finetype_detail(), finetype_cast(), finetype_unpack(),
     finetype_validate(). Capture a transcript.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-04
   description: |
     Community build scaffolding vendored in-tree (choice 0063 step 2). Add the
@@ -127,7 +124,7 @@ acceptance_criteria:
     build contract, runnable from the workspace root. Document the build in
     docs/DEVELOPMENT.md.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-05
   description: |
@@ -136,7 +133,7 @@ acceptance_criteria:
     target platforms (the registry excludes wasm_* and linux_amd64_musl), so a
     tagged ref is buildable by community-extensions CI without manual steps.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-06
   description: |
