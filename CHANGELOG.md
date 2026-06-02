@@ -7,10 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.6.21] - 2026-06-03
+## [0.6.22] - 2026-06-03
+
+> 0.6.21 was tagged but shipped no artifacts — all five release builds
+> failed, so the tag was withdrawn. 0.6.22 carries the 0.6.21 changes plus
+> the recovery fixes below.
 
 ### Fixed
 
+- **Recovered the failed 0.6.21 release.** Three regressions sank every
+  0.6.21 build job:
+  - *Model drift.* `models/default` had been repointed to
+    `sherlock-v22-boundary-relu-s44`, which is not published on
+    HuggingFace, while CI fetched the v19 model — so every build failed
+    "Flat model not found". Reverted `models/default` to
+    `sherlock-v19-relu-s42` (the shipped default; the v22 promotion is
+    deferred until the model is published — see the Added note below).
+  - *Windows extension build.* The DuckDB extension forced vendored
+    OpenSSL on all platforms; the Windows runner's MSYS Perl cannot
+    configure an OpenSSL source build, so the Windows artifact failed.
+    Vendored OpenSSL is now scoped to non-Windows (native-tls uses
+    SChannel on Windows, the Security framework on macOS).
+  - *Windows binary build.* `finetype-train` bundles DuckDB's C++
+    amalgamation, which fails to compile under the Windows release
+    runner's MSVC on DuckDB 1.5.3. `finetype-train` is now an optional
+    dependency behind a `train` feature; the shipped `cpu` build links
+    zero DuckDB. GPU dev builds (`cuda`/`metal`) re-include it, so
+    training from source is unchanged.
 - **DuckDB community extension republished against the stable C API
   (spec `2026-06-02-duckdb-extension-republish`, choice 0063).**
   `INSTALL finetype FROM community; LOAD finetype;` was returning
@@ -30,17 +53,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **v22 boundary-training Sense model promoted to default (spec
-  `2026-05-26-v22-gated-direction-review`, card 0002).** Multi-branch
-  `sherlock-v22-boundary-relu-s44` becomes `models/default`. Gated
-  cell-2 vs v19 lands at **−10.4% (Partial band)** on 503k columns of
-  the gittables corpus pass; per-subtype gains: country **−31.5%**,
-  region −12.8%, city −10.2%, longitude −14.3% (the four monotone-
-  movers absorb 95% of v19 cell-2 misses). val_acc 0.9305 (+0.0132
-  over v19). The v19→v20→v21→v22 ratchet is monotone on the
-  dominant subtypes; no v22-jumpers — the recipe works as a campaign,
-  not a v22-only spike. Trajectory at
-  `output/v22-direction-review/per_subtype_trajectory.md`.
+- **v22 boundary-training Sense model landed in-tree; promotion to
+  default deferred (spec `2026-05-26-v22-gated-direction-review`,
+  card 0002).** Multi-branch `sherlock-v22-boundary-relu-s44` is in the
+  model tree with its full training campaign. Gated cell-2 vs v19 lands
+  at **−10.4% (Partial band)** on 503k columns of the gittables corpus
+  pass; per-subtype gains: country **−31.5%**, region −12.8%, city
+  −10.2%, longitude −14.3% (the four monotone-movers absorb 95% of v19
+  cell-2 misses). val_acc 0.9305 (+0.0132 over v19). The
+  v19→v20→v21→v22 ratchet is monotone on the dominant subtypes; no
+  v22-jumpers — the recipe works as a campaign, not a v22-only spike.
+  Trajectory at `output/v22-direction-review/per_subtype_trajectory.md`.
+  **`models/default` remains `sherlock-v19-relu-s42`** — v22 is not yet
+  published to HuggingFace, so promoting it would break the release
+  fetch (see the recovery note under Fixed). Promotion follows once v22
+  is published.
 - **Gated YDF baseline is the canonical scoring lens (spec
   `2026-05-26-ydf-validation-gate`).** `scripts/apply_ydf_validation_gate.py`
   writes `ydf_prediction_gated` alongside the raw `ydf_prediction`:
@@ -76,10 +103,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   per MADR 0087 (13/13 ACs closed). The v18+ retrain block is lifted.
   The corroborated-gaps report at `eval/gittables/corpus_pass/report.md`
   is now the load-bearing input for the next Sense retrain bet.
-- **Card 0002 goal updated to v22.** Reflects current default model,
+- **Card 0002 goal updated to v22.** Reflects the v22 training target,
   gated cell-2 numbers, and the long-tail subtypes (full_address,
   street_name, postal_code) deferred pending a different intervention
-  class.
+  class. (The shipped default stays v19 until v22 is published — see
+  Fixed.)
 
 ### Closed without shipping
 
