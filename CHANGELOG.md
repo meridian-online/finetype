@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.21] - 2026-06-03
+
+### Fixed
+
+- **DuckDB community extension republished against the stable C API
+  (spec `2026-06-02-duckdb-extension-republish`, choice 0063).**
+  `INSTALL finetype FROM community; LOAD finetype;` was returning
+  HTTP 404 on DuckDB 1.5.2/1.5.3: the old standalone source built
+  against the *unstable* C API, which version-locks each artifact to
+  one exact DuckDB release, so the registry rebuild produced no
+  matching binary. The extension is now consolidated in-tree
+  (`crates/finetype-duckdb`), bumped to DuckDB 1.5.3, and stamps the
+  stable `C_STRUCT` ABI at the `v1.2.0` floor — one artifact loads on
+  DuckDB 1.2 through 1.5+, so a routine DuckDB patch no longer breaks
+  the install. The community build contract (extension-ci-tools
+  submodule, `configure/`, root `Makefile` targets) and a CI
+  distribution job are vendored so a tagged ref is rebuildable by
+  community-extensions CI with no manual steps. The extension also now
+  loads its model correctly from any working directory (Model2Vec
+  resources are fetched co-located with the model files).
+
 ### Added
 
 - **v22 boundary-training Sense model promoted to default (spec
