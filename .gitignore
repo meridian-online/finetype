@@ -14,6 +14,10 @@ Cargo.lock
 .DS_Store
 ._*
 
+# Logs and scratch run artifacts (never commit)
+*.log
+/output/llm_labels.csv
+
 # Model artifacts (push to HuggingFace, decision 0014)
 # Only the `default` symlink is tracked — everything else is downloaded at
 # build time via .github/scripts/download-model.sh or set via FINETYPE_MODEL_DIR.

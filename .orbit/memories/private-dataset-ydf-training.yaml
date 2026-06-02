@@ -1,5 +1,12 @@
 key: private-dataset-ydf-training
-body: 'Private dataset off-limits to this repo: /Users/hugh/datasets/ydf_training/{swingset,swingset-v8}/ is from a private repo. NEVER reference the name ''ydf_training'', ''swingset'', ''swingset-v8'', or its contents in any committed file (specs, registry, code, docs, commits, PRs) in the finetype repo. The YDF lens model itself (eval/gittables/models/ydf.bin) is fine to reference — only the training-data origin is private.'
+body: 'A private upstream dataset is the training-data origin for the YDF lens
+  model and must NOT be identified in any committed file in this repo (specs,
+  registry, code, docs, commits, PRs). Do not commit its codenames or its local
+  filesystem path. The YDF lens model artifact itself
+  (eval/gittables/models/ydf.bin) is fine to reference — only the upstream
+  training-data origin is private. The literal forbidden names and path are
+  recorded in an untracked local note on the author''s machine, deliberately
+  kept out of git.'
 timestamp: 2026-05-24T10:30:26.859305Z
 labels:
 - dataset-source
