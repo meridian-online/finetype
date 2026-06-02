@@ -1,0 +1,39 @@
+name: DuckDB Extension Distribution
+
+# Builds the finetype.duckdb_extension for the platforms the project
+# distributes, using the same reusable workflow + build contract the
+# duckdb/community-extensions CI uses when it rebuilds the registered
+# extension. A green run here proves a tagged ref is buildable by community
+# CI without manual steps. See spec 2026-06-02-duckdb-extension-republish.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  duckdb-stable-build:
+    name: Build extension binaries
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    with:
+      # Latest stable DuckDB. The artifact is stamped with the stable C API
+      # (C_STRUCT) at the v1.2.0 floor by the in-tree Makefile, so one binary
+      # loads on DuckDB 1.2 through 1.5+ regardless of this build target.
+      duckdb_version: v1.5.3
+      ci_tools_version: v1.5.3
+      extension_name: finetype
+      # The Rust toolchain builds the cdylib; python3 backs the metadata-stamp
+      # venv and the sqllogictest test runner.
+      extra_toolchains: 'rust;python3'
+      # Distribute Linux x86/arm, macOS x86/arm, Windows amd64. Everything else
+      # is excluded: wasm_* and linux_amd64_musl per the community registry,
+      # plus linux_arm64_musl, windows_arm64, and windows_amd64_mingw which the
+      # project does not ship.
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
