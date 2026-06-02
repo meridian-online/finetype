@@ -1,0 +1,139 @@
+id: 2026-06-02-public-release-readiness
+goal: |
+  Get the already-public meridian-online/finetype repo, its README, the
+  meridian.online website, and the DuckDB extension into a state we are happy
+  to actively promote. This spec is the umbrella plan; the DuckDB extension —
+  the most involved piece — is carried by its own spec
+  (2026-06-02-duckdb-extension-republish) and referenced here as ac-09.
+
+  ## Context
+
+  The repo is ALREADY public (visibility: PUBLIC). So "release readiness" means
+  cleaning up a live repo before we promote it, not a pre-flip checklist. A
+  readiness review on 2026-06-02 found: three live exposure leaks (now removed
+  from HEAD in commit aef1b2d — history left as-is by author decision), a
+  website that documents retired commands (rewritten, staged uncommitted in the
+  web repo), a type-count that disagrees across three sources, internal jargon
+  leaking into CLI help, and a broken DuckDB community install.
+
+  ## What this spec tracks
+
+  - Land the website rewrite (21 staged files in the web repo).
+  - Reconcile the type count to a single canonical number across binary,
+    README, and website.
+  - Remove remaining repo clutter that contradicts our own .gitignore.
+  - Strip internal jargon from user-facing CLI help.
+  - Sync stale version strings in docs.
+  - Repair the orbit substrate so spec tooling works again.
+  - Land the DuckDB community-extension republish (delegated to its own spec).
+
+  ## Already done (for the record)
+
+  - commit aef1b2d: removed tracked output/llm_labels.csv (third-party sample
+    emails), output/llm_label.log, train.log, train_v12b.log; scrubbed the
+    private dataset codenames + local path from the dataset-source memory;
+    added *.log and the data-dump CSV to .gitignore.
+  - README.md: DuckDB install block changed to an honest "being republished /
+    build from source" note (reverts via duckdb spec ac-10).
+  - Author decision 2026-06-02: leave git history as-is (no filter-repo /
+    force-push); the removed leaks are low-harm and a rewrite would disrupt the
+    .orbit substrate sync.
+
+  ## Out of scope
+
+  - The git history rewrite (explicitly declined).
+  - Any model/taxonomy retrain.
+  - The DuckDB extension engineering itself (its own spec).
+
+cards:
+- 0006-command-line-interface
+status: open
+labels:
+- release
+- docs
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Website rewrite reviewed, committed, and deployed. The 21 staged files in
+    /Users/hugh/github/meridian-online/web (retired schema/load pages removed,
+    new mcp page, real 5-verb surface, 250→240, version pin fix, honest DuckDB
+    install note) are reviewed against the live CLI, committed, pushed, and the
+    site rebuilds clean (`npm run build`).
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-02
+  description: |
+    Type count reconciled to one canonical number. The binary reports 240
+    (`finetype taxonomy -o csv`), README says 250, and web/src/data/taxonomy.json
+    has 251 hand-maintained keys with no generator. Decide the canonical figure,
+    align all three (and the per-domain tables), and ideally generate
+    taxonomy.json from the labels/ definitions so it cannot drift again.
+    Per-domain truth today: container 11, datetime 84, finance 28, geography 25,
+    identity 33, representation 33, technology 26 = 240.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    README type count corrected. README.md "250 types" → the canonical figure
+    from ac-02, and its per-domain table updated to match.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-04
+  description: |
+    Internal jargon stripped from user-facing CLI help. The visible `--help`
+    for public commands must describe behaviour, not cite internal artifacts.
+    Fix the clap doc comments in crates/finetype-cli/src/main.rs: profile's
+    `--enum-threshold` (cites "spec 2026-04-28-validate-precision-corpus, ac-09
+    sub-fix (a)") and infer's `--explain` (cites "MADR 0075 + 0081", "ac-08 of
+    the gittables multi-lens diagnostic"). Verify no public command's --help
+    contains spec IDs, MADR refs, ac- tokens, NNFT/bead IDs.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-05
+  description: |
+    Cargo.lock tracked. Remove `Cargo.lock` from .gitignore and commit it — for
+    a binary/CLI the lockfile belongs in git for reproducible builds.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-06
+  description: |
+    Tracked model weights removed. `git rm --cached` the ~52MB of *.safetensors
+    that are tracked despite .gitignore excluding `models/**/*.safetensors`
+    (worst offender models/test/model.safetensors, 41MB). Confirm the
+    models/default symlink target still resolves for build/download. Working-
+    tree files stay; only un-track them.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-07
+  description: |
+    Orbit substrate repaired. `orbit spec list` / `orbit session prime`
+    currently fail: "unknown field `constraints`". The binary's spec schema
+    dropped `constraints` but the template and existing specs still carry it.
+    Migrate .orbit/specs/_template/spec.yaml and all offending specs to the
+    current schema (id, goal, cards, status, labels, acceptance_criteria,
+    memories_considered, closed_at) so the tooling parses cleanly.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-08
+  description: |
+    Stale version strings synced. CLAUDE.md "Version: 0.6.19" → 0.6.20;
+    docs/DEVELOPMENT.md "CLI Surface (v0.6.19)" and its stale extension-build
+    example versions updated to current.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-09
+  description: |
+    DuckDB community install restored. Tracked by spec
+    2026-06-02-duckdb-extension-republish (implements choice 0063). This AC
+    closes when that spec's ac-08 (community install verified working) holds.
+  gate: false
+  checked: false
+  ac_type: observation

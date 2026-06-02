@@ -86,10 +86,11 @@ duckdb out.db -c "SELECT column_name, error_type, constraint_failed, expected_ty
 
 ### DuckDB Extension
 
+> **Install:** the signed community build (`INSTALL finetype FROM community;`) is being republished and is currently unavailable on recent DuckDB versions. Until it lands, build the extension from this repo with `make build-release` and load it unsigned — see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#duckdb-extension-build).
+
 ```sql
--- Install and load
-INSTALL finetype FROM community;
-LOAD finetype;
+-- Load a locally-built extension (DuckDB started with -unsigned)
+LOAD './target/release/finetype_duckdb.duckdb_extension';
 
 -- Classify a single value
 SELECT finetype('192.168.1.1');

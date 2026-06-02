@@ -1,0 +1,186 @@
+id: 2026-06-02-duckdb-extension-republish
+goal: |
+  Restore `INSTALL finetype FROM community; LOAD finetype;` to working order on
+  current DuckDB by consolidating the DuckDB extension in-tree and repointing
+  the community-extensions registry — i.e. execute the migration that
+  choice 0063 decided (Option B) but never carried out.
+
+  ## Why now
+
+  The community install is broken, not merely stale. On 2026-06-02 a user on
+  DuckDB v1.5.3 hit `HTTP 404` for
+  `community-extensions.duckdb.org/v1.5.3/osx_arm64/finetype.duckdb_extension.gz`.
+  Probing the registry: artifacts exist for v1.5.0 and v1.5.1, but 404 for
+  v1.5.2 and v1.5.3. So every new DuckDB user who follows the README/website
+  one-liner gets a broken install. The DuckDB extension is a load-bearing
+  distribution channel (card 0007) — the only one-line install path for DuckDB
+  users — so this blocks the extension's public story even though it does not
+  block the CLI binary release.
+
+  ## Root cause (a version-pin lag, not a code bug)
+
+  community-extensions rebuilds every registered extension against each new
+  DuckDB release. The registered source `meridian-online/duckdb-finetype`
+  (ref 2b45744, registry version 0.2.0) pins the DuckDB Rust crate to
+  `=1.10500.0` — DuckDB 1.5.0 exactly. When DuckDB shipped 1.5.2/1.5.3 the
+  exact-pinned rebuild produced no matching artifact, so publishing stopped.
+  Nobody has bumped the pin since the standalone repo's last commit
+  (2026-03-17). Compounding it: the in-tree crate `crates/finetype-duckdb`
+  is pinned even older (`duckdb = "=1.4.4"`, DuckDB 1.4.x), so repointing the
+  registry at it as-is would build *backwards*. And the registry's
+  `extended_description` still advertises the abandoned architecture
+  ("tiered CharCNN, 34 CNNs, 250 types") — none of which is true of the
+  current multi-branch sherlock model (240 types, single forward pass).
+
+  ## Sequence (the registry PR is the LAST step, not the first)
+
+  A registry PR submitted before the source builds would just fail community
+  CI. Order of operations:
+
+    1. Pick the source — already decided in choice 0063: the in-tree crate.
+    2. Bump the DuckDB Rust crate to the line tracking current DuckDB and fix
+       any 1.4→1.5 API breakage; prove the extension builds.
+    3. Prove the built artifact loads and its functions work on current DuckDB.
+    4. Vendor the community build scaffolding in-tree (extension-ci-tools,
+       configure/, Makefile) + CI so a tagged ref is buildable by community CI.
+    5. Tag a ref (align with the next CLI release tag).
+    6. Submit the community-extensions PR (repoint + version bump + rewrite
+       extended_description).
+    7. After merge + one green rebuild, archive the standalone and revert the
+       "being republished" doc notes.
+
+  ## Release-cut question (answered, for the record)
+
+  No full product release is required to fix the community channel. The
+  community build pulls SOURCE from a git ref — it does not consume the GitHub
+  binaries, Homebrew, or crates.io. It needs only a git tag/commit containing
+  the fixed extension + scaffolding, plus a `version:` bump in the registry
+  `description.yml`. Practically, align the tag with the next CLI release so
+  the extension version tracks the CLI version.
+
+  ## Pin-strategy decision required (ac-01)
+
+  An exact `=` pin guarantees another 404 on the next DuckDB patch. The spec
+  must decide: loosen to a compatible range, or accept a bump-and-re-PR each
+  DuckDB release. This ongoing maintenance tax is the real cost of keeping the
+  community channel, and is worth weighing against choice 0063 Option A
+  (deregister; rely on Homebrew + cargo install).
+
+  ## Out of scope
+
+  - The CLI binary public release (does not depend on this; ships with the
+    honest "being republished" docs already in place).
+  - Any Sense/model retrain or taxonomy change.
+  - WASM / musl platform support (already excluded in the registry).
+
+  ## Decisions
+
+  Implements choice 0063 (Consolidate DuckDB Extension In-Tree, Repoint
+  Community-Extensions Registry — accepted). ac-01 may amend 0063 or add a new
+  choice recording the pin strategy.
+
+cards:
+- 0007-duckdb-sql-extension
+status: open
+labels:
+- duckdb
+- distribution
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Pin strategy decided and recorded. Write a short decision (amend
+    choice 0063 or add a new choice) settling whether the in-tree extension
+    pins `duckdb`/`libduckdb-sys` to an exact DuckDB version (and accepts a
+    bump-and-re-PR per DuckDB release) or to a compatible range. Name the
+    maintenance commitment either choice implies, and confirm Option B
+    (consolidate) still beats Option A (deregister) given that cost.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-02
+  description: |
+    DuckDB crate bumped and the in-tree extension builds against current
+    DuckDB. Update the workspace `duckdb` + `libduckdb-sys` pins (currently
+    `=1.4.4`) to the duckdb-rs release tracking the target DuckDB version
+    (current DuckDB is 1.5.3; the standalone tracked 1.5.0 via `=1.10500.0`),
+    per the ac-01 strategy. Fix any 1.4→1.5 Rust API breakage in
+    `crates/finetype-duckdb/src/`. `cargo build -p finetype_duckdb --release`
+    succeeds.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    Built artifact loads and functions work on current DuckDB. `make
+    build-release` produces `finetype_duckdb.duckdb_extension`; loaded unsigned
+    in a current DuckDB (v1.5.3), each scalar function returns correct results:
+    finetype(), finetype_detail(), finetype_cast(), finetype_unpack(),
+    finetype_validate(). Capture a transcript.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    Community build scaffolding vendored in-tree (choice 0063 step 2). Add the
+    `extension-ci-tools` submodule, `configure/`, and a Makefile target that
+    builds a per-platform `.duckdb_extension` matching the community-extensions
+    build contract, runnable from the workspace root. Document the build in
+    docs/DEVELOPMENT.md.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-05
+  description: |
+    CI produces the extension artifact. A GitHub Actions job in
+    meridian-online/finetype builds the `.duckdb_extension` for the registry's
+    target platforms (the registry excludes wasm_* and linux_amd64_musl), so a
+    tagged ref is buildable by community-extensions CI without manual steps.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-06
+  description: |
+    A buildable ref is tagged. Tag the commit that contains the bumped deps +
+    scaffolding (align with the next CLI release tag where practical) so the
+    registry `repo.ref` can point at a stable tag, not a floating commit.
+  gate: false
+  checked: false
+  ac_type: ops
+- id: ac-07
+  description: |
+    community-extensions PR raised. PR to duckdb/community-extensions updating
+    extensions/finetype/description.yml: `repo.github` → meridian-online/finetype,
+    `repo.ref` → the new tag, `version` bumped, and `extended_description`
+    rewritten to the current architecture (multi-branch sherlock, single
+    forward pass, 240 types — drop "tiered CharCNN / 34 CNNs / 250 types").
+    Reply to the open issue #3 (DuckDB pin bump request from @rustyconover).
+  gate: false
+  checked: false
+  ac_type: ops
+- id: ac-08
+  description: |
+    Community install verified working. After the PR merges and the rebuild
+    lands, `community-extensions.duckdb.org/v1.5.3/osx_arm64/finetype.duckdb_extension.gz`
+    returns HTTP 200 and `INSTALL finetype FROM community; LOAD finetype;`
+    succeeds on a clean DuckDB v1.5.3, with finetype('user@example.com')
+    returning identity.person.email.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-09
+  description: |
+    Standalone repo retired. After one green community rebuild cycle, archive
+    meridian-online/duckdb-finetype (close issue #3 with a pointer to the
+    in-tree source).
+  gate: false
+  checked: false
+  ac_type: ops
+- id: ac-10
+  description: |
+    Docs reverted to the working install. Once ac-08 holds, restore the
+    `INSTALL finetype FROM community;` instruction in README.md and the web
+    repo (duckdb-extension.mdx, quick-start.mdx, parquet guide), removing the
+    interim "being republished / build from source" notes.
+  gate: false
+  checked: false
+  ac_type: doc
