@@ -1,0 +1,5 @@
+key: duckdb-ext-vendored-openssl
+body: The DuckDB extension (crates/finetype-duckdb) MUST keep openssl = { version="0.10", features=["vendored"] } as a direct dep. hf-hub + tokenizers pull OpenSSL transitively via native-tls. The community-extensions Linux build container sets OPENSSL_DIR to a vcpkg prefix that has NO OpenSSL, so a system build of openssl-sys panics ('OpenSSL include directory does not exist') and the distribution CI fails on linux_amd64. Vendored makes openssl-sys compile its own copy and ignore OPENSSL_DIR. rustls is hard here because feature-unification forces native-tls back on through both hf-hub defaults and tokenizers' internal hf-hub dep. The CLI binary release (cargo build -p finetype-cli on GitHub runners) is unaffected because those runners have system OpenSSL. Surfaced 2026-06-03 cutting v0.6.21.
+timestamp: 2026-06-02T19:42:57.145357Z
+labels:
+- topology

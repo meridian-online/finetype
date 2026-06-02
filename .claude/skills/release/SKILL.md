@@ -127,10 +127,33 @@ Cut a GitHub release with cross-platform binaries.
 
 #### 1. Pre-flight Checks
 
+Run these and **stop on any failure** — a binary release that fails build ships nothing (publish jobs skip when builds fail), so every gap here is caught the hard way in CI.
+
 1. **CI is green** — all jobs on the current main branch must pass.
 2. **No uncommitted changes** — `git status` must be clean.
 3. **Tests pass locally** — `cargo test -p finetype-model` must pass.
 4. **Zero warnings** — `cargo build --workspace 2>&1 | grep "^warning\[" | head -1` must be empty.
+5. **Model symlink ↔ CI env agree** — `embed-models` (default feature) bakes the `models/default` target into the binary via `build.rs`, and CI only downloads the model named by `FINETYPE_CI_MODEL`. If they diverge, every platform build fails with `Flat model not found at "models/<name>"`. Assert all three match:
+
+   ```bash
+   DEFAULT=$(basename "$(readlink models/default)")
+   CI_MODEL=$(grep -h 'FINETYPE_CI_MODEL:' .github/workflows/ci.yml .github/workflows/release.yml | awk '{print $2}' | sort -u)
+   echo "models/default → $DEFAULT"
+   echo "FINETYPE_CI_MODEL → $CI_MODEL"
+   # All three values MUST be identical. If not, fix the drift before tagging
+   # (bump FINETYPE_CI_MODEL in both workflows, or revert the symlink).
+   ```
+
+6. **Default model is published on HuggingFace** — bumping `FINETYPE_CI_MODEL` is useless if the weights aren't uploaded; CI's download 404s. Confirm the `models/default` target is fetchable before tagging:
+
+   ```bash
+   curl -sfI "https://huggingface.co/meridian-online/finetype-model/resolve/main/$DEFAULT/model.safetensors" >/dev/null \
+     && echo "$DEFAULT published" || echo "MISSING — run /release model first"
+   ```
+
+   If it 404s, the model has not been released — run the **Model Release** flow first.
+
+7. **Windows bundled-DuckDB risk (only if the duckdb pin changed)** — `finetype-cli` pulls `libduckdb-sys` transitively (finetype-cli → finetype-train → duckdb), so a workspace `duckdb` pin bump recompiles bundled DuckDB C++ on every platform, including Windows MSVC. New DuckDB releases have broken MSVC builds (e.g. 1.5.3 fmt `checked_array_iterator` C2061). If `git diff v{prev}..HEAD -- Cargo.toml` touches the `duckdb`/`libduckdb-sys` pins, confirm a Windows build has gone green on a PR before tagging — the local toolchain can't reproduce the MSVC failure.
 
 #### 2. Bump Version
 
