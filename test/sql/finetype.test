@@ -1,0 +1,114 @@
+# name: test/sql/finetype.test
+# description: smoke test for the finetype DuckDB extension
+# group: [finetype]
+#
+# Assertions are anchored on the structural contract (functions registered,
+# NULL/empty handling, JSON shape, cast pass-through) and on validation-backed
+# semantic types (ipv4, url, iso date, boolean) that the Sharpen stage confirms
+# and which therefore stay stable across Sense-model retrains. Model-dependent
+# single-value labels (e.g. a bare email or UUID) are deliberately not asserted
+# here so a routine retrain does not break the community rebuild.
+
+# Before loading the extension, finetype() does not exist.
+statement error
+SELECT finetype('hello');
+----
+Catalog Error
+
+# Load the extension from now on.
+require finetype
+
+# Version string is well-formed.
+query I
+SELECT finetype_version() LIKE 'finetype %';
+----
+true
+
+# Validation-backed types are stable.
+query I
+SELECT finetype('https://example.com');
+----
+technology.internet.url
+
+query I
+SELECT finetype('2024-01-15');
+----
+datetime.date.iso
+
+query I
+SELECT finetype('true');
+----
+representation.boolean.terms
+
+query I
+SELECT finetype('192.168.1.1');
+----
+technology.internet.ip_v4
+
+# NULL passes through as NULL.
+query I
+SELECT finetype(NULL);
+----
+NULL
+
+# Empty string is unknown.
+query I
+SELECT finetype('');
+----
+unknown
+
+# Any string input classifies without error.
+statement ok
+SELECT finetype('user@example.com');
+
+# finetype_detail() returns JSON carrying the type and a duckdb_type.
+query I
+SELECT finetype_detail('192.168.1.1') LIKE '%technology.internet.ip_v4%';
+----
+true
+
+query I
+SELECT finetype_detail('192.168.1.1') LIKE '%INET%';
+----
+true
+
+# finetype_cast() normalizes a boolean.
+query I
+SELECT finetype_cast('true');
+----
+true
+
+# finetype_cast() passes a UUID through unchanged.
+query I
+SELECT finetype_cast('550e8400-e29b-41d4-a716-446655440000');
+----
+550e8400-e29b-41d4-a716-446655440000
+
+# finetype_unpack() annotates a JSON object's fields.
+query I
+SELECT finetype_unpack('{"ip": "10.0.0.1"}') LIKE '%technology.internet.ip_v4%';
+----
+true
+
+# finetype_unpack() on non-JSON returns NULL.
+query I
+SELECT finetype_unpack('not json');
+----
+NULL
+
+# finetype_validate() checks a value against a named type (value, type).
+statement ok
+SELECT finetype_validate('192.168.1.1', 'technology.internet.ip_v4');
+
+# Column classification uses chunk-as-sample: finetype() over a column reads the
+# whole chunk as one sample and returns a single type for it. A homogeneous IPv4
+# column therefore classifies as ip_v4 for every row.
+statement ok
+CREATE TABLE ips AS SELECT * FROM (
+    VALUES ('192.168.1.1'), ('10.0.0.1'), ('172.16.0.5'), ('8.8.8.8')
+) AS t(value);
+
+query I
+SELECT DISTINCT finetype(value) FROM ips;
+----
+technology.internet.ip_v4

@@ -101,6 +101,10 @@ data/cldr/json/
 # DuckDB extension build
 extension/build/
 *.duckdb_extension
+# community-extensions build contract (extension-ci-tools) generated state
+/build/
+/configure/venv/
+/configure/platform.txt
 
 # Python
 __pycache__/

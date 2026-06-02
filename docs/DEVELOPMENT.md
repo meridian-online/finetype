@@ -101,26 +101,46 @@ crates/finetype-train/
 
 ## DuckDB Extension Build
 
-The DuckDB extension requires metadata appended to the compiled shared library. This is handled by the `finetype-build-tools` crate.
+The DuckDB extension is the in-tree workspace crate `finetype_duckdb` (`crates/finetype-duckdb/`). Its cdylib lib name is `finetype` (set in that crate's `Cargo.toml`), so the compiled library is `libfinetype.{dylib,so,dll}` and the loadable artifact is `finetype.duckdb_extension` — the package stays `finetype_duckdb` so `cargo build -p finetype_duckdb` is unchanged. A DuckDB metadata footer must be appended to the compiled library before it will load.
+
+There are two build paths, both producing a `finetype.duckdb_extension` that loads unsigned (`duckdb -unsigned`):
+
+### 1. Local quick build (pure Rust, no Python)
 
 ```bash
-# Full release build (includes metadata appending)
 make build-release
+```
 
-# The metadata tool can also be used standalone:
+This builds the cdylib, then appends metadata with the `finetype-build-tools` crate. It detects the platform (`.dylib` on macOS, `.so` on Linux) and stamps the **stable** C API (`--abi-type C_STRUCT`) at the `v1.2.0` floor, so one artifact loads on DuckDB 1.2 through 1.5+. The artifact lands at `target/release/finetype.duckdb_extension`. The metadata tool can also be run standalone:
+
+```bash
 cargo run -p finetype-build-tools --bin append-duckdb-metadata -- \
-    -l target/release/libfinetype_duckdb.so \
-    -n finetype_duckdb \
-    -o target/release/finetype_duckdb.duckdb_extension \
-    -p linux_amd64 \
+    -l target/release/libfinetype.dylib \
+    -n finetype \
+    -o target/release/finetype.duckdb_extension \
+    -p osx_arm64 \
     --duckdb-version v1.2.0 \
-    --extension-version 0.5.1 \
+    --extension-version 0.6.20 \
     --abi-type C_STRUCT
 ```
 
-The metadata format follows DuckDB's extension specification: a WebAssembly custom section (`duckdb_signature`) containing platform, version, and ABI type fields, plus 256 bytes reserved for signing.
+The metadata format follows DuckDB's extension specification: a custom section (`duckdb_signature`) carrying platform, version, and ABI type fields, plus 256 bytes reserved for signing.
 
-If the build tool is unavailable, `make build-release` falls back to copying the raw `.so` without metadata (the extension will load with `-unsigned` flag only).
+### 2. Community-extensions build contract (extension-ci-tools)
+
+This is the path `duckdb/community-extensions` CI uses when it rebuilds the registered extension. It is driven by the vendored `extension-ci-tools` submodule (pinned to `v1.5.3`) plus the `configure/` directory and the contract targets in the root `Makefile`. It needs Python 3 (for the venv + metadata script) and a Rust toolchain.
+
+```bash
+git submodule update --init --recursive   # first time only
+make configure                            # creates configure/venv, detects platform + version
+make release                              # builds finetype_duckdb, stamps metadata
+# artifact: build/release/finetype.duckdb_extension
+make test_release                         # runs test/sql/*.test via the DuckDB sqllogictest runner
+```
+
+The contract targets (`configure`, `release`, `debug`, `test_release`, `test_debug`) build the single workspace member `finetype_duckdb` — not the whole workspace — and copy the cdylib into `build/release/`. They include `extension-ci-tools/makefiles/c_api_extensions/base.Makefile` but **not** its `rust.Makefile`, because the stock rust.Makefile runs a whole-workspace `cargo build` that would pull in the heavy `finetype-train`/`finetype-eval` deps (bundled DuckDB, candle).
+
+**Stable C API is the whole point.** `USE_UNSTABLE_C_API` is deliberately left unset, so metadata stamps the stable `C_STRUCT` ABI at `TARGET_DUCKDB_VERSION = v1.2.0`. The standalone repo used the *unstable* C API, which version-locks each artifact to one exact DuckDB release — that was the root cause of the community-channel 404 when DuckDB shipped 1.5.2/1.5.3. See choice 0063 (pin-strategy addendum).
 
 ## Related Repositories
 

@@ -3,7 +3,7 @@
 SHELL := /bin/bash
 
 TAXONOMY_DIR   := labels
-EXTENSION      := target/release/finetype_duckdb.duckdb_extension
+EXTENSION      := target/release/finetype.duckdb_extension
 
 # ─── Dataset paths (override via env vars or eval/config.env) ────
 # These defaults match eval/config.env. Export env vars to override.
@@ -72,19 +72,29 @@ build-release:
 	cargo build --release
 	cargo build -p finetype_duckdb --release
 	cargo build -p finetype-build-tools --release
-	@# Append DuckDB extension metadata to the .so (pure Rust, no Python)
-	@if [ -f target/release/append-duckdb-metadata ]; then \
+	@# Append DuckDB extension metadata to the cdylib (pure Rust, no Python).
+	@# The cdylib lib name is `finetype` (see crates/finetype-duckdb/Cargo.toml),
+	@# so the artifact is lib finetype.{dylib,so} per platform. Stamp the STABLE
+	@# C API (C_STRUCT) at the v1.2.0 floor so one artifact loads on DuckDB 1.2+
+	@# (choice 0063). For the community-extensions build contract use `make
+	@# configure release` instead, which drives extension-ci-tools.
+	@libext=$$([ "$$(uname -s)" = "Darwin" ] && echo dylib || echo so); \
+	libpath=target/release/libfinetype.$$libext; \
+	if [ ! -f $$libpath ]; then \
+		echo "✗ $$libpath not found after build"; exit 1; \
+	fi; \
+	if [ -f target/release/append-duckdb-metadata ]; then \
 		target/release/append-duckdb-metadata \
-			-l target/release/libfinetype_duckdb.so \
-			-n finetype_duckdb \
-			-o target/release/finetype_duckdb.duckdb_extension \
-			-p $$(echo "SELECT platform FROM pragma_platform();" | duckdb -noheader -csv 2>/dev/null || echo "linux_amd64") \
+			-l $$libpath \
+			-n finetype \
+			-o target/release/finetype.duckdb_extension \
+			-p $$(echo "SELECT platform FROM pragma_platform();" | duckdb -noheader -csv 2>/dev/null || echo "$$([ "$$(uname -s)" = "Darwin" ] && echo "$$([ "$$(uname -m)" = "arm64" ] && echo osx_arm64 || echo osx_amd64)" || echo linux_amd64)") \
 			--duckdb-version v1.2.0 \
-			--extension-version $$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/') \
+			--extension-version $$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1) \
 			--abi-type C_STRUCT; \
 	else \
-		echo "⚠ append-duckdb-metadata not found — copying .so without metadata"; \
-		cp target/release/libfinetype_duckdb.so target/release/finetype_duckdb.duckdb_extension; \
+		echo "⚠ append-duckdb-metadata not found — copying lib without metadata"; \
+		cp $$libpath target/release/finetype.duckdb_extension; \
 	fi
 
 check:
@@ -343,3 +353,61 @@ stats:
 
 taxonomy:
 	@cargo run -- taxonomy 2>&1 | head -10
+
+# ─── Community-extensions build contract ──────────────────────────────────────
+# Drives the DuckDB extension-ci-tools makefiles so a tagged ref of this repo is
+# buildable by duckdb/community-extensions CI without manual steps. The community
+# harness runs `make configure_ci` then `make release` / `make test_release` at
+# the repo root; the targets below satisfy that contract while building the
+# in-tree workspace member `finetype_duckdb` (not the whole workspace).
+#
+# STABLE C API: USE_UNSTABLE_C_API is deliberately left unset → append metadata
+# stamps the stable C_STRUCT ABI at the v1.2.0 floor, so one artifact loads on
+# DuckDB 1.2 through 1.5+ (choice 0063 pin-strategy addendum). This is the fix
+# for the community-channel 404 — the standalone repo used the *unstable* C API,
+# which version-locked each artifact to one exact DuckDB release.
+#
+# Local quick build (no Python): use `make build-release` above instead.
+EXTENSION_NAME        := finetype
+TARGET_DUCKDB_VERSION := v1.2.0
+
+include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
+
+# Cross-compile target selection (the community matrix builds osx_arm64 + osx_amd64
+# from a single macOS runner). Mirrors extension-ci-tools/rust.Makefile, but our
+# build targets a single workspace member rather than the whole workspace.
+DUCKDB_CARGO_TARGET :=
+DUCKDB_CARGO_OUT    := target
+ifeq ($(DUCKDB_PLATFORM),osx_amd64)
+	DUCKDB_CARGO_TARGET := --target x86_64-apple-darwin
+	DUCKDB_CARGO_OUT    := target/x86_64-apple-darwin
+else ifeq ($(DUCKDB_PLATFORM),osx_arm64)
+	DUCKDB_CARGO_TARGET := --target aarch64-apple-darwin
+	DUCKDB_CARGO_OUT    := target/aarch64-apple-darwin
+endif
+
+.PHONY: configure all release debug test_release test_debug clean_ext clean_ext_all
+
+configure: venv platform extension_version
+all: release
+
+build_extension_library_release: check_configure
+	DUCKDB_EXTENSION_NAME=$(EXTENSION_NAME) DUCKDB_EXTENSION_MIN_DUCKDB_VERSION=$(TARGET_DUCKDB_VERSION) \
+		cargo build -p finetype_duckdb --release $(DUCKDB_CARGO_TARGET)
+	mkdir -p $(EXTENSION_BUILD_PATH)/release/extension/$(EXTENSION_NAME)
+	cp $(DUCKDB_CARGO_OUT)/release/$(EXTENSION_LIB_FILENAME) $(EXTENSION_BUILD_PATH)/release/$(EXTENSION_LIB_FILENAME)
+
+build_extension_library_debug: check_configure
+	DUCKDB_EXTENSION_NAME=$(EXTENSION_NAME) DUCKDB_EXTENSION_MIN_DUCKDB_VERSION=$(TARGET_DUCKDB_VERSION) \
+		cargo build -p finetype_duckdb $(DUCKDB_CARGO_TARGET)
+	mkdir -p $(EXTENSION_BUILD_PATH)/debug/extension/$(EXTENSION_NAME)
+	cp $(DUCKDB_CARGO_OUT)/debug/$(EXTENSION_LIB_FILENAME) $(EXTENSION_BUILD_PATH)/debug/$(EXTENSION_LIB_FILENAME)
+
+release: build_extension_library_release build_extension_with_metadata_release
+debug:   build_extension_library_debug   build_extension_with_metadata_debug
+
+test_release: test_extension_release
+test_debug:   test_extension_debug
+
+clean_ext:     clean_build
+clean_ext_all: clean_configure clean_build

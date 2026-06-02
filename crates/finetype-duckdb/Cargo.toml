@@ -6,7 +6,12 @@ license.workspace = true
 description = "DuckDB extension for semantic type classification"
 publish = false
 
+# The produced artifact is `libfinetype.{dylib,so,dll}` — the community-extensions
+# build contract derives the library filename from the extension name (`finetype`),
+# not the package name. Keeping the package `finetype_duckdb` preserves the
+# documented `cargo build -p finetype_duckdb` command.
 [lib]
+name = "finetype"
 crate-type = ["cdylib"]
 
 [dependencies]

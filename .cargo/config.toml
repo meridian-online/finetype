@@ -1,0 +1,4 @@
+# Statically link the C runtime on Windows so the loadable extension has no
+# external MSVC runtime dependency (community-extensions build contract).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]
