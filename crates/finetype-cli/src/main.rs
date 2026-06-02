@@ -734,9 +734,8 @@ fn cmd_infer_explain_batch(taxonomy_path: &std::path::Path) -> Result<()> {
         if line.trim().is_empty() {
             continue;
         }
-        let input: InferInput = serde_json::from_str(&line).map_err(|e| {
-            anyhow::anyhow!("failed to parse stdin JSON line ({}): {}", e, line)
-        })?;
+        let input: InferInput = serde_json::from_str(&line)
+            .map_err(|e| anyhow::anyhow!("failed to parse stdin JSON line ({}): {}", e, line))?;
         let result = infer(&taxonomy, &input);
         writeln!(out, "{}", serde_json::to_string(&result)?)?;
     }
@@ -3178,7 +3177,10 @@ fn cmd_validate_table(
             // matches the CSV path's all_varchar=true contract — typed
             // transforms (REGEXP_REPLACE, LIKE, TRY_CAST) downstream assume
             // VARCHAR staging cells.
-            format!("(SELECT COLUMNS(*)::VARCHAR FROM read_parquet({}))", input_literal)
+            format!(
+                "(SELECT COLUMNS(*)::VARCHAR FROM read_parquet({}))",
+                input_literal
+            )
         } else {
             format!("read_csv({}, header=true, all_varchar=true)", input_literal)
         };
@@ -3595,9 +3597,8 @@ fn cmd_profile(
             err.exit();
         }
         if let Some(ref od) = out_dir {
-            std::fs::create_dir_all(od).map_err(|e| {
-                anyhow::anyhow!("could not create --out-dir {:?}: {}", od, e)
-            })?;
+            std::fs::create_dir_all(od)
+                .map_err(|e| anyhow::anyhow!("could not create --out-dir {:?}: {}", od, e))?;
         }
     }
 
@@ -3684,87 +3685,180 @@ fn cmd_profile(
                 .as_ref()
                 .expect("--out-dir is required with --files (clap-validated)")
                 .join(format!("{}.{}", stem, batch_ext));
-            Box::new(std::io::BufWriter::new(std::fs::File::create(&out_path).map_err(
-                |e| anyhow::anyhow!("could not create output {:?}: {}", out_path, e),
-            )?))
+            Box::new(std::io::BufWriter::new(
+                std::fs::File::create(&out_path).map_err(|e| {
+                    anyhow::anyhow!("could not create output {:?}: {}", out_path, e)
+                })?,
+            ))
         } else {
             Box::new(std::io::BufWriter::new(std::io::stdout()))
         };
 
-    eprintln!("Reading {:?}", file);
+        eprintln!("Reading {:?}", file);
 
-    // Detect file format by extension
-    let ext = file
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .unwrap_or_default();
-    let is_json_input = matches!(ext.as_str(), "json" | "ndjson" | "jsonl");
+        // Detect file format by extension
+        let ext = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .unwrap_or_default();
+        let is_json_input = matches!(ext.as_str(), "json" | "ndjson" | "jsonl");
 
-    let (headers, columns, row_count) = if is_json_input {
-        read_json_input(&file, &ext)?
-    } else {
-        read_csv_input(&file, delimiter)?
-    };
+        let (headers, columns, row_count) = if is_json_input {
+            read_json_input(file, &ext)?
+        } else {
+            read_csv_input(file, delimiter)?
+        };
 
-    let n_cols = headers.len();
-    eprintln!("Read {} rows", row_count);
+        let n_cols = headers.len();
+        eprintln!("Read {} rows", row_count);
 
-    // Profile each column
-    struct ColProfile {
-        name: String,
-        label: String,
-        confidence: f32,
-        samples_used: usize,
-        non_null_count: usize,
-        null_count: usize,
-        disambiguation_applied: bool,
-        disambiguation_rule: Option<String>,
-        detected_locale: Option<String>,
-        // Taxonomy contract fields (NNFT-207)
-        broad_type: Option<String>,
-        format_string: Option<String>,
-        transform: Option<String>,
-        is_generic: bool,
-        // Validation quality fields (NNFT-212, NNFT-213)
-        quality: Option<ColProfileQuality>,
-        // Unique values for ENUM/categorical columns (NNFT-273)
-        unique_values: Option<Vec<String>>,
-    }
+        // Profile each column
+        struct ColProfile {
+            name: String,
+            label: String,
+            confidence: f32,
+            samples_used: usize,
+            non_null_count: usize,
+            null_count: usize,
+            disambiguation_applied: bool,
+            disambiguation_rule: Option<String>,
+            detected_locale: Option<String>,
+            // Taxonomy contract fields (NNFT-207)
+            broad_type: Option<String>,
+            format_string: Option<String>,
+            transform: Option<String>,
+            is_generic: bool,
+            // Validation quality fields (NNFT-212, NNFT-213)
+            quality: Option<ColProfileQuality>,
+            // Unique values for ENUM/categorical columns (NNFT-273)
+            unique_values: Option<Vec<String>>,
+        }
 
-    /// Per-column validation + quality data.
-    struct ColProfileQuality {
-        valid_count: usize,
-        invalid_count: usize,
-        null_count: usize,
-        score: finetype_core::ColumnQualityScore,
-        invalid_samples: Vec<String>,
-    }
+        /// Per-column validation + quality data.
+        struct ColProfileQuality {
+            valid_count: usize,
+            invalid_count: usize,
+            null_count: usize,
+            score: finetype_core::ColumnQualityScore,
+            invalid_samples: Vec<String>,
+        }
 
-    // Load taxonomy for enrichment (may already be loaded for validation)
-    let taxonomy_path = std::path::PathBuf::from("labels");
-    let enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
+        // Load taxonomy for enrichment (may already be loaded for validation)
+        let taxonomy_path = std::path::PathBuf::from("labels");
+        let enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
 
-    let mut profiles: Vec<ColProfile> = Vec::new();
+        let mut profiles: Vec<ColProfile> = Vec::new();
 
-    // NNFT-268: When sibling-context attention is available, classify all columns
-    // together so each column benefits from cross-column context.
-    if column_classifier.has_sibling_context() && !no_header_hint {
-        // Build column descriptors for all non-empty columns
-        let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new(); // (index, values, header_hint, name, null_count)
-        let mut empty_profiles: Vec<(usize, ColProfile)> = Vec::new();
+        // NNFT-268: When sibling-context attention is available, classify all columns
+        // together so each column benefits from cross-column context.
+        if column_classifier.has_sibling_context() && !no_header_hint {
+            // Build column descriptors for all non-empty columns
+            let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new(); // (index, values, header_hint, name, null_count)
+            let mut empty_profiles: Vec<(usize, ColProfile)> = Vec::new();
 
-        for (i, col_values) in columns.iter().enumerate() {
-            let name = headers
-                .get(i)
-                .cloned()
-                .unwrap_or_else(|| format!("col_{}", i));
-            let null_count = row_count - col_values.len();
+            for (i, col_values) in columns.iter().enumerate() {
+                let name = headers
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("col_{}", i));
+                let null_count = row_count - col_values.len();
 
-            if col_values.is_empty() {
-                empty_profiles.push((
-                    i,
+                if col_values.is_empty() {
+                    empty_profiles.push((
+                        i,
+                        ColProfile {
+                            name,
+                            label: "unknown".to_string(),
+                            confidence: 0.0,
+                            samples_used: 0,
+                            non_null_count: 0,
+                            null_count,
+                            disambiguation_applied: false,
+                            disambiguation_rule: None,
+                            detected_locale: None,
+                            broad_type: None,
+                            format_string: None,
+                            transform: None,
+                            is_generic: false,
+                            quality: None,
+                            unique_values: None,
+                        },
+                    ));
+                } else {
+                    let header_hint = if is_json_input {
+                        path_leaf(&name)
+                    } else {
+                        name.clone()
+                    };
+                    col_inputs.push((i, col_values.clone(), header_hint, name, null_count));
+                }
+            }
+
+            // Classify all non-empty columns with sibling context
+            let context_columns: Vec<(Vec<String>, String)> = col_inputs
+                .iter()
+                .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
+                .collect();
+            let context_results =
+                column_classifier.classify_columns_with_context(&context_columns)?;
+
+            // Merge results back in original order
+            let mut all_entries: Vec<(usize, ColProfile)> = Vec::new();
+            all_entries.extend(empty_profiles);
+            for ((idx, values, _, name, null_count), result) in
+                col_inputs.into_iter().zip(context_results)
+            {
+                let (broad_type, format_string, transform) =
+                    if let Some(ref taxonomy) = enrichment_taxonomy {
+                        if let Some(def) = taxonomy.get(&result.label) {
+                            (
+                                def.broad_type.clone(),
+                                def.format_string.clone(),
+                                def.transform.clone(),
+                            )
+                        } else {
+                            (None, None, None)
+                        }
+                    } else {
+                        (None, None, None)
+                    };
+                let unique_values =
+                    collect_unique_values_if_categorical(&result.label, &values, enum_threshold);
+                all_entries.push((
+                    idx,
                     ColProfile {
+                        name,
+                        label: result.label,
+                        confidence: result.confidence,
+                        samples_used: result.samples_used,
+                        non_null_count: values.len(),
+                        null_count,
+                        disambiguation_applied: result.disambiguation_applied,
+                        disambiguation_rule: result.disambiguation_rule,
+                        detected_locale: result.detected_locale,
+                        broad_type,
+                        format_string,
+                        transform,
+                        is_generic: result.is_generic,
+                        quality: None,
+                        unique_values,
+                    },
+                ));
+            }
+            all_entries.sort_by_key(|(idx, _)| *idx);
+            profiles = all_entries.into_iter().map(|(_, p)| p).collect();
+        } else {
+            // Per-column classification (standard path)
+            for (i, col_values) in columns.iter().enumerate() {
+                let name = headers
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("col_{}", i));
+                let null_count = row_count - col_values.len();
+
+                if col_values.is_empty() {
+                    profiles.push(ColProfile {
                         name,
                         label: "unknown".to_string(),
                         confidence: 0.0,
@@ -3780,55 +3874,47 @@ fn cmd_profile(
                         is_generic: false,
                         quality: None,
                         unique_values: None,
-                    },
-                ));
-            } else {
+                    });
+                    continue;
+                }
+
+                // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
                 let header_hint = if is_json_input {
                     path_leaf(&name)
                 } else {
                     name.clone()
                 };
-                col_inputs.push((i, col_values.clone(), header_hint, name, null_count));
-            }
-        }
 
-        // Classify all non-empty columns with sibling context
-        let context_columns: Vec<(Vec<String>, String)> = col_inputs
-            .iter()
-            .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
-            .collect();
-        let context_results = column_classifier.classify_columns_with_context(&context_columns)?;
+                let result = if no_header_hint {
+                    column_classifier.classify_column(col_values)?
+                } else {
+                    column_classifier.classify_column_with_header(col_values, &header_hint)?
+                };
 
-        // Merge results back in original order
-        let mut all_entries: Vec<(usize, ColProfile)> = Vec::new();
-        all_entries.extend(empty_profiles);
-        for ((idx, values, _, name, null_count), result) in
-            col_inputs.into_iter().zip(context_results)
-        {
-            let (broad_type, format_string, transform) =
-                if let Some(ref taxonomy) = enrichment_taxonomy {
-                    if let Some(def) = taxonomy.get(&result.label) {
-                        (
-                            def.broad_type.clone(),
-                            def.format_string.clone(),
-                            def.transform.clone(),
-                        )
+                // Look up taxonomy contract fields for the predicted label
+                let (broad_type, format_string, transform) =
+                    if let Some(ref taxonomy) = enrichment_taxonomy {
+                        if let Some(def) = taxonomy.get(&result.label) {
+                            (
+                                def.broad_type.clone(),
+                                def.format_string.clone(),
+                                def.transform.clone(),
+                            )
+                        } else {
+                            (None, None, None)
+                        }
                     } else {
                         (None, None, None)
-                    }
-                } else {
-                    (None, None, None)
-                };
-            let unique_values =
-                collect_unique_values_if_categorical(&result.label, &values, enum_threshold);
-            all_entries.push((
-                idx,
-                ColProfile {
+                    };
+
+                let unique_values =
+                    collect_unique_values_if_categorical(&result.label, col_values, enum_threshold);
+                profiles.push(ColProfile {
                     name,
                     label: result.label,
                     confidence: result.confidence,
                     samples_used: result.samples_used,
-                    non_null_count: values.len(),
+                    non_null_count: col_values.len(),
                     null_count,
                     disambiguation_applied: result.disambiguation_applied,
                     disambiguation_rule: result.disambiguation_rule,
@@ -3839,464 +3925,384 @@ fn cmd_profile(
                     is_generic: result.is_generic,
                     quality: None,
                     unique_values,
-                },
-            ));
-        }
-        all_entries.sort_by_key(|(idx, _)| *idx);
-        profiles = all_entries.into_iter().map(|(_, p)| p).collect();
-    } else {
-        // Per-column classification (standard path)
-        for (i, col_values) in columns.iter().enumerate() {
-            let name = headers
-                .get(i)
-                .cloned()
-                .unwrap_or_else(|| format!("col_{}", i));
-            let null_count = row_count - col_values.len();
-
-            if col_values.is_empty() {
-                profiles.push(ColProfile {
-                    name,
-                    label: "unknown".to_string(),
-                    confidence: 0.0,
-                    samples_used: 0,
-                    non_null_count: 0,
-                    null_count,
-                    disambiguation_applied: false,
-                    disambiguation_rule: None,
-                    detected_locale: None,
-                    broad_type: None,
-                    format_string: None,
-                    transform: None,
-                    is_generic: false,
-                    quality: None,
-                    unique_values: None,
                 });
-                continue;
             }
+        } // end else (per-column path)
 
-            // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
-            let header_hint = if is_json_input {
-                path_leaf(&name)
-            } else {
-                name.clone()
-            };
-
-            let result = if no_header_hint {
-                column_classifier.classify_column(col_values)?
-            } else {
-                column_classifier.classify_column_with_header(col_values, &header_hint)?
-            };
-
-            // Look up taxonomy contract fields for the predicted label
-            let (broad_type, format_string, transform) =
-                if let Some(ref taxonomy) = enrichment_taxonomy {
-                    if let Some(def) = taxonomy.get(&result.label) {
-                        (
-                            def.broad_type.clone(),
-                            def.format_string.clone(),
-                            def.transform.clone(),
-                        )
-                    } else {
-                        (None, None, None)
-                    }
-                } else {
-                    (None, None, None)
-                };
-
-            let unique_values =
-                collect_unique_values_if_categorical(&result.label, col_values, enum_threshold);
-            profiles.push(ColProfile {
-                name,
-                label: result.label,
-                confidence: result.confidence,
-                samples_used: result.samples_used,
-                non_null_count: col_values.len(),
-                null_count,
-                disambiguation_applied: result.disambiguation_applied,
-                disambiguation_rule: result.disambiguation_rule,
-                detected_locale: result.detected_locale,
-                broad_type,
-                format_string,
-                transform,
-                is_generic: result.is_generic,
-                quality: None,
-                unique_values,
-            });
-        }
-    } // end else (per-column path)
-
-    // Output results
-    match output {
-        OutputFormat::Plain => {
-            println!(
-                "FineType Column Profile — {:?} ({} rows, {} columns)",
-                file, row_count, n_cols
-            );
-            println!("{}", "═".repeat(80));
-            println!();
-            if false {
-                // validate removed (AC-10)
+        // Output results
+        match output {
+            OutputFormat::Plain => {
                 println!(
-                    "  {:<25} {:<38} {:>8} {:>6} {:>8}",
-                    "COLUMN", "TYPE", "BROAD", "CONF", "VALID"
+                    "FineType Column Profile — {:?} ({} rows, {} columns)",
+                    file, row_count, n_cols
                 );
-            } else {
-                println!(
-                    "  {:<25} {:<38} {:>8} {:>6}",
-                    "COLUMN", "TYPE", "BROAD", "CONF"
-                );
-            }
-            println!("  {}", "─".repeat(78));
-
-            for p in &profiles {
-                let conf_str = if p.non_null_count > 0 {
-                    format!("{:.1}%", p.confidence * 100.0)
-                } else {
-                    "—".to_string()
-                };
-                let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                let disambig = if p.disambiguation_applied {
-                    format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
-                } else {
-                    String::new()
-                };
-                let locale_str = if let Some(locale) = &p.detected_locale {
-                    format!(" locale:{}", locale)
-                } else {
-                    String::new()
-                };
-                let quality_str = if false {
-                    // validate removed (AC-10)
-                    match &p.quality {
-                        Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
-                        None => "      —".to_string(),
-                    }
-                } else {
-                    String::new()
-                };
-                println!(
-                    "  {:<25} {:<38} {:>8} {:>6}{}{}{}",
-                    p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
-                );
-                // Show top 3 invalid samples inline (plain output, validate mode)
+                println!("{}", "═".repeat(80));
+                println!();
                 if false {
                     // validate removed (AC-10)
-                    if let Some(ref q) = p.quality {
-                        for sample in q.invalid_samples.iter().take(3) {
-                            println!("  {:>25} ⚠ \"{}\"", "", sample);
-                        }
-                    }
-                }
-            }
-
-            println!();
-            let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            if false {
-                // validate removed (AC-10)
-                let scores: Vec<_> = profiles
-                    .iter()
-                    .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
-                    .collect();
-                let grade = finetype_core::compute_file_grade(&scores);
-                println!(
-                    "{}/{} columns typed, {} rows analyzed — Quality: {}",
-                    typed_cols, n_cols, row_count, grade
-                );
-            } else {
-                println!(
-                    "{}/{} columns typed, {} rows analyzed",
-                    typed_cols, n_cols, row_count
-                );
-            }
-        }
-        OutputFormat::Json => {
-            let cols: Vec<serde_json::Value> = profiles
-                .iter()
-                .map(|p| {
-                    let mut obj = serde_json::Map::new();
-                    obj.insert("column".to_string(), json!(p.name));
-                    obj.insert("type".to_string(), json!(p.label));
-                    obj.insert("confidence".to_string(), json!(p.confidence));
-                    let resolved_broad =
-                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                    obj.insert("broad_type".to_string(), json!(resolved_broad));
-                    if let Some(fs) = &p.format_string {
-                        obj.insert("format_string".to_string(), json!(fs));
-                    }
-                    if let Some(tr) = &p.transform {
-                        obj.insert("transform".to_string(), json!(tr));
-                    }
-                    obj.insert("is_generic".to_string(), json!(p.is_generic));
-                    obj.insert("samples_used".to_string(), json!(p.samples_used));
-                    obj.insert("non_null".to_string(), json!(p.non_null_count));
-                    obj.insert("null".to_string(), json!(p.null_count));
-                    if p.disambiguation_applied {
-                        obj.insert("disambiguation_applied".to_string(), json!(true));
-                        if let Some(rule) = &p.disambiguation_rule {
-                            obj.insert("disambiguation_rule".to_string(), json!(rule));
-                        }
-                    }
-                    if let Some(locale) = &p.detected_locale {
-                        obj.insert("locale".to_string(), json!(locale));
-                    }
-                    // NNFT-273: Include unique values for categorical columns in verbose mode
-                    if verbose {
-                        if let Some(ref uv) = p.unique_values {
-                            obj.insert("unique_values".to_string(), json!(uv));
-                        }
-                    }
-                    if false {
-                        // validate removed (AC-10)
-                        match &p.quality {
-                            Some(q) => {
-                                let r = |v: f64| (v * 10000.0).round() / 10000.0;
-                                obj.insert(
-                                    "quality".to_string(),
-                                    json!({
-                                        "valid": q.valid_count,
-                                        "invalid": q.invalid_count,
-                                        "null": q.null_count,
-                                        "type_conforming_rate": r(q.score.type_conforming_rate),
-                                        "null_rate": r(q.score.null_rate),
-                                        "completeness": r(q.score.completeness),
-                                        "quality_score": r(q.score.quality_score),
-                                    }),
-                                );
-                                if !q.invalid_samples.is_empty() {
-                                    obj.insert(
-                                        "invalid_samples".to_string(),
-                                        json!(q.invalid_samples),
-                                    );
-                                }
-                            }
-                            None => {
-                                obj.insert("quality".to_string(), json!(null));
-                            }
-                        }
-                    }
-                    serde_json::Value::Object(obj)
-                })
-                .collect();
-
-            // Compute file-level grade when validation is active
-            let file_grade = if false {
-                // validate removed (AC-10)
-                let scores: Vec<_> = profiles
-                    .iter()
-                    .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
-                    .collect();
-                Some(finetype_core::compute_file_grade(&scores))
-            } else {
-                None
-            };
-
-            if is_json_input {
-                // Structured JSON output: reconstruct nested hierarchy
-                let schema_input: Vec<(String, String, Option<String>, f32)> = profiles
-                    .iter()
-                    .map(|p| {
-                        (
-                            p.name.clone(),
-                            p.label.clone(),
-                            p.broad_type.clone(),
-                            p.confidence,
-                        )
-                    })
-                    .collect();
-                let schema = reconstruct_json_schema(&schema_input);
-                let mut result = json!({
-                    "file": file.to_string_lossy(),
-                    "rows": row_count,
-                    "schema": schema,
-                    "columns": cols,
-                });
-                if let Some(grade) = &file_grade {
-                    result["grade"] = json!(grade.to_string());
-                }
-                println!("{}", serde_json::to_string_pretty(&result)?);
-            } else {
-                let mut result = json!({
-                    "file": file.to_string_lossy(),
-                    "rows": row_count,
-                    "columns": cols,
-                });
-                if let Some(grade) = &file_grade {
-                    result["grade"] = json!(grade.to_string());
-                }
-                println!("{}", serde_json::to_string_pretty(&result)?);
-            }
-        }
-        OutputFormat::Csv => {
-            println!("column,type,confidence,broad_type,format_string,transform,is_generic,samples_used,non_null,null,disambiguation,locale");
-            for p in &profiles {
-                println!(
-                    "\"{}\",\"{}\",{:.4},\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\",\"{}\"",
-                    p.name,
-                    p.label,
-                    p.confidence,
-                    p.broad_type.as_deref().unwrap_or(""),
-                    p.format_string.as_deref().unwrap_or(""),
-                    p.transform.as_deref().unwrap_or(""),
-                    p.is_generic,
-                    p.samples_used,
-                    p.non_null_count,
-                    p.null_count,
-                    p.disambiguation_rule.as_deref().unwrap_or(""),
-                    p.detected_locale.as_deref().unwrap_or("")
-                );
-            }
-        }
-        OutputFormat::Markdown => {
-            println!(
-                "## FineType Column Profile — `{}`\n",
-                file.to_string_lossy()
-            );
-            println!("{} rows, {} columns\n", row_count, n_cols);
-            if false {
-                // validate removed (AC-10)
-                println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
-                println!("|--------|------|-----------|----------:|-----------:|--------:|");
-            } else {
-                println!("| Column | Type | Broad Type | Confidence |");
-                println!("|--------|------|-----------|----------:|");
-            }
-            for p in &profiles {
-                let conf_str = if p.non_null_count > 0 {
-                    format!("{:.1}%", p.confidence * 100.0)
-                } else {
-                    "—".to_string()
-                };
-                let broad = resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
-                if false {
-                    // validate removed (AC-10)
-                    let (valid_str, score_str) = match &p.quality {
-                        Some(q) => (
-                            format!("{:.1}%", q.score.type_conforming_rate * 100.0),
-                            format!("{:.1}%", q.score.quality_score * 100.0),
-                        ),
-                        None => ("—".to_string(), "—".to_string()),
-                    };
                     println!(
-                        "| {} | `{}` | {} | {} | {} | {} |",
-                        p.name, p.label, broad, conf_str, valid_str, score_str
+                        "  {:<25} {:<38} {:>8} {:>6} {:>8}",
+                        "COLUMN", "TYPE", "BROAD", "CONF", "VALID"
                     );
                 } else {
-                    println!("| {} | `{}` | {} | {} |", p.name, p.label, broad, conf_str);
+                    println!(
+                        "  {:<25} {:<38} {:>8} {:>6}",
+                        "COLUMN", "TYPE", "BROAD", "CONF"
+                    );
+                }
+                println!("  {}", "─".repeat(78));
+
+                for p in &profiles {
+                    let conf_str = if p.non_null_count > 0 {
+                        format!("{:.1}%", p.confidence * 100.0)
+                    } else {
+                        "—".to_string()
+                    };
+                    let broad =
+                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+                    let disambig = if p.disambiguation_applied {
+                        format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
+                    } else {
+                        String::new()
+                    };
+                    let locale_str = if let Some(locale) = &p.detected_locale {
+                        format!(" locale:{}", locale)
+                    } else {
+                        String::new()
+                    };
+                    let quality_str = if false {
+                        // validate removed (AC-10)
+                        match &p.quality {
+                            Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
+                            None => "      —".to_string(),
+                        }
+                    } else {
+                        String::new()
+                    };
+                    println!(
+                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}",
+                        p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
+                    );
+                    // Show top 3 invalid samples inline (plain output, validate mode)
+                    if false {
+                        // validate removed (AC-10)
+                        if let Some(ref q) = p.quality {
+                            for sample in q.invalid_samples.iter().take(3) {
+                                println!("  {:>25} ⚠ \"{}\"", "", sample);
+                            }
+                        }
+                    }
+                }
+
+                println!();
+                let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
+                if false {
+                    // validate removed (AC-10)
+                    let scores: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                        .collect();
+                    let grade = finetype_core::compute_file_grade(&scores);
+                    println!(
+                        "{}/{} columns typed, {} rows analyzed — Quality: {}",
+                        typed_cols, n_cols, row_count, grade
+                    );
+                } else {
+                    println!(
+                        "{}/{} columns typed, {} rows analyzed",
+                        typed_cols, n_cols, row_count
+                    );
                 }
             }
-            let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
-            if false {
-                // validate removed (AC-10)
-                let scores: Vec<_> = profiles
+            OutputFormat::Json => {
+                let cols: Vec<serde_json::Value> = profiles
                     .iter()
-                    .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
-                    .collect();
-                let grade = finetype_core::compute_file_grade(&scores);
-                println!(
-                    "\n{}/{} columns typed — **Quality: {}**",
-                    typed_cols, n_cols, grade
-                );
-                // Data Issues section for columns with invalid samples
-                let issues: Vec<_> = profiles
-                    .iter()
-                    .filter_map(|p| {
-                        p.quality.as_ref().and_then(|q| {
-                            if q.invalid_samples.is_empty() {
-                                None
-                            } else {
-                                Some((&p.name, &q.invalid_samples))
+                    .map(|p| {
+                        let mut obj = serde_json::Map::new();
+                        obj.insert("column".to_string(), json!(p.name));
+                        obj.insert("type".to_string(), json!(p.label));
+                        obj.insert("confidence".to_string(), json!(p.confidence));
+                        let resolved_broad =
+                            resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+                        obj.insert("broad_type".to_string(), json!(resolved_broad));
+                        if let Some(fs) = &p.format_string {
+                            obj.insert("format_string".to_string(), json!(fs));
+                        }
+                        if let Some(tr) = &p.transform {
+                            obj.insert("transform".to_string(), json!(tr));
+                        }
+                        obj.insert("is_generic".to_string(), json!(p.is_generic));
+                        obj.insert("samples_used".to_string(), json!(p.samples_used));
+                        obj.insert("non_null".to_string(), json!(p.non_null_count));
+                        obj.insert("null".to_string(), json!(p.null_count));
+                        if p.disambiguation_applied {
+                            obj.insert("disambiguation_applied".to_string(), json!(true));
+                            if let Some(rule) = &p.disambiguation_rule {
+                                obj.insert("disambiguation_rule".to_string(), json!(rule));
                             }
+                        }
+                        if let Some(locale) = &p.detected_locale {
+                            obj.insert("locale".to_string(), json!(locale));
+                        }
+                        // NNFT-273: Include unique values for categorical columns in verbose mode
+                        if verbose {
+                            if let Some(ref uv) = p.unique_values {
+                                obj.insert("unique_values".to_string(), json!(uv));
+                            }
+                        }
+                        if false {
+                            // validate removed (AC-10)
+                            match &p.quality {
+                                Some(q) => {
+                                    let r = |v: f64| (v * 10000.0).round() / 10000.0;
+                                    obj.insert(
+                                        "quality".to_string(),
+                                        json!({
+                                            "valid": q.valid_count,
+                                            "invalid": q.invalid_count,
+                                            "null": q.null_count,
+                                            "type_conforming_rate": r(q.score.type_conforming_rate),
+                                            "null_rate": r(q.score.null_rate),
+                                            "completeness": r(q.score.completeness),
+                                            "quality_score": r(q.score.quality_score),
+                                        }),
+                                    );
+                                    if !q.invalid_samples.is_empty() {
+                                        obj.insert(
+                                            "invalid_samples".to_string(),
+                                            json!(q.invalid_samples),
+                                        );
+                                    }
+                                }
+                                None => {
+                                    obj.insert("quality".to_string(), json!(null));
+                                }
+                            }
+                        }
+                        serde_json::Value::Object(obj)
+                    })
+                    .collect();
+
+                // Compute file-level grade when validation is active
+                let file_grade = if false {
+                    // validate removed (AC-10)
+                    let scores: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                        .collect();
+                    Some(finetype_core::compute_file_grade(&scores))
+                } else {
+                    None
+                };
+
+                if is_json_input {
+                    // Structured JSON output: reconstruct nested hierarchy
+                    let schema_input: Vec<(String, String, Option<String>, f32)> = profiles
+                        .iter()
+                        .map(|p| {
+                            (
+                                p.name.clone(),
+                                p.label.clone(),
+                                p.broad_type.clone(),
+                                p.confidence,
+                            )
+                        })
+                        .collect();
+                    let schema = reconstruct_json_schema(&schema_input);
+                    let mut result = json!({
+                        "file": file.to_string_lossy(),
+                        "rows": row_count,
+                        "schema": schema,
+                        "columns": cols,
+                    });
+                    if let Some(grade) = &file_grade {
+                        result["grade"] = json!(grade.to_string());
+                    }
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                } else {
+                    let mut result = json!({
+                        "file": file.to_string_lossy(),
+                        "rows": row_count,
+                        "columns": cols,
+                    });
+                    if let Some(grade) = &file_grade {
+                        result["grade"] = json!(grade.to_string());
+                    }
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                }
+            }
+            OutputFormat::Csv => {
+                println!("column,type,confidence,broad_type,format_string,transform,is_generic,samples_used,non_null,null,disambiguation,locale");
+                for p in &profiles {
+                    println!(
+                        "\"{}\",\"{}\",{:.4},\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\",\"{}\"",
+                        p.name,
+                        p.label,
+                        p.confidence,
+                        p.broad_type.as_deref().unwrap_or(""),
+                        p.format_string.as_deref().unwrap_or(""),
+                        p.transform.as_deref().unwrap_or(""),
+                        p.is_generic,
+                        p.samples_used,
+                        p.non_null_count,
+                        p.null_count,
+                        p.disambiguation_rule.as_deref().unwrap_or(""),
+                        p.detected_locale.as_deref().unwrap_or("")
+                    );
+                }
+            }
+            OutputFormat::Markdown => {
+                println!(
+                    "## FineType Column Profile — `{}`\n",
+                    file.to_string_lossy()
+                );
+                println!("{} rows, {} columns\n", row_count, n_cols);
+                if false {
+                    // validate removed (AC-10)
+                    println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
+                    println!("|--------|------|-----------|----------:|-----------:|--------:|");
+                } else {
+                    println!("| Column | Type | Broad Type | Confidence |");
+                    println!("|--------|------|-----------|----------:|");
+                }
+                for p in &profiles {
+                    let conf_str = if p.non_null_count > 0 {
+                        format!("{:.1}%", p.confidence * 100.0)
+                    } else {
+                        "—".to_string()
+                    };
+                    let broad =
+                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+                    if false {
+                        // validate removed (AC-10)
+                        let (valid_str, score_str) = match &p.quality {
+                            Some(q) => (
+                                format!("{:.1}%", q.score.type_conforming_rate * 100.0),
+                                format!("{:.1}%", q.score.quality_score * 100.0),
+                            ),
+                            None => ("—".to_string(), "—".to_string()),
+                        };
+                        println!(
+                            "| {} | `{}` | {} | {} | {} | {} |",
+                            p.name, p.label, broad, conf_str, valid_str, score_str
+                        );
+                    } else {
+                        println!("| {} | `{}` | {} | {} |", p.name, p.label, broad, conf_str);
+                    }
+                }
+                let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
+                if false {
+                    // validate removed (AC-10)
+                    let scores: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                        .collect();
+                    let grade = finetype_core::compute_file_grade(&scores);
+                    println!(
+                        "\n{}/{} columns typed — **Quality: {}**",
+                        typed_cols, n_cols, grade
+                    );
+                    // Data Issues section for columns with invalid samples
+                    let issues: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| {
+                            p.quality.as_ref().and_then(|q| {
+                                if q.invalid_samples.is_empty() {
+                                    None
+                                } else {
+                                    Some((&p.name, &q.invalid_samples))
+                                }
+                            })
+                        })
+                        .collect();
+                    if !issues.is_empty() {
+                        println!("\n### Data Issues\n");
+                        for (name, samples) in &issues {
+                            println!("**{}** — invalid samples:", name);
+                            for s in *samples {
+                                println!("- `{}`", s);
+                            }
+                            println!();
+                        }
+                    }
+                } else {
+                    println!("\n{}/{} columns typed", typed_cols, n_cols);
+                }
+            }
+            OutputFormat::Arrow => {
+                // Arrow IPC JSON schema format
+                let fields: Vec<serde_json::Value> = profiles
+                    .iter()
+                    .map(|p| {
+                        let duckdb_type = p.broad_type.as_deref().unwrap_or("VARCHAR");
+                        let arrow_type = duckdb_to_arrow_type(duckdb_type);
+                        json!({
+                            "name": p.name,
+                            "type": arrow_type,
+                            "nullable": true,
+                            "children": [],
                         })
                     })
                     .collect();
-                if !issues.is_empty() {
-                    println!("\n### Data Issues\n");
-                    for (name, samples) in &issues {
-                        println!("**{}** — invalid samples:", name);
-                        for s in *samples {
-                            println!("- `{}`", s);
-                        }
-                        println!();
+
+                let schema = json!({
+                    "fields": fields,
+                    "metadata": {
+                        "finetype_version": env!("CARGO_PKG_VERSION"),
+                        "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
+                        "row_count": row_count.to_string(),
                     }
-                }
-            } else {
-                println!("\n{}/{} columns typed", typed_cols, n_cols);
+                });
+
+                println!("{}", serde_json::to_string_pretty(&schema)?);
+            }
+            OutputFormat::JsonSchema => {
+                // ac-03 / ac-05: emit table-level JSON Schema via the shared
+                // helper. Taxonomy enrichment is required for label → property
+                // shape; without it, we cannot produce a meaningful schema.
+                let taxonomy = enrichment_taxonomy.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "JSON Schema output requires the bundled taxonomy at `labels/`; \
+                     run from the FineType source tree or ship with embedded taxonomy."
+                    )
+                })?;
+
+                let file_stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
+                let file_id = file
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("data.csv");
+
+                // Project profile rows + raw column values into the helper's
+                // borrowed-input shape. `columns` parallels `profiles` by index.
+                let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| {
+                        let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+                        json_schema::TableSchemaColumn {
+                            name: &p.name,
+                            label: &p.label,
+                            values,
+                            null_count: p.null_count,
+                        }
+                    })
+                    .collect();
+
+                let schema = json_schema::emit_table_schema(
+                    &cols,
+                    file_stem,
+                    file_id,
+                    taxonomy,
+                    stats,
+                    enum_threshold,
+                );
+
+                writeln!(writer, "{}", serde_json::to_string_pretty(&schema)?)?;
             }
         }
-        OutputFormat::Arrow => {
-            // Arrow IPC JSON schema format
-            let fields: Vec<serde_json::Value> = profiles
-                .iter()
-                .map(|p| {
-                    let duckdb_type = p.broad_type.as_deref().unwrap_or("VARCHAR");
-                    let arrow_type = duckdb_to_arrow_type(duckdb_type);
-                    json!({
-                        "name": p.name,
-                        "type": arrow_type,
-                        "nullable": true,
-                        "children": [],
-                    })
-                })
-                .collect();
 
-            let schema = json!({
-                "fields": fields,
-                "metadata": {
-                    "finetype_version": env!("CARGO_PKG_VERSION"),
-                    "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
-                    "row_count": row_count.to_string(),
-                }
-            });
-
-            println!("{}", serde_json::to_string_pretty(&schema)?);
-        }
-        OutputFormat::JsonSchema => {
-            // ac-03 / ac-05: emit table-level JSON Schema via the shared
-            // helper. Taxonomy enrichment is required for label → property
-            // shape; without it, we cannot produce a meaningful schema.
-            let taxonomy = enrichment_taxonomy.as_ref().ok_or_else(|| {
-                anyhow::anyhow!(
-                    "JSON Schema output requires the bundled taxonomy at `labels/`; \
-                     run from the FineType source tree or ship with embedded taxonomy."
-                )
-            })?;
-
-            let file_stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
-            let file_id = file
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("data.csv");
-
-            // Project profile rows + raw column values into the helper's
-            // borrowed-input shape. `columns` parallels `profiles` by index.
-            let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
-                    json_schema::TableSchemaColumn {
-                        name: &p.name,
-                        label: &p.label,
-                        values,
-                        null_count: p.null_count,
-                    }
-                })
-                .collect();
-
-            let schema = json_schema::emit_table_schema(
-                &cols,
-                file_stem,
-                file_id,
-                taxonomy,
-                stats,
-                enum_threshold,
-            );
-
-            writeln!(writer, "{}", serde_json::to_string_pretty(&schema)?)?;
-        }
-    }
-
-    writer.flush()?;
+        writer.flush()?;
     } // end per-file loop
 
     Ok(())

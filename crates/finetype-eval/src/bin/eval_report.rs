@@ -64,9 +64,8 @@ fn discover_model_identity(model_dir: &Path) -> Result<ModelIdentity> {
     }
     // Resolve symlink chain to a real directory; preserve the symlink name as
     // the tag (e.g. `models/default` → `sherlock-v19-relu-s42`).
-    let resolved = fs::canonicalize(model_dir).with_context(|| {
-        format!("could not resolve {}", model_dir.display())
-    })?;
+    let resolved = fs::canonicalize(model_dir)
+        .with_context(|| format!("could not resolve {}", model_dir.display()))?;
     let tag = resolved
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -102,9 +101,8 @@ fn discover_model_identity(model_dir: &Path) -> Result<ModelIdentity> {
         .unwrap_or_else(|| weights.display().to_string());
 
     let mut hasher = Sha256::new();
-    let mut fh = fs::File::open(&weights).with_context(|| {
-        format!("could not open weights file {}", weights.display())
-    })?;
+    let mut fh = fs::File::open(&weights)
+        .with_context(|| format!("could not open weights file {}", weights.display()))?;
     let mut buf = vec![0u8; 1 << 20];
     loop {
         let n = fh.read(&mut buf)?;

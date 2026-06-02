@@ -933,8 +933,15 @@ const CLOSED_MECHANISMS: &[&str] = &[
 fn run_infer_explain_batch(input_lines: &[&str]) -> Vec<Value> {
     let mut child = Command::new("cargo")
         .args([
-            "run", "-p", "finetype-cli", "--",
-            "infer", "--mode", "column", "--batch", "--explain",
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
+            "infer",
+            "--mode",
+            "column",
+            "--batch",
+            "--explain",
         ])
         .current_dir(workspace_root())
         .stdin(Stdio::piped())
@@ -962,8 +969,9 @@ fn run_infer_explain_batch(input_lines: &[&str]) -> Vec<Value> {
     stdout
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .map(|l| serde_json::from_str(l)
-             .unwrap_or_else(|e| panic!("output line not JSON: {e} ({l})")))
+        .map(|l| {
+            serde_json::from_str(l).unwrap_or_else(|e| panic!("output line not JSON: {e} ({l})"))
+        })
         .collect()
 }
 
@@ -1011,10 +1019,7 @@ fn infer_explain_batch_preserves_input_order() {
             r.get("inferred_correct_type").is_some(),
             "row {i}: missing inferred_correct_type"
         );
-        assert!(
-            r.get("signals").is_some(),
-            "row {i}: missing signals"
-        );
+        assert!(r.get("signals").is_some(), "row {i}: missing signals");
     }
 }
 
@@ -1026,15 +1031,24 @@ fn infer_explain_batch_preserves_input_order() {
 fn infer_explain_without_batch_is_rejected() {
     let out = Command::new("cargo")
         .args([
-            "run", "-p", "finetype-cli", "--",
-            "infer", "--mode", "column", "--explain",
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
+            "infer",
+            "--mode",
+            "column",
+            "--explain",
         ])
         .current_dir(workspace_root())
         .stdin(Stdio::null())
         .output()
         .expect("failed to run finetype infer");
-    assert!(!out.status.success(),
-            "--explain without --batch must fail; got rc={:?}", out.status.code());
+    assert!(
+        !out.status.success(),
+        "--explain without --batch must fail; got rc={:?}",
+        out.status.code()
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("--explain requires --mode column --batch"),
@@ -1048,16 +1062,23 @@ fn infer_explain_without_batch_is_rejected() {
 fn infer_explain_without_column_mode_is_rejected() {
     let out = Command::new("cargo")
         .args([
-            "run", "-p", "finetype-cli", "--",
-            "infer", "--batch", "--explain",
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
+            "infer",
+            "--batch",
+            "--explain",
         ])
         .current_dir(workspace_root())
         .stdin(Stdio::null())
         .output()
         .expect("failed to run finetype infer");
-    assert!(!out.status.success(),
-            "--explain without --mode column must fail; got rc={:?}",
-            out.status.code());
+    assert!(
+        !out.status.success(),
+        "--explain without --mode column must fail; got rc={:?}",
+        out.status.code()
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1077,7 +1098,11 @@ fn build_batch_fixture(n: usize) -> (tempfile::TempDir, PathBuf, PathBuf) {
         let p = in_dir.join(format!("t{i}.csv"));
         std::fs::write(
             &p,
-            format!("email,age\nalice@example.com,{}\nbob@example.com,{}\n", i, i + 1),
+            format!(
+                "email,age\nalice@example.com,{}\nbob@example.com,{}\n",
+                i,
+                i + 1
+            ),
         )
         .expect("write csv");
         paths.push(p.to_string_lossy().to_string());
@@ -1095,11 +1120,17 @@ fn profile_files_batch_produces_one_output_per_input() {
     let (_tmp, paths, out_dir) = build_batch_fixture(3);
     let out = Command::new("cargo")
         .args([
-            "run", "-p", "finetype-cli", "--",
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
             "profile",
-            "--files", paths.to_str().unwrap(),
-            "--out-dir", out_dir.to_str().unwrap(),
-            "-o", "json-schema",
+            "--files",
+            paths.to_str().unwrap(),
+            "--out-dir",
+            out_dir.to_str().unwrap(),
+            "-o",
+            "json-schema",
         ])
         .current_dir(workspace_root())
         .output()
@@ -1111,8 +1142,11 @@ fn profile_files_batch_produces_one_output_per_input() {
     );
     for i in 0..3 {
         let schema_path = out_dir.join(format!("t{i}.json"));
-        assert!(schema_path.exists(),
-                "expected {} to exist", schema_path.display());
+        assert!(
+            schema_path.exists(),
+            "expected {} to exist",
+            schema_path.display()
+        );
         let body = std::fs::read_to_string(&schema_path).expect("read schema");
         let v: Value = serde_json::from_str(&body)
             .unwrap_or_else(|e| panic!("schema {i} not JSON: {e}\n{body}"));
@@ -1141,17 +1175,23 @@ fn profile_files_requires_out_dir() {
     let (_tmp, paths, _out_dir) = build_batch_fixture(1);
     let out = Command::new("cargo")
         .args([
-            "run", "-p", "finetype-cli", "--",
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
             "profile",
-            "--files", paths.to_str().unwrap(),
-            "-o", "json-schema",
+            "--files",
+            paths.to_str().unwrap(),
+            "-o",
+            "json-schema",
         ])
         .current_dir(workspace_root())
         .output()
         .expect("failed to run profile --files");
     assert!(
         !out.status.success(),
-        "--files without --out-dir must fail; got rc={:?}", out.status.code()
+        "--files without --out-dir must fail; got rc={:?}",
+        out.status.code()
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -1169,18 +1209,25 @@ fn profile_files_rejects_non_json_schema_output() {
     let (_tmp, paths, out_dir) = build_batch_fixture(1);
     let out = Command::new("cargo")
         .args([
-            "run", "-p", "finetype-cli", "--",
+            "run",
+            "-p",
+            "finetype-cli",
+            "--",
             "profile",
-            "--files", paths.to_str().unwrap(),
-            "--out-dir", out_dir.to_str().unwrap(),
-            "-o", "plain",
+            "--files",
+            paths.to_str().unwrap(),
+            "--out-dir",
+            out_dir.to_str().unwrap(),
+            "-o",
+            "plain",
         ])
         .current_dir(workspace_root())
         .output()
         .expect("failed to run profile --files");
     assert!(
         !out.status.success(),
-        "profile --files -o plain must fail; got rc={:?}", out.status.code()
+        "profile --files -o plain must fail; got rc={:?}",
+        out.status.code()
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(

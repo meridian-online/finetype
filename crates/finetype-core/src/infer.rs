@@ -28,8 +28,8 @@
 //!
 //! 1. `unknown_no_fit`        — `max_score < 0.4` (Rule-1 fallback)
 //! 2. `validator_widening`    — predicted's validator rejects ≥50% AND
-//!                              header_match for predicted ≥0.7 AND
-//!                              argmax == predicted (ac-08)
+//!    header_match for predicted ≥0.7 AND
+//!    argmax == predicted (ac-08)
 //! 3. `enum_overfit`          — predicted == inferred + enum reject ≥50%
 //! 4. `format_diversity_path_b` — predicted != inferred + same broad prefix
 //! 5. `code_vs_canonical_path_b` — predicted != inferred + code/canonical XOR
@@ -192,8 +192,7 @@ pub fn tokenize(s: &str) -> Vec<String> {
 pub fn header_match_score(column_name: &str, label: &str) -> f64 {
     let header_tokens: std::collections::BTreeSet<String> =
         tokenize(column_name).into_iter().collect();
-    let label_tokens: std::collections::BTreeSet<String> =
-        tokenize(label).into_iter().collect();
+    let label_tokens: std::collections::BTreeSet<String> = tokenize(label).into_iter().collect();
     if header_tokens.is_empty() || label_tokens.is_empty() {
         return 0.0;
     }
@@ -274,7 +273,7 @@ fn score_candidates(
 
 /// Pick the argmax with lexicographic tie-break on equal rounded score.
 /// Iteration order over `candidates` MUST already be lexicographic.
-fn argmax_lex<'a>(candidates: &'a [CandidateScore]) -> Option<&'a CandidateScore> {
+fn argmax_lex(candidates: &[CandidateScore]) -> Option<&CandidateScore> {
     let mut best: Option<&CandidateScore> = None;
     for c in candidates {
         match best {
@@ -349,7 +348,10 @@ const CODE_CANONICAL_PAIRS: &[(&str, &str)] = &[
     // Currency code (USD) vs amount (123.45)
     ("finance.currency.amount", "finance.currency.code"),
     // Country full name vs code
-    ("geography.location.country", "geography.location.country_code"),
+    (
+        "geography.location.country",
+        "geography.location.country_code",
+    ),
 ];
 
 fn is_code_canonical_pair(a: &str, b: &str) -> bool {
@@ -509,10 +511,8 @@ pub fn infer(taxonomy: &Taxonomy, input: &InferInput) -> InferOutput {
     let confidence = max_score;
 
     // Predicted's signal sub-scores (used by the cascade and emitted in signals)
-    let predicted_v = validator_pass_rate(
-        &truncated,
-        taxonomy.get_validator(&input.predicted_type),
-    );
+    let predicted_v =
+        validator_pass_rate(&truncated, taxonomy.get_validator(&input.predicted_type));
     let predicted_h = header_match_score(&input.column_name, &input.predicted_type);
 
     // Build cascade context. Rule 1 (unknown_no_fit) is checked FIRST —
@@ -703,9 +703,7 @@ mod tests {
     #[test]
     fn infer_truncates_samples_to_eight() {
         // ac-15 — only the first 8 samples are scored
-        let mut samples: Vec<String> = (0..100)
-            .map(|i| format!("user{}@example.com", i))
-            .collect();
+        let mut samples: Vec<String> = (0..100).map(|i| format!("user{}@example.com", i)).collect();
         // Replace samples 0..8 with non-email garbage so if all 100 were
         // scanned the validator pass-rate would be near 1.0 (8 garbage +
         // 92 emails); with truncation only the 8 garbage are scored and
@@ -823,7 +821,10 @@ mod tests {
 
     #[test]
     fn tokenize_basic() {
-        assert_eq!(tokenize("identity.person.email"), vec!["identity", "person", "email"]);
+        assert_eq!(
+            tokenize("identity.person.email"),
+            vec!["identity", "person", "email"]
+        );
         assert_eq!(tokenize("emailAddress"), vec!["email", "address"]);
         assert_eq!(tokenize("first_name"), vec!["first", "name"]);
         assert_eq!(tokenize("Email"), vec!["email"]);

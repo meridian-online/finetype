@@ -1359,7 +1359,9 @@ datetime.timestamp.iso_8601:
         // to be state/province codes. The test makes the load-bearing
         // distinction explicit: rejection is about the ISO list, not
         // about whether the code happens to be a state code.
-        for code in ["AL", "CA", "GA", "IN", "MA", "MN", "NL", "NU", "PE", "SK", "TN"] {
+        for code in [
+            "AL", "CA", "GA", "IN", "MA", "MN", "NL", "NU", "PE", "SK", "TN",
+        ] {
             assert!(
                 validator.is_valid(code),
                 "{code} IS a valid ISO 3166-1 code (collides with a state/province code); should be accepted"
