@@ -351,6 +351,7 @@ enum Commands {
     Mcp,
 
     /// Train a multi-branch Sherlock-style model from FTMB feature data
+    #[cfg(feature = "train")]
     #[command(name = "train-multi-branch", hide = true)]
     TrainMultiBranch {
         /// FTMB binary training data file
@@ -662,6 +663,7 @@ fn main() -> Result<()> {
 
         Commands::Mcp => cmd_mcp(),
 
+        #[cfg(feature = "train")]
         Commands::TrainMultiBranch {
             data,
             output,
@@ -815,6 +817,7 @@ fn cmd_mcp() -> Result<()> {
 }
 
 /// Train a multi-branch Sherlock-style model from FTMB feature-vector data.
+#[cfg(feature = "train")]
 #[allow(clippy::too_many_arguments)]
 fn cmd_train_multi_branch(
     data: PathBuf,

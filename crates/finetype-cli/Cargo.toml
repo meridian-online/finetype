@@ -24,15 +24,27 @@ path = "src/bin/train_disambiguator.rs"
 
 [features]
 default = ["cpu", "embed-models"]
-cpu = ["finetype-model/cpu", "finetype-train/default"]
-cuda = ["finetype-model/cuda", "finetype-train/cuda", "finetype-train/tui"]
-metal = ["finetype-model/metal", "finetype-train/metal", "finetype-train/tui"]
+# `cpu` is the shipped path: inference only, no `finetype-train`, so the
+# distributed binary never compiles bundled DuckDB. This dodges the bundled
+# DuckDB 1.5.3 amalgamation failing to build under the Windows release runner's
+# MSVC, and keeps the binary lean — training is a dev/research workflow.
+cpu = ["finetype-model/cpu"]
+# GPU builds are the training builds in this repo: `cuda`/`metal` pull the
+# trainer (and its DuckDB) on top of the GPU inference backend, so existing
+# `--no-default-features --features metal` training scripts keep working. These
+# only run on Linux/macOS where bundled DuckDB compiles fine.
+cuda = ["finetype-model/cuda", "train", "finetype-train/cuda"]
+metal = ["finetype-model/metal", "train", "finetype-train/metal"]
 embed-models = []
+# Opt-in trainer for CPU-host training (`cargo run --features train -- \
+# train-multi-branch ...`). Gates the `train-multi-branch` subcommand; `cuda`
+# and `metal` enable it transitively.
+train = ["dep:finetype-train", "finetype-train/tui"]
 
 [dependencies]
 finetype-core = { workspace = true }
 finetype-model = { workspace = true }
-finetype-train = { workspace = true }
+finetype-train = { workspace = true, optional = true }
 finetype-mcp = { path = "../finetype-mcp" }
 chrono = { workspace = true }
 clap = { workspace = true }

@@ -157,9 +157,17 @@ The contract targets (`configure`, `release`, `debug`, `test_release`, `test_deb
 | Tier            | Commands                                                       |
 |-----------------|----------------------------------------------------------------|
 | Public (v0.6.19)| `infer`, `profile`, `validate`, `mcp`, `taxonomy`              |
-| Internal (hidden)| `check`, `generate`, `train`, `train-multi-branch`,           |
+| Internal (hidden)| `check`, `generate`, `train`, `train-multi-branch`*,          |
 |                  | `eval`, `infer-batch`                                         |
 ```
+
+\* `train-multi-branch` is feature-gated behind `train` (or `cuda`/`metal`,
+which enable it transitively). It is the only command that links
+`finetype-train` — which bundles DuckDB's C++ — so the distributed `cpu`
+binary omits it, keeping releases lean and dodging the Windows MSVC failure
+that bundled DuckDB 1.5.3 triggers. Train from source with
+`cargo run --features train -- train-multi-branch ...`; the GPU training
+scripts already pass `--features metal`/`cuda`, so they get it automatically.
 
 The hide mechanism is `#[command(hide = true)]` on the clap variant — no wrapper scripts, no env-var gating, no separate binary. Hidden ≠ removed: `finetype check` continues to power `make ci` and `finetype generate` continues to power training data prep.
 
