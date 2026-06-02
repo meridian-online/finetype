@@ -27,3 +27,11 @@ serde_json = { workspace = true }
 jsonschema = { workspace = true }
 hf-hub = { workspace = true }
 tracing = { workspace = true }
+
+# Force a vendored OpenSSL build. hf-hub + tokenizers pull OpenSSL transitively
+# via native-tls; the community-extensions Linux container points OPENSSL_DIR at
+# a vcpkg prefix that contains no OpenSSL, so a system/vcpkg build of openssl-sys
+# panics ("OpenSSL include directory does not exist"). The vendored feature makes
+# openssl-sys compile its own copy and ignore OPENSSL_DIR, so the extension builds
+# in that container (and under `cross`) without a system OpenSSL.
+openssl = { version = "0.10", features = ["vendored"] }
