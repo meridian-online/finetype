@@ -77,9 +77,12 @@ tempfile = "3"
 # HuggingFace Hub (runtime model download)
 hf-hub = "0.4"
 
-# DuckDB extension
-duckdb = { version = "=1.4.4", features = ["loadable-extension", "vscalar"] }
-libduckdb-sys = "=1.4.4"
+# DuckDB extension — exact pin tracking a specific DuckDB release (choice 0063
+# pin-strategy addendum). 1.10503.x = DuckDB 1.5.3. The loadable-extension ABI
+# must match the DuckDB version community CI builds against, so this is bumped
+# and re-PR'd per DuckDB release rather than floated as a range.
+duckdb = { version = "=1.10503.1", features = ["loadable-extension", "vscalar"] }
+libduckdb-sys = "=1.10503.1"
 
 # Internal crates
 finetype-core = { version = "0.6.0", path = "crates/finetype-core" }

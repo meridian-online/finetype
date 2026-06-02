@@ -54,4 +54,57 @@ body: |
   2. In-tree scaffolding: vendor `extension-ci-tools` submodule, add `configure/`, port the standalone `Makefile` into a form that works from the workspace root, confirm CI can produce per-platform `.duckdb_extension` artefacts matching the community-extension build contract.
   3. Registry PR to `duckdb/community-extensions`: update `repo.github` and `repo.ref`, bump `version` to the current finetype release, refresh the `extended_description` to match the sherlock-v16 architecture.
   4. After the registry PR merges and one successful community-extensions rebuild lands: archive `meridian-online/duckdb-finetype`.
+
+  ## Addendum 2026-06-02 — Pin strategy (spec 2026-06-02-duckdb-extension-republish ac-01)
+
+  **Decision: build against the STABLE C API (`abi_type = C_STRUCT`, metadata
+  `duckdb_version = v1.2.0`) and exact-pin `duckdb` / `libduckdb-sys` to the
+  current duckdb-rs release for the *build*. The stable C API makes the produced
+  artifact forward-compatible across DuckDB versions, so the crate pin is bumped
+  only when the build itself needs it (toolchain / security / a wanted feature) —
+  NOT mechanically per DuckDB patch.**
+
+  ### Empirical finding (2026-06-02) that drives this
+
+  Built `crates/finetype-duckdb` against duckdb-rs `=1.10503.1` (DuckDB 1.5.3
+  headers), stamped the metadata via `append-duckdb-metadata` with
+  `--abi-type C_STRUCT --duckdb-version v1.2.0`, and loaded it unsigned in DuckDB
+  v1.5.3: it loads and all five scalar functions execute. DuckDB 1.5.3's own
+  rejection message is the key: *"we can only load extensions built for DuckDB C
+  API 'v1.2.0' and lower"* — i.e. the host advertises a max **stable** C API of
+  1.2.0 and accepts any extension whose declared C API is ≤ that. Stamping the
+  metadata at the 1.2.0 floor makes the extension maximally forward-compatible:
+  one artifact built against current headers loads on DuckDB 1.2 through 1.5+ and
+  onward, as long as the host keeps supporting stable C API ≥ 1.2.0.
+
+  ### Why this overturns the earlier "exact-pin, re-PR per release" reasoning
+
+  The 404 we are fixing was NOT inherent to the community channel — it was an
+  artifact of the standalone repo choosing the **unstable** C API
+  (`USE_UNSTABLE_C_API=1`, `TARGET_DUCKDB_VERSION=v1.5.0` in its Makefile).
+  Unstable-API extensions are version-locked to one exact DuckDB release, so when
+  the pinned crate (`=1.10500.0` = DuckDB 1.5.0) met DuckDB 1.5.2/1.5.3 the
+  rebuild produced no matching artifact. The in-tree path uses the stable C API
+  via duckdb-rs's `loadable-extension` feature, which sidesteps that entire
+  failure mode. A floated cargo range still buys little (duckdb-rs ships one
+  crate per DuckDB version; cargo resolves to a single one at build time), so the
+  build pin stays exact for legibility — but its *cadence* is decoupled from
+  DuckDB releases by the stable ABI.
+
+  ### Maintenance commitment
+
+  Per supported DuckDB release the registry rebuild now just needs the source to
+  *compile*; it no longer needs a fresh artifact per exact version. So the tax is
+  ~one crate-pin bump when the build breaks or we want newer duckdb-rs, plus the
+  one-time registry repoint — not a standing per-release PR treadmill. Fold any
+  bump into the existing CLI release cadence (extension version already tracks
+  `version.workspace`).
+
+  ### Option B still beats Option A
+
+  With the maintenance tax now much smaller than first assumed, consolidating
+  in-tree (Option B) is even more clearly right than deregistering (Option A):
+  Option A would permanently remove the only one-line install path for DuckDB
+  users (card 0007) to save a tax that the stable C API has already largely
+  eliminated. Option B stands.
 references: []

@@ -214,7 +214,7 @@ pub unsafe fn invoke_column_detail(
     let col_classifier = get_column_classifier();
     let len = input.len();
     let n_cols = input.num_columns();
-    let output_vec = output.flat_vector();
+    let mut output_vec = output.flat_vector();
 
     for i in 0..len {
         if let Some(values) = read_list_varchar(input, 0, i) {
@@ -258,7 +258,7 @@ pub unsafe fn invoke_column_detail(
             }
         } else {
             // NULL list → NULL output
-            output.flat_vector().set_null(i);
+            output_vec.set_null(i);
         }
     }
 

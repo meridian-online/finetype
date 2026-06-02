@@ -21,7 +21,7 @@ serde_yaml = { workspace = true }
 safetensors = "0.4"
 
 # Data loading
-duckdb = { version = "=1.4.4", default-features = true, features = ["bundled"] }
+duckdb = { version = "=1.10503.1", default-features = true, features = ["bundled"] }
 csv = { workspace = true }
 
 # CLI
