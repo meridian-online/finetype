@@ -27,9 +27,7 @@
 //! Otherwise the rule cascade fires in priority order (first-fire wins):
 //!
 //! 1. `unknown_no_fit`        — `max_score < 0.4` (Rule-1 fallback)
-//! 2. `validator_widening`    — predicted's validator rejects ≥50% AND
-//!    header_match for predicted ≥0.7 AND
-//!    argmax == predicted (ac-08)
+//! 2. `validator_widening`    — predicted's validator rejects ≥50% AND header_match for predicted ≥0.7 AND argmax == predicted (ac-08)
 //! 3. `enum_overfit`          — predicted == inferred + enum reject ≥50%
 //! 4. `format_diversity_path_b` — predicted != inferred + same broad prefix
 //! 5. `code_vs_canonical_path_b` — predicted != inferred + code/canonical XOR
