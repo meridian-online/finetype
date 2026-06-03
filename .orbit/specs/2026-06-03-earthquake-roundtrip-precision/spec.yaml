@@ -24,18 +24,29 @@ goal: |
     - place 67, gap 6 (long-tail).
   That is ~3.2 columns' worth of cells doing essentially all the damage.
 
-  ## Approach
+  ## Approach (revised 2026-06-03 after reachability review)
 
-  Per decisions 0038 (prefer retraining over Sharpen rules) and 0048 (value-based
-  rules only): the honest fix is training-data coverage so these columns stop
-  being mistyped, not a per-column Sharpen patch or hand-cleaning the dataset.
-  scripts/roundtrip_metrics.sh is the measurement harness; a Claude Code /goal
-  drives the session against the two thresholds, escalating to a retrain bet if a
-  turn-sized fix does not converge.
+  A training-data retrain will NOT safely fix this set. The two failure families
+  here are both LOW-safety per the corpus reachability advisory (safety_score on
+  corroborated_gaps.parquet): id -> geography.coordinate.geohash is safety 0.32,
+  and net/locationSource/magSource -> representation.scientific.measurement_unit
+  is safety 0.29 — both < 0.50, both with correct label discrete.categorical.
+  These are exactly the categorical-target clusters that sank v23 (it ate ~48k
+  geography columns to win them). So additive training is the wrong lever here;
+  the safe routes are (a) a scoped value-based Sharpen demotion of geohash /
+  measurement_unit when values are low-cardinality codes, per decisions
+  0038/0048, or (b) a taxonomy/validator change. The HIGH-safety numeric clusters
+  are carried separately by spec 2026-06-03-v24-numeric-precision; this set is NOT
+  in that retrain's scope.
+
+  scripts/roundtrip_metrics.sh + scripts/roundtrip_ab.py are the measurement
+  harness (validated 2026-06-03 to track the gittables corpus: earthquake reject
+  0.149 ~ sample 0.141). They gate whichever fix ships.
 
   ## Out of scope
   - Hand-editing earthquakes_2024.csv or its committed schema to mask the failure.
-  - Any taxonomy retrain beyond what the two metrics require.
+  - An additive training-data retrain on these LOW-safety families (carried by
+    v24 only for the HIGH-safety numeric clusters, which this set is not).
 cards:
 - 0014-profile-validate-precision
 status: open
