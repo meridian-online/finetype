@@ -1,0 +1,77 @@
+id: 2026-06-03-earthquake-roundtrip-precision
+goal: |
+  Make the earthquake demo round-trip cleanly on the shipping CLI so the stalled
+  blog post can land. Today `finetype profile -> validate` on
+  eval/datasets/csv/earthquakes_2024.csv yields Grade F / 0 valid rows / 46,447
+  rejects — even when validated against its OWN generated schema. The profile
+  assigns labels its own validator then rejects.
+
+  ## Diagnosis (measured 2026-06-03, binary 0.6.22, local default model)
+
+  Recall is already met; precision is the binding constraint.
+
+  - non_trivial_pct = 1.00 — every one of 22 columns gets a real (non-catch-all)
+    type, so recall against the "type everything VARCHAR" failure is fine.
+  - reject_rate_non_trivial = 0.1494 — ~15x over the 0.01 target. Grade F.
+
+  The rejects concentrate in a handful of misclassified low-cardinality columns,
+  not a broad smear:
+    - net, locationSource, magSource -> representation.scientific.measurement_unit
+      (schema enum = SI units {meter, kilogram, ...}; values are network codes
+      "ci"/"us"/"nc") -> 100% reject, ~14,132 cells each.
+    - id -> geography.coordinate.geohash (pattern rejects the alphanumeric event
+      ids) -> ~3,978 rejects.
+    - place 67, gap 6 (long-tail).
+  That is ~3.2 columns' worth of cells doing essentially all the damage.
+
+  ## Approach
+
+  Per decisions 0038 (prefer retraining over Sharpen rules) and 0048 (value-based
+  rules only): the honest fix is training-data coverage so these columns stop
+  being mistyped, not a per-column Sharpen patch or hand-cleaning the dataset.
+  scripts/roundtrip_metrics.sh is the measurement harness; a Claude Code /goal
+  drives the session against the two thresholds, escalating to a retrain bet if a
+  turn-sized fix does not converge.
+
+  ## Out of scope
+  - Hand-editing earthquakes_2024.csv or its committed schema to mask the failure.
+  - Any taxonomy retrain beyond what the two metrics require.
+cards:
+- 0014-profile-validate-precision
+status: open
+labels:
+- precision
+- model
+- blog
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Measurement harness exists and is reproducible. scripts/roundtrip_metrics.sh
+    <csv> profiles the file, generates a JSON Schema from those labels, validates
+    the data against it, and prints non_trivial_pct and reject_rate_non_trivial
+    plus PASS/FAIL against the targets. Honours FINETYPE_MODEL_DIR so a retrained
+    model can be swapped in without editing the script.
+  ac_type: code
+- id: ac-02
+  description: |
+    Recall target holds on the earthquake set: non_trivial_pct >= 0.80 measured by
+    scripts/roundtrip_metrics.sh eval/datasets/csv/earthquakes_2024.csv. (Already
+    at 1.00 on 0.6.22 — this AC guards against a fix that regresses recall to buy
+    precision, e.g. collapsing columns to plain_text.)
+  ac_type: observation
+- id: ac-03
+  description: |
+    Precision target holds on the earthquake set: reject_rate_non_trivial <= 0.01
+    measured by scripts/roundtrip_metrics.sh eval/datasets/csv/earthquakes_2024.csv.
+    Binding constraint — baseline 0.1494 on 0.6.22. Closes when the model (or a
+    scoped value-based Sharpen demotion, last resort) stops mistyping the
+    network-code and event-id columns into enum/pattern types they cannot satisfy.
+  ac_type: observation
+- id: ac-04
+  description: |
+    Blog round-trip restored. profile -> validate -> load on
+    eval/datasets/csv/earthquakes_2024.csv produces a non-empty typed table and a
+    grade of C or better on the shipping CLI, and the blog draft
+    (web/content/blog/less-typing-more-discovery.mdx) claims match a real
+    transcript (no "14,132 rows validated and loaded" against a Grade F run).
+  ac_type: observation
