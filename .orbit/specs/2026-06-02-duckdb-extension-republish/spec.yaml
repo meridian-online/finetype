@@ -152,7 +152,7 @@ acceptance_criteria:
     forward pass, 240 types — drop "tiered CharCNN / 34 CNNs / 250 types").
     Reply to the open issue #3 (DuckDB pin bump request from @rustyconover).
   gate: false
-  checked: false
+  checked: true
   ac_type: ops
 - id: ac-08
   description: |
