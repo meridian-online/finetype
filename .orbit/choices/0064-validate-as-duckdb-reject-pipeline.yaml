@@ -2,7 +2,7 @@ id: '0064'
 title: '`finetype validate` as a DuckDB-native reject pipeline'
 status: accepted
 date_created: 2026-04-24
-date_modified: 2026-04-28
+date_modified: 2026-06-03
 body: |
   # 0064. `finetype validate` as a DuckDB-native reject pipeline
 
@@ -122,4 +122,42 @@ body: |
 
   Test grid: 15 `vrp_acNN_*` functions across two crates (core 7 + CLI 8),
   all passing.
+
+  ## Addendum 2026-06-03 — table verbs reachable via SQL macros (spec 2026-06-03-duckdb-extension-table-verbs)
+
+  The original decision (option A) concluded table-level validation was
+  blocked by the **catalog wall**: on the pin of the day, duckdb-rs `BindInfo`
+  exposed no `Connection` / catalog lookup / row-iteration, so a Rust *table
+  function* registered via the safe API could not read an existing DuckDB
+  table by name. That wall still stands on the current pin
+  (`duckdb 1.10503.1`, DuckDB 1.5.3) — a second probe this spec ran confirms a
+  related **aggregate wall**: duckdb-rs 1.10503.1 also exposes no aggregate-UDF
+  registration API, so a column-level verb cannot ship as a true aggregate
+  either.
+
+  Both walls are about what the *safe Rust API* can register. Neither blocks
+  **SQL macros**, which option A did not consider. A macro registered at
+  `LOAD` (`CREATE OR REPLACE MACRO ft_validate(tbl, schema) AS TABLE …`)
+  expands into SQL that **DuckDB itself** executes with full catalog access;
+  `query_table(tbl)` is the execution-time resolution that reads the named
+  table on DuckDB's side, entirely past the BindInfo catalog wall. The
+  all-VARCHAR cell extraction (`COLUMNS(*)::VARCHAR` + `UNPIVOT`) and the
+  per-column `$.properties.<col>` join are likewise pure SQL the macro emits —
+  the extension writes no row-iteration code.
+
+  So the table-validity question ships as a first-class verb after all:
+
+  - `ft_validate(table, schema)` — SQL table macro (the path past both walls).
+  - `ft_profile(LIST<VARCHAR>)` — scalar over an explicit `list(col)`, **not**
+    an aggregate (aggregate wall); self-bounds the pooled sample to 100.
+  - `ft_infer(value)` / `ft_validate_text(value, schema)` — scalars.
+
+  This does NOT revive the v1.1 Rust `finetype_validate_table` table function;
+  that remains dropped (the unsafe-FFI cost and the safe-API gap are unchanged).
+  It records that the *user value* (a pure-SQL table-validity verb) is
+  reachable by a route option A ruled out for the wrong reason — it judged
+  "Rust table function" infeasible and stopped, rather than "any SQL-channel
+  table verb". The macro route is now the canonical SQL-channel answer; the CLI
+  reject pipeline (this MADR's core decision) remains the materialising path
+  with the 13-column reject ontology.
 references: []

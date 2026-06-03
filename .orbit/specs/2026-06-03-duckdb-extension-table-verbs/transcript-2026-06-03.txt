@@ -1,0 +1,66 @@
+# ac-10 evidence — ft_ table-verb surface on DuckDB v1.5.3 (Variegata 14eca11bd9)
+# Captured 2026-06-03. SQL source preserved alongside as transcript.sql.
+# Build: target/release/finetype.duckdb_extension (make build-release, stable C_STRUCT @ v1.2.0).
+# Run:  HF_HUB_OFFLINE=1 FINETYPE_LOG=error duckdb -unsigned -init /dev/null < transcript.sql
+#
+# Verbs: ft_version, ft_infer (scalar), ft_profile (LIST scalar),
+# ft_validate_text (scalar->STRUCT), ft_validate (table macro, inline + file schema).
+# Nested STRUCT column addr surfaces as a guard row (NULL counts) — never silently rejected.
+# email/phone each reject 1/3 (the malformed row); inline and file schema give identical counts.
+# ft_profile on a 3-row sample is a weak probe (plain_text @0.669) — correct function, tiny sample.
+#
+== load ==
+== ft_version ==
+┌─────────────────┐
+│  ft_version()   │
+│     varchar     │
+├─────────────────┤
+│ finetype 0.6.22 │
+└─────────────────┘
+== ft_infer scalar ==
+┌───────────────────────┐
+│           t           │
+│        varchar        │
+├───────────────────────┤
+│ identity.person.email │
+└───────────────────────┘
+== build people table ==
+== ft_profile(list(email)) ==
+┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                 p                                                  │
+│                   struct("type" varchar, confidence double, duckdb_type varchar)                   │
+├────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {'type': representation.text.plain_text, 'confidence': 0.6690410375595093, 'duckdb_type': VARCHAR} │
+└────────────────────────────────────────────────────────────────────────────────────────────────────┘
+== ft_validate_text inline (valid email) ==
+┌────────────────────────────────────────────────────────────────┐
+│                               r                                │
+│ struct("valid" boolean, "constraint" varchar, message varchar) │
+├────────────────────────────────────────────────────────────────┤
+│ {'valid': true, 'constraint': NULL, 'message': NULL}           │
+└────────────────────────────────────────────────────────────────┘
+== ft_validate_text inline (bad email) ==
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                      r                                                      │
+│                       struct("valid" boolean, "constraint" varchar, message varchar)                        │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {'valid': false, 'constraint': pattern, 'message': '"not-an-email" does not match "^[^@]+@[^@]+\\.[^@]+$"'} │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+== ft_validate inline schema ==
+┌─────────────┬───────┬─────────┬───────────────────────────────────────────────────────────────────────────────────┐
+│ column_name │ total │ rejects │                                  sample_message                                   │
+│   varchar   │ int64 │  int64  │                                      varchar                                      │
+├─────────────┼───────┼─────────┼───────────────────────────────────────────────────────────────────────────────────┤
+│ addr        │  NULL │    NULL │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before validating │
+│ email       │     3 │       1 │ "not-an-email" does not match "^[^@]+@[^@]+\.[^@]+$"                              │
+│ phone       │     3 │       1 │ "not-a-phone" does not match "^\+?[0-9().+ -]{7,}$"                               │
+└─────────────┴───────┴─────────┴───────────────────────────────────────────────────────────────────────────────────┘
+== ft_validate file schema ==
+┌─────────────┬───────┬─────────┬───────────────────────────────────────────────────────────────────────────────────┐
+│ column_name │ total │ rejects │                                  sample_message                                   │
+│   varchar   │ int64 │  int64  │                                      varchar                                      │
+├─────────────┼───────┼─────────┼───────────────────────────────────────────────────────────────────────────────────┤
+│ addr        │  NULL │    NULL │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before validating │
+│ email       │     3 │       1 │ "not-an-email" does not match "^[^@]+@[^@]+\.[^@]+$"                              │
+│ phone       │     3 │       1 │ "not-a-phone" does not match "^\+?[0-9().+ -]{7,}$"                               │
+└─────────────┴───────┴─────────┴───────────────────────────────────────────────────────────────────────────────────┘

@@ -142,6 +142,83 @@ The contract targets (`configure`, `release`, `debug`, `test_release`, `test_deb
 
 **Stable C API is the whole point.** `USE_UNSTABLE_C_API` is deliberately left unset, so metadata stamps the stable `C_STRUCT` ABI at `TARGET_DUCKDB_VERSION = v1.2.0`. The standalone repo used the *unstable* C API, which version-locks each artifact to one exact DuckDB release — that was the root cause of the community-channel 404 when DuckDB shipped 1.5.2/1.5.3. See choice 0063 (pin-strategy addendum).
 
+## DuckDB Extension SQL Surface (`ft_` verbs)
+
+The extension exposes a `profile → schema → validate` flow that mirrors the CLI, so an analyst answers "what type is this column?" and "is this table valid?" in SQL — not just "what type is this one value?". Every verb is `ft_`-prefixed; the older un-prefixed scalars (`finetype`, `finetype_detail`, `finetype_cast`, `finetype_unpack`, `finetype_validate`, `finetype_version`) stay registered as aliases for one release.
+
+| Verb | Scope | DuckDB kind | Mirrors CLI |
+|------|-------|-------------|-------------|
+| `ft_infer(value)` | one value | scalar | — (weak probe) |
+| `ft_profile(list(col))` | a column | scalar over `LIST` | `profile` |
+| `ft_validate_text(value, schema)` | one value / column | scalar → STRUCT | per-cell |
+| `ft_validate(table, schema)` | a table | SQL table macro | `validate` |
+| `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
+
+`ft_profile` is a **scalar over an explicit `LIST`** (built with `list(col)`), not an aggregate: duckdb-rs `1.10503.1` exposes no aggregate-UDF registration API (the *aggregate wall*), just as its `BindInfo` exposes no catalog access (the *catalog wall* of choice 0064). `ft_validate` sidesteps both as a SQL table macro registered at `LOAD` — it expands into catalog-aware SQL that DuckDB executes with `query_table(name)`. See choice 0064's 2026-06-03 addendum.
+
+### Why `ft_profile`, not `ft_infer`, is the accurate path
+
+The model is column-oriented (5-branch: char + embed + stats + header + validation, pooled across a column's values). A single value carries no column context, so `ft_infer(v)` is "profile with sample size 1" — strictly weaker. Reach for `ft_infer` only to probe one literal; use `ft_profile` over a row sample for a real answer.
+
+```sql
+LOAD 'finetype.duckdb_extension';
+
+-- Single-value probe (no column context — weak):
+SELECT ft_infer('jane.doe@company.co.uk');   -- identity.person.email
+
+-- Column profile over a bounded sample (the accurate path).
+-- ft_profile self-bounds the pooled sample to 100 values, but
+-- USING SAMPLE keeps the LIST small before it is even built:
+SELECT ft_profile(list(email)) AS p
+FROM   people USING SAMPLE 100 ROWS;
+-- {'type': identity.person.email, 'confidence': …, 'duckdb_type': VARCHAR}
+```
+
+### profile → schema → validate
+
+Schema **generation** stays in the CLI (`finetype taxonomy`); the extension only **consumes** a JSON Schema. The one `schema` argument auto-detects inline JSON (`trim(schema) LIKE '{%'`), a `getvariable()` variable, or a file path — DuckDB short-circuits the `CASE` so the inline path never hits `read_text`.
+
+```sql
+-- 1. profile: see what each column is (CLI: finetype profile)
+SELECT ft_profile(list(email)) FROM people USING SAMPLE 100 ROWS;
+
+-- 2. schema: generate a JSON Schema with the CLI, save to schema.json
+--    finetype taxonomy ... > schema.json
+
+-- 3. validate: is the loaded table valid? (CLI: finetype validate)
+SELECT * FROM ft_validate('people', 'schema.json');
+-- ┌─────────────┬───────┬─────────┬───────────────────────────────────────┐
+-- │ column_name │ total │ rejects │            sample_message             │
+-- ├─────────────┼───────┼─────────┼───────────────────────────────────────┤
+-- │ email       │     3 │       1 │ "not-an-email" does not match "^…$"    │
+-- │ phone       │     3 │       1 │ "not-a-phone" does not match "^…$"     │
+-- └─────────────┴───────┴─────────┴───────────────────────────────────────┘
+
+-- Inline schema works through the same one argument (no file-not-found):
+SELECT * FROM ft_validate('people',
+  '{"properties":{"email":{"type":"string","pattern":"^[^@]+@[^@]+\\.[^@]+$"}}}');
+```
+
+`ft_validate_text` is the per-cell verb behind the macro — it returns a STRUCT naming which constraint failed (mirroring the CLI `reject_errors` shape), and applies the CLI null semantics (empty / `"null"` skip):
+
+```sql
+SELECT ft_validate_text('not-an-email',
+  '{"type":"string","pattern":"^[^@]+@[^@]+\\.[^@]+$"}');
+-- {'valid': false, 'constraint': pattern, 'message': '"not-an-email" does not match …'}
+```
+
+> **Note the JSON escaping.** A regex `\.` must be written `\\.` in the schema string — `\.` is invalid JSON. DuckDB single-quoted strings pass backslashes through literally, so `'…\\.[^@]…'` reaches the validator as valid JSON.
+
+### Nested-column guard (Precision Principle)
+
+`COLUMNS(*)::VARCHAR` flattens a STRUCT / LIST to DuckDB **display** text (`{'city': London}` — inner quotes lost, not valid JSON), which would silently FALSE-reject. `ft_validate` guards nested columns: it surfaces them as an explicit skip row (NULL counts) telling the analyst to `unnest` / `to_json` / extract first, rather than reporting bogus rejects.
+
+```
+│ addr │ NULL │ NULL │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before validating │
+```
+
+> The community `description.yml` (`extended_description` / `hello_world`) still teaches the v0.6.22 per-value scalars; it gains the `ft_` surface at the next community publish, once these verbs ship in a release. Until then this section is the canonical teaching for the SQL surface.
+
 ## Related Repositories
 
 - **meridian-online/finetype** (this repo) — Production codebase. Candle-based, DuckDB integration.

@@ -39,6 +39,28 @@ pub fn classify_column(
     get_column_classifier().classify_column(values)
 }
 
+/// Sample cap for `ft_profile`. The classifier only pools `sample_size`
+/// (100) values, so reading more is wasted work; `ft_profile` stops reading the
+/// incoming LIST once it has this many non-empty values, bounding both the
+/// allocation and the model cost even if the analyst passes an unbounded
+/// `list(col)` over a huge column.
+pub const PROFILE_SAMPLE_CAP: usize = 100;
+
+/// Read up to `cap` non-empty, trimmed values from a LIST<VARCHAR> cell.
+///
+/// Like `read_list_varchar` but stops reading the child vector once `cap` values
+/// are collected, so a multi-million-row `list(col)` never materialises a
+/// multi-million-element Rust Vec just to discard all but the first
+/// `sample_size` the model pools. Returns None if the list cell itself is NULL.
+pub unsafe fn read_list_varchar_capped(
+    input: &mut DataChunkHandle,
+    col_idx: usize,
+    row_idx: usize,
+    cap: usize,
+) -> Option<Vec<String>> {
+    read_list_varchar_inner(input, col_idx, row_idx, cap)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INPUT TYPE DETECTION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -71,7 +93,22 @@ unsafe fn read_list_varchar(
     col_idx: usize,
     row_idx: usize,
 ) -> Option<Vec<String>> {
+    read_list_varchar_inner(input, col_idx, row_idx, usize::MAX)
+}
+
+/// Shared LIST<VARCHAR> reader. Collects at most `cap` non-empty, trimmed
+/// values, breaking out of the child scan once `cap` is reached.
+unsafe fn read_list_varchar_inner(
+    input: &mut DataChunkHandle,
+    col_idx: usize,
+    row_idx: usize,
+    cap: usize,
+) -> Option<Vec<String>> {
     use libduckdb_sys::*;
+
+    if cap == 0 {
+        return Some(vec![]);
+    }
 
     let raw_chunk = input.get_ptr();
     let vector = duckdb_data_chunk_get_vector(raw_chunk, col_idx as idx_t);
@@ -103,9 +140,12 @@ unsafe fn read_list_varchar(
     let child_validity = duckdb_vector_get_validity(child_vector);
     let child_data = duckdb_vector_get_data(child_vector) as *const duckdb_string_t;
 
-    let mut values = Vec::with_capacity(length);
+    let mut values = Vec::with_capacity(length.min(cap));
 
     for i in 0..length {
+        if values.len() >= cap {
+            break;
+        }
         let child_idx = offset + i;
 
         // Check child validity

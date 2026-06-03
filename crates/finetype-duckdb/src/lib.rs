@@ -430,7 +430,7 @@ impl VScalar for FineTypeCast {
                     continue;
                 }
                 // Classify single value via column classifier (1-element column)
-                match col_classifier.classify_column(&[text.clone()]) {
+                match col_classifier.classify_column(std::slice::from_ref(&text)) {
                     Ok(result) => {
                         if let Some(normalized) = normalize::normalize(&text, &result.label) {
                             let cstr = CString::new(normalized)?;
@@ -572,6 +572,290 @@ impl VScalar for FineTypeValidate {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ft_ CONVERGED SURFACE (spec 2026-06-03-duckdb-extension-table-verbs)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// `ft_infer(value VARCHAR) → VARCHAR` — single-value semantic type probe.
+///
+/// "Profile with sample size 1": classifies each value on its own, with no
+/// column context. Strictly weaker than `ft_profile` over a column sample — a
+/// bare UUID, phone, or placeholder email only disambiguates when pooled with
+/// its column siblings. Use `ft_profile(list(col))` for an accurate answer;
+/// reach for `ft_infer` only to probe a single literal.
+struct FineTypeInfer;
+
+impl VScalar for FineTypeInfer {
+    type State = ();
+
+    unsafe fn invoke(
+        _state: &Self::State,
+        input: &mut DataChunkHandle,
+        output: &mut dyn WritableVector,
+    ) -> Result<(), Box<dyn Error>> {
+        let col_classifier = get_column_classifier();
+        let len = input.len();
+        let mut output_vec = output.flat_vector();
+
+        for i in 0..len {
+            match read_varchar(input, 0, i) {
+                Some(text) => {
+                    let trimmed = text.trim();
+                    if trimmed.is_empty() {
+                        output_vec.insert(i, CString::new("unknown")?);
+                        continue;
+                    }
+                    // Single-value column (sample size 1): no sibling context.
+                    let label = match col_classifier.classify_column(&[trimmed.to_string()]) {
+                        Ok(r) => r.label,
+                        Err(_) => "unknown".to_string(),
+                    };
+                    output_vec.insert(i, CString::new(label)?);
+                }
+                None => output_vec.set_null(i),
+            }
+        }
+
+        Ok(())
+    }
+
+    fn signatures() -> Vec<ScalarFunctionSignature> {
+        vec![ScalarFunctionSignature::exact(
+            vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)],
+            LogicalTypeHandle::from(LogicalTypeId::Varchar),
+        )]
+    }
+}
+
+/// `ft_profile(LIST<VARCHAR>) → STRUCT{type, confidence, duckdb_type}`
+/// `ft_profile(LIST<VARCHAR>, header VARCHAR) → STRUCT{…}`
+///
+/// Column-level semantic type — the accurate path. Pools char/embed/stats/
+/// validator signal across the values (the optional `header` feeds the header
+/// branch). The aggregate `list()` assembles the sample on DuckDB's side; the
+/// documented idiom is `SELECT ft_profile(list(col)) FROM t USING SAMPLE 100
+/// ROWS` so the LIST is bounded before it is built. As a backstop, this scalar
+/// reads at most `PROFILE_SAMPLE_CAP` (100) values from each list — the model
+/// pools no more than that, so an unbounded `list(col)` over a huge column
+/// bounds its model cost here even if the analyst forgets to sample.
+///
+/// (duckdb-rs 1.10503.1 exposes no aggregate-UDF registration API, so this
+/// ships as a scalar over LIST rather than a true aggregate — see choice 0064.)
+struct FineTypeProfile;
+
+impl VScalar for FineTypeProfile {
+    type State = ();
+
+    unsafe fn invoke(
+        _state: &Self::State,
+        input: &mut DataChunkHandle,
+        output: &mut dyn WritableVector,
+    ) -> Result<(), Box<dyn Error>> {
+        let col_classifier = get_column_classifier();
+        let len = input.len();
+        let n_cols = input.num_columns();
+
+        let struct_vec = output.struct_vector();
+        let mut type_child = struct_vec.child(0, len);
+        let mut conf_child = struct_vec.child(1, len);
+        let mut ddb_child = struct_vec.child(2, len);
+
+        for i in 0..len {
+            let values = column_fn::read_list_varchar_capped(
+                input,
+                0,
+                i,
+                column_fn::PROFILE_SAMPLE_CAP,
+            );
+
+            let result = match values {
+                None => {
+                    // NULL list → NULL struct fields.
+                    type_child.set_null(i);
+                    conf_child.set_null(i);
+                    ddb_child.set_null(i);
+                    continue;
+                }
+                Some(vals) if vals.is_empty() => {
+                    type_child.insert(i, "unknown");
+                    conf_child.as_mut_slice::<f64>()[i] = 0.0;
+                    ddb_child.insert(i, "VARCHAR");
+                    continue;
+                }
+                Some(vals) => {
+                    let header = if n_cols >= 2 {
+                        read_varchar(input, 1, i).filter(|h| !h.is_empty())
+                    } else {
+                        None
+                    };
+                    match header {
+                        Some(h) => col_classifier.classify_column_with_header(&vals, &h),
+                        None => col_classifier.classify_column(&vals),
+                    }
+                }
+            };
+
+            match result {
+                Ok(col_result) => {
+                    let ddb = type_mapping::to_duckdb_type(&col_result.label);
+                    type_child.insert(i, col_result.label.as_str());
+                    conf_child.as_mut_slice::<f64>()[i] = col_result.confidence as f64;
+                    ddb_child.insert(i, ddb);
+                }
+                Err(_) => {
+                    type_child.insert(i, "unknown");
+                    conf_child.as_mut_slice::<f64>()[i] = 0.0;
+                    ddb_child.insert(i, "VARCHAR");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn signatures() -> Vec<ScalarFunctionSignature> {
+        let varchar = || LogicalTypeHandle::from(LogicalTypeId::Varchar);
+        let ret = || {
+            LogicalTypeHandle::struct_type(&[
+                ("type", varchar()),
+                ("confidence", LogicalTypeHandle::from(LogicalTypeId::Double)),
+                ("duckdb_type", varchar()),
+            ])
+        };
+        vec![
+            ScalarFunctionSignature::exact(vec![LogicalTypeHandle::list(&varchar())], ret()),
+            ScalarFunctionSignature::exact(
+                vec![LogicalTypeHandle::list(&varchar()), varchar()],
+                ret(),
+            ),
+        ]
+    }
+}
+
+/// `ft_validate_text(value VARCHAR, schema VARCHAR) → STRUCT{valid, constraint, message}`
+///
+/// Validates a value (or a whole column, one row at a time) against a JSON
+/// Schema fragment. Unlike `finetype_validate`, which returns a bare
+/// `'valid'`/error string, this returns a STRUCT mirroring the CLI
+/// `reject_errors` shape so a report can name which constraint failed:
+///   - `valid` BOOLEAN
+///   - `constraint` VARCHAR — `pattern` | `min_length` | … | `other` (NULL when valid)
+///   - `message` VARCHAR — the `jsonschema` error text (NULL when valid)
+///
+/// Null semantics match `finetype validate`: an empty / `"null"` value is
+/// skipped (valid), and a NULL / empty / non-object schema means the column
+/// carries no constraint (valid). This is the per-cell engine the `ft_validate`
+/// table macro calls under the hood.
+struct FineTypeValidateText;
+
+impl VScalar for FineTypeValidateText {
+    type State = ();
+
+    unsafe fn invoke(
+        _state: &Self::State,
+        input: &mut DataChunkHandle,
+        output: &mut dyn WritableVector,
+    ) -> Result<(), Box<dyn Error>> {
+        let len = input.len();
+
+        let struct_vec = output.struct_vector();
+        let mut valid_child = struct_vec.child(0, len);
+        let mut constraint_child = struct_vec.child(1, len);
+        let mut message_child = struct_vec.child(2, len);
+
+        for i in 0..len {
+            let value = read_varchar(input, 0, i);
+            let schema = read_varchar(input, 1, i);
+            let (valid, constraint, message) =
+                validate::validate_value_detail(value.as_deref(), schema.as_deref());
+
+            valid_child.as_mut_slice::<bool>()[i] = valid;
+            match constraint {
+                Some(c) => constraint_child.insert(i, c.as_str()),
+                None => constraint_child.set_null(i),
+            }
+            match message {
+                Some(m) => message_child.insert(i, m.as_str()),
+                None => message_child.set_null(i),
+            }
+        }
+
+        Ok(())
+    }
+
+    fn signatures() -> Vec<ScalarFunctionSignature> {
+        let varchar = || LogicalTypeHandle::from(LogicalTypeId::Varchar);
+        let ret = LogicalTypeHandle::struct_type(&[
+            ("valid", LogicalTypeHandle::from(LogicalTypeId::Boolean)),
+            ("constraint", varchar()),
+            ("message", varchar()),
+        ]);
+        vec![ScalarFunctionSignature::exact(
+            vec![varchar(), varchar()],
+            ret,
+        )]
+    }
+}
+
+/// `ft_validate(table, schema) → TABLE` — registered as a SQL table macro at
+/// LOAD (not a Rust table function: the BindInfo catalog wall stands, choice
+/// 0064). The macro expands into catalog-aware SQL that DuckDB executes with
+/// full table access via `query_table(table)`.
+///
+/// It melts every column to VARCHAR with a name-free `COLUMNS(*)::VARCHAR`
+/// UNPIVOT, joins each column to its `$.properties.<col>` subschema, and returns
+/// a per-column report `{column_name, total, rejects, sample_message}`.
+///
+/// The one `schema` argument auto-detects its three forms: an inline JSON
+/// literal (`trim(schema) LIKE '{%'`), a `getvariable()` reference (resolves to
+/// inline JSON before the macro sees it), or a file path (read via `read_text`).
+/// `CASE` short-circuits, so the inline branch never touches the filesystem.
+///
+/// Nested columns are guarded (Precision Principle): `typeof(COLUMNS(*))` flags
+/// STRUCT / LIST / MAP / UNION / ARRAY columns, which are surfaced as an explicit
+/// skip row ("unnest / to_json / extract before validating") instead of being
+/// silently FALSE-rejected on their flattened display text.
+const FT_VALIDATE_MACRO: &str = r#"CREATE OR REPLACE MACRO ft_validate(tbl, schema) AS TABLE
+WITH
+  resolved(s) AS (
+    SELECT CASE WHEN trim(schema) LIKE '{%' THEN schema
+                ELSE (SELECT content FROM read_text(schema)) END
+  ),
+  types AS (
+    SELECT col AS column_name, ty AS column_type,
+           (ty LIKE 'STRUCT%' OR ty LIKE 'MAP%' OR ty LIKE 'UNION%' OR ty LIKE '%]') AS nested
+    FROM (SELECT typeof(COLUMNS(*)) FROM query_table(tbl) LIMIT 1)
+    UNPIVOT (ty FOR col IN (COLUMNS(*)))
+  ),
+  melted AS (
+    SELECT col AS column_name, val
+    FROM (SELECT COLUMNS(*)::VARCHAR FROM query_table(tbl))
+    UNPIVOT (val FOR col IN (COLUMNS(*)))
+  ),
+  scalar_report AS (
+    SELECT m.column_name,
+           count(*)::BIGINT AS total,
+           count(*) FILTER (WHERE NOT ft_validate_text(m.val,
+             json_extract((SELECT s FROM resolved), '$."properties"."' || m.column_name || '"')::VARCHAR).valid)::BIGINT AS rejects,
+           any_value(ft_validate_text(m.val,
+             json_extract((SELECT s FROM resolved), '$."properties"."' || m.column_name || '"')::VARCHAR).message)
+             FILTER (WHERE NOT ft_validate_text(m.val,
+             json_extract((SELECT s FROM resolved), '$."properties"."' || m.column_name || '"')::VARCHAR).valid) AS sample_message
+    FROM melted m JOIN types tp USING (column_name)
+    WHERE NOT tp.nested
+    GROUP BY m.column_name
+  ),
+  nested_report AS (
+    SELECT tp.column_name, NULL::BIGINT AS total, NULL::BIGINT AS rejects,
+           'nested ' || tp.column_type || ' column — unnest / to_json / extract before validating' AS sample_message
+    FROM types tp WHERE tp.nested
+  )
+  SELECT * FROM scalar_report
+  UNION ALL
+  SELECT * FROM nested_report
+  ORDER BY column_name;
+"#;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // EXTENSION ENTRYPOINT
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -613,6 +897,32 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // rejects to the output .db via duckdb-rs (spec ac-06 / ac-09).
     con.register_table_function::<spike::FineTypeSpike>("finetype_spike")
         .expect("Failed to register finetype_spike (spike artefact — not production)");
+
+    // ── ft_ converged surface (spec 2026-06-03-duckdb-extension-table-verbs) ──
+    // The un-prefixed scalars above stay registered as aliases for one release
+    // so the v0.6.22 community install keeps working; new docs teach the ft_
+    // names. ft_infer (single-value probe) and ft_profile (column, the accurate
+    // path) are genuinely new; ft_validate_text returns a STRUCT; ft_cast /
+    // ft_unpack / ft_version alias the existing scalar impls.
+    con.register_scalar_function::<FineTypeVersion>("ft_version")
+        .expect("Failed to register ft_version");
+    con.register_scalar_function::<FineTypeInfer>("ft_infer")
+        .expect("Failed to register ft_infer");
+    con.register_scalar_function::<FineTypeProfile>("ft_profile")
+        .expect("Failed to register ft_profile");
+    con.register_scalar_function::<FineTypeValidateText>("ft_validate_text")
+        .expect("Failed to register ft_validate_text");
+    con.register_scalar_function::<FineTypeCast>("ft_cast")
+        .expect("Failed to register ft_cast");
+    con.register_scalar_function::<FineTypeUnpack>("ft_unpack")
+        .expect("Failed to register ft_unpack");
+
+    // ft_validate(table, schema) ships as a SQL table macro, not a Rust table
+    // function: the macro expands into catalog-aware SQL DuckDB runs with full
+    // table access (query_table), reaching past the BindInfo catalog wall that
+    // blocks Rust table functions on this pin (choice 0064).
+    con.execute_batch(FT_VALIDATE_MACRO)
+        .expect("Failed to register ft_validate table macro");
 
     Ok(())
 }

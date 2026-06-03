@@ -31,7 +31,7 @@ goal: |
   | Verb                          | Scope        | DuckDB kind        | Mirrors CLI |
   |-------------------------------|--------------|--------------------|-------------|
   | `ft_infer(value)`             | one value    | scalar             | — (probe)   |
-  | `ft_profile(table)`           | a column     | aggregate UDF      | `profile`   |
+  | `ft_profile(list(col))`       | a column     | scalar over LIST   | `profile`   |
   | `ft_validate_text(value, schema)` | one value / column | scalar    | per-cell    |
   | `ft_validate(table, schema)`  | a table      | SQL table macro    | `validate`  |
   | `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar     | utilities   |
@@ -119,7 +119,7 @@ acceptance_criteria:
     catalog wall on the current pin (duckdb 1.10503.1). Name `query_table(name)`
     as the execution-time resolution that does the work.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |
@@ -128,18 +128,23 @@ acceptance_criteria:
     Documented as the weak probe: less accurate than ft_profile because it
     carries no column context. Returns the same label finetype() does today.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
-    `ft_profile` registered as an aggregate UDF returning the column's semantic
-    type (and, in a detail variant or struct, confidence + recommended DuckDB
-    type). Used `SELECT col, ft_profile(val) FROM (... UNPIVOT ...) GROUP BY col`
-    or directly over a column. Pools char/embed/stats/validator signal across
-    the aggregated values (header branch reads the column name). A row sample
-    (e.g. `USING SAMPLE 100`) is the documented idiom; the aggregate itself
-    bounds the values it pools so a full-table scan does not OOM.
+    `ft_profile(LIST<VARCHAR>) → STRUCT{type, confidence, duckdb_type}`
+    registered as a scalar over a LIST (with a 2-arg `(LIST<VARCHAR>, header)`
+    overload). NOTE: duckdb-rs 1.10503.1 exposes no aggregate-UDF registration
+    API (the aggregate wall, recorded in choice 0064 alongside the catalog
+    wall), so ft_profile ships as a scalar over an explicit LIST built by
+    `list(col)` — not as an aggregate. Returns the column's semantic type,
+    confidence, and recommended DuckDB type. Pools char/embed/stats/validator
+    signal across the LIST's values (header branch reads the column name when
+    given). Idiom: `SELECT ft_profile(list(col)) FROM t USING SAMPLE 100 ROWS`
+    so the LIST is bounded before it is built; as a backstop the scalar
+    self-bounds the values it pools (PROFILE_SAMPLE_CAP = 100) so an unbounded
+    `list(col)` over a huge column never OOMs.
   gate: false
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     `ft_validate_text(value VARCHAR, schema VARCHAR)` registered, operating over
@@ -150,7 +155,7 @@ acceptance_criteria:
     the CLI null semantics (empty / "null" skip) so column validation matches
     `finetype validate`.
   gate: false
-  checked: false
+  checked: true
 - id: ac-05
   description: |
     `ft_validate(table, schema)` shipped as a SQL table macro answering "is this
@@ -160,7 +165,7 @@ acceptance_criteria:
     run on a loaded heterogeneous table via the catalog (macro path, not a Rust
     table function).
   gate: false
-  checked: false
+  checked: true
 - id: ac-06
   description: |
     One schema argument accepts inline JSON, a variable, and a file path. The
@@ -171,7 +176,7 @@ acceptance_criteria:
     subquery). `getvariable('schema')` also works (resolves to inline JSON
     before the macro). No second function, no overload.
   gate: false
-  checked: false
+  checked: true
 - id: ac-07
   description: |
     Nested columns guarded. When a table has a STRUCT / LIST / nested column,
@@ -181,14 +186,14 @@ acceptance_criteria:
     instructing the analyst to unnest / to_json / extract first. A test proves a
     STRUCT column is not silently FALSE-rejected.
   gate: false
-  checked: false
+  checked: true
 - id: ac-08
   description: |
     Existing un-prefixed scalars retained as aliases for one release so the
     v0.6.22 community install keeps working, with a deprecation note in docs
     pointing at the ft_ names. finetype()/finetype_validate()/etc. still resolve.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-09
   description: |
@@ -199,7 +204,7 @@ acceptance_criteria:
     verified-working examples (no `user@example.com`→email; that returns
     plain_text).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-10
   description: |
@@ -209,5 +214,5 @@ acceptance_criteria:
     inline schema and a schema.json file, and the nested-column guard firing on
     a STRUCT column.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
