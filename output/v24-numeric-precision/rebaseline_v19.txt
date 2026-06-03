@@ -1,0 +1,82 @@
+# v24 ac-00 re-baseline — model=models/sherlock-v19-relu-s42
+# n=300/cluster rows=1000 seed=42
+
+## utc->int: datetime.offset.utc (ydf says representation.numeric.integer_number)
+   sampled=300 profiled=300 v19_fp=251 v19_fp_rate=0.8367  -> KEEP (v19 still mistypes)
+   v19 instead assigns: representation.numeric.integer_number=48, representation.identifier.increment=1
+
+## bool->int: representation.boolean.binary (ydf says representation.numeric.integer_number)
+   sampled=298 profiled=298 v19_fp=296 v19_fp_rate=0.9933  -> KEEP (v19 still mistypes)
+   v19 instead assigns: representation.numeric.integer_number=2
+
+## url->int: technology.internet.url (ydf says representation.numeric.integer_number)
+   sampled=297 profiled=297 v19_fp=297 v19_fp_rate=1.0000  -> KEEP (v19 still mistypes)
+
+## int->dec: representation.numeric.integer_number (ydf says representation.numeric.decimal_number)
+   sampled=298 profiled=298 v19_fp=298 v19_fp_rate=1.0000  -> KEEP (v19 still mistypes)
+
+=== JSON ===
+[
+  {
+    "cluster": "utc->int",
+    "sense_fp": "datetime.offset.utc",
+    "ydf_correct": "representation.numeric.integer_number",
+    "sampled": 300,
+    "profiled": 300,
+    "v19_fp_count": 251,
+    "v19_fp_rate": 0.8367,
+    "verdict": "KEEP (v19 still mistypes)",
+    "v19_reassigns_to": [
+      {
+        "label": "representation.numeric.integer_number",
+        "n": 48
+      },
+      {
+        "label": "representation.identifier.increment",
+        "n": 1
+      }
+    ],
+    "extract_err": 0
+  },
+  {
+    "cluster": "bool->int",
+    "sense_fp": "representation.boolean.binary",
+    "ydf_correct": "representation.numeric.integer_number",
+    "sampled": 298,
+    "profiled": 298,
+    "v19_fp_count": 296,
+    "v19_fp_rate": 0.9933,
+    "verdict": "KEEP (v19 still mistypes)",
+    "v19_reassigns_to": [
+      {
+        "label": "representation.numeric.integer_number",
+        "n": 2
+      }
+    ],
+    "extract_err": 2
+  },
+  {
+    "cluster": "url->int",
+    "sense_fp": "technology.internet.url",
+    "ydf_correct": "representation.numeric.integer_number",
+    "sampled": 297,
+    "profiled": 297,
+    "v19_fp_count": 297,
+    "v19_fp_rate": 1.0,
+    "verdict": "KEEP (v19 still mistypes)",
+    "v19_reassigns_to": [],
+    "extract_err": 3
+  },
+  {
+    "cluster": "int->dec",
+    "sense_fp": "representation.numeric.integer_number",
+    "ydf_correct": "representation.numeric.decimal_number",
+    "sampled": 298,
+    "profiled": 298,
+    "v19_fp_count": 298,
+    "v19_fp_rate": 1.0,
+    "verdict": "KEEP (v19 still mistypes)",
+    "v19_reassigns_to": [],
+    "extract_err": 2
+  }
+]
