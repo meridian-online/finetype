@@ -141,7 +141,7 @@ acceptance_criteria:
     scaffolding (align with the next CLI release tag where practical) so the
     registry `repo.ref` can point at a stable tag, not a floating commit.
   gate: false
-  checked: false
+  checked: true
   ac_type: ops
 - id: ac-07
   description: |
