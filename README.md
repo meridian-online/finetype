@@ -19,7 +19,7 @@ identity.person.email
 
 ## Features
 
-- **250 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
+- **240 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 32+ for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -144,12 +144,12 @@ FineType recognizes **250 types** across **7 domains**:
 | Domain | Types | Examples |
 |--------|-------|----------|
 | `datetime` | 84 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (32+ locales) |
-| `representation` | 36 | Integers, floats, booleans, numeric codes, hex colors, JSON, CAS numbers, SMILES, InChI |
-| `technology` | 28 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
-| `identity` | 34 | Names, emails, phone numbers (46+ locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
-| `finance` | 31 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, FIGI, currency amounts (7 format variants), routing numbers |
+| `representation` | 33 | Integers, floats, booleans, numeric codes, hex colors, JSON, CAS numbers, SMILES, InChI |
+| `technology` | 26 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
+| `identity` | 33 | Names, emails, phone numbers (46+ locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
+| `finance` | 28 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, FIGI, currency amounts (7 format variants), routing numbers |
 | `geography` | 25 | Lat/lon, countries, cities, postal codes (65+ locales), WKT, GeoJSON, H3, geohash, Plus Codes, MGRS |
-| `container` | 12 | JSON objects, CSV rows, query strings, key-value pairs |
+| `container` | 11 | JSON objects, CSV rows, query strings, key-value pairs |
 
 Each type is a **transformation contract** — if FineType predicts `datetime.date.mdy_slash`, that guarantees `strptime(value, '%m/%d/%Y')::DATE` will succeed.
 
@@ -161,8 +161,8 @@ See [`labels/`](labels/) for the complete taxonomy definitions.
 
 | Model | Profile Eval | Actionability | Classes |
 |-------|----------|---------|---------|
-| **Multi-branch→Sharpen** (default) | **81.6% label** (155/190) | **99.9%** | **250** |
-| Sense→Sharpen (legacy) | 98.9% label (188/190) | 99.9% | 250 |
+| **Multi-branch→Sharpen** (default) | **81.6% label** (155/190) | **99.9%** | **240** |
+| Sense→Sharpen (legacy) | 98.9% label (188/190) | 99.9% | 240 |
 
 **Profile eval:** 29 real-world datasets, 190 format-detectable columns. **Actionability:** 232,321/232,541 values transformed successfully across 120 types.
 

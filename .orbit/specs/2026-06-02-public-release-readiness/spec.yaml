@@ -44,7 +44,6 @@ goal: |
   - The git history rewrite (explicitly declined).
   - Any model/taxonomy retrain.
   - The DuckDB extension engineering itself (its own spec).
-
 cards:
 - 0006-command-line-interface
 status: open
@@ -61,7 +60,6 @@ acceptance_criteria:
     site rebuilds clean (`npm run build`).
   gate: false
   checked: false
-  ac_type: code
 - id: ac-02
   description: |
     Type count reconciled to one canonical number. The binary reports 240
@@ -73,13 +71,12 @@ acceptance_criteria:
     identity 33, representation 33, technology 26 = 240.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-03
   description: |
     README type count corrected. README.md "250 types" → the canonical figure
     from ac-02, and its per-domain table updated to match.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-04
   description: |
@@ -91,14 +88,13 @@ acceptance_criteria:
     the gittables multi-lens diagnostic"). Verify no public command's --help
     contains spec IDs, MADR refs, ac- tokens, NNFT/bead IDs.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-05
   description: |
     Cargo.lock tracked. Remove `Cargo.lock` from .gitignore and commit it — for
     a binary/CLI the lockfile belongs in git for reproducible builds.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-06
   description: |
@@ -127,7 +123,7 @@ acceptance_criteria:
     docs/DEVELOPMENT.md "CLI Surface (v0.6.19)" and its stale extension-build
     example versions updated to current.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-09
   description: |

@@ -99,15 +99,14 @@ enum Commands {
         #[arg(long)]
         batch: bool,
 
-        /// Diagnostic cascade — given a column's Sense prediction and samples,
+        /// Diagnostic cascade — given a column's predicted type and samples,
         /// return the inferred correct type plus a mechanism token explaining
-        /// the predicted/actual relationship (one of ten closed tokens per
-        /// MADR 0075 + 0081). Requires `--mode column --batch`; stdin is
-        /// NDJSON of {"column_name","predicted_type","samples":[...]} and
-        /// stdout is NDJSON of {"inferred_correct_type","confidence",
-        /// "mechanism","signals":{...}}. Loads taxonomy + validators once
-        /// across the whole stream. Used by ac-08 of the gittables
-        /// multi-lens diagnostic.
+        /// the predicted/actual relationship (one of ten closed tokens).
+        /// Requires `--mode column --batch`; stdin is NDJSON of
+        /// {"column_name","predicted_type","samples":[...]} and stdout is
+        /// NDJSON of {"inferred_correct_type","confidence","mechanism",
+        /// "signals":{...}}. Loads taxonomy + validators once across the
+        /// whole stream.
         #[arg(long)]
         explain: bool,
 
@@ -325,9 +324,9 @@ enum Commands {
         model_type: ModelType,
 
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR).
-        /// Default 32 — lowered from 50 in v0.6.20 (spec
-        /// 2026-04-28-validate-precision-corpus, ac-09 sub-fix (a)) to
-        /// reduce enum-overfit attribution in profile→validate round-trip.
+        /// A column with at most this many distinct values is typed as an ENUM;
+        /// above it, VARCHAR. Default 32 — tuned to reduce over-eager ENUM
+        /// attribution in the profile→validate round-trip.
         #[arg(long, default_value = "32")]
         enum_threshold: usize,
 

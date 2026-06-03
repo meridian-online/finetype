@@ -120,7 +120,7 @@ cargo run -p finetype-build-tools --bin append-duckdb-metadata -- \
     -o target/release/finetype.duckdb_extension \
     -p osx_arm64 \
     --duckdb-version v1.2.0 \
-    --extension-version 0.6.20 \
+    --extension-version 0.6.22 \
     --abi-type C_STRUCT
 ```
 
@@ -239,14 +239,14 @@ SELECT ft_validate_text('not-an-email',
 
 ---
 
-## CLI Surface (v0.6.19)
+## CLI Surface (v0.6.22)
 
 `finetype --help` lists **only the 5 public commands**. Hidden subcommands stay callable for internal use (CI, training data prep, sweep wrappers, eval scripts) but never appear in the help surface — they're not part of the stable contract and may move or change shape between minor versions without a deprecation cycle.
 
 ```
 | Tier            | Commands                                                       |
 |-----------------|----------------------------------------------------------------|
-| Public (v0.6.19)| `infer`, `profile`, `validate`, `mcp`, `taxonomy`              |
+| Public (v0.6.22)| `infer`, `profile`, `validate`, `mcp`, `taxonomy`              |
 | Internal (hidden)| `check`, `generate`, `train`, `train-multi-branch`*,          |
 |                  | `eval`, `infer-batch`                                         |
 ```
@@ -292,7 +292,7 @@ Three env vars exist — each is read by exactly one consumer. Do not conflate.
 
 CLI/MCP/DuckDB/eval code does NOT read `FINETYPE_CI_MODEL`. The runtime default remains `models/default` for every non-CI consumer.
 
-## Build & Test (v0.6.19)
+## Build & Test (v0.6.22)
 
 ```bash
 make setup              # Install git hooks (first time)
