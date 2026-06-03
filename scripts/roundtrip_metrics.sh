@@ -18,8 +18,9 @@
 #
 # Targets (blog round-trip): non_trivial_pct >= 0.80 AND reject_rate_non_trivial <= 0.01
 #
-# Model selection: honours FINETYPE_MODEL_DIR (inherited) so a retrained model can
-# be swapped in without touching this script. Binary overridable via FINETYPE_BIN.
+# Model selection: honours FINETYPE_MODEL (inherited; a path to the model dir, e.g.
+# models/sherlock-v23-precision-relu-s42) so a retrained model can be swapped in
+# without touching this script. Binary overridable via FINETYPE_BIN.
 #
 # Usage: scripts/roundtrip_metrics.sh <input.csv>
 
