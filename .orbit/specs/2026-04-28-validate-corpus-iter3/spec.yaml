@@ -1,3 +1,5 @@
+id: 2026-04-28-validate-corpus-iter3
+status: closed
 goal: |
   Wire the validate-corpus harness's per-mechanism attribution to surface what
   iter-2's curated mechanism-coverage datasets were designed to exercise, and
@@ -27,881 +29,437 @@ goal: |
   `crates/finetype-eval/src/bin/validate_corpus.rs`. Iter-2 GT sidecars,
   validate-corpus CSVs, the manifest, sources.yaml, and row_hashes.tsv are
   byte-unchanged.
-
-constraints:
-  - "Pure attribution-logic change. The harness binary at
-    `crates/finetype-eval/src/bin/validate_corpus.rs` and the new fixture file
-    at `eval/datasets/validate_corpus_expected_attributions.yaml` are the
-    only code/data files that change. Iter-2 GT sidecars
-    (`eval/datasets/validate_corpus/*.gt.yaml`), validate-corpus CSVs,
-    `eval/datasets/validate_manifest.csv`, `eval/datasets/sources.yaml`, and
-    `eval/row_hashes.tsv` are untouched."
-
-  - "Card 0014 scenario 2 pins the partition at exactly four mechanisms:
-    enum_overfit, validator-format-diversity (`format_diversity` in code),
-    misclassification, code_vs_canonical. Iter-3 must coalesce — no new
-    mechanism names, no 6-bucket split. The two trigger paths per bucket
-    (iter-2's `predicted == expected + pattern-reject` and iter-3's
-    `predicted != expected` shape) are an internal implementation detail
-    surfaced in a per-column `trigger:` notes column, not in the bucket count."
-
-  - "Cascade ordering must be explicit, documented, and tested. The new
-    iter-3 paths (format_diversity path B, code_vs_canonical path B) must
-    fire BEFORE Rule 1 (misclassification) in the cascade. A dedicated
-    cascade-order test asserts rules fire in the documented sequence."
-
-  - "Attribution stays deterministic, label-only, no model calls inside the
-    harness. Rules consume per-column artefacts already on hand: GT label,
-    predicted label, validator-failure reason from the MADR 0071 reject
-    ontology (error_type, constraint_failed), and column header. No new
-    plumbing through `process_dataset` or `RejectRow` — the
-    code-typed-taxonomy allowlist (taxonomy label matching) is the
-    label-only mechanism for code_vs_canonical path B.
-
-    **Allowlist tuning IS in scope for iter-3** — the implementer is
-    expected to expand the allowlist beyond ac-02's seed set during
-    fixture construction (ac-03) to cover whatever real taxonomy labels
-    the model actually predicts on iter-2's curated datasets. This stays
-    label-only (entries are still taxonomy label strings). Tuning the
-    allowlist is NOT escalation.
-
-    **What IS deferred** — adding new artefacts to RejectRow or
-    `process_dataset` (column-mode value-shape statistics, length
-    histograms, character-class summaries). If, after exhausting allowlist
-    tuning, the rule still under-fires on iter-2's curated datasets, the
-    failure is documented in the iter-3 report's expected-vs-actual table
-    as 'pending value-shape escalation', and a follow-up spec is filed —
-    NOT addressed in iter-3."
-
-  - "Per-(dataset, column) fixture at
-    `eval/datasets/validate_corpus_expected_attributions.yaml` is
-    authoritative ground-truth. It must contain a row for EVERY failing
-    column across all 12 datasets in `eval/datasets/validate_manifest.csv`,
-    not just iter-2's curated 5. Each row carries
-    `(dataset, column, expected_mechanism, rationale)` plus optional
-    `pending_escalation: bool` (default false). A unit test iterates
-    the fixture and asserts `attribute(...)` returns the expected mechanism
-    for every row where `pending_escalation` is false. Silent
-    re-attribution is impossible — drift requires a fixture diff in the
-    PR.
-
-    **Fixture-regrowth pin.** A test
-    (`vci3_fixture_row_count_baseline`) loads the fixture and asserts
-    the row count is ≥ a baseline value pinned by ac-03 (Phase 2 row
-    count from the iter-3 harness run, recorded in the spec's
-    implementation_notes after Phase 2). The PR description MUST
-    include a 'Fixture diff rationale' section explaining any net
-    addition or removal of fixture rows vs the baseline; the
-    review-pr stage greps for this section. Together these guard
-    against a future change silently shrinking the fixture (e.g. by
-    fixing the harness without updating ground-truth)."
-
-  - "Test naming converges to a single prefix: `vci3_*` (matching
-    `metadata.test_prefix`). Iter-1's `pvc_attribute_rule_*` tests are
-    renamed in this iteration; `mechanism_attribution` references in the
-    stub spec's verification text are dropped. Single naming convention
-    going forward; no migration window."
-
-  - "AC-06 pre-screen floor recalibration is explicitly out of scope for
-    iter-3. It's a calibration job on `eval/pre-screen_floors.yaml` for
-    real-world dimensional data — mechanism-orthogonal to attribution
-    rules. Stays deferred for a future spec under the m-19 / eval-expansion
-    arc."
-
-  - "Three MADRs land alongside this iteration: (1) bucket-coalesce decision
-    (4 buckets, two trigger paths each); (2) per-(dataset, column) fixture
-    as anti-regression lock; (3) label-only attribution for
-    code_vs_canonical with escalation path to value-shape signals if
-    needed. All three accepted, dated 2026-04-29."
-
 acceptance_criteria:
-  - id: ac-01
-    ac_type: code
-    description: |
-      Cascade refactor in `crates/finetype-eval/src/bin/validate_corpus.rs`
-      `attribute` module. The 5-rule cascade (iter-2) becomes a 7-rule cascade
-      with explicit ordering:
+- id: ac-01
+  description: |
+    Cascade refactor in `crates/finetype-eval/src/bin/validate_corpus.rs`
+    `attribute` module. The 5-rule cascade (iter-2) becomes a 7-rule cascade
+    with explicit ordering:
 
-      1. enum_overfit — `predicted == expected` AND any enum-constraint failure.
-      2. format_diversity (path B — iter-3 NEW) — `predicted != expected`
-         AND GT and predicted share broad-type prefix (split on '.', take
-         first segment) AND full-label mismatch (subtype differs).
-      3. code_vs_canonical (path B — iter-3 NEW) — `predicted != expected`
-         AND one side is in the code-typed taxonomy allowlist.
-      4. format_diversity (path A — iter-2 PRESERVED) — `predicted == expected`
-         AND SEMANTIC_TYPE pattern-reject AND
-         `!column_in_seam_table(column_name)` (the iter-2 helper at
-         validate_corpus.rs:292 — must be invoked explicitly, not
-         re-derived inline).
-      5. code_vs_canonical (path A — iter-2 PRESERVED) — `predicted == expected`
-         AND SEMANTIC_TYPE pattern-reject AND
-         `column_in_seam_table(column_name)` (same helper as Rule 4,
-         opposite branch).
-      6. misclassification — `predicted != expected` AND any SEMANTIC_TYPE
-         reject (catch-all for prediction errors not handled by 2 or 3).
-      7. unknown — anything else.
+    1. enum_overfit — `predicted == expected` AND any enum-constraint failure.
+    2. format_diversity (path B — iter-3 NEW) — `predicted != expected`
+       AND GT and predicted share broad-type prefix (split on '.', take
+       first segment) AND full-label mismatch (subtype differs).
+    3. code_vs_canonical (path B — iter-3 NEW) — `predicted != expected`
+       AND one side is in the code-typed taxonomy allowlist.
+    4. format_diversity (path A — iter-2 PRESERVED) — `predicted == expected`
+       AND SEMANTIC_TYPE pattern-reject AND
+       `!column_in_seam_table(column_name)` (the iter-2 helper at
+       validate_corpus.rs:292 — must be invoked explicitly, not
+       re-derived inline).
+    5. code_vs_canonical (path A — iter-2 PRESERVED) — `predicted == expected`
+       AND SEMANTIC_TYPE pattern-reject AND
+       `column_in_seam_table(column_name)` (same helper as Rule 4,
+       opposite branch).
+    6. misclassification — `predicted != expected` AND any SEMANTIC_TYPE
+       reject (catch-all for prediction errors not handled by 2 or 3).
+    7. unknown — anything else.
 
-      Each rule lives in its own free function (e.g. `try_format_diversity_b`,
-      `try_code_vs_canonical_b`) with rustdoc explaining trigger condition,
-      example input, and what it does NOT fire on. The `attribute()` entry
-      point becomes a thin dispatcher iterating the rules in order.
-    verification: |
-      `cargo build -p finetype-eval` succeeds. `cargo clippy -p finetype-eval
-      --all-targets -- -D warnings` exits 0. The `attribute` module has 7
-      named rule functions plus the dispatcher; each rule function has
-      rustdoc with `# Triggers`, `# Example`, and `# Does NOT fire on`
-      sections. `cargo doc -p finetype-eval --no-deps` builds without
-      warnings.
+    Each rule lives in its own free function (e.g. `try_format_diversity_b`,
+    `try_code_vs_canonical_b`) with rustdoc explaining trigger condition,
+    example input, and what it does NOT fire on. The `attribute()` entry
+    point becomes a thin dispatcher iterating the rules in order.
+  ac_type: code
+- id: ac-02
+  description: |
+    Code-typed taxonomy allowlist module within
+    `crates/finetype-eval/src/bin/validate_corpus.rs` (or a sibling module
+    in the same binary). Curated set of taxonomy labels treated as
+    code-typed for the code_vs_canonical path B rule. Every entry MUST
+    be a label that exists in `labels/definitions_*.yaml` — verified
+    against the loaded taxonomy at test time, not by `[a-z_.]` regex.
 
-  - id: ac-02
-    ac_type: code
-    description: |
-      Code-typed taxonomy allowlist module within
-      `crates/finetype-eval/src/bin/validate_corpus.rs` (or a sibling module
-      in the same binary). Curated set of taxonomy labels treated as
-      code-typed for the code_vs_canonical path B rule. Every entry MUST
-      be a label that exists in `labels/definitions_*.yaml` — verified
-      against the loaded taxonomy at test time, not by `[a-z_.]` regex.
+    Initial seed (≥20 entries, all verified present in v0.6.19 taxonomy
+    as of 2026-04-29):
 
-      Initial seed (≥20 entries, all verified present in v0.6.19 taxonomy
-      as of 2026-04-29):
+    - geography: `geography.location.country_code`,
+      `geography.location.state_code`,
+      `geography.transportation.iata_code`,
+      `geography.transportation.icao_code`,
+      `geography.transportation.hs_code`,
+      `geography.transportation.unlocode`,
+      `geography.contact.calling_code`
+    - finance: `finance.banking.swift_bic`, `finance.banking.iban`,
+      `finance.banking.aba_routing`, `finance.banking.bsb`,
+      `finance.currency.currency_code`,
+      `finance.securities.cusip`, `finance.securities.figi`,
+      `finance.securities.isin`, `finance.securities.lei`,
+      `finance.securities.sedol`,
+      `finance.payment.credit_card_number`
+    - identity: `identity.medical.cpt`, `identity.medical.loinc`,
+      `identity.medical.npi`, `identity.medical.ndc`,
+      `identity.medical.icd10`, `identity.government.ssn`,
+      `identity.government.ein`, `identity.government.vin`,
+      `identity.government.eu_vat`, `identity.commerce.ean`,
+      `identity.commerce.isbn`, `identity.commerce.upc`,
+      `identity.person.gender_code`
+    - technology: `technology.code.doi`, `technology.code.imei`,
+      `technology.code.locale_code`, `technology.internet.http_method`,
+      `technology.internet.top_level_domain`
 
-      - geography: `geography.location.country_code`,
-        `geography.location.state_code`,
-        `geography.transportation.iata_code`,
-        `geography.transportation.icao_code`,
-        `geography.transportation.hs_code`,
-        `geography.transportation.unlocode`,
-        `geography.contact.calling_code`
-      - finance: `finance.banking.swift_bic`, `finance.banking.iban`,
-        `finance.banking.aba_routing`, `finance.banking.bsb`,
-        `finance.currency.currency_code`,
-        `finance.securities.cusip`, `finance.securities.figi`,
-        `finance.securities.isin`, `finance.securities.lei`,
-        `finance.securities.sedol`,
-        `finance.payment.credit_card_number`
-      - identity: `identity.medical.cpt`, `identity.medical.loinc`,
-        `identity.medical.npi`, `identity.medical.ndc`,
-        `identity.medical.icd10`, `identity.government.ssn`,
-        `identity.government.ein`, `identity.government.vin`,
-        `identity.government.eu_vat`, `identity.commerce.ean`,
-        `identity.commerce.isbn`, `identity.commerce.upc`,
-        `identity.person.gender_code`
-      - technology: `technology.code.doi`, `technology.code.imei`,
-        `technology.code.locale_code`, `technology.internet.http_method`,
-        `technology.internet.top_level_domain`
+    **GICS carve-out (S&P 500).** `gics_sector / industry_group /
+    industry / sub_industry` do NOT exist in v0.6.19 taxonomy; the
+    `sp500_constituents.GICS Sector` GT label is
+    `representation.discrete.categorical`. The allowlist cannot
+    handle this slot; iter-3's S&P 500 code_vs_canonical attribution
+    relies on the implementer's allowlist tuning during fixture
+    construction (constraint 4) — concretely, on whether the iter-3
+    harness predicts a label for that column that is itself in the
+    allowlist (e.g. a code-typed label predicted for canonical text).
+    If allowlist tuning cannot make S&P 500 attribute to
+    code_vs_canonical with label-only signals, the row is recorded
+    in the iter-3 report's expected-vs-actual table as 'pending
+    value-shape escalation' per constraint 4, and a follow-up spec
+    is filed (taxonomy widening for GICS, OR value-shape signals).
 
-      **GICS carve-out (S&P 500).** `gics_sector / industry_group /
-      industry / sub_industry` do NOT exist in v0.6.19 taxonomy; the
-      `sp500_constituents.GICS Sector` GT label is
-      `representation.discrete.categorical`. The allowlist cannot
-      handle this slot; iter-3's S&P 500 code_vs_canonical attribution
-      relies on the implementer's allowlist tuning during fixture
-      construction (constraint 4) — concretely, on whether the iter-3
-      harness predicts a label for that column that is itself in the
-      allowlist (e.g. a code-typed label predicted for canonical text).
-      If allowlist tuning cannot make S&P 500 attribute to
-      code_vs_canonical with label-only signals, the row is recorded
-      in the iter-3 report's expected-vs-actual table as 'pending
-      value-shape escalation' per constraint 4, and a follow-up spec
-      is filed (taxonomy widening for GICS, OR value-shape signals).
+    The allowlist is a `pub(crate) const` slice of `&'static str` with
+    a rustdoc block explaining the curation criterion (short-form
+    identifier codes vs canonical text/name forms) and the escalation
+    path (value-shape signals if label-only proves insufficient even
+    after tuning). The implementer MAY add or remove labels during
+    fixture construction; the seed above is a starting point, not a
+    ceiling.
+  ac_type: code
+- id: ac-03
+  description: |
+    Per-(dataset, column) fixture file at
+    `eval/datasets/validate_corpus_expected_attributions.yaml`. YAML
+    array; each entry has fields:
+    - `dataset` (string, required)
+    - `column` (string, required)
+    - `expected_mechanism` (string, required, one of: enum_overfit,
+      format_diversity, misclassification, code_vs_canonical, unknown,
+      no_gt)
+    - `rationale` (string, required, ≤200 chars)
+    - `pending_escalation` (bool, optional, default false) — see ac-13
 
-      The allowlist is a `pub(crate) const` slice of `&'static str` with
-      a rustdoc block explaining the curation criterion (short-form
-      identifier codes vs canonical text/name forms) and the escalation
-      path (value-shape signals if label-only proves insufficient even
-      after tuning). The implementer MAY add or remove labels during
-      fixture construction; the seed above is a starting point, not a
-      ceiling.
-    verification: |
-      The allowlist is a named `pub(crate) const` (e.g.
-      `CODE_TYPED_LABELS`). Module-level rustdoc lists the curation
-      criterion AND the GICS carve-out. A unit test
-      (`vci3_code_typed_allowlist_taxonomy_valid`) loads the taxonomy
-      via `finetype_core` and asserts every entry in `CODE_TYPED_LABELS`
-      is a key in the loaded taxonomy map (NOT a regex match — a real
-      taxonomy lookup). A second test
-      (`vci3_code_typed_allowlist_seed_minimum`) asserts the allowlist
-      has ≥20 entries.
+    Fixture coverage: EVERY failing column across all 12 datasets in
+    `eval/datasets/validate_manifest.csv`. Construction is **strict
+    two-pass** (enforced by ac-13's git-log assertion):
 
-  - id: ac-03
-    ac_type: code
-    description: |
-      Per-(dataset, column) fixture file at
-      `eval/datasets/validate_corpus_expected_attributions.yaml`. YAML
-      array; each entry has fields:
-      - `dataset` (string, required)
-      - `column` (string, required)
-      - `expected_mechanism` (string, required, one of: enum_overfit,
-        format_diversity, misclassification, code_vs_canonical, unknown,
-        no_gt)
-      - `rationale` (string, required, ≤200 chars)
-      - `pending_escalation` (bool, optional, default false) — see ac-13
-
-      Fixture coverage: EVERY failing column across all 12 datasets in
-      `eval/datasets/validate_manifest.csv`. Construction is **strict
-      two-pass** (enforced by ac-13's git-log assertion):
-
-      Phase 1 (separate commit): hand-write the 5 anchor rows from
-      `.orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml`'s
-      expected-vs-actual table. NO harness run informs Phase 1 —
-      `expected_mechanism` for these 5 rows is taken VERBATIM from
-      iter-2's spec.
-
-      Phase 2 (separate commit): run the iter-3 harness against the
-      full 12-dataset manifest, capture per-dataset failing columns,
-      and append a fixture row per column. Each row's `rationale` is
-      the first sentence of the rule's rustdoc that fired; each row's
-      `expected_mechanism` is the harness's actual output. Hand-review
-      each row before commit (catch any obvious miscategorisations).
-
-      After Phase 2 commits, record the row count in this spec's
-      implementation_notes as the baseline for the
-      `vci3_fixture_row_count_baseline` test (constraint 5).
-
-      The fixture is committed to the repo and is the authoritative
-      ground-truth for what each failure means.
-    verification: |
-      `eval/datasets/validate_corpus_expected_attributions.yaml` exists.
-      Loading it via `serde_yaml::from_reader::<Vec<FixtureRow>>` succeeds.
-      The number of fixture rows is ≥ the total failing-column count from
-      the post-iter-3 harness run (allows extra rows for defensive
-      coverage; failing columns must all be present). A unit test
-      (`vci3_fixture_covers_all_failing_columns`) asserts no failing
-      column from the iter-3 harness run is missing from the fixture.
-      `git log --follow eval/datasets/validate_corpus_expected_attributions.yaml`
-      shows ≥2 commits on the iter-3 branch (Phase 1 then Phase 2);
-      the Phase 1 commit's diff contains exactly the 5 anchor rows and
-      no others.
-
-  - id: ac-04
-    ac_type: code
-    description: |
-      Per-mechanism positive and negative tests for the 4 mechanism buckets
-      AND the 2 trigger paths within format_diversity and code_vs_canonical.
-
-      Positive tests (≥1 per bucket, ≥1 per trigger path):
-      - `vci3_attribute_enum_overfit_positive`
-      - `vci3_attribute_format_diversity_path_a_positive` (iter-2 path)
-      - `vci3_attribute_format_diversity_path_b_positive` (iter-3 path)
-      - `vci3_attribute_code_vs_canonical_path_a_positive` (iter-2 path)
-      - `vci3_attribute_code_vs_canonical_path_b_positive` (iter-3 path)
-      - `vci3_attribute_misclassification_positive`
-
-      Negative tests (2-3 per mechanism documenting boundary cases):
-      - `vci3_attribute_format_diversity_negative_cross_domain` —
-        GT=`datetime.timestamp.iso_8601`, predicted=`representation.numeric.integer`,
-        rejects=[SEMANTIC_TYPE]. Asserts misclassification, not format_diversity.
-      - `vci3_attribute_format_diversity_negative_no_subtype_diff` —
-        GT=`datetime.timestamp.iso_8601`, predicted=`datetime.timestamp.iso_8601`,
-        rejects=[]. Asserts NoGt or unknown, not format_diversity.
-      - `vci3_attribute_code_vs_canonical_negative_both_code_typed` —
-        GT=`geography.location.country_code` (ISO-2),
-        predicted=`finance.banking.swift_bic`, both in allowlist. Asserts
-        misclassification, not code_vs_canonical.
-      - `vci3_attribute_code_vs_canonical_negative_both_text` —
-        GT=`representation.text.word`, predicted=`representation.text.sentence`.
-        Asserts misclassification or unknown, not code_vs_canonical.
-      - `vci3_attribute_enum_overfit_negative_pattern_only` —
-        `predicted == expected`, only pattern reject (no enum). Asserts
-        format_diversity (path A), not enum_overfit.
-      - `vci3_attribute_misclassification_negative_handled_by_path_b` —
-        `predicted != expected`, same broad-type prefix, subtype mismatch.
-        Asserts format_diversity (path B), not misclassification (regression
-        test for cascade ordering).
-
-      (The seam-table-guard test for Rule 4 vs Rule 5 cascade ordering
-      lives in ac-06, NOT here — it's a cascade-ordering test, not a
-      format_diversity boundary test.)
-
-      Total: ≥12 attribution tests (6 positive + 6 negative minimum).
-    verification: |
-      `cargo test -p finetype-eval --bin validate_corpus vci3_attribute_`
-      runs ≥12 tests, all pass. Each test asserts a single
-      `Mechanism` enum variant return value. Test functions are documented
-      with one-line `///` rustdoc explaining the boundary they pin.
-
-  - id: ac-05
-    ac_type: code
-    description: |
-      Fixture-iteration **regression test** that asserts per-(dataset,
-      column) attribution matches the fixture for every row. This is a
-      regression check (pins behaviour against future drift), NOT a
-      correctness check (the only correctness check is ac-13's anchor
-      pin — every other Phase-2 fixture row records the harness's
-      output as `expected_mechanism`, so attribute() agreeing with the
-      fixture proves nothing about correctness on Phase-2 rows; it
-      proves the harness still does what it did when the fixture was
-      written).
-
-      The test loads
-      `eval/datasets/validate_corpus_expected_attributions.yaml`,
-      synthesises a minimal `(predicted_label, expected_label, rejects)`
-      triple per row from per-dataset stored test data (or runs the
-      validate harness against test fixtures), and asserts
-      `attribute(...)` returns the fixture's `expected_mechanism` for
-      every row where `pending_escalation: false`.
-
-      The test name is `vci3_fixture_attribution_regression_match`
-      (renamed from v1.1's `vci3_fixture_attribution_match` to make the
-      regression-check framing explicit). Rustdoc on the test function
-      explicitly states it's a regression check, not a correctness
-      check, and points at ac-13 as the correctness anchor.
-
-      Failure messages include the offending row's `(dataset, column,
-      expected, actual, rationale)` for clear diff in CI.
-    verification: |
-      `cargo test -p finetype-eval --bin validate_corpus
-      vci3_fixture_attribution_regression_match` runs and passes. The
-      test reads the committed fixture file and skips
-      `pending_escalation: true` rows. Per-row failure messages
-      include all 5 diagnostic fields. Rustdoc on the test function
-      contains the string "regression check" AND a reference to
-      "ac-13" (or the anchor-rows test name).
-
-  - id: ac-06
-    ac_type: code
-    description: |
-      Cascade-order test that asserts the 7 rules fire in the documented
-      order. Constructs synthetic inputs that would trigger multiple rules
-      and asserts the highest-priority rule wins.
-
-      Test name: `vci3_attribute_cascade_order`. Cases (≥4
-      multi-rule-eligible cases):
-      - Input matches both Rule 2 (format_diversity path B) and Rule 6
-        (misclassification) → asserts format_diversity.
-      - Input matches both Rule 3 (code_vs_canonical path B) and Rule 6
-        (misclassification) → asserts code_vs_canonical.
-      - Input matches both Rule 1 (enum_overfit) and Rule 4
-        (format_diversity path A) → asserts enum_overfit.
-      - Input matches both Rule 5 (code_vs_canonical path A — column IN
-        seam table, predicted == expected, SEMANTIC_TYPE pattern-reject)
-        and Rule 4 (format_diversity path A — same trigger but
-        seam-table-blind). Asserts code_vs_canonical (Rule 5 fires
-        first by cascade order; the `column_in_seam_table()` guard on
-        Rule 4 must short-circuit). This case can be a sub-test inside
-        `vci3_attribute_cascade_order` OR a separately-named test
-        `vci3_attribute_cascade_order_rule5_before_rule4` — implementer
-        choice. Either way, the case lives under ac-06's cascade-order
-        coverage, NOT under ac-04's format_diversity negatives.
-    verification: |
-      `cargo test -p finetype-eval --bin validate_corpus
-      vci3_attribute_cascade_order` runs and passes. Test covers ≥4
-      multi-rule-eligible cases including the Rule 5 vs Rule 4
-      seam-table case.
-
-  - id: ac-07
-    ac_type: code
-    description: |
-      Test naming reconciliation. Iter-1's `pvc_attribute_rule_*` tests
-      (validate_corpus.rs:690, 703, 716, 729, 742, 754 per review-spec)
-      renamed to `vci3_attribute_*`-prefixed equivalents that fold into
-      ac-04/05/06 coverage. The 6 iter-1 tests do not survive as
-      independent tests — their assertions are absorbed into the new
-      ac-04 positive/negative test suite to avoid duplication.
-
-      Verification text in this spec uses `vci3_attribute_*` exclusively;
-      no `mechanism_attribution_*` or `pvc_attribute_*` references in
-      verification fields after this iteration ships.
-    verification: |
-      `rg "pvc_attribute_rule" crates/finetype-eval/src/bin/validate_corpus.rs`
-      returns no matches. `rg "mechanism_attribution"
-      crates/finetype-eval/src/bin/validate_corpus.rs` returns no matches.
-      All attribution test names in the file start with `vci3_`.
-
-  - id: ac-08
-    ac_type: doc
-    description: |
-      Analyst-facing markdown doc at `docs/mechanism-attribution.md`
-      explaining the 4 mechanism buckets in plain language for analysts
-      who don't read Rust. Each bucket gets a section with:
-
-      - **Definition** — one-paragraph plain-English description
-      - **Trigger conditions** — when does this fire (label-level, no code)
-      - **Example failure** — concrete dataset/column from the corpus
-      - **Recommended fix path** — what an analyst (or follow-up card)
-        should do about it (taxonomy widening, model retrain, schema
-        manual override, etc.)
-
-      The doc opens with a 2-3 paragraph framing of the round-trip
-      diagnostic — what `make validate-corpus` does, why mechanism
-      attribution matters, how to read the per-mechanism breakdown table
-      in the report. Closes with a "When to file a follow-up card"
-      section listing the escalation paths.
-
-      Linked from the header of `eval/eval_output/validate_corpus.md`
-      (top of the file, above the headline) via a relative markdown link.
-    verification: |
-      `docs/mechanism-attribution.md` exists. Has 4 sections (one per
-      mechanism), each with the 4 sub-sections (Definition, Trigger
-      conditions, Example failure, Recommended fix path). Opens with
-      ≥2-paragraph framing. Closes with "When to file a follow-up card"
-      section. `eval/eval_output/validate_corpus.md` contains a relative
-      link to `../../docs/mechanism-attribution.md` (or equivalent path)
-      in its header section.
-
-  - id: ac-09
-    ac_type: code
-    description: |
-      Per-column report layout extended with a `trigger:` notes column
-      so the iter-2 vs iter-3 trigger path is visible per failure. The
-      per-column table in `eval/eval_output/validate_corpus.md` gains a
-      column showing one of these 6 distinct labels (no shared
-      `cascade-default` bucket):
-      - `path-a-pattern` (iter-2 trigger: predicted == expected + pattern-reject)
-      - `path-b-prefix` (iter-3 trigger: predicted != expected + same prefix)
-      - `path-b-codetype` (iter-3 trigger: predicted != expected + code-typed)
-      - `enum-constraint` (Rule 1 enum_overfit: predicted == expected + enum reject)
-      - `prediction-error` (Rule 6 misclassification: predicted != expected, fell through paths B)
-      - `fallthrough` (Rule 7 unknown: nothing else matched)
-
-      The harness's report-generation code is updated to thread the trigger
-      label through DatasetResult → per-column table. Each rule function
-      returns its trigger label as part of the `(Mechanism, &'static str)`
-      tuple (see implementation_notes); the dispatcher does not infer the
-      label from the Mechanism variant.
-    verification: |
-      `make validate-corpus` produces `eval/eval_output/validate_corpus.md`
-      with a per-column table whose header includes `trigger`. Spot-check
-      all 6 distinct labels appear at least once in the report (or, for
-      `fallthrough`, document its absence in the report's preamble — it
-      is allowed to be empty if no row hits Rule 7). NYC Taxi
-      `tpep_pickup_datetime` row carries `path-b-prefix`; an iter-2
-      path A column (e.g. a country/gender column with pattern reject)
-      carries `path-a-pattern`.
-
-  - id: ac-10
-    ac_type: code
-    description: |
-      Run `make validate-corpus` to regenerate
-      `eval/eval_output/validate_corpus.md`. The post-iter-3 report shows:
-
-      1. Per-mechanism breakdown table with `format_diversity` count ≥ 1
-         AND `code_vs_canonical` count ≥ 1 (lifts iter-2's AC-08
-         downgrade). The `code_vs_canonical` count must include at
-         least one row whose `(dataset, column)` matches a fixture
-         entry with `expected_mechanism: code_vs_canonical` AND
-         `pending_escalation: false` — i.e. the count cannot be
-         satisfied solely by GICS-style pending-escalation rows AND
-         cannot be trivially engineered via allowlist tuning that
-         doesn't tie to a fixture-blessed row. Same constraint
-         applies symmetrically to `format_diversity` ≥ 1.
-      2. Misclassification bucket count strictly less than the iter-2
-         baseline (which had all 5 curated datasets attributing to
-         misclassification).
-      3. Per-dataset attribution for the 5 iter-2 anchor rows
-         (ac-13) matches the fixture's `expected_mechanism` for each
-         row, EXCEPT rows carrying `pending_escalation: true` which
-         are reported as the actual harness output and called out in
-         the report's expected-vs-actual table as "pending value-shape
-         escalation". This sub-criterion is fixture-driven: the
-         assertion is "report agrees with fixture for all anchor rows
-         where pending_escalation is false", not a hard count of
-         specific datasets — the fixture is the authority (constraint
-         5).
-      4. Iter-2 expected-vs-actual table at the bottom of the report
-         updated: the "iter-1 actual" column relabeled to "iter-2
-         actual"; a new "iter-3 actual" column added showing each row
-         now matches the "expected" column (or carries the
-         "pending value-shape escalation" annotation per
-         sub-criterion 3).
-    verification: |
-      `make validate-corpus` exits 0. Report contains the headline
-      `**N of 12 datasets pass at P=99%**`. Per-mechanism breakdown
-      shows `format_diversity` ≥1 and `code_vs_canonical` ≥1.
-      Misclassification count is less than the iter-2 baseline.
-      Per-dataset tables for the 5 anchor datasets (ac-13) match the
-      fixture for every non-`pending_escalation` row. The
-      bottom-of-report expected-vs-actual table has the "iter-3 actual"
-      column with all rows matching "expected" OR carrying the
-      "pending value-shape escalation" annotation.
-
-  - id: ac-11
-    ac_type: doc
-    description: |
-      Three MADRs landed at `.orbit/choices/` capturing the architectural
-      decisions surfaced in the design session:
-
-      - `00NN-mechanism-bucket-coalesce.md` — 4 buckets, two trigger paths
-        each. Refines/extends iter-1's implicit cascade decision. Status:
-        accepted, dated 2026-04-29.
-      - `00NN-validate-corpus-fixture-anti-regression-lock.md` —
-        per-(dataset, column) fixture as authoritative ground-truth and
-        anti-regression lock. Notes the fixture is also the test surface
-        for ac-05. Status: accepted, dated 2026-04-29.
-      - `00NN-label-only-code-canonical-attribution.md` — label-only
-        attribution via taxonomy allowlist for code_vs_canonical path B,
-        with explicit escalation path to value-shape signals if
-        under-fires. Status: accepted, dated 2026-04-29.
-
-      Numbers (`00NN`) chosen sequentially from the next available slots
-      after the highest-numbered existing MADR.
-    verification: |
-      `ls .orbit/choices/` shows 3 new MADR files committed in this
-      iteration. Each has YAML frontmatter with `status: accepted` and
-      `date-created: 2026-04-29`. Each follows the MADR template
-      (Context and Problem Statement / Considered Options / Decision
-      Outcome / Consequences).
-
-  - id: ac-12
-    ac_type: doc
-    description: |
-      Documentation updates outside the MADRs:
-
-      - `CHANGELOG.md` [Unreleased] section gains entries describing the
-        cascade refactor, fixture file, analyst-facing doc, and test
-        rename.
-      - `CLAUDE.md` "Recent work" / "What's next" sections updated to
-        reflect iter-3 shipping. The "Validate-precision corpus shipped"
-        bullet under "What's next" gets an iter-3 follow-up clause; the
-        iter-3 bullet moves from "stub" to a full one-paragraph status.
-      - Card `.orbit/cards/0014-profile-validate-precision.yaml` `specs[]`
-        array already contains `.orbit/specs/2026-04-28-validate-corpus-iter3/`
-        from iter-2 — verify it's still there post-iter-3.
-    verification: |
-      `git diff main -- CHANGELOG.md` shows ≥1 new line under an
-      `[Unreleased]` (or equivalent in-progress) heading mentioning
-      the iter-3 cascade refactor or fixture file (text match is not
-      pinned — implementer chooses wording that matches the project's
-      existing CHANGELOG style; review-pr stage spot-checks the
-      content). `git diff main -- CLAUDE.md` shows iter-3 status
-      update under "Recent work" or "What's next".
-      `rg "validate-corpus-iter3" .orbit/cards/0014-profile-validate-precision.yaml`
-      returns ≥1 match.
-
-  - id: ac-13
-    ac_type: code
-    description: |
-      Independent-ground-truth pin: 4 hard anchor rows + 1 known
-      taxonomy-gap row, sourced from the iter-2 GT sidecar `notes:`
-      sections (NOT the illustrative mismatch table at iter-2 spec
-      lines 432-440 — that table is documentation pattern, not
-      delivered curation thesis). The fixture (ac-03) MUST contain
-      these 5 rows with `expected_mechanism` taken from each
-      dataset's GT sidecar `notes:` (the curation thesis), pinned
-      independently of the iter-3 harness output.
-
-      **Hard anchors (4 rows, strict assertion):**
-      - `nyc_taxi`, `tpep_pickup_datetime`, `format_diversity`
-        — source: iter-2 GT sidecar `notes:` naming subtype drift on
-        the timestamp column.
-      - `gdelt_events`, `SQLDATE`, `format_diversity`
-        — source: iter-2 GT sidecar naming compact_ymd date subtype.
-      - `fifa_players`, `Value`, `code_vs_canonical`
-        — source: `eval/datasets/validate_corpus/fifa_players.gt.yaml`
-        notes section item (2): "Value, Wage, Release Clause use
-        formatted currency with M/K abbreviation ('€110.5M', '€565K')
-        ... finance.currency.amount validation accepts plain numerics
-        with at most a single currency symbol; the M/K suffix breaks
-        the validator." Path B trigger: GT
-        `representation.text.plain_text`; harness predicts
-        `finance.currency.amount` (in allowlist) → one-side-in-allowlist
-        fires. (Replaces the v1.1 Nationality anchor — Nationality is
-        named only in iter-2's illustrative mismatch-documentation
-        table, not in the FIFA GT sidecar's CvC commitment, and isn't
-        even in the current report's failing-column list.)
-      - `oecd_employment`, `REF_AREA`, `code_vs_canonical`
-        — source: iter-2 GT sidecar naming alpha-2/alpha-3 country
-        code mix. Path B trigger: GT
-        `geography.location.country_code` (in allowlist).
-
-      **Known taxonomy-gap row (1 row, NOT a hard anchor):**
-      - `sp500_constituents`, `GICS Sector`, `code_vs_canonical` —
-        constructively un-attributable via label-only signals under
-        v0.6.19 taxonomy: GT is `representation.discrete.categorical`
-        (no GICS label exists), and there's no plausible predicted
-        label that puts either side in the code-typed allowlist
-        (English-text sector names like "Information Technology"
-        will predict text/categorical, not codes). This row exists
-        in the fixture as `pending_escalation: true` with rationale
-        pointing at a follow-up spec for taxonomy-widening (GICS
-        sector/industry types) OR value-shape signals plumbed into
-        RejectRow. The harness assertion for this row is SKIPPED
-        — the test marks it `#[ignore]` with a comment pointing at
-        the follow-up spec — but it remains a fixture row so the
-        obligation isn't lost. **Framed openly as 4 hard + 1 known
-        gap, not 5 hard anchors.**
-
-      **Source-of-truth precedence.** When iter-2's spec text
-      contradicts the GT sidecar `notes:` section, the GT sidecar
-      wins (the sidecar IS the curation deliverable; the spec text
-      is the curation plan). The iter-2 spec's mismatch-documentation
-      table is illustrative, not authoritative — do NOT cite it as
-      the anchor source.
-
-      Two-pass fixture construction (pinned in implementation_notes):
-      Phase 1 hand-writes these 5 rows from the GT sidecar `notes:`
-      sections (NOT from harness output, NOT from the iter-2 spec's
-      illustrative table). Phase 2 runs the harness and adds rows
-      for every other failing column. Phase 1 commits BEFORE Phase
-      2 runs, so the 4 hard anchors can never be silently
-      regenerated from harness output.
-    verification: |
-      `eval/datasets/validate_corpus_expected_attributions.yaml`
-      contains the 5 rows whose `(dataset, column)` pairs exactly
-      match the list above (with `Value` not `Nationality` for
-      FIFA). A unit test
-      (`vci3_fixture_iter2_anchor_rows_present`) asserts:
-      - All 5 rows exist with matching `(dataset, column)` pairs.
-      - The 4 hard anchors have `expected_mechanism` strictly
-        enforced AND `pending_escalation: false` (or absent).
-      - The 1 GICS gap row carries `pending_escalation: true` AND a
-        non-empty `rationale` field referencing the follow-up
-        taxonomy-widening spec.
-      A second test (`vci3_fixture_anchor_count_4_hard_1_gap`)
-      asserts exactly 4 rows in the fixture have
-      `expected_mechanism: code_vs_canonical OR format_diversity`
-      AND `pending_escalation: false` AND `(dataset, column)`
-      matches one of the 4 hard anchors — i.e. the 4-hard-1-gap
-      framing is enforced numerically, not just by inspection.
-      `git log eval/datasets/validate_corpus_expected_attributions.yaml`
-      shows ≥2 commits — Phase 1 commit (5 rows only) precedes
-      Phase 2 commit (rest of the fixture).
-
-  - id: ac-14
-    ac_type: gate
-    description: |
-      `make ci` exits 0. This includes fmt + clippy + test + check. The
-      new tests under `vci3_*` prefix all pass:
-      - ≥12 attribution tests (ac-04: 6 positive + 6 negative minimum)
-      - 1 fixture-iteration regression test (ac-05:
-        `vci3_fixture_attribution_regression_match`)
-      - 1 cascade-order test (ac-06: `vci3_attribute_cascade_order`,
-        ≥4 cases including Rule 5 vs Rule 4 seam-table case)
-      - 2 allowlist tests (ac-02:
-        `vci3_code_typed_allowlist_taxonomy_valid` +
-        `vci3_code_typed_allowlist_seed_minimum`)
-      - 1 fixture-baseline test (constraint 5:
-        `vci3_fixture_row_count_baseline`)
-      - 2 anchor tests (ac-13:
-        `vci3_fixture_iter2_anchor_rows_present` +
-        `vci3_fixture_anchor_count_4_hard_1_gap`)
-      Total: ≥19 net new `vci3_*` tests. No clippy warnings on the
-      new code. The taxonomy `cargo run -- check` step remains green.
-    verification: |
-      `make ci` exits 0 from a clean working tree on the iter-3 branch.
-      Output shows fmt clean, clippy clean, tests pass with ≥19 new
-      `vci3_*`-prefixed tests, taxonomy check clean.
-
-implementation_notes:
-  - |
-    **Existing cascade lives at `crates/finetype-eval/src/bin/validate_corpus.rs:259-340`.**
-    The `attribute` module has the `Mechanism` enum (5 + NoGt), 5-seam
-    table at line 290, `column_in_seam_table()` helper at line 292, and
-    `attribute()` fn at line 300 implementing the 5-rule cascade. Read
-    this before changing anything. Iter-2's rules are correct in their
-    domain and must be preserved as paths A within their respective
-    buckets.
-
-  - |
-    **Cascade rule layout suggestion.** Refactor `attribute()` from a
-    single switch into a thin dispatcher iterating an ordered slice of
-    rule functions. Each rule function takes `(column_name,
-    predicted_label, expected_label, rejects)` and returns
-    `Option<Mechanism>` (None = doesn't fire, falls through to the next
-    rule). The 7th rule (unknown) returns `Some(Mechanism::Unknown)`
-    unconditionally. This shape makes the cascade order test (ac-06)
-    trivial — it can iterate the rules slice and assert on first-match
-    behaviour.
-
-  - |
-    **Code-typed taxonomy allowlist seeding.** Walk
-    `labels/definitions_*.yaml` for `broad_type: VARCHAR` types whose
-    `format_string` is short-token (≤8 chars) or whose label contains
-    `code` substring as a starting heuristic. Hand-curate from there.
-    Document the criterion in rustdoc on `CODE_TYPED_LABELS`.
-
-  - |
-    **Fixture file population workflow — strict two-pass (ac-03 +
-    ac-13).** Each phase is a SEPARATE git commit on the iter-3
-    branch; this is enforced by ac-13's `git log` assertion.
-
-    Phase 1 (anchor commit): hand-write the 5 anchor rows from
+    Phase 1 (separate commit): hand-write the 5 anchor rows from
     `.orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml`'s
-    expected-vs-actual table. The harness has NOT been run at this
-    point; `expected_mechanism` for these 5 rows is taken VERBATIM
-    from iter-2's spec. Commit message: "iter-3 fixture Phase 1 —
-    5 iter-2 anchor rows (independent ground-truth)".
+    expected-vs-actual table. NO harness run informs Phase 1 —
+    `expected_mechanism` for these 5 rows is taken VERBATIM from
+    iter-2's spec.
 
-    Phase 2 (harness-derived commit): run iter-3 harness against the
+    Phase 2 (separate commit): run the iter-3 harness against the
     full 12-dataset manifest, capture per-dataset failing columns,
-    append one row per column with rationale = first sentence of the
-    rule's rustdoc that fired. Hand-review each Phase-2 row for
-    plausibility (catch obvious miscategorisations) before commit.
-    Commit message: "iter-3 fixture Phase 2 — N harness-derived
-    rows from 12-dataset run".
+    and append a fixture row per column. Each row's `rationale` is
+    the first sentence of the rule's rustdoc that fired; each row's
+    `expected_mechanism` is the harness's actual output. Hand-review
+    each row before commit (catch any obvious miscategorisations).
 
-    After Phase 2 commits: record the fixture row count in this
-    spec's metadata as `metadata.fixture_baseline_rows` (or in a new
-    `implementation_state` block), and wire that constant into
-    `vci3_fixture_row_count_baseline` (constraint 5). Subsequent
-    fixture changes that shrink the row count below the baseline
-    fail the test.
+    After Phase 2 commits, record the row count in this spec's
+    implementation_notes as the baseline for the
+    `vci3_fixture_row_count_baseline` test (constraint 5).
 
-  - |
-    **Same-broad-type prefix detection.**
-    `predicted_label.split('.').next()` returns `Some("datetime")` for
-    `datetime.timestamp.iso_8601`. Compare with
-    `expected_label.split('.').next()`. Subtype mismatch is the full-label
-    inequality after the prefix-equality check. No regex needed.
+    The fixture is committed to the repo and is the authoritative
+    ground-truth for what each failure means.
+  ac_type: code
+- id: ac-04
+  description: |
+    Per-mechanism positive and negative tests for the 4 mechanism buckets
+    AND the 2 trigger paths within format_diversity and code_vs_canonical.
 
-  - |
-    **Code-typed lookup is O(N) over allowlist.** Allowlist will be
-    small (≤30 entries). Linear scan with `.iter().any(|s| s ==
-    label)` is fine — no need for HashSet plumbing. If the list grows
-    past ~50 entries, escalate to `phf` or `OnceLock<HashSet>`.
+    Positive tests (≥1 per bucket, ≥1 per trigger path):
+    - `vci3_attribute_enum_overfit_positive`
+    - `vci3_attribute_format_diversity_path_a_positive` (iter-2 path)
+    - `vci3_attribute_format_diversity_path_b_positive` (iter-3 path)
+    - `vci3_attribute_code_vs_canonical_path_a_positive` (iter-2 path)
+    - `vci3_attribute_code_vs_canonical_path_b_positive` (iter-3 path)
+    - `vci3_attribute_misclassification_positive`
 
-  - |
-    **Trigger label threading.** The `attribute()` dispatcher returns
-    `(Mechanism, &'static str)` instead of just `Mechanism` — the
-    second tuple element is the rule's trigger label, OWNED by the
-    rule function (the dispatcher does NOT infer it from the
-    Mechanism variant). The 6 distinct labels are:
-    `"path-a-pattern"`, `"path-b-prefix"`, `"path-b-codetype"`,
-    `"enum-constraint"`, `"prediction-error"`, `"fallthrough"`.
-    Plumb the tuple through `DatasetResult` and into the per-column
-    report row.
+    Negative tests (2-3 per mechanism documenting boundary cases):
+    - `vci3_attribute_format_diversity_negative_cross_domain` —
+      GT=`datetime.timestamp.iso_8601`, predicted=`representation.numeric.integer`,
+      rejects=[SEMANTIC_TYPE]. Asserts misclassification, not format_diversity.
+    - `vci3_attribute_format_diversity_negative_no_subtype_diff` —
+      GT=`datetime.timestamp.iso_8601`, predicted=`datetime.timestamp.iso_8601`,
+      rejects=[]. Asserts NoGt or unknown, not format_diversity.
+    - `vci3_attribute_code_vs_canonical_negative_both_code_typed` —
+      GT=`geography.location.country_code` (ISO-2),
+      predicted=`finance.banking.swift_bic`, both in allowlist. Asserts
+      misclassification, not code_vs_canonical.
+    - `vci3_attribute_code_vs_canonical_negative_both_text` —
+      GT=`representation.text.word`, predicted=`representation.text.sentence`.
+      Asserts misclassification or unknown, not code_vs_canonical.
+    - `vci3_attribute_enum_overfit_negative_pattern_only` —
+      `predicted == expected`, only pattern reject (no enum). Asserts
+      format_diversity (path A), not enum_overfit.
+    - `vci3_attribute_misclassification_negative_handled_by_path_b` —
+      `predicted != expected`, same broad-type prefix, subtype mismatch.
+      Asserts format_diversity (path B), not misclassification (regression
+      test for cascade ordering).
 
-  - |
-    **Markdown doc location.** `docs/mechanism-attribution.md` puts
-    the file at the project's standard docs root (next to any other
-    project markdown docs). If `docs/` doesn't exist yet, create it.
-    The link from `validate_corpus.md` is relative:
-    `../../docs/mechanism-attribution.md`.
+    (The seam-table-guard test for Rule 4 vs Rule 5 cascade ordering
+    lives in ac-06, NOT here — it's a cascade-ordering test, not a
+    format_diversity boundary test.)
 
-  - |
-    **MADR numbering.** `ls .orbit/choices/` shows the highest current
-    MADR number; the next 3 numbers go to bucket-coalesce, fixture-lock,
-    label-only attribution in that order. Sequential, not topical
-    grouping.
+    Total: ≥12 attribution tests (6 positive + 6 negative minimum).
+  ac_type: code
+- id: ac-05
+  description: |
+    Fixture-iteration **regression test** that asserts per-(dataset,
+    column) attribution matches the fixture for every row. This is a
+    regression check (pins behaviour against future drift), NOT a
+    correctness check (the only correctness check is ac-13's anchor
+    pin — every other Phase-2 fixture row records the harness's
+    output as `expected_mechanism`, so attribute() agreeing with the
+    fixture proves nothing about correctness on Phase-2 rows; it
+    proves the harness still does what it did when the fixture was
+    written).
 
-  - |
-    **Test prefix migration.** The 6 iter-1 tests at lines
-    690/703/716/729/742/754 are renamed/absorbed, not deleted in place.
-    The replacement tests (under `vci3_*`) cover the same behavioural
-    surface, so the absorption is a 1-for-1+ replacement, not a
-    regression. Run `cargo test -p finetype-eval` before and after to
-    confirm no test count regression.
+    The test loads
+    `eval/datasets/validate_corpus_expected_attributions.yaml`,
+    synthesises a minimal `(predicted_label, expected_label, rejects)`
+    triple per row from per-dataset stored test data (or runs the
+    validate harness against test fixtures), and asserts
+    `attribute(...)` returns the fixture's `expected_mechanism` for
+    every row where `pending_escalation: false`.
 
-evaluation_principles:
-  - principle: "Rules surface what iter-2 curated AND generalise across the corpus"
-    weight: 0.30
-  - principle: "Fixture is authoritative ground-truth on every failure"
-    weight: 0.25
-  - principle: "Deterministic, label-only, tested boundaries"
-    weight: 0.20
-  - principle: "Self-describing report for analysts"
-    weight: 0.15
-  - principle: "Iter-2 GT sidecars + manifest unchanged"
-    weight: 0.10
+    The test name is `vci3_fixture_attribution_regression_match`
+    (renamed from v1.1's `vci3_fixture_attribution_match` to make the
+    regression-check framing explicit). Rustdoc on the test function
+    explicitly states it's a regression check, not a correctness
+    check, and points at ac-13 as the correctness anchor.
 
-exit_conditions:
-  - "Per-mechanism breakdown in `eval/eval_output/validate_corpus.md` shows
-    `format_diversity` ≥1 AND `code_vs_canonical` ≥1 (lifts iter-2 AC-08)"
-  - "Misclassification bucket count strictly less than iter-2 baseline"
-  - "Per-(dataset, column) fixture covers every failing column across all 12
-    datasets; `vci3_fixture_attribution_regression_match` test passes
-    (regression check, not correctness check — ac-13 is the correctness
-    anchor)"
-  - "4 hard anchor rows + 1 known taxonomy-gap row pinned by Phase-1
-    commit (independent of harness output, sourced from GT sidecar
-    `notes:` sections not iter-2 spec's illustrative table). FIFA anchor
-    is `Value` not `Nationality`. GICS Sector row carries
-    `pending_escalation: true`. Both
-    `vci3_fixture_iter2_anchor_rows_present` and
-    `vci3_fixture_anchor_count_4_hard_1_gap` tests pass."
-  - "Fixture row-count baseline pinned in spec metadata after Phase 2;
-    `vci3_fixture_row_count_baseline` test passes; PR description includes
-    'Fixture diff rationale' section"
-  - "All 4 mechanisms have rustdoc + ≥1 positive test + 2-3 negative tests
-    (≥12 attribution tests, ≥19 net new vci3_* tests including fixture,
-    cascade-order with seam-table case, allowlist, baseline, and 4+1
-    anchor pins)"
-  - "`docs/mechanism-attribution.md` exists with 4 sections (one per
-    mechanism), linked from `validate_corpus.md` header"
-  - "Test naming unified to `vci3_*`; no `pvc_attribute_rule_*` or
-    `mechanism_attribution_*` in `validate_corpus.rs`"
-  - "3 MADRs accepted, dated 2026-04-29"
-  - "`make ci` exits 0"
+    Failure messages include the offending row's `(dataset, column,
+    expected, actual, rationale)` for clear diff in CI.
+  ac_type: code
+- id: ac-06
+  description: |
+    Cascade-order test that asserts the 7 rules fire in the documented
+    order. Constructs synthetic inputs that would trigger multiple rules
+    and asserts the highest-priority rule wins.
 
-metadata:
-  version: "1.2"
-  test_prefix: "vci3"
-  status: "ready-for-review"
-  timestamp: "2026-04-29T00:00:00Z"
-  ambiguity_score: 0.04
-  card_ref: ".orbit/cards/0014-profile-validate-precision.yaml"
-  parent_spec_ref: ".orbit/specs/2026-04-28-validate-corpus-curation/spec.yaml"
-  interview_ref: ".orbit/specs/2026-04-28-validate-corpus-iter3/interview.md"
-  prior_review_ref: ".orbit/specs/2026-04-28-validate-corpus-iter3/review-spec-2026-04-29-stub.md"
-  cycle1_review_ref: ".orbit/specs/2026-04-28-validate-corpus-iter3/review-spec-2026-04-29.md"
-  cycle2_review_ref: ".orbit/specs/2026-04-28-validate-corpus-iter3/review-spec-2026-04-29-v2.md"
-  fixture_baseline_rows: 80  # 5 Phase 1 + 75 Phase 2 (78 failing columns; 3 already in Phase 1). Wired into vci3_fixture_row_count_baseline.
-  notes: |
-    Promoted from stub (v0.1) to full spec (v1.0) on 2026-04-29 via
-    /orb:design + /orb:spec. v1.1 (2026-04-29) addresses the 8 findings
-    from cycle 1 forked review-spec (REQUEST_CHANGES verdict at
-    review-spec-2026-04-29.md):
+    Test name: `vci3_attribute_cascade_order`. Cases (≥4
+    multi-rule-eligible cases):
+    - Input matches both Rule 2 (format_diversity path B) and Rule 6
+      (misclassification) → asserts format_diversity.
+    - Input matches both Rule 3 (code_vs_canonical path B) and Rule 6
+      (misclassification) → asserts code_vs_canonical.
+    - Input matches both Rule 1 (enum_overfit) and Rule 4
+      (format_diversity path A) → asserts enum_overfit.
+    - Input matches both Rule 5 (code_vs_canonical path A — column IN
+      seam table, predicted == expected, SEMANTIC_TYPE pattern-reject)
+      and Rule 4 (format_diversity path A — same trigger but
+      seam-table-blind). Asserts code_vs_canonical (Rule 5 fires
+      first by cascade order; the `column_in_seam_table()` guard on
+      Rule 4 must short-circuit). This case can be a sub-test inside
+      `vci3_attribute_cascade_order` OR a separately-named test
+      `vci3_attribute_cascade_order_rule5_before_rule4` — implementer
+      choice. Either way, the case lives under ac-06's cascade-order
+      coverage, NOT under ac-04's format_diversity negatives.
+  ac_type: code
+- id: ac-07
+  description: |
+    Test naming reconciliation. Iter-1's `pvc_attribute_rule_*` tests
+    (validate_corpus.rs:690, 703, 716, 729, 742, 754 per review-spec)
+    renamed to `vci3_attribute_*`-prefixed equivalents that fold into
+    ac-04/05/06 coverage. The 6 iter-1 tests do not survive as
+    independent tests — their assertions are absorbed into the new
+    ac-04 positive/negative test suite to avoid duplication.
 
-    - HIGH-1 (label-only vs hard sub-counts): constraint 4 expanded to
-      clarify allowlist tuning IS in scope (still label-only); ac-10
-      sub-criterion 3 softened to fixture-driven assertion with
-      pending-escalation annotation.
-    - HIGH-2 (self-referential fixture oracle): new ac-13 pins 5
-      iter-2 rows as independent ground-truth from the curation spec;
-      ac-03 now mandates strict two-pass commit phasing enforced by
-      git-log assertion.
-    - MEDIUM (cascade rule 4 guard): ac-01 rules 4 and 5 now name
-      `column_in_seam_table()` explicitly; ac-04 gains
-      `vci3_attribute_format_diversity_path_a_seam_table_guard`
-      regression test.
-    - MEDIUM (prior_review_ref typo): metadata path corrected to
-      `-stub.md`; cycle1_review_ref added.
-    - MEDIUM (dead allowlist labels): ac-02 allowlist replaced with
-      ≥20 verified taxonomy labels (gics_*, country_subdivision_code
-      removed); GICS S&P 500 carve-out documented; verification now
-      asserts taxonomy existence, not regex match.
-    - MEDIUM (fixture regrowth): constraint 5 gains
-      `vci3_fixture_row_count_baseline` test + PR-description
-      'Fixture diff rationale' section requirement.
-    - LOW (cascade-default trigger label too coarse): ac-09 splits
-      `cascade-default` into 3 labels: `enum-constraint`,
-      `prediction-error`, `fallthrough`; trigger label is rule-owned
-      not dispatcher-inferred.
-    - LOW (CHANGELOG format unpinned): ac-12 verification softened to
-      ≥1 line under `[Unreleased]` heading, exact wording is
-      implementer's choice within project style.
+    Verification text in this spec uses `vci3_attribute_*` exclusively;
+    no `mechanism_attribution_*` or `pvc_attribute_*` references in
+    verification fields after this iteration ships.
+  ac_type: code
+- id: ac-08
+  description: |
+    Analyst-facing markdown doc at `docs/mechanism-attribution.md`
+    explaining the 4 mechanism buckets in plain language for analysts
+    who don't read Rust. Each bucket gets a section with:
 
-    v1.2 (2026-04-29) addresses the 5 findings from cycle 2 forked
-    review-spec (REQUEST_CHANGES verdict at
-    review-spec-2026-04-29-v2.md):
+    - **Definition** — one-paragraph plain-English description
+    - **Trigger conditions** — when does this fire (label-level, no code)
+    - **Example failure** — concrete dataset/column from the corpus
+    - **Recommended fix path** — what an analyst (or follow-up card)
+      should do about it (taxonomy widening, model retrain, schema
+      manual override, etc.)
 
-    - HIGH-1 (FIFA Nationality anchor contradicts iter-2 GT sidecar):
-      ac-13 anchor swapped from `fifa_players, Nationality,
-      code_vs_canonical` to `fifa_players, Value, code_vs_canonical`.
-      Source-of-truth precedence pinned: GT sidecar `notes:` wins
-      over iter-2 spec's illustrative mismatch table. ac-13's
-      description cites the FIFA GT sidecar item (2) verbatim
-      (formatted-currency M/K suffix CvC).
-    - HIGH-2 (GICS pre-escalated, undermines anchor framing): ac-13
-      reframed as "4 hard anchors + 1 known taxonomy-gap row" —
-      GICS Sector explicitly NOT a hard anchor, framed openly as a
-      pending taxonomy-widening obligation. New test
-      `vci3_fixture_anchor_count_4_hard_1_gap` enforces the framing
-      numerically.
-    - MEDIUM-1 (Phase-2 fixture still harness-derived): ac-05 renamed
-      to `vci3_fixture_attribution_regression_match` with rustdoc
-      explicitly framing it as a regression check (not correctness).
-      ac-13 is the sole correctness anchor.
-    - MEDIUM-2 (ac-10 sub-criterion 1 hard count engineerable): added
-      fixture-rooted quality bar — count must include ≥1 row with
-      `expected_mechanism: code_vs_canonical` AND
-      `pending_escalation: false` matching a fixture entry, ruling
-      out trivial-engineer-toward-1 path.
-    - MEDIUM-3 (seam-table-guard test misplaced): moved from ac-04
-      (format_diversity negatives) to ac-06 (cascade-order) as the
-      Rule 5 vs Rule 4 case. ac-04 negative count drops to 6.
+    The doc opens with a 2-3 paragraph framing of the round-trip
+    diagnostic — what `make validate-corpus` does, why mechanism
+    attribution matters, how to read the per-mechanism breakdown table
+    in the report. Closes with a "When to file a follow-up card"
+    section listing the escalation paths.
 
-    Iter-2's AC-08 escape-hatch remains satisfied by this spec's
-    existence; iter-3 implementation is the planned follow-up that
-    closes the mechanism-attribution gap properly.
+    Linked from the header of `eval/eval_output/validate_corpus.md`
+    (top of the file, above the headline) via a relative markdown link.
+  ac_type: doc
+- id: ac-09
+  description: |
+    Per-column report layout extended with a `trigger:` notes column
+    so the iter-2 vs iter-3 trigger path is visible per failure. The
+    per-column table in `eval/eval_output/validate_corpus.md` gains a
+    column showing one of these 6 distinct labels (no shared
+    `cascade-default` bucket):
+    - `path-a-pattern` (iter-2 trigger: predicted == expected + pattern-reject)
+    - `path-b-prefix` (iter-3 trigger: predicted != expected + same prefix)
+    - `path-b-codetype` (iter-3 trigger: predicted != expected + code-typed)
+    - `enum-constraint` (Rule 1 enum_overfit: predicted == expected + enum reject)
+    - `prediction-error` (Rule 6 misclassification: predicted != expected, fell through paths B)
+    - `fallthrough` (Rule 7 unknown: nothing else matched)
+
+    The harness's report-generation code is updated to thread the trigger
+    label through DatasetResult → per-column table. Each rule function
+    returns its trigger label as part of the `(Mechanism, &'static str)`
+    tuple (see implementation_notes); the dispatcher does not infer the
+    label from the Mechanism variant.
+  ac_type: code
+- id: ac-10
+  description: |
+    Run `make validate-corpus` to regenerate
+    `eval/eval_output/validate_corpus.md`. The post-iter-3 report shows:
+
+    1. Per-mechanism breakdown table with `format_diversity` count ≥ 1
+       AND `code_vs_canonical` count ≥ 1 (lifts iter-2's AC-08
+       downgrade). The `code_vs_canonical` count must include at
+       least one row whose `(dataset, column)` matches a fixture
+       entry with `expected_mechanism: code_vs_canonical` AND
+       `pending_escalation: false` — i.e. the count cannot be
+       satisfied solely by GICS-style pending-escalation rows AND
+       cannot be trivially engineered via allowlist tuning that
+       doesn't tie to a fixture-blessed row. Same constraint
+       applies symmetrically to `format_diversity` ≥ 1.
+    2. Misclassification bucket count strictly less than the iter-2
+       baseline (which had all 5 curated datasets attributing to
+       misclassification).
+    3. Per-dataset attribution for the 5 iter-2 anchor rows
+       (ac-13) matches the fixture's `expected_mechanism` for each
+       row, EXCEPT rows carrying `pending_escalation: true` which
+       are reported as the actual harness output and called out in
+       the report's expected-vs-actual table as "pending value-shape
+       escalation". This sub-criterion is fixture-driven: the
+       assertion is "report agrees with fixture for all anchor rows
+       where pending_escalation is false", not a hard count of
+       specific datasets — the fixture is the authority (constraint
+       5).
+    4. Iter-2 expected-vs-actual table at the bottom of the report
+       updated: the "iter-1 actual" column relabeled to "iter-2
+       actual"; a new "iter-3 actual" column added showing each row
+       now matches the "expected" column (or carries the
+       "pending value-shape escalation" annotation per
+       sub-criterion 3).
+  ac_type: code
+- id: ac-11
+  description: |
+    Three MADRs landed at `.orbit/choices/` capturing the architectural
+    decisions surfaced in the design session:
+
+    - `00NN-mechanism-bucket-coalesce.md` — 4 buckets, two trigger paths
+      each. Refines/extends iter-1's implicit cascade decision. Status:
+      accepted, dated 2026-04-29.
+    - `00NN-validate-corpus-fixture-anti-regression-lock.md` —
+      per-(dataset, column) fixture as authoritative ground-truth and
+      anti-regression lock. Notes the fixture is also the test surface
+      for ac-05. Status: accepted, dated 2026-04-29.
+    - `00NN-label-only-code-canonical-attribution.md` — label-only
+      attribution via taxonomy allowlist for code_vs_canonical path B,
+      with explicit escalation path to value-shape signals if
+      under-fires. Status: accepted, dated 2026-04-29.
+
+    Numbers (`00NN`) chosen sequentially from the next available slots
+    after the highest-numbered existing MADR.
+  ac_type: doc
+- id: ac-12
+  description: |
+    Documentation updates outside the MADRs:
+
+    - `CHANGELOG.md` [Unreleased] section gains entries describing the
+      cascade refactor, fixture file, analyst-facing doc, and test
+      rename.
+    - `CLAUDE.md` "Recent work" / "What's next" sections updated to
+      reflect iter-3 shipping. The "Validate-precision corpus shipped"
+      bullet under "What's next" gets an iter-3 follow-up clause; the
+      iter-3 bullet moves from "stub" to a full one-paragraph status.
+    - Card `.orbit/cards/0014-profile-validate-precision.yaml` `specs[]`
+      array already contains `.orbit/specs/2026-04-28-validate-corpus-iter3/`
+      from iter-2 — verify it's still there post-iter-3.
+  ac_type: doc
+- id: ac-13
+  description: |
+    Independent-ground-truth pin: 4 hard anchor rows + 1 known
+    taxonomy-gap row, sourced from the iter-2 GT sidecar `notes:`
+    sections (NOT the illustrative mismatch table at iter-2 spec
+    lines 432-440 — that table is documentation pattern, not
+    delivered curation thesis). The fixture (ac-03) MUST contain
+    these 5 rows with `expected_mechanism` taken from each
+    dataset's GT sidecar `notes:` (the curation thesis), pinned
+    independently of the iter-3 harness output.
+
+    **Hard anchors (4 rows, strict assertion):**
+    - `nyc_taxi`, `tpep_pickup_datetime`, `format_diversity`
+      — source: iter-2 GT sidecar `notes:` naming subtype drift on
+      the timestamp column.
+    - `gdelt_events`, `SQLDATE`, `format_diversity`
+      — source: iter-2 GT sidecar naming compact_ymd date subtype.
+    - `fifa_players`, `Value`, `code_vs_canonical`
+      — source: `eval/datasets/validate_corpus/fifa_players.gt.yaml`
+      notes section item (2): "Value, Wage, Release Clause use
+      formatted currency with M/K abbreviation ('€110.5M', '€565K')
+      ... finance.currency.amount validation accepts plain numerics
+      with at most a single currency symbol; the M/K suffix breaks
+      the validator." Path B trigger: GT
+      `representation.text.plain_text`; harness predicts
+      `finance.currency.amount` (in allowlist) → one-side-in-allowlist
+      fires. (Replaces the v1.1 Nationality anchor — Nationality is
+      named only in iter-2's illustrative mismatch-documentation
+      table, not in the FIFA GT sidecar's CvC commitment, and isn't
+      even in the current report's failing-column list.)
+    - `oecd_employment`, `REF_AREA`, `code_vs_canonical`
+      — source: iter-2 GT sidecar naming alpha-2/alpha-3 country
+      code mix. Path B trigger: GT
+      `geography.location.country_code` (in allowlist).
+
+    **Known taxonomy-gap row (1 row, NOT a hard anchor):**
+    - `sp500_constituents`, `GICS Sector`, `code_vs_canonical` —
+      constructively un-attributable via label-only signals under
+      v0.6.19 taxonomy: GT is `representation.discrete.categorical`
+      (no GICS label exists), and there's no plausible predicted
+      label that puts either side in the code-typed allowlist
+      (English-text sector names like "Information Technology"
+      will predict text/categorical, not codes). This row exists
+      in the fixture as `pending_escalation: true` with rationale
+      pointing at a follow-up spec for taxonomy-widening (GICS
+      sector/industry types) OR value-shape signals plumbed into
+      RejectRow. The harness assertion for this row is SKIPPED
+      — the test marks it `#[ignore]` with a comment pointing at
+      the follow-up spec — but it remains a fixture row so the
+      obligation isn't lost. **Framed openly as 4 hard + 1 known
+      gap, not 5 hard anchors.**
+
+    **Source-of-truth precedence.** When iter-2's spec text
+    contradicts the GT sidecar `notes:` section, the GT sidecar
+    wins (the sidecar IS the curation deliverable; the spec text
+    is the curation plan). The iter-2 spec's mismatch-documentation
+    table is illustrative, not authoritative — do NOT cite it as
+    the anchor source.
+
+    Two-pass fixture construction (pinned in implementation_notes):
+    Phase 1 hand-writes these 5 rows from the GT sidecar `notes:`
+    sections (NOT from harness output, NOT from the iter-2 spec's
+    illustrative table). Phase 2 runs the harness and adds rows
+    for every other failing column. Phase 1 commits BEFORE Phase
+    2 runs, so the 4 hard anchors can never be silently
+    regenerated from harness output.
+  ac_type: code
+- id: ac-14
+  description: |
+    `make ci` exits 0. This includes fmt + clippy + test + check. The
+    new tests under `vci3_*` prefix all pass:
+    - ≥12 attribution tests (ac-04: 6 positive + 6 negative minimum)
+    - 1 fixture-iteration regression test (ac-05:
+      `vci3_fixture_attribution_regression_match`)
+    - 1 cascade-order test (ac-06: `vci3_attribute_cascade_order`,
+      ≥4 cases including Rule 5 vs Rule 4 seam-table case)
+    - 2 allowlist tests (ac-02:
+      `vci3_code_typed_allowlist_taxonomy_valid` +
+      `vci3_code_typed_allowlist_seed_minimum`)
+    - 1 fixture-baseline test (constraint 5:
+      `vci3_fixture_row_count_baseline`)
+    - 2 anchor tests (ac-13:
+      `vci3_fixture_iter2_anchor_rows_present` +
+      `vci3_fixture_anchor_count_4_hard_1_gap`)
+    Total: ≥19 net new `vci3_*` tests. No clippy warnings on the
+    new code. The taxonomy `cargo run -- check` step remains green.

@@ -1,270 +1,57 @@
-goal: >
-  Add a 4th header embedding branch to the multi-branch (Sherlock-style) model
-  architecture and retrain with a 50/50 distilled/synthetic data mix. The header
-  branch encodes the column name via Model2Vec (128-dim compact model), giving the
-  model direct access to the strongest disambiguation signal. Target: ≥150/190
-  (79%+) on the 190-column profile eval, proving multi-branch + headers is a
-  viable path toward replacing CharCNN + hand-tuned disambiguation.
-
-  Phase 1 (post-processing overlay) is deliberately skipped. The user's strategy
-  is to reduce disambiguation dependency through better models, not to layer more
-  post-processing. This training run answers: does header signal improve the raw
-  multi-branch model? The comparison is against sherlock-v2-flat (128/190, 67.4%
-  on the current eval set after PR #23 eval fixes).
-
-constraints:
-  - "No eval data in training — the 190-column profile eval set is a clean, uncontaminated benchmark"
-  - "50/50 distilled/synthetic data mix (up from 30/70 in sherlock-v2)"
-  - "M1 Pro hardware with Metal acceleration for training"
-  - "Pure Rust — no Python dependencies at build or inference time"
-  - "Model artifact ≤ 50 MB (branch weights + merge weights; Model2Vec shared)"
-  - "Backward-compatible: finetype profile --model-type multi-branch produces same output format"
-  - "End-to-end execution: code changes + data prep + training + eval in one session"
-  - "Existing FTMB binary format must be extended, not replaced (backward compat for old .ftmb files)"
-  - "Model2Vec: use compact 128-dim model already at models/model2vec/ (not 384-dim potion-base-4M)"
-
+id: 2026-03-23-multibranch-training-strategy
+status: closed
+goal: |
+  Add a 4th header embedding branch to the multi-branch (Sherlock-style) model architecture and retrain with a 50/50 distilled/synthetic data mix. The header branch encodes the column name via Model2Vec (128-dim compact model), giving the model direct access to the strongest disambiguation signal. Target: ≥150/190 (79%+) on the 190-column profile eval, proving multi-branch + headers is a viable path toward replacing CharCNN + hand-tuned disambiguation.
+  Phase 1 (post-processing overlay) is deliberately skipped. The user's strategy is to reduce disambiguation dependency through better models, not to layer more post-processing. This training run answers: does header signal improve the raw multi-branch model? The comparison is against sherlock-v2-flat (128/190, 67.4% on the current eval set after PR #23 eval fixes).
 acceptance_criteria:
-  # ── Architecture ──────────────────────────────────────────────
-  - id: AC-1
-    description: >
-      4th header branch added to MultiBranchClassifier in both training
-      (finetype-train/src/multi_branch.rs) and inference (finetype-model/src/multi_branch.rs).
-
-      Specific code changes:
-      (a) Add header_dim and header_hidden fields to MultiBranchConfig (both crates).
-      (b) Update merged_dim() to include header_hidden[1] in the sum.
-      (c) Add header BranchWeights to MultiBranchModel (training) and
-          MultiBranchClassifier (inference).
-      (d) Update forward pass: concatenate 4 branch outputs before merge trunk.
-      (e) Update MultiBranchClassifier::load() to load the 4th branch weights.
-
-      Input: 128-dim Model2Vec embedding of column header string. Branch hidden
-      dims: 128→128→64, matching the stats branch pattern. Merge layer updated:
-      char 300 + embed 200 + stats 64 + header 64 = 628 dims.
-    verification: >
-      Model compiles and trains for 1 epoch without error. Architecture summary
-      shows 4 branches with correct dimensions. Unit test: assert
-      config.merged_dim() == 628. Gradient flow: nonzero gradients for all 4
-      branch inputs after one backward pass.
-
-  - id: AC-2
-    description: >
-      FTMB binary format extended with header embedding field.
-
-      Specific code changes:
-      (a) Add header_features field to TrainingRecord struct.
-      (b) Bump FTMB_VERSION from 1 to 2.
-      (c) Update write_training_data() to write header_dim in header + header
-          features per record.
-      (d) Update read_training_data() in Rust: detect version 1 (old) vs 2 (new).
-          Version 1: load with zero-vector header_features. Version 2: read 4th
-          feature vector. Remove the hard bail!() on unknown versions — instead
-          accept version 1 with graceful degradation.
-      (e) Update read_ftmb.py Python reader similarly: accept version 1 with
-          zero header features.
-      (f) Add Rust unit test for FTMB v1↔v2 round-trip.
-    verification: >
-      Rust unit test: write v2 FTMB, read back, assert 4 feature vectors per
-      record. Read a v1 FTMB file, assert it loads with zero header features
-      and correct 3-branch dimensions. No panics on version mismatch.
-
-  - id: AC-3
-    description: >
-      Data preparation pipeline updated to extract header embeddings.
-
-      Specific code changes:
-      (a) Extend extract-features CLI subcommand to embed the header string via
-          Model2Vec and emit a 128-dim float array in the JSON output (currently
-          emits the raw header string only).
-      (b) Update prepare_multibranch_data.py to pass column headers to
-          extract_features() and write the 4th feature vector to FTMB records.
-      (c) For synthetic data: use realistic header variations, not the type key.
-          E.g., for identity.person.email use ["email", "email_address", "e-mail",
-          "contact_email"] sampled randomly. This prevents the model from learning
-          to cheat on perfect type-key headers unavailable at inference.
-      (d) For distilled data: use the original column headers from the Sherlock
-          corpus (already present in the distilled CSV).
-    verification: >
-      Dry-run shows header features extracted for all columns. Spot-check 10
-      records: header embeddings are non-zero and differ between semantically
-      distinct headers. Synthetic headers are realistic variations, not type keys.
-
-  # ── Training Data ─────────────────────────────────────────────
-  - id: AC-4
-    description: >
-      Training data prepared with 50/50 distilled/synthetic mix. No eval dataset
-      columns included. Total volume: ≥200K column-level training samples.
-      Type coverage: all 250 taxonomy types represented.
-
-      The distillation pipeline (output/distillation-v3/) is known to be sourced
-      from Sherlock web-table data, not from eval/datasets/. Contamination check
-      is by provenance of the distillation pipeline, not by post-hoc file-path
-      inspection of the .ftmb file.
-    verification: >
-      FTMB stats (via read_ftmb.py --stats) show 50/50 ratio ± 5%. All 250 types
-      present. Total samples ≥200K. Manifest JSON records source provenance.
-
-  # ── Training & Evaluation ────────────────────────────────────
-  - id: AC-5
-    description: >
-      Model trained with header branch on 50/50 data. Hyperparameters: seed 42,
-      batch 32, 20 epochs, dropout 0.35, Adam lr 0.0001, weight decay 0.0001,
-      patience 10. Training completes on M1 Pro with Metal acceleration.
-
-      overnight_sherlock.sh updated with --ratio-distilled 0.5 and new model
-      output paths (sherlock-v3-flat/).
-    verification: >
-      Training log shows convergence (val loss decreasing). Best checkpoint saved.
-      Training completes within ~4 hours. overnight_sherlock.sh diff shows
-      updated ratio and output paths.
-
-  - id: AC-6
-    description: >
-      Profile eval on 190-column benchmark achieves ≥150/190 (79%+) label accuracy.
-      This is compared against the raw sherlock-v2-flat baseline of 128/190 (67.4%)
-      measured on the same eval set (post-PR#23 eval pipeline). Note: this is raw
-      multi-branch output with NO post-processing — the comparison is architecture-
-      to-architecture, not against the CharCNN + disambiguation production pipeline
-      (188/190).
-    verification: >
-      FINETYPE_MODEL_TYPE=multi-branch FINETYPE_MODEL=models/sherlock-v3-flat
-      make eval-profile reports ≥150/190. Improvement over sherlock-v2-flat ≥22
-      columns.
-
-  - id: AC-7
-    description: >
-      Ablation comparison: train one model WITH header branch and one WITHOUT
-      (same 50/50 data, same hyperparameters). The header branch model must
-      outperform the no-header model by a meaningful margin (≥10 columns).
-      This isolates the header signal's contribution.
-    verification: >
-      Two model directories produced (sherlock-v3-flat, sherlock-v3-noheader).
-      Both evaluated on profile eval. Delta ≥10 columns reported.
-
-  # ── Integration ──────────────────────────────────────────────
-  - id: AC-8
-    description: >
-      MultiBranchClassifier inference path updated to accept header string. The
-      classify_multi_branch method in column.rs passes the header to the classifier,
-      which embeds it via Model2Vec and feeds it through the 4th branch. When
-      header is empty/absent, zero-vector used (graceful degradation).
-
-      Additional test: measure accuracy with headers vs without headers (zero-vector)
-      at inference time on the eval set. This validates graceful degradation and
-      quantifies the header signal's inference-time contribution.
-    verification: >
-      finetype profile --model-type multi-branch on 3 test CSVs produces output.
-      Same CSVs with --model-type char-cnn still work (no regression). Accuracy
-      delta with vs without headers reported.
-
-rollback:
-  description: >
-    If the header-branch model scores <150/190 on profile eval, document findings
-    and recommend next steps (more data, different architecture, post-processing
-    overlay as Phase 1). Production default remains char-cnn-v14-250. The code
-    changes (4th branch, FTMB format) are still valuable infrastructure for future
-    training iterations.
-
-ontology_schema:
-  name: "MultiBranchV3Classifier"
-  description: "4-branch Sherlock-style model with header embeddings for column-type classification"
-  fields:
-    - name: "char_features"
-      type: "array"
-      description: "960-dim character distribution features (96 chars × 10 aggregations)"
-    - name: "embedding_features"
-      type: "array"
-      description: "512-dim Model2Vec value embedding aggregations (128d × 4 stats)"
-    - name: "stat_features"
-      type: "array"
-      description: "27-dim statistical features (entropy, cardinality, length stats)"
-    - name: "header_features"
-      type: "array"
-      description: "128-dim Model2Vec embedding of column header string (new 4th branch)"
-    - name: "branch_hidden_dims"
-      type: "object"
-      description: "Per-branch hidden dims: {char: [300,300], embed: [200,200], stats: [128,64], header: [128,64]}"
-    - name: "merge_dim"
-      type: "number"
-      description: "Merged dimension after concatenation (300+200+64+64 = 628)"
-    - name: "head_type"
-      type: "string"
-      description: "Classification head: 'flat' (250-softmax) — hierarchical deferred"
-    - name: "n_classes"
-      type: "number"
-      description: "Number of output classes (250)"
-
-evaluation_principles:
-  - principle: "Accuracy — label accuracy on 190-column profile eval (raw, no post-processing)"
-    weight: 0.40
-  - principle: "Architecture validity — header branch demonstrably improves accuracy (ablation)"
-    weight: 0.25
-  - principle: "Training efficiency — completes within time budget on M1 Pro"
-    weight: 0.15
-  - principle: "Clean evaluation — no training data contamination of eval set"
-    weight: 0.10
-  - principle: "Backward compatibility — old FTMB files and CLI commands still work"
-    weight: 0.10
-
-exit_conditions:
-  - "4th header branch implemented in both training and inference code"
-  - "FTMB format extended with backward compatibility (v1 files load with zero header features)"
-  - "50/50 training data prepared with realistic header variations (no eval contamination)"
-  - "Model trained and evaluated on profile eval"
-  - "Ablation: with-header vs without-header comparison reported (≥10 column delta)"
-  - "Score ≥150/190 OR findings document explains gap and recommends next steps"
-  - "overnight_sherlock.sh updated with new ratio and model paths"
-  - "FTMB round-trip unit test in Rust"
-  - "All code changes ship via PR"
-
-metadata:
-  version: "2.0"
-  timestamp: "2026-03-23T23:00:00Z"
-  ambiguity_score: 0.08
-  interview_ref: ".orbit/specs/2026-03-23-multibranch-training-strategy/interview.md"
-  review_ref: ".orbit/specs/2026-03-23-multibranch-training-strategy/review-spec-2026-03-23.md"
-  risk_tier: "HIGH"
-  related_decisions:
-    - ".orbit/choices/0040-sherlock-first-defer-remaining-distillation.md"
-  related_specs:
-    - ".orbit/specs/2026-03-21-sherlock-architecture/spec.yaml"
-    - ".orbit/specs/2026-03-23-multibranch-eval-diagnosis/findings.md"
-  prior_art:
-    - "Sherlock (KDD 2019): multi-branch NN, 78 types, GloVe+Doc2Vec+char features"
-    - "sherlock-v2-flat: 128/190 (67.4%) without header signal (post-PR#23 eval)"
-    - "CharCNN + disambiguation: 188/190 (98.9%) with 7 post-processing layers"
-  review_responses:
-    - finding: "Baseline number discrepancy (128 vs 101)"
-      response: >
-        Both are real measurements. 101/190 was from the findings doc eval run
-        before PR #23 eval pipeline fixes. 128/190 is from today's eval run with
-        reconstructed config/label_map artifacts. The 128/190 number is the current
-        state. Clarified in spec that this is raw multi-branch, not vs production.
-    - finding: "Phase 1 skipped without justification"
-      response: >
-        Deliberate strategy choice by the user: better training over more
-        disambiguation. Added explicit justification in the goal section.
-    - finding: "Core deliverables don't exist yet"
-      response: >
-        Expanded AC-1, AC-2, AC-3 with specific code changes required.
-    - finding: "FTMB backward compat requires code changes"
-      response: >
-        Expanded AC-2 with specific version-handling logic for both Rust and Python.
-    - finding: "Synthetic header signal too discriminative"
-      response: >
-        AC-3 now specifies realistic header variations, not type keys.
-    - finding: "No FTMB round-trip tests"
-      response: >
-        Added to AC-2 verification and exit conditions.
-    - finding: "merged_dim() doesn't include header"
-      response: >
-        AC-1 now explicitly lists updating merged_dim() and adding header_hidden.
-    - finding: "Overnight script hardcodes 30/70"
-      response: >
-        Added to AC-5 and exit conditions.
-    - finding: "Lock down Model2Vec dimension"
-      response: >
-        Committed to 128-dim compact model. Removed 384-dim option.
-    - finding: "Eval contamination unverifiable from .ftmb"
-      response: >
-        AC-4 now documents provenance-based contamination assurance.
+- id: AC-1
+  description: |
+    4th header branch added to MultiBranchClassifier in both training (finetype-train/src/multi_branch.rs) and inference (finetype-model/src/multi_branch.rs).
+    Specific code changes: (a) Add header_dim and header_hidden fields to MultiBranchConfig (both crates). (b) Update merged_dim() to include header_hidden[1] in the sum. (c) Add header BranchWeights to MultiBranchModel (training) and
+        MultiBranchClassifier (inference).
+    (d) Update forward pass: concatenate 4 branch outputs before merge trunk. (e) Update MultiBranchClassifier::load() to load the 4th branch weights.
+    Input: 128-dim Model2Vec embedding of column header string. Branch hidden dims: 128→128→64, matching the stats branch pattern. Merge layer updated: char 300 + embed 200 + stats 64 + header 64 = 628 dims.
+- id: AC-2
+  description: |
+    FTMB binary format extended with header embedding field.
+    Specific code changes: (a) Add header_features field to TrainingRecord struct. (b) Bump FTMB_VERSION from 1 to 2. (c) Update write_training_data() to write header_dim in header + header
+        features per record.
+    (d) Update read_training_data() in Rust: detect version 1 (old) vs 2 (new).
+        Version 1: load with zero-vector header_features. Version 2: read 4th
+        feature vector. Remove the hard bail!() on unknown versions — instead
+        accept version 1 with graceful degradation.
+    (e) Update read_ftmb.py Python reader similarly: accept version 1 with
+        zero header features.
+    (f) Add Rust unit test for FTMB v1↔v2 round-trip.
+- id: AC-3
+  description: |
+    Data preparation pipeline updated to extract header embeddings.
+    Specific code changes: (a) Extend extract-features CLI subcommand to embed the header string via
+        Model2Vec and emit a 128-dim float array in the JSON output (currently
+        emits the raw header string only).
+    (b) Update prepare_multibranch_data.py to pass column headers to
+        extract_features() and write the 4th feature vector to FTMB records.
+    (c) For synthetic data: use realistic header variations, not the type key.
+        E.g., for identity.person.email use ["email", "email_address", "e-mail",
+        "contact_email"] sampled randomly. This prevents the model from learning
+        to cheat on perfect type-key headers unavailable at inference.
+    (d) For distilled data: use the original column headers from the Sherlock
+        corpus (already present in the distilled CSV).
+- id: AC-4
+  description: |
+    Training data prepared with 50/50 distilled/synthetic mix. No eval dataset columns included. Total volume: ≥200K column-level training samples. Type coverage: all 250 taxonomy types represented.
+    The distillation pipeline (output/distillation-v3/) is known to be sourced from Sherlock web-table data, not from eval/datasets/. Contamination check is by provenance of the distillation pipeline, not by post-hoc file-path inspection of the .ftmb file.
+- id: AC-5
+  description: |
+    Model trained with header branch on 50/50 data. Hyperparameters: seed 42, batch 32, 20 epochs, dropout 0.35, Adam lr 0.0001, weight decay 0.0001, patience 10. Training completes on M1 Pro with Metal acceleration.
+    overnight_sherlock.sh updated with --ratio-distilled 0.5 and new model output paths (sherlock-v3-flat/).
+- id: AC-6
+  description: |
+    Profile eval on 190-column benchmark achieves ≥150/190 (79%+) label accuracy. This is compared against the raw sherlock-v2-flat baseline of 128/190 (67.4%) measured on the same eval set (post-PR#23 eval pipeline). Note: this is raw multi-branch output with NO post-processing — the comparison is architecture- to-architecture, not against the CharCNN + disambiguation production pipeline (188/190).
+- id: AC-7
+  description: |
+    Ablation comparison: train one model WITH header branch and one WITHOUT (same 50/50 data, same hyperparameters). The header branch model must outperform the no-header model by a meaningful margin (≥10 columns). This isolates the header signal's contribution.
+- id: AC-8
+  description: |
+    MultiBranchClassifier inference path updated to accept header string. The classify_multi_branch method in column.rs passes the header to the classifier, which embeds it via Model2Vec and feeds it through the 4th branch. When header is empty/absent, zero-vector used (graceful degradation).
+    Additional test: measure accuracy with headers vs without headers (zero-vector) at inference time on the eval set. This validates graceful degradation and quantifies the header signal's inference-time contribution.

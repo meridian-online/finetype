@@ -1,223 +1,44 @@
-goal: >
-  Replace the Sense+CharCNN inference pipeline with multi-branch as the sole
-  classifier, wired through a lightweight Sharpen layer of deterministic
-  post-processing rules. Ship when profile eval reaches >= 140/190 label accuracy.
-  Primary driver is inference speed: one forward pass per column replaces ~100
-  CharCNN value-level inferences. CharCNN and Sense are fully retired.
-
-constraints:
-  - "CharCNN value-level voting is removed from the inference path — no fallback, no legacy mode, no --legacy flag"
-  - "Sense classifier is removed from the inference path — multi-branch IS the classifier"
-  - "Sharpen rules use only: result.label, result.confidence, values, ColumnFeatures, header, taxonomy — no per-value ClassificationResults, no vote distributions"
-  - "ColumnFeatures (36-dim deterministic) must be computed in the multi-branch path — cheap, no neural inference"
-  - "Existing rule logic is adapted, not rewritten — trigger guards change from vote-based to label-based"
-  - "Default model switches to sherlock-v4-sibling (multi-branch + sibling context)"
-  - "All CLI commands (profile, infer, schema, validate, load) use the new pipeline"
-  - "DuckDB extension switches from include_bytes! CharCNN to hf_hub runtime download of multi-branch model"
-  - "MCP server constructor updated to accept multi-branch classifier"
-  - "LogRenderer and TuiRenderer are unaffected — training infrastructure unchanged"
-  - "hf_hub added as dependency for DuckDB extension crate (runtime model download)"
-
-prerequisites:
-  - "sherlock-v4-sibling model trained and achieving >= 121/190 raw label accuracy"
-  - "Model artifacts published to HuggingFace (meridian-online/finetype-model or equivalent)"
-
+id: 2026-03-25-multi-branch-pipeline-integration
+status: closed
+goal: |
+  Replace the Sense+CharCNN inference pipeline with multi-branch as the sole classifier, wired through a lightweight Sharpen layer of deterministic post-processing rules. Ship when profile eval reaches >= 140/190 label accuracy. Primary driver is inference speed: one forward pass per column replaces ~100 CharCNN value-level inferences. CharCNN and Sense are fully retired.
 acceptance_criteria:
-  - id: AC-1
-    description: >
-      Multi-branch classify_column output flows through Sharpen post-processing.
-      classify_multi_branch() and classify_multi_branch_with_enriched() are
-      modified in-place to: (a) compute ColumnFeatures on the sampled values,
-      (b) call feature_sharpen() with adapted F1-F6 rules, (c) call
-      value_sharpen() with adapted R1-R19 rules, (d) call header hint logic.
-      This is the insertion point — both methods currently return bare
-      ColumnResult with column_features: None and no rule application.
-    verification: >
-      Code review: classify_multi_branch (line ~1948) and
-      classify_multi_branch_with_enriched (line ~2002) now compute
-      ColumnFeatures, call feature_sharpen, value_sharpen, and header hints
-      before returning. ColumnResult.column_features is populated.
-      Sharpen functions accept no votes or ClassificationResult parameters.
-
-  - id: AC-2
-    description: >
-      Feature-based rules F1-F6 adapted for multi-branch output in a new
-      feature_sharpen() function. Vote-dependent guards removed entirely
-      (not just "dropped" — the code paths checking votes must not exist):
-        F1 — leading_zero + label check (no change needed)
-        F2 — slash_segments + label check (remove docker_ref vote guard entirely)
-        F3 — digit/dot/neg features + label check (remove hs_code vote presence
-              and vote fraction guards; fire on feature thresholds alone)
-        F4 — length_variance + hex + label check (no change needed)
-        F5 — leading_zero + float ratio + label check (no change needed)
-        F6 — length/dot/alpha + label check (use fixed categorical fallback
-              instead of next-vote fallback)
-    verification: >
-      Unit tests for each adapted rule using single-entry vote distributions
-      (simulating multi-branch output). F2 fires on hostname with high
-      slash_segments WITHOUT docker_ref in votes. F3 fires on decimal_number
-      with HS code features WITHOUT hs_code in votes. F6 falls back to
-      categorical with empty second-place votes. Existing F1/F4/F5 tests
-      continue to pass.
-
-  - id: AC-3
-    description: >
-      Value-based disambiguation rules R1-R19 adapted for multi-branch output
-      in a new value_sharpen() function. Rules that previously triggered on
-      contains_pair(top_labels, ...) now trigger on result.label matching the
-      relevant type or domain. R12 triggers when result.label is any
-      numeric-adjacent type. disambiguate() signature drops the
-      results: &[ClassificationResult] parameter.
-
-      Attractor demotion (R15) adapted: majority_fraction uses
-      result.confidence directly instead of top_count / n_samples (which
-      produces 0.0 with multi-branch single-entry votes where confidence
-      as usize truncates to 0). Fallback logic uses taxonomy-based
-      demotion when no second-place vote exists.
-    verification: >
-      Code review: disambiguate() has no ClassificationResult parameter.
-      R15 uses result.confidence for majority_fraction. Unit tests for
-      R5 (day-of-week), R8 (gender), R11 (categorical), R12
-      (year/increment/postal), R15 (attractor demotion), R17 (UTC offset)
-      pass with single-entry vote distribution input. R15 test confirms
-      confidence-based threshold works (confidence=0.95 does NOT demote,
-      confidence=0.3 DOES demote).
-
-  - id: AC-4
-    description: >
-      numeric_code false positives eliminated by F5. The 14 false numeric_code
-      predictions from sherlock-v4-sibling (salary, altitude, pages, deaths,
-      response_time_ms, etc.) are demoted to integer_number or decimal_number
-      by the leading-zero check. Columns with genuine leading zeros remain
-      as numeric_code.
-    verification: >
-      Run profile eval with multi-branch + Sharpen on the 14 known false
-      positive columns. All 14 demoted to integer/decimal. Synthetic unit
-      test with leading-zero values (e.g., "00123", "04500") confirms F5
-      preserves numeric_code when leading_zero_ratio >= 0.01.
-
-  - id: AC-5
-    description: >
-      Header hints (Model2Vec semantic matching) wired into Sharpen layer.
-      The existing header_hint logic runs after feature and value rules,
-      operating on result.label and the header string. No dependency on
-      Sense broad_category or CharCNN votes.
-    verification: >
-      Code review: header hint logic callable from sharpen path.
-      Known header-sensitive columns (phone, latitude, longitude, url)
-      benefit from header hints in the multi-branch pipeline.
-
-  - id: AC-6
-    description: >
-      Profile eval with multi-branch + Sharpen reaches >= 140/190 label
-      accuracy on the 190-column eval suite. This is the ship gate.
-    verification: >
-      make eval-report with models/default pointing to sherlock-v4-sibling.
-      Output shows >= 140/190 label accuracy. Results committed to
-      models/sherlock-v4-sibling/eval/.
-
-  - id: AC-7
-    description: >
-      models/default symlink updated to sherlock-v4-sibling. CLI uses
-      multi-branch by default. The --model-type flag is no longer needed
-      for multi-branch inference. Existing --model-type multi-branch flag
-      continues to work (no-op when default is already multi-branch).
-    verification: >
-      finetype profile <file> uses multi-branch without --model-type flag.
-      finetype infer classifies values via multi-branch. No CLI flag required.
-
-  - id: AC-8
-    description: >
-      Sense and CharCNN value-level inference paths removed from the default
-      pipeline. No --legacy flag. The default pipeline is:
-      multi-branch -> sharpen -> output. No Sense model loading, no CharCNN
-      batch inference. Comparison testing uses git branch checkout.
-    verification: >
-      Code review: classify_column_with_header() default path calls
-      multi-branch, not sense_sharpen. No --legacy flag in CLI args.
-      cargo build -p finetype-cli succeeds without sense model artifacts.
-      cargo test -p finetype-model passes.
-
-  - id: AC-9
-    description: >
-      MCP server receives a fully-configured ColumnClassifier — same pipeline
-      as the CLI. FineTypeServer::new changed from CharClassifier to accept
-      a ColumnClassifier directly. cmd_mcp() builds the complete pipeline:
-      MultiBranchClassifier + sibling context + Sharpen rules + taxonomy +
-      Model2Vec semantic hints. Eliminates the current gap where MCP runs
-      bare CharCNN with no post-processing (the existing TODO on line 778:
-      "Add Sense + Entity wiring once MCP server supports it" is resolved
-      by passing a fully-wired ColumnClassifier).
-    verification: >
-      Code review: FineTypeServer::new accepts ColumnClassifier (not
-      CharClassifier). cmd_mcp() mirrors the CLI model-loading path.
-      MCP profile tool returns multi-branch + Sharpen predictions matching
-      CLI output for the same input. cargo build -p finetype-mcp succeeds.
-
-  - id: AC-10
-    description: >
-      DuckDB extension switches from compile-time include_bytes! CharCNN
-      embedding to runtime model download via hf_hub (following the
-      quackformers pattern). On first use, the extension downloads
-      multi-branch model artifacts from HuggingFace and caches them
-      locally. Subsequent loads use the cache. Environment variable
-      FINETYPE_MODEL_DIR overrides with a local path.
-    verification: >
-      DuckDB extension builds without model files in workspace (no
-      include_bytes! for model weights). First SELECT finetype(col)
-      downloads model from HuggingFace. Second query uses cache (no
-      network). FINETYPE_MODEL_DIR=/path/to/model loads from local path.
-      cargo build -p finetype_duckdb succeeds in CI without model artifacts.
-
-ontology_schema:
-  name: "MultiBranchPipeline"
-  description: "The new default inference pipeline: multi-branch classifier + lightweight Sharpen"
-  fields:
-    - name: "classifier"
-      type: "string"
-      description: "Multi-branch model (sherlock-v4-sibling) — single forward pass per column"
-    - name: "sharpen_features"
-      type: "object"
-      description: "ColumnFeatures (36-dim deterministic) computed on sampled values"
-    - name: "sharpen_rules_feature"
-      type: "array"
-      description: "Feature-based rules F1-F6 operating on label + ColumnFeatures"
-    - name: "sharpen_rules_value"
-      type: "array"
-      description: "Value-based disambiguation rules R1-R19 operating on label + values + confidence"
-    - name: "sharpen_header_hints"
-      type: "object"
-      description: "Model2Vec semantic header matching for domain-specific overrides"
-    - name: "output"
-      type: "object"
-      description: "ColumnResult with label, confidence, disambiguation_rule, detected_locale"
-
-evaluation_principles:
-  - principle: "Accuracy — profile eval >= 140/190 label accuracy"
-    weight: 0.35
-  - principle: "Speed — single forward pass per column, no CharCNN batch inference"
-    weight: 0.25
-  - principle: "Analyst safety — numeric_code false positives eliminated, leading zeros preserved"
-    weight: 0.20
-  - principle: "Simplicity — one pipeline, no fallback modes, clean architecture"
-    weight: 0.20
-
-exit_conditions:
-  - "Profile eval >= 140/190 with multi-branch + Sharpen (AC-6)"
-  - "All CLI/MCP commands use multi-branch by default (AC-7, AC-9)"
-  - "DuckDB extension downloads multi-branch from HuggingFace (AC-10)"
-  - "cargo test passes, cargo build succeeds without Sense artifacts (AC-8)"
-  - "14 numeric_code false positives eliminated (AC-4)"
-
-metadata:
-  version: "2.0"
-  timestamp: "2026-03-25T16:30:00Z"
-  ambiguity_score: 0.09
-  interview_ref: null
-  analysis_ref: null
-  review_ref: ".orbit/specs/2026-03-25-multi-branch-pipeline-integration/review-spec-2026-03-25.md"
-  decisions:
-    - ".orbit/choices/0041-multi-branch-as-sense-replacement.md (updated 2026-03-25)"
-    - ".orbit/choices/0038-supersede-v2-fixes-with-retraining.md"
-    - ".orbit/choices/0042-remove-regex-header-hints.md"
-  risk_tier: "HIGH"
+- id: AC-1
+  description: |
+    Multi-branch classify_column output flows through Sharpen post-processing. classify_multi_branch() and classify_multi_branch_with_enriched() are modified in-place to: (a) compute ColumnFeatures on the sampled values, (b) call feature_sharpen() with adapted F1-F6 rules, (c) call value_sharpen() with adapted R1-R19 rules, (d) call header hint logic. This is the insertion point — both methods currently return bare ColumnResult with column_features: None and no rule application.
+- id: AC-2
+  description: |
+    Feature-based rules F1-F6 adapted for multi-branch output in a new feature_sharpen() function. Vote-dependent guards removed entirely (not just "dropped" — the code paths checking votes must not exist):
+      F1 — leading_zero + label check (no change needed)
+      F2 — slash_segments + label check (remove docker_ref vote guard entirely)
+      F3 — digit/dot/neg features + label check (remove hs_code vote presence
+            and vote fraction guards; fire on feature thresholds alone)
+      F4 — length_variance + hex + label check (no change needed)
+      F5 — leading_zero + float ratio + label check (no change needed)
+      F6 — length/dot/alpha + label check (use fixed categorical fallback
+            instead of next-vote fallback)
+- id: AC-3
+  description: |
+    Value-based disambiguation rules R1-R19 adapted for multi-branch output in a new value_sharpen() function. Rules that previously triggered on contains_pair(top_labels, ...) now trigger on result.label matching the relevant type or domain. R12 triggers when result.label is any numeric-adjacent type. disambiguate() signature drops the results: &[ClassificationResult] parameter.
+    Attractor demotion (R15) adapted: majority_fraction uses result.confidence directly instead of top_count / n_samples (which produces 0.0 with multi-branch single-entry votes where confidence as usize truncates to 0). Fallback logic uses taxonomy-based demotion when no second-place vote exists.
+- id: AC-4
+  description: |
+    numeric_code false positives eliminated by F5. The 14 false numeric_code predictions from sherlock-v4-sibling (salary, altitude, pages, deaths, response_time_ms, etc.) are demoted to integer_number or decimal_number by the leading-zero check. Columns with genuine leading zeros remain as numeric_code.
+- id: AC-5
+  description: |
+    Header hints (Model2Vec semantic matching) wired into Sharpen layer. The existing header_hint logic runs after feature and value rules, operating on result.label and the header string. No dependency on Sense broad_category or CharCNN votes.
+- id: AC-6
+  description: |
+    Profile eval with multi-branch + Sharpen reaches >= 140/190 label accuracy on the 190-column eval suite. This is the ship gate.
+- id: AC-7
+  description: |
+    models/default symlink updated to sherlock-v4-sibling. CLI uses multi-branch by default. The --model-type flag is no longer needed for multi-branch inference. Existing --model-type multi-branch flag continues to work (no-op when default is already multi-branch).
+- id: AC-8
+  description: |
+    Sense and CharCNN value-level inference paths removed from the default pipeline. No --legacy flag. The default pipeline is: multi-branch -> sharpen -> output. No Sense model loading, no CharCNN batch inference. Comparison testing uses git branch checkout.
+- id: AC-9
+  description: |
+    MCP server receives a fully-configured ColumnClassifier — same pipeline as the CLI. FineTypeServer::new changed from CharClassifier to accept a ColumnClassifier directly. cmd_mcp() builds the complete pipeline: MultiBranchClassifier + sibling context + Sharpen rules + taxonomy + Model2Vec semantic hints. Eliminates the current gap where MCP runs bare CharCNN with no post-processing (the existing TODO on line 778: "Add Sense + Entity wiring once MCP server supports it" is resolved by passing a fully-wired ColumnClassifier).
+- id: AC-10
+  description: |
+    DuckDB extension switches from compile-time include_bytes! CharCNN embedding to runtime model download via hf_hub (following the quackformers pattern). On first use, the extension downloads multi-branch model artifacts from HuggingFace and caches them locally. Subsequent loads use the cache. Environment variable FINETYPE_MODEL_DIR overrides with a local path.

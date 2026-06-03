@@ -1,101 +1,33 @@
-goal: >
-  Audit all 23 v12 misclassifications to determine root cause (model error,
-  training data quality, or eval GT error). Fix GT where evidence justifies it.
-  Produce a retrain brief for v13 if training data issues are found.
-
-constraints:
-  - Inspect upstream data (distilled CSV values + synthetic generator output) — feature vectors alone don't explain root cause
-  - All 23 v12 misclassifications audited with equal rigour — no priority triage
-  - GT corrections committed directly to eval ground truth per decision 0037
-  - Include confidence analysis for the 6 persistent errors that got more confident in v12
-  - Prior audit findings (.orbit/specs/2026-04-12 eval-audit-v2, .orbit/specs/2026-03-26 collisions) are starting context, not repeated work
-
+id: 2026-04-16-v12-data-quality-audit
+status: closed
+goal: |
+  Audit all 23 v12 misclassifications to determine root cause (model error, training data quality, or eval GT error). Fix GT where evidence justifies it. Produce a retrain brief for v13 if training data issues are found.
 acceptance_criteria:
-  - id: ac-01
-    ac_type: doc
-    description: >
-      Per-item audit table for all 23 v12 misclassifications. Each row includes:
-      dataset, column, v11 prediction, v12 prediction, expected label, v11 confidence,
-      v12 confidence, root cause verdict, and evidence summary.
-    verification: Review audit table — every row has a verdict and evidence.
-
-  - id: ac-02
-    ac_type: doc
-    description: >
-      Root cause classification for each item using categories: model_error (model
-      genuinely wrong), gt_error (ground truth label is wrong or debatable),
-      training_collision (types overlap in training data), generator_defect
-      (synthetic generator produces confusable output), data_gap (type has
-      insufficient or unrepresentative training data).
-    verification: Every item has exactly one root cause. Distribution of root causes reported.
-
-  - id: ac-03
-    ac_type: doc
-    description: >
-      Training data inspection for the 4 regressed items plus 8 key confusion pairs.
-      For each regression and high-confusion pair, sample distilled and synthetic
-      examples from each type and report: value overlap rate, distinguishing features,
-      and whether the types are genuinely confusable from the data.
-    verification: 4 regression pairs + 8 confusion pairs inspected with sample data and overlap analysis.
-
-  - id: ac-04
-    ac_type: doc
-    description: >
-      Confidence analysis for the 6 persistent errors that increased in confidence.
-      For each, extract the v12 validation features (239-dim) and report which
-      taxonomy types the values pass validation for. Determine whether the validation
-      branch is reinforcing or neutral toward the wrong prediction.
-    verification: 6 persistent errors analysed with validation feature breakdown.
-
-  - id: ac-05
-    ac_type: code
-    description: >
-      GT corrections committed to eval ground truth files where ac-02 verdict is
-      gt_error. Each correction includes a comment explaining the evidence.
-    verification: Ground truth CSV updated. Corrected labels match the evidence from ac-01.
-
-  - id: ac-06
-    ac_type: doc
-    description: >
-      Adjusted v12 score after GT corrections. Report the new label accuracy and
-      domain accuracy with the corrected ground truth.
-    verification: Re-run eval or compute adjusted score from the audit table.
-
-  - id: ac-07
-    ac_type: doc
-    description: >
-      Retrain brief for v13 (if training data issues found in ac-02/ac-03).
-      Lists: specific training data fixes needed, generator changes, distilled
-      data filtering, and expected impact. This brief becomes input for a future
-      /orb:design session.
-    verification: Brief exists and references specific findings from ac-02/ac-03.
-
-deliverables:
-  - .orbit/specs/2026-04-16-v12-data-quality-audit/audit.md — Full audit table and analysis
-  - .orbit/specs/2026-04-16-v12-data-quality-audit/confidence-analysis.md — Validation feature analysis for persistent errors
-  - .orbit/specs/2026-04-16-v12-data-quality-audit/retrain-brief.md — v13 retrain recommendations
-  - eval/schema_mapping.yaml — GT corrections (if any)
-
-evaluation_principles:
-  - principle: "Evidence over intuition — every verdict backed by sampled data"
-    weight: 0.4
-  - principle: "Upstream root cause — trace errors to training data, not just predictions"
-    weight: 0.3
-  - principle: "Actionable findings — each issue leads to a concrete fix or decision"
-    weight: 0.3
-
-exit_conditions:
-  - All 23 items have verdicts with evidence
-  - GT corrections committed (or explicitly zero corrections justified)
-  - Adjusted v12 score computed
-  - Retrain brief written (or explicitly no training data issues found)
-
-metadata:
-  version: "1.0"
-  timestamp: "2026-04-16T09:00:00Z"
-  ambiguity_score: 0.10
-  interview_ref: ".orbit/specs/2026-04-16-v12-data-quality-audit/interview.md"
-  prior_art:
-    - ".orbit/specs/2026-04-12-accuracy-gap-retraining/eval-audit-v2.md"
-    - ".orbit/specs/2026-03-26-overnight-v6-data-quality/collisions.md"
-    - ".orbit/choices/0037-eval-serves-the-engine.md"
+- id: ac-01
+  description: |
+    Per-item audit table for all 23 v12 misclassifications. Each row includes: dataset, column, v11 prediction, v12 prediction, expected label, v11 confidence, v12 confidence, root cause verdict, and evidence summary.
+  ac_type: doc
+- id: ac-02
+  description: |
+    Root cause classification for each item using categories: model_error (model genuinely wrong), gt_error (ground truth label is wrong or debatable), training_collision (types overlap in training data), generator_defect (synthetic generator produces confusable output), data_gap (type has insufficient or unrepresentative training data).
+  ac_type: doc
+- id: ac-03
+  description: |
+    Training data inspection for the 4 regressed items plus 8 key confusion pairs. For each regression and high-confusion pair, sample distilled and synthetic examples from each type and report: value overlap rate, distinguishing features, and whether the types are genuinely confusable from the data.
+  ac_type: doc
+- id: ac-04
+  description: |
+    Confidence analysis for the 6 persistent errors that increased in confidence. For each, extract the v12 validation features (239-dim) and report which taxonomy types the values pass validation for. Determine whether the validation branch is reinforcing or neutral toward the wrong prediction.
+  ac_type: doc
+- id: ac-05
+  description: |
+    GT corrections committed to eval ground truth files where ac-02 verdict is gt_error. Each correction includes a comment explaining the evidence.
+  ac_type: code
+- id: ac-06
+  description: |
+    Adjusted v12 score after GT corrections. Report the new label accuracy and domain accuracy with the corrected ground truth.
+  ac_type: doc
+- id: ac-07
+  description: |
+    Retrain brief for v13 (if training data issues found in ac-02/ac-03). Lists: specific training data fixes needed, generator changes, distilled data filtering, and expected impact. This brief becomes input for a future /orb:design session.
+  ac_type: doc

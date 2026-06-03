@@ -115,7 +115,7 @@ acceptance_criteria:
     current schema (id, goal, cards, status, labels, acceptance_criteria,
     memories_considered, closed_at) so the tooling parses cleanly.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-08
   description: |

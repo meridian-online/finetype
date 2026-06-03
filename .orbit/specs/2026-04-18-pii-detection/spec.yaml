@@ -1,70 +1,16 @@
-goal: "Add x-finetype-pii (true/false) to JSON Schema output for all properties, driven by a pii field in taxonomy YAML definitions. 6 direct-identifier types flagged as PII."
-
-constraints:
-  - "Strict PII scope: only direct identifiers that uniquely identify a person"
-  - "pii field lives in taxonomy YAML definitions (source of truth)"
-  - "x-finetype-pii always present in schema output (true or false, never omitted)"
-  - "Schema output only — profile and DuckDB surfaces are future iterations"
-  - "No model changes, no eval changes, no new dependencies"
-  - "12 PII types (direct + quasi): email, email_display, phone_number, phone_e164, password, ssn, pan_india, credit_card_number, full_name, first_name, last_name, full_address"
-  - "Remove pii: true from 4 business/institutional identifiers: ein, abn, aba_routing, bsb"
-
+id: 2026-04-18-pii-detection
+status: closed
+goal: Add x-finetype-pii (true/false) to JSON Schema output for all properties, driven by a pii field in taxonomy YAML definitions. 6 direct-identifier types flagged as PII.
 acceptance_criteria:
-  - id: ac-01
-    description: "12 taxonomy definitions have pii: true (narrowed from 15 — removed 4 business IDs, added credit_card_number)"
-    verification: "grep 'pii: true' labels/definitions_*.yaml returns exactly 12 matches"
-    files:
-      - labels/definitions_identity.yaml
-      - labels/definitions_finance.yaml
-      - labels/definitions_geography.yaml
-
-  - id: ac-02
-    description: "CLI type-level schema emits x-finetype-pii for every type (true for PII types, false for others)"
-    verification: "finetype schema identity.person.email --stdout | jq '.\"x-finetype-pii\"' returns true; finetype schema datetime.date.iso --stdout | jq '.\"x-finetype-pii\"' returns false"
-    files:
-      - crates/finetype-cli/src/main.rs
-
-  - id: ac-03
-    description: "CLI table-level schema emits x-finetype-pii on every property"
-    verification: "finetype schema eval/datasets/csv/ecommerce_orders.csv --stdout | jq '.properties.customer_email.\"x-finetype-pii\"' returns true; jq '.properties.order_date.\"x-finetype-pii\"' returns false"
-    files:
-      - crates/finetype-cli/src/main.rs
-
-  - id: ac-04
-    description: "MCP schema tool emits x-finetype-pii in both type-level and table-level output"
-    verification: "MCP schema tool JSON output includes x-finetype-pii field"
-    files:
-      - crates/finetype-mcp/src/tools/schema.rs
-
-  - id: ac-05
-    description: "Non-PII types default to pii: false (Option<bool> None treated as false)"
-    verification: "Types without pii field in YAML emit x-finetype-pii: false in schema output"
-    files:
-      - crates/finetype-cli/src/main.rs
-      - crates/finetype-mcp/src/tools/schema.rs
-
-  - id: ac-06
-    description: "Golden integration tests pass with x-finetype-pii in schema output"
-    verification: "cargo test -p finetype-cli --test cli_golden -- --ignored passes"
-    files:
-      - crates/finetype-cli/tests/cli_golden.rs
-
-evaluation_principles:
-  - principle: "Precision — only direct identifiers are flagged, zero false positives"
-    weight: 0.5
-  - principle: "Completeness — x-finetype-pii present on every schema property"
-    weight: 0.3
-  - principle: "Consistency — same output from CLI and MCP surfaces"
-    weight: 0.2
-
-exit_conditions:
-  - "All 6 ACs pass"
-  - "finetype check passes (taxonomy alignment unbroken)"
-  - "No regressions in existing tests"
-
-metadata:
-  version: "1.0"
-  timestamp: "2026-04-18T12:30:00Z"
-  ambiguity_score: 0.02
-  interview_ref: ".orbit/specs/2026-04-18-pii-detection/interview.md"
-  card_ref: ".orbit/cards/0012-pii-detection.yaml"
+- id: ac-01
+  description: '12 taxonomy definitions have pii: true (narrowed from 15 — removed 4 business IDs, added credit_card_number)'
+- id: ac-02
+  description: CLI type-level schema emits x-finetype-pii for every type (true for PII types, false for others)
+- id: ac-03
+  description: CLI table-level schema emits x-finetype-pii on every property
+- id: ac-04
+  description: MCP schema tool emits x-finetype-pii in both type-level and table-level output
+- id: ac-05
+  description: 'Non-PII types default to pii: false (Option<bool> None treated as false)'
+- id: ac-06
+  description: Golden integration tests pass with x-finetype-pii in schema output
