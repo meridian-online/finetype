@@ -855,6 +855,57 @@ WITH
   ORDER BY column_name;
 "#;
 
+/// `ft_profile(tbl) → TABLE{column_name, type, confidence, duckdb_type}` — the
+/// table-in form of profile, symmetric with `ft_validate(tbl, schema)`. Mirrors
+/// the CLI `profile`: one row per column with its semantic type.
+///
+/// Registered at `LOAD` as a SQL table macro, so it reaches the catalog via
+/// `query_table(tbl)` past the BindInfo wall (choice 0064). It melts every
+/// column to VARCHAR (`COLUMNS(*)::VARCHAR` + `UNPIVOT`), pools each column's
+/// values with `list()`, and feeds them — plus the column name as the header
+/// hint — to the `ft_profile(LIST<VARCHAR>, header)` *scalar*. DuckDB routes by
+/// call position: `FROM ft_profile('t')` binds this macro; `ft_profile(list(c))`
+/// in a projection binds the scalar. The two coexist under one name.
+///
+/// `USING SAMPLE 100 ROWS` bounds the scan *before* `list()` materialises a
+/// per-column array — without it a huge table would build a full-column list in
+/// memory just for the scalar to cap at 100 (the OOM the scalar's cap alone
+/// can't prevent, because `list()` runs first). Profiling is a sample-based
+/// heuristic, so the random sample is acceptable.
+///
+/// Nested columns are guarded exactly as in `ft_validate`: `typeof(COLUMNS(*))`
+/// flags STRUCT / LIST / MAP / UNION / ARRAY columns, surfaced as an explicit
+/// row instructing the analyst to unnest / to_json / extract first rather than
+/// profiling their flattened display text.
+const FT_PROFILE_MACRO: &str = r#"CREATE OR REPLACE MACRO ft_profile(tbl) AS TABLE
+WITH
+  types AS (
+    SELECT col AS column_name, ty AS column_type,
+           (ty LIKE 'STRUCT%' OR ty LIKE 'MAP%' OR ty LIKE 'UNION%' OR ty LIKE '%]') AS nested
+    FROM (SELECT typeof(COLUMNS(*)) FROM query_table(tbl) LIMIT 1)
+    UNPIVOT (ty FOR col IN (COLUMNS(*)))
+  ),
+  melted AS (
+    SELECT col AS column_name, val
+    FROM (SELECT COLUMNS(*)::VARCHAR FROM query_table(tbl) USING SAMPLE 100 ROWS)
+    UNPIVOT (val FOR col IN (COLUMNS(*)))
+  ),
+  profiled AS (
+    SELECT m.column_name, ft_profile(list(m.val), m.column_name) AS p
+    FROM melted m JOIN types tp USING (column_name)
+    WHERE NOT tp.nested
+    GROUP BY m.column_name
+  )
+  SELECT column_name, p.type AS type, p.confidence AS confidence, p.duckdb_type AS duckdb_type
+  FROM profiled
+  UNION ALL
+  SELECT tp.column_name,
+         'nested ' || tp.column_type || ' column — unnest / to_json / extract before profiling',
+         NULL::DOUBLE, NULL::VARCHAR
+  FROM types tp WHERE tp.nested
+  ORDER BY column_name;
+"#;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXTENSION ENTRYPOINT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -902,8 +953,8 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // The un-prefixed scalars above stay registered as aliases for one release
     // so the v0.6.22 community install keeps working; new docs teach the ft_
     // names. ft_infer (single-value probe) and ft_profile (column, the accurate
-    // path) are genuinely new; ft_validate_text returns a STRUCT; ft_cast /
-    // ft_unpack / ft_version alias the existing scalar impls.
+    // path) are genuinely new; ft_validate_text returns a STRUCT; ft_detail /
+    // ft_cast / ft_unpack / ft_version alias the existing scalar impls.
     con.register_scalar_function::<FineTypeVersion>("ft_version")
         .expect("Failed to register ft_version");
     con.register_scalar_function::<FineTypeInfer>("ft_infer")
@@ -912,6 +963,8 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
         .expect("Failed to register ft_profile");
     con.register_scalar_function::<FineTypeValidateText>("ft_validate_text")
         .expect("Failed to register ft_validate_text");
+    con.register_scalar_function::<FineTypeDetail>("ft_detail")
+        .expect("Failed to register ft_detail");
     con.register_scalar_function::<FineTypeCast>("ft_cast")
         .expect("Failed to register ft_cast");
     con.register_scalar_function::<FineTypeUnpack>("ft_unpack")
@@ -923,6 +976,12 @@ pub unsafe fn extension_entrypoint(con: duckdb::Connection) -> Result<(), Box<dy
     // blocks Rust table functions on this pin (choice 0064).
     con.execute_batch(FT_VALIDATE_MACRO)
         .expect("Failed to register ft_validate table macro");
+
+    // ft_profile(tbl) table macro — the table-in form, symmetric with
+    // ft_validate. Shares the ft_profile name with the LIST scalar; DuckDB
+    // routes by call position (FROM → macro, projection → scalar).
+    con.execute_batch(FT_PROFILE_MACRO)
+        .expect("Failed to register ft_profile table macro");
 
     Ok(())
 }

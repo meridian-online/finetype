@@ -148,8 +148,16 @@ body: |
   So the table-validity question ships as a first-class verb after all:
 
   - `ft_validate(table, schema)` — SQL table macro (the path past both walls).
-  - `ft_profile(LIST<VARCHAR>)` — scalar over an explicit `list(col)`, **not**
-    an aggregate (aggregate wall); self-bounds the pooled sample to 100.
+  - `ft_profile(table)` — SQL table macro, **symmetric with `ft_validate`**:
+    both table verbs take a table name and resolve it via `query_table`. It
+    melts every column (`COLUMNS(*)::VARCHAR` + `UNPIVOT`), pools each column
+    with `list()`, and feeds the result to the `ft_profile(LIST<VARCHAR>,
+    header)` *scalar*. DuckDB routes the shared `ft_profile` name by call
+    position — `FROM ft_profile('t')` binds the macro, `ft_profile(list(c))`
+    in a projection binds the scalar — so the two coexist under one name. The
+    scalar exists because the aggregate wall blocks a true aggregate; the macro
+    bakes in `USING SAMPLE 100 ROWS` so the scan is bounded before `list()`
+    materialises a per-column array.
   - `ft_infer(value)` / `ft_validate_text(value, schema)` — scalars.
 
   This does NOT revive the v1.1 Rust `finetype_validate_table` table function;

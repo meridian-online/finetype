@@ -31,10 +31,11 @@ goal: |
   | Verb                          | Scope        | DuckDB kind        | Mirrors CLI |
   |-------------------------------|--------------|--------------------|-------------|
   | `ft_infer(value)`             | one value    | scalar             | — (probe)   |
+  | `ft_profile(table)`           | a table      | SQL table macro    | `profile`   |
   | `ft_profile(list(col))`       | a column     | scalar over LIST   | `profile`   |
   | `ft_validate_text(value, schema)` | one value / column | scalar    | per-cell    |
   | `ft_validate(table, schema)`  | a table      | SQL table macro    | `validate`  |
-  | `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar     | utilities   |
+  | `ft_detail` / `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
 
   The existing un-prefixed scalars stay registered for one release as aliases so
   the just-republished v0.6.22 install does not break; new docs teach `ft_`.
@@ -131,18 +132,30 @@ acceptance_criteria:
   checked: true
 - id: ac-03
   description: |
-    `ft_profile(LIST<VARCHAR>) → STRUCT{type, confidence, duckdb_type}`
-    registered as a scalar over a LIST (with a 2-arg `(LIST<VARCHAR>, header)`
-    overload). NOTE: duckdb-rs 1.10503.1 exposes no aggregate-UDF registration
-    API (the aggregate wall, recorded in choice 0064 alongside the catalog
-    wall), so ft_profile ships as a scalar over an explicit LIST built by
-    `list(col)` — not as an aggregate. Returns the column's semantic type,
-    confidence, and recommended DuckDB type. Pools char/embed/stats/validator
-    signal across the LIST's values (header branch reads the column name when
-    given). Idiom: `SELECT ft_profile(list(col)) FROM t USING SAMPLE 100 ROWS`
-    so the LIST is bounded before it is built; as a backstop the scalar
-    self-bounds the values it pools (PROFILE_SAMPLE_CAP = 100) so an unbounded
-    `list(col)` over a huge column never OOMs.
+    `ft_profile` ships in two coexisting forms under one name, routed by call
+    position (DuckDB binds `FROM ft_profile('t')` to the macro, `ft_profile(
+    list(c))` in a projection to the scalar):
+
+      - PRIMARY — `ft_profile(table) → TABLE{column_name, type, confidence,
+        duckdb_type}`, a SQL table macro symmetric with `ft_validate(table,
+        schema)`. Takes a table name, resolves it via `query_table`, melts every
+        column (`COLUMNS(*)::VARCHAR` + UNPIVOT) under `USING SAMPLE 100 ROWS`,
+        pools each column with `list()`, and feeds the `ft_profile(LIST, header)`
+        scalar. Guards nested columns with a named skip row (same edge as
+        ft_validate). One per-column row out.
+      - `ft_profile(LIST<VARCHAR>) → STRUCT{type, confidence, duckdb_type}`, the
+        scalar the macro wraps (with a 2-arg `(LIST<VARCHAR>, header)` overload).
+        NOTE: duckdb-rs 1.10503.1 exposes no aggregate-UDF registration API (the
+        aggregate wall, recorded in choice 0064 alongside the catalog wall), so
+        ft_profile ships as a scalar over an explicit LIST — not as an aggregate.
+        Pools char/embed/stats/validator signal across the LIST's values (header
+        branch reads the column name when given). The scalar self-bounds the
+        values it pools (PROFILE_SAMPLE_CAP = 100) so an unbounded `list(col)`
+        over a huge column never OOMs; the macro's `USING SAMPLE 100 ROWS` bounds
+        the scan before `list()` materialises the array.
+
+    Verified live on DuckDB 1.5.3: `SELECT * FROM ft_profile('people')` returns
+    per-column rows and `ft_profile(list(email))` still resolves in a projection.
   gate: false
   checked: true
 - id: ac-04

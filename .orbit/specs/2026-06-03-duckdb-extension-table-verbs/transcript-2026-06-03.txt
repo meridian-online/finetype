@@ -1,14 +1,8 @@
-# ac-10 evidence — ft_ table-verb surface on DuckDB v1.5.3 (Variegata 14eca11bd9)
-# Captured 2026-06-03. SQL source preserved alongside as transcript.sql.
-# Build: target/release/finetype.duckdb_extension (make build-release, stable C_STRUCT @ v1.2.0).
-# Run:  HF_HUB_OFFLINE=1 FINETYPE_LOG=error duckdb -unsigned -init /dev/null < transcript.sql
-#
-# Verbs: ft_version, ft_infer (scalar), ft_profile (LIST scalar),
-# ft_validate_text (scalar->STRUCT), ft_validate (table macro, inline + file schema).
-# Nested STRUCT column addr surfaces as a guard row (NULL counts) — never silently rejected.
-# email/phone each reject 1/3 (the malformed row); inline and file schema give identical counts.
-# ft_profile on a 3-row sample is a weak probe (plain_text @0.669) — correct function, tiny sample.
-#
+# Transcript — DuckDB ft_ surface on DuckDB v1.5.3 (extension v0.6.22)
+# Generated 2026-06-03 by replaying transcript.sql with: duckdb -unsigned -batch < transcript.sql
+# Proves: ft_infer, ft_detail, ft_profile(table) macro + ft_profile(list) scalar coexistence,
+#         ft_validate_text STRUCT, ft_validate(table) with inline + file schema, nested-column guard.
+
 == load ==
 == ft_version ==
 ┌─────────────────┐
@@ -24,8 +18,24 @@
 ├───────────────────────┤
 │ identity.person.email │
 └───────────────────────┘
+== ft_detail scalar (utility alias) ==
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                      d                                                                                      │
+│                                                                                   varchar                                                                                   │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {"type": "identity.person.email", "confidence": 0.680, "duckdb_type": "VARCHAR", "samples": 1, "disambiguation": "multi-branch", "votes": {"identity.person.email": 0.680}} │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 == build people table ==
-== ft_profile(list(email)) ==
+== ft_profile(table) — table macro, one row per column ==
+┌─────────────┬──────────────────────────────────────────────────────────────────────────────────┬────────────────────┬─────────────┐
+│ column_name │                                       type                                       │     confidence     │ duckdb_type │
+│   varchar   │                                     varchar                                      │       double       │   varchar   │
+├─────────────┼──────────────────────────────────────────────────────────────────────────────────┼────────────────────┼─────────────┤
+│ addr        │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before profiling │               NULL │ NULL        │
+│ email       │ identity.person.email                                                            │ 0.5812865495681763 │ VARCHAR     │
+│ phone       │ identity.person.phone_number                                                     │                0.5 │ VARCHAR     │
+└─────────────┴──────────────────────────────────────────────────────────────────────────────────┴────────────────────┴─────────────┘
+== ft_profile(list(email)) — scalar still resolves in projection ==
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                                 p                                                  │
 │                   struct("type" varchar, confidence double, duckdb_type varchar)                   │

@@ -7,6 +7,9 @@ SELECT ft_version();
 .print == ft_infer scalar ==
 SELECT ft_infer('jane.doe@company.co.uk') AS t;
 
+.print == ft_detail scalar (utility alias) ==
+SELECT ft_detail('jane.doe@company.co.uk') AS d;
+
 .print == build people table ==
 CREATE TABLE people AS
   SELECT * FROM (VALUES
@@ -15,7 +18,10 @@ CREATE TABLE people AS
     ('not-an-email',           'not-a-phone',      {'city': 'Leeds'})
   ) AS t(email, phone, addr);
 
-.print == ft_profile(list(email)) ==
+.print == ft_profile(table) — table macro, one row per column ==
+SELECT * FROM ft_profile('people');
+
+.print == ft_profile(list(email)) — scalar still resolves in projection ==
 SELECT ft_profile(list(email)) AS p FROM people;
 
 .print == ft_validate_text inline (valid email) ==

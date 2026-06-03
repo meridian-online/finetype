@@ -149,16 +149,24 @@ The extension exposes a `profile → schema → validate` flow that mirrors the 
 | Verb | Scope | DuckDB kind | Mirrors CLI |
 |------|-------|-------------|-------------|
 | `ft_infer(value)` | one value | scalar | — (weak probe) |
+| `ft_profile(table)` | whole table | SQL table macro | `profile` |
 | `ft_profile(list(col))` | a column | scalar over `LIST` | `profile` |
 | `ft_validate_text(value, schema)` | one value / column | scalar → STRUCT | per-cell |
 | `ft_validate(table, schema)` | a table | SQL table macro | `validate` |
-| `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
+| `ft_detail` / `ft_cast` / `ft_unpack` / `ft_version` | one value | scalar | utilities |
 
-`ft_profile` is a **scalar over an explicit `LIST`** (built with `list(col)`), not an aggregate: duckdb-rs `1.10503.1` exposes no aggregate-UDF registration API (the *aggregate wall*), just as its `BindInfo` exposes no catalog access (the *catalog wall* of choice 0064). `ft_validate` sidesteps both as a SQL table macro registered at `LOAD` — it expands into catalog-aware SQL that DuckDB executes with `query_table(name)`. See choice 0064's 2026-06-03 addendum.
+The two table verbs are symmetric — both take a table name: `ft_profile('t')` and `ft_validate('t', schema)`. Each is a SQL table macro registered at `LOAD`, so it reaches the catalog via `query_table(name)` past the `BindInfo` wall that blocks Rust table functions on this pin (choice 0064).
+
+`ft_profile` is **one name covering two forms**, which DuckDB routes by call position:
+
+- **`FROM ft_profile('t')`** — the table macro; one row per column `{column_name, type, confidence, duckdb_type}`. The everyday form.
+- **`ft_profile(list(col))` in a `SELECT`** — the underlying scalar over a `LIST`, with a 2-arg `(LIST, header)` overload. The table macro calls this scalar internally; reach for it directly only when you've already assembled a list.
+
+`ft_profile` ships as a scalar (plus a macro), not a true aggregate, because duckdb-rs `1.10503.1` exposes no aggregate-UDF registration API (the *aggregate wall*) — see choice 0064's 2026-06-03 addendum.
 
 ### Why `ft_profile`, not `ft_infer`, is the accurate path
 
-The model is column-oriented (5-branch: char + embed + stats + header + validation, pooled across a column's values). A single value carries no column context, so `ft_infer(v)` is "profile with sample size 1" — strictly weaker. Reach for `ft_infer` only to probe one literal; use `ft_profile` over a row sample for a real answer.
+The model is column-oriented (5-branch: char + embed + stats + header + validation, pooled across a column's values). A single value carries no column context, so `ft_infer(v)` is "profile with sample size 1" — strictly weaker. Reach for `ft_infer` only to probe one literal; use `ft_profile` over a column for a real answer.
 
 ```sql
 LOAD 'finetype.duckdb_extension';
@@ -166,12 +174,17 @@ LOAD 'finetype.duckdb_extension';
 -- Single-value probe (no column context — weak):
 SELECT ft_infer('jane.doe@company.co.uk');   -- identity.person.email
 
--- Column profile over a bounded sample (the accurate path).
--- ft_profile self-bounds the pooled sample to 100 values, but
--- USING SAMPLE keeps the LIST small before it is even built:
-SELECT ft_profile(list(email)) AS p
-FROM   people USING SAMPLE 100 ROWS;
--- {'type': identity.person.email, 'confidence': …, 'duckdb_type': VARCHAR}
+-- Profile a whole table — one row per column (the everyday form):
+SELECT * FROM ft_profile('people');
+-- ┌─────────────┬───────────────────────────────────────┬────────────┬─────────────┐
+-- │ column_name │ type                                  │ confidence │ duckdb_type │
+-- ├─────────────┼───────────────────────────────────────┼────────────┼─────────────┤
+-- │ age         │ representation.numeric.integer_number │      0.956 │ BIGINT      │
+-- │ email       │ identity.person.email                 │      1.000 │ VARCHAR     │
+-- │ phone       │ identity.person.phone_number          │      0.500 │ VARCHAR     │
+-- └─────────────┴───────────────────────────────────────┴────────────┴─────────────┘
+-- The macro bakes in USING SAMPLE 100 ROWS, so it bounds the scan before
+-- list() materialises a per-column array — safe on arbitrarily large tables.
 ```
 
 ### profile → schema → validate
@@ -180,7 +193,7 @@ Schema **generation** stays in the CLI (`finetype taxonomy`); the extension only
 
 ```sql
 -- 1. profile: see what each column is (CLI: finetype profile)
-SELECT ft_profile(list(email)) FROM people USING SAMPLE 100 ROWS;
+SELECT * FROM ft_profile('people');
 
 -- 2. schema: generate a JSON Schema with the CLI, save to schema.json
 --    finetype taxonomy ... > schema.json
@@ -211,7 +224,7 @@ SELECT ft_validate_text('not-an-email',
 
 ### Nested-column guard (Precision Principle)
 
-`COLUMNS(*)::VARCHAR` flattens a STRUCT / LIST to DuckDB **display** text (`{'city': London}` — inner quotes lost, not valid JSON), which would silently FALSE-reject. `ft_validate` guards nested columns: it surfaces them as an explicit skip row (NULL counts) telling the analyst to `unnest` / `to_json` / extract first, rather than reporting bogus rejects.
+`COLUMNS(*)::VARCHAR` flattens a STRUCT / LIST to DuckDB **display** text (`{'city': London}` — inner quotes lost, not valid JSON), which would silently FALSE-reject. Both table macros guard nested columns: `ft_validate` and `ft_profile` surface them as an explicit skip row (NULL counts) telling the analyst to `unnest` / `to_json` / extract first, rather than reporting bogus rejects or profiling display text.
 
 ```
 │ addr │ NULL │ NULL │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before validating │
