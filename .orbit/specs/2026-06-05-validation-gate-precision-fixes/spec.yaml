@@ -1,0 +1,101 @@
+id: 2026-06-05-validation-gate-precision-fixes
+goal: Ship validation-as-veto in the profile path by fixing the format-brittle pattern validations and case-folding enum matching that the corpus-wide false-veto sweep surfaced, so profile checks its own answers against the data without any retraining.
+cards:
+- .orbit/cards/0002-semantic-type-detection.yaml
+status: open
+labels:
+- precision
+- validation-gate
+acceptance_criteria:
+- id: ac-01
+  description: >
+    Fix the five format-brittle pattern validations the false-veto sweep
+    surfaced, widening each ONLY to real-world format variants (never to
+    accept arbitrary input — Precision Principle holds):
+      - datetime.timestamp.mdy_12h: allow optional `:SS`
+        (`06/30/2013 12:00:00 AM` currently rejected).
+      - datetime.timestamp.rfc_3339: accept a colon-less `[+-]\d{4}` offset
+        (`... -0800`) alongside the existing `[+-]\d{2}:\d{2}|Z`.
+      - datetime.time.iso: accept 1-6 fractional digits (`\.\d{1,6}`), not
+        exactly 6 (`00:07:13.580` currently rejected).
+      - datetime.time.hms_24h: allow an optional fractional part
+        (`01:03:29.000`).
+      - datetime.component.year: tolerate an integer-valued float suffix
+        (`1998.0`) — parquet stores integer columns as floats, so `^\d{4}$`
+        wrongly NULLs real year columns.
+    Generators pass (`scripts` taxonomy generators, 100% alignment retained).
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-02
+  description: >
+    Make enum validation matching case-insensitive (Unicode case-fold) in the
+    Rust validator (crates/finetype-core/src/validator.rs CompiledValidator)
+    AND in the eval gate's evaluate() (scripts/apply_ydf_validation_gate.py),
+    so word-enums match regardless of case. Case-folding only ever ADDS
+    matches, so no clean validation regresses. Unit test pins day_of_week
+    (`thursday` -> Thursday) and gender (`male` -> Male). The sweep measured
+    the wins: day_of_week 70%->19% veto, gender 22%->5%, continent 60%->53%.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: >
+    Source the gender enums to reputable standards and add `references:` to
+    both definitions (they are currently self-labelled "illustrative"):
+      - identity.person.gender -> HL7 FHIR AdministrativeGender
+        (male | female | other | unknown).
+      - identity.person.gender_code -> ICAO Doc 9303 passport sex field
+        (M/F/X); align the definition's description (which wrongly claims `O`)
+        to the pattern, and add an ISO/IEC 5218 numeric variant
+        (0 not-known / 1 male / 2 female / 9 not-applicable) for digit-coded
+        columns. Matched case-insensitively per ac-02.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-04
+  description: >
+    Runtime/eval parity — the ac-01/ac-02/ac-03 changes are reflected in the
+    Rust validator's JSON-Schema-export semantics so live `finetype validate`
+    and the eval gate (which mirrors CompiledValidator) agree. A parity test
+    runs a fixed value set through both and asserts identical pass/fail.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-05
+  description: >
+    Re-run the corpus-wide false-veto sweep (this session's agreement-column
+    method over eval/gittables/corpus_pass/columns.parquet) before and after
+    the fixes; record the per-validation veto-rate delta. Target: day_of_week,
+    gender, component.year, and the four datetime timestamp/time patterns each
+    drop below a 10% false-veto rate on agreement columns, and NO
+    previously-clean validation (veto<2%) regresses. Artefact written under
+    output/ (sanitised — no raw corpus values, per secret-scanner risk).
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-06
+  description: >
+    Wire validation-as-veto into the live profile path — profile exposes a
+    per-column validation pass-rate and applies the veto (NULL/flag the
+    predicted type when pass-rate < threshold) mirroring the canonical
+    ydf_prediction_gated semantics. Scope the hard veto to audited-safe labels
+    (the ~40 clean + the ac-01/02/03 fixed set); for the 152 types the sweep
+    could NOT measure (too few agreement columns — the same rare-type
+    starvation as spec 2026-06-04), the pass-rate is surfaced as advisory, not
+    a hard NULL, until measurable. This is the gate-in-profile deliverable and
+    the near-term precision win that needs no retraining.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-07
+  description: >
+    MADR choice record capturing the direction: validation is an ASYMMETRIC
+    signal (reliable NO, unreliable YES — see memory validation-gate-asymmetry),
+    so validation-as-veto ships in profile while value-level YES-disambiguation
+    stays blocked on rare-type training data (spec 2026-06-04 INCONCLUSIVE).
+    Records the case-fold-enums decision and the standards-sourcing decision
+    (FHIR / ICAO 9303 / ISO 5218).
+  gate: false
+  checked: false
+  ac_type: doc
