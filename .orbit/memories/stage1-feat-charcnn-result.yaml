@@ -1,0 +1,21 @@
+key: stage1-feat-charcnn-result
+body: |-
+  Stage 1 result + CORRECTION (2026-06-04): feature-augmented CharCNN = char-cnn-v13-feat (`finetype train --model-type char-cnn --use-features`, 36-dim PER-VALUE shape features from features.rs, 12 epochs, 91.87% train acc).
+
+  Collateral lens (150 gittables files vs v19): utc 1->0, latitude 97->14 (7x drop vs plain CharCNN). Total collateral 14 vs v24 multi-branch 29 and plain CharCNN 98. Categorical footprint rose to 55/1871 (2.94%) — watch, not measured for correctness.
+
+  CORRECTION to charcnn-probe + my "only the header disambiguates latitude/mag" claim — WRONG, Hugh challenged it and data proved him right. mag vs latitude ARE separable by VALUE SHAPE:
+  - Precision: earthquake latitude median 4 decimal places, mag median 1 dp. Distinct.
+  - Range: longitude/depth exceed +/-90; latitude schema caps at 90.
+  The latitude taxonomy def (labels/definitions_geography.yaml ~line 1149) ALREADY encodes validation: minimum -90/maximum 90 + pattern ^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$, with explicit note "Column-mode: if any |value|>90 -> longitude". So the 240-dim JSONSchema column pass-rate vector (validation_features.rs) would separate longitude/depth/place from latitude FOR FREE — Stage 1 never used it (only 36-dim per-value shape).
+
+  THE REAL GAP: the 36 features (features.rs FEATURE_NAMES) have is_float/digit_count/segment_count_dot but NO fractional-precision (decimal-place count) feature and no numeric magnitude/range feature. So feat-CharCNN was blind to the precision signal that separates mag(1dp) from latitude(4dp). For mag specifically, range can't help (mag in [0,7.3] sits inside +/-90) — precision is the ONLY value separator, and we don't extract it.
+
+  Synthetic data note: synthetic latitude has realistic high precision (2-8 dp) but synthetic decimal_number overlaps (0-7 dp), so synthetic alone won't perfectly separate; the discriminator is per-COLUMN precision consistency (real latitude columns uniformly ~4dp), a column-level feature -> favours training the fusion/eval on gittables columns.
+
+  REVISED PLAN (supersedes "header is load-bearing"): before any header fusion, (a) wire in the full 240-dim JSONSchema column vector (free range separation), (b) add a decimal-precision (fractional-digit) feature + maybe per-column precision consistency, then re-run earthquake + collateral lenses. If that closes mag/dmin/errors, the disease is cracked by VALUE FEATURES ALONE — no header, no hints. Header demoted to last resort for genuinely value-signal-free cases (2-letter country codes etc.).
+
+  Hugh's standing position (reinforced this session): he dislikes header HINTS the same as Sharpen rules (see [[sharpen-rules-fail-on-corpus-expansion]], decision 0042 deprecates regex header_hint). Acceptable header use = LEARNED semantic matching: embed column name, match vs embedded taxonomy type signatures (name+description) in Model2Vec space — scale-free, generalises to unseen headers, NO hint table. See [[late-fusion-architecture-plan]] [[charcnn-probe-latitude-cascade]].
+timestamp: 2026-06-04T05:08:53.769735Z
+labels:
+- topology

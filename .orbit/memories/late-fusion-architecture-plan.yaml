@@ -1,0 +1,17 @@
+key: late-fusion-architecture-plan
+body: |-
+  Next architecture test (Hugh's direction, 2026-06-04): a LATE-FUSION value classifier built from three components he trusts, each fast: (1) CharCNN value inference, (2) JSONSchema feature engineering via validation_features.rs, (3) Model2Vec header semantics. These are the SAME signals multi-branch already fuses (char+validation+header of its 5 branches) — the change is fusion TOPOLOGY, not new signals.
+
+  Thesis (from charcnn-probe-latitude-cascade): the v23/v24 entanglement disease lives in multi-branch's deep shared merge trunk (merge_hidden [750,750]) — move one class boundary, all low-cardinality columns move through shared weights. CharCNN's per-value INDEPENDENCE cures that (utc collateral 26->1) but it has no column context (latitude-on-decimals explosion 3->97; mag vs latitude overlap by value, only the HEADER separates them). Late fusion = keep CharCNN independent value logits + bring column context (validation 240-dim + Model2Vec header 128-dim) through a THIN head, not a deep shared trunk. Independence where entanglement hurts; context where blindness hurts.
+
+  Step-zero feasibility CONFIRMED (read-only investigation 2026-06-04): both non-CharCNN encoders are already standalone-callable, no trunk untangling needed.
+  - crates/finetype-model/src/validation_features.rs: ValidationFeatureExtractor::from_type_keys(...).extract(values, taxonomy) -> 240-dim column schema-pass vector, NO multi-branch dependency.
+  - crates/finetype-model/src/model2vec_shared.rs: Model2VecResources loads independently from models/model2vec/, embeds header string -> 128-dim.
+  - Only the learned dense fusion is inside multi_branch.rs's trunk — which we replace, not reuse.
+
+  KEY DESIGN POINT: the fusion head must train on GITTABLES COLUMNS, not synthetic per-value samples — ValidationFeatures needs the whole column, Model2Vec needs the real header. This gives the encoders their required context AND sidesteps the synthetic-vs-gittables confound that limited the CharCNN probe. Freeze the synthetic-trained CharCNN as the value encoder (char patterns are fine); only the thin head learns the column-context combination, from real data.
+
+  Staging: Stage 1 (running/ran) = CharCNN + --use-features (36-dim per-value shape features only, NO header) — predicted to barely move latitude, which proves component 3 (header) is load-bearing not optional. Stage 2 = the three-encoder late-fusion head. Eval lenses: utc-on-integers collateral + latitude-on-decimals collateral + earthquake roundtrip (eval/datasets/csv/earthquakes_2024.csv), vs v19 baseline. Pending: Hugh to choose draft-spec-now vs wait-for-Stage-1-number.
+timestamp: 2026-06-04T03:42:19.249428Z
+labels:
+- topology

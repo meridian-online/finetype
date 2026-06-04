@@ -40,12 +40,16 @@ goal: |
   Pipeline (detail in the acceptance criteria):
     1. Bootstrap a clean prior — value-level YDF on synthetic per-type values.
     2. Score every gittables value out-of-fold (cross-fit; no self-grading).
-    3. Corroboration triad — keep a value when >=2 of {YDF=L high-conf, value
+    3. Survivor census — cheap go/no-go: do latitude and utc survive the floor?
+       HALT and relax the floor if not, before any heavy machinery is built.
+    4. Corroboration triad — keep a value when >=2 of {YDF=L high-conf, value
        passes L's JSON Schema, L == weak column label}; drop off-distribution
        values; flag majority-disagreement columns as distillation label-errors.
-    4. Optional one self-training round.
-    5. Retrain the CharCNN on the cleaned value-level set.
-    6. Apples-to-apples vs v19 on the corpus-pass gated lens.
+    5. Optional one self-training round.
+    6. Retrain the CharCNN on the cleaned value-level set.
+    7. Apples-to-apples vs v19 on the corpus-pass gated lens — plus a
+       dirty-trained CharCNN control cell, scored against a pre-set win
+       condition (closes the confound; doesn't just measure cleaner data).
 
   ## Feature set per value
 
@@ -74,7 +78,7 @@ goal: |
   "direction validated" into "architecture validated, or not". The cost is
   honest: a value-level YDF has no column context, so columns whose identity only
   emerges in aggregate (a categorical of repeated 2-letter codes) are where it is
-  weakest. The ac-06 full-corpus delta therefore ALSO measures the size of the
+  weakest. The ac-07 full-corpus delta therefore ALSO measures the size of the
   job left for the Model2Vec semantic leg — the third component, deferred to a
   later spec.
 
@@ -86,21 +90,21 @@ goal: |
 
   ## Halt conditions
   - If the triad starves many types below a usable per-type floor (gate too
-    strict), RELAX the confidence floor and re-run ac-03 rather than retraining
-    the CharCNN on a starved set (ac-05 must not train on < N cols/type).
+    strict), RELAX the confidence floor and re-run ac-04 rather than retraining
+    the CharCNN on a starved set (ac-06 must not train on < N cols/type).
   - If the label-error (quarantine) rate is implausibly high, STOP and inspect:
     that points to a miscalibrated YDF prior, not a wholesale-wrong distillation.
-  - Leakage firewall is non-negotiable (ac-07). If any cleaned value collides
+  - Leakage firewall is non-negotiable (ac-08). If any cleaned value collides
     with the eval holdout, the run is void.
 
   ## Out of scope
   - The Model2Vec semantic-matching leg (header-to-taxonomy in embedding space).
-    Separate spec; its size is an OUTPUT of ac-06, not an input here.
+    Separate spec; its size is an OUTPUT of ac-07, not an input here.
   - Promoting any model to models/default. This is an architecture experiment;
     promotion is a separate gated decision (v22 precedent).
   - Sharpen-stage rules and the regex header_hint path (decisions 0038/0042/0048).
   - The COLUMN-level YDF lens used by the corpus diagnostic — left untouched so
-    the ac-06 metric stays comparable to prior baselines.
+    the ac-07 metric stays comparable to prior baselines.
   - Changing the multi-branch v19 default. The schema gate already added (commit
     24c8f90) lives only in the per-value path; v19 is unaffected.
 cards:
@@ -138,10 +142,23 @@ acceptance_criteria:
     value from eval/gittables/corpus_pass/columns.parquet, emitting per value:
     ydf_label, ydf_confidence (RF vote fraction), the JSON-Schema pass set, and
     the weak column label. Cross-fitting (OOF) is used so any gittables value
-    later folded into training (ac-04) is never graded by a tree that saw it.
+    later folded into training (ac-05) is never graded by a tree that saw it.
     Output a scored-values parquet under output/value-level-labelling/.
   ac_type: code
 - id: ac-03
+  description: |
+    Survivor census — the cheap go/no-go that runs BEFORE the triad is built.
+    From the ac-02 scored-values parquet, count high-confidence (conf >= floor,
+    default 0.85) survivors per type, with latitude and utc called out
+    explicitly — these are the diseases the head-to-head exists to test. If
+    latitude or utc fall below the usable per-type floor (N values), HALT and
+    relax the floor: do NOT build the triad on a starved type, because a clean
+    filter over a type that isn't there cannot answer the question. Emits a
+    one-table census report and gates ac-04. This is deliberately the lightest
+    AC in the spec — it spends an afternoon to stop the heavy machinery being
+    built on sand.
+  ac_type: code
+- id: ac-04
   description: |
     Corroboration triad implemented and run. For each scored value: KEEP as
     (value, L) when >=2 of {YDF predicts L at conf >= floor; value passes L's
@@ -154,42 +171,57 @@ acceptance_criteria:
     within-column heterogeneity fraction removed. Zero kept rows whose label is
     representation.discrete.categorical trained as a positive target (CLAUDE.md).
   ac_type: code
-- id: ac-04
+- id: ac-05
   description: |
     One self-training round (guarded). Fold the high-confidence KEPT gittables
     values back into the YDF training pool, retrain, re-score once. Report the
     delta in kept-set size and quarantine rate vs the single-pass result. If the
     round does not improve the kept set or worsens the leakage/heterogeneity
     metrics, keep the single-pass set and record why. Skippable without failing
-    the spec if ac-03 already yields a usable set.
-  ac_type: code
-- id: ac-05
-  description: |
-    CharCNN retrained on the cleaned set. Train char-cnn with --use-features
-    (37-dim) on the ac-03 (or ac-04) cleaned NDJSON, same recipe as v14-feat
-    (12 epochs, seed 42), with the column.rs schema gate active. Refuse to train
-    if any type falls below the usable per-type floor (halt condition — relax the
-    floor and re-run ac-03 instead). Model saved to models/char-cnn-v15-gittables.
+    the spec if ac-04 already yields a usable set.
   ac_type: code
 - id: ac-06
   description: |
-    Apples-to-apples head-to-head — the question this spec settles. Run the full
-    corpus-pass gated lens (ydf_prediction_gated) for the cleaned-data CharCNN vs
-    v19 on the SAME corpus. Report BOTH: (a) the latitude/utc collateral
-    footprint — does v14's latitude=0 survive on cleaned REAL data? — and (b)
-    full-corpus cell-2 accuracy vs v19, the net-win check, not just the one
-    disease. State plainly whether the architecture holds and, where it loses,
-    which losses are column-context-dependent types (the Model2Vec gap).
+    CharCNN retrained on the cleaned set. Train char-cnn with --use-features
+    (37-dim) on the ac-04 (or ac-05) cleaned NDJSON, same recipe as v14-feat
+    (12 epochs, seed 42), with the column.rs schema gate active. Refuse to train
+    if any type falls below the usable per-type floor (halt condition — relax the
+    floor and re-run ac-04 instead). Model saved to models/char-cnn-v15-gittables.
+  ac_type: code
+- id: ac-07
+  description: |
+    Apples-to-apples head-to-head — the question this spec settles. Three cells,
+    one corpus, one gated lens (ydf_prediction_gated):
+      (1) cleaned-data CharCNN (ac-06),
+      (2) DIRTY-data CharCNN — same recipe trained on the UN-cleaned gittables
+          blend (skip the triad). This is the confound control: without it a
+          CharCNN win reads as "clean data won"; with it the win reads "the
+          METHOD won, on the same messy data v19 had".
+      (3) v19 multi-branch baseline.
+    Report BOTH: (a) the latitude/utc collateral footprint — does v14's
+    latitude=0 survive on cleaned REAL data? — and (b) full-corpus cell-2
+    accuracy vs v19, the net-win check, not just the one disease.
+
+    WIN CONDITION — decide the verdict against this bar, set BEFORE the run, do
+    not rationalise it after:
+      - latitude at/near 0 on cleaned data AND net cell-2 does not regress vs
+        v19  ->  architecture VALIDATED (clean win).
+      - latitude survives but cell-2 dips ONLY on column-context-dependent types
+        ->  VALIDATED, with the Model2Vec gap quantified (the expected outcome).
+      - latitude collateral returns once trained on real data  ->  NO-GO; v14
+        was a synthetic-data artefact, not an architecture.
+    State plainly which bar the result hits, and which losses are
+    column-context-dependent types (the size of the deferred Model2Vec job).
   ac_type: observation
   gate: true
-- id: ac-07
+- id: ac-08
   description: |
     Leakage audit clean. Confirm zero overlap between the cleaned training set
     and the eval holdout via the row_hash(header,value) firewall against
     eval/row_hashes.tsv and the file_content_sha256 MOD 2 partition, mirroring
     the existing extractor's ac-02 leakage report. Any overlap voids the run.
   ac_type: observation
-- id: ac-08
+- id: ac-09
   description: |
     Decision memo written: is the architecture validated? Records whether v14's
     result held on cleaned data, the measured cost in column-context-dependent

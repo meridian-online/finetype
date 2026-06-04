@@ -1,0 +1,16 @@
+key: charcnn-probe-latitude-cascade
+body: |-
+  CharCNN quick-probe verdict (char-cnn-v13-probe, 240-type, synthetic-trained, 12 epochs, 87.1% train acc): it does NOT escape the cascade — it trades v24's utc-on-integers collateral for a WORSE latitude-on-decimals collateral.
+
+  Collateral lens (150 gittables files, vs v19): NEW utc collateral 26→1 (CharCNN nearly eliminates it), but NEW latitude collateral 3→97. Of 98 total CharCNN latitude predictions, ~all are collateral, all flipped from v19 decimal_number. Examples: NBA percentage stats (NET_RATING, AST_PCT, REB_PCT, TS_PCT...) — decimals in ~[-90,90] that value-by-value look exactly like coordinates.
+
+  Earthquake round-trip confirms structurally: CharCNN mislabels 7 of ~10 decimal columns (depth->longitude, mag/dmin/rms/horizontalError/depthError/magError -> latitude), plus status(reviewed/automatic)->month_name, net(us/ci)->boolean.initials. v19 on the same file keeps EVERY decimal as decimal_number (depth, mag, dmin, rms, *Error all correct) because its stats+header branches see the column distribution; v19's only errors are the genuine value-ambiguity codes (net/magType/status as TLD/measurement_unit).
+
+  Mechanism: CharCNN's per-value voting kills boundary-entanglement (the v23/v24 disease) but has NO column/header context, so any decimal in coordinate range votes latitude. The structural prediction held — context-free voting can't resolve what needs column context.
+
+  CONFOUND (do not over-read): CharCNN trained on SYNTHETIC per-type data, v19 on gittables. The synthetic latitude generator likely emits clean in-range decimals with no "decimal-but-not-a-coordinate" negatives, so CharCNN never learned the boundary. A gittables-trained CharCNN (the decisive option-B same-data test) might narrow the latitude gap — but the no-header-context ceiling stands regardless. This probe shows the limitation is real and product-fatal on the decimal/coordinate boundary; it does NOT settle the same-data cascade question.
+
+  Plumbing notes for re-runs: scripts/train.sh is stale — it calls bare `finetype train`, which since ~Mar 2026 errors "use train-multi-branch". Train CharCNN via `finetype train --model-type char-cnn`. Profile CharCNN via `finetype profile --model-type char-cnn` (default profile path is multi-branch-only, looks for config.json; CharCNN writes config.yaml/labels.json and falls through to the embedded-model error without the flag). Eval harness: /tmp/charcnn_eval.py.
+timestamp: 2026-06-04T03:09:08.916568Z
+labels:
+- topology
