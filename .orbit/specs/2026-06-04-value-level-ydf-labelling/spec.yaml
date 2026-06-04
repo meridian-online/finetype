@@ -109,7 +109,7 @@ goal: |
     24c8f90) lives only in the per-value path; v19 is unaffected.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - labelling
 - ydf
@@ -242,3 +242,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-04T21:34:37.94307Z

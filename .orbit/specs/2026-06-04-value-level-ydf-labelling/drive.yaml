@@ -2,9 +2,9 @@ spec_id: 2026-06-04-value-level-ydf-labelling
 card_path: /Users/hugh/github/meridian-online/finetype/.orbit/cards/0002-semantic-type-detection.yaml
 autonomy: guided
 iteration: 1
-stage: review-pr
+stage: complete
 review_spec_cycle: 0
 review_spec_date: 2026-06-04
 review_pr_cycle: 0
-review_pr_date: null
+review_pr_date: 2026-06-05
 iteration_history: []

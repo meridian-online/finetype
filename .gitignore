@@ -209,6 +209,14 @@ homebrew-tap/
 
 # Model directories (large binary artifacts)
 models/tiered-v2/
+# Experimental CharCNN value-level models (spec 2026-06-04, INCONCLUSIVE).
+# Regenerable from scripts/value_ydf/; manifest.json escapes the models/**
+# binary patterns, so exclude the whole dirs.
+models/char-cnn-v13-feat/
+models/char-cnn-v13-probe/
+models/char-cnn-v14-feat/
+models/char-cnn-v15-dirty/
+models/char-cnn-v15-gittables/
 
 # RunPod (credentials, ephemeral config)
 .runpod_ssh.env
