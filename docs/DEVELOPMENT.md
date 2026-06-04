@@ -120,7 +120,7 @@ cargo run -p finetype-build-tools --bin append-duckdb-metadata -- \
     -o target/release/finetype.duckdb_extension \
     -p osx_arm64 \
     --duckdb-version v1.2.0 \
-    --extension-version 0.6.22 \
+    --extension-version 0.6.23 \
     --abi-type C_STRUCT
 ```
 
@@ -230,7 +230,7 @@ SELECT ft_validate_text('not-an-email',
 │ addr │ NULL │ NULL │ nested STRUCT(city VARCHAR) column — unnest / to_json / extract before validating │
 ```
 
-> The community `description.yml` (`extended_description` / `hello_world`) still teaches the v0.6.22 per-value scalars; it gains the `ft_` surface at the next community publish, once these verbs ship in a release. Until then this section is the canonical teaching for the SQL surface.
+> The community `description.yml` (`extended_description` / `hello_world`) teaches the `ft_` profile → schema → validate surface as of the v0.6.23 republish; the un-prefixed scalars (`finetype`, `finetype_validate`, …) remain registered as aliases for one release so a v0.6.22 install keeps working.
 
 ## Related Repositories
 
@@ -239,14 +239,14 @@ SELECT ft_validate_text('not-an-email',
 
 ---
 
-## CLI Surface (v0.6.22)
+## CLI Surface (v0.6.23)
 
 `finetype --help` lists **only the 5 public commands**. Hidden subcommands stay callable for internal use (CI, training data prep, sweep wrappers, eval scripts) but never appear in the help surface — they're not part of the stable contract and may move or change shape between minor versions without a deprecation cycle.
 
 ```
 | Tier            | Commands                                                       |
 |-----------------|----------------------------------------------------------------|
-| Public (v0.6.22)| `infer`, `profile`, `validate`, `mcp`, `taxonomy`              |
+| Public (v0.6.23)| `infer`, `profile`, `validate`, `mcp`, `taxonomy`              |
 | Internal (hidden)| `check`, `generate`, `train`, `train-multi-branch`*,          |
 |                  | `eval`, `infer-batch`                                         |
 ```
@@ -292,7 +292,7 @@ Three env vars exist — each is read by exactly one consumer. Do not conflate.
 
 CLI/MCP/DuckDB/eval code does NOT read `FINETYPE_CI_MODEL`. The runtime default remains `models/default` for every non-CI consumer.
 
-## Build & Test (v0.6.22)
+## Build & Test (v0.6.23)
 
 ```bash
 make setup              # Install git hooks (first time)

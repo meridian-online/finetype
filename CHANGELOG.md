@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.23] - 2026-06-04
+
+### Added
+
+- **DuckDB extension gains a `profile → schema → validate` table surface
+  (spec `2026-06-03-duckdb-extension-table-verbs`, amends choice 0064).**
+  The extension was six per-value scalars with no table verb — validating
+  a loaded table meant hand-writing an `UNPIVOT` + `json_keys` join. It now
+  ships an `ft_`-prefixed surface that mirrors the CLI:
+  - `ft_profile(table)` — one row per column with its detected type,
+    confidence, and recommended DuckDB type. A SQL **table macro**, so it
+    reads a catalog table by name (the path the Rust `BindInfo` catalog
+    wall blocked — choice 0064 is amended to record that macros reach
+    table verbs even though Rust table functions remain walled).
+  - `ft_validate(table, schema)` — answers "is this table valid?" against a
+    JSON Schema, returning per-column `total` / `rejects` / `sample_message`.
+    The one `schema` argument auto-detects an inline JSON literal, a
+    `getvariable` value, or a file path in a single argument.
+  - `ft_infer(value)`, `ft_validate_text(value, schema)`,
+    `ft_profile(list(col))` — scalar probes; `ft_detail` / `ft_cast` /
+    `ft_unpack` / `ft_version` utilities.
+  Because the model is column-oriented, `ft_profile` over a row sample is
+  the *accurate* path, not sugar over the single-value `ft_infer`.
+  **Nested-column guard (Precision Principle):** `COLUMNS(*)::VARCHAR`
+  flattens STRUCT/LIST to display text that is not valid JSON; rather than
+  silently FALSE-rejecting it, the table verbs surface the column with a
+  message to unnest / `to_json` / extract first. Verified end to end on
+  DuckDB 1.5.3.
+
+### Changed
+
+- **`ft_` is the taught surface; the un-prefixed scalars stay as aliases
+  for one release.** `finetype()`, `finetype_validate()`, etc. still
+  resolve so a v0.6.22 community install does not break, but docs and the
+  community `description.yml` now teach the `ft_` names.
+
 ## [0.6.22] - 2026-06-03
 
 > 0.6.21 was tagged but shipped no artifacts — all five release builds
