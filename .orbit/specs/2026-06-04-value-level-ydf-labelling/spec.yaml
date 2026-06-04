@@ -147,7 +147,7 @@ acceptance_criteria:
     later folded into training (ac-05) is never graded by a tree that saw it.
     Output a scored-values parquet under output/value-level-labelling/.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     Survivor census — the cheap go/no-go that runs BEFORE the triad is built.
@@ -161,7 +161,7 @@ acceptance_criteria:
     AC in the spec — it spends an afternoon to stop the heavy machinery being
     built on sand.
   gate: false
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     Corroboration triad implemented and run. For each scored value: KEEP as
@@ -175,7 +175,7 @@ acceptance_criteria:
     within-column heterogeneity fraction removed. Zero kept rows whose label is
     representation.discrete.categorical trained as a positive target (CLAUDE.md).
   gate: false
-  checked: false
+  checked: true
 - id: ac-05
   description: |
     One self-training round (guarded). Fold the high-confidence KEPT gittables
@@ -185,7 +185,7 @@ acceptance_criteria:
     metrics, keep the single-pass set and record why. Skippable without failing
     the spec if ac-04 already yields a usable set.
   gate: false
-  checked: false
+  checked: true
 - id: ac-06
   description: |
     CharCNN retrained on the cleaned set. Train char-cnn with --use-features
@@ -194,7 +194,7 @@ acceptance_criteria:
     if any type falls below the usable per-type floor (halt condition — relax the
     floor and re-run ac-04 instead). Model saved to models/char-cnn-v15-gittables.
   gate: false
-  checked: false
+  checked: true
 - id: ac-07
   description: |
     Apples-to-apples head-to-head — the question this spec settles. Three cells,
@@ -220,7 +220,7 @@ acceptance_criteria:
     State plainly which bar the result hits, and which losses are
     column-context-dependent types (the size of the deferred Model2Vec job).
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-08
   description: |
@@ -229,7 +229,7 @@ acceptance_criteria:
     eval/row_hashes.tsv and the file_content_sha256 MOD 2 partition, mirroring
     the existing extractor's ac-02 leakage report. Any overlap voids the run.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-09
   description: |
@@ -240,5 +240,5 @@ acceptance_criteria:
     and the go/no-go on drafting the late-fusion spec. Substrate:
     output/value-level-labelling/decision_memo.md.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc

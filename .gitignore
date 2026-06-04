@@ -46,6 +46,14 @@ eval/gittables/models/training_rows_manifest.tsv
 eval/gittables/models/ydf_value/
 eval/gittables/models/ydf_value_manifest.txt
 output/value-level-labelling/synthetic_features.csv
+# Large/real-value intermediates — regenerable from scripts/value_ydf/
+# (ac02 scoring, ac04 triad). The *.parquet carry real gittables sample
+# values (secret-scanner false-positive risk, as with the corpus parquets);
+# quarantine_label_errors.csv likewise. Reports + memo under the same dir
+# ARE tracked. *.ndjson is already covered by the global rule below.
+output/value-level-labelling/scored_values.parquet
+output/value-level-labelling/kept_rows.parquet
+output/value-level-labelling/quarantine_label_errors.csv
 
 # DBpedia annotations parquet (~96 MB) — regenerable from
 # scripts/extract_dbpedia_annotations.py against corpus_paths.txt.

@@ -1,0 +1,9 @@
+{
+  "scored_rows": 25609271,
+  "unique_values": 2701085,
+  "rowgroups": 7,
+  "model": "eval/gittables/models/ydf_value",
+  "oof": "synthetic-only prior; gittables scoring is OOF by construction (cross-fit folds deferred to ac-05)",
+  "weak_label_source": "ydf_prediction",
+  "output": "output/value-level-labelling/scored_values.parquet"
+}

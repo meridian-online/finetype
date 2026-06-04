@@ -22,9 +22,16 @@ EXTRACT_BIN = REPO / "target" / "release" / "extract_value_features"
 FINETYPE_BIN = REPO / "target" / "release" / "finetype"
 MODELS_DIR = REPO / "eval" / "gittables" / "models"
 OUT_DIR = REPO / "output" / "value-level-labelling"
+CORPUS_PARQUET = REPO / "eval" / "gittables" / "corpus_pass" / "columns.parquet"
+YDF_VALUE_MODEL = MODELS_DIR / "ydf_value"
 
 # Columns the exporter prepends before the 277 feature columns.
 META_COLS = ["classification", "text"]
+# The column-level YDF call doubles as the weak column label (the unverified
+# distillation we audit); it is independent of the multi-branch model the gate
+# cleans data for, so it does not leak the target model into the gate.
+WEAK_LABEL_COL = "ydf_prediction"
+SCHEMA_PREFIX = "schema_pass:"
 
 
 def eval_value_set(manifest: Path = EVAL_MANIFEST) -> set[str]:
@@ -67,3 +74,29 @@ def export_features(ndjson: Path, out_csv: Path, manifest_out: Path | None = Non
 def feature_columns(columns) -> list[str]:
     """The 277 feature column names (everything after the meta columns)."""
     return [c for c in columns if c not in META_COLS]
+
+
+def schema_columns(columns) -> list[str]:
+    """The 240 JSON-Schema pass-rate columns (the per-value precision vector)."""
+    return [c for c in columns if c.startswith(SCHEMA_PREFIX)]
+
+
+def extract_value_features_df(values, workdir: Path):
+    """Export the 277-dim contract for `values` via the ac-00 Rust bin.
+
+    Writes a headerless-NDJSON ({"text": v}) and reads the CSV back as a
+    DataFrame whose row order matches `values`. Used by the gittables scorer to
+    featurise a batch of de-duplicated values in one bin invocation.
+    """
+    import json
+
+    import pandas as pd
+
+    ndjson = workdir / "_score_values.ndjson"
+    out_csv = workdir / "_score_values.csv"
+    with open(ndjson, "w", encoding="utf-8") as fh:
+        for v in values:
+            fh.write(json.dumps({"text": v}) + "\n")
+    export_features(ndjson, out_csv)
+    df = pd.read_csv(out_csv, dtype={"classification": str, "text": str}, keep_default_na=False)
+    return df

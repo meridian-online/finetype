@@ -1,0 +1,32 @@
+{
+  "n_cols_profiled": 1871,
+  "cells": {
+    "v19": {
+      "utc_footprint": 10,
+      "lat_footprint": 1,
+      "cat_footprint": 15
+    },
+    "clean_v15": {
+      "utc_footprint": 1,
+      "lat_footprint": 0,
+      "cat_footprint": 17,
+      "utc_collateral": 1,
+      "lat_collateral": 0,
+      "cols_compared_with_v19": 1870,
+      "agree_with_v19": 709,
+      "agreement_rate": 0.3791,
+      "disagree_non_disease": 1160
+    },
+    "dirty_v15": {
+      "utc_footprint": 1,
+      "lat_footprint": 0,
+      "cat_footprint": 8,
+      "utc_collateral": 1,
+      "lat_collateral": 0,
+      "cols_compared_with_v19": 1870,
+      "agree_with_v19": 922,
+      "agreement_rate": 0.493,
+      "disagree_non_disease": 947
+    }
+  }
+}

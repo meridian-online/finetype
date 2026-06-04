@@ -1,0 +1,13 @@
+{
+  "floor": 0.85,
+  "per_type_floor": 50,
+  "scored_rows": 25609271,
+  "survivor_rows": 3337324,
+  "survivor_fraction": 0.1303,
+  "types_with_survivors": 172,
+  "disease_survivors": {
+    "geography.coordinate.latitude": 2488,
+    "datetime.offset.utc": 0
+  },
+  "halt": true
+}

@@ -1,0 +1,14 @@
+{
+  "floor": 0.85,
+  "scored_rows": 25609271,
+  "kept_rows": 17967246,
+  "dropped_rows": 7447260,
+  "flagged_rows": 194765,
+  "flagged_columns": 30100,
+  "kept_types": 159,
+  "kept_distinct_values": 1982493,
+  "within_column_heterogeneity_removed": 0.0089,
+  "categorical_positive_targets": 0,
+  "leakage_collisions_removed": 202099,
+  "lat_kept_distinct": 10
+}

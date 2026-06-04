@@ -1,0 +1,10 @@
+{
+  "kept_rows": 17967246,
+  "eval_hashes_loaded": 349665,
+  "row_hash_collisions": 0,
+  "partition_counts": {
+    "1": 17967246
+  },
+  "off_partition_rows": 0,
+  "verdict": "CLEAN"
+}
