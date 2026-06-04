@@ -25,6 +25,7 @@ pub mod tiered;
 pub mod tiered_training;
 pub mod training;
 pub mod validation_features;
+pub mod value_features;
 
 pub use char_cnn::{CharCnn, CharCnnConfig, CharVocab, HeadType, HierarchicalHead, HierarchyMap};
 pub use char_distribution::{extract_char_distribution, CHAR_DIST_DIM, CHAR_DIST_NAMES};
@@ -50,3 +51,4 @@ pub use tiered::{TierTiming, TieredClassifier};
 pub use tiered_training::{TieredTrainer, TieredTrainingConfig, TieredTrainingReport};
 pub use training::{Trainer, TrainingConfig, TrainingError};
 pub use validation_features::ValidationFeatureExtractor;
+pub use value_features::{value_feature_dim, value_feature_names, value_feature_row};

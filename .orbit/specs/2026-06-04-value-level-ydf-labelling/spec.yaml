@@ -126,7 +126,8 @@ acceptance_criteria:
     a golden test pins the vector for a handful of known values (a 4dp latitude,
     a 1dp magnitude, a 2-letter code) so the feature contract cannot drift
     silently between training and scoring.
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-01
   description: |
     Bootstrap prior trained. A value-level YDF (RandomForest) trains on synthetic
@@ -135,7 +136,8 @@ acceptance_criteria:
     eval/row_hashes.tsv (exclude collisions). Model + feature manifest saved
     under eval/gittables/models/ydf_value.*; report records per-type support and
     held-out accuracy on synthetic data.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Gittables scored out-of-fold. The prior scores every non-trivial gittables
@@ -144,7 +146,8 @@ acceptance_criteria:
     the weak column label. Cross-fitting (OOF) is used so any gittables value
     later folded into training (ac-05) is never graded by a tree that saw it.
     Output a scored-values parquet under output/value-level-labelling/.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Survivor census — the cheap go/no-go that runs BEFORE the triad is built.
@@ -157,7 +160,8 @@ acceptance_criteria:
     one-table census report and gates ac-04. This is deliberately the lightest
     AC in the spec — it spends an afternoon to stop the heavy machinery being
     built on sand.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Corroboration triad implemented and run. For each scored value: KEEP as
@@ -170,7 +174,8 @@ acceptance_criteria:
     report. Report: kept/dropped/flagged counts, per-type kept volume, and the
     within-column heterogeneity fraction removed. Zero kept rows whose label is
     representation.discrete.categorical trained as a positive target (CLAUDE.md).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     One self-training round (guarded). Fold the high-confidence KEPT gittables
@@ -179,7 +184,8 @@ acceptance_criteria:
     round does not improve the kept set or worsens the leakage/heterogeneity
     metrics, keep the single-pass set and record why. Skippable without failing
     the spec if ac-04 already yields a usable set.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     CharCNN retrained on the cleaned set. Train char-cnn with --use-features
@@ -187,7 +193,8 @@ acceptance_criteria:
     (12 epochs, seed 42), with the column.rs schema gate active. Refuse to train
     if any type falls below the usable per-type floor (halt condition — relax the
     floor and re-run ac-04 instead). Model saved to models/char-cnn-v15-gittables.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Apples-to-apples head-to-head — the question this spec settles. Three cells,
@@ -212,14 +219,17 @@ acceptance_criteria:
         was a synthetic-data artefact, not an architecture.
     State plainly which bar the result hits, and which losses are
     column-context-dependent types (the size of the deferred Model2Vec job).
-  ac_type: observation
   gate: true
+  checked: false
+  ac_type: observation
 - id: ac-08
   description: |
     Leakage audit clean. Confirm zero overlap between the cleaned training set
     and the eval holdout via the row_hash(header,value) firewall against
     eval/row_hashes.tsv and the file_content_sha256 MOD 2 partition, mirroring
     the existing extractor's ac-02 leakage report. Any overlap voids the run.
+  gate: false
+  checked: false
   ac_type: observation
 - id: ac-09
   description: |
@@ -229,4 +239,6 @@ acceptance_criteria:
     error rate (and whether it justifies moving from quarantine to auto-relabel),
     and the go/no-go on drafting the late-fusion spec. Substrate:
     output/value-level-labelling/decision_memo.md.
+  gate: false
+  checked: false
   ac_type: doc
