@@ -660,12 +660,8 @@ impl VScalar for FineTypeProfile {
         let mut ddb_child = struct_vec.child(2, len);
 
         for i in 0..len {
-            let values = column_fn::read_list_varchar_capped(
-                input,
-                0,
-                i,
-                column_fn::PROFILE_SAMPLE_CAP,
-            );
+            let values =
+                column_fn::read_list_varchar_capped(input, 0, i, column_fn::PROFILE_SAMPLE_CAP);
 
             let result = match values {
                 None => {
