@@ -798,6 +798,17 @@ impl ColumnClassifier {
         result.column_features = Some(column_features.clone());
         feature_disambiguate(&mut result, &column_features, &votes, n_samples);
 
+        // Step 5c: Column schema-validation gate (Precision Principle).
+        // A per-value classifier (CharCNN) has no column context, so it can
+        // confidently emit a type whose schema the column's values violate —
+        // e.g. decimal magnitude → latitude, where longitude/depth values exceed
+        // the ±90 latitude range. Unlike attractor demotion (Step 4), this gate
+        // applies to ANY predicted label: if most values fail the predicted
+        // type's JSON Schema, the prediction is not supported by the data.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            schema_validation_gate(&mut result, &sample, &votes, taxonomy);
+        }
+
         // Step 6: Post-hoc locale detection via validation patterns (NNFT-140).
         // When taxonomy is available, run sample values against validation_by_locale
         // patterns to detect the most likely locale. This takes priority over any
@@ -5102,6 +5113,85 @@ fn disambiguate_attractor_demotion(
 /// Priority:
 /// 1. Use an existing representation.* type from the vote distribution
 /// 2. Default: numeric → integer/decimal, text → categorical, code → alphanumeric_id
+/// Column schema-validation gate (Precision Principle, NNFT-272).
+///
+/// Computes the column's pass-rate against the predicted type's JSON Schema
+/// validator. When >50% of non-empty values fail, the prediction is not
+/// supported by the data — demote to the strongest alternative that *does*
+/// validate, else to a representation.* fallback chosen by value shape.
+///
+/// This generalises Signal 1 of [`disambiguate_attractor_demotion`] beyond the
+/// attractor lists: a per-value classifier can over-emit any type whose schema
+/// the column violates (notably `geography.coordinate.latitude` on decimal
+/// columns where longitude/depth values exceed ±90). Locale-specific types are
+/// skipped — their real validation lives in `validation_by_locale`, and a
+/// permissive universal pattern is not evidence either way (NNFT-132).
+///
+/// Runs AFTER feature disambiguation and BEFORE locale detection, so a demoted
+/// label can still pick up a locale on the fallback type if applicable.
+fn schema_validation_gate(
+    result: &mut ColumnResult,
+    values: &[String],
+    votes: &[(String, usize)],
+    taxonomy: &Taxonomy,
+) {
+    // Already a generic representation.* type — nothing stricter to fail against.
+    if result.label.starts_with("representation.") {
+        return;
+    }
+    // Locale-specific types validate through validation_by_locale, not the
+    // universal pattern — skip to avoid demoting on a permissive universal.
+    if taxonomy.get_locale_validators(&result.label).is_some() {
+        return;
+    }
+    let Some(validator) = taxonomy.get_validator(&result.label) else {
+        return;
+    };
+
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+    if non_empty.len() < 3 {
+        return;
+    }
+
+    let fail_count = non_empty.iter().filter(|v| !validator.is_valid(v)).count();
+    let fail_rate = fail_count as f32 / non_empty.len() as f32;
+    if fail_rate <= 0.5 {
+        return;
+    }
+
+    // Prefer the strongest alternative vote that validates against its own schema.
+    let demoted = votes
+        .iter()
+        .find(|(label, _)| {
+            label != &result.label
+                && taxonomy
+                    .get_validator(label)
+                    .map(|alt| {
+                        let pass = non_empty.iter().filter(|v| alt.is_valid(v)).count();
+                        pass as f32 / non_empty.len() as f32 > 0.5
+                    })
+                    .unwrap_or(false)
+        })
+        .map(|(label, _)| label.clone())
+        .unwrap_or_else(|| {
+            let is_numeric = non_empty.iter().all(|v| v.parse::<f64>().is_ok());
+            select_fallback(votes, is_numeric, !is_numeric, false, values)
+        });
+
+    if demoted != result.label {
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("schema_validation_gate:{}", result.label));
+        result.label = demoted;
+        result.confidence = result.confidence.min(0.6);
+        result.detected_locale = None;
+    }
+}
+
 fn select_fallback(
     votes: &[(String, usize)],
     is_numeric: bool,

@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 
 /// Total number of features in the feature vector.
-pub const FEATURE_DIM: usize = 36;
+pub const FEATURE_DIM: usize = 37;
 
 /// Human-readable names for each feature index, for interpretability and debugging.
 pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
@@ -57,6 +57,8 @@ pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
     // Tier 5 — Semantic binary features (NNFT-270)
     "has_negative_prefix", // 34 — starts with '-' followed by digit (negative number)
     "has_percent",         // 35 — contains '%' character
+    // Tier 6 — Numeric precision (NNFT-272)
+    "decimal_places", // 36 — count of fractional digits (latitude 4dp vs magnitude 1dp)
 ];
 
 /// Extract a fixed-size feature vector from a string value.
@@ -280,7 +282,34 @@ pub fn extract_features(value: &str) -> [f32; FEATURE_DIM] {
     // Supports percentage detection and future percentage rules.
     f[35] = if value.contains('%') { 1.0 } else { 0.0 };
 
+    // ─── Tier 6: Numeric precision (NNFT-272) ────────────────────────
+    // 36: decimal_places — count of fractional digits for a numeric value.
+    // Separates types that share a magnitude but differ in measured precision:
+    // geographic latitude is reported to ~4dp ("35.6895"), seismic magnitude
+    // to ~1dp ("4.5"). 0 for integers and non-numeric values.
+    f[36] = fractional_digit_count(value) as f32;
+
     f
+}
+
+/// Count the fractional digits of a numeric value (digits after the decimal
+/// point, excluding any exponent). Returns 0 for integers, non-numeric input,
+/// or values without a fractional part.
+fn fractional_digit_count(value: &str) -> u32 {
+    if value.parse::<f64>().is_err() {
+        return 0;
+    }
+    match value.split_once('.') {
+        Some((_, frac)) => {
+            // Drop a scientific-notation exponent if present.
+            let frac = frac
+                .split(['e', 'E'])
+                .next()
+                .unwrap_or(frac);
+            frac.chars().filter(|c| c.is_ascii_digit()).count() as u32
+        }
+        None => 0,
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
