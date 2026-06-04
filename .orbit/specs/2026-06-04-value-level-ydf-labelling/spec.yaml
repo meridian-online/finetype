@@ -137,7 +137,7 @@ acceptance_criteria:
     under eval/gittables/models/ydf_value.*; report records per-type support and
     held-out accuracy on synthetic data.
   gate: false
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     Gittables scored out-of-fold. The prior scores every non-trivial gittables

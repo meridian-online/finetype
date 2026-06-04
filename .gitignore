@@ -40,6 +40,13 @@ models/*.md
 eval/gittables/models/ydf.bin/
 eval/gittables/models/training_rows_manifest.tsv
 
+# Value-level YDF prior (spec 2026-06-04) — ~780 MB model dir + regenerable
+# manifest/CSV, all rebuilt by scripts/value_ydf/ac01_train_prior.py. The
+# pinned feature contract lives in output/value-level-labelling/.
+eval/gittables/models/ydf_value/
+eval/gittables/models/ydf_value_manifest.txt
+output/value-level-labelling/synthetic_features.csv
+
 # DBpedia annotations parquet (~96 MB) — regenerable from
 # scripts/extract_dbpedia_annotations.py against corpus_paths.txt.
 eval/gittables/corpus_pass/dbpedia_annotations.parquet
