@@ -2939,21 +2939,29 @@ fn value_sharpen(
         }
     }
 
-    // Rule 32: Closed-set over-emit demotion (earthquake-roundtrip-precision ac-03).
-    // The sibling-context head over-confidently emits two narrow types onto
-    // free-form code/id columns: measurement_unit (a closed enum of SI units) onto
-    // short network codes, and geohash (a base32 pattern) onto event ids. Demote —
-    // value-based, gated on the column's own schema-validation fail-rate (>50%, see
-    // schema_fail_demotion) — to a representation.* fallback. The network codes are
-    // 100% non-units so they demote; the event ids fail only ~28% (most coincidentally
-    // satisfy base32) so the >50% bar leaves them as geohash, which is the deliberate
-    // cost of not regressing real short-geohash detection (the v13 min-length trade-off
-    // — author's call, see the spec diagnosis). Scoped to these two labels only, so
-    // unlike the attractor lists (which also arm cardinality/confidence signals) it
-    // cannot regress unrelated columns. Last-resort value-based Sharpen (decisions
-    // 0038/0048).
+    // Rule 32: Closed-set over-emit demotion (earthquake-roundtrip-precision ac-03;
+    // utc/url widening per v24 relitigation memo).
+    // The Sense stage over-confidently emits narrow, pattern-bound types onto
+    // free-form code/id/numeric columns. Four such labels are in scope:
+    //   - measurement_unit (closed SI-unit enum) onto short network codes
+    //   - geohash (base32 pattern) onto event ids
+    //   - datetime.offset.utc (`^UTC [+-]\d{2}:\d{2}$`) onto plain integers
+    //   - technology.internet.url (scheme://… pattern) onto bare ids/codes
+    // Demote — value-based, gated on the column's own schema-validation fail-rate
+    // (>50%, see schema_fail_demotion) — to a representation.* fallback. utc and url
+    // are added because their over-emits are schema-contradicted: the offending
+    // columns fail the label's own validator ~100% (an integer is never `UTC +HH:MM`;
+    // a bare code is never a URL), so the >50% bar fires cleanly while genuine
+    // utc/url columns (which validate ~100%) are untouched. This is the additive
+    // hard-negative retrain's job done with a value-based rule instead — see the v24
+    // memo: retrain was 0-for-2 and moved the over-emit rather than removing it.
+    // Scoped to these four labels only, so unlike the attractor lists (which also arm
+    // cardinality/confidence signals) it cannot regress unrelated columns. Last-resort
+    // value-based Sharpen (decisions 0038/0048).
     if result_label == "representation.scientific.measurement_unit"
         || result_label == "geography.coordinate.geohash"
+        || result_label == "datetime.offset.utc"
+        || result_label == "technology.internet.url"
     {
         if let Some(taxonomy) = taxonomy {
             if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
@@ -7798,6 +7806,120 @@ representation.scientific.measurement_unit:
         assert!(
             result.is_none(),
             "real SI-unit values must not be demoted off measurement_unit"
+        );
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_utc_integers_to_categorical() {
+        // Plain integers the Sense stage over-emits as datetime.offset.utc. None
+        // matches the `UTC +HH:MM` pattern → 100% fail → demote (low cardinality →
+        // categorical). This is the corpus utc over-emit the v24 retrain made worse.
+        let values: Vec<String> = vec!["5", "100", "23", "5", "100", "7", "23", "5"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let yaml = r#"
+datetime.offset.utc:
+  title: "UTC Offset"
+  validation:
+    type: string
+    pattern: "^UTC [+-]\\d{2}:\\d{2}$"
+  tier: [VARCHAR, datetime, offset]
+  release_priority: 4
+  samples: ["UTC +05:00"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "datetime.offset.utc", 0.9, Some(&taxonomy));
+        let (label, rule) = result.expect("integers should demote off datetime.offset.utc");
+        assert_eq!(label, "representation.discrete.categorical");
+        assert!(rule.starts_with("schema_fail_demotion:"));
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_keeps_real_utc() {
+        // A genuine UTC-offset column (all values match the pattern) must NOT be
+        // demoted — the regression guard for widening the allowlist to utc.
+        let values: Vec<String> = vec![
+            "UTC +05:00",
+            "UTC -08:00",
+            "UTC +00:00",
+            "UTC +05:30",
+            "UTC -03:00",
+            "UTC +09:00",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let yaml = r#"
+datetime.offset.utc:
+  title: "UTC Offset"
+  validation:
+    type: string
+    pattern: "^UTC [+-]\\d{2}:\\d{2}$"
+  tier: [VARCHAR, datetime, offset]
+  release_priority: 4
+  samples: ["UTC +05:00"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "datetime.offset.utc", 0.9, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "real UTC-offset values must not be demoted off datetime.offset.utc"
+        );
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_url_codes_to_alphanumeric_id() {
+        // Bare ids/codes the Sense stage over-emits as technology.internet.url. None
+        // has a scheme:// → 100% fail → demote (high cardinality → alphanumeric_id).
+        let values: Vec<String> = (0..30).map(|i| format!("ABC{:05}", i)).collect();
+        let yaml = r#"
+technology.internet.url:
+  title: "URL"
+  validation:
+    type: string
+    pattern: "^(?:https?|ftp|file)://[^\\s]+$"
+  tier: [VARCHAR, technology, internet]
+  release_priority: 4
+  samples: ["https://example.com"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "technology.internet.url", 0.9, Some(&taxonomy));
+        let (label, rule) = result.expect("bare codes should demote off technology.internet.url");
+        assert_eq!(label, "representation.identifier.alphanumeric_id");
+        assert!(rule.starts_with("schema_fail_demotion:"));
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_keeps_real_url() {
+        // A genuine URL column (all values have a valid scheme://) must NOT be
+        // demoted — the regression guard for widening the allowlist to url.
+        let values: Vec<String> = vec![
+            "https://example.com",
+            "http://foo.org/path",
+            "https://a.b.c/x?y=1",
+            "ftp://files.example.com",
+            "https://news.site/article",
+            "http://localhost:8080",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let yaml = r#"
+technology.internet.url:
+  title: "URL"
+  validation:
+    type: string
+    pattern: "^(?:https?|ftp|file)://[^\\s]+$"
+  tier: [VARCHAR, technology, internet]
+  release_priority: 4
+  samples: ["https://example.com"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "technology.internet.url", 0.9, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "real URL values must not be demoted off technology.internet.url"
         );
     }
 

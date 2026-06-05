@@ -1,0 +1,126 @@
+id: 2026-06-05-destination-drift-precheck
+goal: |
+  Before committing to an additive hard-negative retrain, predict — cheaply,
+  before the full overnight 3-seed run — which UNTARGETED label boundaries the
+  candidate blend will destabilise, and gate the bet on it. Calibrate the check
+  against the two failures we already paid for: v23's categorical explosion and
+  v24's coordinate.latitude explosion. A good pre-check must flag both from a
+  cheap proxy, and must NOT cry wolf on benign seed noise.
+
+  ## Why now
+
+  Additive hard-negative retrain is 0-for-2, and both losses share one mechanism:
+  negative transfer into a neighbouring, untargeted boundary.
+
+  - v23 (spec 2026-05-27): won 6 FP clusters but fired
+    representation.discrete.categorical on 548k cols (+529.6% vs v22), eating
+    ~48k geography columns. Closed Failed.
+  - v24 (spec 2026-06-03): trained clean (val_acc 0.944), AVOIDED the categorical
+    explosion (corpus 1.01%→0.86%), but opened a new one in its place —
+    geography.coordinate.latitude 15→65 (4.3×), longitude 16→44, region ~1.7× on
+    a matched 1000-file snapshot. Plain numeric columns (earthquake
+    mag/dmin/rms/*Error) relabelled latitude; earthquake round-trip C→F. Closed
+    Failed (output/v24-numeric-precision/relitigation_memo.md).
+
+  Two blind spots let v24 through to a full overnight run before we knew:
+
+  1. The reachability `safety_score` (specs 2026-05-29/30/31) gates ONE axis of
+     risk — a cluster's distinctness from its own correct_label population. It
+     was right that categorical didn't explode. It is structurally blind to
+     DESTINATION DRIFT: which OTHER labels' columns get pulled when you add the
+     cluster's examples. v24's four targets all scored HIGH/MODERATE-safe
+     (0.84–0.95) and still produced the coordinate explosion. HIGH safety is
+     necessary, not sufficient.
+  2. The mandatory Sense-distribution pre/post check DID catch it — but only
+     AFTER the full 3-seed 50-epoch run, and only because of a manual diff. The
+     snapshot's `watch` block tracks a hand-picked set (categorical + city /
+     region / country); coordinate.latitude was invisible in it. The 4.3× was
+     found by hand-extracting label_counts, not by the instrument.
+
+  So we are spending a full overnight run to learn what a cheap proxy plus a
+  full-label-space diff could tell us up front. This spec closes both gaps:
+  broaden the collateral instrument to the whole label space, and move it earlier
+  via a cheap proxy train, gated before promotion-intent.
+
+  ## What "destination drift" means
+
+  Adding hard negatives for cluster C (correct_label = L) does not only sharpen
+  C→L. It rebalances the whole softmax. Drift is any label M ≠ L whose corpus
+  prediction count moves beyond a band between the pre-train baseline and the
+  candidate. v23's M = categorical; v24's M = coordinate.latitude. The check
+  measures the full vector of M's, not a pre-registered subset.
+
+  ## Ground truth available
+
+  We already hold the inputs to calibrate without new full runs:
+  - v23 + v24 candidate hard-negative blends (output/v2{3,4}-*/hard_negatives*).
+  - Their full-run outcomes (sense_dist_v{19,24}_clean.json; v23 relitigation
+    memo) — the labels that actually exploded.
+  - A known-good negative control: v19-vs-v19 different-seed snapshots (no real
+    drift; only sampling noise) to set the false-positive floor.
+
+  ## Out of scope
+  - Re-running v23 or v24 full retrains (we have their outcomes).
+  - Changing the reachability safety_score itself (it stays as the
+    distinctness-axis advisory; this is the orthogonal second axis).
+  - Fixing the coordinate.latitude or utc/url over-emits (separate Sharpen /
+    taxonomy work — v24 relitigation memo, schema_fail_demotion allowlist).
+  - Promoting any model. This spec ships an instrument + gate, not a retrain.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- precision
+- retrain
+- eval
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Full-label-space drift report. A script diffs two Sense-distribution
+    snapshots (baseline vs candidate) and emits EVERY label whose prediction
+    count moves beyond a band — both an absolute floor and a relative multiple —
+    ranked by magnitude, not a pre-registered watch subset. Normalises for
+    differing total_cols between snapshots (use rate, not raw count). Run on the
+    existing sense_dist_v19_clean.json vs sense_dist_v24_clean.json, it must list
+    geography.coordinate.latitude among the top movers (the signal the old watch
+    block missed).
+  ac_type: code
+- id: ac-02
+  description: |
+    Cheap proxy-train protocol. A documented, scripted fast proxy trains on a
+    candidate hard-negative blend and produces a full-distribution snapshot
+    without the full 3-seed 50-epoch overnight cost. Single seed, reduced epochs
+    (calibrate the epoch floor against ac-03 — enough to surface drift, no more).
+    Record proxy wall-clock as a fraction of the full overnight run; target
+    ≤ ~20%. The proxy reuses the existing prepare/train scripts
+    (scripts/overnight_v24_numeric.sh as template), parameterised, not forked.
+  ac_type: code
+- id: ac-03
+  description: |
+    Retro-calibration against both paid-for failures. Run the proxy (ac-02) +
+    drift report (ac-01) on the v23 candidate blend AND the v24 candidate blend.
+    The check must FLAG v23's representation.discrete.categorical explosion AND
+    v24's geography.coordinate.latitude explosion — a true positive on both. For
+    each, record the proxy's drift magnitude against the known full-run magnitude
+    (does a cheap proxy preserve the ranking, even if it understates the size?).
+  ac_type: observation
+- id: ac-04
+  description: |
+    Band calibrated to separate signal from noise. Set the absolute + relative
+    thresholds so the v23 and v24 explosions trip the gate (ac-03) AND a
+    negative control does NOT — v19-vs-v19 different-seed snapshots, where any
+    movement is sampling noise, must produce a GO (no label flagged). Document
+    the chosen thresholds and the margin between the worst noise mover and the
+    band.
+  ac_type: code
+- id: ac-05
+  description: |
+    Gate wired + instrument adopted. (a) The pre-check emits an explicit GO /
+    NO-GO with the drifted-label list, runnable before a full overnight run is
+    launched. (b) The Sense-distribution snapshot's hand-picked `watch` block is
+    superseded by (or augmented with) the full-label-space drift report as the
+    canonical collateral instrument. (c) CLAUDE.md / the retrain runbook document
+    the proxy pre-check as a mandatory step ALONGSIDE the existing post-train
+    Sense-distribution check — the post-train check stays mandatory; the proxy
+    pre-check is the cheaper early gate, not a replacement.
+  ac_type: doc
