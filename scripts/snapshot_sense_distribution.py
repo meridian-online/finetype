@@ -145,11 +145,19 @@ def main() -> int:
                 counts[label] = counts.get(label, 0) + 1
 
     total = sum(counts.values())
+    # SUPERSEDED (spec 2026-06-05-destination-drift-precheck ac-05): this
+    # hand-picked watch block only ever measured a pre-registered subset, so it
+    # missed v24's geography.coordinate.latitude explosion (never registered).
+    # The canonical collateral instrument is now scripts/drift_report.py, which
+    # diffs two of these snapshots across the WHOLE label vector. The watch block
+    # is retained for at-a-glance continuity with the v23/v24 memos; the GO/NO-GO
+    # decision belongs to the drift report, not to these four numbers.
     watch = {
         "categorical_count": counts.get(CATEGORICAL, 0),
         "categorical_pct": round(counts.get(CATEGORICAL, 0) / total, 4) if total else 0.0,
         "geography": {k: counts.get(v, 0) for k, v in GEO.items()},
         "v24_fp_labels": {k: counts.get(v, 0) for k, v in V24_FP.items()},
+        "_superseded_by": "scripts/drift_report.py (full-label-space gate)",
     }
     out = {
         "label": args.label,
