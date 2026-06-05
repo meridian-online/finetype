@@ -1471,6 +1471,19 @@ DOMAIN_CAP_OVERRIDES = {
     "geography": 3000,
 }
 
+TYPE_CAP_OVERRIDES = {
+    # Per-LABEL overrides, checked before the domain override. Narrower than a
+    # domain raise: lifts exactly one type's distilled budget so a targeted
+    # hard-negative injection survives the cap while every other type — even
+    # siblings in the same domain — stays at the global default. Per spec
+    # 2026-06-06-latitude-decimal-hard-negative-retrain ac-02: the 2,540
+    # latitude->decimal hard negatives all carry decimal_number, so without
+    # this they would collapse to the v19 base of 600 and dilute the fix. This
+    # keeps the blend a one-variable change vs v19 (clean proxy/gold-anchor
+    # attribution) instead of the confounded global-cap raise.
+    "representation.numeric.decimal_number": 2600,
+}
+
 
 def cap_distilled_columns(columns_by_type, max_per_type, rng):
     """Cap distilled columns per type to max_per_type via random sampling.
@@ -1478,7 +1491,8 @@ def cap_distilled_columns(columns_by_type, max_per_type, rng):
     Args:
         columns_by_type: dict[str, list[tuple[list[str], str]]]
         max_per_type: default maximum distilled columns per type (e.g. 600);
-                      domains in DOMAIN_CAP_OVERRIDES use their override instead.
+                      a type in TYPE_CAP_OVERRIDES uses its override, else a
+                      domain in DOMAIN_CAP_OVERRIDES uses its override.
         rng: random.Random instance for reproducible sampling
 
     Returns:
@@ -1492,7 +1506,9 @@ def cap_distilled_columns(columns_by_type, max_per_type, rng):
     for type_key in list(columns_by_type.keys()):
         cols = columns_by_type[type_key]
         domain = type_key.split(".")[0] if "." in type_key else type_key
-        cap: int = DOMAIN_CAP_OVERRIDES.get(domain) or max_per_type
+        cap: int = (TYPE_CAP_OVERRIDES.get(type_key)
+                    or DOMAIN_CAP_OVERRIDES.get(domain)
+                    or max_per_type)
         if len(cols) > cap:
             original_count = len(cols)
             columns_by_type[type_key] = rng.sample(cols, cap)
