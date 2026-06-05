@@ -68,7 +68,7 @@ goal: |
   - Promoting any model. This spec ships an instrument + gate, not a retrain.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - precision
 - retrain
@@ -96,7 +96,7 @@ acceptance_criteria:
     ≤ ~20%. The proxy reuses the existing prepare/train scripts
     (scripts/overnight_v24_numeric.sh as template), parameterised, not forked.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     Retro-calibration against both paid-for failures. Run the proxy (ac-02) +
@@ -106,7 +106,7 @@ acceptance_criteria:
     each, record the proxy's drift magnitude against the known full-run magnitude
     (does a cheap proxy preserve the ranking, even if it understates the size?).
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
@@ -129,5 +129,10 @@ acceptance_criteria:
     Sense-distribution check — the post-train check stays mandatory; the proxy
     pre-check is the cheaper early gate, not a replacement.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+memories_considered:
+- key: v24-numeric-retrain-failed-coordinate-explosion
+  disposition: adopted
+  reason: This memory is the spec's motivation. safety_score is blind to destination drift, and the mandatory post-train check caught v24's coordinate explosion only after the overnight run was spent. The spec built the cheaper pre-filter that pays that back, and the outcome refines the lesson — the destination drift IS catchable BEFORE the overnight run. A 10-epoch single-seed proxy (6-7% wall-clock) reproduced BOTH paid-for explosions (v23 categorical 4.69x, v24 latitude 6.19x), preserving rank and direction and slightly over-stating magnitude, a conservative true positive on both, so additive-retrain's 0-for-2 record is now detectable up front.
+closed_at: 2026-06-05T13:23:41.548867Z
