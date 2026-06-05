@@ -1244,9 +1244,11 @@ geography.coordinate.coordinates:
 geography.coordinate.geohash:
   title: "Geohash"
   description: >
-    Base-32 encoded geographic area. 4-12 characters using the Geohash
+    Base-32 encoded geographic area. 6-12 characters using the Geohash
     alphabet (0-9, b-h, j, k, m, n, p-z — excludes a, i, l, o).
-    Longer strings represent smaller, more precise areas.
+    Longer strings represent smaller, more precise areas. The canonical
+    geohash range is 1-12 characters; FineType deliberately requires a
+    minimum of 6 (see notes) to avoid mistyping short alphanumeric codes.
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR

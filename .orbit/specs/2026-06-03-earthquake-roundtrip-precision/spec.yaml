@@ -91,5 +91,5 @@ acceptance_criteria:
     (web/content/blog/less-typing-more-discovery.mdx) claims match a real
     transcript (no "14,132 rows validated and loaded" against a Grade F run).
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
