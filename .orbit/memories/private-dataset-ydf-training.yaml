@@ -1,12 +1,4 @@
 key: private-dataset-ydf-training
-body: 'A private upstream dataset is the training-data origin for the YDF lens
-  model and must NOT be identified in any committed file in this repo (specs,
-  registry, code, docs, commits, PRs). Do not commit its codenames or its local
-  filesystem path. The YDF lens model artifact itself
-  (eval/gittables/models/ydf.bin) is fine to reference — only the upstream
-  training-data origin is private. The literal forbidden names and path are
-  recorded in an untracked local note on the author''s machine, deliberately
-  kept out of git.'
-timestamp: 2026-05-24T10:30:26.859305Z
-labels:
-- dataset-source
+body: 'CORRECTED 2026-06-05 (verified against scripts/train_ydf.py): the YDF lens is trained ENTIRELY on PUBLIC data — there is NO private upstream dataset. The earlier claim in this memory was a misunderstanding. train_ydf.py reads two sources: (1) distilled half = output/distillation-v3/sherlock_distilled.csv.gz (~102k GitTables column samples with adjudicated labels; GitTables is public, gittables.github.io); (2) synthetic half = finetype generate from crates/finetype-core/src/generator.rs (our own generator). This is the same 50/50 distilled+synthetic blend used for Sense training (spec 2026-05-20-gittables-multi-lens-diagnostic ac-03; MADRs 0024/0049/0060). ''Sherlock'' names the public ML4DB benchmark the distillation imitates, not a private origin. The dbpedia_finetype_mapping.tsv (public DBpedia->taxonomy map) does NOT feed YDF training — it is diagnostic-only; the report''s dbpedia_mapping_sha is just a reproducibility anchor. Implication: retraining/specialising the YDF lens carries NO private-data leak risk. (The reasons not to build specialised YDF models are independence-collapse and corpus-starvation, not provenance.)'
+timestamp: 2026-06-05T01:39:29.197325Z
+labels: []
