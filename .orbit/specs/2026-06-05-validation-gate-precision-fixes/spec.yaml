@@ -63,5 +63,5 @@ acceptance_criteria:
   description: |
     MADR choice record capturing the direction: validation is an ASYMMETRIC signal (reliable NO, unreliable YES — see memory validation-gate-asymmetry), so validation-as-veto ships in profile while value-level YES-disambiguation stays blocked on rare-type training data (spec 2026-06-04 INCONCLUSIVE). Records the case-fold-enums decision SCOPED to enum membership (not a universal case-insensitivity claim — co-attached patterns stay exact) and the standards-sourcing decision (FHIR / ICAO 9303 / ISO 5218).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
