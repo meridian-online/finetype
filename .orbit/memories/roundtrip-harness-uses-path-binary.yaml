@@ -1,0 +1,5 @@
+key: roundtrip-harness-uses-path-binary
+body: 'scripts/roundtrip_metrics.sh defaults BIN to `finetype` on PATH (line 32: FINETYPE_BIN:-finetype), NOT ./target/release/finetype. The PATH binary (~/.cargo/bin/finetype) is currently v0.6.20 from 2026-05-22 — badly stale, lacks Rule 32 schema_fail_demotion and the v24 architecture. Symptom: harness reports earthquake reject_rate 0.1494/grade F when the freshly-built binary gives 0.0130/grade C. ALWAYS run the harness with FINETYPE_BIN=./target/release/finetype after a code change, else you measure the installed binary. Also: cargo build --release after editing crates/finetype-model/src/column.rs may report ''1 crates'' and NOT recompile finetype-model if its artifact looks current — touch the file to force a 3-crate rebuild and confirm. Verified 2026-06-05.'
+timestamp: 2026-06-05T07:43:22.589836Z
+labels:
+- code-investigate
