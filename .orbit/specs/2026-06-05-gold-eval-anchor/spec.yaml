@@ -3,7 +3,7 @@ goal: Build a small curated gold-label eval set for the known confusion families
 cards:
 - 0002-semantic-type-detection
 - 0017-ydf-specialist-geography
-status: open
+status: closed
 labels:
 - precision
 - data-factory
@@ -94,3 +94,4 @@ acceptance_criteria:
   gate: false
   checked: false
   ac_type: observation
+closed_at: 2026-06-05T03:53:42.65853Z
