@@ -3,7 +3,7 @@ goal: Build a small curated gold-label eval set for the known confusion families
 cards:
 - 0002-semantic-type-detection
 - 0017-ydf-specialist-geography
-status: open
+status: closed
 labels:
 - precision
 - data-factory
@@ -20,7 +20,7 @@ acceptance_criteria:
     comparison. Without this, training Sense on YDF-mined labels and scoring
     against YDF is circular — Sense passes by construction.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |
@@ -33,22 +33,23 @@ acceptance_criteria:
     are the columns whose true type is contested between lenses; the gold set is
     the tie-breaker.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-03
   description: |
     Gold set materialised as a versioned, fixed fixture under eval/ (TSV/parquet),
     columns at minimum: file, column, curated_label, provenance/rationale. Set a
     per-family floor (>= 20 curated columns per family, or a justified smaller N
-    where the family is genuinely rare). Sanitised — no raw third-party values
+    where the family is genuinely rare — e.g. iso6346, mgrs surface as scattered
+    single mis-labels and may not reach 20). Where N < 20, record the achieved
+    count and the rarity rationale in the fixture's provenance column so the floor
+    exception is auditable, not silent. Sanitised — no raw third-party values
     that trip the secret scanner, consistent with the corpus-pass artefact
     discipline. Extend the existing eval leakage infra
     (.orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.tsv, already
     excluded by train_ydf.py) rather than inventing a parallel one where
     practical.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-04
   description: |
     Scoring harness. A script scores any model's predictions against the gold
@@ -57,8 +58,7 @@ acceptance_criteria:
     sanitised artefact under output/. The harness is the durable instrument every
     future model bet (B3 late-fusion, v24, any retrain) is judged against.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-05
   description: |
     Re-baseline the shipped default (v19, models/default) against the gold set
@@ -67,16 +67,31 @@ acceptance_criteria:
     families with a measurement against labels neither lens produced. Dated
     empirical window.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-06
   description: |
-    Leakage guard enforced and tested. The gold columns are hash-excluded from
-    any training/mining corpus (value-hash filter, mirroring train_ydf.py's
-    labelled_eval exclusion at scripts/train_ydf.py). A test or audit asserts zero
-    overlap between the gold fixture and the B2 harvested corpus once that exists,
-    so the independence contract (ac-01) is mechanically enforced, not just
-    documented.
+    Leakage guard enforced and tested, keyed on COLUMN IDENTITY not value hash.
+    train_ydf.py's existing exclusion (scripts/train_ydf.py:84-98,133) hashes a
+    column's sampled value TUPLE — so the same column sampled with a different
+    window yields a different hash and slips past the filter. The gold guard MUST
+    instead key on the (file, column) identity the fixture already carries (ac-03),
+    so a gold column is excluded regardless of how it is later sampled. Wire the
+    gold fixture into train_ydf.py's exclusion path alongside labelled_eval, and a
+    test asserts zero (file, column) overlap between the gold fixture and the
+    CURRENT training corpus. This half is closable now and mechanically enforces
+    the independence contract (ac-01) against today's pipeline.
+  gate: false
+  checked: true
+- id: ac-07
+  description: |
+    B2 corpus independence audit (deferred — depends on the mining factory). Once
+    the B2 harvested corpus exists (spec 2026-06-05-reference-data-inventory and
+    its downstream mining spec), an audit asserts zero (file, column) overlap
+    between the gold fixture and the harvested corpus, closing the loop that ac-06
+    opens against the current pipeline. Cannot close until B2 produces a corpus, so
+    it is an observation, not a blocker on this spec.
   gate: false
   checked: false
-  ac_type: code
+  ac_type: observation
+closed_at: 2026-06-05T03:53:42.65853Z
