@@ -6,9 +6,12 @@ Spec 2026-06-05-gold-eval-anchor ac-04 (harness) + ac-05 (v19 re-baseline).
 Two modes:
 
   predict — for each gold column, pull its sample values from the corpus parquet,
-            run `finetype infer --mode column` (uses models/default), and write a
+            run the REAL Sense path (`finetype profile -f csv -o json-schema`,
+            reading x-finetype-label — uses models/default), and write a
             predictions TSV keyed on (file_content_sha256, column_name). This is
-            how the shipped default (v19) baseline is produced.
+            how the shipped default (v19) baseline is produced. NB: not
+            `infer --mode column`, which returns a degenerate container.array
+            tie for plain numeric columns — see _profile_column below.
 
   score   — join the gold fixture with ANY predictions TSV and report per-family
             precision/recall. The gold label is ground truth; YDF is NOT consulted
