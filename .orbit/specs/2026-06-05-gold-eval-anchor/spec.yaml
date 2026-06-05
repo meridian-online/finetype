@@ -1,0 +1,82 @@
+id: 2026-06-05-gold-eval-anchor
+goal: Build a small curated gold-label eval set for the known confusion families, held out from the mining pipeline and sharing no inputs with it, as the independent ground truth that keeps model evaluation non-circular once YDF is repurposed from judge to miner.
+cards:
+- 0002-semantic-type-detection
+- 0017-ydf-specialist-geography
+status: open
+labels:
+- precision
+- data-factory
+- eval
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Independence contract specified FIRST — this is the load-bearing constraint
+    the whole spec exists to guarantee. Document the gold set's label provenance
+    and the rule that its labels MUST NOT derive from the YDF lens, the Sense
+    cascade, or any authoritative source the mining factory (B2,
+    spec 2026-06-05-reference-data-inventory) ingests. Labels come from human
+    curation or an oracle that shares no inputs with either model under
+    comparison. Without this, training Sense on YDF-mined labels and scoring
+    against YDF is circular — Sense passes by construction.
+  gate: true
+  checked: false
+  ac_type: doc
+- id: ac-02
+  description: |
+    Confusion-family scope fixed. Enumerate the target families the gold set must
+    cover — at minimum the cell-2 pollution the corpus diagnostic surfaced
+    (msg_id mislabelled iso6346, stock_id -> mgrs, 3-letter team codes ->
+    country_code, exchange codes -> country_code; memories v23-ac01-finding /
+    v23-ac08-outcome) PLUS the shared-shape numerics that mining cannot
+    disambiguate (latitude vs longitude vs temperature, component.year). These
+    are the columns whose true type is contested between lenses; the gold set is
+    the tie-breaker.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    Gold set materialised as a versioned, fixed fixture under eval/ (TSV/parquet),
+    columns at minimum: file, column, curated_label, provenance/rationale. Set a
+    per-family floor (>= 20 curated columns per family, or a justified smaller N
+    where the family is genuinely rare). Sanitised — no raw third-party values
+    that trip the secret scanner, consistent with the corpus-pass artefact
+    discipline. Extend the existing eval leakage infra
+    (.orbit/specs/2026-05-04-autonomous-type-inference/labelled_eval.tsv, already
+    excluded by train_ydf.py) rather than inventing a parallel one where
+    practical.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    Scoring harness. A script scores any model's predictions against the gold
+    fixture and reports per-family precision/recall, computed independently of
+    YDF (the gold label is ground truth, not the YDF prediction). Output is a
+    sanitised artefact under output/. The harness is the durable instrument every
+    future model bet (B3 late-fusion, v24, any retrain) is judged against.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-05
+  description: |
+    Re-baseline the shipped default (v19, models/default) against the gold set
+    and record the honest per-family precision/recall as the anchor number future
+    bets must beat. This replaces the polluted cell-2 comparison for these
+    families with a measurement against labels neither lens produced. Dated
+    empirical window.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-06
+  description: |
+    Leakage guard enforced and tested. The gold columns are hash-excluded from
+    any training/mining corpus (value-hash filter, mirroring train_ydf.py's
+    labelled_eval exclusion at scripts/train_ydf.py). A test or audit asserts zero
+    overlap between the gold fixture and the B2 harvested corpus once that exists,
+    so the independence contract (ac-01) is mechanically enforced, not just
+    documented.
+  gate: false
+  checked: false
+  ac_type: code
