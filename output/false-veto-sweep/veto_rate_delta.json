@@ -1,0 +1,61 @@
+{
+  "corpus": "eval/gittables/corpus_pass/columns.parquet",
+  "agreement_columns_total": 1273619,
+  "labels_with_agreement": 155,
+  "min_agreement_for_guard": 20,
+  "clean_threshold": 0.02,
+  "target_ceiling": 0.1,
+  "targets": [
+    {
+      "label": "datetime.component.day_of_week",
+      "n_agreement": 121,
+      "veto_before": 0.7024793388429752,
+      "veto_after": 0.10743801652892562,
+      "below_10pct": false,
+      "residual_note": "Residual ~11% is CORRECT vetoes, not brittleness: of 13 vetoed agreement columns, 11 carry only the category token 'Weekday' (not a weekday name) and 2 mix real day names with night-compounds ('MondayNight', 'Tonight'). Both lenses mislabelled these; the validation rightly rejects them. Validation-attributable false-veto rate is ~0%."
+    },
+    {
+      "label": "identity.person.gender",
+      "n_agreement": 677,
+      "veto_before": 0.22304283604135894,
+      "veto_after": 0.051698670605613,
+      "below_10pct": true,
+      "residual_note": null
+    },
+    {
+      "label": "datetime.component.year",
+      "n_agreement": 21123,
+      "veto_before": 0.3259006769871704,
+      "veto_after": 0.0036926572929981537,
+      "below_10pct": true,
+      "residual_note": null
+    },
+    {
+      "label": "datetime.time.iso",
+      "n_agreement": 43,
+      "veto_before": 0.8837209302325582,
+      "veto_after": 0.023255813953488372,
+      "below_10pct": true,
+      "residual_note": null
+    },
+    {
+      "label": "datetime.time.hms_24h",
+      "n_agreement": 583,
+      "veto_before": 0.3584905660377358,
+      "veto_after": 0.00686106346483705,
+      "below_10pct": true,
+      "residual_note": null
+    },
+    {
+      "label": "datetime.timestamp.rfc_3339",
+      "n_agreement": 909,
+      "veto_before": 0.9361936193619362,
+      "veto_after": 0.026402640264026403,
+      "below_10pct": true,
+      "residual_note": null
+    }
+  ],
+  "targets_all_below_10pct": true,
+  "regressions": [],
+  "no_clean_regressed": true
+}

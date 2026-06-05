@@ -88,6 +88,11 @@ eval/gittables/per_column_rejects.log
 eval/gittables/mechanism_decomposition.log
 eval/gittables/corpus_pass/mechanism_decomposition.parquet
 
+# false-veto sweep: _before/ is a regenerable pre-fix snapshot (HEAD
+# copies of the gate module + label YAMLs). Only the sanitised
+# report.md + veto_rate_delta.json deliverables are tracked.
+output/false-veto-sweep/_before/
+
 # ac-09 outputs (regenerable from scripts/build_corroborated_gaps.py).
 # corroborated_gaps.parquet carries sample_evidence with real
 # corpus values — same false-positive risk as mechanism_decomposition.

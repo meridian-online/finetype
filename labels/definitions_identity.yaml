@@ -578,8 +578,10 @@ identity.person.password:
 identity.person.gender:
   title: "Gender"
   description: >
-    Gender identity. May be "Male", "Female", "Non-binary", "Other", or similar.
-    Broad categorization due to variance in values and encoding.
+    Administrative gender per HL7 FHIR AdministrativeGender: male, female,
+    other, or unknown. Matched case-insensitively (ac-02), so "Male"/"MALE"
+    validate. Identities beyond the administrative four (e.g. non-binary) map
+    to FHIR `other` at the data layer.
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -590,30 +592,35 @@ identity.person.gender:
   validation:
     type: string
     enum:
-      - Male
-      - Female
-      - Non-binary
-      - Other
-      - Prefer not to say
-      - Unknown
+      - male
+      - female
+      - other
+      - unknown
   tier: [VARCHAR, person]
   release_priority: 3
   aliases: null
   samples:
     - "Male"
     - "Female"
-    - "Non-binary"
     - "Other"
-  references: null
+    - "Unknown"
+  references:
+    - title: "HL7 FHIR AdministrativeGender value set"
+      link: "https://www.hl7.org/fhir/valueset-administrative-gender.html"
   notes: >
-    v1 migration: Was person.gender marked broad_words. Enum is illustrative;
-    actual values depend on data source. Consider inclusivity and cultural context.
+    Sourced to HL7 FHIR AdministrativeGender (male | female | other | unknown),
+    replacing the prior self-labelled-illustrative list. Matched
+    case-insensitively per ac-02. The administrative value set deliberately
+    collapses identity detail: non-binary and similar map to `other`,
+    declined/withheld to `unknown`; those literal strings are not enum members.
 
 identity.person.gender_code:
   title: "Gender Code"
   description: >
-    Single character or short code representing gender (M, F, X, O, etc.).
-    Broad categorization.
+    Single-character sex/gender code. ICAO Doc 9303 passport sex field uses
+    M (male), F (female), X (unspecified). ISO/IEC 5218 numeric coding uses
+    0 (not known), 1 (male), 2 (female), 9 (not applicable). Matched
+    case-insensitively (ac-02).
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
@@ -623,7 +630,14 @@ identity.person.gender_code:
   decompose: null
   validation:
     type: string
-    pattern: "^[MFX]$"
+    enum:
+      - M
+      - F
+      - X
+      - "0"
+      - "1"
+      - "2"
+      - "9"
   tier: [VARCHAR, person]
   release_priority: 3
   aliases: null
@@ -631,10 +645,18 @@ identity.person.gender_code:
     - "M"
     - "F"
     - "X"
-  references: null
+    - "1"
+  references:
+    - title: "ICAO Doc 9303 — Machine Readable Travel Documents (sex field M/F/X)"
+      link: "https://www.icao.int/publications/pages/publication.aspx?docnum=9303"
+    - title: "ISO/IEC 5218 — Information technology — Codes for the representation of human sexes"
+      link: "https://www.iso.org/standard/81682.html"
   notes: >
-    v1 migration: Was person.gender_code marked broad_words. Single character
-    or code. Transform uppercases. Common: M (male), F (female), X (other/not specified).
+    Sourced to ICAO Doc 9303 (alpha M/F/X) and ISO/IEC 5218 (numeric 0/1/2/9).
+    The prior ^[MFX]$ pattern was uppercase-only and its description wrongly
+    listed `O` as valid — ICAO uses X (not O) for unspecified. Converted to an
+    enum so case-insensitive matching flows from ac-02; the transform still
+    uppercases for materialisation.
 
 # identity.person.nationality: REMOVED in Phase 0 (NNFT-162)
 # Collapsed into representation.discrete.categorical. Short enumerated list.

@@ -104,7 +104,7 @@ class ValidationSpec:
                     and self.pattern_re.fullmatch(value) is None):
                 return False
             if (self.enum_set is not None
-                    and value not in self.enum_set):
+                    and value.lower() not in self.enum_set):
                 return False
             return True
         if self.kind == "locale":
@@ -173,7 +173,11 @@ def _compile_spec(label: str, body: dict) -> ValidationSpec:
             print(f"warn: {label} pattern uncompilable ({exc}); skipping",
                   file=sys.stderr)
     if enum_vals:
-        enum_set = frozenset(str(x) for x in enum_vals)
+        # Case-fold (lower-case) the enum set; `passes()` lower-cases the value
+        # before membership so enum matching is case-insensitive, mirroring
+        # CompiledValidator (ac-02). Scoped to enum only — a co-attached
+        # pattern still matches the raw value byte-exact.
+        enum_set = frozenset(str(x).lower() for x in enum_vals)
 
     if pattern_re is not None or enum_set is not None:
         # `kind` records the most-constraining attached check for

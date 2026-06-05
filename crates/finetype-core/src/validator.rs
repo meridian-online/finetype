@@ -14,7 +14,7 @@
 //! Preserved for backwards compatibility; use `CompiledValidator` in hot paths.
 
 use crate::taxonomy::{Taxonomy, Validation};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -51,6 +51,41 @@ pub struct CompiledValidator {
     minimum: Option<f64>,
     /// Manual numeric maximum bound (string→f64 parsing).
     maximum: Option<f64>,
+    /// Case-folded enum membership set (each value lower-cased). Enum is matched
+    /// manually rather than via jsonschema so the case-fold scopes to enum
+    /// membership ONLY — any co-attached `pattern` stays byte-exact on the raw
+    /// value. `None` when the definition carries no enum.
+    enum_folded: Option<HashSet<String>>,
+}
+
+/// Build the internal jsonschema validator (with `enum` stripped) plus the
+/// case-folded enum set. `enum` is removed from the schema the jsonschema crate
+/// compiles because enum membership is checked manually with Unicode
+/// case-folding (`str::to_lowercase`); this keeps a co-attached `pattern`
+/// byte-exact on the raw value while making enum matching case-insensitive.
+fn compile_schema_parts(
+    validation: &Validation,
+    label: &str,
+) -> Result<(jsonschema::Validator, Option<HashSet<String>>), ValidatorError> {
+    let mut json_schema = validation.to_json_schema();
+    if let serde_json::Value::Object(map) = &mut json_schema {
+        map.remove("enum");
+    }
+    let schema_validator =
+        jsonschema::validator_for(&json_schema).map_err(|e| {
+            ValidatorError::SchemaCompilationError {
+                label: label.to_string(),
+                detail: e.to_string(),
+            }
+        })?;
+    let enum_folded = validation.enum_values.as_ref().and_then(|vals| {
+        if vals.is_empty() {
+            None
+        } else {
+            Some(vals.iter().map(|v| v.to_lowercase()).collect::<HashSet<String>>())
+        }
+    });
+    Ok((schema_validator, enum_folded))
 }
 
 impl CompiledValidator {
@@ -59,33 +94,23 @@ impl CompiledValidator {
     /// Converts the validation to JSON Schema, pre-compiles with jsonschema-rs,
     /// and stores numeric bounds for manual checking.
     pub fn new(validation: &Validation) -> Result<Self, ValidatorError> {
-        let json_schema = validation.to_json_schema();
-        let schema_validator = jsonschema::validator_for(&json_schema).map_err(|e| {
-            ValidatorError::SchemaCompilationError {
-                label: String::new(),
-                detail: e.to_string(),
-            }
-        })?;
+        let (schema_validator, enum_folded) = compile_schema_parts(validation, "")?;
         Ok(Self {
             schema_validator,
             minimum: validation.minimum,
             maximum: validation.maximum,
+            enum_folded,
         })
     }
 
     /// Compile a new validator with a label for error context.
     pub fn new_for_label(validation: &Validation, label: &str) -> Result<Self, ValidatorError> {
-        let json_schema = validation.to_json_schema();
-        let schema_validator = jsonschema::validator_for(&json_schema).map_err(|e| {
-            ValidatorError::SchemaCompilationError {
-                label: label.to_string(),
-                detail: e.to_string(),
-            }
-        })?;
+        let (schema_validator, enum_folded) = compile_schema_parts(validation, label)?;
         Ok(Self {
             schema_validator,
             minimum: validation.minimum,
             maximum: validation.maximum,
+            enum_folded,
         })
     }
 
@@ -111,6 +136,12 @@ impl CompiledValidator {
                 if num > maximum {
                     return false;
                 }
+            }
+        }
+        // Case-folded enum membership (scoped to enum only; pattern stays exact)
+        if let Some(enum_folded) = &self.enum_folded {
+            if !enum_folded.contains(&value.to_lowercase()) {
+                return false;
             }
         }
         true
@@ -165,6 +196,15 @@ impl CompiledValidator {
                         message: format!("Value {} exceeds maximum {}", num, maximum),
                     });
                 }
+            }
+        }
+        // Case-folded enum membership (scoped to enum only; pattern stays exact)
+        if let Some(enum_folded) = &self.enum_folded {
+            if !enum_folded.contains(&value.to_lowercase()) {
+                errors.push(ValidationError {
+                    check: ValidationCheck::Enum,
+                    message: format!("Value '{}' is not in the allowed enum set", value),
+                });
             }
         }
 
@@ -1003,6 +1043,43 @@ datetime.timestamp.iso_8601:
                 "expected adjacent-token `{bad}` to reject"
             );
         }
+    }
+
+    /// ac-02 (spec 2026-06-05-validation-gate-precision-fixes): enum membership
+    /// is matched case-insensitively (Unicode case-fold via `to_lowercase`),
+    /// scoped to the enum check only. A pattern-free enum type accepts any case
+    /// variant; a co-attached pattern stays byte-exact (covered by
+    /// `ac07_http_method_case_variants`).
+    #[test]
+    fn ac02_enum_case_fold() {
+        fn enum_only(values: &[&str]) -> Validation {
+            Validation {
+                schema_type: Some("string".to_string()),
+                pattern: None,
+                min_length: None,
+                max_length: None,
+                minimum: None,
+                maximum: None,
+                enum_values: Some(values.iter().map(|s| s.to_string()).collect()),
+            }
+        }
+
+        // day_of_week: title-case enum accepts lower-case input.
+        let dow = CompiledValidator::new(&enum_only(&[
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        ]))
+        .unwrap();
+        assert!(dow.is_valid("thursday"), "thursday should fold to Thursday");
+        assert!(dow.is_valid("THURSDAY"));
+        assert!(dow.is_valid("Thursday"));
+        assert!(!dow.is_valid("thursdays"), "non-member must still reject");
+
+        // gender: FHIR lower-case enum accepts title-case input.
+        let gender = CompiledValidator::new(&enum_only(&["male", "female", "other", "unknown"]))
+            .unwrap();
+        assert!(gender.is_valid("Male"), "Male should fold to male");
+        assert!(gender.is_valid("FEMALE"));
+        assert!(!gender.is_valid("masculine"), "non-member must still reject");
     }
 
     #[test]

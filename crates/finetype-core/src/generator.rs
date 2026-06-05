@@ -1692,11 +1692,16 @@ impl Generator {
                 Ok(pass)
             }
             ("person", "gender") => {
-                let genders = ["Male", "Female", "Non-binary", "Other", "Prefer not to say"];
+                // FHIR AdministrativeGender (male|female|other|unknown), mixed
+                // case to exercise the case-insensitive enum match (ac-02).
+                let genders = [
+                    "Male", "Female", "Other", "Unknown", "male", "female", "MALE", "FEMALE",
+                ];
                 Ok(genders[self.rng.gen_range(0..genders.len())].to_string())
             }
             ("person", "gender_code") => {
-                let codes = ["M", "F", "X"];
+                // ICAO 9303 alpha (M/F/X) + ISO/IEC 5218 numeric (0/1/2/9).
+                let codes = ["M", "F", "X", "0", "1", "2", "9"];
                 Ok(codes[self.rng.gen_range(0..codes.len())].to_string())
             }
             ("person", "nationality") => {

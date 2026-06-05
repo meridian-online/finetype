@@ -249,6 +249,24 @@ enum Commands {
         output: OutputFormat,
     },
 
+    /// Validate a single value against a taxonomy label's CompiledValidator.
+    /// Prints `PASS` or `FAIL`. Used by the runtime/eval parity test
+    /// (scripts/validation_parity.py) to cross-check the live Rust validator
+    /// against the Python eval gate on a fixed fixture.
+    #[command(hide = true)]
+    ValidateValue {
+        /// Taxonomy label (e.g. `datetime.time.iso`)
+        #[arg(short, long)]
+        label: String,
+
+        /// The value to validate
+        value: String,
+
+        /// Taxonomy file or directory
+        #[arg(short, long, default_value = "labels")]
+        taxonomy: PathBuf,
+    },
+
     /// Validate CSV or Parquet data against a JSON Schema — check-only by default,
     /// or pass --db/--table to materialise valid rows + reject sidecar.
     Validate {
@@ -591,6 +609,12 @@ fn main() -> Result<()> {
             verbose,
             output,
         } => cmd_check(taxonomy, samples, seed, priority, verbose, output),
+
+        Commands::ValidateValue {
+            label,
+            value,
+            taxonomy,
+        } => cmd_validate_value(label, value, taxonomy),
 
         Commands::Validate {
             file,
@@ -4869,6 +4893,22 @@ fn cmd_eval(
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Validate a single value against a label's live `CompiledValidator`.
+///
+/// Hidden subcommand backing the runtime/eval parity test (ac-04). It
+/// exercises the SAME validator the profile veto (ac-06) uses —
+/// `validate_value_for_label`, which carries the ac-02 scoped enum
+/// case-fold and the ac-01 widened patterns/bounds. Prints `PASS`/`FAIL`
+/// so a shell-out test can cross-check it against the Python eval gate.
+fn cmd_validate_value(label: String, value: String, taxonomy_path: PathBuf) -> Result<()> {
+    let mut taxonomy = load_taxonomy(&taxonomy_path)?;
+    taxonomy.compile_validators();
+    let result = finetype_core::validate_value_for_label(&value, &label, &taxonomy)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    println!("{}", if result.is_valid { "PASS" } else { "FAIL" });
+    Ok(())
+}
 
 /// Load taxonomy from a file or directory.
 fn load_taxonomy(path: &PathBuf) -> Result<Taxonomy> {

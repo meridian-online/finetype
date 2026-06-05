@@ -184,7 +184,7 @@ datetime.timestamp.rfc_3339:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}([+-]\\d{2}:\\d{2}|Z)$"
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} ?([+-]\\d{2}:\\d{2}|[+-]\\d{4}|Z)$"
   tier: [TIMESTAMPTZ, timestamp]
   release_priority: 5
   aliases: []
@@ -890,9 +890,9 @@ datetime.time.iso:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{2}:\\d{2}:\\d{2}\\.\\d{6}$"
-    minLength: 15
-    maxLength: 15
+    pattern: "^\\d{2}:\\d{2}:\\d{2}\\.\\d{1,9}$"
+    minLength: 10
+    maxLength: 18
   tier: [TIME, time]
   release_priority: 3
   aliases: []
@@ -916,9 +916,9 @@ datetime.time.hms_24h:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{2}:\\d{2}:\\d{2}$"
-    minLength: 8
-    maxLength: 8
+    pattern: "^\\d{1,2}:\\d{2}:\\d{2}(\\.\\d{1,6})?$"
+    minLength: 7
+    maxLength: 15
   tier: [TIME, time]
   release_priority: 5
   aliases: [formatted_time]
@@ -1249,7 +1249,7 @@ datetime.component.year:
   decompose: null
   validation:
     type: string
-    pattern: "^\\d{4}$"
+    pattern: "^\\d{4}(\\.0+)?$"
     minimum: 1000
     maximum: 2100
   tier: [INTEGER, component]
@@ -1310,13 +1310,23 @@ datetime.component.day_of_week:
       - "Friday"
       - "Saturday"
       - "Sunday"
+      # CLDR EN abbreviated weekday names — common in tabular data
+      # (`Mon`/`Tue`/.../`Sun`). Case-folded per ac-02.
+      - "Mon"
+      - "Tue"
+      - "Wed"
+      - "Thu"
+      - "Fri"
+      - "Sat"
+      - "Sun"
   validation_by_locale:
     # Source: Unicode CLDR (cldr-dates-full, wide day names)
     # License: Unicode License (permissive, attribution)
     # Each locale lists the 7 full weekday names in that language. (NNFT-141, NNFT-197)
     EN:
       type: string
-      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+             "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     FR:
       type: string
       enum: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
