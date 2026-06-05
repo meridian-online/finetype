@@ -24,6 +24,7 @@ scenarios:
 specs:
 - .orbit/specs/2026-05-23-ydf-specialist-geography/spec.yaml
 - .orbit/specs/2026-06-05-gold-eval-anchor/spec.yaml
+- .orbit/specs/2026-06-05-reference-data-inventory/spec.yaml
 relations: []
 references:
 - .orbit/specs/2026-05-20-gittables-multi-lens-diagnostic/  (m-19; author observation 2026-05-23 motivated this card)

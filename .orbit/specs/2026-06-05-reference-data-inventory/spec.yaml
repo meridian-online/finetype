@@ -3,7 +3,7 @@ goal: Produce a verified, durable reference-data inventory mapping every authori
 cards:
 - 0017-ydf-specialist-geography
 - 0001-type-taxonomy
-status: open
+status: closed
 labels:
 - precision
 - data-factory
@@ -23,7 +23,7 @@ acceptance_criteria:
     geography 25, identity 33, representation 33, technology 26); no type
     unassigned.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |
@@ -36,7 +36,7 @@ acceptance_criteria:
     gap is concrete. The full-249 country_code enum is named as the completeness
     template every reference-backed type should reach.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-03
   description: |
@@ -48,7 +48,7 @@ acceptance_criteria:
     never by vendoring the list. Any source whose licence cannot be verified is
     marked "verify before use", not assumed safe.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-04
   description: |
@@ -59,7 +59,7 @@ acceptance_criteria:
     unrealised win (thinnest types — city/region/district at 15-40 hand-curated —
     against the richest source, ~4M).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-05
   description: |
@@ -71,7 +71,7 @@ acceptance_criteria:
     2026-06-02-public-release-readiness ac-06); and the normalised on-disk shape
     the B2 sieves consume.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-06
   description: |
@@ -84,5 +84,6 @@ acceptance_criteria:
     eval-independence implication: the diagnostic's YDF lens cannot also be the
     judge once it mines (see spec 2026-06-05-gold-eval-anchor).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-05T05:37:04.48962Z

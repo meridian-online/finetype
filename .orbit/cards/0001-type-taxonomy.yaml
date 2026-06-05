@@ -29,6 +29,7 @@ scenarios:
 specs:
 - .orbit/specs/2026-03-02-taxonomy-revision/
 - .orbit/specs/2026-03-26-overnight-v6-data-quality/
+- .orbit/specs/2026-06-05-reference-data-inventory/spec.yaml
 relations: []
 references:
 - README.md
