@@ -62,7 +62,7 @@ goal: |
   - YDF retraining / DBpedia mapping changes (lenses fixed for this bet).
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - precision
 - retrain
@@ -76,7 +76,8 @@ acceptance_criteria:
     clusters' FP rate on THAT model (the diagnostic's gaps are v22 FPs and may
     differ on the shipping model). Record per-cluster pre-train FP rate. If a
     target cluster's FP rate is already ~0 on the true default, drop it from scope.
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-01
   description: |
     Hard-negative corpus extracted for the four HIGH-safety numeric-target
@@ -87,7 +88,8 @@ acceptance_criteria:
     output/v24-numeric-precision/hard_negatives.parquet with correct_label = the
     numeric ydf label. A per-cluster summary shows non-zero coverage on all four
     and ZERO rows whose correct_label is representation.discrete.categorical.
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-02
   description: |
     Pre-training Sense-distribution snapshot captured on the corpus (label ->
@@ -95,14 +97,16 @@ acceptance_criteria:
     post-train check has a baseline. Pre-training audit gate confirms no
     categorical label appears as a training target (VALID_DIM=240, distilled cap
     <= 600/type, per-type volume within range).
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-03
   description: |
     Train v24 with the numeric-target hard negatives added, same config as v22/v23
     (50 epochs, ~1200 cols/type, 70/30 blend, Metal). Model saved to
     models/sherlock-v24-numeric-relu-s{42,43,44}. discrete.categorical is not a
     training target.
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-04
   description: |
     Eval, gated on BOTH components (Failed if either fails):
@@ -114,6 +118,8 @@ acceptance_criteria:
         gated cell-2 vs v19 does not regress.
     The combined band must be Met to promote. If Failed, open a re-litigation memo
     and do not ship.
+  gate: false
+  checked: true
   ac_type: observation
 - id: ac-05
   description: |
@@ -121,4 +127,11 @@ acceptance_criteria:
     earthquakes_2024.csv and scripts/roundtrip_ab.py on the 250-table gittables
     sample show non_trivial_pct still >= 0.80 under v24 (precision may improve on
     integer-heavy tables; it must not buy that by collapsing recall).
+  gate: false
+  checked: true
   ac_type: observation
+memories_considered:
+- key: v24-safe-retrain-is-numeric-targets
+  disposition: adopted
+  reason: The spec's design followed it (numeric-target clusters only, discrete.categorical never trained, mandatory Sense-distribution pre/post check); the Failed outcome refined it — safety_score is blind to destination drift, now appended to the memory.
+closed_at: 2026-06-05T10:24:47.729519Z
