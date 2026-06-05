@@ -72,6 +72,14 @@ def main() -> int:
     ap.add_argument("--rows", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--columns", type=Path, default=CORPUS_COLUMNS)
+    ap.add_argument("--file-list", type=Path, default=None,
+                    help="profile this exact newline-delimited list of source files "
+                         "instead of sampling. REQUIRED for any cross-model diff: "
+                         "DuckDB reservoir sampling is NOT reproducible across runs "
+                         "(same --seed yields a different file set each time), so two "
+                         "snapshots meant to isolate a model change must share one "
+                         "fixed list. When omitted, a fresh sample is drawn AND written "
+                         "to <out-dir>/sense_dist_<label>.files.txt for reuse.")
     ap.add_argument("--out-dir", type=Path,
                     default=REPO / "output/v24-numeric-precision")
     args = ap.parse_args()
@@ -81,9 +89,16 @@ def main() -> int:
         print(f"error: model dir not found: {MODEL}", file=sys.stderr)
         return 3
 
-    files = sample_files(args.columns, args.files, args.seed)
-    print(f"sampled {len(files)} source files (seed {args.seed})",
-          file=sys.stderr)
+    if args.file_list:
+        files = [l.strip() for l in args.file_list.read_text().splitlines() if l.strip()]
+        print(f"using fixed file list {args.file_list} ({len(files)} files)",
+              file=sys.stderr)
+    else:
+        files = sample_files(args.columns, args.files, args.seed)
+        print(f"sampled {len(files)} source files (seed {args.seed})",
+              file=sys.stderr)
+    list_path = args.out_dir / f"sense_dist_{args.label}.files.txt"
+    list_path.write_text("\n".join(files) + "\n")
 
     with tempfile.TemporaryDirectory(prefix="sensedist_") as work:
         csvdir = Path(work) / "csv"

@@ -3,13 +3,46 @@
 
 Diffs two Sense-distribution snapshots (baseline vs candidate, as written by
 scripts/snapshot_sense_distribution.py) and flags EVERY label whose prediction
-rate moves beyond a band. The band has two conjoint conditions — a label trips
-only when BOTH hold:
+rate moves beyond a band. The band has three conjoint conditions — a label trips
+only when ALL hold:
 
-  - absolute floor:  |cand_rate - base_rate| >= --abs-floor  (suppresses tiny
+  - direction:       cand_rate > base_rate (with --direction up, the default).
+                     Destination drift is a boundary ABSORBING columns it should
+                     not, and real drift concentrates INTO one destination while
+                     benign seed noise disperses across many — so a label that
+                     SHRINKS is the targeted cluster shedding FPs or a benign
+                     reshuffle, not an over-emit. --direction both restores
+                     symmetric flagging for general distribution diffs.
+  - absolute floor:  cand_rate - base_rate >= --abs-floor  (suppresses tiny
                      labels whose raw counts wobble on sampling noise), AND
   - relative multiple: max(ratio, 1/ratio) >= --rel-mult     (suppresses large,
                      stable labels that drift a few columns in absolute terms).
+
+## Calibrated band (spec 2026-06-05-destination-drift-precheck ac-04)
+
+Defaults --abs-floor 0.0040, --rel-mult 3.0, --direction up are calibrated
+against two paid-for explosions and one negative control, all on ONE fixed
+1000-file / 13,533-column corpus sample (snapshots in
+output/destination-drift-precheck/, identical file list — DuckDB reservoir
+sampling is NOT seed-reproducible, so a shared list is mandatory):
+
+  - v23 (v22 -> v23): NO-GO. representation.discrete.categorical +6.13pp, 4.10×
+    — the categorical explosion that closed v23 Failed. Trips.
+  - v24 (v19 -> v24): NO-GO. geography.coordinate.latitude +0.64pp, 5.65× — the
+    untargeted boundary the hand-picked watch block missed. Trips.
+  - negative control (v19 s42 -> s43, same files, different MODEL seed, so every
+    move is pure seed noise): GO. No label trips.
+
+Margins to the band (why these thresholds, not tighter):
+  - Relative axis: worst noise mover is technology.internet.user_agent at 2.23×;
+    smallest true signal is v23 categorical at 4.10×. 3.00× sits near-centrally
+    in that (2.23×, 4.10×) gap — 0.77× of headroom below, 1.10× above.
+  - Absolute axis: the floor is load-bearing for small-base relative wobblers
+    that clear the rel line — identity.commerce.isbn moves +0.32pp at 4.19× and
+    is excluded ONLY by the 0.40pp floor; the smallest true signal it must let
+    through is v24 latitude at +0.64pp (0.24pp of headroom).
+  - Direction: the control's container.array.comma_separated collapses -2.93pp
+    and v23/v24 shrink many labels; all excluded structurally, not by threshold.
 
 Rates, not raw counts: the two snapshots may profile a different total_cols
 (different file sample, different model), so every comparison is a rate
@@ -27,9 +60,9 @@ pre-registered subset, so a drift in an unwatched boundary (v24's
 geography.coordinate.latitude) cannot hide.
 
 Usage:
-    scripts/drift_report.py BASELINE.json CANDIDATE.json
+    scripts/drift_report.py BASELINE.json CANDIDATE.json    # calibrated defaults
     scripts/drift_report.py b.json c.json --abs-floor 0.002 --rel-mult 2.0
-    scripts/drift_report.py b.json c.json --json out.json
+    scripts/drift_report.py b.json c.json --direction both --json out.json
 """
 import argparse
 import json
@@ -54,12 +87,23 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("baseline", type=Path, help="baseline snapshot JSON (pre-train)")
     ap.add_argument("candidate", type=Path, help="candidate snapshot JSON (post-train)")
-    ap.add_argument("--abs-floor", type=float, default=0.0020,
+    ap.add_argument("--abs-floor", type=float, default=0.0040,
                     help="absolute rate-change floor, as a fraction of total_cols "
-                         "(default 0.0020 = 0.20 percentage points)")
-    ap.add_argument("--rel-mult", type=float, default=2.0,
-                    help="relative multiple a label's rate must move, in either "
-                         "direction, on smoothed rates (default 2.0 = a doubling/halving)")
+                         "(default 0.0040 = 0.40 percentage points; calibrated, see "
+                         "the band section of the module docstring)")
+    ap.add_argument("--rel-mult", type=float, default=3.0,
+                    help="relative multiple a label's rate must move, on smoothed "
+                         "rates (default 3.0×; calibrated to sit near-centrally in the "
+                         "gap between the worst model-seed noise mover and the smallest "
+                         "paid-for explosion — see the module docstring)")
+    ap.add_argument("--direction", choices=("up", "both"), default="up",
+                    help="which movers can trip the band. 'up' (default) flags only "
+                         "labels that GAIN rate — destination drift is a boundary "
+                         "absorbing columns it should not, and real drift concentrates "
+                         "INTO one destination while benign seed noise disperses across "
+                         "many (a base-N label collapsing is the targeted cluster "
+                         "shedding FPs or a benign reshuffle, not an over-emit). 'both' "
+                         "restores symmetric flagging for general distribution diffs.")
     ap.add_argument("--top", type=int, default=20,
                     help="how many ranked movers to print (default 20)")
     ap.add_argument("--json", type=Path, default=None,
@@ -81,7 +125,8 @@ def main():
         d_rate = cr - br
         ratio = (cr + eps) / (br + eps)
         directional = max(ratio, 1.0 / ratio)  # magnitude of move in either direction
-        flagged = (abs(d_rate) >= args.abs_floor) and (directional >= args.rel_mult)
+        dir_ok = (d_rate > 0) if args.direction == "up" else True
+        flagged = dir_ok and (abs(d_rate) >= args.abs_floor) and (directional >= args.rel_mult)
         rows.append({
             "label": label,
             "base_count": b, "cand_count": c,

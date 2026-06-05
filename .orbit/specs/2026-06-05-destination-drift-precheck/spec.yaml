@@ -84,7 +84,8 @@ acceptance_criteria:
     existing sense_dist_v19_clean.json vs sense_dist_v24_clean.json, it must list
     geography.coordinate.latitude among the top movers (the signal the old watch
     block missed).
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-02
   description: |
     Cheap proxy-train protocol. A documented, scripted fast proxy trains on a
@@ -94,7 +95,8 @@ acceptance_criteria:
     Record proxy wall-clock as a fraction of the full overnight run; target
     ≤ ~20%. The proxy reuses the existing prepare/train scripts
     (scripts/overnight_v24_numeric.sh as template), parameterised, not forked.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Retro-calibration against both paid-for failures. Run the proxy (ac-02) +
@@ -103,6 +105,8 @@ acceptance_criteria:
     v24's geography.coordinate.latitude explosion — a true positive on both. For
     each, record the proxy's drift magnitude against the known full-run magnitude
     (does a cheap proxy preserve the ranking, even if it understates the size?).
+  gate: false
+  checked: false
   ac_type: observation
 - id: ac-04
   description: |
@@ -112,7 +116,8 @@ acceptance_criteria:
     movement is sampling noise, must produce a GO (no label flagged). Document
     the chosen thresholds and the margin between the worst noise mover and the
     band.
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-05
   description: |
     Gate wired + instrument adopted. (a) The pre-check emits an explicit GO /
@@ -123,4 +128,6 @@ acceptance_criteria:
     the proxy pre-check as a mandatory step ALONGSIDE the existing post-train
     Sense-distribution check — the post-train check stays mandatory; the proxy
     pre-check is the cheaper early gate, not a replacement.
+  gate: false
+  checked: false
   ac_type: doc
