@@ -2939,7 +2939,94 @@ fn value_sharpen(
         }
     }
 
+    // Rule 32: Closed-set over-emit demotion (earthquake-roundtrip-precision ac-03).
+    // The sibling-context head over-confidently emits two narrow types onto
+    // free-form code/id columns: measurement_unit (a closed enum of SI units) onto
+    // short network codes, and geohash (a base32 pattern) onto event ids. Demote —
+    // value-based, gated on the column's own schema-validation fail-rate (>50%, see
+    // schema_fail_demotion) — to a representation.* fallback. The network codes are
+    // 100% non-units so they demote; the event ids fail only ~28% (most coincidentally
+    // satisfy base32) so the >50% bar leaves them as geohash, which is the deliberate
+    // cost of not regressing real short-geohash detection (the v13 min-length trade-off
+    // — author's call, see the spec diagnosis). Scoped to these two labels only, so
+    // unlike the attractor lists (which also arm cardinality/confidence signals) it
+    // cannot regress unrelated columns. Last-resort value-based Sharpen (decisions
+    // 0038/0048).
+    if result_label == "representation.scientific.measurement_unit"
+        || result_label == "geography.coordinate.geohash"
+    {
+        if let Some(taxonomy) = taxonomy {
+            if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
+                return Some((label, rule));
+            }
+        }
+    }
+
     None
+}
+
+/// Demote a closed-set label whose own schema the column's values fail.
+///
+/// Fires only when the predicted type has a compiled validator (enum or pattern)
+/// and >50% of non-empty values fail it. Picks a `representation.*` fallback by
+/// cardinality: 1–20 distinct → `discrete.categorical`, else
+/// `identifier.alphanumeric_id`. Both are non-trivial taxonomy types, so the
+/// recall guard (non_trivial_pct) is unaffected — no collapse to plain text.
+fn schema_fail_demotion(
+    values: &[String],
+    result_label: &str,
+    taxonomy: &Taxonomy,
+) -> Option<(String, String)> {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+    if non_empty.len() < 3 {
+        return None;
+    }
+    // Prefer the pre-compiled validator; fall back to compile-per-call when the
+    // taxonomy cache isn't populated (mirrors disambiguate_attractor_demotion).
+    let fail_count = if let Some(compiled) = taxonomy.get_validator(result_label) {
+        non_empty.iter().filter(|v| !compiled.is_valid(v)).count()
+    } else {
+        let validation = taxonomy.get(result_label)?.validation.as_ref()?;
+        non_empty
+            .iter()
+            .filter(|v| {
+                finetype_core::validate_value(v, validation)
+                    .map(|r| !r.is_valid)
+                    .unwrap_or(false)
+            })
+            .count()
+    };
+    let fail_rate = fail_count as f32 / non_empty.len() as f32;
+    // Demote only on majority failure (>50%). The instinct for a closed type is a
+    // tight bar — a real geohash or SI-unit column "should" validate ~100%. But the
+    // shipped definitions don't: the geohash pattern's v13 min-length-6 deliberately
+    // rejects valid 4-5 char geohashes (~23% of a genuine column — see the geohash
+    // `notes`), and the measurement_unit enum lists only 30 SI units, so real unit
+    // columns fail ~44%. A tighter bar would demote those genuine columns. >50% fires
+    // only when the column is overwhelmingly not the type (network codes that are
+    // 100% non-units), which is the over-emit this rule targets. Precision Principle.
+    if fail_rate <= 0.5 {
+        return None;
+    }
+    let mut unique: Vec<&str> = non_empty.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    let fallback = if (1..=20).contains(&unique.len()) {
+        "representation.discrete.categorical"
+    } else {
+        "representation.identifier.alphanumeric_id"
+    };
+    Some((
+        fallback.to_string(),
+        format!(
+            "schema_fail_demotion:{}:fail_rate={:.2}",
+            result_label, fail_rate
+        ),
+    ))
 }
 
 /// Attractor demotion adapted for multi-branch pipeline (AC-3, R15).
@@ -7573,6 +7660,144 @@ geography.transportation.icao_code:
         assert!(
             result.is_none(),
             "Should NOT demote ICAO codes when validation confirms them"
+        );
+    }
+
+    // ── Rule 32: closed-set over-emit demotion (earthquake-roundtrip ac-03) ──
+
+    #[test]
+    fn test_schema_fail_demotion_measurement_unit_to_categorical() {
+        // net/locationSource/magSource: short network codes the model labels
+        // measurement_unit (a closed SI-unit enum). None is an SI unit → 100%
+        // fail the enum → demote to categorical (low cardinality).
+        let values: Vec<String> = vec!["us", "ci", "nc", "us", "nn", "ci", "us", "nc"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let yaml = r#"
+representation.scientific.measurement_unit:
+  title: "Measurement Unit"
+  validation:
+    type: string
+    enum: [meter, kilogram, second, m, kg, s]
+  tier: [VARCHAR, scientific]
+  release_priority: 3
+  samples: ["meter"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(
+            &values,
+            "representation.scientific.measurement_unit",
+            0.9,
+            Some(&taxonomy),
+        );
+        let (label, rule) = result.expect("network codes should demote off measurement_unit");
+        assert_eq!(label, "representation.discrete.categorical");
+        assert!(rule.starts_with("schema_fail_demotion:"));
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_geohash_to_alphanumeric_id() {
+        // id: unique event identifiers the model labels geohash. The geohash
+        // base32 alphabet excludes a/i/l/o, so network-prefixed ids ("ci…")
+        // fail the pattern → demote to alphanumeric_id (high cardinality).
+        let values: Vec<String> = (0..30).map(|i| format!("ci40{:06}", i)).collect();
+        let yaml = r#"
+geography.coordinate.geohash:
+  title: "Geohash"
+  validation:
+    type: string
+    pattern: "^[0-9b-hjkmnp-z]{6,12}$"
+  tier: [VARCHAR, geography, coordinate]
+  release_priority: 5
+  samples: ["u4pruyd"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "geography.coordinate.geohash", 0.9, Some(&taxonomy));
+        let (label, rule) = result.expect("event ids should demote off geohash");
+        assert_eq!(label, "representation.identifier.alphanumeric_id");
+        assert!(rule.starts_with("schema_fail_demotion:"));
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_partial_fail_kept() {
+        // A column only ~17% of whose values fail the geohash pattern is NOT demoted.
+        // Genuine geohash columns fail their own (v13 min-6) pattern ~23% on legitimate
+        // short geohashes, and real unit columns fail the incomplete SI enum ~44%; the
+        // >50% bar spares them. Only overwhelming failure (network codes that are 100%
+        // non-units) demotes. Locks the bar against over-demoting genuine columns —
+        // the earthquake `id` column (~28% fail) is intentionally left as geohash here
+        // rather than risk regressing real short-geohash detection (the v13 trade-off).
+        let mut values: Vec<String> = (0..25).map(|i| format!("bcd{:03}", i)).collect();
+        values.extend((0..5).map(|i| format!("icd{:03}", i))); // 'i' ∉ base32 → fail
+        let yaml = r#"
+geography.coordinate.geohash:
+  title: "Geohash"
+  validation:
+    type: string
+    pattern: "^[0-9b-hjkmnp-z]{6,12}$"
+  tier: [VARCHAR, geography, coordinate]
+  release_priority: 5
+  samples: ["u4pruyd"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "geography.coordinate.geohash", 0.9, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "partial-fail column must be kept, not demoted (>50% bar spares genuine columns)"
+        );
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_keeps_real_geohash() {
+        // A genuine geohash column (all values valid base32) must NOT be demoted.
+        let values: Vec<String> = (0..30).map(|i| format!("bcd{:03}", i)).collect();
+        let yaml = r#"
+geography.coordinate.geohash:
+  title: "Geohash"
+  validation:
+    type: string
+    pattern: "^[0-9b-hjkmnp-z]{6,12}$"
+  tier: [VARCHAR, geography, coordinate]
+  release_priority: 5
+  samples: ["u4pruyd"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(&values, "geography.coordinate.geohash", 0.9, Some(&taxonomy));
+        assert!(
+            result.is_none(),
+            "valid geohash values must not be demoted off geohash"
+        );
+    }
+
+    #[test]
+    fn test_schema_fail_demotion_keeps_real_units() {
+        // A genuine units column whose values ARE SI units must NOT be demoted —
+        // the rule fires on schema-validation failure, not on the label alone.
+        let values: Vec<String> = vec!["meter", "kg", "second", "m", "kg", "meter"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let yaml = r#"
+representation.scientific.measurement_unit:
+  title: "Measurement Unit"
+  validation:
+    type: string
+    enum: [meter, kilogram, second, m, kg, s]
+  tier: [VARCHAR, scientific]
+  release_priority: 3
+  samples: ["meter"]
+"#;
+        let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+        let result = value_sharpen(
+            &values,
+            "representation.scientific.measurement_unit",
+            0.9,
+            Some(&taxonomy),
+        );
+        assert!(
+            result.is_none(),
+            "real SI-unit values must not be demoted off measurement_unit"
         );
     }
 
