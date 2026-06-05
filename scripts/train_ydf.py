@@ -46,6 +46,13 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gold_anchor_guard import (  # noqa: E402
+    DEFAULT_GOLD,
+    is_gold_column,
+    load_gold_identities,
+)
+
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO / "eval" / "gittables" / "models"
 DEFAULT_DISTILLED = REPO / "output" / "distillation-v3" / "sherlock_distilled.csv.gz"
@@ -102,22 +109,39 @@ def _labelled_eval_hashes(tsv: Path) -> set[str]:
 def _load_distilled_columns(
     distilled: Path,
     excluded_hashes: set[str] | None = None,
-) -> tuple[list[tuple[str, list[str], str]], int]:
+    gold_ids: set[tuple[str, str]] | None = None,
+) -> tuple[list[tuple[str, list[str], str]], int, int]:
     """Returns [(type_id, [val1..valK], source_tag)] from the distilled
     CSV. Sample values are JSON-parsed, truncated to SAMPLES_PER_COLUMN,
     and filtered for empty strings.
 
     source_tag is "distilled" (vs the "synthetic" tag emitted by the
     NDJSON grouper). Used downstream in the training-rows manifest.
+
+    Two leakage filters apply, in order of independence strength:
+      - value-hash (excluded_hashes): drops rows whose sampled value tuple
+        matches a labelled_eval row. Window-sensitive (see gold_anchor_guard).
+      - gold identity (gold_ids): drops any row carrying a gold-anchor
+        (file_content_sha256, column_name). Keyed on durable identity, so it
+        holds regardless of sampling window (spec ac-06). Distilled Sherlock
+        rows carry no such identity today, so this fires 0 times now — the
+        wiring is the mechanical guarantee, not a current-corpus correction.
     """
     out: list[tuple[str, list[str], str]] = []
     n_excluded = 0
+    n_gold_excluded = 0
     excluded = excluded_hashes or set()
+    gold = gold_ids or set()
     with gzip.open(distilled, "rt") as fh:
         for row in csv.DictReader(fh):
             label = (row.get("final_label") or "").strip()
             samples_raw = (row.get("sample_values") or "").strip()
             if not label or not samples_raw:
+                continue
+            if is_gold_column(
+                row.get("file_content_sha256"), row.get("column_name"), gold
+            ):
+                n_gold_excluded += 1
                 continue
             try:
                 samples = json.loads(samples_raw)
@@ -134,7 +158,7 @@ def _load_distilled_columns(
                 n_excluded += 1
                 continue
             out.append((label, vals, "distilled"))
-    return out, n_excluded
+    return out, n_excluded, n_gold_excluded
 
 
 def _group_into_columns(ndjson: Path) -> list[tuple[str, list[str]]]:
@@ -287,14 +311,21 @@ def main() -> int:
                   file=sys.stderr)
             return 2
         labelled_hashes = _labelled_eval_hashes(DEFAULT_LABELLED_EVAL)
+        gold_ids = load_gold_identities(DEFAULT_GOLD)
         print(f"  labelled_eval hash count: {len(labelled_hashes)}",
               file=sys.stderr)
-        distilled_cols, n_distilled_excluded = _load_distilled_columns(
-            args.distilled, excluded_hashes=labelled_hashes,
+        print(f"  gold-anchor identity count: {len(gold_ids)} "
+              f"(excluded by (file, column), spec ac-06)", file=sys.stderr)
+        distilled_cols, n_distilled_excluded, n_gold_excluded = (
+            _load_distilled_columns(
+                args.distilled, excluded_hashes=labelled_hashes,
+                gold_ids=gold_ids,
+            )
         )
         print(f"loaded {len(distilled_cols)} distilled training columns "
               f"from {args.distilled.name} "
-              f"({n_distilled_excluded} excluded for labelled_eval overlap)",
+              f"({n_distilled_excluded} excluded for labelled_eval overlap, "
+              f"{n_gold_excluded} excluded for gold-anchor identity)",
               file=sys.stderr)
 
     # Merge: tag synthetic rows with "synthetic" source; distilled rows

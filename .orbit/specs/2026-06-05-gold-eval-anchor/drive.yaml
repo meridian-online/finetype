@@ -1,0 +1,10 @@
+spec_id: 2026-06-05-gold-eval-anchor
+card_path: /Users/hugh/github/meridian-online/finetype/.orbit/cards/0002-semantic-type-detection.yaml
+autonomy: guided
+iteration: 1
+stage: review-pr
+review_spec_cycle: 1
+review_spec_date: 2026-06-05
+review_pr_cycle: 0
+review_pr_date: 2026-06-05
+iteration_history: []
