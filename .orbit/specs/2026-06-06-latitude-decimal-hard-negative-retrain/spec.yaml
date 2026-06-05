@@ -69,14 +69,20 @@ labels:
 acceptance_criteria:
 - id: ac-01
   description: |
-    Anchor the blend to v19's OWN mistakes, not v22's. The corpus diagnostic
-    carries v22 sense predictions; the gold anchor confirms v19 has the same
-    failure SHAPE (latitude P 0.714, decimal R 0.600) but not necessarily the
-    same column identities. Snapshot the shipped default (v19, models/default)
-    on the corpus file list and extract the actual columns v19 labels latitude
-    whose values are non-geographic feature floats (the v19 false-positive set).
-    Build the hard-negative pool from THESE identities. Document the v19 FP
-    column count and how it compares to the v22-derived 3,974.
+    Anchor the blend to v19's OWN mistakes. RESOLVED from existing data — no
+    fresh profiling run needed: eval/gittables/corpus_pass/columns.parquet's
+    sense_prediction column is byte-identical to output/ydf-validation-gate/
+    v19_gated.parquet (0 of 6.59M rows differ), while v19_gated vs v22_gated
+    differ on 1.4M rows (v22 grabs latitude on 26,002 cols vs v19's 7,894). So
+    the corpus diagnostic's predictions ARE v19's, NOT v22's (correcting the
+    CLAUDE.md eval note). The v19 latitude false-positive pool is therefore the
+    3,974 columns where sense=geography.coordinate.latitude AND
+    ydf=representation.numeric.decimal_number: ~1,280 TRUE latitudes
+    (Lat/lat/latitude — preserve) and the remainder feature floats
+    (cumulative_gpa, mag, HitRate_*, velocities, RealTime(ms), LnPrior, ML
+    min_q) — the hard negatives. The gold anchor (latitude P 0.714, decimal R
+    0.600, real Sense path) confirms the SHAPE on the same v19 weights. Deliver
+    the v19 FP column list as the blend source.
   gate: true
   checked: false
   ac_type: code
