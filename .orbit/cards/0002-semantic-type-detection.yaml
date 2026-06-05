@@ -45,6 +45,7 @@ specs:
 - .orbit/specs/2026-05-26-taxonomy-country-code-enum-cleanup/spec.yaml
 - .orbit/specs/2026-05-27-v23-precision-retrain/spec.yaml
 - .orbit/specs/2026-06-04-value-level-ydf-labelling/spec.yaml
+- .orbit/specs/2026-06-05-validation-gate-precision-fixes/spec.yaml
 relations: []
 references:
 - README.md

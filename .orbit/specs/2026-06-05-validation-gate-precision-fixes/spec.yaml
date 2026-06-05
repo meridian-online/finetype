@@ -1,8 +1,8 @@
 id: 2026-06-05-validation-gate-precision-fixes
 goal: Ship validation-as-veto in the profile path by fixing the format-brittle pattern validations and case-folding enum matching that the corpus-wide false-veto sweep surfaced, so profile checks its own answers against the data without any retraining.
 cards:
-- .orbit/cards/0002-semantic-type-detection.yaml
-status: open
+- 0002-semantic-type-detection
+status: closed
 labels:
 - precision
 - validation-gate
@@ -65,3 +65,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-05T00:54:22.473881Z
