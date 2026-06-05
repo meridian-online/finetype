@@ -58,7 +58,7 @@ acceptance_criteria:
   description: |
     Wire validation-as-veto into the live profile path. profile emits a per-column `validation_pass_rate` (fraction of sample values passing the predicted type's validation) and applies the veto at the canonical 50% threshold (matching ydf_prediction_gated): pass_rate < 0.5 => the predicted type is NULLed/flagged. SCOPE the HARD veto to audited-safe labels (the ~40 sweep-clean + the ac-01/02/03 fixed set); for the 152 types the sweep could NOT measure (too few agreement columns — same rare-type starvation as spec 2026-06-04), surface pass_rate as ADVISORY only (no hard NULL) until measurable. State the profile output-shape change and whether the veto is default-on. This is the gate-in-profile deliverable — the near-term precision win needing no retraining.
   gate: false
-  checked: false
+  checked: true
 - id: ac-07
   description: |
     MADR choice record capturing the direction: validation is an ASYMMETRIC signal (reliable NO, unreliable YES — see memory validation-gate-asymmetry), so validation-as-veto ships in profile while value-level YES-disambiguation stays blocked on rare-type training data (spec 2026-06-04 INCONCLUSIVE). Records the case-fold-enums decision SCOPED to enum membership (not a universal case-insensitivity claim — co-attached patterns stay exact) and the standards-sourcing decision (FHIR / ICAO 9303 / ISO 5218).

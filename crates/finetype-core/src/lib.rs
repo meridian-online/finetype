@@ -16,6 +16,7 @@ pub mod quality;
 pub mod table_validator;
 pub mod taxonomy;
 pub mod tokenizer;
+pub mod validation_veto;
 pub mod validator;
 
 pub use checker::{format_report, CheckReport, Checker};
@@ -32,6 +33,9 @@ pub use taxonomy::{
     DdlInfo, Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary, Validation,
 };
 pub use tokenizer::Tokenizer;
+pub use validation_veto::{
+    audited_safe_labels, evaluate_validation_veto, ValidationVeto, VETO_THRESHOLD,
+};
 pub use validator::{
     validate_column, validate_column_for_label, validate_value, validate_value_for_label,
     ColumnStats, ColumnValidationResult, CompiledValidator, InvalidStrategy, QuarantinedValue,

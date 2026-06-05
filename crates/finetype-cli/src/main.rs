@@ -362,6 +362,15 @@ enum Commands {
         /// Diagnostic flag for ablation studies. Not part of the stable CLI contract.
         #[arg(long, hide = true)]
         raw_model: bool,
+
+        /// Disable validation-as-veto. By default profile checks each
+        /// column's sample values against the predicted type's validation
+        /// and NULLs the prediction (→ "unknown") when fewer than half pass,
+        /// scoped to audited-safe types (labels/veto_safe.txt). Types the
+        /// false-veto sweep could not measure get an advisory flag, never a
+        /// hard veto. This flag turns the whole mechanism off.
+        #[arg(long)]
+        no_validation_veto: bool,
     },
 
     /// Start MCP server for AI agent integration (stdio transport)
@@ -639,6 +648,7 @@ fn main() -> Result<()> {
             stats,
             verbose,
             raw_model,
+            no_validation_veto,
         } => {
             // ac-04: --stats is gated to -o json-schema. Refuse early with a
             // clap-style error rather than silently dropping the flag.
@@ -673,6 +683,7 @@ fn main() -> Result<()> {
                 stats,
                 verbose,
                 raw_model,
+                no_validation_veto,
             )
         }
 
@@ -3561,6 +3572,28 @@ fn resolve_broad_type_display<'a>(
     }
 }
 
+/// ac-06: evaluate the validation-as-veto for one column. Returns
+/// `(pass_rate, hard_vetoed, advisory_low)`. A no-op `(None, false, false)`
+/// when the veto is disabled, the taxonomy is unavailable, or the label has
+/// no applicable validation. `values` are the column's non-null sample values.
+fn col_validation_veto(
+    label: &str,
+    values: &[String],
+    taxonomy: Option<&finetype_core::Taxonomy>,
+    safe: &std::collections::HashSet<String>,
+    enabled: bool,
+) -> (Option<f64>, bool, bool) {
+    if !enabled {
+        return (None, false, false);
+    }
+    let Some(tax) = taxonomy else {
+        return (None, false, false);
+    };
+    let opt: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+    let v = finetype_core::evaluate_validation_veto(label, &opt, tax, safe);
+    (v.pass_rate, v.vetoed, v.advisory_low)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn cmd_profile(
     file: Option<PathBuf>,
@@ -3575,6 +3608,7 @@ fn cmd_profile(
     stats: bool,
     verbose: bool,
     raw_model: bool,
+    no_validation_veto: bool,
 ) -> Result<()> {
     use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
     use std::io::Write as _;
@@ -3756,6 +3790,16 @@ fn cmd_profile(
             quality: Option<ColProfileQuality>,
             // Unique values for ENUM/categorical columns (NNFT-273)
             unique_values: Option<Vec<String>>,
+            // ac-06 validation-as-veto: fraction of sample values passing
+            // the predicted type's validation (None = no applicable
+            // validation), whether that triggered a HARD veto (label NULLed
+            // to "unknown"), an ADVISORY low-pass flag (sub-threshold but the
+            // type is not audited-safe — surfaced, not NULLed), and the
+            // original predicted label when hard-vetoed.
+            validation_pass_rate: Option<f64>,
+            validation_vetoed: bool,
+            validation_advisory_low: bool,
+            vetoed_type: Option<String>,
         }
 
         /// Per-column validation + quality data.
@@ -3769,7 +3813,23 @@ fn cmd_profile(
 
         // Load taxonomy for enrichment (may already be loaded for validation)
         let taxonomy_path = std::path::PathBuf::from("labels");
-        let enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
+        let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
+
+        // ac-06: validation-as-veto. Compile the enrichment taxonomy's
+        // validators once (the per-column veto checks sample values against
+        // the predicted type's schema) and load the audited-safe allowlist
+        // that scopes the HARD veto. Skipped entirely under --no-validation-veto.
+        let veto_enabled = !no_validation_veto;
+        let veto_safe = if veto_enabled {
+            finetype_core::audited_safe_labels()
+        } else {
+            std::collections::HashSet::new()
+        };
+        if veto_enabled {
+            if let Some(ref mut tax) = enrichment_taxonomy {
+                tax.compile_validators();
+            }
+        }
 
         let mut profiles: Vec<ColProfile> = Vec::new();
 
@@ -3806,6 +3866,10 @@ fn cmd_profile(
                             is_generic: false,
                             quality: None,
                             unique_values: None,
+                            validation_pass_rate: None,
+                            validation_vetoed: false,
+                            validation_advisory_low: false,
+                            vetoed_type: None,
                         },
                     ));
                 } else {
@@ -3832,9 +3896,21 @@ fn cmd_profile(
             for ((idx, values, _, name, null_count), result) in
                 col_inputs.into_iter().zip(context_results)
             {
+                let (vp_rate, vetoed, advisory_low) = col_validation_veto(
+                    &result.label,
+                    &values,
+                    enrichment_taxonomy.as_ref(),
+                    &veto_safe,
+                    veto_enabled,
+                );
+                let (final_label, vetoed_type) = if vetoed {
+                    ("unknown".to_string(), Some(result.label.clone()))
+                } else {
+                    (result.label.clone(), None)
+                };
                 let (broad_type, format_string, transform) =
                     if let Some(ref taxonomy) = enrichment_taxonomy {
-                        if let Some(def) = taxonomy.get(&result.label) {
+                        if let Some(def) = taxonomy.get(&final_label) {
                             (
                                 def.broad_type.clone(),
                                 def.format_string.clone(),
@@ -3847,12 +3923,12 @@ fn cmd_profile(
                         (None, None, None)
                     };
                 let unique_values =
-                    collect_unique_values_if_categorical(&result.label, &values, enum_threshold);
+                    collect_unique_values_if_categorical(&final_label, &values, enum_threshold);
                 all_entries.push((
                     idx,
                     ColProfile {
                         name,
-                        label: result.label,
+                        label: final_label,
                         confidence: result.confidence,
                         samples_used: result.samples_used,
                         non_null_count: values.len(),
@@ -3866,6 +3942,10 @@ fn cmd_profile(
                         is_generic: result.is_generic,
                         quality: None,
                         unique_values,
+                        validation_pass_rate: vp_rate,
+                        validation_vetoed: vetoed,
+                        validation_advisory_low: advisory_low,
+                        vetoed_type,
                     },
                 ));
             }
@@ -3897,6 +3977,10 @@ fn cmd_profile(
                         is_generic: false,
                         quality: None,
                         unique_values: None,
+                        validation_pass_rate: None,
+                        validation_vetoed: false,
+                        validation_advisory_low: false,
+                        vetoed_type: None,
                     });
                     continue;
                 }
@@ -3914,10 +3998,23 @@ fn cmd_profile(
                     column_classifier.classify_column_with_header(col_values, &header_hint)?
                 };
 
-                // Look up taxonomy contract fields for the predicted label
+                let (vp_rate, vetoed, advisory_low) = col_validation_veto(
+                    &result.label,
+                    col_values,
+                    enrichment_taxonomy.as_ref(),
+                    &veto_safe,
+                    veto_enabled,
+                );
+                let (final_label, vetoed_type) = if vetoed {
+                    ("unknown".to_string(), Some(result.label.clone()))
+                } else {
+                    (result.label.clone(), None)
+                };
+
+                // Look up taxonomy contract fields for the (possibly vetoed) label
                 let (broad_type, format_string, transform) =
                     if let Some(ref taxonomy) = enrichment_taxonomy {
-                        if let Some(def) = taxonomy.get(&result.label) {
+                        if let Some(def) = taxonomy.get(&final_label) {
                             (
                                 def.broad_type.clone(),
                                 def.format_string.clone(),
@@ -3931,10 +4028,10 @@ fn cmd_profile(
                     };
 
                 let unique_values =
-                    collect_unique_values_if_categorical(&result.label, col_values, enum_threshold);
+                    collect_unique_values_if_categorical(&final_label, col_values, enum_threshold);
                 profiles.push(ColProfile {
                     name,
-                    label: result.label,
+                    label: final_label,
                     confidence: result.confidence,
                     samples_used: result.samples_used,
                     non_null_count: col_values.len(),
@@ -3948,6 +4045,10 @@ fn cmd_profile(
                     is_generic: result.is_generic,
                     quality: None,
                     unique_values,
+                    validation_pass_rate: vp_rate,
+                    validation_vetoed: vetoed,
+                    validation_advisory_low: advisory_low,
+                    vetoed_type,
                 });
             }
         } // end else (per-column path)
@@ -3993,6 +4094,21 @@ fn cmd_profile(
                     } else {
                         String::new()
                     };
+                    // ac-06: annotate a hard veto (predicted type NULLed) or an
+                    // advisory low-pass (sub-threshold but not audited-safe).
+                    let veto_str = if p.validation_vetoed {
+                        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
+                        format!(
+                            " ⊘ vetoed:{} ({:.0}% pass)",
+                            p.vetoed_type.as_deref().unwrap_or("?"),
+                            rate
+                        )
+                    } else if p.validation_advisory_low {
+                        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
+                        format!(" ⚠ low-pass {:.0}% (advisory)", rate)
+                    } else {
+                        String::new()
+                    };
                     let quality_str = if false {
                         // validate removed (AC-10)
                         match &p.quality {
@@ -4003,8 +4119,8 @@ fn cmd_profile(
                         String::new()
                     };
                     println!(
-                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}",
-                        p.name, p.label, broad, conf_str, quality_str, disambig, locale_str
+                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}",
+                        p.name, p.label, broad, conf_str, quality_str, disambig, locale_str, veto_str
                     );
                     // Show top 3 invalid samples inline (plain output, validate mode)
                     if false {
@@ -4066,6 +4182,23 @@ fn cmd_profile(
                         }
                         if let Some(locale) = &p.detected_locale {
                             obj.insert("locale".to_string(), json!(locale));
+                        }
+                        // ac-06: validation-as-veto signals. pass_rate is
+                        // emitted whenever the predicted type had an applicable
+                        // validation; the veto/advisory flags and the original
+                        // label surface only when they fired.
+                        if let Some(rate) = p.validation_pass_rate {
+                            let r = (rate * 10000.0).round() / 10000.0;
+                            obj.insert("validation_pass_rate".to_string(), json!(r));
+                        }
+                        if p.validation_vetoed {
+                            obj.insert("validation_vetoed".to_string(), json!(true));
+                            if let Some(vt) = &p.vetoed_type {
+                                obj.insert("vetoed_type".to_string(), json!(vt));
+                            }
+                        }
+                        if p.validation_advisory_low {
+                            obj.insert("validation_advisory_low".to_string(), json!(true));
                         }
                         // NNFT-273: Include unique values for categorical columns in verbose mode
                         if verbose {
