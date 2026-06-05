@@ -62,13 +62,16 @@ acceptance_criteria:
     the data against it, and prints non_trivial_pct and reject_rate_non_trivial
     plus PASS/FAIL against the targets. Honours FINETYPE_MODEL_DIR so a retrained
     model can be swapped in without editing the script.
-  ac_type: code
+  gate: false
+  checked: true
 - id: ac-02
   description: |
     Recall target holds on the earthquake set: non_trivial_pct >= 0.80 measured by
     scripts/roundtrip_metrics.sh eval/datasets/csv/earthquakes_2024.csv. (Already
     at 1.00 on 0.6.22 — this AC guards against a fix that regresses recall to buy
     precision, e.g. collapsing columns to plain_text.)
+  gate: false
+  checked: true
   ac_type: observation
 - id: ac-03
   description: |
@@ -77,6 +80,8 @@ acceptance_criteria:
     Binding constraint — baseline 0.1494 on 0.6.22. Closes when the model (or a
     scoped value-based Sharpen demotion, last resort) stops mistyping the
     network-code and event-id columns into enum/pattern types they cannot satisfy.
+  gate: false
+  checked: false
   ac_type: observation
 - id: ac-04
   description: |
@@ -85,4 +90,6 @@ acceptance_criteria:
     grade of C or better on the shipping CLI, and the blog draft
     (web/content/blog/less-typing-more-discovery.mdx) claims match a real
     transcript (no "14,132 rows validated and loaded" against a Grade F run).
+  gate: false
+  checked: false
   ac_type: observation

@@ -18,19 +18,28 @@
 #
 # Targets (blog round-trip): non_trivial_pct >= 0.80 AND reject_rate_non_trivial <= 0.01
 #
-# Model selection: honours FINETYPE_MODEL (inherited; a path to the model dir, e.g.
+# Model selection: honours FINETYPE_MODEL_DIR (a path to the model dir, e.g.
 # models/sherlock-v23-precision-relu-s42) so a retrained model can be swapped in
-# without touching this script. Binary overridable via FINETYPE_BIN.
+# without touching this script. The CLI reads its model path from FINETYPE_MODEL,
+# so the harness translates FINETYPE_MODEL_DIR -> FINETYPE_MODEL for the CLI;
+# FINETYPE_MODEL is still honoured directly if set. Binary overridable via
+# FINETYPE_BIN (defaults to the finetype on PATH — the shipping CLI).
 #
 # Usage: scripts/roundtrip_metrics.sh <input.csv>
 
 set -euo pipefail
 
-BIN="${FINETYPE_BIN:-./target/release/finetype}"
+BIN="${FINETYPE_BIN:-finetype}"
 CSV="${1:?usage: roundtrip_metrics.sh <input.csv>}"
 
-if [[ ! -x "$BIN" ]]; then
-  echo "error: finetype binary not found/executable at $BIN (build it or set FINETYPE_BIN)" >&2
+# AC contract: honour FINETYPE_MODEL_DIR. The CLI consumes FINETYPE_MODEL, so
+# map the dir onto it (FINETYPE_MODEL_DIR wins when both are set).
+if [[ -n "${FINETYPE_MODEL_DIR:-}" ]]; then
+  export FINETYPE_MODEL="$FINETYPE_MODEL_DIR"
+fi
+
+if ! command -v "$BIN" >/dev/null 2>&1 && [[ ! -x "$BIN" ]]; then
+  echo "error: finetype binary not found/executable at $BIN (build it, install it, or set FINETYPE_BIN)" >&2
   exit 3
 fi
 if [[ ! -f "$CSV" ]]; then
