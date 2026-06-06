@@ -84,8 +84,7 @@ acceptance_criteria:
     0.600, real Sense path) confirms the SHAPE on the same v19 weights. Deliver
     the v19 FP column list as the blend source.
   gate: true
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-02
   description: |
     Hard-negative blend built. Add the v19 false-positive feature-float columns
@@ -96,8 +95,7 @@ acceptance_criteria:
     vs the v19 training set. Reuse the existing prepare/blend tooling
     (scripts/overnight_v24_numeric.sh lineage), parameterised, not forked.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-03
   description: |
     Proxy pre-check GO — the gate. Run scripts/proxy_pretrain.sh on the candidate
@@ -109,7 +107,7 @@ acceptance_criteria:
     wall-clock, and the top movers. This is the proxy's first forward use; its
     decision is binding on whether ac-04 may run.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
@@ -122,7 +120,7 @@ acceptance_criteria:
     alphanumeric_id, integer hold). Record the full per-family table vs the v19
     anchor. Dated empirical window.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-05
   description: |
@@ -134,7 +132,7 @@ acceptance_criteria:
     the proxy's forward-use track record (it was 2-for-2 retro; this is its first
     forward test). Dated empirical window.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-06
   description: |
