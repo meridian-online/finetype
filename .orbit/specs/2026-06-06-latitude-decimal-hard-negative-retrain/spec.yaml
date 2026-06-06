@@ -144,5 +144,5 @@ acceptance_criteria:
     decision and the evidence, it does not perform the HuggingFace swap. If
     NO-GO, record the negative result so the next bet starts informed.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
