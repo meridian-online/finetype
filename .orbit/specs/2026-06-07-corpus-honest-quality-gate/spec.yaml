@@ -170,7 +170,7 @@ acceptance_criteria:
     the column throughput; if the target is missed, record what dominates (profile
     subprocess vs score) so the next cut is informed.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-05
   description: |
