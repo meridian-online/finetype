@@ -28,27 +28,47 @@ The collapse alongside the explosion is the load-bearing context the band's
 - `representation.numeric.decimal_number` 31.29% -> **0.29%** (-31.0pp)
 - `representation.numeric.integer_number` 12.95% -> **1.16%** (-11.8pp)
 
-## Diagnosis
+## Diagnosis — CORRECTED (first diagnosis was wrong)
 
-The manufactured blend — text-shaped reference values (cities, regions, street
-names, country names, plus coordinates rendered as strings) blended at the v19
-recipe (`--ratio-distilled 0.5 --distilled-cap 600`) — pushes the model's prior
-toward text/entity classification and **collapses numeric prediction**. The
-untargeted boundary that explodes is `entity_name` (a label we did NOT
-manufacture), with numerics swallowed. This is the same failure mode as v23
-(categorical +529%) and v24 (latitude 4.3×): a fix that looks good on its own
-target destabilises an UNTARGETED neighbour. safety_score is structurally blind
-to it; the pre-check is not.
+**The first-pass diagnosis ("the blend over-weights text-shaped manufactured
+columns — dial the volume down") was wrong, and the dial-down knob it proposed
+could not have fixed this.** Two findings overturned it:
 
-## Decision
+1. **The blend is per-type balanced, not volume-flooded.** `prepare_multibranch_data`'s
+   v3 `blend_columns` targets `effective_spt × ratio_distilled` distilled + remainder
+   synthetic PER TYPE (~600 + 600 = 1,200 each), and geography is capped by
+   `DOMAIN_CAP_OVERRIDES = {"geography": 3000}`. No manufactured type swamps the base
+   distribution by count. The `read_ftmb --stats` figures the first pass cited
+   (region 5,084, city 4,436) are sibling/context occurrences, not training balance.
 
-Do NOT launch the overnight train. Manufacturing dissolved starvation at the
-census/FTMB level (latitude 10 -> 959 training columns), but the blend RECIPE
-over-weights text-shaped manufactured columns. Next move is a recipe redesign —
-dial the manufactured contribution down so the base numeric distribution is not
-swamped (lower per-type `--distilled-cap` for the manufactured types and/or lower
-`--ratio-distilled`), then re-run the proxy BEFORE any overnight spend. The
-manufactured corpus itself (ac-01–04) stands; only the blend ratio is at fault.
+2. **The real cause is degenerate proximity grouping.** `materialise.blend()`
+   *appended* the manufactured block verbatim, and materialise emits types in sorted
+   order — so the 2,086 manufactured columns landed as 18 contiguous single-type runs
+   (longitude 583, city 549, latitude 430, postal 339, …). The v3 FTMB builder's
+   `group_distilled_by_proximity` (`prepare_multibranch_data.py:1938`) cuts table
+   groups from 5–15 ADJACENT rows on the assumption that adjacent rows share a source
+   table. A sorted manufactured block therefore becomes degenerate same-type
+   pseudo-tables, and the sibling-context branch trains on columns whose neighbours
+   are all identical labels — the opposite of a real mixed table.
+
+That is what collapsed the proxy: the numerics did NOT relocate onto coordinates
+(the v24 failure mode); they were swallowed wholesale into generic TEXT labels
+(`entity_name` +41pp, `alphanumeric_id` +9.2pp, `plain_text`, `unknown`) because the
+sibling branch saw structureless single-type blocks and the model fell back to its
+broadest text prior. This is a **blend-construction bug**, not destination drift and
+not a recipe-ratio problem.
+
+## Decision — re-blend with interleaving, re-proxy
+
+Do NOT launch the overnight train on this FTMB. Manufacturing dissolved starvation
+at the census/FTMB level (latitude 10 -> 959 training columns) and that stands; the
+fault was entirely in how the manufactured columns were spliced into the base stream.
+`materialise.blend()` now **interleaves** the manufactured columns evenly through the
+base distilled stream (shuffled to break the per-type runs, one column every ~49 base
+rows), so each manufactured column lands inside a real mixed-type base proximity group.
+Re-blend, rebuild the FTMB, and re-run the proxy BEFORE any overnight spend. The
+dial-down (`--distilled-cap` / `--ratio-distilled`) is NOT the fix and was not run.
 
 Evidence: `output/destination-drift-precheck/mfg-proxy.runlog`,
-`proxy_drift_mfg-proxy.json`, `sense_dist_mfg-proxy.json`.
+`proxy_drift_mfg-proxy.json`, `sense_dist_mfg-proxy.json`. Re-proxy evidence to follow
+under `mfg-proxy2`.

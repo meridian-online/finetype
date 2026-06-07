@@ -116,26 +116,54 @@ def write_distilled(columns: list[tuple[str, list[str], str]], path: Path) -> No
             w.writerow([label, json.dumps(values, ensure_ascii=False), header])
 
 
-def blend(base: Path, manufactured: Path, out: Path) -> tuple[int, int]:
-    """Concatenate base + manufactured distilled CSVs. Returns (base_rows, mfg_rows)."""
+def blend(base: Path, manufactured: Path, out: Path,
+          rng: random.Random) -> tuple[int, int]:
+    """Interleave manufactured columns evenly through the base distilled stream.
+
+    Appending the manufactured block verbatim sorts it into one contiguous run per
+    type (materialise emits types in sorted order). `prepare_multibranch_data`'s v3
+    proximity grouping (`group_distilled_by_proximity`) then cuts 5–15 ADJACENT rows
+    into pseudo-tables on the assumption that adjacent rows share a source table — so
+    a sorted manufactured block becomes degenerate single-type pseudo-tables and the
+    sibling-context branch trains on columns whose neighbours are all the same label.
+    That is what collapsed the proxy (numerics swallowed into generic text labels).
+
+    Fix: shuffle the manufactured columns (breaking the per-type runs) and splice them
+    one-at-a-time into the base stream at an even stride, so each manufactured column
+    lands inside a real, mixed-type base proximity group. Base adjacency is otherwise
+    preserved. Returns (base_rows, mfg_rows)."""
+    mfg: list[list[str]] = []
+    with gzip.open(manufactured, "rt", newline="", encoding="utf-8") as fm:
+        r = csv.DictReader(fm)
+        for row in r:
+            mfg.append([row.get("final_label", ""), row.get("sample_values", "[]"),
+                        row.get("column_name", "")])
+    rng.shuffle(mfg)
+    mfg_rows = len(mfg)
+
     base_rows = 0
-    mfg_rows = 0
     opener_base = gzip.open if base.suffix == ".gz" else open
+    with opener_base(base, "rt", newline="", encoding="utf-8") as fb:  # type: ignore
+        base_rows = sum(1 for _ in csv.DictReader(fb))
+
+    # Even stride: drop one manufactured column every `stride` base rows.
+    stride = max(1, base_rows // (mfg_rows + 1)) if mfg_rows else base_rows + 1
+    mfg_iter = iter(mfg)
+    emitted_mfg = 0
     with gzip.open(out, "wt", newline="", encoding="utf-8") as fo:
         w = csv.writer(fo)
         w.writerow(["final_label", "sample_values", "column_name"])
         with opener_base(base, "rt", newline="", encoding="utf-8") as fb:  # type: ignore
             r = csv.DictReader(fb)
-            for row in r:
+            for i, row in enumerate(r):
                 w.writerow([row.get("final_label", ""), row.get("sample_values", "[]"),
                             row.get("column_name", "")])
-                base_rows += 1
-        with gzip.open(manufactured, "rt", newline="", encoding="utf-8") as fm:
-            r = csv.DictReader(fm)
-            for row in r:
-                w.writerow([row.get("final_label", ""), row.get("sample_values", "[]"),
-                            row.get("column_name", "")])
-                mfg_rows += 1
+                if emitted_mfg < mfg_rows and (i + 1) % stride == 0:
+                    w.writerow(next(mfg_iter))
+                    emitted_mfg += 1
+        for row in mfg_iter:  # any remainder
+            w.writerow(row)
+            emitted_mfg += 1
     return base_rows, mfg_rows
 
 
@@ -194,7 +222,7 @@ def main() -> int:
 
     blend_info = None
     if args.base:
-        base_rows, mfg_rows = blend(args.base, args.mfg_out, args.blend_out)
+        base_rows, mfg_rows = blend(args.base, args.mfg_out, args.blend_out, rng)
         blend_info = {"base": rel(args.base), "base_rows": base_rows,
                       "mfg_rows": mfg_rows, "blend_out": rel(args.blend_out)}
         print(f"blended: {base_rows:,} base + {mfg_rows:,} mfg -> {args.blend_out}",
