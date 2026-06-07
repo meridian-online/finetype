@@ -1,0 +1,6 @@
+{
+  "value_model": "../value-charcnn-v25",
+  "mb_model": "../sherlock-v19-relu-s42",
+  "head": "../fusion-head-v26",
+  "sample_n": 32
+}

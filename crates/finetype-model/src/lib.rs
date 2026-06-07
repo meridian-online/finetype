@@ -12,6 +12,7 @@ pub mod column_stats;
 pub mod embedding_aggregation;
 pub mod entity;
 pub mod features;
+pub mod fusion;
 pub mod inference;
 pub mod label_category_map;
 pub mod model;
@@ -37,6 +38,7 @@ pub use column_stats::{extract_column_stats, COLUMN_STATS_DIM, COLUMN_STATS_NAME
 pub use embedding_aggregation::{extract_embedding_aggregation, EMBED_AGG_DIM, EMBED_DIM};
 pub use entity::EntityClassifier;
 pub use features::{extract_features, FEATURE_DIM, FEATURE_NAMES};
+pub use fusion::{compute_fusion_row, FusionClassifier, FusionHead};
 pub use inference::{
     extract_validation_patterns, CharClassifier, ClassificationResult, Classifier, ValueClassifier,
 };

@@ -545,6 +545,9 @@ enum ModelType {
     CharCnn,
     Tiered,
     MultiBranch,
+    /// B3 late-fusion Sense classifier (value-CharCNN + multi-branch → residual
+    /// head). Loaded from a `fusion_manifest.json` directory. Profile-only.
+    LateFusion,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -1336,89 +1339,17 @@ fn cmd_dump_fusion_features(
             skipped_empty += 1;
             continue;
         }
-        let n_used = sampled.len();
-
-        // ---- View1: value-CharCNN softmax aggregated over the sampled values ----
-        let results = value_clf.classify_batch(&sampled)?;
-        let mut mean = vec![0.0f32; n_classes];
-        let mut vmax = vec![0.0f32; n_classes];
-        let mut vote = vec![0.0f32; n_classes];
-        let mut top1s: Vec<f32> = Vec::with_capacity(n_used);
-        let mut entropies: Vec<f32> = Vec::with_capacity(n_used);
-        for r in &results {
-            // canonical-aligned softmax for this value
-            let mut row = vec![0.0f32; n_classes];
-            for (name, p) in &r.all_scores {
-                if let Some(&i) = name_to_idx.get(name.as_str()) {
-                    row[i] = *p;
-                }
-            }
-            let mut argmax = 0usize;
-            let mut argmax_p = -1.0f32;
-            let mut ent = 0.0f32;
-            for (i, &p) in row.iter().enumerate() {
-                mean[i] += p;
-                if p > vmax[i] {
-                    vmax[i] = p;
-                }
-                if p > argmax_p {
-                    argmax_p = p;
-                    argmax = i;
-                }
-                if p > 1e-9 {
-                    ent -= p * p.ln();
-                }
-            }
-            vote[argmax] += 1.0;
-            top1s.push(argmax_p.max(0.0));
-            entropies.push(ent);
-        }
-        let inv = 1.0 / n_used as f32;
-        for i in 0..n_classes {
-            mean[i] *= inv;
-            vote[i] *= inv;
-        }
-
-        // 8 confidence scalars
-        let mean_top1 = top1s.iter().sum::<f32>() * inv;
-        let max_top1 = top1s.iter().cloned().fold(0.0f32, f32::max);
-        let min_top1 = top1s.iter().cloned().fold(1.0f32, f32::min);
-        let var_top1 =
-            top1s.iter().map(|x| (x - mean_top1) * (x - mean_top1)).sum::<f32>() * inv;
-        let std_top1 = var_top1.max(0.0).sqrt();
-        let mean_entropy = entropies.iter().sum::<f32>() * inv;
-        let vote_agreement = vote.iter().cloned().fold(0.0f32, f32::max); // modal share
-        let mut uniq = std::collections::HashSet::new();
-        for v in &sampled {
-            uniq.insert(v.as_str());
-        }
-        let frac_unique = uniq.len() as f32 * inv;
-        let n_used_norm = n_used as f32 / sample_n.max(1) as f32;
-        let scalars = [
-            mean_top1,
-            max_top1,
-            min_top1,
-            std_top1,
-            mean_entropy,
-            vote_agreement,
-            frac_unique,
-            n_used_norm,
-        ];
-        debug_assert_eq!(scalars.len(), N_SCALARS);
-
-        // ---- View2: multi-branch raw logits (canonical order) ----
-        let v2 = mb.column_logits(&sampled, &header, Some(&taxonomy))?;
-        if v2.len() != n_classes {
-            anyhow::bail!("column_logits returned {} != {n_classes}", v2.len());
-        }
-
-        // ---- Write one row: mean ⊕ max ⊕ vote ⊕ scalars ⊕ v2 ----
-        let mut rowbuf: Vec<f32> = Vec::with_capacity(row_dim);
-        rowbuf.extend_from_slice(&mean);
-        rowbuf.extend_from_slice(&vmax);
-        rowbuf.extend_from_slice(&vote);
-        rowbuf.extend_from_slice(&scalars);
-        rowbuf.extend_from_slice(&v2);
+        // ---- View1 + View2 row (shared with inference — see fusion::compute_fusion_row) ----
+        let rowbuf = finetype_model::compute_fusion_row(
+            &value_clf,
+            &mb,
+            &name_to_idx,
+            n_classes,
+            &sampled,
+            &header,
+            sample_n,
+            Some(&taxonomy),
+        )?;
         debug_assert_eq!(rowbuf.len(), row_dim);
         let mut bytes: Vec<u8> = Vec::with_capacity(row_dim * 4);
         for f in &rowbuf {
@@ -1596,6 +1527,10 @@ fn cmd_infer(
     use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
     use std::time::Instant;
 
+    if matches!(model_type, ModelType::LateFusion) {
+        anyhow::bail!("late-fusion is only supported by `finetype profile`");
+    }
+
     // --explain: diagnostic cascade over an NDJSON stream. Subsumes the
     // historical `infer-type` subcommand; lives on `infer` to keep the
     // CLI surface flat.
@@ -1750,7 +1685,7 @@ fn cmd_infer(
                 ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
                 ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
                 ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-                ModelType::MultiBranch => unreachable!(),
+                ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
             };
             let semantic_hint = load_semantic_hint();
             if let Some(semantic) = semantic_hint {
@@ -1975,7 +1910,7 @@ fn cmd_infer(
                 }
             }
         }
-        ModelType::MultiBranch => unreachable!("guarded above"),
+        ModelType::MultiBranch | ModelType::LateFusion => unreachable!("guarded above"),
     }
 
     if bench {
@@ -2029,7 +1964,7 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
             ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
             ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
             ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch => unreachable!(),
+            ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
         };
 
         // Wire up semantic hint (Model2Vec) — same as profile command
@@ -2241,6 +2176,57 @@ fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifie
     }
 
     Ok(classifier)
+}
+
+/// Load a B3 late-fusion classifier from a `fusion_manifest.json` directory.
+///
+/// The manifest points at the three frozen sub-models (paths relative to the
+/// manifest dir, or absolute):
+///   { "value_model": "...", "mb_model": "...", "head": "...", "sample_n": 32 }
+///
+/// Asserts `feature_dim == 0` on the value sub-model (ac-06): a feature-trained
+/// CharCNN would silently zero-fill its feature vector at inference.
+fn load_fusion_classifier(model: &PathBuf) -> Result<finetype_model::FusionClassifier> {
+    let manifest_path = model.join("fusion_manifest.json");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&manifest_path)
+            .map_err(|e| anyhow::anyhow!("read {manifest_path:?}: {e}"))?,
+    )
+    .map_err(|e| anyhow::anyhow!("parse {manifest_path:?}: {e}"))?;
+
+    let resolve = |key: &str| -> Result<PathBuf> {
+        let p = manifest[key]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("fusion_manifest missing string field {key:?}"))?;
+        let pb = PathBuf::from(p);
+        Ok(if pb.is_absolute() { pb } else { model.join(pb) })
+    };
+    let value_dir = resolve("value_model")?;
+    let mb_dir = resolve("mb_model")?;
+    let head_dir = resolve("head")?;
+    let sample_n = manifest["sample_n"].as_u64().unwrap_or(32) as usize;
+
+    // Assert feature_dim == 0 on the value sub-model (read its config directly).
+    let vcfg_path = value_dir.join("config.yaml");
+    if let Ok(cfg) = std::fs::read_to_string(&vcfg_path) {
+        for line in cfg.lines() {
+            if let Some(rest) = line.trim().strip_prefix("feature_dim:") {
+                let fd: usize = rest.trim().parse().unwrap_or(0);
+                if fd != 0 {
+                    anyhow::bail!(
+                        "fusion value sub-model {value_dir:?} has feature_dim={fd}, expected 0 \
+                         (a feature-trained CharCNN zero-fills features at inference)"
+                    );
+                }
+            }
+        }
+    }
+
+    let value_clf = load_char_classifier(&value_dir)?;
+    let mb = load_multi_branch_classifier(&mb_dir)?;
+    let (head, head_labels) = finetype_model::FusionHead::load(&head_dir)?;
+    let fusion = finetype_model::FusionClassifier::new(value_clf, mb, head, head_labels, sample_n)?;
+    Ok(fusion)
 }
 
 /// Load a TieredClassifier: try the model directory first, then fall back to
@@ -2633,6 +2619,11 @@ fn cmd_train(
         ModelType::MultiBranch => {
             anyhow::bail!(
                 "Multi-branch training uses `finetype train-multi-branch`, not `finetype train`."
+            );
+        }
+        ModelType::LateFusion => {
+            anyhow::bail!(
+                "Late-fusion head training uses `train-fusion-head`, not `finetype train`."
             );
         }
     }
@@ -3968,7 +3959,14 @@ fn cmd_profile(
         sample_size,
         ..Default::default()
     };
-    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
+    let mut column_classifier = if matches!(model_type, ModelType::LateFusion) {
+        let fusion = load_fusion_classifier(&model)?;
+        eprintln!(
+            "Loaded late-fusion classifier ({} classes)",
+            fusion.labels().len()
+        );
+        ColumnClassifier::with_fusion(fusion, config)
+    } else if matches!(model_type, ModelType::MultiBranch) {
         let mb = load_multi_branch_classifier(&model)?;
         eprintln!(
             "Loaded multi-branch classifier ({} classes)",
@@ -3980,7 +3978,7 @@ fn cmd_profile(
             ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
             ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
             ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch => unreachable!(),
+            ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
         };
         if let Some(semantic) = load_semantic_hint() {
             eprintln!("Loaded semantic hint classifier (Model2Vec)");
@@ -4012,8 +4010,10 @@ fn cmd_profile(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models
-    if !column_classifier.has_multi_branch() {
+    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy models only.
+    // Fusion is its own Sense stage and computes View2 with the raw header, so it
+    // wires neither Sense nor sibling-context.
+    if !column_classifier.has_multi_branch() && !column_classifier.has_fusion() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }
@@ -5093,6 +5093,11 @@ fn cmd_eval(
                 "Multi-branch models are column-level only and cannot be evaluated with value-level test data."
             );
         }
+        ModelType::LateFusion => {
+            anyhow::bail!(
+                "Late-fusion models are column-level only and cannot be evaluated with value-level test data; use `finetype profile`."
+            );
+        }
     }
 
     eprintln!("Computing metrics...");
@@ -5373,6 +5378,126 @@ fn load_taxonomy(path: &PathBuf) -> Result<Taxonomy> {
 mod tests {
     use super::*;
     use std::fs;
+
+    /// ac-05 parity: the in-process `FusionClassifier` (the shipped Sense stage)
+    /// must reproduce the offline `dump-fusion-features` + `train-fusion-head
+    /// predict` labels that ac-03/ac-04 validated. Because the dump and the
+    /// classifier now share `compute_fusion_row`, and `FusionHead::forward` is a
+    /// line-for-line port of the trainer's head, this confirms the refactor and
+    /// the port preserved the validated behaviour.
+    ///
+    /// Skips when the local-only fusion weights / gold artefacts are absent
+    /// (CI without `models/fusion-v26` should not fail).
+    #[test]
+    fn test_fusion_parity_reproduces_offline_predictions() {
+        use finetype_model::{
+            extract_validation_patterns, CharClassifier, FusionClassifier, FusionHead,
+            MultiBranchClassifier,
+        };
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
+        let fusion_dir = repo.join("models/fusion-v26");
+        let value_dir = repo.join("models/value-charcnn-v25");
+        let mb_dir = repo.join("models/sherlock-v19-relu-s42");
+        let head_dir = repo.join("models/fusion-head-v26");
+        let input = repo.join("output/late-fusion/gold_anchor/candidate_input.csv");
+        let preds = repo.join("output/late-fusion/gold_anchor_v26/preds_keyed.tsv");
+
+        if !fusion_dir.join("fusion_manifest.json").exists()
+            || !value_dir.exists()
+            || !mb_dir.exists()
+            || !head_dir.join("model.safetensors").exists()
+            || !input.exists()
+            || !preds.exists()
+        {
+            eprintln!("fusion parity: local artefacts absent — skipping");
+            return;
+        }
+
+        // Multi-branch / value loaders resolve `models/model2vec/` relative to the
+        // CWD; production runs from the repo root, so match that here. Harmless to
+        // other tests (they use absolute tempdir paths).
+        std::env::set_current_dir(&repo).unwrap();
+
+        // Taxonomy (absolute, compiled) — matches the dump's loaded taxonomy.
+        let mut taxonomy = load_taxonomy(&repo.join("labels")).expect("load taxonomy");
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+
+        // Value CharCNN with validation patterns, mirroring load_char_classifier.
+        let mut value_clf = CharClassifier::load(&value_dir).expect("load value charcnn");
+        let patterns = extract_validation_patterns(&taxonomy);
+        if !patterns.is_empty() {
+            value_clf.set_validation_patterns(patterns);
+        }
+        let mb = MultiBranchClassifier::load(&mb_dir).expect("load multi-branch");
+        let (head, head_labels) = FusionHead::load(&head_dir).expect("load fusion head");
+        let fusion = FusionClassifier::new(value_clf, mb, head, head_labels, 32)
+            .expect("build fusion classifier");
+
+        // Expected: composite key -> offline predicted label.
+        let mut expected: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        for line in fs::read_to_string(&preds).unwrap().lines() {
+            if line.starts_with("row_idx\t") || line.starts_with("key\t") {
+                continue;
+            }
+            let mut it = line.splitn(2, '\t');
+            if let (Some(k), Some(v)) = (it.next(), it.next()) {
+                expected.insert(k.to_string(), v.to_string());
+            }
+        }
+        assert!(!expected.is_empty(), "no offline predictions loaded");
+
+        let mut rdr = csv::Reader::from_path(&input).unwrap();
+        let headers = rdr.headers().unwrap().clone();
+        let pos = |n: &str| headers.iter().position(|h| h == n);
+        let key_i = pos("key").expect("key column");
+        let vals_i = pos("sample_values").expect("sample_values column");
+        let name_i = pos("column_name");
+
+        let mut checked = 0usize;
+        let mut mismatches: Vec<(String, String, String)> = Vec::new();
+        for rec in rdr.records() {
+            let rec = rec.unwrap();
+            let key = rec.get(key_i).unwrap_or("").to_string();
+            let Some(want) = expected.get(&key) else { continue };
+            let header = name_i.and_then(|i| rec.get(i)).unwrap_or("").to_string();
+            let parsed: Vec<String> =
+                serde_json::from_str(rec.get(vals_i).unwrap_or("[]")).unwrap_or_default();
+            // Match the dump's `.take(sample_n)` (first 32), not strided sampling.
+            let sampled: Vec<String> = parsed.into_iter().take(32).collect();
+            if sampled.is_empty() {
+                continue;
+            }
+            let (got, _conf) = fusion
+                .classify_column(&sampled, &header, Some(&taxonomy))
+                .expect("classify");
+            checked += 1;
+            if &got != want {
+                mismatches.push((key, want.clone(), got));
+            }
+        }
+
+        assert!(checked > 0, "no columns checked — key join failed");
+        eprintln!(
+            "fusion parity: {}/{} columns reproduce offline labels ({} mismatch)",
+            checked - mismatches.len(),
+            checked,
+            mismatches.len()
+        );
+        for (k, w, g) in mismatches.iter().take(10) {
+            eprintln!("  MISMATCH key={k} offline={w} fusion={g}");
+        }
+        assert!(
+            mismatches.is_empty(),
+            "{} of {} columns diverged from the offline predict labels",
+            mismatches.len(),
+            checked
+        );
+    }
 
     #[test]
     fn test_snapshot_skips_empty_dir() {
