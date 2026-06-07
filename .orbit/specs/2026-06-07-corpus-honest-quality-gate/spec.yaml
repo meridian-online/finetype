@@ -183,7 +183,7 @@ acceptance_criteria:
     bought: gold-anchor + ship-gate is NOT sufficient to promote; corpus breadth is
     the only thing that catches a fix that relocates rather than removes.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-06
   description: |
