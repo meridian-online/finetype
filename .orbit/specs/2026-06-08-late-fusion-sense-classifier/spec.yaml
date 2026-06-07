@@ -59,7 +59,7 @@ acceptance_criteria:
     the spec before any Rust port — fall back, do not port a head that regresses. A GO
     (improve-or-hold on the families) authorises the port.
   gate: true
-  checked: false
+  checked: true
 - id: ac-05
   description: |
     Rust port: ModelType::LateFusion (main.rs), fusion_manifest.json pointing at the two
@@ -69,14 +69,14 @@ acceptance_criteria:
     classify_columns_with_context (column.rs:856). Parity test: Rust fused logits ==
     Python within tolerance on a held sample.
   gate: false
-  checked: false
+  checked: true
 - id: ac-06
   description: |
     cmd_profile wiring (main.rs load / wire / batched-context): fusion slots as the Sense
     stage; Sharpen still runs after; --raw-model bypasses only Sharpen. Assert feature_dim==0
     on the value sub-model at load.
   gate: false
-  checked: false
+  checked: true
 - id: ac-07
   description: |
     Full POST-train ship gate on the RUST path (FINETYPE_MODEL=models/fusion-v25):
