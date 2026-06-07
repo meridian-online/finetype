@@ -940,6 +940,86 @@ impl MultiBranchClassifier {
         self.config.n_classes
     }
 
+    /// Raw pre-softmax logits over all `n_classes`, in `labels()` order.
+    ///
+    /// This is View2 for the late-fusion classifier: the column-level signal the
+    /// fusion head fuses with the value-level CharCNN view. Mirrors
+    /// `classify_column`'s feature extraction and trunk, but returns the head's
+    /// raw logit vector instead of an argmax label. A Flat head emits logits
+    /// directly; a Hierarchical head returns probabilities, so we return their
+    /// log (a monotone logit surrogate) to keep one contract.
+    pub fn column_logits(
+        &self,
+        values: &[String],
+        header: &str,
+        taxonomy: Option<&Taxonomy>,
+    ) -> Result<Vec<f32>, InferenceError> {
+        if values.is_empty() {
+            return Ok(vec![0.0f32; self.config.n_classes]);
+        }
+
+        let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
+
+        let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
+        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
+            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
+
+        let device = Device::Cpu;
+        let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
+        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
+            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+
+        let header_t = if self.header_branch.is_some() {
+            let header_embed = if !header.is_empty() {
+                self.model2vec
+                    .encode_one(header)
+                    .and_then(|t| t.to_vec1::<f32>().ok())
+                    .unwrap_or_else(|| vec![0.0f32; self.config.header_dim])
+            } else {
+                vec![0.0f32; self.config.header_dim]
+            };
+            Some(
+                Tensor::from_slice(&header_embed, (1, self.config.header_dim), &device)
+                    .map_err(|e| InferenceError::InvalidPath(format!("header tensor: {e}")))?,
+            )
+        } else {
+            None
+        };
+
+        let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
+
+        let hidden =
+            self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref(), valid_t.as_ref())?;
+
+        let logits = match &self.head {
+            ClassificationHead::Flat(head) => head
+                .forward_t(&hidden, false)
+                .map_err(|e| InferenceError::InvalidPath(format!("head: {e}")))?
+                .squeeze(0)
+                .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                .to_vec1::<f32>()
+                .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?,
+            ClassificationHead::Hierarchical(hier_head) => {
+                let probs = hier_head
+                    .forward(&hidden, self.config.n_classes)
+                    .map_err(|e| {
+                        InferenceError::InvalidPath(format!("hierarchical forward: {e}"))
+                    })?
+                    .squeeze(0)
+                    .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
+                    .to_vec1::<f32>()
+                    .map_err(|e| InferenceError::InvalidPath(format!("to_vec1: {e}")))?;
+                probs.iter().map(|p| (p.max(1e-9)).ln()).collect()
+            }
+        };
+
+        Ok(logits)
+    }
+
     /// Return the label list (index → label mapping).
     pub fn labels(&self) -> &[String] {
         &self.labels

@@ -456,6 +456,43 @@ enum Commands {
         validation: bool,
     },
 
+    /// Dump late-fusion training features over a labelled distilled corpus.
+    ///
+    /// Per labelled column, emits View1 (value-CharCNN 240-softmax aggregated
+    /// over sampled values: mean ⊕ max ⊕ argmax-vote ⊕ 8 confidence scalars =
+    /// 728) ⊕ View2 (multi-branch raw logits = 240) = 968 features. Output is a
+    /// raw little-endian f32 blob `<out>.f32` (row-major [N,968]), a label tsv
+    /// `<out>.labels.tsv` (`row_idx\tlabel_index\tlabel_name`), and a meta json
+    /// `<out>.meta.json` (canonical 240-label order + dims + counts). This is
+    /// the one expensive Rust pass; the tiny fusion head trains in Rust/Candle
+    /// (train-fusion-head) over this blob — the repo is zero-Python-dep.
+    #[command(name = "dump-fusion-features", hide = true)]
+    DumpFusionFeatures {
+        /// Labelled distilled CSV(.gz): columns `final_label,sample_values[,column_name]`.
+        #[arg(short, long)]
+        input: PathBuf,
+
+        /// Value-level CharCNN model dir (feature_dim=0). Supplies View1.
+        #[arg(long)]
+        value_model: PathBuf,
+
+        /// Multi-branch model dir (e.g. v19). Supplies View2 logits + canonical labels.
+        #[arg(long)]
+        mb_model: PathBuf,
+
+        /// Output path stem; writes <stem>.f32 / <stem>.labels.tsv / <stem>.meta.json.
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// Max values sampled per column for View1 aggregation.
+        #[arg(long, default_value = "32")]
+        sample_n: usize,
+
+        /// Optional row cap (debug). 0 = no cap.
+        #[arg(long, default_value = "0")]
+        limit: usize,
+    },
+
     /// Evaluate model accuracy on a test set
     #[command(hide = true)]
     Eval {
@@ -735,6 +772,14 @@ fn main() -> Result<()> {
             json,
             validation,
         } => cmd_extract_features(header, json, validation),
+        Commands::DumpFusionFeatures {
+            input,
+            value_model,
+            mb_model,
+            output,
+            sample_n,
+            limit,
+        } => cmd_dump_fusion_features(&input, &value_model, &mb_model, &output, sample_n, limit),
     }
 }
 
@@ -1172,6 +1217,226 @@ fn cmd_train_multi_branch(
 /// - stats: 27-dim column-level statistics
 ///
 /// Outputs JSON to stdout.
+/// Dump late-fusion training features (View1 ⊕ View2) over a labelled corpus.
+///
+/// View1 (728) = value-CharCNN 240-softmax aggregated over the column's sampled
+/// values: mean(240) ⊕ max(240) ⊕ argmax-vote-histogram(240) ⊕ 8 confidence
+/// scalars. View2 (240) = multi-branch raw logits. Both aligned to the canonical
+/// label order = the multi-branch `labels()` ordering. Writes a raw f32 blob plus
+/// a label tsv and a meta json (see the subcommand doc). The fusion head trains
+/// in Python on these.
+fn cmd_dump_fusion_features(
+    input: &PathBuf,
+    value_model: &PathBuf,
+    mb_model: &PathBuf,
+    output: &PathBuf,
+    sample_n: usize,
+    limit: usize,
+) -> Result<()> {
+    use std::collections::HashMap;
+    use std::io::Write;
+
+    const V1_DIM: usize = 728; // 240*3 + 8
+    const V2_DIM: usize = 240;
+    const N_SCALARS: usize = 8;
+
+    // Load models + taxonomy once (the expensive part).
+    let value_clf = load_char_classifier(value_model)?;
+    let mb = load_multi_branch_classifier(mb_model)?;
+    let mut taxonomy = load_taxonomy(&PathBuf::from("labels"))?;
+    taxonomy.compile_validators();
+    taxonomy.compile_locale_validators();
+
+    // Canonical label order = multi-branch labels.
+    let canonical: Vec<String> = mb.labels().to_vec();
+    let n_classes = canonical.len();
+    if n_classes != V2_DIM {
+        anyhow::bail!(
+            "multi-branch model has {n_classes} classes, fusion dump expects {V2_DIM}"
+        );
+    }
+    let name_to_idx: HashMap<&str, usize> =
+        canonical.iter().enumerate().map(|(i, l)| (l.as_str(), i)).collect();
+
+    let mut rdr = csv::Reader::from_path(input)
+        .map_err(|e| anyhow::anyhow!("open {input:?}: {e}"))?;
+    let headers = rdr.headers()?.clone();
+    let col = |name: &str| headers.iter().position(|h| h == name);
+    let label_col = col("final_label")
+        .or_else(|| col("classification"))
+        .ok_or_else(|| anyhow::anyhow!("input missing final_label/classification column"))?;
+    let values_col = col("sample_values")
+        .ok_or_else(|| anyhow::anyhow!("input missing sample_values column"))?;
+    let header_col = col("column_name");
+
+    let feat_path = output.with_extension("f32");
+    let labels_path = output.with_extension("labels.tsv");
+    let meta_path = output.with_extension("meta.json");
+    let mut feat_out = std::io::BufWriter::new(std::fs::File::create(&feat_path)?);
+    let mut labels_out = std::io::BufWriter::new(std::fs::File::create(&labels_path)?);
+    writeln!(labels_out, "row_idx\tlabel_index\tlabel_name")?;
+
+    let mut n_rows = 0usize;
+    let mut skipped_unknown_label = 0usize;
+    let mut skipped_empty = 0usize;
+    let row_dim = V1_DIM + V2_DIM;
+
+    for rec in rdr.records() {
+        let rec = rec?;
+        let label = rec.get(label_col).unwrap_or("").trim().to_string();
+        let raw_vals = rec.get(values_col).unwrap_or("[]");
+        let header = header_col
+            .and_then(|c| rec.get(c))
+            .unwrap_or("")
+            .trim()
+            .to_string();
+
+        let target_idx = match name_to_idx.get(label.as_str()) {
+            Some(&i) => i,
+            None => {
+                skipped_unknown_label += 1;
+                continue;
+            }
+        };
+
+        let parsed: Vec<String> = serde_json::from_str(raw_vals).unwrap_or_default();
+        let sampled: Vec<String> = parsed.into_iter().take(sample_n.max(1)).collect();
+        if sampled.is_empty() {
+            skipped_empty += 1;
+            continue;
+        }
+        let n_used = sampled.len();
+
+        // ---- View1: value-CharCNN softmax aggregated over the sampled values ----
+        let results = value_clf.classify_batch(&sampled)?;
+        let mut mean = vec![0.0f32; n_classes];
+        let mut vmax = vec![0.0f32; n_classes];
+        let mut vote = vec![0.0f32; n_classes];
+        let mut top1s: Vec<f32> = Vec::with_capacity(n_used);
+        let mut entropies: Vec<f32> = Vec::with_capacity(n_used);
+        for r in &results {
+            // canonical-aligned softmax for this value
+            let mut row = vec![0.0f32; n_classes];
+            for (name, p) in &r.all_scores {
+                if let Some(&i) = name_to_idx.get(name.as_str()) {
+                    row[i] = *p;
+                }
+            }
+            let mut argmax = 0usize;
+            let mut argmax_p = -1.0f32;
+            let mut ent = 0.0f32;
+            for (i, &p) in row.iter().enumerate() {
+                mean[i] += p;
+                if p > vmax[i] {
+                    vmax[i] = p;
+                }
+                if p > argmax_p {
+                    argmax_p = p;
+                    argmax = i;
+                }
+                if p > 1e-9 {
+                    ent -= p * p.ln();
+                }
+            }
+            vote[argmax] += 1.0;
+            top1s.push(argmax_p.max(0.0));
+            entropies.push(ent);
+        }
+        let inv = 1.0 / n_used as f32;
+        for i in 0..n_classes {
+            mean[i] *= inv;
+            vote[i] *= inv;
+        }
+
+        // 8 confidence scalars
+        let mean_top1 = top1s.iter().sum::<f32>() * inv;
+        let max_top1 = top1s.iter().cloned().fold(0.0f32, f32::max);
+        let min_top1 = top1s.iter().cloned().fold(1.0f32, f32::min);
+        let var_top1 =
+            top1s.iter().map(|x| (x - mean_top1) * (x - mean_top1)).sum::<f32>() * inv;
+        let std_top1 = var_top1.max(0.0).sqrt();
+        let mean_entropy = entropies.iter().sum::<f32>() * inv;
+        let vote_agreement = vote.iter().cloned().fold(0.0f32, f32::max); // modal share
+        let mut uniq = std::collections::HashSet::new();
+        for v in &sampled {
+            uniq.insert(v.as_str());
+        }
+        let frac_unique = uniq.len() as f32 * inv;
+        let n_used_norm = n_used as f32 / sample_n.max(1) as f32;
+        let scalars = [
+            mean_top1,
+            max_top1,
+            min_top1,
+            std_top1,
+            mean_entropy,
+            vote_agreement,
+            frac_unique,
+            n_used_norm,
+        ];
+        debug_assert_eq!(scalars.len(), N_SCALARS);
+
+        // ---- View2: multi-branch raw logits (canonical order) ----
+        let v2 = mb.column_logits(&sampled, &header, Some(&taxonomy))?;
+        if v2.len() != n_classes {
+            anyhow::bail!("column_logits returned {} != {n_classes}", v2.len());
+        }
+
+        // ---- Write one row: mean ⊕ max ⊕ vote ⊕ scalars ⊕ v2 ----
+        let mut rowbuf: Vec<f32> = Vec::with_capacity(row_dim);
+        rowbuf.extend_from_slice(&mean);
+        rowbuf.extend_from_slice(&vmax);
+        rowbuf.extend_from_slice(&vote);
+        rowbuf.extend_from_slice(&scalars);
+        rowbuf.extend_from_slice(&v2);
+        debug_assert_eq!(rowbuf.len(), row_dim);
+        let mut bytes: Vec<u8> = Vec::with_capacity(row_dim * 4);
+        for f in &rowbuf {
+            bytes.extend_from_slice(&f.to_le_bytes());
+        }
+        feat_out.write_all(&bytes)?;
+        writeln!(labels_out, "{}\t{}\t{}", n_rows, target_idx, label)?;
+
+        n_rows += 1;
+        if n_rows % 5000 == 0 {
+            eprintln!("  dumped {n_rows} rows...");
+        }
+        if limit > 0 && n_rows >= limit {
+            break;
+        }
+    }
+    feat_out.flush()?;
+    labels_out.flush()?;
+
+    let meta = serde_json::json!({
+        "n_rows": n_rows,
+        "row_dim": row_dim,
+        "view1_dim": V1_DIM,
+        "view2_dim": V2_DIM,
+        "n_scalars": N_SCALARS,
+        "sample_n": sample_n,
+        "value_model": value_model.to_string_lossy(),
+        "mb_model": mb_model.to_string_lossy(),
+        "input": input.to_string_lossy(),
+        "skipped_unknown_label": skipped_unknown_label,
+        "skipped_empty": skipped_empty,
+        "label_order": canonical,
+        "layout": "mean(240) | max(240) | vote(240) | scalars(8) | mb_logits(240)",
+        "scalar_names": [
+            "mean_top1","max_top1","min_top1","std_top1",
+            "mean_entropy","vote_agreement","frac_unique","n_used_norm"
+        ],
+        "dtype": "float32_le",
+    });
+    std::fs::write(&meta_path, serde_json::to_string_pretty(&meta)? + "\n")?;
+
+    eprintln!(
+        "dump-fusion-features: wrote {n_rows} rows x {row_dim} f32 -> {feat_path:?}\n  \
+         labels -> {labels_path:?}  meta -> {meta_path:?}\n  \
+         skipped: unknown_label={skipped_unknown_label} empty={skipped_empty}"
+    );
+    Ok(())
+}
+
 fn cmd_extract_features(
     header: Option<String>,
     json_input: bool,

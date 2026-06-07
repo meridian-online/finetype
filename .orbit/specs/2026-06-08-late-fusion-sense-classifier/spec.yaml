@@ -1,0 +1,102 @@
+id: 2026-06-08-late-fusion-sense-classifier
+goal: 'Build B3, a late-fusion Sense-stage classifier that becomes the general column-classification primary for all 240 types, replacing multi-branch: a learned residual fusion head combines a value-level CharCNN view, the multi-branch column-logit view, and sibling-context, validated through the corpus-honest gate + gold anchor (pre-port Python kill switch, then post-port Rust ship gate) and promoted to models/default as release 0.7.0.'
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- release
+- fusion
+- retrain
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Production value-level CharCNN, feature_dim=0 (sidesteps the infer zero-fill bug).
+    Trained on the full clean corpus (output/value-level-labelling/cleaned_capped.ndjson)
+    plus the manufactured reference corpus (output/mining-factory/firewalled_values.ndjson)
+    via scripts/mining_factory/build_value_level_split.py. Record per-type recall; the
+    confusion family must clear — latitude/longitude recall matches the arch-test Arm B
+    (~74%/82%), decimal survives as a viable class (not collapsed). Model lands at
+    models/value-charcnn-v25/ (local-only weights).
+    CLOSED: v25 trained (8ep, seed42, feature_dim=0, train_acc 76.4%); held-out eval
+    output/value-level-arch-test/eval_v25_prod.json — overall 0.789 (arch-test ArmB 0.788);
+    latitude 0.729, longitude 0.813, decimal_number 0.803 (survives; multi-branch was 0.29%).
+  gate: false
+  checked: true
+- id: ac-02
+  description: |
+    finetype dump-fusion-features subcommand (Rust): loads the value-CharCNN +
+    multi-branch v19 once and emits, per labelled column,
+    [label, v1(728) + v2(240)] = 968 feature cols, to parquet over the labelled
+    distilled corpus output/distillation-v3/sherlock_distilled.csv.gz (102,461 cols;
+    sample_values + final_label, header-less). View1 = value-CharCNN 240-softmax
+    aggregated over the column's sampled values (mean ⊕ max ⊕ argmax-vote ⊕ 8
+    confidence scalars). View2 = multi-branch forward_trunk + flat head raw logits.
+    CORPUS DEVIATION FROM PLAN: distillation-v3 carries NO file_sha/table_id/header,
+    and no labelled corpus has values+header+siblings+file_sha together; View3
+    (standalone sibling-context 128-dim) is DROPPED because it would be near-constant
+    in training (no sibling tables) — the column-level tiebreak is carried by View2,
+    which is computed WITH sibling-context at inference. FIREWALL DEVIATION: row-hash
+    dedup against eval/row_hashes.tsv (canonical Layer-2 firewall, choice 0056) +
+    exclude eval/gold/gold_eval_anchor.tsv rows, replacing the file_sha MOD 2 split
+    the distilled corpus cannot support. Zero firewall overlap.
+  gate: false
+  checked: false
+- id: ac-03
+  description: |
+    Python head research on the dumped features: train the residual MLP
+    (LayerNorm -> 968->512 -> GELU -> Dropout -> 512->256 -> GELU -> Dropout -> 256->240,
+    then + alpha*View2-logits before softmax, alpha init 1.0 learnable). Architecture-search
+    width/dropout/alpha-init; record val accuracy + per-class recall vs standalone v19.
+    Freeze the winner. Trainer under scripts/fusion/.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-04
+  description: |
+    PRE-PORT KILL SWITCH (gate). Score the winning Python head's predictions through
+    scripts/corpus_honest_gate.py (vs output/ydf-validation-gate/v19_gated.parquet) plus
+    the gold anchor. A corpus-honest NO-GO or any gold-anchor per-family regression HALTS
+    the spec before any Rust port — fall back, do not port a head that regresses. A GO
+    (improve-or-hold on the families) authorises the port.
+  gate: true
+  checked: false
+- id: ac-05
+  description: |
+    Rust port: ModelType::LateFusion (main.rs), fusion_manifest.json pointing at the two
+    sub-model dirs (value-CharCNN + multi-branch) + the frozen head, load_fusion_classifier
+    (reusing load_char_classifier + multi-branch loaders), FusionClassifier +
+    ColumnClassifier::with_fusion (near column.rs:573), wired into
+    classify_columns_with_context (column.rs:856). Parity test: Rust fused logits ==
+    Python within tolerance on a held sample.
+  gate: false
+  checked: false
+- id: ac-06
+  description: |
+    cmd_profile wiring (main.rs load / wire / batched-context): fusion slots as the Sense
+    stage; Sharpen still runs after; --raw-model bypasses only Sharpen. Assert feature_dim==0
+    on the value sub-model at load.
+  gate: false
+  checked: false
+- id: ac-07
+  description: |
+    Full POST-train ship gate on the RUST path (FINETYPE_MODEL=models/fusion-v25):
+    mandatory Sense-distribution pre/post snapshot (snapshot_sense_distribution.py +
+    advisory drift_report.py), corpus-honest gate GO (BLOCKING, H05), gold anchor with no
+    per-family regression. A corpus-honest NO-GO blocks the models/default swap.
+  gate: true
+  checked: false
+- id: ac-08
+  description: |
+    Promotion per docs/RELEASE.md: publish models/fusion-v25 to HuggingFace, bump
+    FINETYPE_CI_MODEL in .github/workflows/{ci,release}.yml, flip the models/default symlink,
+    Cargo.toml 0.6.23 -> 0.7.0, CHANGELOG.md.
+  gate: false
+  checked: false
+  ac_type: ops
+- id: ac-09
+  description: |
+    Decision/release memo: did general fusion hold-and-improve? Gate results, release notes,
+    and whether to extend manufacture to Tier-2 next.
+  gate: false
+  checked: false
+  ac_type: doc
