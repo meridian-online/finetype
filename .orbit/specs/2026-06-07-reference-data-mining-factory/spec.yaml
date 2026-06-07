@@ -48,7 +48,7 @@ acceptance_criteria:
     rows. This guarantees the manufactured corpus shares no values with the eval
     holdout or the independent judge — the independence the gate and anchor rely on.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
