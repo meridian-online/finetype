@@ -98,3 +98,39 @@ v22/v23/v24 — additive blend retrains are now 0-for-3.
 
 Evidence: `output/destination-drift-precheck/mfg-proxy2.runlog`,
 `proxy_drift_mfg-proxy2.json`, `sense_dist_mfg-proxy2.json`.
+
+## Light-dose re-proxy (mfg-proxy3): NO-GO — additive blend route DEAD (0-for-3)
+
+Capped the manufactured injection at 50 columns/type (`--max-cols-per-type 50`):
+manufactured mass dropped 6× (2,086 -> 335 columns) while every starved type still
+cleared the distinct floor by orders of magnitude (latitude 2,500 distinct vs the
+10-in-18M starvation floor). Rebuilt the FTMB, re-ran the proxy. **Still NO-GO. The
+numeric prior still collapses:**
+
+| label | v19 base | full-dose (proxy2) | light-dose (proxy3) |
+|---|---:|---:|---:|
+| `representation.numeric.decimal_number` | 31.29% | 0.29% | **0.29%** |
+| `representation.numeric.integer_number` | 12.95% | 1.15% | **3.36%** |
+| `representation.text.entity_name` | 3.38% | 48.18% | **28.32%** |
+| `representation.text.plain_text` | 6.26% | 26.65% | **23.35%** |
+| `unknown` | 10.86% | 9.57% | **29.81%** |
+
+**The decisive finding: `decimal_number` collapses to 0.29% IDENTICALLY at full dose
+and at 1/6 dose.** The worst-hit numeric class is at a floor regardless of manufactured
+volume — so this is NOT a dose/volume problem. The light dose merely redistributed the
+collapse (entity_name down, unknown/plain_text up); it did not prevent it. Even 50
+latitude columns of decimal-shaped values labelled `geography.coordinate` are enough to
+gut the model's `decimal_number` prior on the real corpus.
+
+**Conclusion — the additive multi-branch blend approach cannot absorb manufactured
+reference data.** Three independent constructions — full sorted block (proxy1),
+interleaved (proxy2), light dose (proxy3) — all collapse the numeric prior. Additive
+hard-negative/reference retrains are now 0-for-4 across v22/v23/v24 + this. The proxy
+pre-check did its job: caught the collapse cheaply three times, before any overnight
+spend. ac-05 stays BLOCKED; manufacturing (ac-01–04) and the proxy instrument stand.
+The diversity win is real (latitude 10 -> 2,500 distinct) but the multi-branch model is
+structurally unable to hold its numeric/text boundary when fed decimal-shaped
+coordinates as a distinct class. Next move is a strategy decision, not another knob.
+
+Evidence: `output/destination-drift-precheck/mfg-proxy3.runlog`,
+`proxy_drift_mfg-proxy3.json`, `sense_dist_mfg-proxy3.json`.
