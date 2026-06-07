@@ -43,8 +43,22 @@ const N_CLASSES: usize = 240;
 const MB_OFFSET: usize = 728; // start of mb_logits within the 968-dim row
 
 #[derive(Parser, Debug)]
-#[command(name = "train-fusion-head", about = "Train the B3 late-fusion residual head")]
-struct Args {
+#[command(name = "train-fusion-head", about = "Train/predict the B3 late-fusion residual head")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Cmd {
+    /// Train the residual head over a dumped feature blob.
+    Train(TrainArgs),
+    /// Run a frozen head over a feature blob and emit per-row predicted labels.
+    Predict(PredictArgs),
+}
+
+#[derive(Parser, Debug)]
+struct TrainArgs {
     /// Feature stem; reads <stem>.f32 / <stem>.labels.tsv / <stem>.meta.json
     #[arg(long)]
     features: PathBuf,
@@ -85,6 +99,21 @@ struct Args {
 
     #[arg(long, default_value = "42")]
     seed: u64,
+}
+
+#[derive(Parser, Debug)]
+struct PredictArgs {
+    /// Frozen head dir (config.json + model.safetensors from a prior `train`)
+    #[arg(long)]
+    head: PathBuf,
+
+    /// Feature stem; reads <stem>.f32 / <stem>.meta.json
+    #[arg(long)]
+    features: PathBuf,
+
+    /// Output TSV: `row_idx \t pred_label`
+    #[arg(long)]
+    out: PathBuf,
 }
 
 /// Residual fusion head. Dropout is applied only when `train` is true.
@@ -164,6 +193,9 @@ fn read_features(stem: &Path) -> Result<(Vec<f32>, Vec<u32>, usize, Vec<String>)
     let labels_txt = fs::read_to_string(&labels_path).with_context(|| format!("read {labels_path:?}"))?;
     let mut labels = Vec::with_capacity(n_rows);
     for line in labels_txt.lines() {
+        if line.starts_with("row_idx\t") {
+            continue; // header
+        }
         let mut it = line.split('\t');
         let _row = it.next();
         let idx: u32 = it.next().context("labels label_index")?.parse()?;
@@ -231,8 +263,71 @@ fn argmax_rows(x: &Tensor) -> Result<Vec<u32>> {
     Ok(x.argmax(D::Minus1)?.to_dtype(DType::U32)?.to_vec1::<u32>()?)
 }
 
+fn read_blob(stem: &Path) -> Result<(Vec<f32>, usize)> {
+    let f32_path = with_ext(stem, "f32");
+    let raw = fs::read(&f32_path).with_context(|| format!("read {f32_path:?}"))?;
+    if raw.len() % (ROW_DIM * 4) != 0 {
+        bail!("{f32_path:?} size {} not a multiple of row stride", raw.len());
+    }
+    let n_rows = raw.len() / (ROW_DIM * 4);
+    let mut feats = Vec::with_capacity(n_rows * ROW_DIM);
+    for chunk in raw.chunks_exact(4) {
+        feats.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    }
+    Ok((feats, n_rows))
+}
+
+fn run_predict(args: PredictArgs) -> Result<()> {
+    let device = Device::Cpu;
+    let cfg: serde_json::Value =
+        serde_json::from_slice(&fs::read(args.head.join("config.json"))?)?;
+    let h1 = cfg["hidden1"].as_u64().context("config.hidden1")? as usize;
+    let h2 = cfg["hidden2"].as_u64().context("config.hidden2")? as usize;
+    let label_order: Vec<String> = cfg["label_order"]
+        .as_array()
+        .context("config.label_order")?
+        .iter()
+        .map(|v| v.as_str().unwrap_or_default().to_string())
+        .collect();
+
+    let weights = args.head.join("model.safetensors");
+    let vb = unsafe {
+        VarBuilder::from_mmaped_safetensors(&[weights.clone()], DType::F32, &device)
+            .with_context(|| format!("load head {weights:?}"))?
+    };
+    let head = FusionHead::new(vb, h1, h2, 0.0, 1.0)?;
+
+    let (feats, n_rows) = read_blob(&args.features)?;
+    println!("predict: {n_rows} rows x {ROW_DIM}");
+
+    let mut out = std::io::BufWriter::new(fs::File::create(&args.out)?);
+    use std::io::Write;
+    let batch = 4096usize;
+    let mut i = 0usize;
+    while i < n_rows {
+        let j = (i + batch).min(n_rows);
+        let x = Tensor::from_slice(&feats[i * ROW_DIM..j * ROW_DIM], (j - i, ROW_DIM), &device)?;
+        let logits = head.forward(&x, false)?;
+        let preds = argmax_rows(&logits)?;
+        for (k, &p) in preds.iter().enumerate() {
+            let label = label_order.get(p as usize).map(|s| s.as_str()).unwrap_or("?");
+            writeln!(out, "{}\t{}", i + k, label)?;
+        }
+        i = j;
+    }
+    out.flush()?;
+    println!("wrote {} predictions -> {}", n_rows, args.out.display());
+    Ok(())
+}
+
 fn main() -> Result<()> {
-    let args = Args::parse();
+    match Cli::parse().cmd {
+        Cmd::Train(a) => run_train(a),
+        Cmd::Predict(a) => run_predict(a),
+    }
+}
+
+fn run_train(args: TrainArgs) -> Result<()> {
     let device = Device::Cpu;
 
     let (feats, labels, n_rows, label_order) = read_features(&args.features)?;

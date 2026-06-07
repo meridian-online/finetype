@@ -1,0 +1,9 @@
+family	label	support	tp	fp	fn	precision	recall
+A_tight_code_vs_alnum	representation.identifier.alphanumeric_id	30	12	0	18	1.000	0.400
+B_country_vs_categorical	geography.location.country_code	30	30	30	0	0.500	1.000
+B_country_vs_categorical	representation.discrete.categorical	30	0	0	30	nan	0.000
+C_lat_lon_temperature	geography.coordinate.latitude	30	0	0	30	nan	0.000
+C_lat_lon_temperature	geography.coordinate.longitude	30	1	0	29	1.000	0.033
+C_lat_lon_temperature	representation.numeric.decimal_number	30	30	59	0	0.337	1.000
+D_year_vs_integer	datetime.component.year	30	30	12	0	0.714	1.000
+D_year_vs_integer	representation.numeric.integer_number	30	7	0	23	1.000	0.233

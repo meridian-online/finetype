@@ -40,7 +40,7 @@ acceptance_criteria:
     exclude eval/gold/gold_eval_anchor.tsv rows, replacing the file_sha MOD 2 split
     the distilled corpus cannot support. Zero firewall overlap.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     Python head research on the dumped features: train the residual MLP
@@ -49,7 +49,7 @@ acceptance_criteria:
     width/dropout/alpha-init; record val accuracy + per-class recall vs standalone v19.
     Freeze the winner. Trainer under scripts/fusion/.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |

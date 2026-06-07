@@ -491,6 +491,12 @@ enum Commands {
         /// Optional row cap (debug). 0 = no cap.
         #[arg(long, default_value = "0")]
         limit: usize,
+
+        /// Optional CSV column carrying a per-row key (e.g. file_path\x01column_name).
+        /// When set, writes <stem>.keys.tsv (`row_idx\tkey`) aligned to emitted rows and
+        /// keeps rows whose label is unknown (prediction/keyed mode, not training).
+        #[arg(long)]
+        key_col: Option<String>,
     },
 
     /// Evaluate model accuracy on a test set
@@ -779,7 +785,10 @@ fn main() -> Result<()> {
             output,
             sample_n,
             limit,
-        } => cmd_dump_fusion_features(&input, &value_model, &mb_model, &output, sample_n, limit),
+            key_col,
+        } => cmd_dump_fusion_features(
+            &input, &value_model, &mb_model, &output, sample_n, limit, key_col.as_deref(),
+        ),
     }
 }
 
@@ -1232,6 +1241,7 @@ fn cmd_dump_fusion_features(
     output: &PathBuf,
     sample_n: usize,
     limit: usize,
+    key_col: Option<&str>,
 ) -> Result<()> {
     use std::collections::HashMap;
     use std::io::Write;
@@ -1268,6 +1278,12 @@ fn cmd_dump_fusion_features(
     let values_col = col("sample_values")
         .ok_or_else(|| anyhow::anyhow!("input missing sample_values column"))?;
     let header_col = col("column_name");
+    let key_idx = match key_col {
+        Some(name) => Some(
+            col(name).ok_or_else(|| anyhow::anyhow!("input missing key column {name:?}"))?,
+        ),
+        None => None,
+    };
 
     let feat_path = output.with_extension("f32");
     let labels_path = output.with_extension("labels.tsv");
@@ -1275,6 +1291,15 @@ fn cmd_dump_fusion_features(
     let mut feat_out = std::io::BufWriter::new(std::fs::File::create(&feat_path)?);
     let mut labels_out = std::io::BufWriter::new(std::fs::File::create(&labels_path)?);
     writeln!(labels_out, "row_idx\tlabel_index\tlabel_name")?;
+    let keys_path = output.with_extension("keys.tsv");
+    let mut keys_out = match key_idx {
+        Some(_) => {
+            let mut w = std::io::BufWriter::new(std::fs::File::create(&keys_path)?);
+            writeln!(w, "row_idx\tkey")?;
+            Some(w)
+        }
+        None => None,
+    };
 
     let mut n_rows = 0usize;
     let mut skipped_unknown_label = 0usize;
@@ -1291,11 +1316,17 @@ fn cmd_dump_fusion_features(
             .trim()
             .to_string();
 
-        let target_idx = match name_to_idx.get(label.as_str()) {
-            Some(&i) => i,
+        // In keyed/predict mode we don't need a gold label (target_idx == -1 sentinel);
+        // in training mode an unknown label is skipped.
+        let target_idx: i64 = match name_to_idx.get(label.as_str()) {
+            Some(&i) => i as i64,
             None => {
-                skipped_unknown_label += 1;
-                continue;
+                if key_idx.is_some() {
+                    -1
+                } else {
+                    skipped_unknown_label += 1;
+                    continue;
+                }
             }
         };
 
@@ -1395,6 +1426,9 @@ fn cmd_dump_fusion_features(
         }
         feat_out.write_all(&bytes)?;
         writeln!(labels_out, "{}\t{}\t{}", n_rows, target_idx, label)?;
+        if let (Some(w), Some(ki)) = (keys_out.as_mut(), key_idx) {
+            writeln!(w, "{}\t{}", n_rows, rec.get(ki).unwrap_or(""))?;
+        }
 
         n_rows += 1;
         if n_rows % 5000 == 0 {
@@ -1406,6 +1440,9 @@ fn cmd_dump_fusion_features(
     }
     feat_out.flush()?;
     labels_out.flush()?;
+    if let Some(w) = keys_out.as_mut() {
+        w.flush()?;
+    }
 
     let meta = serde_json::json!({
         "n_rows": n_rows,
