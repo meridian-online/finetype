@@ -142,7 +142,7 @@ acceptance_criteria:
     latdec parquet that it counts the ~4,417 ydf=None latitude FPs the bet's
     original metric drove to zero.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     THE GATE — trust by reproduction. Run the stratified, oracle-honest gate
@@ -158,7 +158,7 @@ acceptance_criteria:
     nothing about the instrument is trustworthy until it re-derives the four
     answers we already know.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
