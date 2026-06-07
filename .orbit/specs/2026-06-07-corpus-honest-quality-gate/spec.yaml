@@ -107,7 +107,7 @@ goal: |
     gate is the post-train corpus-honest layer alongside it, not a re-tune of it.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - eval
 - precision
@@ -196,5 +196,10 @@ acceptance_criteria:
     and the gate stays a post-train instrument. Either outcome is a durable finding
     about where in the loop honesty is affordable.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
+memories_considered:
+- key: latdec-corpus-fp-relocation
+  disposition: adopted
+  reason: This memory is the spec's motivation — latdec's corpus-scale latitude relocation (4,417 new FPs on ydf-abstain feature-floats) that gold anchor, m-19 and the drift proxy all cleared, caught only by the 9-hour full pass. The gate built here counts exactly that miss against the stable gated-v19 oracle, reproduces the NO-GO from a 6.6% stratified sample (latitude net contra 2,481, 446 observed cols), and ac-06 refined the lesson — the relocation is legible PRE-train on the 10-epoch proxy (net 4,716, ratio 1.274 rising), so the signal moves earlier than the overnight spend while the settled per-label ledger stays post-train.
+closed_at: 2026-06-07T01:51:29.588957Z
