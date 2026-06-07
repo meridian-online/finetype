@@ -83,9 +83,16 @@ def load_survivors(path: Path) -> dict[str, list[str]]:
 
 
 def materialise_columns(by_type: dict[str, list[str]], column_size: int,
-                        min_values: int, rng: random.Random
+                        min_values: int, rng: random.Random,
+                        max_cols_per_type: int | None = None
                         ) -> tuple[list[tuple[str, list[str], str]], dict[str, dict]]:
-    """Chunk each type's values into (label, values, header) columns."""
+    """Chunk each type's values into (label, values, header) columns.
+
+    `max_cols_per_type` caps the number of columns emitted PER TYPE (light-dose
+    blend): a starved type still clears the distinct-value floor by orders of
+    magnitude (50 cols x 50 vals = 2,500 distinct) while the aggregate manufactured
+    mass shrinks ~10x, so the concentrated geography/text block cannot shift the
+    model's global prior off numerics. None = no cap (full dose)."""
     columns: list[tuple[str, list[str], str]] = []
     stats: dict[str, dict] = {}
     for type_key in sorted(by_type):
@@ -93,6 +100,8 @@ def materialise_columns(by_type: dict[str, list[str]], column_size: int,
         rng.shuffle(values)
         n_cols = 0
         for i in range(0, len(values), column_size):
+            if max_cols_per_type is not None and n_cols >= max_cols_per_type:
+                break
             chunk = values[i:i + column_size]
             if len(chunk) < min_values:
                 continue
@@ -179,6 +188,11 @@ def main() -> int:
                     default=OUT_DIR / "sherlock_distilled_mfg.csv.gz")
     ap.add_argument("--column-size", type=int, default=50)
     ap.add_argument("--min-values", type=int, default=5)
+    ap.add_argument("--max-cols-per-type", type=int, default=None,
+                    help="Light-dose cap: max manufactured columns per type. A "
+                         "starved type still clears the distinct floor by orders of "
+                         "magnitude while the aggregate manufactured mass shrinks, so "
+                         "the geography/text block cannot shift the global prior.")
     ap.add_argument("--distilled-cap", type=int, default=600,
                     help="Documented per-type cap applied by prepare_multibranch at "
                          "FTMB time; recorded in the recipe, NOT applied here.")
@@ -188,7 +202,8 @@ def main() -> int:
     rng = random.Random(args.seed)
     by_type = load_survivors(args.inp)
     columns, stats = materialise_columns(by_type, args.column_size,
-                                         args.min_values, rng)
+                                         args.min_values, rng,
+                                         args.max_cols_per_type)
 
     # Audit gate. Zero categorical is the load-bearing HARD gate (CLAUDE.md).
     cat_cols = sum(1 for c in columns if c[0] == CATEGORICAL)
