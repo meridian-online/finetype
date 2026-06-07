@@ -128,8 +128,7 @@ acceptance_criteria:
     resolution table, not the size — small is only valuable if latitude is still
     legible in it.
   gate: false
-  ac_type: code
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     Oracle-honest FP scorer — closes flaw 2 (the gameable metric). Implement a
@@ -143,7 +142,6 @@ acceptance_criteria:
     latdec parquet that it counts the ~4,417 ydf=None latitude FPs the bet's
     original metric drove to zero.
   gate: false
-  ac_type: code
   checked: false
 - id: ac-03
   description: |
@@ -160,8 +158,8 @@ acceptance_criteria:
     nothing about the instrument is trustworthy until it re-derives the four
     answers we already know.
   gate: true
-  ac_type: observation
   checked: false
+  ac_type: observation
 - id: ac-04
   description: |
     Cost — cheap enough to run in the loop, not as a 9-hour event. Measure the
@@ -172,8 +170,8 @@ acceptance_criteria:
     the column throughput; if the target is missed, record what dominates (profile
     subprocess vs score) so the next cut is informed.
   gate: false
-  ac_type: observation
   checked: false
+  ac_type: observation
 - id: ac-05
   description: |
     Wire it into the promotion contract. Update CLAUDE.md's instrument map and the
@@ -185,8 +183,8 @@ acceptance_criteria:
     bought: gold-anchor + ship-gate is NOT sufficient to promote; corpus breadth is
     the only thing that catches a fix that relocates rather than removes.
   gate: false
-  ac_type: doc
   checked: false
+  ac_type: doc
 - id: ac-06
   description: |
     Pre-train reach — can the honest gate move EARLIER? (Investigation, recorded
@@ -198,5 +196,5 @@ acceptance_criteria:
     and the gate stays a post-train instrument. Either outcome is a durable finding
     about where in the loop honesty is affordable.
   gate: false
-  ac_type: observation
   checked: false
+  ac_type: observation

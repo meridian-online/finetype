@@ -1,0 +1,1 @@
+{"task_id":"t-00017e8718b6a4adb02420a8","spec_id":"2026-06-07-corpus-honest-quality-gate","event":"open","body":"ac-01: stratified corpus sampler — file list keyed to v19 label distribution, oversampling rare labels; deliver list + size fraction + per-label resolution table","labels":[],"timestamp":"2026-06-07T00:22:48.563205Z"}

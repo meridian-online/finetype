@@ -1,0 +1,1732 @@
+{
+  "summary": {
+    "spec": "2026-06-07-corpus-honest-quality-gate",
+    "ac": "ac-01",
+    "baseline": "/Users/hugh/github/meridian-online/finetype/eval/gittables/corpus_pass/columns.parquet",
+    "params": {
+      "tmin": 400,
+      "rare_floor": 40000
+    },
+    "corpus": {
+      "files": 505708,
+      "cols": 6590432
+    },
+    "sample": {
+      "files": 33250,
+      "pct_files": 6.57,
+      "cols": 855917,
+      "pct_cols": 12.99
+    },
+    "resolution": {
+      "labels": 243,
+      "min_sample_cols": 2,
+      "labels_fully_captured": 81,
+      "labels_below_tmin_not_captured": 0,
+      "unresolved": []
+    },
+    "file_list": "/Users/hugh/github/meridian-online/finetype/output/corpus-honest-gate/stratified_sample.files.txt"
+  },
+  "per_label": [
+    {
+      "label": "representation.numeric.decimal_number",
+      "full_cols": 1900526,
+      "sample_cols": 217907,
+      "sample_rate": 0.1147,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.numeric.integer_number",
+      "full_cols": 909464,
+      "sample_cols": 99055,
+      "sample_rate": 0.1089,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.text.plain_text",
+      "full_cols": 447422,
+      "sample_cols": 45176,
+      "sample_rate": 0.101,
+      "fully_captured": false
+    },
+    {
+      "label": "unknown",
+      "full_cols": 414938,
+      "sample_cols": 82088,
+      "sample_rate": 0.1978,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.identifier.increment",
+      "full_cols": 326753,
+      "sample_cols": 24786,
+      "sample_rate": 0.0759,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.full_name",
+      "full_cols": 249568,
+      "sample_cols": 15672,
+      "sample_rate": 0.0628,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.text.entity_name",
+      "full_cols": 225350,
+      "sample_cols": 33460,
+      "sample_rate": 0.1485,
+      "fully_captured": false
+    },
+    {
+      "label": "container.array.comma_separated",
+      "full_cols": 212987,
+      "sample_cols": 6498,
+      "sample_rate": 0.0305,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.text.word",
+      "full_cols": 206922,
+      "sample_cols": 23417,
+      "sample_rate": 0.1132,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.url",
+      "full_cols": 196762,
+      "sample_cols": 7465,
+      "sample_rate": 0.0379,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.top_level_domain",
+      "full_cols": 87542,
+      "sample_cols": 1315,
+      "sample_rate": 0.015,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.discrete.ordinal",
+      "full_cols": 76691,
+      "sample_cols": 8171,
+      "sample_rate": 0.1065,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.identifier.alphanumeric_id",
+      "full_cols": 76641,
+      "sample_cols": 11686,
+      "sample_rate": 0.1525,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.boolean.binary",
+      "full_cols": 68743,
+      "sample_cols": 6401,
+      "sample_rate": 0.0931,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.discrete.categorical",
+      "full_cols": 67864,
+      "sample_cols": 13358,
+      "sample_rate": 0.1968,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.identifier.numeric_code",
+      "full_cols": 59157,
+      "sample_cols": 2707,
+      "sample_rate": 0.0458,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.currency.amount",
+      "full_cols": 59054,
+      "sample_cols": 28659,
+      "sample_rate": 0.4853,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.boolean.terms",
+      "full_cols": 56342,
+      "sample_cols": 17004,
+      "sample_rate": 0.3018,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.medical.npi",
+      "full_cols": 42675,
+      "sample_cols": 2137,
+      "sample_rate": 0.0501,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.component.year",
+      "full_cols": 41017,
+      "sample_cols": 6072,
+      "sample_rate": 0.148,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.epoch.unix_seconds",
+      "full_cols": 39799,
+      "sample_cols": 2885,
+      "sample_rate": 0.0725,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.city",
+      "full_cols": 38312,
+      "sample_cols": 6616,
+      "sample_rate": 0.1727,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.address.postal_code",
+      "full_cols": 31799,
+      "sample_cols": 9253,
+      "sample_rate": 0.291,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.identifier.uuid",
+      "full_cols": 30432,
+      "sample_cols": 4124,
+      "sample_rate": 0.1355,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.offset.utc",
+      "full_cols": 27595,
+      "sample_cols": 1389,
+      "sample_rate": 0.0503,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.gender_code",
+      "full_cols": 25935,
+      "sample_cols": 2264,
+      "sample_rate": 0.0873,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.time.hm_24h",
+      "full_cols": 24452,
+      "sample_cols": 1822,
+      "sample_rate": 0.0745,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.sql_standard",
+      "full_cols": 23402,
+      "sample_cols": 2363,
+      "sample_rate": 0.101,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.boolean.initials",
+      "full_cols": 22186,
+      "sample_cols": 6086,
+      "sample_rate": 0.2743,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.user_agent",
+      "full_cols": 21094,
+      "sample_cols": 2207,
+      "sample_rate": 0.1046,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.transportation.iata_code",
+      "full_cols": 20515,
+      "sample_cols": 2578,
+      "sample_rate": 0.1257,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.region",
+      "full_cols": 20310,
+      "sample_cols": 4233,
+      "sample_rate": 0.2084,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.blood_type",
+      "full_cols": 20296,
+      "sample_cols": 1751,
+      "sample_rate": 0.0863,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.numeric.percentage",
+      "full_cols": 20063,
+      "sample_cols": 10608,
+      "sample_rate": 0.5287,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.cryptographic.hash",
+      "full_cols": 17518,
+      "sample_cols": 3359,
+      "sample_rate": 0.1917,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.iso",
+      "full_cols": 17306,
+      "sample_cols": 3056,
+      "sample_rate": 0.1766,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.iso_8601",
+      "full_cols": 15649,
+      "sample_cols": 5351,
+      "sample_rate": 0.3419,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.hostname",
+      "full_cols": 15514,
+      "sample_cols": 1367,
+      "sample_rate": 0.0881,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.component.periodicity",
+      "full_cols": 13967,
+      "sample_cols": 1635,
+      "sample_rate": 0.1171,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.address.full_address",
+      "full_cols": 13690,
+      "sample_cols": 4234,
+      "sample_rate": 0.3093,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.gender",
+      "full_cols": 12916,
+      "sample_cols": 2343,
+      "sample_rate": 0.1814,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.commerce.upc",
+      "full_cols": 12873,
+      "sample_cols": 1377,
+      "sample_rate": 0.107,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.file.excel_format",
+      "full_cols": 11744,
+      "sample_cols": 1504,
+      "sample_rate": 0.1281,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.country",
+      "full_cols": 10949,
+      "sample_cols": 3403,
+      "sample_rate": 0.3108,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.phone_number",
+      "full_cols": 10758,
+      "sample_cols": 3555,
+      "sample_rate": 0.3305,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.coordinate.longitude",
+      "full_cols": 10200,
+      "sample_cols": 1493,
+      "sample_rate": 0.1464,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.numeric.si_number",
+      "full_cols": 9461,
+      "sample_cols": 7066,
+      "sample_rate": 0.7469,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.coordinate.geohash",
+      "full_cols": 9381,
+      "sample_cols": 1072,
+      "sample_rate": 0.1143,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.email",
+      "full_cols": 8772,
+      "sample_cols": 1089,
+      "sample_rate": 0.1241,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.identifier.tsid",
+      "full_cols": 8472,
+      "sample_cols": 1528,
+      "sample_rate": 0.1804,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.component.day_of_week",
+      "full_cols": 8147,
+      "sample_cols": 1189,
+      "sample_rate": 0.1459,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.commerce.isbn",
+      "full_cols": 8024,
+      "sample_cols": 1919,
+      "sample_rate": 0.2392,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.coordinate.latitude",
+      "full_cols": 7974,
+      "sample_cols": 2213,
+      "sample_rate": 0.2775,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.cryptographic.jwt",
+      "full_cols": 7920,
+      "sample_cols": 907,
+      "sample_rate": 0.1145,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.commerce.ean",
+      "full_cols": 7540,
+      "sample_cols": 1592,
+      "sample_rate": 0.2111,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.banking.aba_routing",
+      "full_cols": 7522,
+      "sample_cols": 2787,
+      "sample_rate": 0.3705,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.mdy_slash",
+      "full_cols": 7453,
+      "sample_cols": 1996,
+      "sample_rate": 0.2678,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.height",
+      "full_cols": 7281,
+      "sample_cols": 1910,
+      "sample_rate": 0.2623,
+      "fully_captured": false
+    },
+    {
+      "label": "container.object.html",
+      "full_cols": 7004,
+      "sample_cols": 1303,
+      "sample_rate": 0.186,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.last_name",
+      "full_cols": 6611,
+      "sample_cols": 1463,
+      "sample_rate": 0.2213,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.abbreviated_month",
+      "full_cols": 6388,
+      "sample_cols": 3627,
+      "sample_rate": 0.5678,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.country_code",
+      "full_cols": 6196,
+      "sample_cols": 2399,
+      "sample_rate": 0.3872,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.iso_8601_milliseconds",
+      "full_cols": 6148,
+      "sample_cols": 1192,
+      "sample_rate": 0.1939,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.scientific.measurement_unit",
+      "full_cols": 5995,
+      "sample_cols": 1391,
+      "sample_rate": 0.232,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.password",
+      "full_cols": 5967,
+      "sample_cols": 1020,
+      "sample_rate": 0.1709,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.iso_8601_compact",
+      "full_cols": 4877,
+      "sample_cols": 1137,
+      "sample_rate": 0.2331,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.alphanumeric.alphanumeric_id",
+      "full_cols": 4746,
+      "sample_cols": 1209,
+      "sample_rate": 0.2547,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.format.color_hsl",
+      "full_cols": 4745,
+      "sample_cols": 431,
+      "sample_rate": 0.0908,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.username",
+      "full_cols": 4655,
+      "sample_cols": 1070,
+      "sample_rate": 0.2299,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.file.extension",
+      "full_cols": 4524,
+      "sample_cols": 1627,
+      "sample_rate": 0.3596,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.code.locale_code",
+      "full_cols": 4246,
+      "sample_cols": 1663,
+      "sample_rate": 0.3917,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.cloud.s3_uri",
+      "full_cols": 3866,
+      "sample_cols": 542,
+      "sample_rate": 0.1402,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.state",
+      "full_cols": 3856,
+      "sample_cols": 1228,
+      "sample_rate": 0.3185,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.currency.currency_code",
+      "full_cols": 3731,
+      "sample_cols": 1993,
+      "sample_rate": 0.5342,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.coordinate.dms",
+      "full_cols": 3694,
+      "sample_cols": 426,
+      "sample_rate": 0.1153,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.code.doi",
+      "full_cols": 3681,
+      "sample_cols": 731,
+      "sample_rate": 0.1986,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.index.h3",
+      "full_cols": 3625,
+      "sample_cols": 638,
+      "sample_rate": 0.176,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.code.imei",
+      "full_cols": 3563,
+      "sample_cols": 703,
+      "sample_rate": 0.1973,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.time.hm_12h",
+      "full_cols": 3489,
+      "sample_cols": 476,
+      "sample_rate": 0.1364,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.text.emoji",
+      "full_cols": 3372,
+      "sample_cols": 1135,
+      "sample_rate": 0.3366,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.development.version",
+      "full_cols": 3289,
+      "sample_cols": 862,
+      "sample_rate": 0.2621,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.scientific.smiles",
+      "full_cols": 3227,
+      "sample_cols": 991,
+      "sample_rate": 0.3071,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.file.mime_type",
+      "full_cols": 3214,
+      "sample_cols": 700,
+      "sample_rate": 0.2178,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.coordinate.coordinates",
+      "full_cols": 3117,
+      "sample_cols": 836,
+      "sample_rate": 0.2682,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.http_method",
+      "full_cols": 3008,
+      "sample_cols": 952,
+      "sample_rate": 0.3165,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.address.street_suffix",
+      "full_cols": 2810,
+      "sample_cols": 770,
+      "sample_rate": 0.274,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.period.quarter",
+      "full_cols": 2792,
+      "sample_cols": 995,
+      "sample_rate": 0.3564,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.currency.amount_accounting",
+      "full_cols": 2776,
+      "sample_cols": 873,
+      "sample_rate": 0.3145,
+      "fully_captured": false
+    },
+    {
+      "label": "container.array.whitespace_separated",
+      "full_cols": 2707,
+      "sample_cols": 589,
+      "sample_rate": 0.2176,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.first_name",
+      "full_cols": 2692,
+      "sample_cols": 889,
+      "sample_rate": 0.3302,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.person.weight",
+      "full_cols": 2573,
+      "sample_cols": 578,
+      "sample_rate": 0.2246,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.cryptographic.token_urlsafe",
+      "full_cols": 2538,
+      "sample_cols": 790,
+      "sample_rate": 0.3113,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.numeric.scientific_notation",
+      "full_cols": 2508,
+      "sample_cols": 674,
+      "sample_rate": 0.2687,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.scientific.rna_sequence",
+      "full_cols": 2497,
+      "sample_cols": 497,
+      "sample_rate": 0.199,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.compact_ym",
+      "full_cols": 2414,
+      "sample_cols": 531,
+      "sample_rate": 0.22,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.compact_dmy",
+      "full_cols": 2392,
+      "sample_cols": 480,
+      "sample_rate": 0.2007,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.development.docker_ref",
+      "full_cols": 2178,
+      "sample_cols": 499,
+      "sample_rate": 0.2291,
+      "fully_captured": false
+    },
+    {
+      "label": "container.object.xml",
+      "full_cols": 2104,
+      "sample_cols": 479,
+      "sample_rate": 0.2277,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.numeric.decimal_number_comma",
+      "full_cols": 2090,
+      "sample_cols": 843,
+      "sample_rate": 0.4033,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.mdy_12h",
+      "full_cols": 2077,
+      "sample_cols": 709,
+      "sample_rate": 0.3414,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.data_uri",
+      "full_cols": 2073,
+      "sample_cols": 618,
+      "sample_rate": 0.2981,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.compact_ymd",
+      "full_cols": 1987,
+      "sample_cols": 775,
+      "sample_rate": 0.39,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.jp_era_long",
+      "full_cols": 1832,
+      "sample_cols": 726,
+      "sample_rate": 0.3963,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.crypto.ethereum_address",
+      "full_cols": 1800,
+      "sample_cols": 711,
+      "sample_rate": 0.395,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.time.iso",
+      "full_cols": 1738,
+      "sample_cols": 437,
+      "sample_rate": 0.2514,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.rfc_3339",
+      "full_cols": 1648,
+      "sample_cols": 697,
+      "sample_rate": 0.4229,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.medical.loinc",
+      "full_cols": 1631,
+      "sample_cols": 704,
+      "sample_rate": 0.4316,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.offset.iana",
+      "full_cols": 1599,
+      "sample_cols": 1179,
+      "sample_rate": 0.7373,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.state_code",
+      "full_cols": 1596,
+      "sample_cols": 559,
+      "sample_rate": 0.3503,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.epoch.unix_milliseconds",
+      "full_cols": 1590,
+      "sample_cols": 520,
+      "sample_rate": 0.327,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.government.ein",
+      "full_cols": 1548,
+      "sample_cols": 495,
+      "sample_rate": 0.3198,
+      "fully_captured": false
+    },
+    {
+      "label": "container.array.semicolon_separated",
+      "full_cols": 1524,
+      "sample_cols": 545,
+      "sample_rate": 0.3576,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.compact_mdy",
+      "full_cols": 1501,
+      "sample_cols": 461,
+      "sample_rate": 0.3071,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.securities.cusip",
+      "full_cols": 1415,
+      "sample_cols": 489,
+      "sample_rate": 0.3456,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.month_year_full",
+      "full_cols": 1404,
+      "sample_cols": 414,
+      "sample_rate": 0.2949,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.file.file_size",
+      "full_cols": 1324,
+      "sample_cols": 1016,
+      "sample_rate": 0.7674,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.currency.currency_symbol",
+      "full_cols": 1261,
+      "sample_cols": 515,
+      "sample_rate": 0.4084,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.syslog_bsd",
+      "full_cols": 1224,
+      "sample_cols": 405,
+      "sample_rate": 0.3309,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.medical.hcpcs",
+      "full_cols": 1215,
+      "sample_cols": 455,
+      "sample_rate": 0.3745,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.ymd_slash",
+      "full_cols": 1202,
+      "sample_cols": 561,
+      "sample_rate": 0.4667,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.securities.sedol",
+      "full_cols": 1192,
+      "sample_cols": 595,
+      "sample_rate": 0.4992,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.contact.calling_code",
+      "full_cols": 1190,
+      "sample_cols": 454,
+      "sample_rate": 0.3815,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.commerce.issn",
+      "full_cols": 1158,
+      "sample_cols": 464,
+      "sample_rate": 0.4007,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.sql_milliseconds",
+      "full_cols": 1151,
+      "sample_cols": 526,
+      "sample_rate": 0.457,
+      "fully_captured": false
+    },
+    {
+      "label": "container.object.yaml",
+      "full_cols": 1122,
+      "sample_cols": 435,
+      "sample_rate": 0.3877,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.sql_microseconds_offset",
+      "full_cols": 1119,
+      "sample_cols": 412,
+      "sample_rate": 0.3682,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.location.continent",
+      "full_cols": 1114,
+      "sample_cols": 540,
+      "sample_rate": 0.4847,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.identifier.snowflake_id",
+      "full_cols": 1102,
+      "sample_cols": 452,
+      "sample_rate": 0.4102,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.address.street_address",
+      "full_cols": 1098,
+      "sample_cols": 604,
+      "sample_rate": 0.5501,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.transportation.icao_code",
+      "full_cols": 1084,
+      "sample_cols": 636,
+      "sample_rate": 0.5867,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.mdy_dash",
+      "full_cols": 1023,
+      "sample_cols": 501,
+      "sample_rate": 0.4897,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.iso_microseconds",
+      "full_cols": 1015,
+      "sample_cols": 565,
+      "sample_rate": 0.5567,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.banking.swift_bic",
+      "full_cols": 1002,
+      "sample_cols": 488,
+      "sample_rate": 0.487,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.ip_v4",
+      "full_cols": 977,
+      "sample_cols": 567,
+      "sample_rate": 0.5803,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.rate.yield",
+      "full_cols": 974,
+      "sample_cols": 648,
+      "sample_rate": 0.6653,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.long_full_month",
+      "full_cols": 963,
+      "sample_cols": 454,
+      "sample_rate": 0.4714,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.dmy_short_dot",
+      "full_cols": 959,
+      "sample_cols": 416,
+      "sample_rate": 0.4338,
+      "fully_captured": false
+    },
+    {
+      "label": "container.array.pipe_separated",
+      "full_cols": 952,
+      "sample_cols": 501,
+      "sample_rate": 0.5263,
+      "fully_captured": false
+    },
+    {
+      "label": "geography.transportation.unlocode",
+      "full_cols": 929,
+      "sample_cols": 479,
+      "sample_rate": 0.5156,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.medical.cpt",
+      "full_cols": 922,
+      "sample_cols": 491,
+      "sample_rate": 0.5325,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.format.color_hex",
+      "full_cols": 904,
+      "sample_cols": 439,
+      "sample_rate": 0.4856,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.medical.icd10",
+      "full_cols": 904,
+      "sample_cols": 448,
+      "sample_rate": 0.4956,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.iso_8601_offset",
+      "full_cols": 897,
+      "sample_cols": 436,
+      "sample_rate": 0.4861,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.component.month_name",
+      "full_cols": 881,
+      "sample_cols": 463,
+      "sample_rate": 0.5255,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.time.hms_24h",
+      "full_cols": 870,
+      "sample_cols": 468,
+      "sample_rate": 0.5379,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.mdy_24h",
+      "full_cols": 803,
+      "sample_cols": 648,
+      "sample_rate": 0.807,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.dmy_slash",
+      "full_cols": 767,
+      "sample_cols": 488,
+      "sample_rate": 0.6362,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.sql_microseconds",
+      "full_cols": 733,
+      "sample_cols": 435,
+      "sample_rate": 0.5935,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.internet.ip_v6",
+      "full_cols": 705,
+      "sample_cols": 430,
+      "sample_rate": 0.6099,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.korean_ymd",
+      "full_cols": 694,
+      "sample_cols": 426,
+      "sample_rate": 0.6138,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.timestamp.dmy_hm",
+      "full_cols": 628,
+      "sample_cols": 442,
+      "sample_rate": 0.7038,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.currency.amount_space",
+      "full_cols": 594,
+      "sample_cols": 516,
+      "sample_rate": 0.8687,
+      "fully_captured": false
+    },
+    {
+      "label": "representation.scientific.dna_sequence",
+      "full_cols": 553,
+      "sample_cols": 431,
+      "sample_rate": 0.7794,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.payment.credit_card_number",
+      "full_cols": 528,
+      "sample_cols": 406,
+      "sample_rate": 0.7689,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.mdy_short_slash",
+      "full_cols": 483,
+      "sample_cols": 409,
+      "sample_rate": 0.8468,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.crypto.bitcoin_address",
+      "full_cols": 469,
+      "sample_cols": 410,
+      "sample_rate": 0.8742,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.duration.iso_8601",
+      "full_cols": 466,
+      "sample_cols": 427,
+      "sample_rate": 0.9163,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.year_month",
+      "full_cols": 460,
+      "sample_cols": 410,
+      "sample_rate": 0.8913,
+      "fully_captured": false
+    },
+    {
+      "label": "identity.government.eu_vat",
+      "full_cols": 456,
+      "sample_cols": 411,
+      "sample_rate": 0.9013,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.date.dmy_dash_abbrev_short",
+      "full_cols": 456,
+      "sample_cols": 414,
+      "sample_rate": 0.9079,
+      "fully_captured": false
+    },
+    {
+      "label": "finance.currency.amount_comma",
+      "full_cols": 454,
+      "sample_cols": 415,
+      "sample_rate": 0.9141,
+      "fully_captured": false
+    },
+    {
+      "label": "technology.cloud.aws_arn",
+      "full_cols": 413,
+      "sample_cols": 401,
+      "sample_rate": 0.9709,
+      "fully_captured": false
+    },
+    {
+      "label": "datetime.epoch.unix_microseconds",
+      "full_cols": 388,
+      "sample_cols": 388,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.time.hms_12h",
+      "full_cols": 383,
+      "sample_cols": 383,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.banking.bsb",
+      "full_cols": 363,
+      "sample_cols": 363,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.internet.urn",
+      "full_cols": 357,
+      "sample_cols": 357,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.banking.iban",
+      "full_cols": 355,
+      "sample_cols": 355,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.development.calver",
+      "full_cols": 353,
+      "sample_cols": 353,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.pg_short_offset",
+      "full_cols": 348,
+      "sample_cols": 348,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.financial.currency_code",
+      "full_cols": 328,
+      "sample_cols": 328,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.development.os",
+      "full_cols": 321,
+      "sample_cols": 321,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.rate.basis_points",
+      "full_cols": 313,
+      "sample_cols": 313,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "representation.scientific.cas_number",
+      "full_cols": 298,
+      "sample_cols": 298,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "geography.format.wkt",
+      "full_cols": 292,
+      "sample_cols": 292,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.iso_8601_millis_offset",
+      "full_cols": 282,
+      "sample_cols": 282,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_nodecimal",
+      "full_cols": 280,
+      "sample_cols": 280,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "container.key_value.query_string",
+      "full_cols": 274,
+      "sample_cols": 274,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "representation.scientific.protein_sequence",
+      "full_cols": 268,
+      "sample_cols": 268,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.short_ymd",
+      "full_cols": 265,
+      "sample_cols": 265,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.weekday_abbreviated_month",
+      "full_cols": 264,
+      "sample_cols": 264,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.jp_era_short",
+      "full_cols": 260,
+      "sample_cols": 260,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "representation.format.color_rgb",
+      "full_cols": 257,
+      "sample_cols": 257,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.credential.password",
+      "full_cols": 243,
+      "sample_cols": 243,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.month_year_abbrev",
+      "full_cols": 227,
+      "sample_cols": 227,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.slash_ymd_24h",
+      "full_cols": 226,
+      "sample_cols": 226,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.dmy_dash_abbrev",
+      "full_cols": 221,
+      "sample_cols": 221,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.weekday_full_month",
+      "full_cols": 213,
+      "sample_cols": 213,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.dmy_short_slash",
+      "full_cols": 205,
+      "sample_cols": 205,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.identifier.ulid",
+      "full_cols": 204,
+      "sample_cols": 204,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.period.fiscal_year",
+      "full_cols": 202,
+      "sample_cols": 202,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.academic.orcid",
+      "full_cols": 196,
+      "sample_cols": 196,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.securities.lei",
+      "full_cols": 190,
+      "sample_cols": 190,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.iso_8601_micros_offset",
+      "full_cols": 185,
+      "sample_cols": 185,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "geography.transportation.iso6346",
+      "full_cols": 183,
+      "sample_cols": 183,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_apostrophe",
+      "full_cols": 180,
+      "sample_cols": 180,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.commerce.isrc",
+      "full_cols": 172,
+      "sample_cols": 172,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.medical.dea_number",
+      "full_cols": 171,
+      "sample_cols": 171,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "geography.address.street_name",
+      "full_cols": 171,
+      "sample_cols": 171,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.short_mdy",
+      "full_cols": 169,
+      "sample_cols": 169,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.dmy_dot",
+      "full_cols": 168,
+      "sample_cols": 168,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.iso_week",
+      "full_cols": 166,
+      "sample_cols": 166,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.chinese_ymd",
+      "full_cols": 155,
+      "sample_cols": 155,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.securities.isin",
+      "full_cols": 153,
+      "sample_cols": 153,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_crypto",
+      "full_cols": 151,
+      "sample_cols": 151,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.dmy_dash",
+      "full_cols": 146,
+      "sample_cols": 146,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.person.phone_e164",
+      "full_cols": 128,
+      "sample_cols": 128,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.short_dmy",
+      "full_cols": 118,
+      "sample_cols": 118,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.internet.cidr",
+      "full_cols": 112,
+      "sample_cols": 112,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.government.pan_india",
+      "full_cols": 110,
+      "sample_cols": 110,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_comma_suffix",
+      "full_cols": 101,
+      "sample_cols": 101,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.weekday_dmy_full",
+      "full_cols": 96,
+      "sample_cols": 96,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.ctime",
+      "full_cols": 94,
+      "sample_cols": 94,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.person.email_display",
+      "full_cols": 93,
+      "sample_cols": 93,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "geography.coordinate.mgrs",
+      "full_cols": 80,
+      "sample_cols": 80,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "container.object.csv",
+      "full_cols": 77,
+      "sample_cols": 77,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.internet.ip_v4_with_port",
+      "full_cols": 72,
+      "sample_cols": 72,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.month_year_slash",
+      "full_cols": 70,
+      "sample_cols": 70,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.dmy_space_abbrev",
+      "full_cols": 68,
+      "sample_cols": 68,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "geography.coordinate.plus_code",
+      "full_cols": 64,
+      "sample_cols": 64,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.rfc_2822",
+      "full_cols": 63,
+      "sample_cols": 63,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.dot_dmy_24h",
+      "full_cols": 61,
+      "sample_cols": 61,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.full_month_no_comma",
+      "full_cols": 60,
+      "sample_cols": 60,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.clf",
+      "full_cols": 52,
+      "sample_cols": 52,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.julian",
+      "full_cols": 51,
+      "sample_cols": 51,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.container.docker_ref",
+      "full_cols": 45,
+      "sample_cols": 45,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.government.abn",
+      "full_cols": 45,
+      "sample_cols": 45,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_multisym",
+      "full_cols": 40,
+      "sample_cols": 40,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.iso_8601_microseconds",
+      "full_cols": 35,
+      "sample_cols": 35,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.abbrev_month_no_comma",
+      "full_cols": 35,
+      "sample_cols": 35,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.dmy_space_full",
+      "full_cols": 34,
+      "sample_cols": 34,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_neg_trailing",
+      "full_cols": 33,
+      "sample_cols": 33,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.identifier.uuid",
+      "full_cols": 31,
+      "sample_cols": 31,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "technology.internet.mac_address",
+      "full_cols": 25,
+      "sample_cols": 25,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.securities.figi",
+      "full_cols": 22,
+      "sample_cols": 22,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.ymd_dot",
+      "full_cols": 19,
+      "sample_cols": 19,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.date.ordinal",
+      "full_cols": 19,
+      "sample_cols": 19,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_code_prefix",
+      "full_cols": 8,
+      "sample_cols": 8,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.rfc_2822_ordinal",
+      "full_cols": 7,
+      "sample_cols": 7,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.government.vin",
+      "full_cols": 7,
+      "sample_cols": 7,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "identity.government.ssn",
+      "full_cols": 7,
+      "sample_cols": 7,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.dot_ymd_24h",
+      "full_cols": 3,
+      "sample_cols": 3,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "datetime.timestamp.iso_space_zulu",
+      "full_cols": 2,
+      "sample_cols": 2,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    },
+    {
+      "label": "finance.currency.amount_lakh",
+      "full_cols": 2,
+      "sample_cols": 2,
+      "sample_rate": 1.0,
+      "fully_captured": true
+    }
+  ]
+}
