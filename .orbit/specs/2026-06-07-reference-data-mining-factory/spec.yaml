@@ -93,5 +93,5 @@ acceptance_criteria:
     feasible on a non-starved corpus); drafting B3 late-fusion. Substrate under
     output/mining-factory/.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc

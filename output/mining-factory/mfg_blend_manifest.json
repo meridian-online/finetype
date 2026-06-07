@@ -3,8 +3,8 @@
   "min_values": 5,
   "seed": 42,
   "documented_distilled_cap": 600,
-  "total_columns": 2086,
-  "total_values": 103913,
+  "total_columns": 335,
+  "total_values": 16445,
   "per_type": {
     "datetime.component.day_of_week": {
       "distinct_values": 6,
@@ -18,8 +18,8 @@
     },
     "datetime.date.abbreviated_month": {
       "distinct_values": 3699,
-      "columns": 74,
-      "values_in_columns": 3699
+      "columns": 50,
+      "values_in_columns": 2500
     },
     "finance.currency.currency_code": {
       "distinct_values": 149,
@@ -33,8 +33,8 @@
     },
     "geography.address.postal_code": {
       "distinct_values": 16954,
-      "columns": 339,
-      "values_in_columns": 16950
+      "columns": 50,
+      "values_in_columns": 2500
     },
     "geography.address.street_name": {
       "distinct_values": 92,
@@ -48,18 +48,18 @@
     },
     "geography.coordinate.latitude": {
       "distinct_values": 21478,
-      "columns": 430,
-      "values_in_columns": 21478
+      "columns": 50,
+      "values_in_columns": 2500
     },
     "geography.coordinate.longitude": {
       "distinct_values": 29140,
-      "columns": 583,
-      "values_in_columns": 29140
+      "columns": 50,
+      "values_in_columns": 2500
     },
     "geography.location.city": {
       "distinct_values": 27437,
-      "columns": 549,
-      "values_in_columns": 27437
+      "columns": 50,
+      "values_in_columns": 2500
     },
     "geography.location.continent": {
       "distinct_values": 1,
@@ -78,8 +78,8 @@
     },
     "geography.location.region": {
       "distinct_values": 3764,
-      "columns": 76,
-      "values_in_columns": 3764
+      "columns": 50,
+      "values_in_columns": 2500
     },
     "geography.location.state_code": {
       "distinct_values": 56,
@@ -121,7 +121,7 @@
   "blend": {
     "base": "output/distillation-v3/sherlock_distilled.csv.gz",
     "base_rows": 102461,
-    "mfg_rows": 2086,
+    "mfg_rows": 335,
     "blend_out": "output/mining-factory/sherlock_distilled_mfg.csv.gz"
   }
 }
