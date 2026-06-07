@@ -1,0 +1,97 @@
+id: 2026-06-07-reference-data-mining-factory
+goal: 'Dissolve the corpus-starvation wall (spec 2026-06-04-value-level-ydf-labelling closed INCONCLUSIVE: 10 distinct latitudes in 18M GitTables rows, 66 of 159 types below a 50-distinct floor, and scaling GitTables provably cannot fix it) by MANUFACTURING a value-level labelled training corpus directly from authoritative reference data (Geonames coords/cities, CLDR names, ISO/IANA codes) for all 22 Tier-1 reference-backed types, filtered through the JSON-Schema validation-as-veto precision funnel and the leakage firewall. Train one multi-branch candidate on the manufactured-augmented corpus and evaluate it honestly through BOTH the gold anchor (efficacy on the confusion families) and the corpus-honest gate (corpus-scale collateral) — the gate''s FIRST genuine non-trivial GO candidate, validating its one open scope limit (GO-precision). This is roadmap Line B / B2 (the mining factory), the prerequisite that unblocks the char-cnn-vs-multi-branch architecture test and the B3 late-fusion model.'
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- precision
+- labelling
+- reference-data
+- retrain
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Manufacture — value-level rows from authoritative reference data, with the
+    starvation-dissolution proof. A script under scripts/mining_factory/ emits
+    value-level rows (value, type, source, locale) for all 22 Tier-1 types: the 9
+    Geonames geography types (city, region, country, country_code, continent,
+    state_code, postal_code, street_name, street_suffix) PLUS latitude and longitude
+    (real Geonames coordinates — the load-bearing confusion family) drawn from the
+    v21 Geonames distill + raw fetch; the 3 CLDR datetime types (day_of_week,
+    month_name, abbreviated_month) across the 706-locale TSVs; and the ISO/IANA enum
+    types (top_level_domain, http_method, locale_code, currency_code, currency_symbol,
+    gender_code, blood_type) via finetype generate, localized where applicable.
+    Acceptance bar = a distinct-value census: every Tier-1 type clears the 50-distinct
+    floor by a wide margin, and the lat/lon/city family clears it by orders of
+    magnitude (latitude 10 -> >= thousands). This AC is the starvation-dissolution
+    proof — small counts are a failure even if the script runs.
+  gate: false
+  checked: false
+- id: ac-02
+  description: |
+    Precision funnel — JSON-Schema validation-as-veto over every manufactured value.
+    Each value is adjudicated by its own type's JSON-Schema (reuse
+    crates/finetype-core/src/validator.rs::CompiledValidator::is_valid via the
+    extract_value_features 277-dim contract, or validation_veto.rs::
+    evaluate_validation_veto): drop authoritative-but-malformed values; resolve
+    cross-type collisions (a value validating as >= 2 incompatible types) by
+    source-authority precedence or drop. Deliver per-type survival counts + drop
+    reasons.
+  gate: false
+  checked: false
+- id: ac-03
+  description: |
+    Leakage firewall — zero overlap with the eval holdout and the independent judge.
+    Compute row_hash(header, value) (reuse scripts/eval_leakage/) for every surviving
+    manufactured row and intersect against BOTH eval/row_hashes.tsv and the gold-anchor
+    fixture eval/gold/gold_eval_anchor.tsv. Require zero overlap; void any overlapping
+    rows. This guarantees the manufactured corpus shares no values with the eval
+    holdout or the independent judge — the independence the gate and anchor rely on.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-04
+  description: |
+    Materialise + blend — into the format the training pipeline already consumes.
+    Convert surviving rows to the distilled CSV / NDJSON shape
+    scripts/prepare_multibranch_data.py consumes; blend with the base distilled corpus
+    at a documented ratio with a per-type cap (don't swamp the base distribution);
+    keep representation.discrete.categorical positives at ZERO (CLAUDE.md). Report the
+    final per-type volumes + the blend recipe.
+  gate: false
+  checked: false
+- id: ac-05
+  description: |
+    Train one candidate — multi-branch, v19 recipe, with the mandatory pre-check.
+    Build the FTMB and train one multi-branch model on the augmented corpus, same v19
+    recipe (config, epochs, seed 42). The destination-drift proxy pre-check
+    (scripts/proxy_pretrain.sh) is MANDATORY and runs BEFORE the full overnight run
+    (CLAUDE.md); a NO-GO blocks the full train. Record the trained model SHA.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-06
+  description: |
+    Honest evaluation — the gate's first genuine GO candidate. Score the candidate
+    through BOTH honest instruments: (a) the gold anchor per-family precision/recall
+    (eval/gold/ harness — efficacy on the confusion families vs v19), and (b) the
+    corpus-honest gate (scripts/corpus_honest_gate.py — corpus-scale collateral on the
+    stratified sample), plus the mandatory Sense-distribution pre/post check. This is
+    the FIRST genuine non-trivial candidate through the gate; a clean GO is the first
+    validation of its GO-precision. Verdict against a PRE-SET bar: gold-anchor
+    confusion families improve-or-hold AND corpus-honest GO AND no per-type >= 5%
+    regression -> manufacturing VALIDATED + gate GO-precision validated.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-07
+  description: |
+    Decision memo — what the candidate tells us, and what's unblocked. Did
+    manufacturing dissolve starvation (census proof)? Is the candidate a GO on both
+    instruments, and did it validate the gate's GO-precision? Go/no-go on: extending
+    manufacture to Tier-2 types; the char-cnn-vs-multi-branch data-scaling test (now
+    feasible on a non-starved corpus); drafting B3 late-fusion. Substrate under
+    output/mining-factory/.
+  gate: false
+  checked: false
+  ac_type: doc
