@@ -59,7 +59,7 @@ acceptance_criteria:
     keep representation.discrete.categorical positives at ZERO (CLAUDE.md). Report the
     final per-type volumes + the blend recipe.
   gate: false
-  checked: false
+  checked: true
 - id: ac-05
   description: |
     Train one candidate — multi-branch, v19 recipe, with the mandatory pre-check.
