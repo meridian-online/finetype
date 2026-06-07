@@ -3954,6 +3954,16 @@ fn cmd_profile(
 
     let model = resolve_model_path();
 
+    // Auto-detect late-fusion from the model directory: a `fusion_manifest.json`
+    // means this is a fusion model, regardless of the --model-type default. This
+    // is what lets `models/default` resolve to a fusion model and route every
+    // `finetype profile` through it without a flag.
+    let model_type = if model.join("fusion_manifest.json").exists() {
+        ModelType::LateFusion
+    } else {
+        model_type
+    };
+
     eprintln!("Loading model from {:?}", model);
     let config = ColumnConfig {
         sample_size,
