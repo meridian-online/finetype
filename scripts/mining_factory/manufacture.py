@@ -95,6 +95,14 @@ def emit(rows: list, value: str, type_key: str, source: str, locale: str) -> Non
     rows.append({"value": value, "type": type_key, "source": source, "locale": locale})
 
 
+# geography.location.continent schema is localized continent NAMES, not the
+# 2-letter GeoNames codes. Map the 7 codes -> English names (closed vocab).
+CONTINENT_NAMES = {
+    "AF": "Africa", "AN": "Antarctica", "AS": "Asia", "EU": "Europe",
+    "NA": "North America", "OC": "Oceania", "SA": "South America",
+}
+
+
 def fmt_coord(f: float, rng: random.Random) -> str:
     """Real coordinate in one of the formats GitTables exhibits — decimal,
     signed-decimal, or short-decimal. Format diversity is the load-bearing
@@ -145,7 +153,9 @@ def manufacture_geography(rows: list, rng: random.Random, high_card_cap: int) ->
         emit(rows, c.country_name, "geography.location.country", src, "und")
         emit(rows, c.iso2, "geography.location.country_code", src, "und")
         emit(rows, c.iso3, "geography.location.country_code", src, "und")
-        emit(rows, c.continent_code, "geography.location.continent", src, "und")
+        name = CONTINENT_NAMES.get(c.continent_code)
+        if name:
+            emit(rows, name, "geography.location.continent", src, "und")
 
     print("  geography: loading postal codes", file=sys.stderr)
     all_ccs = {c.iso2 for c in countries}
@@ -171,7 +181,7 @@ def manufacture_country_codes(rows: list) -> None:
             parts = line.rstrip("\n").split("\t")
             if len(parts) < 12:
                 continue
-            tld = parts[9].strip()
+            tld = parts[9].strip().lstrip(".").lower()  # schema: "does not include the dot"
             currency = parts[10].strip()
             if tld:
                 emit(rows, tld, "technology.internet.top_level_domain", src, "und")
@@ -194,16 +204,18 @@ def _read_cldr(path: Path) -> list[list[str]]:
     return out
 
 
-def manufacture_datetime(rows: list) -> None:
+def manufacture_datetime(rows: list, rng: random.Random) -> None:
     src = "cldr"
-    # weekday wide -> day_of_week
+    # weekday wide -> day_of_week (bare name vocabulary)
     for parts in _read_cldr(CLDR_DIR / "cldr_weekday_names.tsv"):
         locale, width = parts[0], parts[1]
         if width != "wide":
             continue
         for name in parts[2:9]:
             emit(rows, name, "datetime.component.day_of_week", src, locale)
-    # month wide -> month_name ; month abbreviated -> abbreviated_month
+    # month wide -> month_name (bare name) ; month abbreviated -> abbreviated_month
+    # which is a DATE format "%b %d, %Y" (e.g. "Jan 15, 2020"), NOT a bare
+    # abbreviation — build dates from the CLDR abbreviated names.
     for parts in _read_cldr(CLDR_DIR / "cldr_month_names.tsv"):
         locale, width = parts[0], parts[1]
         names = parts[2:14]
@@ -212,7 +224,10 @@ def manufacture_datetime(rows: list) -> None:
                 emit(rows, name, "datetime.component.month_name", src, locale)
         elif width == "abbreviated":
             for name in names:
-                emit(rows, name, "datetime.date.abbreviated_month", src, locale)
+                day = rng.randint(1, 28)
+                year = rng.randint(1970, 2025)
+                emit(rows, f"{name} {day:02d}, {year}",
+                     "datetime.date.abbreviated_month", src, locale)
 
 
 def manufacture_locale_codes(rows: list) -> None:
@@ -430,7 +445,7 @@ def main() -> int:
     print("manufacturing ccTLD + currency codes (countryInfo)...", file=sys.stderr)
     manufacture_country_codes(rows)
     print("manufacturing datetime names (CLDR)...", file=sys.stderr)
-    manufacture_datetime(rows)
+    manufacture_datetime(rows, rng)
     print("manufacturing locale codes (CLDR)...", file=sys.stderr)
     manufacture_locale_codes(rows)
     print("manufacturing embedded enums (finetype generate)...", file=sys.stderr)

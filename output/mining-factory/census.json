@@ -134,7 +134,7 @@
       "n_locales": 706
     },
     "datetime.date.abbreviated_month": {
-      "distinct": 2229,
+      "distinct": 8348,
       "rows": 8472,
       "class": "high-cardinality",
       "verdict": "pass",

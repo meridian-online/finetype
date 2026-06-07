@@ -23,7 +23,7 @@ Two honest classes. *High-cardinality* types were the starvation problem — the
 | `geography.coordinate.longitude` | high-cardinality | 29,219 | 30,000 | 1 | PASS |
 | `datetime.component.day_of_week` | high-cardinality | 1,617 | 4,942 | 706 | PASS |
 | `datetime.component.month_name` | high-cardinality | 2,486 | 8,472 | 706 | PASS |
-| `datetime.date.abbreviated_month` | high-cardinality | 2,229 | 8,472 | 706 | PASS |
+| `datetime.date.abbreviated_month` | high-cardinality | 8,348 | 8,472 | 706 | PASS |
 | `technology.internet.top_level_domain` | high-cardinality | 249 | 251 | 1 | PASS |
 | `technology.internet.http_method` | closed | 7 | 200 | 1 | closed ✓ |
 | `technology.code.locale_code` | high-cardinality | 706 | 706 | 706 | PASS |

@@ -26,7 +26,7 @@ acceptance_criteria:
     magnitude (latitude 10 -> >= thousands). This AC is the starvation-dissolution
     proof — small counts are a failure even if the script runs.
   gate: false
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     Precision funnel — JSON-Schema validation-as-veto over every manufactured value.
@@ -38,7 +38,7 @@ acceptance_criteria:
     source-authority precedence or drop. Deliver per-type survival counts + drop
     reasons.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     Leakage firewall — zero overlap with the eval holdout and the independent judge.
