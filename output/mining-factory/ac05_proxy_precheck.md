@@ -70,5 +70,31 @@ Re-blend, rebuild the FTMB, and re-run the proxy BEFORE any overnight spend. The
 dial-down (`--distilled-cap` / `--ratio-distilled`) is NOT the fix and was not run.
 
 Evidence: `output/destination-drift-precheck/mfg-proxy.runlog`,
-`proxy_drift_mfg-proxy.json`, `sense_dist_mfg-proxy.json`. Re-proxy evidence to follow
-under `mfg-proxy2`.
+`proxy_drift_mfg-proxy.json`, `sense_dist_mfg-proxy.json`.
+
+## Re-proxy after interleaving (mfg-proxy2): NO-GO — interleave hypothesis FALSIFIED
+
+Rebuilt the FTMB on the interleaved blend (manufactured columns shuffled and spliced
+one-per-~49 base rows; verified the per-type runs broke — longitude/latitude/postal
+max contiguous run 1–2) and re-ran the proxy. **The collapse reproduced essentially
+unchanged, marginally worse:**
+
+| label | base | mfg-proxy (block) | mfg-proxy2 (interleaved) |
+|---|---:|---:|---:|
+| `representation.text.entity_name` | 3.38% | 44.71% | **48.18%** |
+| `representation.text.plain_text` | 6.26% | — | **26.65%** |
+| `representation.numeric.decimal_number` | 31.29% | 0.29% | **0.29%** |
+| `representation.numeric.integer_number` | 12.95% | 1.16% | **1.15%** |
+
+The proximity-grouping bug was real but **was not the cause**. Two independent blend
+constructions (sorted block vs. interleaved) collapse the numeric prior into generic
+text by the same magnitude. Manufactured content is clean (latitude/longitude are
+well-formed decimals, postal codes well-formed). So the driver is not blend mechanics
+and not corrupt data — it is the manufactured mass itself: ~1,900 of 2,086 manufactured
+columns are geography (longitude 583, city 549, latitude 430, postal 339), and blending
+that concentrated geography/text block at the v19 recipe shifts the model's global prior
+off numerics on the real corpus. This is the same untargeted-neighbour collapse as
+v22/v23/v24 — additive blend retrains are now 0-for-3.
+
+Evidence: `output/destination-drift-precheck/mfg-proxy2.runlog`,
+`proxy_drift_mfg-proxy2.json`, `sense_dist_mfg-proxy2.json`.
