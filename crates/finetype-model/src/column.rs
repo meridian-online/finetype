@@ -12,10 +12,10 @@
 
 use crate::entity::EntityClassifier;
 use crate::features::{extract_features, FEATURE_DIM};
+use crate::fusion::FusionClassifier;
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
-use crate::fusion::FusionClassifier;
 use crate::multi_branch::MultiBranchClassifier;
 use crate::rhh;
 use crate::semantic::SemanticHintClassifier;
@@ -2107,7 +2107,11 @@ impl ColumnClassifier {
                 }
             }
             let distinct = uniq.len();
-            let frac_unique = if total > 0 { distinct as f32 / total as f32 } else { 0.0 };
+            let frac_unique = if total > 0 {
+                distinct as f32 / total as f32
+            } else {
+                0.0
+            };
             let too_high_card = distinct > 50 || (frac_unique > 0.7 && distinct > 20);
             if too_high_card {
                 if let Some((alt_label, alt_conf)) =
@@ -5397,11 +5401,6 @@ fn disambiguate_attractor_demotion(
     None
 }
 
-/// Select the best fallback type when demoting an attractor prediction.
-///
-/// Priority:
-/// 1. Use an existing representation.* type from the vote distribution
-/// 2. Default: numeric → integer/decimal, text → categorical, code → alphanumeric_id
 /// Column schema-validation gate (Precision Principle, NNFT-272).
 ///
 /// Computes the column's pass-rate against the predicted type's JSON Schema
@@ -5473,8 +5472,7 @@ fn schema_validation_gate(
 
     if demoted != result.label {
         result.disambiguation_applied = true;
-        result.disambiguation_rule =
-            Some(format!("schema_validation_gate:{}", result.label));
+        result.disambiguation_rule = Some(format!("schema_validation_gate:{}", result.label));
         result.label = demoted;
         result.confidence = result.confidence.min(0.6);
         result.detected_locale = None;
@@ -7915,7 +7913,12 @@ geography.coordinate.geohash:
   samples: ["u4pruyd"]
 "#;
         let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
-        let result = value_sharpen(&values, "geography.coordinate.geohash", 0.9, Some(&taxonomy));
+        let result = value_sharpen(
+            &values,
+            "geography.coordinate.geohash",
+            0.9,
+            Some(&taxonomy),
+        );
         let (label, rule) = result.expect("event ids should demote off geohash");
         assert_eq!(label, "representation.identifier.alphanumeric_id");
         assert!(rule.starts_with("schema_fail_demotion:"));
@@ -7943,7 +7946,12 @@ geography.coordinate.geohash:
   samples: ["u4pruyd"]
 "#;
         let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
-        let result = value_sharpen(&values, "geography.coordinate.geohash", 0.9, Some(&taxonomy));
+        let result = value_sharpen(
+            &values,
+            "geography.coordinate.geohash",
+            0.9,
+            Some(&taxonomy),
+        );
         assert!(
             result.is_none(),
             "partial-fail column must be kept, not demoted (>50% bar spares genuine columns)"
@@ -7965,7 +7973,12 @@ geography.coordinate.geohash:
   samples: ["u4pruyd"]
 "#;
         let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
-        let result = value_sharpen(&values, "geography.coordinate.geohash", 0.9, Some(&taxonomy));
+        let result = value_sharpen(
+            &values,
+            "geography.coordinate.geohash",
+            0.9,
+            Some(&taxonomy),
+        );
         assert!(
             result.is_none(),
             "valid geohash values must not be demoted off geohash"

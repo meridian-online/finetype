@@ -41,6 +41,7 @@ fn err(msg: impl Into<String>) -> InferenceError {
 /// `name_to_idx` maps the canonical (multi-branch) label names to their index in
 /// the 240-wide vectors; `n_classes` is the canonical label count (240). This is
 /// the exact computation the dump performs — keep them identical.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_fusion_row(
     value_clf: &CharClassifier,
     mb: &MultiBranchClassifier,
@@ -101,7 +102,11 @@ pub fn compute_fusion_row(
     let mean_top1 = top1s.iter().sum::<f32>() * inv;
     let max_top1 = top1s.iter().cloned().fold(0.0f32, f32::max);
     let min_top1 = top1s.iter().cloned().fold(1.0f32, f32::min);
-    let var_top1 = top1s.iter().map(|x| (x - mean_top1) * (x - mean_top1)).sum::<f32>() * inv;
+    let var_top1 = top1s
+        .iter()
+        .map(|x| (x - mean_top1) * (x - mean_top1))
+        .sum::<f32>()
+        * inv;
     let std_top1 = var_top1.max(0.0).sqrt();
     let mean_entropy = entropies.iter().sum::<f32>() * inv;
     let vote_agreement = vote.iter().cloned().fold(0.0f32, f32::max); // modal share
@@ -159,8 +164,12 @@ impl FusionHead {
             .map_err(|e| err(format!("read fusion head config.json: {e}")))?;
         let cfg: serde_json::Value = serde_json::from_slice(&cfg_bytes)
             .map_err(|e| err(format!("parse fusion head config.json: {e}")))?;
-        let h1 = cfg["hidden1"].as_u64().ok_or_else(|| err("config.hidden1"))? as usize;
-        let h2 = cfg["hidden2"].as_u64().ok_or_else(|| err("config.hidden2"))? as usize;
+        let h1 = cfg["hidden1"]
+            .as_u64()
+            .ok_or_else(|| err("config.hidden1"))? as usize;
+        let h2 = cfg["hidden2"]
+            .as_u64()
+            .ok_or_else(|| err("config.hidden2"))? as usize;
         let row_dim = cfg["row_dim"].as_u64().unwrap_or(ROW_DIM as u64) as usize;
         if row_dim != ROW_DIM {
             return Err(err(format!("config.row_dim {row_dim} != {ROW_DIM}")));
@@ -181,7 +190,7 @@ impl FusionHead {
         let device = Device::Cpu;
         let weights = dir.join("model.safetensors");
         let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[weights.clone()], DType::F32, &device)
+            VarBuilder::from_mmaped_safetensors(std::slice::from_ref(&weights), DType::F32, &device)
                 .map_err(|e| err(format!("load fusion head {weights:?}: {e}")))?
         };
         let head = Self::from_var_builder(vb, h1, h2)?;
@@ -191,13 +200,21 @@ impl FusionHead {
     fn from_var_builder(vb: VarBuilder, h1: usize, h2: usize) -> Result<Self, InferenceError> {
         let ln = layer_norm(ROW_DIM, LayerNormConfig::default(), vb.pp("ln"))
             .map_err(|e| err(format!("fusion head ln: {e}")))?;
-        let l1 = linear(ROW_DIM, h1, vb.pp("l1")).map_err(|e| err(format!("fusion head l1: {e}")))?;
+        let l1 =
+            linear(ROW_DIM, h1, vb.pp("l1")).map_err(|e| err(format!("fusion head l1: {e}")))?;
         let l2 = linear(h1, h2, vb.pp("l2")).map_err(|e| err(format!("fusion head l2: {e}")))?;
-        let l3 = linear(h2, V2_DIM, vb.pp("l3")).map_err(|e| err(format!("fusion head l3: {e}")))?;
+        let l3 =
+            linear(h2, V2_DIM, vb.pp("l3")).map_err(|e| err(format!("fusion head l3: {e}")))?;
         let alpha = vb
             .get_with_hints(1, "alpha", Init::Const(1.0))
             .map_err(|e| err(format!("fusion head alpha: {e}")))?;
-        Ok(Self { ln, l1, l2, l3, alpha })
+        Ok(Self {
+            ln,
+            l1,
+            l2,
+            l3,
+            alpha,
+        })
     }
 
     /// Fused logits for a batch of rows `[n_rows, ROW_DIM]`.
@@ -205,7 +222,10 @@ impl FusionHead {
         let mb_logits = x
             .narrow(1, MB_OFFSET, V2_DIM)
             .map_err(|e| err(format!("fusion head narrow: {e}")))?;
-        let h = self.ln.forward(x).map_err(|e| err(format!("fusion ln fwd: {e}")))?;
+        let h = self
+            .ln
+            .forward(x)
+            .map_err(|e| err(format!("fusion ln fwd: {e}")))?;
         let h = self
             .l1
             .forward(&h)
@@ -216,7 +236,10 @@ impl FusionHead {
             .forward(&h)
             .and_then(|t| t.gelu_erf())
             .map_err(|e| err(format!("fusion l2 fwd: {e}")))?;
-        let head_logits = self.l3.forward(&h).map_err(|e| err(format!("fusion l3 fwd: {e}")))?;
+        let head_logits = self
+            .l3
+            .forward(&h)
+            .map_err(|e| err(format!("fusion l3 fwd: {e}")))?;
         let scaled = mb_logits
             .broadcast_mul(&self.alpha)
             .map_err(|e| err(format!("fusion alpha mul: {e}")))?;
@@ -226,7 +249,10 @@ impl FusionHead {
     /// Fused logits for a single 968-dim row.
     pub fn fused_logits(&self, row: &[f32]) -> Result<Vec<f32>, InferenceError> {
         if row.len() != ROW_DIM {
-            return Err(err(format!("fused_logits: row len {} != {ROW_DIM}", row.len())));
+            return Err(err(format!(
+                "fused_logits: row len {} != {ROW_DIM}",
+                row.len()
+            )));
         }
         let device = Device::Cpu;
         let x = Tensor::from_slice(row, (1, ROW_DIM), &device)
@@ -272,7 +298,13 @@ impl FusionClassifier {
                 "fusion: head label_order does not match multi-branch labels",
             ));
         }
-        Ok(Self { value_clf, mb, head, labels, sample_n })
+        Ok(Self {
+            value_clf,
+            mb,
+            head,
+            labels,
+            sample_n,
+        })
     }
 
     pub fn labels(&self) -> &[String] {
@@ -308,8 +340,12 @@ impl FusionClassifier {
             return Ok(vec![("unknown".to_string(), 0.0)]);
         }
         let n_classes = self.labels.len();
-        let name_to_idx: HashMap<&str, usize> =
-            self.labels.iter().enumerate().map(|(i, l)| (l.as_str(), i)).collect();
+        let name_to_idx: HashMap<&str, usize> = self
+            .labels
+            .iter()
+            .enumerate()
+            .map(|(i, l)| (l.as_str(), i))
+            .collect();
 
         let row = compute_fusion_row(
             &self.value_clf,
@@ -329,8 +365,16 @@ impl FusionClassifier {
             .iter()
             .enumerate()
             .map(|(i, &l)| {
-                let p = if denom > 0.0 { (l - amax).exp() / denom } else { 0.0 };
-                let label = self.labels.get(i).cloned().unwrap_or_else(|| "unknown".to_string());
+                let p = if denom > 0.0 {
+                    (l - amax).exp() / denom
+                } else {
+                    0.0
+                };
+                let label = self
+                    .labels
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
                 (label, p)
             })
             .collect();

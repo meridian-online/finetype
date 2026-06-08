@@ -790,7 +790,13 @@ fn main() -> Result<()> {
             limit,
             key_col,
         } => cmd_dump_fusion_features(
-            &input, &value_model, &mb_model, &output, sample_n, limit, key_col.as_deref(),
+            &input,
+            &value_model,
+            &mb_model,
+            &output,
+            sample_n,
+            limit,
+            key_col.as_deref(),
         ),
     }
 }
@@ -1241,7 +1247,7 @@ fn cmd_dump_fusion_features(
     input: &PathBuf,
     value_model: &PathBuf,
     mb_model: &PathBuf,
-    output: &PathBuf,
+    output: &Path,
     sample_n: usize,
     limit: usize,
     key_col: Option<&str>,
@@ -1264,15 +1270,16 @@ fn cmd_dump_fusion_features(
     let canonical: Vec<String> = mb.labels().to_vec();
     let n_classes = canonical.len();
     if n_classes != V2_DIM {
-        anyhow::bail!(
-            "multi-branch model has {n_classes} classes, fusion dump expects {V2_DIM}"
-        );
+        anyhow::bail!("multi-branch model has {n_classes} classes, fusion dump expects {V2_DIM}");
     }
-    let name_to_idx: HashMap<&str, usize> =
-        canonical.iter().enumerate().map(|(i, l)| (l.as_str(), i)).collect();
+    let name_to_idx: HashMap<&str, usize> = canonical
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (l.as_str(), i))
+        .collect();
 
-    let mut rdr = csv::Reader::from_path(input)
-        .map_err(|e| anyhow::anyhow!("open {input:?}: {e}"))?;
+    let mut rdr =
+        csv::Reader::from_path(input).map_err(|e| anyhow::anyhow!("open {input:?}: {e}"))?;
     let headers = rdr.headers()?.clone();
     let col = |name: &str| headers.iter().position(|h| h == name);
     let label_col = col("final_label")
@@ -1282,9 +1289,9 @@ fn cmd_dump_fusion_features(
         .ok_or_else(|| anyhow::anyhow!("input missing sample_values column"))?;
     let header_col = col("column_name");
     let key_idx = match key_col {
-        Some(name) => Some(
-            col(name).ok_or_else(|| anyhow::anyhow!("input missing key column {name:?}"))?,
-        ),
+        Some(name) => {
+            Some(col(name).ok_or_else(|| anyhow::anyhow!("input missing key column {name:?}"))?)
+        }
         None => None,
     };
 
@@ -1362,7 +1369,7 @@ fn cmd_dump_fusion_features(
         }
 
         n_rows += 1;
-        if n_rows % 5000 == 0 {
+        if n_rows.is_multiple_of(5000) {
             eprintln!("  dumped {n_rows} rows...");
         }
         if limit > 0 && n_rows >= limit {
@@ -2186,7 +2193,7 @@ fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifie
 ///
 /// Asserts `feature_dim == 0` on the value sub-model (ac-06): a feature-trained
 /// CharCNN would silently zero-fill its feature vector at inference.
-fn load_fusion_classifier(model: &PathBuf) -> Result<finetype_model::FusionClassifier> {
+fn load_fusion_classifier(model: &Path) -> Result<finetype_model::FusionClassifier> {
     let manifest_path = model.join("fusion_manifest.json");
     let manifest: serde_json::Value = serde_json::from_slice(
         &std::fs::read(&manifest_path)
@@ -4432,7 +4439,14 @@ fn cmd_profile(
                     };
                     println!(
                         "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}",
-                        p.name, p.label, broad, conf_str, quality_str, disambig, locale_str, veto_str
+                        p.name,
+                        p.label,
+                        broad,
+                        conf_str,
+                        quality_str,
+                        disambig,
+                        locale_str,
+                        veto_str
                     );
                     // Show top 3 invalid samples inline (plain output, validate mode)
                     if false {
@@ -5449,7 +5463,8 @@ mod tests {
             .expect("build fusion classifier");
 
         // Expected: composite key -> offline predicted label.
-        let mut expected: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut expected: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
         for line in fs::read_to_string(&preds).unwrap().lines() {
             if line.starts_with("row_idx\t") || line.starts_with("key\t") {
                 continue;
@@ -5473,7 +5488,9 @@ mod tests {
         for rec in rdr.records() {
             let rec = rec.unwrap();
             let key = rec.get(key_i).unwrap_or("").to_string();
-            let Some(want) = expected.get(&key) else { continue };
+            let Some(want) = expected.get(&key) else {
+                continue;
+            };
             let header = name_i.and_then(|i| rec.get(i)).unwrap_or("").to_string();
             let parsed: Vec<String> =
                 serde_json::from_str(rec.get(vals_i).unwrap_or("[]")).unwrap_or_default();

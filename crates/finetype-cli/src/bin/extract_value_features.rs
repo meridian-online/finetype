@@ -49,8 +49,8 @@ fn parse_args() -> Result<Args> {
 }
 
 fn load_taxonomy() -> Result<Taxonomy> {
-    let mut taxonomy =
-        Taxonomy::from_directory(&PathBuf::from("labels")).context("loading taxonomy from labels/")?;
+    let mut taxonomy = Taxonomy::from_directory(PathBuf::from("labels"))
+        .context("loading taxonomy from labels/")?;
     taxonomy.compile_validators();
     taxonomy.compile_locale_validators();
     Ok(taxonomy)
@@ -108,7 +108,10 @@ fn main() -> Result<()> {
             writeln!(w, "{name}")?;
         }
         w.flush()?;
-        eprintln!("Wrote feature manifest ({} names) to {path}", feature_names.len());
+        eprintln!(
+            "Wrote feature manifest ({} names) to {path}",
+            feature_names.len()
+        );
     }
 
     let input = match args.input {
@@ -159,7 +162,7 @@ fn main() -> Result<()> {
         }
         wtr.write_record(&row)?;
         n += 1;
-        if n % 50_000 == 0 {
+        if n.is_multiple_of(50_000) {
             eprintln!("  {n} values...");
         }
     }
