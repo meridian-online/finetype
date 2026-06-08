@@ -1705,7 +1705,11 @@ impl ColumnClassifier {
                     .and_then(|sh| sh.classify_header(header))
                     .map(|r| r.label.clone())
             });
-            let hint_is_hardcoded = hardcoded_hint.is_some() && !hints_defer_enabled();
+            let hint_is_hardcoded = hardcoded_hint.is_some()
+                && (!hints_defer_enabled()
+                    || hardcoded_hint
+                        .as_deref()
+                        .is_some_and(header_hint_is_load_bearing));
 
             if let Some(hinted_type) = hinted_type.as_deref() {
                 // Already predicts the hinted type — boost confidence
@@ -2370,14 +2374,15 @@ impl ColumnClassifier {
     fn apply_header_sharpen(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
         let label_before = result.label.clone();
 
-        // 0094 (feature-flagged via FINETYPE_COORD_HEADER_VETO, default OFF):
-        // header-corroboration demotion for the value-identical coordinate
-        // boundary. A latitude/longitude prediction whose header does NOT
-        // corroborate a coordinate, on a generic numeric column, is demoted to
-        // decimal_number. Demotion-only — the header can veto a false coordinate,
-        // never promote one, so a mislabelled header cannot create a coordinate.
-        // Fires in the no-hint gap the sci_measurement override below misses.
-        if coord_header_veto_enabled()
+        // 0094 — header hint family `header_hint_coord_veto` (default ON, like the
+        // other header hints; RHH-disableable via RHH_DISABLE_HINTS). Header-
+        // corroboration demotion for the value-identical coordinate boundary: a
+        // latitude/longitude prediction whose header does NOT corroborate a
+        // coordinate, on a generic numeric column, is demoted to decimal_number.
+        // Demotion-only — the header can veto a false coordinate, never promote
+        // one, so a mislabelled header cannot create a coordinate. Fires in the
+        // no-hint gap the sci_measurement override below misses.
+        if !rhh::is_disabled("header_hint_coord_veto")
             && matches!(
                 result.label.as_str(),
                 "geography.coordinate.latitude" | "geography.coordinate.longitude"
@@ -2416,7 +2421,11 @@ impl ColumnClassifier {
                 .and_then(|sh| sh.classify_header(header))
                 .map(|r| r.label.clone())
         });
-        let hint_is_hardcoded = hardcoded_hint.is_some() && !hints_defer_enabled();
+        let hint_is_hardcoded = hardcoded_hint.is_some()
+            && (!hints_defer_enabled()
+                || hardcoded_hint
+                    .as_deref()
+                    .is_some_and(header_hint_is_load_bearing));
 
         let hinted_type = match hinted_type.as_deref() {
             Some(h) => h,
@@ -4164,21 +4173,34 @@ fn disambiguate_boolean_override(
 // HEADER NAME HINTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Whether hardcoded header hints should DEFER to confident model predictions
-/// like the learned classifier already does (FINETYPE_HINTS_DEFER, default OFF).
-/// When set, `hint_is_hardcoded` is forced false everywhere, so the deprecated
-/// hardcoded table loses its privilege of overriding even a confident prediction
-/// — the learned model becomes the authority wherever it is sure, and hints fire
-/// only as a tiebreaker on uncertain (<=0.90) predictions. Per choice 0042.
+/// Whether non-load-bearing hardcoded header hints should DEFER to confident
+/// model predictions like the learned classifier already does
+/// (FINETYPE_HINTS_DEFER, default OFF). When set, a hardcoded hint loses its
+/// privilege of overriding a confident prediction UNLESS its type is load-
+/// bearing (see [`header_hint_is_load_bearing`]) — so the learned model becomes
+/// the authority wherever it is sure, except on the families the corpus ablation
+/// proved it cannot yet cover. Per choice 0042.
 fn hints_defer_enabled() -> bool {
     std::env::var("FINETYPE_HINTS_DEFER").is_ok_and(|v| v == "1" || v == "true")
 }
 
-/// Whether the 0094 coordinate header-veto demotion is enabled (default OFF).
-/// Read per call to match the RHH env-flag pattern; the lookup is negligible
-/// against a forward pass, and an unset var short-circuits immediately.
-fn coord_header_veto_enabled() -> bool {
-    std::env::var("FINETYPE_COORD_HEADER_VETO").is_ok_and(|v| v == "1" || v == "true")
+/// Types where the hardcoded header hint is LOAD-BEARING — the model regresses
+/// without it, per the 2026-06-09 corpus-scale ablation (gate NO-GO on
+/// removal/defer): url is confused with data_uri, unix-epoch detection halves,
+/// isbn / postal_code / currency-amount variants are not yet model-covered.
+/// These keep their override privilege even under FINETYPE_HINTS_DEFER, so the
+/// per-family defer fires only on the families the model can already stand on.
+fn header_hint_is_load_bearing(hinted_type: &str) -> bool {
+    matches!(
+        hinted_type,
+        "technology.internet.url"
+            | "technology.internet.data_uri"
+            | "identity.commerce.isbn"
+            | "geography.address.postal_code"
+    ) || hinted_type.starts_with("datetime.epoch.")
+        || hinted_type.starts_with("datetime.offset.")
+        || hinted_type.starts_with("datetime.timestamp.")
+        || hinted_type.starts_with("finance.currency.amount")
 }
 
 /// True if the header carries a coordinate token, i.e. it corroborates a
@@ -6798,11 +6820,33 @@ mod tests {
     }
 
     #[test]
-    fn coord_veto_flag_defaults_off() {
-        // With the env var unset, the veto is inert (default behaviour unchanged).
-        // Not mutating the var here — Cargo runs tests concurrently in-process.
-        if std::env::var("FINETYPE_COORD_HEADER_VETO").is_err() {
-            assert!(!coord_header_veto_enabled());
+    fn coord_veto_is_a_default_on_header_hint() {
+        // As a header-hint family, the coordinate veto is ON in default builds
+        // (rhh::is_disabled is a const `false` when the rhh-instrumentation
+        // feature is off) and disableable via RHH_DISABLE_HINTS in ablation builds.
+        assert!(!rhh::is_disabled("header_hint_coord_veto"));
+    }
+
+    #[test]
+    fn load_bearing_hints_keep_override_under_defer() {
+        // The corpus ablation's model-gap families stay load-bearing; the bulk
+        // families do not (they defer to the model).
+        for keep in [
+            "technology.internet.url",
+            "identity.commerce.isbn",
+            "datetime.epoch.unix_seconds",
+            "geography.address.postal_code",
+            "finance.currency.amount",
+        ] {
+            assert!(header_hint_is_load_bearing(keep), "should keep: {keep}");
+        }
+        for defer in [
+            "geography.location.state",
+            "identity.person.full_name",
+            "representation.discrete.categorical",
+            "identity.person.gender",
+        ] {
+            assert!(!header_hint_is_load_bearing(defer), "should defer: {defer}");
         }
     }
 
