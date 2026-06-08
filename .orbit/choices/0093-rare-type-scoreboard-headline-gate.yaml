@@ -1,0 +1,85 @@
+id: '0093'
+title: Rare-type scoreboard is the headline promotion gate; aggregate corpus precision is context-only
+status: accepted
+date_created: 2026-06-08
+date_modified: 2026-06-08
+body: |
+  # 0093. Rare-type scoreboard is the headline promotion gate; aggregate corpus precision is context-only
+
+  ## Context and Problem Statement
+
+  Four consecutive Sense retrains (v22, v23, v24, latdec) read as a flat
+  precision "ceiling" at ~0.49 cell-2 vs the gated-YDF oracle, despite each
+  doing real work on rare-type confusions. The 2026-06-08 diagnosis
+  (`output/eval-ceiling-diagnosis/finding.md`) established that the ceiling is
+  a **measurement artifact**, not a model limit:
+
+  1. **The scored denominator is structurally blind to the targets.** On
+     `v19_gated.parquet` (5,813,522 scored columns) integer+decimal = 52.5%,
+     while the rounds' battlegrounds — latitude + longitude + url + utc — total
+     **18 columns (0.0003%)**. Raw YDF proposes latitude 8× and utc 0× across
+     6.6M columns, so those columns cannot enter the denominator at all.
+  2. **The metric counts only downside.** The common types a rare-type bet
+     collaterally damages (city 60.5k, country 8.5k) ARE measured, so a round
+     is debited for side-effects and credited nothing for the rare-type fix —
+     a one-way ratchet where every round can only stay flat or regress.
+  3. **The oracle is a noisy judge.** Gated-YDF is confidently wrong 70–100%
+     on many families (its own gate-refusal data) and ~8× further from
+     independent DBpedia truth than the Sense model it grades. Leakage was
+     ruled out — the firewall holds.
+
+  The prototype scoreboard (`scripts/build_rare_type_gold.py`,
+  `output/eval-ceiling-diagnosis/rare_type_gold.md`) proves the alternative:
+  oracle-free, header-anchored metrics on latitude/url/utc that **swing across
+  rounds** (latitude FP-rate 0.0013 → 0.0163 → 0.0010; url recall 0.949 →
+  0.896 → 0.989) where corpus precision was flat — and would have caught
+  v22/v23 pre-promotion.
+
+  ## Considered Options
+
+  - **A. Status quo.** Keep aggregate corpus precision (cell-2 vs gated-YDF) as
+     the headline progress/promotion number.
+  - **B. Rare-type scoreboard as headline.** Promotion decisions lead with the
+     header-anchored rare-type scoreboard (FP-rate / recall per contested type);
+     aggregate corpus precision is retained only as a context number for the
+     bulk-numeric population, never as the pass/fail headline.
+  - **C. Replace corpus precision entirely.** Drop the 0.49 metric.
+
+  ## Decision Outcome
+
+  **Option B.** The rare-type scoreboard is the headline promotion gate for any
+  round whose intent touches a contested rare type. Aggregate corpus precision
+  is demoted to a context number (it still validly tracks bulk-numeric health
+  and catches common-type collateral — which is real signal, just not the
+  headline). Option C is rejected: the 0.49 still catches collateral regressions
+  the scoreboard's narrow gold set would miss, so it stays as a guardrail.
+
+  This **does not replace** the existing instruments — it reorders them. The
+  corpus-honest gate (rare-label-quota'd; NO-GO is blocking, H05) remains the
+  blocking release gate; the rare-type scoreboard is the **headline progress
+  signal and a fast pre-promotion check** (seconds, no 9-hour pass) that the
+  9-hour corpus pass cannot provide. Promotion sequence becomes: gold-anchor →
+  drift proxy (pre-train) → **rare-type scoreboard (headline)** → corpus-honest
+  gate (blocking) → models/default swap, with aggregate corpus precision read
+  as context throughout.
+
+  ### Gate precedence (non-overridable)
+
+  The scoreboard is a headline and a fast pre-check; it has **no authority to
+  promote.** Explicitly: **a green rare-type scoreboard NEVER overrides a NO-GO
+  corpus-honest gate, nor a material common-type regression on aggregate corpus
+  precision.** Promotion requires ALL of: corpus-honest gate = GO (blocking,
+  H05), no common-type regression beyond the calibrated band on aggregate corpus
+  precision, AND a non-regressing scoreboard on the targeted types. The
+  scoreboard can only *withhold* promotion (a red scoreboard blocks a round that
+  claims to fix a rare type but didn't) or *surface* progress — it can never
+  greenlight past a breadth-gate failure. This keeps cross-type regression
+  protection entirely with the breadth gates the scoreboard does not replace.
+
+  GO-precision of the scoreboard is unvalidated until its gold set is human-
+  checked (the canonical-isation step, tracked separately) — until then it is a
+  proven *relative* round-vs-round comparator and a NO-GO early-warning, not an
+  absolute accuracy meter. Updates the "Eval baseline" section of CLAUDE.md.
+
+  Substrate: `output/eval-ceiling-diagnosis/{finding,rare_type_gold}.md`,
+  `scripts/build_rare_type_gold.py`, memory `eval-precision-metric-blind-to-rare-targets`.
