@@ -1705,7 +1705,7 @@ impl ColumnClassifier {
                     .and_then(|sh| sh.classify_header(header))
                     .map(|r| r.label.clone())
             });
-            let hint_is_hardcoded = hardcoded_hint.is_some();
+            let hint_is_hardcoded = hardcoded_hint.is_some() && !hints_defer_enabled();
 
             if let Some(hinted_type) = hinted_type.as_deref() {
                 // Already predicts the hinted type — boost confidence
@@ -2416,7 +2416,7 @@ impl ColumnClassifier {
                 .and_then(|sh| sh.classify_header(header))
                 .map(|r| r.label.clone())
         });
-        let hint_is_hardcoded = hardcoded_hint.is_some();
+        let hint_is_hardcoded = hardcoded_hint.is_some() && !hints_defer_enabled();
 
         let hinted_type = match hinted_type.as_deref() {
             Some(h) => h,
@@ -4163,6 +4163,16 @@ fn disambiguate_boolean_override(
 // ═══════════════════════════════════════════════════════════════════════════════
 // HEADER NAME HINTS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Whether hardcoded header hints should DEFER to confident model predictions
+/// like the learned classifier already does (FINETYPE_HINTS_DEFER, default OFF).
+/// When set, `hint_is_hardcoded` is forced false everywhere, so the deprecated
+/// hardcoded table loses its privilege of overriding even a confident prediction
+/// — the learned model becomes the authority wherever it is sure, and hints fire
+/// only as a tiebreaker on uncertain (<=0.90) predictions. Per choice 0042.
+fn hints_defer_enabled() -> bool {
+    std::env::var("FINETYPE_HINTS_DEFER").is_ok_and(|v| v == "1" || v == "true")
+}
 
 /// Whether the 0094 coordinate header-veto demotion is enabled (default OFF).
 /// Read per call to match the RHH env-flag pattern; the lookup is negligible
