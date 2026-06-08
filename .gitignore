@@ -249,3 +249,6 @@ results/
 # CodeGraph local index (machine-local, regenerable via `codegraph index`)
 .codegraph/
 output/eval-ceiling-diagnosis/coord_veto_candidate.parquet
+
+# Header-hint ablation pass outputs (large, real values; regenerable)
+output/eval-ceiling-diagnosis/abl_*/

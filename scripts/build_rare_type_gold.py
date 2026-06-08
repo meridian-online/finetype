@@ -142,4 +142,6 @@ def main():
     print("recall = genuine-T columns the model gets. These move per round where")
     print("aggregate corpus precision (~0.49) does not.")
 
-main()
+
+if __name__ == "__main__":
+    main()
