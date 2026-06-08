@@ -103,7 +103,10 @@ mod tests {
 
         // A 2-letter code: passes country_code, is not a number so fails latitude.
         let code = value_feature_row("US", &extractor, &taxonomy);
-        assert_eq!(code[DECIMAL_PLACES], 0.0, "non-numeric has 0 decimal places");
+        assert_eq!(
+            code[DECIMAL_PLACES], 0.0,
+            "non-numeric has 0 decimal places"
+        );
         assert_eq!(code[cc_i], 1.0, "US must pass the country_code schema");
         assert_eq!(code[lat_i], 0.0, "US must fail the latitude schema");
     }

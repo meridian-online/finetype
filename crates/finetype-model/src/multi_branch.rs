@@ -992,8 +992,13 @@ impl MultiBranchClassifier {
 
         let valid_t = self.compute_validation_tensor(&value_refs, taxonomy, &device)?;
 
-        let hidden =
-            self.forward_trunk(&char_t, &embed_t, &stats_t, header_t.as_ref(), valid_t.as_ref())?;
+        let hidden = self.forward_trunk(
+            &char_t,
+            &embed_t,
+            &stats_t,
+            header_t.as_ref(),
+            valid_t.as_ref(),
+        )?;
 
         let logits = match &self.head {
             ClassificationHead::Flat(head) => head
@@ -1006,9 +1011,7 @@ impl MultiBranchClassifier {
             ClassificationHead::Hierarchical(hier_head) => {
                 let probs = hier_head
                     .forward(&hidden, self.config.n_classes)
-                    .map_err(|e| {
-                        InferenceError::InvalidPath(format!("hierarchical forward: {e}"))
-                    })?
+                    .map_err(|e| InferenceError::InvalidPath(format!("hierarchical forward: {e}")))?
                     .squeeze(0)
                     .map_err(|e| InferenceError::InvalidPath(format!("squeeze: {e}")))?
                     .to_vec1::<f32>()

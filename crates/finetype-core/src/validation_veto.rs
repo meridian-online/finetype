@@ -78,16 +78,12 @@ pub fn evaluate_validation_veto(
     taxonomy: &Taxonomy,
     safe: &HashSet<String>,
 ) -> ValidationVeto {
-    let result = match validate_column_for_label(
-        values,
-        label,
-        taxonomy,
-        InvalidStrategy::Quarantine,
-    ) {
-        Ok(r) => r,
-        // Unknown label or no schema — no validation signal.
-        Err(_) => return ValidationVeto::inert(),
-    };
+    let result =
+        match validate_column_for_label(values, label, taxonomy, InvalidStrategy::Quarantine) {
+            Ok(r) => r,
+            // Unknown label or no schema — no validation signal.
+            Err(_) => return ValidationVeto::inert(),
+        };
 
     let checked = result.stats.valid_count + result.stats.invalid_count;
     if checked == 0 {
@@ -178,10 +174,8 @@ identity.person.gender_code:
     fn safe_label_with_failing_values_is_hard_vetoed() {
         let safe = audited_safe_labels();
         // Single/double-digit values are not four-digit years.
-        let values: Vec<Option<&str>> =
-            vec![Some("5"), Some("9"), Some("12"), Some("88")];
-        let veto =
-            evaluate_validation_veto("datetime.component.year", &values, &taxonomy(), &safe);
+        let values: Vec<Option<&str>> = vec![Some("5"), Some("9"), Some("12"), Some("88")];
+        let veto = evaluate_validation_veto("datetime.component.year", &values, &taxonomy(), &safe);
         assert!(veto.pass_rate.unwrap() < VETO_THRESHOLD);
         assert!(veto.vetoed, "audited-safe + failing => hard veto");
         assert!(!veto.advisory_low);
@@ -192,8 +186,7 @@ identity.person.gender_code:
         let safe = audited_safe_labels();
         let values: Vec<Option<&str>> =
             vec![Some("1998"), Some("2001"), Some("1850"), Some("2020")];
-        let veto =
-            evaluate_validation_veto("datetime.component.year", &values, &taxonomy(), &safe);
+        let veto = evaluate_validation_veto("datetime.component.year", &values, &taxonomy(), &safe);
         assert!(veto.pass_rate.unwrap() >= VETO_THRESHOLD);
         assert!(!veto.vetoed);
         assert!(!veto.advisory_low);
@@ -205,12 +198,8 @@ identity.person.gender_code:
         // produce an advisory flag, never a hard veto.
         let safe = audited_safe_labels();
         let values: Vec<Option<&str>> = vec![Some("nope"), Some("zzz")];
-        let veto = evaluate_validation_veto(
-            "identity.person.gender_code",
-            &values,
-            &taxonomy(),
-            &safe,
-        );
+        let veto =
+            evaluate_validation_veto("identity.person.gender_code", &values, &taxonomy(), &safe);
         assert!(veto.pass_rate.unwrap() < VETO_THRESHOLD);
         assert!(!veto.vetoed, "not audited-safe => never hard-vetoed");
         assert!(veto.advisory_low);

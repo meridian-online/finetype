@@ -43,7 +43,10 @@ const N_CLASSES: usize = 240;
 const MB_OFFSET: usize = 728; // start of mb_logits within the 968-dim row
 
 #[derive(Parser, Debug)]
-#[command(name = "train-fusion-head", about = "Train/predict the B3 late-fusion residual head")]
+#[command(
+    name = "train-fusion-head",
+    about = "Train/predict the B3 late-fusion residual head"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -139,7 +142,14 @@ impl FusionHead {
         let l2 = linear(h1, h2, vb.pp("l2"))?;
         let l3 = linear(h2, N_CLASSES, vb.pp("l3"))?;
         let alpha = vb.get_with_hints(1, "alpha", Init::Const(alpha_init))?;
-        Ok(Self { ln, l1, l2, l3, alpha, dropout })
+        Ok(Self {
+            ln,
+            l1,
+            l2,
+            l3,
+            alpha,
+            dropout,
+        })
     }
 
     fn forward(&self, x: &Tensor, train: bool) -> Result<Tensor> {
@@ -188,7 +198,10 @@ fn read_features(stem: &Path) -> Result<(Vec<f32>, Vec<u32>, usize, Vec<String>)
 
     let raw = fs::read(&f32_path).with_context(|| format!("read {f32_path:?}"))?;
     if raw.len() % (ROW_DIM * 4) != 0 {
-        bail!("{f32_path:?} size {} not a multiple of row stride", raw.len());
+        bail!(
+            "{f32_path:?} size {} not a multiple of row stride",
+            raw.len()
+        );
     }
     let n_rows = raw.len() / (ROW_DIM * 4);
     let mut feats = Vec::with_capacity(n_rows * ROW_DIM);
@@ -196,7 +209,8 @@ fn read_features(stem: &Path) -> Result<(Vec<f32>, Vec<u32>, usize, Vec<String>)
         feats.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
     }
 
-    let labels_txt = fs::read_to_string(&labels_path).with_context(|| format!("read {labels_path:?}"))?;
+    let labels_txt =
+        fs::read_to_string(&labels_path).with_context(|| format!("read {labels_path:?}"))?;
     let mut labels = Vec::with_capacity(n_rows);
     for line in labels_txt.lines() {
         if line.starts_with("row_idx\t") {
@@ -237,7 +251,12 @@ fn split_indices(n: usize, val_fraction: f64, seed: u64) -> (Vec<usize>, Vec<usi
     (train, val)
 }
 
-fn gather_rows(feats: &[f32], labels: &[u32], idx: &[usize], device: &Device) -> Result<(Tensor, Tensor)> {
+fn gather_rows(
+    feats: &[f32],
+    labels: &[u32],
+    idx: &[usize],
+    device: &Device,
+) -> Result<(Tensor, Tensor)> {
     let mut xb = Vec::with_capacity(idx.len() * ROW_DIM);
     let mut yb = Vec::with_capacity(idx.len());
     for &i in idx {
@@ -261,19 +280,30 @@ fn per_class_recall(preds: &[u32], targets: &[u32], n_classes: usize) -> Vec<f32
         }
     }
     (0..n_classes)
-        .map(|c| if tot[c] == 0 { f32::NAN } else { tp[c] as f32 / tot[c] as f32 })
+        .map(|c| {
+            if tot[c] == 0 {
+                f32::NAN
+            } else {
+                tp[c] as f32 / tot[c] as f32
+            }
+        })
         .collect()
 }
 
 fn argmax_rows(x: &Tensor) -> Result<Vec<u32>> {
-    Ok(x.argmax(D::Minus1)?.to_dtype(DType::U32)?.to_vec1::<u32>()?)
+    Ok(x.argmax(D::Minus1)?
+        .to_dtype(DType::U32)?
+        .to_vec1::<u32>()?)
 }
 
 fn read_blob(stem: &Path) -> Result<(Vec<f32>, usize)> {
     let f32_path = with_ext(stem, "f32");
     let raw = fs::read(&f32_path).with_context(|| format!("read {f32_path:?}"))?;
     if raw.len() % (ROW_DIM * 4) != 0 {
-        bail!("{f32_path:?} size {} not a multiple of row stride", raw.len());
+        bail!(
+            "{f32_path:?} size {} not a multiple of row stride",
+            raw.len()
+        );
     }
     let n_rows = raw.len() / (ROW_DIM * 4);
     let mut feats = Vec::with_capacity(n_rows * ROW_DIM);
@@ -285,8 +315,7 @@ fn read_blob(stem: &Path) -> Result<(Vec<f32>, usize)> {
 
 fn run_predict(args: PredictArgs) -> Result<()> {
     let device = Device::Cpu;
-    let cfg: serde_json::Value =
-        serde_json::from_slice(&fs::read(args.head.join("config.json"))?)?;
+    let cfg: serde_json::Value = serde_json::from_slice(&fs::read(args.head.join("config.json"))?)?;
     let h1 = cfg["hidden1"].as_u64().context("config.hidden1")? as usize;
     let h2 = cfg["hidden2"].as_u64().context("config.hidden2")? as usize;
     let label_order: Vec<String> = cfg["label_order"]
@@ -316,7 +345,10 @@ fn run_predict(args: PredictArgs) -> Result<()> {
         let logits = head.forward(&x, false)?;
         let preds = argmax_rows(&logits)?;
         for (k, &p) in preds.iter().enumerate() {
-            let label = label_order.get(p as usize).map(|s| s.as_str()).unwrap_or("?");
+            let label = label_order
+                .get(p as usize)
+                .map(|s| s.as_str())
+                .unwrap_or("?");
             writeln!(out, "{}\t{}", i + k, label)?;
         }
         i = j;
@@ -337,7 +369,10 @@ fn run_train(args: TrainArgs) -> Result<()> {
     let device = Device::Cpu;
 
     let (feats, labels, n_rows, label_order) = read_features(&args.features)?;
-    println!("loaded {n_rows} rows x {ROW_DIM} f32; {} classes", label_order.len());
+    println!(
+        "loaded {n_rows} rows x {ROW_DIM} f32; {} classes",
+        label_order.len()
+    );
 
     let (train_idx, val_idx) = split_indices(n_rows, args.val_fraction, args.seed);
     println!("split: {} train, {} val", train_idx.len(), val_idx.len());
@@ -356,7 +391,13 @@ fn run_train(args: TrainArgs) -> Result<()> {
 
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
-    let head = FusionHead::new(vb, args.hidden1, args.hidden2, args.dropout, args.alpha_init)?;
+    let head = FusionHead::new(
+        vb,
+        args.hidden1,
+        args.hidden2,
+        args.dropout,
+        args.alpha_init,
+    )?;
 
     let adamw = ParamsAdamW {
         lr: args.lr,
@@ -444,7 +485,10 @@ fn run_train(args: TrainArgs) -> Result<()> {
         "alpha_final": best_alpha,
         "label_order": label_order,
     });
-    fs::write(args.output.join("config.json"), serde_json::to_string_pretty(&config)? + "\n")?;
+    fs::write(
+        args.output.join("config.json"),
+        serde_json::to_string_pretty(&config)? + "\n",
+    )?;
 
     let family = [
         "geography.coordinate.latitude",
@@ -481,7 +525,10 @@ fn run_train(args: TrainArgs) -> Result<()> {
             "seed": args.seed, "val_fraction": args.val_fraction,
         },
     });
-    fs::write(args.output.join("metrics.json"), serde_json::to_string_pretty(&metrics)? + "\n")?;
+    fs::write(
+        args.output.join("metrics.json"),
+        serde_json::to_string_pretty(&metrics)? + "\n",
+    )?;
 
     println!();
     println!("=== fusion head done ===");

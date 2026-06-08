@@ -302,10 +302,7 @@ fn fractional_digit_count(value: &str) -> u32 {
     match value.split_once('.') {
         Some((_, frac)) => {
             // Drop a scientific-notation exponent if present.
-            let frac = frac
-                .split(['e', 'E'])
-                .next()
-                .unwrap_or(frac);
+            let frac = frac.split(['e', 'E']).next().unwrap_or(frac);
             frac.chars().filter(|c| c.is_ascii_digit()).count() as u32
         }
         None => 0,

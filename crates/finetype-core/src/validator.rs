@@ -71,18 +71,21 @@ fn compile_schema_parts(
     if let serde_json::Value::Object(map) = &mut json_schema {
         map.remove("enum");
     }
-    let schema_validator =
-        jsonschema::validator_for(&json_schema).map_err(|e| {
-            ValidatorError::SchemaCompilationError {
-                label: label.to_string(),
-                detail: e.to_string(),
-            }
-        })?;
+    let schema_validator = jsonschema::validator_for(&json_schema).map_err(|e| {
+        ValidatorError::SchemaCompilationError {
+            label: label.to_string(),
+            detail: e.to_string(),
+        }
+    })?;
     let enum_folded = validation.enum_values.as_ref().and_then(|vals| {
         if vals.is_empty() {
             None
         } else {
-            Some(vals.iter().map(|v| v.to_lowercase()).collect::<HashSet<String>>())
+            Some(
+                vals.iter()
+                    .map(|v| v.to_lowercase())
+                    .collect::<HashSet<String>>(),
+            )
         }
     });
     Ok((schema_validator, enum_folded))
@@ -1066,7 +1069,13 @@ datetime.timestamp.iso_8601:
 
         // day_of_week: title-case enum accepts lower-case input.
         let dow = CompiledValidator::new(&enum_only(&[
-            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
         ]))
         .unwrap();
         assert!(dow.is_valid("thursday"), "thursday should fold to Thursday");
@@ -1075,11 +1084,14 @@ datetime.timestamp.iso_8601:
         assert!(!dow.is_valid("thursdays"), "non-member must still reject");
 
         // gender: FHIR lower-case enum accepts title-case input.
-        let gender = CompiledValidator::new(&enum_only(&["male", "female", "other", "unknown"]))
-            .unwrap();
+        let gender =
+            CompiledValidator::new(&enum_only(&["male", "female", "other", "unknown"])).unwrap();
         assert!(gender.is_valid("Male"), "Male should fold to male");
         assert!(gender.is_valid("FEMALE"));
-        assert!(!gender.is_valid("masculine"), "non-member must still reject");
+        assert!(
+            !gender.is_valid("masculine"),
+            "non-member must still reject"
+        );
     }
 
     #[test]
