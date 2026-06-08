@@ -122,4 +122,4 @@ At production base rates (~96% of full_name predictions are non-person):
 
 ## Implementation Status
 
-All integration tasks are complete as of v0.6. The entity classifier is implemented in `crates/finetype-model/src/entity.rs` with shared Model2Vec resources, statistical feature computation, and auto-detection from model directory.
+All integration tasks are complete. The entity classifier is implemented in `crates/finetype-model/src/entity.rs` with shared Model2Vec resources, statistical feature computation, and auto-detection from model directory.

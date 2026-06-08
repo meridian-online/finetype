@@ -261,7 +261,7 @@ scripts already pass `--features metal`/`cuda`, so they get it automatically.
 
 The hide mechanism is `#[command(hide = true)]` on the clap variant — no wrapper scripts, no env-var gating, no separate binary. Hidden ≠ removed: `finetype check` continues to power `make ci` and `finetype generate` continues to power training data prep.
 
-`--model` was removed from every subcommand in v0.6.19. The model directory is now configured exclusively via the `FINETYPE_MODEL` env var (default: `models/default`).
+`--model` is no longer a subcommand flag. The model directory is configured exclusively via the `FINETYPE_MODEL` env var (default: `models/default`).
 
 ### Commands
 
@@ -270,7 +270,7 @@ The hide mechanism is `#[command(hide = true)]` on the clap variant — no wrapp
 |---|---|
 | `finetype infer` | Classify values (single/column/batch mode) |
 | `finetype profile <file>` | Profile all columns in CSV/Parquet (`-o plain\|json\|csv\|markdown\|arrow`, `--enum-threshold N`, `--verbose`) |
-| `finetype taxonomy [KEY]` | Print taxonomy summary, or filter to a single type / glob (`KEY` = `identity.person.email` or `identity.person.*`). Output formats: `-o plain\|json\|csv\|json-schema`. Per-type JSON Schema export (formerly the `schema KEY` verb) lives here in v0.6.19+; output is always a JSON array even for single matches. Schema export carries only `x-finetype-label` + `x-finetype-pii` extensions. |
+| `finetype taxonomy [KEY]` | Print taxonomy summary, or filter to a single type / glob (`KEY` = `identity.person.email` or `identity.person.*`). Output formats: `-o plain\|json\|csv\|json-schema`. Per-type JSON Schema export (formerly the `schema KEY` verb) lives here; output is always a JSON array even for single matches. Schema export carries only `x-finetype-label` + `x-finetype-pii` extensions. |
 | `finetype validate <file> <schema>` | Schema-driven quality gate. Defaults to **check-only mode** — runs the validation engine, prints a summary, exits 0/1/2 (no rejects / rejects / error). Pass `--db <out.db> --table <name>` to also materialise the user's **typed** table (per-column transforms applied via TRY-wrapped projection from each column's `x-finetype-label`) plus `finetype_reject_errors` sidecar (13-col DuckDB `reject_errors` shape + FineType extensions `type_confidence`, `expected_type`, `constraint_failed`, `constraint_value`). Reject ontology: `error_type='SEMANTIC_TYPE'` for engine validation failures; `error_type='TRANSFORM_FAILED'` (`constraint_failed='transform'`) for cells that passed validation but failed the typed cast. Staging-NULL → typed-NULL is not a transform failure. ENUM emission is dropped — low-cardinality columns retain the schema's `duckdb_type`. Flags: `--append` (reuse db, scan_id++; requires `--db`), `--lenient` (force exit 0). Materialise mode requires `duckdb` on PATH. See MADR 0064 (reject pipeline) and MADR 0071 (load fold). |
 | `finetype mcp` | Start MCP server over stdio (8 tools). |
 | `finetype check` *(hidden)* | Validate taxonomy ↔ generator alignment. Used by `make ci`. |

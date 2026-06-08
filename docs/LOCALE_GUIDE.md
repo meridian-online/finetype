@@ -235,7 +235,7 @@ jq '.columns[] | {name, detected_locale: .locale}' profile.json
 
 ## Locale Coverage Expansion
 
-FineType continuously expands locale support. As of v0.6, the expansion roadmap includes:
+FineType continuously expands locale support. The expansion roadmap includes:
 
 ### Phase 1: Core Types ✅ Complete
 - ✅ Phone numbers (46 locales)
