@@ -37,3 +37,8 @@ regex = "1"
 [dev-dependencies]
 anyhow = { workspace = true }
 csv = { workspace = true }
+
+# candle-transformers carries no `use` — it exists for the cuda/metal feature
+# passthrough above. cargo-machete can't see feature-graph deps.
+[package.metadata.cargo-machete]
+ignored = ["candle-transformers"]

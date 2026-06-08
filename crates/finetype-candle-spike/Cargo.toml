@@ -34,3 +34,6 @@ path = "src/bin/train_sense.rs"
 [[bin]]
 name = "train-entity"
 path = "src/bin/train_entity.rs"
+
+[package.metadata.cargo-machete]
+ignored = ["finetype-core", "half", "safetensors"]

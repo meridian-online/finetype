@@ -43,3 +43,6 @@ tracing = { workspace = true }
 # extension build. macOS keeps vendored (its build already compiles it cleanly).
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
+
+[package.metadata.cargo-machete]
+ignored = ["openssl"]
