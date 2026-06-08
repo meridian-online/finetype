@@ -31,13 +31,22 @@ are not "hidden on ydf=NULL" — they sit on columns the oracle positively label
 decimal (421 of 457 sample moves; 36 silent). Three bands read the scaled flows:
 
   over_emit  — est. candidate marginal / v19 marginal >= rel-mult            (v23: +529%)
-  collapse   — est. candidate marginal / v19 marginal <= collapse-frac       (v22: country -31.5%)
-  oracle_fp  — inflow X->B (X != B) onto columns the baseline oracle labels
-               as something OTHER than B: predictions the oracle refutes      (latdec relocation)
+  collapse   — oracle-CONFIRMED candidate support / v19 confirmed support
+               <= collapse-frac (a loss of CORRECT mass, not raw marginal)    (v22: country)
+  oracle_fp  — CREATED false positives: a move A->B the oracle refutes (oracle
+               != B) where the oracle CONFIRMED the source (oracle == A) — a
+               column that was correct as A and is now wrong as B             (latdec relocation)
 
 oracle_fp is the load-bearing band: it counts the false positives a fix CREATES on
 columns the oracle actively contradicts, measured against the stable baseline oracle
 that the bet's own (empty) candidate-ydf metric could not see.
+
+Both oracle-keyed bands read the oracle against BOTH ends of each transition (see
+transition_counts). This is what lets the gate distinguish a regression (a correct
+prediction relocated onto a wrong label) from honest abstention (a label the oracle
+ALREADY refuted, demoted to unknown by the validation veto). The earlier raw-marginal
+collapse + candidate-only oracle_fp scored every correct-FP removal as a regression —
+a NO-GO false alarm on a precision-hardening patch (the 0.6.24 finding).
 """
 from __future__ import annotations
 
@@ -74,12 +83,21 @@ def _split_csv(line: str) -> list[str]:
 
 
 def transition_counts(baseline: Path, candidate: Path, sample: Path) -> list[tuple]:
-    """Rows of (s19, scand, oracle_rel, cnt) on the sample.
+    """Rows of (s19, scand, oracle_dst, oracle_src, cnt) on the sample.
 
-    oracle_rel classifies the baseline oracle (v19 ydf) against the CANDIDATE label:
-      agree     — oracle == candidate label
-      contradict— oracle is non-null and != candidate label (oracle refutes)
-      silent    — oracle is null (no opinion)
+    The oracle is the baseline's gated YDF. We classify it against BOTH ends of
+    the transition so the bands can tell a CREATED false positive from an
+    INHERITED one:
+      oracle_dst — oracle vs the CANDIDATE label (agree / contradict / silent)
+      oracle_src — oracle vs the BASE (v19) label  (agree / contradict / silent)
+
+    Why both: a move A->B that the oracle refutes (oracle != B) is only a NEW
+    false positive if the column was correct before — i.e. the oracle CONFIRMED
+    the source (oracle == A). If the oracle refuted A too, the column was already
+    wrong; demoting it (e.g. A -> unknown) trades a confident mistake for an
+    honest abstention and must not be scored as a regression. Without oracle_src
+    the gate counts every demote-to-unknown as oracle_fp and every correct-FP
+    removal as a collapse — punishing the Precision Principle it exists to serve.
     """
     sql = f"""
 WITH samp AS (SELECT column0 AS file_path
@@ -93,12 +111,15 @@ c AS (SELECT file_path, column_name, sense_prediction s
 j AS (SELECT b.s AS s19, c.s AS scand,
              CASE WHEN b.y IS NULL THEN 'silent'
                   WHEN b.y = c.s THEN 'agree'
-                  ELSE 'contradict' END AS oracle_rel
+                  ELSE 'contradict' END AS oracle_dst,
+             CASE WHEN b.y IS NULL THEN 'silent'
+                  WHEN b.y = b.s THEN 'agree'
+                  ELSE 'contradict' END AS oracle_src
       FROM b JOIN c USING(file_path, column_name))
-SELECT s19, scand, oracle_rel, COUNT(*) cnt FROM j GROUP BY 1,2,3;
+SELECT s19, scand, oracle_dst, oracle_src, COUNT(*) cnt FROM j GROUP BY 1,2,3,4;
 """
     rows = duck_csv(sql)
-    return [(r[0], r[1], r[2], int(r[3])) for r in rows]
+    return [(r[0], r[1], r[2], r[3], int(r[4])) for r in rows]
 
 
 def main() -> int:
@@ -111,7 +132,12 @@ def main() -> int:
     ap.add_argument("--rel-mult", type=float, default=3.0,
                     help="over-emit: est marginal / v19 marginal >= this")
     ap.add_argument("--collapse-frac", type=float, default=0.6,
-                    help="collapse: est marginal / v19 marginal <= this")
+                    help="collapse: oracle-confirmed cand support / v19 support <= this")
+    ap.add_argument("--collapse-correct-floor", type=float, default=1000,
+                    help="collapse: min oracle-confirmed v19 support for the band to "
+                         "fire (suppresses ratio noise on labels with little ground "
+                         "truth — an over-emitted label has scant correct support, so "
+                         "demoting it is not a collapse)")
     ap.add_argument("--oracle-fp-ratio", type=float, default=0.20,
                     help="oracle_fp: net contradicted inflow / v19 marginal >= this")
     ap.add_argument("--oracle-fp-floor", type=int, default=1000,
@@ -135,29 +161,40 @@ def main() -> int:
     # sample rate per v19 source label A = observed sample cols(A) / corpus cols(A)
     sample_src = {}
     for row in trans:
-        a, cnt = row[0], row[3]
+        a, cnt = row[0], row[4]
         sample_src[a] = sample_src.get(a, 0) + cnt
     rate = {a: sample_src[a] / corpus_full[a] for a in sample_src if corpus_full.get(a)}
 
     # scaled corpus flows
     labels = set(corpus_full) | {row[1] for row in trans}
     est_marginal = {b: 0.0 for b in labels}        # est candidate marginal
-    contra_in = {b: 0.0 for b in labels}           # inflow X->B oracle refutes (X!=B)
-    contra_out = {b: 0.0 for b in labels}          # outflow B->X oracle refuted (X!=B)
+    contra_in = {b: 0.0 for b in labels}           # CREATED FP inflow X->B (oracle confirmed X, refutes B)
+    contra_out = {b: 0.0 for b in labels}          # correct support B shed by a CREATED-FP move out
     silent_in = {b: 0.0 for b in labels}           # inflow X->B oracle silent (X!=B)
-    obs_contra_in = {b: 0 for b in labels}         # RAW (unscaled) inflow count, X->B refuted
-    for a, b, rel, cnt in trans:
+    obs_contra_in = {b: 0 for b in labels}         # RAW (unscaled) CREATED-FP inflow count
+    base_correct = {b: 0.0 for b in labels}        # oracle-CONFIRMED baseline (v19) support of B
+    cand_correct = {b: 0.0 for b in labels}        # oracle-CONFIRMED candidate support of B
+    for a, b, odst, osrc, cnt in trans:
         r = rate.get(a)
         if not r:
             continue
         scaled = cnt / r
         est_marginal[b] += scaled
+        # oracle-confirmed support at each end (the truth the bands defend)
+        if osrc == "agree":
+            base_correct[a] += scaled
+        if odst == "agree":
+            cand_correct[b] += scaled
         if a != b:
-            if rel == "contradict":
+            # CREATED false positive: the column was CORRECT as A (oracle == A)
+            # and is now refuted as B. A move the oracle refuted at BOTH ends
+            # (osrc == 'contradict') was already wrong — demoting it to B
+            # (e.g. unknown) is not a regression, so it never counts here.
+            if osrc == "agree":
                 contra_in[b] += scaled
                 contra_out[a] += scaled
                 obs_contra_in[b] += cnt
-            elif rel == "silent":
+            elif odst == "silent":
                 silent_in[b] += scaled
 
     rows = []
@@ -167,13 +204,17 @@ def main() -> int:
         v19m = corpus_full.get(b, 0)
         em = est_marginal[b]
         ratio = (em / v19m) if v19m else float("inf") if em else 0.0
-        # net contradicted inflow: predictions of B the oracle refutes that the
-        # candidate ADDS beyond the contradictions it clears elsewhere on B.
+        # net CREATED false positives on B: oracle-confirmed predictions relocated
+        # onto B, minus oracle-confirmed support B itself lost to a created-FP move.
         net_contra = contra_in[b] - contra_out[b]
+        # oracle-CONFIRMED support change — collapse is a loss of CORRECT mass,
+        # not of raw marginal (demoting an over-emitted label is not a collapse).
+        bc, cc = base_correct[b], cand_correct[b]
+        correct_ratio = (cc / bc) if bc else (float("inf") if cc else 1.0)
         bands = []
         if v19m >= args.marginal_floor and ratio >= args.rel_mult:
             bands.append("over_emit")
-        if v19m >= args.marginal_floor and ratio <= args.collapse_frac:
+        if bc >= args.collapse_correct_floor and correct_ratio <= args.collapse_frac:
             bands.append("collapse")
         if (net_contra >= args.oracle_fp_floor
                 and obs_contra_in[b] >= args.oracle_fp_obs_floor
@@ -185,6 +226,8 @@ def main() -> int:
         rows.append({
             "label": b, "v19_marginal": v19m,
             "est_cand_marginal": round(em), "ratio": round(ratio, 3),
+            "base_correct": round(bc), "cand_correct": round(cc),
+            "correct_ratio": round(correct_ratio, 3),
             "contra_in": round(contra_in[b]), "contra_out": round(contra_out[b]),
             "net_contra_in": round(net_contra), "obs_contra_in": obs_contra_in[b],
             "silent_in": round(silent_in[b]),
@@ -197,6 +240,7 @@ def main() -> int:
         "label": args.label, "verdict": verdict,
         "candidate": args.candidate.as_posix(),
         "bands": {"rel_mult": args.rel_mult, "collapse_frac": args.collapse_frac,
+                  "collapse_correct_floor": args.collapse_correct_floor,
                   "oracle_fp_ratio": args.oracle_fp_ratio,
                   "oracle_fp_floor": args.oracle_fp_floor,
                   "oracle_fp_obs_floor": args.oracle_fp_obs_floor,

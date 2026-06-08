@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.24] - 2026-06-08
+
+A precision-hardening patch. The theme is **FineType says fewer wrong
+things**: when a column is labelled a type but its own values won't validate
+as that type, the engine now steps back to a safer label instead of asserting
+the type anyway. Net effect for analysts — fewer confident mislabels on the
+hard, ambiguous columns, with no loss on the columns that were already right.
+
+### Added
+
+- **Validation-as-veto, on by default.** A new Sharpen-stage funnel
+  (`finetype-core/src/validation_veto.rs`): after Sense proposes a type, the
+  column's sampled values are checked against that type's JSON Schema, and a
+  prediction whose own values demonstrably fail their validator is vetoed
+  rather than emitted. Wired into the default profile path; `--no-validation-veto`
+  restores the prior behaviour. This is the Precision Principle made
+  load-bearing — a label that 90% of the column's values reject is not a label.
+- **Gold evaluation anchor — independent ground truth for the confusion
+  families.** A 240-column curated set with hand-verified labels
+  (`eval/gold/`), scored by `scripts/score_gold_anchor.py`. It measures
+  *efficacy* — does a fix actually land on the hard columns — separately from
+  corpus breadth. v19 baseline: macro precision 0.956, recall 0.754.
+- **Corpus-honest quality gate (promotion infrastructure).** A post-train,
+  pre-swap gate (`scripts/corpus_honest_gate.py`) that scores a candidate's
+  predictions on a 33,250-file stratified sample against a stable gated-YDF
+  oracle, catching rare-label *relocation* — a fix that moves an error rather
+  than removing it — which curated instruments miss. A NO-GO is blocking; a GO
+  is advisory. Plus a destination-drift pre-check (`scripts/proxy_pretrain.sh`
+  + `scripts/drift_report.py`) that rejects a bad retrain bet before the
+  overnight run rather than after.
+
+### Changed
+
+- **`schema_fail_demotion` widened to `datetime.offset.utc` and
+  `technology.internet.url`.** When the majority of a column's values fail the
+  predicted type's validator, the prediction is demoted. Clean A/B on the
+  corpus sample: utc over-emission 54 → 1, url 403 → 392, with zero geography
+  collateral.
+- **Over-emitted `measurement_unit` / `geohash` demoted on majority
+  schema-fail.** Closes a long-tail false-positive band — on the earthquake
+  reference set the reject rate fell 0.1494 (grade F) → 0.0130 (grade C).
+- **`geohash` reconciled to a deliberate 6–12 character floor.** The validator
+  and its description now agree on the minimum length, ending spurious short-
+  token geohash matches.
+
 ## [0.6.23] - 2026-06-04
 
 ### Added
