@@ -69,6 +69,12 @@ When scoring v22 against the gated baseline, v22 lands at **−10.4% cell-2 vs v
 
 48 architectural decisions in `.orbit/choices/` (MADR format). Browse: `ls .orbit/choices/` or Ctrl+B (fzf + glow preview).
 
+## Code-review & audit tooling
+
+The review model is **audit-before-edit + verify**, not PR-gated (memory `finetype-cron-no-pr-merge-policy`): direct push to main, quality held by B07 consumer-graph audit + H02 post-edit verify + H03 load-bearing-edit-without-audit halt + H10 binary-push halt + green CI. Local gates: pre-commit (`fmt`) → pre-push (`fmt` + `clippy -D warnings`, the precise CI mirror) → CI (adds `cargo test`, taxonomy `check`, CLI smoke, **`cargo machete`** unused-deps).
+
+To run the **B07 consumer-graph audit** before a load-bearing edit, use the **codegraph** MCP (`codegraph_impact` / `codegraph_callers`) — enumerates consumers in 1–5 calls. Restart the agent to load the `codegraph_*` tools; `.codegraph/` is a gitignored local index (`codegraph sync` after edits). **Caveat:** codegraph is a *static* call-graph — Rust trait dispatch and the `#[test]` harness are invisible, so "no callers" is NOT dead-code truth (clippy + ripgrep stay canonical; codegraph is a fast first pass to verify against). Recipes + limits: memory `codegraph-usage-and-limits`.
+
 ## Tier-2 references — load on demand
 
 **Before modifying the engine, model pipeline, taxonomy, MCP, DuckDB extension, training, or eval infrastructure:** Read `docs/ARCHITECTURE.md`.
