@@ -212,6 +212,9 @@ const PERSON_NAME_HINTS: &[&str] = &[
     "identity.person.first_name",
 ];
 
+/// The categorical (enum) catch-all label. Used by the fusion cardinality gate.
+const CATEGORICAL_LABEL: &str = "representation.discrete.categorical";
+
 /// Hardcoded list of labels known to be generic catch-all predictions.
 /// Used as a fallback when taxonomy is not available for designation lookup.
 const HARDCODED_GENERIC_LABELS: &[&str] = &[
@@ -2078,8 +2081,44 @@ impl ColumnClassifier {
         let samples_used = sample.len();
 
         // Step 1: Fusion Sense prediction (replaces multi-branch's forward).
-        let (label, confidence) =
-            fusion.classify_column(&sample, header, self.taxonomy.as_ref())?;
+        let ranked = fusion.classify_column_ranked(&sample, header, self.taxonomy.as_ref())?;
+        let (mut label, mut confidence) = ranked
+            .first()
+            .cloned()
+            .unwrap_or_else(|| ("unknown".to_string(), 0.0));
+        let mut disambiguation_rule = "late-fusion".to_string();
+
+        // Lever 1 — cardinality gate. The value head cannot see column cardinality,
+        // so it funnels high-cardinality free-text columns (word/entity_name/
+        // plain_text) into `representation.discrete.categorical`. A real enum
+        // repeats a bounded set of values; a free-text column is mostly distinct.
+        // When the top label is categorical but the FULL column is too high-
+        // cardinality to be an enum, demote to the head's best non-categorical
+        // alternative. (Low-cardinality categorical over-emission is recovered by
+        // the head's alpha floor, not here.)
+        if label == CATEGORICAL_LABEL {
+            let mut uniq = std::collections::HashSet::new();
+            let mut total = 0usize;
+            for v in values {
+                let t = v.trim();
+                if !t.is_empty() {
+                    uniq.insert(t);
+                    total += 1;
+                }
+            }
+            let distinct = uniq.len();
+            let frac_unique = if total > 0 { distinct as f32 / total as f32 } else { 0.0 };
+            let too_high_card = distinct > 50 || (frac_unique > 0.7 && distinct > 20);
+            if too_high_card {
+                if let Some((alt_label, alt_conf)) =
+                    ranked.iter().find(|(l, _)| l != CATEGORICAL_LABEL).cloned()
+                {
+                    disambiguation_rule = format!("fusion_cardinality_gate:{distinct}");
+                    label = alt_label;
+                    confidence = alt_conf;
+                }
+            }
+        }
 
         // Step 2: Deterministic ColumnFeatures (36-dim, no neural inference).
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
@@ -2090,8 +2129,8 @@ impl ColumnClassifier {
             label: label.clone(),
             confidence,
             vote_distribution: vec![(label, confidence)],
-            disambiguation_applied: false,
-            disambiguation_rule: Some("late-fusion".to_string()),
+            disambiguation_applied: disambiguation_rule != "late-fusion",
+            disambiguation_rule: Some(disambiguation_rule),
             samples_used,
             detected_locale: None,
             is_generic: false,

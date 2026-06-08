@@ -287,8 +287,25 @@ impl FusionClassifier {
         header: &str,
         taxonomy: Option<&Taxonomy>,
     ) -> Result<(String, f32), InferenceError> {
+        let ranked = self.classify_column_ranked(values, header, taxonomy)?;
+        Ok(ranked
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| ("unknown".to_string(), 0.0)))
+    }
+
+    /// Classify one column → all labels ranked by softmax probability, highest
+    /// first. The first element is what `classify_column` returns; the rest let a
+    /// caller (e.g. a column-level cardinality gate) pick the best alternative
+    /// when the top label is implausible for the column's distribution.
+    pub fn classify_column_ranked(
+        &self,
+        values: &[String],
+        header: &str,
+        taxonomy: Option<&Taxonomy>,
+    ) -> Result<Vec<(String, f32)>, InferenceError> {
         if values.is_empty() {
-            return Ok(("unknown".to_string(), 0.0));
+            return Ok(vec![("unknown".to_string(), 0.0)]);
         }
         let n_classes = self.labels.len();
         let name_to_idx: HashMap<&str, usize> =
@@ -306,19 +323,19 @@ impl FusionClassifier {
         )?;
         let logits = self.head.fused_logits(&row)?;
 
-        // argmax + softmax confidence
-        let mut argmax = 0usize;
-        let mut amax = f32::NEG_INFINITY;
-        for (i, &l) in logits.iter().enumerate() {
-            if l > amax {
-                amax = l;
-                argmax = i;
-            }
-        }
+        let amax = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let denom: f32 = logits.iter().map(|&l| (l - amax).exp()).sum();
-        let confidence = if denom > 0.0 { 1.0 / denom } else { 0.0 };
-        let label = self.labels.get(argmax).cloned().unwrap_or_else(|| "unknown".to_string());
-        Ok((label, confidence))
+        let mut ranked: Vec<(String, f32)> = logits
+            .iter()
+            .enumerate()
+            .map(|(i, &l)| {
+                let p = if denom > 0.0 { (l - amax).exp() / denom } else { 0.0 };
+                let label = self.labels.get(i).cloned().unwrap_or_else(|| "unknown".to_string());
+                (label, p)
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(ranked)
     }
 }
 

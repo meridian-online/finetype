@@ -79,6 +79,12 @@ struct TrainArgs {
     #[arg(long, default_value = "1.0")]
     alpha_init: f64,
 
+    /// Lower bound on the learnable multi-branch mixing scalar. After each
+    /// optimiser step alpha is projected back up to this floor, so training
+    /// cannot suppress View2 (multi-branch) below it. 0.0 = no floor.
+    #[arg(long, default_value = "0.0")]
+    alpha_floor: f64,
+
     #[arg(long, default_value = "60")]
     epochs: usize,
 
@@ -387,6 +393,15 @@ fn run_train(args: TrainArgs) -> Result<()> {
             let logits = head.forward(&xb, true)?;
             let loss = cross_entropy_loss(&logits, &yb)?;
             opt.backward_step(&loss)?;
+            if args.alpha_floor > 0.0 {
+                let cur = head.alpha.to_vec1::<f32>()?[0] as f64;
+                if cur < args.alpha_floor {
+                    let clamped = Tensor::from_vec(vec![args.alpha_floor as f32], 1, &device)?;
+                    if let Some(v) = varmap.data().lock().unwrap().get("alpha") {
+                        v.set(&clamped)?;
+                    }
+                }
+            }
             running += loss.to_scalar::<f32>()? as f64;
             nb += 1;
         }
@@ -425,6 +440,7 @@ fn run_train(args: TrainArgs) -> Result<()> {
         "hidden2": args.hidden2,
         "dropout": args.dropout,
         "alpha_init": args.alpha_init,
+        "alpha_floor": args.alpha_floor,
         "alpha_final": best_alpha,
         "label_order": label_order,
     });
