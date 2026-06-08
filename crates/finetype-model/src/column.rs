@@ -1698,20 +1698,14 @@ impl ColumnClassifier {
             .is_some_and(|r| r.starts_with("sense_entity_demotion"));
         if !entity_demoted && !header.is_empty() {
             // Hardcoded first (curated knowledge), then Model2Vec.
-            let hardcoded_hint = header_hint(header)
-                .filter(|&h| !hints_delete_enabled() || header_hint_is_load_bearing(h))
-                .map(|h| h.to_string());
+            let hardcoded_hint = header_hint(header).map(|h| h.to_string());
             let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
                 self.semantic_hint
                     .as_ref()
                     .and_then(|sh| sh.classify_header(header))
                     .map(|r| r.label.clone())
             });
-            let hint_is_hardcoded = hardcoded_hint.is_some()
-                && (!hints_defer_enabled()
-                    || hardcoded_hint
-                        .as_deref()
-                        .is_some_and(header_hint_is_load_bearing));
+            let hint_is_hardcoded = hardcoded_hint.is_some();
 
             if let Some(hinted_type) = hinted_type.as_deref() {
                 // Already predicts the hinted type — boost confidence
@@ -2416,20 +2410,14 @@ impl ColumnClassifier {
         let disable_fallback = rhh::is_disabled("header_hint_fallback");
 
         // Get header hint: hardcoded first, then Model2Vec semantic
-        let hardcoded_hint = header_hint(header)
-            .filter(|&h| !hints_delete_enabled() || header_hint_is_load_bearing(h))
-            .map(|h| h.to_string());
+        let hardcoded_hint = header_hint(header).map(|h| h.to_string());
         let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
             self.semantic_hint
                 .as_ref()
                 .and_then(|sh| sh.classify_header(header))
                 .map(|r| r.label.clone())
         });
-        let hint_is_hardcoded = hardcoded_hint.is_some()
-            && (!hints_defer_enabled()
-                || hardcoded_hint
-                    .as_deref()
-                    .is_some_and(header_hint_is_load_bearing));
+        let hint_is_hardcoded = hardcoded_hint.is_some();
 
         let hinted_type = match hinted_type.as_deref() {
             Some(h) => h,
@@ -4176,46 +4164,6 @@ fn disambiguate_boolean_override(
 // ═══════════════════════════════════════════════════════════════════════════════
 // HEADER NAME HINTS
 // ═══════════════════════════════════════════════════════════════════════════════
-
-/// Whether non-load-bearing hardcoded header hints should DEFER to confident
-/// model predictions like the learned classifier already does
-/// (FINETYPE_HINTS_DEFER, default OFF). When set, a hardcoded hint loses its
-/// privilege of overriding a confident prediction UNLESS its type is load-
-/// bearing (see [`header_hint_is_load_bearing`]) — so the learned model becomes
-/// the authority wherever it is sure, except on the families the corpus ablation
-/// proved it cannot yet cover. Per choice 0042.
-fn hints_defer_enabled() -> bool {
-    std::env::var("FINETYPE_HINTS_DEFER").is_ok_and(|v| v == "1" || v == "true")
-}
-
-/// Whether non-load-bearing hardcoded header hints should be SUPPRESSED entirely
-/// (FINETYPE_HINTS_DELETE, default OFF) — true delete semantics for measurement:
-/// the hint never fires, so the model (and learned classifier) decide alone even
-/// when uncertain. Stronger than [`hints_defer_enabled`], which keeps the hint as
-/// a tiebreaker on uncertain predictions. Used to gate the delete config on all
-/// instruments BEFORE committing to actual arm removal.
-fn hints_delete_enabled() -> bool {
-    std::env::var("FINETYPE_HINTS_DELETE").is_ok_and(|v| v == "1" || v == "true")
-}
-
-/// Types where the hardcoded header hint is LOAD-BEARING — the model regresses
-/// without it, per the 2026-06-09 corpus-scale ablation (gate NO-GO on
-/// removal/defer): url is confused with data_uri, unix-epoch detection halves,
-/// isbn / postal_code / currency-amount variants are not yet model-covered.
-/// These keep their override privilege even under FINETYPE_HINTS_DEFER, so the
-/// per-family defer fires only on the families the model can already stand on.
-fn header_hint_is_load_bearing(hinted_type: &str) -> bool {
-    matches!(
-        hinted_type,
-        "technology.internet.url"
-            | "technology.internet.data_uri"
-            | "identity.commerce.isbn"
-            | "geography.address.postal_code"
-    ) || hinted_type.starts_with("datetime.epoch.")
-        || hinted_type.starts_with("datetime.offset.")
-        || hinted_type.starts_with("datetime.timestamp.")
-        || hinted_type.starts_with("finance.currency.amount")
-}
 
 /// True if the header carries a coordinate token, i.e. it corroborates a
 /// latitude/longitude prediction. Generous by design — protecting the recall of
@@ -6839,29 +6787,6 @@ mod tests {
         // (rhh::is_disabled is a const `false` when the rhh-instrumentation
         // feature is off) and disableable via RHH_DISABLE_HINTS in ablation builds.
         assert!(!rhh::is_disabled("header_hint_coord_veto"));
-    }
-
-    #[test]
-    fn load_bearing_hints_keep_override_under_defer() {
-        // The corpus ablation's model-gap families stay load-bearing; the bulk
-        // families do not (they defer to the model).
-        for keep in [
-            "technology.internet.url",
-            "identity.commerce.isbn",
-            "datetime.epoch.unix_seconds",
-            "geography.address.postal_code",
-            "finance.currency.amount",
-        ] {
-            assert!(header_hint_is_load_bearing(keep), "should keep: {keep}");
-        }
-        for defer in [
-            "geography.location.state",
-            "identity.person.full_name",
-            "representation.discrete.categorical",
-            "identity.person.gender",
-        ] {
-            assert!(!header_hint_is_load_bearing(defer), "should defer: {defer}");
-        }
     }
 
     // === keyword guard tests ===
