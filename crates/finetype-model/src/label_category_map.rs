@@ -183,7 +183,7 @@ const FORMAT_LABELS: &[&str] = &[
     "container.object.json_array",
     "container.object.xml",
     "container.object.yaml",
-    // finance.* (moved from identity.payment in v0.5.1)
+    // finance.* (formerly identity.payment)
     "finance.banking.aba_routing",
     "finance.banking.bsb",
     "finance.banking.iban",
@@ -198,7 +198,7 @@ const FORMAT_LABELS: &[&str] = &[
     "finance.securities.sedol",
     // identity.academic.*
     "identity.academic.orcid",
-    // identity.commerce.* (moved from technology.code in v0.5.1)
+    // identity.commerce.* (formerly technology.code)
     "identity.commerce.ean",
     "identity.commerce.isbn",
     "identity.commerce.isrc",
@@ -229,7 +229,7 @@ const FORMAT_LABELS: &[&str] = &[
     "representation.format.color_hex",
     "representation.format.color_hsl",
     "representation.format.color_rgb",
-    // representation.identifier (moved from code/numeric/cryptographic in v0.5.1)
+    // representation.identifier (formerly code/numeric/cryptographic)
     "representation.identifier.alphanumeric_id",
     "representation.identifier.increment",
     "representation.identifier.numeric_code",
@@ -269,7 +269,7 @@ const FORMAT_LABELS: &[&str] = &[
 ];
 
 const TEXT_LABELS: &[&str] = &[
-    // finance.* (low-cardinality enums, moved from identity.payment in v0.5.1)
+    // finance.* (low-cardinality enums, formerly identity.payment)
     "finance.currency.currency_code",
     "finance.currency.currency_symbol",
     // representation.boolean.*

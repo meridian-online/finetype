@@ -1730,7 +1730,6 @@ impl Generator {
                     Ok(format!("{} lbs", self.rng.gen_range(100..265)))
                 }
             }
-            // ("person", "age") — REMOVED in v0.5.2
             ("person", "occupation") => {
                 let jobs = [
                     "Software Engineer",
@@ -2322,7 +2321,6 @@ impl Generator {
             }
 
             // ── address (4 types) ────────────────────────────────────────
-            // ("address", "street_number") — REMOVED in v0.5.2
             ("address", "full_address") => self.gen_full_address(),
             ("address", "street_name") => {
                 let names = locale_data::street_names(self.current_locale());
@@ -3641,8 +3639,8 @@ impl Generator {
                 Ok(format!("{}{}{}", country, check, bban))
             }
             ("banking", "swift_bic") => {
-                // SWIFT/BIC generator (moved from identity.payment in v0.5.1).
-                // v17 ac-02: broadened ISO 3166-1 alpha-2 coverage (~130 codes
+                // SWIFT/BIC generator.
+                // Broadened ISO 3166-1 alpha-2 coverage (~130 codes
                 // from the active SWIFT country list), biased toward major
                 // financial centres to mirror real-world frequency.
                 //

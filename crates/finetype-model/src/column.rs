@@ -1456,8 +1456,8 @@ impl ColumnClassifier {
         //    votes — Sense is uncertain and masking discards too much signal
         // 3. Masking removes >90% of votes regardless of Sense confidence —
         //    when the model overwhelmingly votes for types outside the Sense
-        //    category, the mask is discarding too much signal (NNFT-xxx:
-        //    earthquake horizontalError: 98% decimal_number masked by Text)
+        //    category, the mask is discarding too much signal
+        //    (e.g. earthquake horizontalError: 98% decimal_number masked by Text)
         let total_unmasked: usize = vote_counts_3level.values().sum();
         let total_masked: usize = masked_votes.iter().map(|(_, c)| *c).sum();
         let masked_out_frac = if total_unmasked > 0 {
@@ -2719,7 +2719,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
         result.disambiguation_rule = Some(format!("feature_slash_segments:{:.1}", slash_segments));
     }
 
-    // Rule F3: hs_code vs decimal_number — REMOVED (v14 rule rationalisation Phase 1).
+    // Rule F3 (hs_code vs decimal_number) was removed.
     // F3 created false hs_code predictions from statistical features that R20
     // (value_sharpen HS code validation gate) then cleaned up — net zero with
     // extra complexity. R20 remains as the authoritative HS code check.
@@ -4129,12 +4129,12 @@ fn disambiguate_boolean_override(
     None
 }
 
-// disambiguate_small_integer_ordinal REMOVED — Sharpen rule audit (MADR 0069)
+// disambiguate_small_integer_ordinal removed in a Sharpen rule audit.
 // Ablation: net -2 (0 fixes, 2 regressions). v19-relu model handles these correctly.
 
-// disambiguate_categorical REMOVED — Sharpen rule audit (MADR 0069)
+// disambiguate_categorical removed in the same audit.
 // Both branches ablated: categorical_single_char (net 0), categorical_low_cardinality (net -1).
-// The demotion guard (MADR 0059) is no longer needed since there are no demotion rules to guard against.
+// The demotion guard is no longer needed — there are no demotion rules to guard against.
 // v19-relu model handles categorical detection without heuristic overrides.
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4182,7 +4182,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             "gender" | "sex" => {
                 return Some("identity.person.gender");
             }
-            // "age" — type REMOVED in v0.5.2; redirect to integer_number
+            // "age" is not a taxonomy type; redirect to integer_number
             "age" | "patient age" | "customer age" | "user age" => {
                 return Some("representation.numeric.integer_number");
             }
@@ -4259,7 +4259,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             "currency" | "currency code" => {
                 return Some("identity.financial.currency_code");
             }
-            // "id" | "identifier" — REMOVED (decision 0034). ID columns are genuinely
+            // "id" | "identifier" intentionally unhinted — ID columns are genuinely
             // ambiguous (numeric, UUID, alphanumeric). Let the model decide from values.
             // Count / frequency columns — small integers representing quantities
             "sibsp" | "parch" | "siblings" | "parents" | "children" | "dependents" | "qty"
@@ -4293,7 +4293,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             | "restaurant" | "hospital" | "school" | "university" | "manufacturer" => {
                 return Some("representation.text.entity_name");
             }
-            // Financial code columns (cvv removed in v0.5.1)
+            // Financial code columns
             "swift" | "swift code" | "bic" | "bic code" | "swiftcode" | "biccode" => {
                 return Some("finance.banking.swift_bic");
             }
@@ -5034,8 +5034,6 @@ fn disambiguate_numeric(
             "numeric_postal_code_detection".to_string(),
         ));
     }
-
-    // ("geography.address.street_number" detection block — REMOVED in v0.5.2)
 
     // Fallback: if we couldn't determine more specifically, use the model majority
     // (return None to let the majority vote stand)
@@ -6412,11 +6410,6 @@ mod tests {
         assert!(result.is_none());
     }
 
-    // ── Categorical and ordinal tests REMOVED — Sharpen rule audit (MADR 0069) ──
-    // disambiguate_categorical and disambiguate_small_integer_ordinal removed.
-    // Demotion guard (MADR 0059) tests also removed — the guard protected
-    // categorical demotion logic that no longer exists.
-
     // ── Header hint tests ───────────────────────────────────────────────
 
     #[test]
@@ -6497,7 +6490,7 @@ mod tests {
     fn test_header_hint_identity() {
         assert_eq!(header_hint("gender"), Some("identity.person.gender"));
         assert_eq!(header_hint("Sex"), Some("identity.person.gender"));
-        // "age" type removed in v0.5.2, hint redirects to integer_number
+        // "age" is not a taxonomy type; hint redirects to integer_number
         assert_eq!(
             header_hint("age"),
             Some("representation.numeric.integer_number")
@@ -6607,7 +6600,7 @@ mod tests {
             header_hint("attendance"),
             Some("representation.numeric.integer_number")
         );
-        // "response time" removed in v15 Option C — model handles both
+        // "response time" intentionally unhinted — model handles both
         // integer and decimal response times correctly without hints.
         assert_eq!(header_hint("response_time_ms"), None);
         assert_eq!(
@@ -6635,7 +6628,7 @@ mod tests {
             header_hint("count"),
             Some("representation.numeric.integer_number")
         );
-        // "id" hint removed (decision 0034) — genuinely ambiguous
+        // "id" intentionally unhinted — genuinely ambiguous
         assert_eq!(header_hint("id"), None);
     }
 
@@ -6647,7 +6640,7 @@ mod tests {
         assert_eq!(header_hint("column1"), None);
     }
 
-    // === v15 Option C keyword guard tests ===
+    // === keyword guard tests ===
 
     #[test]
     fn ac01_r25_http_status_gate_fires_on_status_codes() {
@@ -6941,8 +6934,6 @@ mod tests {
             "Real boolean {{0,1}} must not be overridden"
         );
     }
-
-    // disambiguate_small_integer_ordinal tests REMOVED — Sharpen rule audit (MADR 0069)
 
     // ── New header hint tests ─────────────────────────────────
 
@@ -7751,7 +7742,6 @@ mod tests {
 
     // ── Attractor demotion tests (Rule 14) ──────────────────────────────
 
-    // test_attractor_validation_demotion — REMOVED in v0.5.2
     // Was testing street_number demotion which no longer exists.
 
     #[test]
@@ -8130,7 +8120,6 @@ technology.internet.url:
         );
     }
 
-    // test_attractor_no_demotion_true_positive — REMOVED in v0.5.2
     // Was testing street_number non-demotion which no longer exists.
 
     #[test]
@@ -10514,7 +10503,6 @@ datetime.component.day_of_week:
     // AC-2: feature_sharpen — F3 fires on decimal_number without hs_code in votes
     #[test]
     fn test_sharpen_f3_removed_decimal_stays_decimal() {
-        // F3 was removed in v14 rule rationalisation Phase 1.
         // Even with HS code features, decimal_number should NOT be overridden
         // to hs_code by feature_sharpen. R20 in value_sharpen is now the only
         // path to hs_code.

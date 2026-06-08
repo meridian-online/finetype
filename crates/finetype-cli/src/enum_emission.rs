@@ -25,9 +25,7 @@
 /// `representation.discrete.categorical` — discrete finite-domain enum
 /// (the original gate, retained byte-for-byte from v0.6.19).
 /// `representation.boolean.{binary,initials,terms}` — boolean variants
-/// added in v0.6.20 (spec 2026-04-28-validate-precision-corpus, ac-09
-/// sub-fix (b)) so boolean-labelled columns receive the same gate
-/// treatment as categorical ones.
+/// receive the same gate treatment as categorical ones.
 pub fn label_is_enum_eligible(label: &str) -> bool {
     matches!(
         label,

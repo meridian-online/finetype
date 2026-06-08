@@ -705,7 +705,7 @@ mod tests {
     // ac-01: RejectRecord shape + valid_row_indices (spec vrp_ac01)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Canonical constraint_failed tokens per spec v1.2 ac-01/02.
+    /// Canonical constraint_failed tokens.
     const CANONICAL_TOKENS: &[&str] = &[
         "pattern",
         "min_length",

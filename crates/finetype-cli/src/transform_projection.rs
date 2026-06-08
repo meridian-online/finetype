@@ -9,8 +9,7 @@
 //! without re-deriving identifier-quoting or `x-finetype-*` extraction
 //! semantics.
 //!
-//! This file was lifted out of `main.rs` in v0.6.19 (MADR 0071, ac-05) so
-//! the projection helper and its unit tests can live in a 2-file pair —
+//! The projection helper and its unit tests live in a 2-file pair —
 //! source here, tests in `tests/build_transform_projection.rs` — keeping
 //! `main.rs` to dispatch + command bodies.
 
@@ -63,11 +62,10 @@ pub fn format_column_name(name: &str) -> String {
 
 /// Build the per-column projection list for the validate-materialise CTAS.
 ///
-/// Lifted from cmd_load's per-column expression builder (deleted in v0.6.19)
-/// and called by the validate materialise CTAS. The 5-branch decision tree is:
+/// The 5-branch decision tree is:
 ///
 /// 1. **Unlabelled** (`x-finetype-label` absent on the column schema) → emit a
-///    bare quoted identifier. Preserves MADR 0064 ac-11 graceful-degradation —
+///    bare quoted identifier. Preserves graceful-degradation —
 ///    columns without a label fall through as VARCHAR.
 /// 2. **Labelled but unknown to taxonomy** (label present but
 ///    `Taxonomy::ddl_info()` returns `None`) → bare quoted identifier. Same

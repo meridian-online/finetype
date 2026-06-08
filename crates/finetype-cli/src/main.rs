@@ -3136,7 +3136,7 @@ fn cmd_check(
 // VALIDATE — DuckDB-native reject pipeline (spec v1.2 ac-06, ac-08, ac-09, ac-10, ac-11)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Exit codes per spec ac-10.
+/// Exit codes.
 ///
 /// - 0: no rejects, no error
 /// - 1: one or more rejects (default CI-gate)
@@ -3578,15 +3578,14 @@ fn cmd_validate_table(
                 } else {
                     format!("TRY_CAST({} AS {})", col_ref, info.duckdb_type)
                 };
-                // error_message convention (ac-10 / MADR 0071):
+                // error_message convention:
                 //   • SEMANTIC_TYPE rows  — `error_message` carries the
                 //     engine's pass/fail diagnostic ("validation failed"
                 //     or a parse error from the JSON Schema engine).
                 //   • TRANSFORM_FAILED rows — `error_message` carries
                 //     `transform_failed: <transform-expression>` so the
                 //     reject sidecar names exactly which DuckDB cast or
-                //     strptime() refused the cell. The two conventions
-                //     are documented in MADR 0071.
+                //     strptime() refused the cell.
                 let error_message = if let Some(tf) = info.transform.as_ref() {
                     format!("transform_failed: {}", tf)
                 } else {
@@ -5689,9 +5688,7 @@ mod tests {
         assert_eq!(content["model_type"], "charcnn");
     }
 
-    // build_transform_projection unit tests + format_column_name unit test
-    // moved to crates/finetype-cli/tests/build_transform_projection.rs in
-    // v0.6.19 (MADR 0071, ac-05) — they exercise the public surface in
-    // `crates/finetype-cli/src/transform_projection.rs` via the lib, no
-    // private state remained.
+    // build_transform_projection + format_column_name unit tests live in
+    // crates/finetype-cli/tests/build_transform_projection.rs — they exercise
+    // the public surface via the lib.
 }
