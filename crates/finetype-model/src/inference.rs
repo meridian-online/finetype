@@ -74,7 +74,7 @@ impl Classifier {
         let model_dir = model_dir.as_ref();
 
         // Determine device
-        let device = Self::get_device();
+        let device = crate::device::get_device();
 
         // Load taxonomy
         let taxonomy_path = model_dir.join("taxonomy.yaml");
@@ -196,25 +196,6 @@ impl Classifier {
         Ok(results)
     }
 
-    /// Get the best device available.
-    fn get_device() -> Device {
-        #[cfg(feature = "cuda")]
-        {
-            if let Ok(device) = Device::new_cuda(0) {
-                return device;
-            }
-        }
-
-        #[cfg(feature = "metal")]
-        {
-            if let Ok(device) = Device::new_metal(0) {
-                return device;
-            }
-        }
-
-        Device::Cpu
-    }
-
     /// Get the tokenizer.
     pub fn tokenizer(&self) -> &Tokenizer {
         &self.tokenizer
@@ -261,7 +242,7 @@ impl CharClassifier {
         labels_json: &[u8],
         config_yaml: &[u8],
     ) -> Result<Self, InferenceError> {
-        let device = Self::get_device();
+        let device = crate::device::get_device();
 
         // Parse labels
         let labels_str = std::str::from_utf8(labels_json).map_err(|e| {
@@ -345,7 +326,7 @@ impl CharClassifier {
     /// Load a CharCNN classifier from a directory.
     pub fn load<P: AsRef<Path>>(model_dir: P) -> Result<Self, InferenceError> {
         let model_dir = model_dir.as_ref();
-        let device = Self::get_device();
+        let device = crate::device::get_device();
 
         // Load label mapping — try labels.json first (saved by trainer), then taxonomy.yaml
         let labels_json_path = model_dir.join("labels.json");
@@ -658,25 +639,6 @@ impl CharClassifier {
         }
 
         Ok(results)
-    }
-
-    /// Get the best device available.
-    fn get_device() -> Device {
-        #[cfg(feature = "cuda")]
-        {
-            if let Ok(device) = Device::new_cuda(0) {
-                return device;
-            }
-        }
-
-        #[cfg(feature = "metal")]
-        {
-            if let Ok(device) = Device::new_metal(0) {
-                return device;
-            }
-        }
-
-        Device::Cpu
     }
 }
 

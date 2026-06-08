@@ -117,7 +117,7 @@ impl TieredClassifier {
     /// ```
     pub fn load<P: AsRef<Path>>(model_dir: P) -> Result<Self, InferenceError> {
         let model_dir = model_dir.as_ref();
-        let device = Self::get_device();
+        let device = crate::device::get_device();
 
         // Load graph metadata
         let graph_path = model_dir.join("tier_graph.json");
@@ -468,7 +468,7 @@ impl TieredClassifier {
         graph_json: &[u8],
         get_data: fn(&str) -> Option<(&'static [u8], &'static [u8], &'static [u8])>,
     ) -> Result<Self, InferenceError> {
-        let device = Self::get_device();
+        let device = crate::device::get_device();
 
         let graph_str = std::str::from_utf8(graph_json).map_err(|e| {
             InferenceError::InvalidPath(format!("Invalid UTF-8 in tier_graph.json: {}", e))
@@ -626,25 +626,6 @@ impl TieredClassifier {
             index_to_label,
             label_to_index,
         })
-    }
-
-    /// Get the best device available.
-    fn get_device() -> Device {
-        #[cfg(feature = "cuda")]
-        {
-            if let Ok(device) = Device::new_cuda(0) {
-                return device;
-            }
-        }
-
-        #[cfg(feature = "metal")]
-        {
-            if let Ok(device) = Device::new_metal(0) {
-                return device;
-            }
-        }
-
-        Device::Cpu
     }
 }
 

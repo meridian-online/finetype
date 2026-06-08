@@ -72,7 +72,7 @@ pub struct TieredTrainer {
 impl TieredTrainer {
     /// Create a new tiered trainer.
     pub fn new(config: TieredTrainingConfig) -> Self {
-        let device = Self::get_device();
+        let device = crate::device::get_device();
         let vocab = CharVocab::new();
         Self {
             config,
@@ -607,25 +607,6 @@ impl TieredTrainer {
             "tier2": tier2_models,
             "tier2_min_types": self.config.tier2_min_types,
         })
-    }
-
-    /// Get the best available device.
-    fn get_device() -> Device {
-        #[cfg(feature = "cuda")]
-        {
-            if let Ok(device) = Device::new_cuda(0) {
-                return device;
-            }
-        }
-
-        #[cfg(feature = "metal")]
-        {
-            if let Ok(device) = Device::new_metal(0) {
-                return device;
-            }
-        }
-
-        Device::Cpu
     }
 }
 

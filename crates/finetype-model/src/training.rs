@@ -51,7 +51,7 @@ pub struct Trainer {
 impl Trainer {
     /// Create a new trainer.
     pub fn new(config: TrainingConfig) -> Self {
-        let device = Self::get_device();
+        let device = crate::device::get_device();
         Self { config, device }
     }
 
@@ -204,24 +204,5 @@ impl Trainer {
         let labels = Tensor::new(all_labels, &self.device)?;
 
         Ok((input_ids, attention_mask, labels))
-    }
-
-    /// Get the best available device.
-    fn get_device() -> Device {
-        #[cfg(feature = "cuda")]
-        {
-            if let Ok(device) = Device::new_cuda(0) {
-                return device;
-            }
-        }
-
-        #[cfg(feature = "metal")]
-        {
-            if let Ok(device) = Device::new_metal(0) {
-                return device;
-            }
-        }
-
-        Device::Cpu
     }
 }
