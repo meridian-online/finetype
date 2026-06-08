@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Pre-push hook: mirrors the CI lint gates that BLOCK a release (Format + Clippy).
+# These are the jobs that drifted red from un-linted commits; catching them here
+# stops red from ever reaching the remote (and a tag from building against it).
+#
+# Runs only on push (infrequent), so the slower clippy compile doesn't tax every
+# commit — pre-commit keeps the fast fmt check.
+#
+# Activate (per clone):  git config core.hooksPath .githooks
+# Bypass (emergencies):  git push --no-verify
+set -euo pipefail
+
+echo "══ pre-push: cargo fmt --all -- --check ══"
+cargo fmt --all -- --check
+
+echo "══ pre-push: cargo clippy -- -D warnings ══"
+cargo clippy -- -D warnings
+
+echo "══ pre-push: lint gate clean ══"

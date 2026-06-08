@@ -32,7 +32,7 @@ setup:
 		brew upgrade rust 2>/dev/null || true; \
 	fi
 	git config core.hooksPath .githooks
-	@echo "✓ Rust updated, git hooks installed (.githooks/pre-commit)"
+	@echo "✓ Rust updated, git hooks installed (pre-commit: fmt; pre-push: fmt+clippy)"
 
 # ─── CI (run locally before pushing) ─────────
 .PHONY: ci lint fmt clippy
