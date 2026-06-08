@@ -2370,6 +2370,29 @@ impl ColumnClassifier {
     fn apply_header_sharpen(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
         let label_before = result.label.clone();
 
+        // 0094 (feature-flagged via FINETYPE_COORD_HEADER_VETO, default OFF):
+        // header-corroboration demotion for the value-identical coordinate
+        // boundary. A latitude/longitude prediction whose header does NOT
+        // corroborate a coordinate, on a generic numeric column, is demoted to
+        // decimal_number. Demotion-only — the header can veto a false coordinate,
+        // never promote one, so a mislabelled header cannot create a coordinate.
+        // Fires in the no-hint gap the sci_measurement override below misses.
+        if coord_header_veto_enabled()
+            && matches!(
+                result.label.as_str(),
+                "geography.coordinate.latitude" | "geography.coordinate.longitude"
+            )
+            && !header_corroborates_coordinate(header)
+            && values_look_like_generic_decimals(sample)
+        {
+            result.label = "representation.numeric.decimal_number".to_string();
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("coord_header_veto:{}", header.to_lowercase()));
+            return;
+        }
+
         // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
@@ -4140,6 +4163,58 @@ fn disambiguate_boolean_override(
 // ═══════════════════════════════════════════════════════════════════════════════
 // HEADER NAME HINTS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Whether the 0094 coordinate header-veto demotion is enabled (default OFF).
+/// Read per call to match the RHH env-flag pattern; the lookup is negligible
+/// against a forward pass, and an unset var short-circuits immediately.
+fn coord_header_veto_enabled() -> bool {
+    std::env::var("FINETYPE_COORD_HEADER_VETO").is_ok_and(|v| v == "1" || v == "true")
+}
+
+/// True if the header carries a coordinate token, i.e. it corroborates a
+/// latitude/longitude prediction. Generous by design — protecting the recall of
+/// genuine coordinate columns matters more than catching every false positive,
+/// so any plausible coordinate token keeps the prediction. Token-aware (splits
+/// on non-alphanumerics) so `lat_dd`/`y_lat` corroborate but `latency`/`translate`
+/// do not.
+fn header_corroborates_coordinate(header: &str) -> bool {
+    let h = header.to_lowercase();
+    if header_hint(&h).is_some_and(|t| t.starts_with("geography.coordinate")) {
+        return true;
+    }
+    if h.contains("latitude")
+        || h.contains("longitude")
+        || h.contains("coord")
+        || h.contains("wgs84")
+        || h.contains("northing")
+        || h.contains("easting")
+    {
+        return true;
+    }
+    h.split(|c: char| !c.is_alphanumeric()).any(|tok| {
+        matches!(
+            tok,
+            "lat" | "lon" | "lng" | "long" | "lats" | "lons" | "latdd" | "londd" | "gps"
+        )
+    })
+}
+
+/// True if the sampled values are predominantly numeric — the value-validation
+/// guard for the coordinate veto, so it only fires on genuine numeric columns.
+fn values_look_like_generic_decimals(sample: &[String]) -> bool {
+    let (mut numeric, mut total) = (0usize, 0usize);
+    for v in sample.iter().take(8) {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        total += 1;
+        if t.parse::<f64>().is_ok() {
+            numeric += 1;
+        }
+    }
+    total > 0 && numeric * 100 >= total * 80
+}
 
 /// Map a column header name to a hinted type label.
 ///
@@ -6638,6 +6713,87 @@ mod tests {
         assert_eq!(header_hint("xyz"), None);
         assert_eq!(header_hint("data"), None);
         assert_eq!(header_hint("column1"), None);
+    }
+
+    // === 0094 coordinate header-veto helpers ===
+
+    #[test]
+    fn coord_veto_corroborates_real_coordinate_headers() {
+        for h in [
+            "lat",
+            "latitude",
+            "lon",
+            "lng",
+            "long",
+            "longitude",
+            "lat_dd",
+            "y_lat",
+            "decimalLatitude",
+            "gps_lat",
+            "coord_x",
+            "wgs84_lat",
+            "LATITUDE",
+            "Longitude",
+        ] {
+            assert!(header_corroborates_coordinate(h), "should corroborate: {h}");
+        }
+    }
+
+    #[test]
+    fn coord_veto_does_not_corroborate_false_friends_or_quantities() {
+        // value-confusable non-coordinate headers — the FP battleground — must
+        // NOT corroborate, so a latitude prediction on them is demotable.
+        for h in [
+            "mag",
+            "mean",
+            "std",
+            "rms",
+            "error",
+            "depth",
+            "score",
+            "rate",
+            "probability",
+            "latency",
+            "translate",
+            "correlation",
+            "plate",
+            "population",
+            "magnitude",
+            "temperature",
+            "elevation_error",
+        ] {
+            assert!(
+                !header_corroborates_coordinate(h),
+                "should NOT corroborate: {h}"
+            );
+        }
+    }
+
+    #[test]
+    fn coord_veto_value_gate_requires_numeric() {
+        assert!(values_look_like_generic_decimals(&[
+            "0.12".into(),
+            "-3.4".into(),
+            "51.5".into(),
+            "2.0".into(),
+            "9.9".into()
+        ]));
+        // text / mixed columns do not satisfy the value gate
+        assert!(!values_look_like_generic_decimals(&[
+            "alpha".into(),
+            "beta".into(),
+            "gamma".into()
+        ]));
+        assert!(!values_look_like_generic_decimals(&[]));
+    }
+
+    #[test]
+    fn coord_veto_flag_defaults_off() {
+        // With the env var unset, the veto is inert (default behaviour unchanged).
+        // Not mutating the var here — Cargo runs tests concurrently in-process.
+        if std::env::var("FINETYPE_COORD_HEADER_VETO").is_err() {
+            assert!(!coord_header_veto_enabled());
+        }
     }
 
     // === keyword guard tests ===
