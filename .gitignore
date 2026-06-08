@@ -245,3 +245,6 @@ results/
 *.db
 .beads-credential-key
 .beads-archive/
+
+# CodeGraph local index (machine-local, regenerable via `codegraph index`)
+.codegraph/
