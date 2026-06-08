@@ -4527,33 +4527,6 @@ impl Generator {
         Ok(name)
     }
 
-    /// Generate a multi-sentence paragraph.
-    ///
-    /// Produces 2-6 sentences joined by spaces. Each sentence starts with a
-    /// capital letter and ends with punctuation. Total length is typically
-    /// 80-500 characters, well above the 50-char minLength validation.
-    #[allow(dead_code)]
-    fn gen_paragraph(&mut self) -> Result<String, GeneratorError> {
-        let sentence_count = self.rng.gen_range(2..7);
-        let mut sentences = Vec::with_capacity(sentence_count);
-
-        for _ in 0..sentence_count {
-            let word_count = self.rng.gen_range(5..15);
-            let mut words: Vec<String> = (0..word_count).map(|_| self.random_word()).collect();
-            // Capitalise first word
-            if let Some(first) = words.first_mut() {
-                let mut chars = first.chars();
-                if let Some(c) = chars.next() {
-                    *first = c.to_uppercase().collect::<String>() + chars.as_str();
-                }
-            }
-            let ending = [".", ".", ".", "!", "?"][self.rng.gen_range(0..5)];
-            sentences.push(format!("{}{}", words.join(" "), ending));
-        }
-
-        Ok(sentences.join(" "))
-    }
-
     fn random_first_name(&mut self) -> String {
         let names = locale_data::first_names(self.current_locale());
         names[self.rng.gen_range(0..names.len())].to_string()
