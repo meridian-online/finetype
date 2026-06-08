@@ -10,7 +10,7 @@ body: |
 
   FineType's CLI and DuckDB extension need access to trained model weights (CharCNN, Model2Vec, Sense, Entity, Sibling Context) at runtime. The distribution strategy must support zero-config installation (no manual model downloads) while allowing developers to swap models during development.
 
-  The v0.1.0 release shipped broken because model files weren't included in the binary (NNFT-046).
+  The v0.1.0 release shipped broken because model files weren't included in the binary.
 
   ## Considered Options
 

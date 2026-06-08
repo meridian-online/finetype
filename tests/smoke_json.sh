@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-# FineType JSON Profiling Smoke Tests (NNFT-217)
+# FineType JSON Profiling Smoke Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # End-to-end tests for JSON/NDJSON profiling.

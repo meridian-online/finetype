@@ -34,11 +34,11 @@ pub struct CharTrainingConfig {
     /// Optional seed for deterministic training. When set, uses a seeded RNG
     /// instead of `thread_rng()` for reproducible shuffle order.
     pub seed: Option<u64>,
-    /// Enable feature-augmented training (NNFT-249). When true, deterministic
+    /// Enable feature-augmented training. When true, deterministic
     /// features are extracted per sample and passed to the model alongside
     /// character encodings. The model's `feature_dim` is set to `FEATURE_DIM`.
     pub use_features: bool,
-    /// Enable hierarchical classification head (NNFT-267). When true, the model
+    /// Enable hierarchical classification head. When true, the model
     /// uses a tree softmax (domain → category → leaf type) instead of a flat
     /// 250-class softmax. Training uses multi-level cross-entropy loss.
     pub use_hierarchical: bool,
@@ -98,7 +98,7 @@ impl CharTrainer {
         let n_classes = taxonomy.len();
         eprintln!("Number of classes: {}", n_classes);
 
-        // Build hierarchy map if hierarchical mode (NNFT-267)
+        // Build hierarchy map if hierarchical mode
         let hierarchy = if self.config.use_hierarchical {
             let h = HierarchyMap::from_labels(&labels_list);
             eprintln!(
@@ -199,7 +199,7 @@ impl CharTrainer {
             let mut total_loss = 0.0;
             let mut num_correct = 0usize;
             let mut num_total = 0usize;
-            // Per-level accuracy tracking for hierarchical mode (NNFT-267)
+            // Per-level accuracy tracking for hierarchical mode
             let mut domain_correct = 0usize;
             let mut cat_correct = 0usize;
 
@@ -212,7 +212,7 @@ impl CharTrainer {
                 let (input_ids, features, labels) = self.prepare_batch(&batch, &label_to_index)?;
 
                 let loss = if self.config.use_hierarchical {
-                    // Hierarchical training: multi-level cross-entropy (NNFT-267)
+                    // Hierarchical training: multi-level cross-entropy
                     let hier = hierarchy.as_ref().unwrap();
                     let hier_head = model.hierarchical_head().unwrap();
 
@@ -482,7 +482,7 @@ impl CharTrainer {
             let ids = self.vocab.encode(&sample.text, max_len);
             all_ids.extend(ids);
 
-            // Extract deterministic features when enabled (NNFT-249)
+            // Extract deterministic features when enabled
             if self.config.use_features {
                 let feats = extract_features(&sample.text);
                 all_features.extend_from_slice(&feats);

@@ -59,12 +59,12 @@ More importantly, outside the eval set, "method" is genuinely ambiguous (payment
 
 ---
 
-### [MAJOR] ac-04 "port" hint was previously removed (NNFT-242) -- needs justification
+### [MAJOR] ac-04 "port" hint was previously removed -- needs justification
 **Category:** constraint-conflict
-**Description:** The `port` hint was deliberately removed in NNFT-242, along with the removal of the `port` type from the taxonomy. The CHANGELOG documents this: "Removed 2 low-precision integer-range types: http_status_code and port (false positives on plain integers)." Re-adding a `port` -> `integer_number` hint reverses that decision without explicit justification or a new decision record.
+**Description:** The `port` hint was deliberately removed, along with the removal of the `port` type from the taxonomy. The CHANGELOG documents this: "Removed 2 low-precision integer-range types: http_status_code and port (false positives on plain integers)." Re-adding a `port` -> `integer_number` hint reverses that decision without explicit justification or a new decision record.
 
 Additionally, "port" as a column header could refer to a seaport (city name), a wine port, or a computing port. The hint to integer_number is not universally correct.
-**Evidence:** `CHANGELOG.md:98`, `column.rs:5913` ("port header hint removed in NNFT-242"), `.orbit/choices/0023-taxonomy-pruning-principle.md:26`.
+**Evidence:** `CHANGELOG.md:98`, `column.rs:5913` ("port header hint removed"), `.orbit/choices/0023-taxonomy-pruning-principle.md:26`.
 **Recommendation:** Either (a) add a decision record explaining why re-adding the port hint is justified now, or (b) remove "port" from ac-04's list. The eval mapping already maps port ground truth to integer_number, so if the model predicts integer_number without the hint, it already passes.
 
 ---
@@ -97,8 +97,8 @@ The spec's constraint "only Sharpen changes" frames this as bugfix work, but add
 
 ### [MINOR] ac-04 "status code" / "http status" -> integer_number is semantically wrong
 **Category:** assumption
-**Description:** HTTP status codes (200, 404, 500) are better described as categorical/ordinal values, not arbitrary integers. `integer_number` implies the value can be any integer, but HTTP status codes are from a fixed enumeration. The parent spec's eval audit (NNFT-242) removed `http_status_code` as a type because it had "false positives on plain integers" -- but the fix should be `categorical` or `ordinal`, not `integer_number`. Check what the eval mapping says.
-**Evidence:** The `http_status_code` type was removed in NNFT-242 specifically because it was an "integer-range type with no distinguishing character patterns." Mapping it to `integer_number` does not capture the categorical nature of status codes.
+**Description:** HTTP status codes (200, 404, 500) are better described as categorical/ordinal values, not arbitrary integers. `integer_number` implies the value can be any integer, but HTTP status codes are from a fixed enumeration. The parent spec's eval audit removed `http_status_code` as a type because it had "false positives on plain integers" -- but the fix should be `categorical` or `ordinal`, not `integer_number`. Check what the eval mapping says.
+**Evidence:** The `http_status_code` type was removed specifically because it was an "integer-range type with no distinguishing character patterns." Mapping it to `integer_number` does not capture the categorical nature of status codes.
 **Recommendation:** Consider whether `representation.discrete.ordinal` or `representation.discrete.categorical` would be a more accurate hint target. Or simply drop this hint -- it was removed for a reason.
 
 ---

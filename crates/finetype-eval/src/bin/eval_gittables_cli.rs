@@ -1,9 +1,9 @@
-//! GitTables 1M CLI evaluation (NNFT-184)
+//! GitTables 1M CLI evaluation
 //!
 //! Reads pre-extracted column_values.parquet, groups by column, pipes through
 //! `finetype infer --mode column --batch` with header hints, writes cli_predictions.csv.
 //!
-//! Rust port of eval/gittables/eval_cli.py (NNFT-130).
+//! Rust port of eval/gittables/eval_cli.py.
 
 use anyhow::{Context, Result};
 use clap::Parser;

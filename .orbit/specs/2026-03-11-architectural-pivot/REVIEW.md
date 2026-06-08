@@ -11,7 +11,7 @@ Hugh wrote a discovery brief proposing an architectural pivot from FineType's cu
 The brief correctly identifies that FineType has hit a structural ceiling. The evidence is compelling:
 
 - **CLDR regression** (116/120 → 107/120) is the smoking gun — a well-planned, five-phase retraining made things *worse*, revealing cascading fragility in the tier graph, not isolated data issues.
-- **CharCNN capacity ceiling** (≤20 labels per T2 model) is a hard architectural limit — documented in NNFT-126 and decision-002. We cannot scale the taxonomy or add locale variants without fracturing the model graph further.
+- **CharCNN capacity ceiling** (≤20 labels per T2 model) is a hard architectural limit — documented in decision-002. We cannot scale the taxonomy or add locale variants without fracturing the model graph further.
 - **Rule proliferation** is real. The 18 rules have strict ordering dependencies (Duration must run before Attractor Demotion; UTC Offset must run between them; Entity Demotion must fire before header hints but has a guard that blocks header hints entirely). The interaction surface is becoming difficult to reason about — and each new accuracy fix adds another rule.
 - **v0.1.8 → v0.3.0 was a lateral move** at the macro level (GitTables *regressed* 1.3pp, SOTAB gained 1.1pp). The tiered architecture + disambiguation system didn't deliver the step change we expected. This suggests the architecture, not just tuning, is the bottleneck.
 

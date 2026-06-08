@@ -1,7 +1,7 @@
 # Finding: numeric_code vs integer_number — Leading Zero Signal
 
 **Date:** 2026-03-08
-**Related:** NNFT-253/254 (feature-retrain spike), NNFT-250 (feature extractor)
+**Related:** feature-retrain spike, feature extractor
 
 ## Observation
 
@@ -45,7 +45,7 @@ No leading zeros       → integer_number (safe to cast BIGINT)
 
 ### Infrastructure Already Exists
 
-The feature extractor (NNFT-250) already computes `has_leading_zero` (feature index 7) and the column-level aggregation computes the mean across all sampled values. The signal is available in the existing pipeline — this rule would consume it.
+The feature extractor already computes `has_leading_zero` (feature index 7) and the column-level aggregation computes the mean across all sampled values. The signal is available in the existing pipeline — this rule would consume it.
 
 ## Scope
 

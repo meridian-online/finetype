@@ -1,4 +1,4 @@
-//! SOTAB CTA value preparation (NNFT-184)
+//! SOTAB CTA value preparation
 //!
 //! Reads SOTAB table files (gzipped JSON) and ground truth CSV,
 //! samples up to N non-null values per annotated column, and writes

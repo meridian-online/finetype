@@ -235,7 +235,7 @@ mappings:
   finetype_domain: representation
   match_quality: close
   expand: false
-  notes: Street/house numbers — type removed in v0.5.2 (NNFT-192), falls to integer
+  notes: Street/house numbers — type removed in v0.5.2, falls to integer
 - gt_label: uuid
   source: profile
   finetype_label: representation.identifier.uuid
@@ -381,7 +381,7 @@ mappings:
   finetype_domain: representation
   match_quality: close
   expand: false
-  notes: Age values — type removed in v0.5.2 (NNFT-192), falls to integer_number
+  notes: Age values — type removed in v0.5.2, falls to integer_number
 - gt_label: height
   source: both
   finetype_label: identity.person.height
@@ -409,7 +409,7 @@ mappings:
   finetype_domain: representation
   match_quality: close
   expand: false
-  notes: Job titles / occupations; collapsed from identity.person.occupation (NNFT-162)
+  notes: Job titles / occupations; collapsed from identity.person.occupation
 - gt_label: timestamp
   source: profile
   finetype_label: null

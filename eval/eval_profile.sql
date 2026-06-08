@@ -29,7 +29,7 @@
 .print '          LOADING DATA                                            '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- Schema mapping (from NNFT-079)
+-- Schema mapping
 CREATE OR REPLACE TABLE schema_mapping AS
 SELECT * FROM read_csv('eval/schema_mapping.csv', auto_detect=true);
 
@@ -131,8 +131,8 @@ WITH candidates AS (
                  AND pr.predicted_type LIKE 'datetime.timestamp.%'
             THEN true
             -- Name types: full_name ~ entity_name -- GT "name" covers both person
-            -- names and entity names (organisations, venues, products). NNFT-137
-            -- added entity_name as a separate type.
+            -- names and entity names (organisations, venues, products).
+            -- entity_name was added as a separate type.
             WHEN sm.finetype_label = 'identity.person.full_name'
                  AND pr.predicted_type = 'representation.text.entity_name'
             THEN true

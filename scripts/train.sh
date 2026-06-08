@@ -184,12 +184,12 @@ TRAIN_CMD=(
     --device "$(echo "$DEVICE_NAME" | tr '[:upper:]' '[:lower:]')"
 )
 
-# Add --use-features flag when enabled (NNFT-249)
+# Add --use-features flag when enabled
 if [[ "$USE_FEATURES" == "true" ]]; then
     TRAIN_CMD+=(--use-features)
 fi
 
-# Add --hierarchical flag when enabled (NNFT-267)
+# Add --hierarchical flag when enabled
 if [[ "$HIERARCHICAL" == "true" ]]; then
     TRAIN_CMD+=(--hierarchical)
 fi

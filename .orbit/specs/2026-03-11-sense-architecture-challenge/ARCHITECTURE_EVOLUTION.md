@@ -1,7 +1,7 @@
 # Architecture Evolution Plan
 
 **Date:** 2026-03-09
-**Based on:** Spike findings A (NNFT-262), B (NNFT-263), C (NNFT-264)
+**Based on:** Spike findings A, B, C
 **Status:** Approved — implementation phased
 
 ## Current Pipeline (v0.6.8)

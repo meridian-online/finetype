@@ -1,6 +1,5 @@
 # Discovery: Do our benchmarks measure real-world type inference quality?
 
-**Task:** NNFT-144
 **Date:** 2026-02-27
 **Status:** Finding complete
 
@@ -91,7 +90,7 @@ URL precision (32.8%) and geography precision (46.1%) need work — many non-URL
 | Place | 133 | 3.8% |
 | Person (correct!) | 129 | 3.7% |
 
-**Only ~8.6% of full_name predictions are actually person names.** The rest are music recordings, organizations, recipes, restaurants, books, events — anything with proper noun strings. This is the entity_name problem identified in NNFT-137 and NNFT-145.
+**Only ~8.6% of full_name predictions are actually person names.** The rest are music recordings, organizations, recipes, restaurants, books, events — anything with proper noun strings. This is the entity_name problem identified in earlier analysis.
 
 From an analyst perspective, this is the "don't mislead me" problem. If FineType says "this column contains person names" and it's actually restaurant names, the analyst loses trust in all FineType predictions.
 

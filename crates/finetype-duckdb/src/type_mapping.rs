@@ -62,7 +62,7 @@ pub fn to_duckdb_type(label: &str) -> &'static str {
         // ── datetime.component ─────────────────────────────────────────
         "datetime.component.year" => "INTEGER",
         "datetime.component.day_of_month" => "INTEGER",
-        // century removed in NNFT-177
+        // century removed in taxonomy revision v0.5.1
         "datetime.component.day_of_week" => "VARCHAR",
         "datetime.component.month_name" => "VARCHAR",
         "datetime.component.periodicity" => "VARCHAR",
@@ -231,7 +231,7 @@ mod tests {
         );
         assert_eq!(to_duckdb_type("geography.coordinate.latitude"), "DOUBLE");
         assert_eq!(to_duckdb_type("technology.development.boolean"), "BOOLEAN");
-        // NNFT-075: new boolean subtypes
+        // new boolean subtypes
         assert_eq!(to_duckdb_type("representation.boolean.binary"), "BOOLEAN");
         assert_eq!(to_duckdb_type("representation.boolean.initials"), "BOOLEAN");
         assert_eq!(to_duckdb_type("representation.boolean.terms"), "BOOLEAN");

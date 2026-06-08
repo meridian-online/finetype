@@ -10,14 +10,14 @@ body: |
 
   `full_name` is FineType's biggest overcall problem: only 3.7% of 3,500+ SOTAB full_name predictions are actually person names. The rest are cities, organisations, creative works, and generic text. CharCNN can't distinguish at the value level ("London" vs "Johnson") because both are proper nouns with identical character patterns.
 
-  NNFT-150 spike tested embedding similarity (Option C) empirically on 2,911 SOTAB entity columns across 4 categories (person 816, place 719, organization 647, creative work 729).
+  A spike tested embedding similarity (Option C) empirically on 2,911 SOTAB entity columns across 4 categories (person 816, place 719, organization 647, creative work 729).
 
   ## Considered Options
 
   - **Option A — Post-vote trained column-level classifier.** Only fires when CharCNN vote is ambiguous. Requires training a new model on SOTAB data.
   - **Option B — Replace T2 person node with a transformer.** Higher capacity but changes the value-level inference contract.
   - **Option C — Embedding similarity using off-the-shelf Model2Vec.** No new training required. Spike result: 73.6% 4-class accuracy, but silhouette 0.032 (very weak clustering), within-class spread 3-4× larger than between-class distances.
-  - **Enum lookups (NNFT-145)** — Rejected prior to spike. Only covers geography (closed set), doesn't generalise to orgs/creative works (open set).
+  - **Enum lookups** — Rejected prior to spike. Only covers geography (closed set), doesn't generalise to orgs/creative works (open set).
 
   ## Decision Outcome
 

@@ -1,6 +1,5 @@
 # Phase 4: LLM Distillation Runbook
 
-**Task:** NNFT-269
 **Hardware:** M1 MacBook with Ollama
 **Model:** Qwen3 32B (Q4, ~20GB)
 **Goal:** Label 10K+ real-world columns with FineType's 250-type taxonomy
@@ -180,8 +179,8 @@ scp output/llm_labels.csv hugh@beelink:~/github/noon-org/finetype/data/llm_label
 Or commit to a branch:
 
 ```bash
-git checkout -b nnft-269-llm-labels
+git checkout -b llm-labels
 git add output/llm_labels.csv
-git commit -m "NNFT-269: LLM distillation labels from Qwen3 32B"
-git push -u origin nnft-269-llm-labels
+git commit -m "LLM distillation labels from Qwen3 32B"
+git push -u origin llm-labels
 ```

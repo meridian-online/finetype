@@ -1,4 +1,4 @@
-# Feature-Augmented CharCNN Retrain Spike (NNFT-253)
+# Feature-Augmented CharCNN Retrain Spike
 
 **Date:** 2026-03-08
 **Question:** Does training CharCNN with 32 deterministic features fused at fc1 improve accuracy over feature_dim=0 + post-vote rules?
@@ -81,7 +81,7 @@ The F1-F3 post-vote rules (leading-zero, slash-segments, digit-ratio) are orthog
 
 **Do NOT adopt v15 as default.** Revert to v14 (feature_dim=0) + post-vote rules F1-F3.
 
-The feature fusion architecture (NNFT-248) is sound — the regression is a training data problem, not an architecture problem. Future paths to explore:
+The feature fusion architecture is sound — the regression is a training data problem, not an architecture problem. Future paths to explore:
 
 1. **Feature selection**: Use only the ~10 parse-test features (is_valid_date, is_valid_email, etc.) instead of all 32. Character statistics are the likely culprit.
 2. **Feature weighting**: Add a learnable gate or attention over features so the model can down-weight unhelpful features.
@@ -92,15 +92,15 @@ For now, the post-vote rule approach (feature_dim=0 + F1-F3) remains the better 
 
 ---
 
-# Deep Accuracy Spike: Header Hints + Hint Authority (NNFT-254)
+# Deep Accuracy Spike: Header Hints + Hint Authority
 
 **Date:** 2026-03-08
 **Question:** Can expanded header hints and refined hint override authority close the remaining eval gaps without model retraining?
-**Depends on:** NNFT-253 (established that feature_dim=0 + rules is the better path)
+**Depends on:** established that feature_dim=0 + rules is the better path
 
 ## Approach
 
-Instead of retraining the model (NNFT-253 showed diminishing returns), this spike attacked the remaining misclassifications through three experiments targeting the Sense→Sharpen pipeline's disambiguation and header hint system.
+Instead of retraining the model (an earlier experiment showed diminishing returns), this spike attacked the remaining misclassifications through three experiments targeting the Sense→Sharpen pipeline's disambiguation and header hint system.
 
 ## Experiments
 
@@ -171,11 +171,11 @@ Plus domain-aware threshold for hint-not-in-votes:
 
 ### Experiment 3: Feature-Augmented Model (Not Needed)
 
-Experiments 1 and 2 achieved +1 over baseline without any model retraining. Given NNFT-253's finding that feature_dim=32 causes city attractor regression, the rule-based approach is confirmed as the better path.
+Experiments 1 and 2 achieved +1 over baseline without any model retraining. Given the earlier finding that feature_dim=32 causes city attractor regression, the rule-based approach is confirmed as the better path.
 
 ## Final Results
 
-| Metric | v14 baseline | After NNFT-254 | Delta |
+| Metric | v14 baseline | After hint expansion | Delta |
 |---|---|---|---|
 | Profile label | 178/186 (95.7%) | 179/186 (96.2%) | **+0.5pp** |
 | Profile domain | 181/186 (97.3%) | 183/186 (98.4%) | **+1.1pp** |
@@ -198,14 +198,14 @@ Of these, 3 are the perennial "bare name" ambiguity (genuinely ambiguous — "na
 
 ## Recommendation
 
-**Adopt the expanded rule set (feature_dim=0 + F1-F3 + NNFT-254 hints).** This is now the recommended configuration because:
+**Adopt the expanded rule set (feature_dim=0 + F1-F3 + expanded hints).** This is now the recommended configuration because:
 
 1. No model retraining required — zero risk of the city attractor or other regression
-2. Rules are transparent and debuggable — each fix has a clear NNFT-254 annotation
+2. Rules are transparent and debuggable — each fix has a clear annotation
 3. The 7 remaining misclassifications are at the boundary of what header hints can solve
 4. Further accuracy gains will require either model retraining with better training data, or per-dataset ground truth refinement
 
 **Future work:**
-- NNFT-258: Expand golden tests to lock in these gains via Rust integration tests
+- Expand golden tests to lock in these gains via Rust integration tests
 - Consider retraining CharCNN on harder negatives (confusable type pairs) for git_sha/hash, hs_code/decimal_number
 - The 3 bare "name" cases may benefit from a learned header→type classifier (replacing regex-based header_hint)

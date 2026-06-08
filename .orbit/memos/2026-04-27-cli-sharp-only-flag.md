@@ -64,7 +64,7 @@ Cosmetic bug, separate from the flag question.
 
 ## Provenance
 
-The flag dates to the Sense→Sharpen era (CHANGELOG NNFT-173). Then
+The flag dates to the Sense→Sharpen era. Then
 useful: it let users / maintainers bypass the Sense classifier when
 Sense model files were missing or when running the tiered-CharCNN
 fallback. `docs/ARCHITECTURE.md:82` and `docs/SENSE_AND_SHARPEN_PIPELINE.md`

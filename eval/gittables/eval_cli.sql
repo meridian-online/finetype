@@ -1,4 +1,4 @@
--- GitTables 1M Evaluation: FineType CLI pipeline (NNFT-130)
+-- GitTables 1M Evaluation: FineType CLI pipeline
 -- =============================================================================
 -- Scores CLI batch predictions against ground truth using the same schema
 -- mapping and accuracy metrics as eval_1m.sql, but reads pre-computed
@@ -119,7 +119,7 @@ FROM column_predictions;
 .print '          GROUND TRUTH COMPARISON                                 '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- Schema mapping (comprehensive, from NNFT-079)
+-- Schema mapping (comprehensive)
 CREATE OR REPLACE TABLE schema_mapping AS
 SELECT * FROM read_csv('eval/schema_mapping.csv', auto_detect=true);
 
@@ -294,7 +294,7 @@ ORDER BY gt_label, columns DESC
 LIMIT 40;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 6. PRECISION PER PREDICTED TYPE (NNFT-147)
+-- 6. PRECISION PER PREDICTED TYPE
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- When FineType says "this is type X", how often is it right?
 -- This is the analyst trust metric. Precision > recall for building confidence.
@@ -382,7 +382,7 @@ ORDER BY
     END;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 7. OVERCALL ANALYSIS (NNFT-147)
+-- 7. OVERCALL ANALYSIS
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- For high-risk types, what are the false positives actually made of?
 -- This directly measures the "don't mislead the analyst" principle.
@@ -533,7 +533,7 @@ ORDER BY columns DESC
 LIMIT 25;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 9. CONFIDENCE CALIBRATION (NNFT-147)
+-- 9. CONFIDENCE CALIBRATION
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Does FineType know when it's wrong? A well-calibrated model has
 -- accuracy ≈ confidence. Enables downstream threshold decisions.

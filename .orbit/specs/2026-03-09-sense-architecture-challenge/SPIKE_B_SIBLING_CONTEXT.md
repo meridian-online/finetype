@@ -1,7 +1,6 @@
 # Spike B: Sibling-Context Self-Attention in Candle
 
 **Date:** 2026-03-09
-**Task:** NNFT-263
 **Status:** Complete — feasibility confirmed, no blockers
 
 ## Summary

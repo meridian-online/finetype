@@ -28,7 +28,7 @@ Milestones are theme-based, not time-boxed. Ship when the theme is complete.
 - Locale shapes output — validation, format_string, and transform are locale-specific
 - Model retrain on CLDR-enriched training data
 
-**Existing tasks:** NNFT-058 (date/time CLDR permutation), NNFT-060 (CLDR upstream), NNFT-133 (model retrain with CLDR data)
+**Existing tasks:** date/time CLDR permutation, CLDR upstream, model retrain with CLDR data
 
 **Key risk:** CLDR data is vast. Need to scope which locales are "Tier 1" (high data volume, common in datasets) vs "Tier 2" (complete but lower priority).
 
@@ -56,7 +56,7 @@ Milestones are theme-based, not time-boxed. Ship when the theme is complete.
 
 **Goal:** `profile → validate → report` as a first-class pipeline with actionable output.
 
-**Current state:** `finetype validate` exists (NNFT-014). JSON Schema validation is baked into the inference pipeline (NNFT-013/116). Validation signals are used internally but not surfaced as user-facing reports.
+**Current state:** `finetype validate` exists. JSON Schema validation is baked into the inference pipeline. Validation signals are used internally but not surfaced as user-facing reports.
 
 **Scope:**
 - `finetype validate <file>` → per-column quality report

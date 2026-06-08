@@ -8,7 +8,7 @@ body: |
 
   ## Context and Problem Statement
 
-  Phase 2 of the Sense & Sharpen pivot (decision-004). Phases 0-1 complete: taxonomy audit (NNFT-162, 171→163 types) and model spike (NNFT-163, Architecture A wins per decision-005: 88.5% broad accuracy, 78% entity subtype, 3.6ms/column). This decision covers the integration design choices for Phase 3 (Rust implementation).
+  Phase 2 of the Sense & Sharpen pivot (decision-004). Phases 0-1 complete: taxonomy audit (171→163 types) and model spike (Architecture A wins per decision-005: 88.5% broad accuracy, 78% entity subtype, 3.6ms/column). This decision covers the integration design choices for Phase 3 (Rust implementation).
 
   Three key design questions: (1) retrain per-category CharCNN models or mask the existing flat model? (2) how many values to sample and encode? (3) which existing behaviours does Sense absorb?
 

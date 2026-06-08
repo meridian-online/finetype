@@ -1,6 +1,5 @@
 # CLDR-Enriched Retraining: Regression Analysis
 
-**Tasks:** NNFT-157 (Phase 1), NNFT-158 (Phase 2), NNFT-159 (Phase 3), NNFT-160 (Phase 4), NNFT-161 (Phase 5)
 **Date:** 2026-02-28
 **Status:** Complete — model rolled back, findings documented
 

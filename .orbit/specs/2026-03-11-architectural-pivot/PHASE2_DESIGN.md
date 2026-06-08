@@ -1,13 +1,12 @@
 # Phase 2: Sense → Sharpen Integration Design
 
-**Task:** NNFT-164
 **Date:** 2026-03-01
 **Author:** @nightingale
-**Depends on:** Phase 0 (NNFT-162), Phase 1 (NNFT-163), decision-004, decision-005
+**Depends on:** Phase 0, Phase 1, decision-004, decision-005
 
 ## Overview
 
-This document specifies how the Sense model (Architecture A, NNFT-163) integrates into
+This document specifies how the Sense model (Architecture A) integrates into
 FineType's column classification pipeline. It makes Phase 3 (Rust implementation)
 mechanical — every interface, data flow, and design choice is recorded here.
 
@@ -322,7 +321,7 @@ Sense category. Rules for temporal only fire when Sense predicts temporal, etc.
 ### New Module: `sense.rs`
 
 ```rust
-//! Sense classifier — column-level semantic routing via cross-attention (NNFT-163/164).
+//! Sense classifier — column-level semantic routing via cross-attention.
 
 use candle_core::{DType, Device, Tensor};
 use crate::inference::InferenceError;
@@ -738,7 +737,7 @@ if sense_dir.join("model.safetensors").exists() {
     let model_path = portable_path(&sense_dir.join("model.safetensors"));
     let config_path = portable_path(&sense_dir.join("config.json"));
 
-    code.push_str("\n// Sense classifier (column-level routing, NNFT-164)\n");
+    code.push_str("\n// Sense classifier (column-level routing)\n");
     code.push_str("pub const HAS_SENSE_CLASSIFIER: bool = true;\n");
     code.push_str(&format!(
         "pub const SENSE_MODEL: &[u8] = include_bytes!(\"{model_path}\");\n"

@@ -2,7 +2,7 @@
 //!
 //! Multi-task: broad category (6 classes) + entity subtype (4 classes).
 //! Cross-attention: header embedding queries value embeddings.
-//! Validated in Candle spike (NNFT-182): all 10 tests pass.
+//! Validated in Candle spike: all 10 tests pass.
 
 use anyhow::Result;
 use candle_core::{DType, Device, Tensor, D};

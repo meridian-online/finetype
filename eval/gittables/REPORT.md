@@ -274,7 +274,7 @@ The `author` misclassifications shifted from representation types (flat model: w
 | abbreviation | ~0% label | 0% label, 0% domain | 16 columns — predicted as swift_bic codes |
 | day_of_week | ~0% label | 0% label, 0.8% domain | 118 columns — numeric DOW values still undetectable |
 | Semantic-only domain | 73.0% | 47.8% | 15,475 columns — less "accidental" domain alignment |
-| Classification time | 307s | 809s | 2.6x slower (NNFT-098 tracks this) |
+| Classification time | 307s | 809s | 2.6x slower |
 | Types detected | 157 | 118 | 39 fewer unique predictions in wild data |
 
 The **sentence regression is the most actionable**: the flat model correctly identified sentence-format text, but the tiered model routes these through a different path that produces address predictions. This suggests the T1 routing decision for text is incorrectly sending sentences down the geography branch.
@@ -309,7 +309,7 @@ Low-accuracy topics are dominated by semantic-only GT labels (class, description
 
 3. **The "all mapped" regression is a measurement artifact.** Semantic-only types have no format signal; the flat model happened to predict representation-domain types more often, inflating the "all mapped" metric. The format-detectable metric is the meaningful measure of model quality.
 
-4. **Performance is 2.6x slower.** The tiered model runs 34 sub-models through a cascade, taking 809s vs 307s for 774K values. This is tracked in NNFT-098. The DuckDB extension processes values one-by-one without batching — a batch API could significantly reduce overhead.
+4. **Performance is 2.6x slower.** The tiered model runs 34 sub-models through a cascade, taking 809s vs 307s for 774K values. The DuckDB extension processes values one-by-one without batching — a batch API could significantly reduce overhead.
 
 5. **Sentence detection regressed to 0%.** The tiered routing sends sentence-format text down an incorrect branch. This is an actionable bug that should be investigated (likely a T1 classifier issue in the representation domain).
 
@@ -321,7 +321,7 @@ Low-accuracy topics are dominated by semantic-only GT labels (class, description
 
 **Date:** 2026-02-17
 **Model:** CharCNN v6 (169 classes, 89.15% synthetic accuracy)
-**Mapping:** 192-type schema mapping (NNFT-079) with match quality tiers
+**Mapping:** 192-type schema mapping with match quality tiers
 
 ### What Changed from v0.1.0
 
@@ -493,7 +493,7 @@ and numeric types (year vs postal code vs increment).
 
 Column-mode improved **25 columns** (row wrong → column correct) and regressed **21 columns** (row correct → column wrong), for a **net improvement of +4 columns**. Improvements come from year detection (+12), postal code detection (+3), coordinate resolution (+2), and title reclassification (+5). Regressions are primarily ID columns detected as `increment` or `port` — correct format detection that doesn't match the semantic `identity` domain.
 
-## Year Column Analysis (NNFT-026, NNFT-029)
+## Year Column Analysis
 
 Year disambiguation was added to resolve the single largest misclassification pattern identified in the initial evaluation. The rule detects columns of 4-digit integers predominantly in the 1900–2100 range (≥80% threshold, allowing occasional outliers).
 
@@ -571,7 +571,7 @@ Column-mode inference adds measurable value for **geography** (+9.7%) and **date
 The ~48% overall domain accuracy reflects the fundamental difference between format detection (FineType's goal) and semantic type annotation (GitTables' labels). For the subset of types where format implies semantics, FineType achieves **85-100% accuracy on real-world data**, closely matching its 91.97% synthetic accuracy.
 
 ### Recommendations
-1. ~~Add column-mode inference for ambiguous types (years, postal codes, IDs)~~ ✅ Done (NNFT-026, NNFT-028, NNFT-029)
+1. ~~Add column-mode inference for ambiguous types (years, postal codes, IDs)~~ ✅ Done
 2. Improve year detection at the model level — more year training samples with diverse ranges (1900–2100)
 3. Consider column name heuristics as an optional signal for disambiguation
 4. Consider exempting ID columns from `increment` detection when majority vote is identity-domain

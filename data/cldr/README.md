@@ -75,7 +75,7 @@ If libphonenumber updates its phone number metadata:
 
 Per-locale regex patterns for 17 locales (EN, EN_US, EN_CA, EN_GB, EN_AU, DE, FR,
 ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA). Each pattern validates the exact calling
-code for that country. Added in NNFT-141.
+code for that country. Added.
 
 ## Month Name and Day of Week Enumerations
 
@@ -88,7 +88,7 @@ code for that country. Added in NNFT-141.
 Full month name enumerations (12 values per locale) and full weekday name
 enumerations (7 values per locale) for 6 locales (EN, FR, DE, ES, IT, PT).
 Sourced from `cldr-json/cldr-dates-full/main/{locale}/ca-gregorian.json`,
-wide format sections. Added in NNFT-141.
+wide format sections. Added.
 
 ### Refreshing Enumerations
 
@@ -99,7 +99,7 @@ If CLDR updates month/day names:
 3. Update `validation_by_locale` enum entries in `labels/definitions_datetime.yaml`
 4. Run `cargo test` and `cargo run -- check` to verify alignment
 
-## CLDR Date/Time Format Patterns (NNFT-157)
+## CLDR Date/Time Format Patterns
 
 **Source:** [Unicode CLDR JSON](https://github.com/unicode-org/cldr-json) (`cldr-dates-full` v46.0.0)
 **License:** Unicode License (permissive, attribution)

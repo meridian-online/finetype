@@ -619,8 +619,8 @@ mod tests {
             ("first_name", "identity.person.first_name"),
             ("country", "geography.location.country"),
             ("gender", "identity.person.gender"),
-            // ("age", "identity.person.age") — REMOVED in v0.5.2 (NNFT-192)
-            // ("url", "technology.internet.url") — matches "urn" after NNFT-244 expansion
+            // ("age", "identity.person.age") — REMOVED in v0.5.2
+            // ("url", "technology.internet.url") — matches "urn" after taxonomy expansion
             //   (url/urn too close in embedding space). Hardcoded header_hint() handles "url" correctly.
         ];
 

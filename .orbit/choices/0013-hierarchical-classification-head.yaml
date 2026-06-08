@@ -8,7 +8,7 @@ body: |
 
   ## Context and Problem Statement
 
-  FineType's CharCNN used a flat 250-class softmax output layer. Literature review (NNFT-267, informed by the architecture challenge in `specs/sense-architecture-challenge/`) showed that hierarchical classification is low-hanging fruit for taxonomies with natural tree structure — FineType's `domain.category.type` label format directly encodes a 3-level hierarchy (7 domains → 43 categories → 250 types).
+  FineType's CharCNN used a flat 250-class softmax output layer. Literature review (informed by the architecture challenge in `specs/sense-architecture-challenge/`) showed that hierarchical classification is low-hanging fruit for taxonomies with natural tree structure — FineType's `domain.category.type` label format directly encodes a 3-level hierarchy (7 domains → 43 categories → 250 types).
 
   The question: does replacing the flat softmax with a tree softmax improve accuracy, and does it fit within the model size and latency constraints?
 

@@ -178,7 +178,7 @@ container.object.html:
     - '<table><tr><td>Cell</td></tr></table>'
   references: null
   notes: >
-    New in v0.5.1 (NNFT-180). HTML is NOT well-formed XML: HTML5 allows
+    New in v0.5.1. HTML is NOT well-formed XML: HTML5 allows
     unclosed tags (<br>, <img>), unquoted attributes, optional closing.
     Transform strips all HTML tags to extract plain text content.
     Detection relies on recognizing common HTML tag names to distinguish

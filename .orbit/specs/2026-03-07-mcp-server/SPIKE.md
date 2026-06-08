@@ -1,6 +1,5 @@
 # Spike: Rust MCP SDK Evaluation for `finetype mcp`
 
-**Task:** NNFT-240
 **Date:** 2026-03-07
 **Time budget:** ~1 hour
 **Status:** Complete — recommend `rmcp` v1.1.0

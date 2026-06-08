@@ -4,11 +4,11 @@
 **Date:** 2026-03-07
 **Current state:** 216 types across 7 domains (container 12, datetime 85, finance 29, geography 15, identity 19, representation 32, technology 24)
 **Target:** 250+ types (need ≥34 net additions)
-**Sources:** DuckDB community extensions, ISO/industry standards, real-world dataset analysis, NNFT-176 revision notes
+**Sources:** DuckDB community extensions, ISO/industry standards, real-world dataset analysis, taxonomy revision notes
 
 ---
 
-## Guiding Principles (from NNFT-176)
+## Guiding Principles (from the taxonomy revision)
 
 1. **Each type is a transformation contract** — distinct DuckDB cast expression required.
 2. **Precision over permissiveness** — types must meaningfully distinguish "is this" from "is not this."

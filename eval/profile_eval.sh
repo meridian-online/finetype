@@ -4,7 +4,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #
 # Profiles annotated CSV files with FineType and evaluates predictions against
-# ground truth annotations using the schema mapping (NNFT-079).
+# ground truth annotations using the schema mapping.
 #
 # Usage:
 #   ./eval/profile_eval.sh <manifest.csv>

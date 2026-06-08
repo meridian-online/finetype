@@ -1,6 +1,6 @@
-//! Sense classifier — column-level semantic category routing (NNFT-168).
+//! Sense classifier — column-level semantic category routing.
 //!
-//! Ports the PyTorch `SenseModelA` (Architecture A from NNFT-163) to Candle.
+//! Ports the PyTorch `SenseModelA` (Architecture A) to Candle.
 //! Cross-attention over Model2Vec embeddings: column header as attention query
 //! over value embeddings, producing broad category (6 classes) and entity
 //! subtype (4 classes) predictions.
@@ -423,7 +423,7 @@ impl SenseClassifier {
 
     /// Classify a column using a pre-computed context-enriched header embedding.
     ///
-    /// Used by the sibling-context attention module (NNFT-268): the header embedding
+    /// Used by the sibling-context attention module: the header embedding
     /// has already been enriched with cross-column context before being passed here.
     /// The enriched embedding is used directly as the header, skipping `encode_batch`.
     ///

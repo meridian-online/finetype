@@ -178,12 +178,12 @@ enum Commands {
         #[arg(long)]
         seed: Option<u64>,
 
-        /// Enable feature-augmented training (NNFT-249). Extracts deterministic
+        /// Enable feature-augmented training. Extracts deterministic
         /// features per sample and passes them alongside character encodings.
         #[arg(long)]
         use_features: bool,
 
-        /// Enable hierarchical classification head (NNFT-267). Uses tree softmax
+        /// Enable hierarchical classification head. Uses tree softmax
         /// (7 domains → 43 categories → 250 leaf types) instead of flat 250-class softmax.
         #[arg(long)]
         hierarchical: bool,
@@ -1934,7 +1934,7 @@ fn cmd_infer(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INFER BATCH — JSONL column-mode batch classification (NNFT-130)
+// INFER BATCH — JSONL column-mode batch classification
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Batch column-mode inference: reads JSONL from stdin, classifies each column
@@ -2149,7 +2149,7 @@ fn load_multi_branch_classifier(model: &PathBuf) -> Result<finetype_model::Multi
 /// the embedded model if the path doesn't exist (release binaries).
 ///
 /// Automatically loads validation patterns from the taxonomy to enable
-/// pattern-gated post-processing (NNFT-064).
+/// pattern-gated post-processing.
 fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifier> {
     let mut classifier = if model.exists() {
         finetype_model::CharClassifier::load(model)?
@@ -2300,7 +2300,7 @@ fn load_semantic_hint() -> Option<finetype_model::SemanticHintClassifier> {
     None
 }
 
-/// Load the entity classifier for full_name demotion (NNFT-152).
+/// Load the entity classifier for full_name demotion.
 ///
 /// Requires a loaded SemanticHintClassifier to share the Model2Vec tokenizer
 /// and embeddings. Resolution order:
@@ -2340,7 +2340,7 @@ fn load_entity_classifier(
     None
 }
 
-/// Load the Sense classifier for broad category prediction (NNFT-171).
+/// Load the Sense classifier for broad category prediction.
 ///
 /// Resolution order:
 ///  1. models/sense directory on disk (development)
@@ -2435,7 +2435,7 @@ fn wire_model2vec_and_siblings(cc: &mut finetype_model::ColumnClassifier) {
     }
 }
 
-/// Load and wire the sibling-context attention module (NNFT-268).
+/// Load and wire the sibling-context attention module.
 ///
 /// Looks for `models/sibling-context/model.safetensors`. When found,
 /// attaches to the column classifier. When absent, the pipeline is unchanged.
@@ -4013,7 +4013,7 @@ fn cmd_profile(
     };
 
     // Load taxonomy for validation-based attractor demotion (Rule 14)
-    // Pre-compile validators for the hot path (NNFT-116)
+    // Pre-compile validators for the hot path
     let taxonomy_path = std::path::PathBuf::from("labels");
     if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
         taxonomy.compile_validators();
@@ -4100,14 +4100,14 @@ fn cmd_profile(
             disambiguation_applied: bool,
             disambiguation_rule: Option<String>,
             detected_locale: Option<String>,
-            // Taxonomy contract fields (NNFT-207)
+            // Taxonomy contract fields
             broad_type: Option<String>,
             format_string: Option<String>,
             transform: Option<String>,
             is_generic: bool,
-            // Validation quality fields (NNFT-212, NNFT-213)
+            // Validation quality fields
             quality: Option<ColProfileQuality>,
-            // Unique values for ENUM/categorical columns (NNFT-273)
+            // Unique values for ENUM/categorical columns
             unique_values: Option<Vec<String>>,
             // ac-06 validation-as-veto: fraction of sample values passing
             // the predicted type's validation (None = no applicable
@@ -4152,7 +4152,7 @@ fn cmd_profile(
 
         let mut profiles: Vec<ColProfile> = Vec::new();
 
-        // NNFT-268: When sibling-context attention is available, classify all columns
+        // When sibling-context attention is available, classify all columns
         // together so each column benefits from cross-column context.
         if column_classifier.has_sibling_context() && !no_header_hint {
             // Build column descriptors for all non-empty columns
@@ -4526,7 +4526,7 @@ fn cmd_profile(
                         if p.validation_advisory_low {
                             obj.insert("validation_advisory_low".to_string(), json!(true));
                         }
-                        // NNFT-273: Include unique values for categorical columns in verbose mode
+                        // Include unique values for categorical columns in verbose mode
                         if verbose {
                             if let Some(ref uv) = p.unique_values {
                                 obj.insert("unique_values".to_string(), json!(uv));

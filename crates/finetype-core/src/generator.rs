@@ -800,7 +800,7 @@ impl Generator {
                 let days = locale_data::weekday_names(self.current_locale());
                 Ok(days[self.rng.gen_range(0..days.len())].to_string())
             }
-            // century removed in NNFT-177 (taxonomy revision v0.5.1)
+            // century removed in taxonomy revision v0.5.1
             ("component", "periodicity") => {
                 let periods = [
                     "Once",
@@ -903,7 +903,7 @@ impl Generator {
                     tlds[self.rng.gen_range(0..tlds.len())]
                 ))
             }
-            // ("internet", "port") => REMOVED in NNFT-242
+            // ("internet", "port") => REMOVED
             ("internet", "top_level_domain") => {
                 let tlds = [
                     "com", "org", "net", "io", "dev", "edu", "gov", "mil", "co.uk", "com.au",
@@ -972,7 +972,7 @@ impl Generator {
                 let methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
                 Ok(methods[self.rng.gen_range(0..methods.len())].to_string())
             }
-            // ("internet", "http_status_code") => REMOVED in NNFT-242
+            // ("internet", "http_status_code") => REMOVED
             ("internet", "cidr") => {
                 let prefix_len = self.rng.gen_range(0..33u8);
                 // Generate network-aligned IP for common prefixes
@@ -1051,7 +1051,7 @@ impl Generator {
             }
 
             // ── cryptographic (4 types) ──────────────────────────────────
-            // uuid moved to representation.identifier in NNFT-178
+            // uuid moved to representation.identifier
             ("cryptographic", "hash") => {
                 // Generate SHA-1 (40) or SHA-256 (64) length hashes.
                 // v14 AC-02(d): Bias toward 40/64-char to separate from tsid (32-char).
@@ -1340,7 +1340,7 @@ impl Generator {
                     Ok(format!("{}.{:02}", y, m))
                 }
             }
-            // technology.development.boolean — REMOVED in NNFT-075
+            // technology.development.boolean — REMOVED
             // Relocated to representation.boolean.{binary,initials,terms}
             ("development", "docker_ref") => {
                 let registries = [
@@ -1730,7 +1730,7 @@ impl Generator {
                     Ok(format!("{} lbs", self.rng.gen_range(100..265)))
                 }
             }
-            // ("person", "age") — REMOVED in v0.5.2 (NNFT-192)
+            // ("person", "age") — REMOVED in v0.5.2
             ("person", "occupation") => {
                 let jobs = [
                     "Software Engineer",
@@ -1783,8 +1783,8 @@ impl Generator {
                 Ok(format!("{}{}", partial, check))
             }
             // credit_card_expiration_date collapsed into datetime.date.month_year_slash
-            // cvv removed in NNFT-177 (taxonomy revision v0.5.1)
-            // credit_card_network removed in NNFT-233 (low precision, enum-only)
+            // cvv removed in taxonomy revision v0.5.1
+            // credit_card_network removed (low precision, enum-only)
             ("payment", "bitcoin_address") => {
                 let base58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
                 let prefix_choice = self.rng.gen_range(0..3);
@@ -2322,7 +2322,7 @@ impl Generator {
             }
 
             // ── address (4 types) ────────────────────────────────────────
-            // ("address", "street_number") — REMOVED in v0.5.2 (NNFT-192)
+            // ("address", "street_number") — REMOVED in v0.5.2
             ("address", "full_address") => self.gen_full_address(),
             ("address", "street_name") => {
                 let names = locale_data::street_names(self.current_locale());
@@ -2659,7 +2659,7 @@ impl Generator {
                     Ok(format!("{:.2}%", val))
                 }
             }
-            // increment moved to representation.identifier in NNFT-178
+            // increment moved to representation.identifier
             ("numeric", "si_number") => {
                 let suffixes = ['K', 'k', 'M', 'm', 'B', 'b', 'T', 't'];
                 let suffix = suffixes[self.rng.gen_range(0..suffixes.len())];
@@ -3363,7 +3363,7 @@ impl Generator {
             }
 
             // ── boolean (3 types) ─────────────────────────────────────────
-            // NNFT-075: Split from single boolean into format-specific subtypes
+            // Split from single boolean into format-specific subtypes
             ("boolean", "binary") => {
                 let vals = ["0", "1"];
                 Ok(vals[self.rng.gen_range(0..vals.len())].to_string())
@@ -6365,7 +6365,7 @@ test.test.test:
         }
     }
 
-    // ── New format coverage tests (NNFT-224) ─────────────────────────
+    // ── New format coverage tests ─────────────────────────
 
     #[test]
     fn test_chinese_ymd() {

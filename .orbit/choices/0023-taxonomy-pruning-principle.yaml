@@ -22,9 +22,9 @@ body: |
 
   Chosen option: **Remove types that fail the Precision Principle**, applied across 3 cleanup rounds:
 
-  - **NNFT-192** (2026-03-03): Removed `street_number` (indistinguishable from integer) and `age` (205 SOTAB false positives). Added `numeric_code` as the proper home for digit strings that aren't integers.
-  - **NNFT-233** (2026-03-06): Removed 7 low-precision types: `pin`, `day_of_month`, `credit_card_network`, `os`, `programming_language`, `software_license`, `stage`. Recategorized color types.
-  - **NNFT-242** (2026-03-07): Removed `http_status_code` and `port` — integer-range types with no distinguishing character patterns.
+  - **2026-03-03**: Removed `street_number` (indistinguishable from integer) and `age` (205 SOTAB false positives). Added `numeric_code` as the proper home for digit strings that aren't integers.
+  - **2026-03-06**: Removed 7 low-precision types: `pin`, `day_of_month`, `credit_card_network`, `os`, `programming_language`, `software_license`, `stage`. Recategorized color types.
+  - **2026-03-07**: Removed `http_status_code` and `port` — integer-range types with no distinguishing character patterns.
 
   Net: 19 types removed across 3 rounds, taxonomy went from 216 → 207 → 250 (with expansion filling the gaps).
 

@@ -34,7 +34,7 @@ are a bad pattern in my view."
 |----------------------------------------|-----------------------------------|---------------------------------------------|
 | `header_hint()` match table            | column.rs:3999 (~185 lines)       | Canonical exact/near-exact arms             |
 | Substring matchers (h.contains/h==)    | column.rs throughout (~70 sites)  | The mechanism that caused 0065 collapse     |
-| `header_hint_measurement` branch       | column.rs:979, 2183               | Scientific-unit override (NNFT-188)         |
+| `header_hint_measurement` branch | column.rs:979, 2183 | Scientific-unit override |
 | `header_hint_location` / `_keep`       | column.rs:1053                    | Geo rescue/preservation                     |
 | `header_hint_geo_override`             | column.rs:1558                    | Geo promotion branch                        |
 | `header_hint_person_override`          | column.rs (tagged)                | Person-name override                        |
@@ -219,7 +219,7 @@ threshold gates (0.85 cross-domain, 0.95 same-category).
    hard case but explicitly deferred to model improvements per 0048 —
    so no regret to remove the hint.
 4. **representation (33 types)** — numeric_code, integer_number,
-   percentage. Many NNFT-254 epoch/measurement hints live here; most are
+   percentage. Many epoch/measurement hints live here; most are
    patches for cases the v16 header branch handles correctly.
 5. **datetime (84 types)** — largest surface but v16 datetime accuracy
    is very strong. Most hints are epoch/unix-timestamp disambiguators

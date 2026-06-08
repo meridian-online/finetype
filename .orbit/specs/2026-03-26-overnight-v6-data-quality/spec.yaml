@@ -30,7 +30,7 @@ acceptance_criteria:
     Present collision table to Hugh for approval before implementing fixes.
 - id: AC-3
   description: |
-    The stale header_hint reference (identity.financial.currency_code) reflects a taxonomy move that happened in v0.5.1 (NNFT-179). The canonical type is finance.currency.currency_code. Ensure no references to the old location remain anywhere in the codebase (training data, eval mappings, Sharpen rules, tests). Also scan the distilled training corpus for stale identity.financial labels — exclude or relabel before training. Record as MADR decision.
+    The stale header_hint reference (identity.financial.currency_code) reflects a taxonomy move that happened in v0.5.1. The canonical type is finance.currency.currency_code. Ensure no references to the old location remain anywhere in the codebase (training data, eval mappings, Sharpen rules, tests). Also scan the distilled training corpus for stale identity.financial labels — exclude or relabel before training. Record as MADR decision.
 - id: AC-4
   description: |
     Add eval datasets for the ~25 highest-priority uncovered types identified in the investigation. Priority types include:

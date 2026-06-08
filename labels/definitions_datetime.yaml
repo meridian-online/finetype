@@ -1222,7 +1222,7 @@ datetime.duration.iso_8601:
     - title: "ISO 8601-1:2019 Durations"
       link: "https://www.iso.org/standard/70907.html"
   notes: >
-    v1 name: datetime.duration. Updated in NNFT-244.05 to cover full ISO 8601
+    v1 name: datetime.duration. Updated to cover full ISO 8601
     duration spec including weeks (PnW), negative durations (-P...), and
     fractional seconds (PT1.5S). Alias iso_8601_verbose added — no separate
     type needed since same regex covers both compact and verbose forms.
@@ -1322,7 +1322,7 @@ datetime.component.day_of_week:
   validation_by_locale:
     # Source: Unicode CLDR (cldr-dates-full, wide day names)
     # License: Unicode License (permissive, attribution)
-    # Each locale lists the 7 full weekday names in that language. (NNFT-141, NNFT-197)
+    # Each locale lists the 7 full weekday names in that language.
     EN:
       type: string
       enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -1471,7 +1471,7 @@ datetime.component.month_name:
   validation_by_locale:
     # Source: Unicode CLDR (cldr-dates-full, wide month names)
     # License: Unicode License (permissive, attribution)
-    # Each locale lists the 12 full month names in that language. (NNFT-141, NNFT-197)
+    # Each locale lists the 12 full month names in that language.
     EN:
       type: string
       enum: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
@@ -1563,7 +1563,7 @@ datetime.component.month_name:
   references: null
   notes: "v1 name: date.month. Enum shown is EN only — each locale has its own enum."
 
-# datetime.component.century: REMOVED in v0.5.1 (NNFT-177)
+# datetime.component.century: REMOVED in v0.5.1
 # Roman numerals only. No format_string, no DuckDB transformation contract.
 # Vanishingly rare as a standalone column. Better classified as categorical.
 
@@ -1601,7 +1601,7 @@ datetime.component.periodicity:
   notes: null
 
 # ═════════════════════════════════════════════════════════════════════
-# NEW TIMESTAMP FORMATS (Format Coverage Expansion — NNFT-223)
+# NEW TIMESTAMP FORMATS (Format Coverage Expansion)
 #
 # 16 additional timestamp formats covering:
 #   - Fractional-second precision variants (milliseconds, microseconds)
@@ -2063,7 +2063,7 @@ datetime.timestamp.dot_ymd_24h:
     New in format coverage expansion. Low prevalence. East Asian/Baltic niche.
 
 # ═════════════════════════════════════════════════════════════════════
-# NEW DATE FORMATS (Format Coverage Expansion — NNFT-223)
+# NEW DATE FORMATS (Format Coverage Expansion)
 #
 # 23 additional date formats covering:
 #   - Separator variants (slash, dash, dot, space)

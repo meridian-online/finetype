@@ -1,4 +1,4 @@
-//! Entity classifier — binary demotion gate for full_name overcall (NNFT-152).
+//! Entity classifier — binary demotion gate for full_name overcall.
 //!
 //! When CharCNN votes `full_name` for a column, the entity classifier determines
 //! whether the column actually contains person names or other entity types (places,

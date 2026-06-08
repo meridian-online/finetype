@@ -8,7 +8,7 @@ body: |
 
   ## Context and Problem Statement
 
-  FineType's actionability eval (NNFT-191) revealed that certain datetime types have legitimate format variants that a single `format_string` cannot capture. The primary case: ISO 8601 timestamps may include fractional seconds (`%Y-%m-%dT%H:%M:%S%.f`) or not (`%Y-%m-%dT%H:%M:%S`). A column classified as `iso_8601` could contain either variant, but `TRY_STRPTIME` with the wrong format string returns NULL.
+  FineType's actionability eval revealed that certain datetime types have legitimate format variants that a single `format_string` cannot capture. The primary case: ISO 8601 timestamps may include fractional seconds (`%Y-%m-%dT%H:%M:%S%.f`) or not (`%Y-%m-%dT%H:%M:%S`). A column classified as `iso_8601` could contain either variant, but `TRY_STRPTIME` with the wrong format string returns NULL.
 
   Actionability dropped to 92.7% partly because the eval framework only tried one format string per type.
 

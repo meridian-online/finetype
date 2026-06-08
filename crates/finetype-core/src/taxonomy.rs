@@ -1102,7 +1102,7 @@ technology.internet.ip_v6:
         assert_eq!(summary.total_labels, 5);
     }
 
-    // ── Validator cache tests (NNFT-116) ────────────────────────────────
+    // ── Validator cache tests ────────────────────────────────
 
     #[test]
     fn test_compile_validators_basic() {
@@ -1350,7 +1350,7 @@ representation.discrete.categorical:
     }
 
     /// Verify all taxonomy schemas from the labels/ directory compile
-    /// successfully. This is the critical acceptance test for NNFT-116.
+    /// successfully. This is the critical acceptance test for the JSON Schema migration.
     #[test]
     fn test_all_taxonomy_schemas_compile() {
         // Try loading from labels/ directory (works in dev, may not in CI)

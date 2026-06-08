@@ -474,7 +474,7 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         let model_path = portable_path(&entity_dir.join("model.safetensors"));
         let config_path = portable_path(&entity_dir.join("config.json"));
 
-        code.push_str("\n// Entity classifier (full_name demotion gate, NNFT-152)\n");
+        code.push_str("\n// Entity classifier (full_name demotion gate)\n");
         code.push_str("pub const HAS_ENTITY_CLASSIFIER: bool = true;\n");
         code.push_str(&format!(
             "pub const ENTITY_MODEL: &[u8] = include_bytes!(\"{model_path}\");\n"
@@ -494,7 +494,7 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         code.push_str("pub const ENTITY_CONFIG: &[u8] = &[];\n");
     }
 
-    // ── Sense classifier (broad category prediction, NNFT-171) ──────────
+    // ── Sense classifier (broad category prediction) ──────────
     // Embeds the Sense model (Architecture A cross-attention) for broad
     // semantic category prediction. Optional — when absent, the legacy
     // header-hint pipeline is used.
@@ -505,7 +505,7 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         let model_path = portable_path(&sense_dir.join("model.safetensors"));
         let config_path = portable_path(&sense_dir.join("config.json"));
 
-        code.push_str("\n// Sense classifier (broad category prediction, NNFT-171)\n");
+        code.push_str("\n// Sense classifier (broad category prediction)\n");
         code.push_str("pub const HAS_SENSE_CLASSIFIER: bool = true;\n");
         code.push_str(&format!(
             "pub const SENSE_MODEL: &[u8] = include_bytes!(\"{model_path}\");\n"

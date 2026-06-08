@@ -41,7 +41,7 @@ These columns the model classifies correctly, but `apply_header_sharpen()` overr
 
 ### Root causes
 
-- **Same-category override (NNFT-194):** `h.contains("email")` matches header "email_display" → hints `identity.person.email`. Same-category override fires unconditionally (no confidence threshold) because email and email_display share category `identity.person`. Same mechanism for phone_e164 via `h.contains("phone")`.
+- **Same-category override:** `h.contains("email")` matches header "email_display" → hints `identity.person.email`. Same-category override fires unconditionally (no confidence threshold) because email and email_display share category `identity.person`. Same mechanism for phone_e164 via `h.contains("phone")`.
 - **Keyword match overshoot:** `h.contains("state")` in header_hint matches "us_states/State" → hints `geography.location.state`, overriding the model's correct `region` prediction. Similarly `h.contains("dash")` or date-related keywords may be interfering with mdy_dash.
 - **Cross-domain override:** Some hardcoded hints pull predictions across domains with insufficient evidence, overriding correct model predictions.
 

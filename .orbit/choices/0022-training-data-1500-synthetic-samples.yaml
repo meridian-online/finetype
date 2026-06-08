@@ -13,7 +13,7 @@ body: |
   ## Considered Options
 
   - **Real-world data (manual labeling)** — Highest quality but prohibitively expensive at 250 types. Noisy labels from automated extraction degrade training.
-  - **LLM-labeled data** — NNFT-269 explored this with Qwen3 8B on 5,359 columns: 97% valid labels but only 20% agreement with FineType predictions. LLM defaults to container types for ambiguous inputs. Not yet production-quality.
+  - **LLM-labeled data** — An experiment explored this with Qwen3 8B on 5,359 columns: 97% valid labels but only 20% agreement with FineType predictions. LLM defaults to container types for ambiguous inputs. Not yet production-quality.
   - **Synthetic generation (deterministic)** — Purpose-built generators per type that produce realistic samples using locale data, format patterns, and domain knowledge. Seed-based determinism for reproducibility.
   - **Mixed synthetic + real** — Combine synthetic with real-world samples. Not yet implemented.
 
@@ -32,5 +32,5 @@ body: |
   - Good, because generator quality is directly testable (`finetype check` validates alignment)
   - Bad, because synthetic data has distribution mismatch with real-world data — feature fusion regressed due to this (decision-0011)
   - Bad, because generator quality is the ceiling on model quality — garbage generators produce garbage models
-  - Neutral, because LLM-labeled real data (NNFT-269) is a future path to augment synthetic data, pending label quality improvements
+  - Neutral, because LLM-labeled real data is a future path to augment synthetic data, pending label quality improvements
 references: []

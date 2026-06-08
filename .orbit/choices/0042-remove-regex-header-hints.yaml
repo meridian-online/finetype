@@ -10,7 +10,7 @@ body: |
 
   FineType has two header hint systems: hardcoded exact/substring match rules (`header_hint()` in semantic.rs, ~200 lines) and Model2Vec semantic similarity matching. Decision 0028 established hardcoded-first priority. Decision 0006 noted that "the Sense model will eventually subsume both hint systems by treating the header as a direct model input."
 
-  The multi-branch model now includes a dedicated header branch (128-dim Model2Vec embedding). Sibling-context attention (NNFT-268) enriches headers with cross-column context. Both are learned approaches that handle novel headers the regex system cannot. Continuing to maintain regex header hints alongside these learned systems creates competing signal sources and debugging complexity.
+  The multi-branch model now includes a dedicated header branch (128-dim Model2Vec embedding). Sibling-context attention enriches headers with cross-column context. Both are learned approaches that handle novel headers the regex system cannot. Continuing to maintain regex header hints alongside these learned systems creates competing signal sources and debugging complexity.
 
   ## Considered Options
 

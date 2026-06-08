@@ -1,6 +1,5 @@
 # Taxonomy Revision — External Research Brief
 
-**Task:** NNFT-176
 **Goal:** Identify the column types that matter most to data analysts and compare against FineType's current 163-type taxonomy to find gaps, over-engineering, and naming issues.
 
 ## What FineType Does

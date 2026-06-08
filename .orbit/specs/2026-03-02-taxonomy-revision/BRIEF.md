@@ -1,6 +1,5 @@
 # Taxonomy Revision Recommendation — v0.5.1
 
-**Task:** NNFT-176
 **Status:** Recommendation
 **Date:** 2026-03-02
 
@@ -8,7 +7,7 @@
 
 This document recommends specific taxonomy changes for FineType v0.5.1, informed by external research (two independent agents surveying Kaggle, government data, enterprise SaaS schemas, and analyst pain points) and validated against the actual v0.5.0 taxonomy (163 types).
 
-**Correction note:** The research brief's appendix was out of date (pre-NNFT-162), causing both research agents to flag phantom duplicates and missing types that already exist. This document corrects those errors and presents only validated recommendations.
+**Correction note:** The research brief's appendix was out of date (legacy), causing both research agents to flag phantom duplicates and missing types that already exist. This document corrects those errors and presents only validated recommendations.
 
 **Net result:** Remove 2 types, add 5-7 types, restructure 1 domain, create 1 new category + 1 new commerce category. Total taxonomy moves from 163 to ~166-168 types.
 

@@ -1,4 +1,4 @@
-//! Sibling-context self-attention module (NNFT-268).
+//! Sibling-context self-attention module.
 //!
 //! Enriches column embeddings with cross-column context before Sense classification.
 //! When a table has columns ["city", "name", "email"], the "name" column gets signal

@@ -23,7 +23,7 @@ This directly addresses 3/7 remaining errors (bare-name ambiguity: airports.name
 
 Sherlock's 960 character distribution features carry strong signal for visually-similar types. Computing character trigram distributions, digit-to-alpha ratios, positional patterns of dots/slashes/colons in Rust is trivially efficient. A learned fusion MLP (~2 MB) addresses 3/7 errors (git_sha/hash, hs_code/decimal_number, docker_ref/hostname). Candle feasibility: High.
 
-We already have 32 features (NNFT-250). The question is which *additional* features discriminate between our specific confusable pairs.
+We already have 32 features. The question is which *additional* features discriminate between our specific confusable pairs.
 
 ### 3. Hierarchical classification is low-hanging fruit
 

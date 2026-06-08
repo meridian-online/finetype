@@ -1,6 +1,5 @@
 # Phase 1 Finding: Sense Model Spike
 
-**Task:** NNFT-163
 **Date:** 2026-02-28
 **Time-box:** 1 week (spike completed in 1 day — data curation, two architectures, evaluation)
 **Dataset:** SOTAB CTA — 25,374 train / 6,345 validation columns

@@ -1,4 +1,4 @@
-//! FineType Actionability Evaluation (NNFT-184, NNFT-205)
+//! FineType Actionability Evaluation
 //!
 //! Tests whether FineType's type predictions produce working DuckDB transforms.
 //!

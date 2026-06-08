@@ -166,7 +166,7 @@ FROM column_predictions;
 .print '          GROUND TRUTH COMPARISON                                 '
 .print '═══════════════════════════════════════════════════════════════════'
 
--- Schema mapping (comprehensive, from NNFT-079)
+-- Schema mapping (comprehensive)
 CREATE OR REPLACE TABLE schema_mapping AS
 SELECT * FROM read_csv('eval/schema_mapping.csv', auto_detect=true);
 
@@ -490,7 +490,7 @@ SELECT
 FROM classified;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 9. PER-TOPIC ACCURACY HARNESS (NNFT-041)
+-- 9. PER-TOPIC ACCURACY HARNESS
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 .print ''

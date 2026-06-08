@@ -10,7 +10,7 @@ body: |
 
   FineType's semantic header hints use Model2Vec to match column names against pre-computed type embeddings. The original approach used mean-pooled single-centroid embeddings (one 128-dim vector per type, averaged from synonym lists like ["email", "email_address", "e_mail", "electronic_mail"]).
 
-  Synonym expansion (NNFT-122) revealed a centroid dilution problem: adding more synonyms moved the centroid away from all of them, reducing match quality. "email_address" and "electronic_mail" have different embedding locations — their mean is near neither.
+  Synonym expansion revealed a centroid dilution problem: adding more synonyms moved the centroid away from all of them, reducing match quality. "email_address" and "electronic_mail" have different embedding locations — their mean is near neither.
 
   ## Considered Options
 

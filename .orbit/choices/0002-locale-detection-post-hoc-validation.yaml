@@ -8,7 +8,7 @@ body: |
 
   ## Context and Problem Statement
 
-  NNFT-126 trained tiered-v3 with 4-level locale labels (e.g. `identity.person.phone_number.EN_US`). The infrastructure works correctly: `strip_locale_suffix()` collapses 4-level to 3-level for voting, `detected_locale` field populates in `ColumnResult`, and locale appears in JSON output.
+  An earlier experiment trained tiered-v3 with 4-level locale labels (e.g. `identity.person.phone_number.EN_US`). The infrastructure works correctly: `strip_locale_suffix()` collapses 4-level to 3-level for voting, `detected_locale` field populates in `ColumnResult`, and locale appears in JSON output.
 
   However, profile eval regressed 70/74 → 67/74 due to expanded T2 label space: VARCHAR/person at 94 labels hit 51% accuracy (vs 13 labels in tiered-v2), VARCHAR/location at 65 labels hit 55% accuracy. The CharCNN architecture hits a capacity ceiling at ~20 labels per T2 model.
 
@@ -20,7 +20,7 @@ body: |
 
   ## Decision Outcome
 
-  Chosen option: **Option B — Post-hoc locale detection**, because it provides zero regression risk and leverages the existing `validation_by_locale` infrastructure (NNFT-118, NNFT-132). When a type is classified (e.g. `phone_number`), sample values are run against each locale's validation pattern — the locale with the highest match rate >50% becomes `detected_locale`.
+  Chosen option: **Option B — Post-hoc locale detection**, because it provides zero regression risk and leverages the existing `validation_by_locale` infrastructure. When a type is classified (e.g. `phone_number`), sample values are run against each locale's validation pattern — the locale with the highest match rate >50% becomes `detected_locale`.
 
   Confirmed by analysis of the original finetype prototype, which succeeded with 4-level locale labels because it used a Transformer model with much higher capacity.
 

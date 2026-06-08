@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NNFT-150: Entity type embedding separation spike.
+"""Entity type embedding separation spike.
 
 Tests whether Model2Vec value embeddings, aggregated per column,
 carry enough signal to separate entity types (Person vs Place vs
@@ -322,7 +322,7 @@ def experiment_binary_person_vs_rest(columns, model):
 
 def main():
     print("=" * 70)
-    print("NNFT-150: Entity Type Embedding Separation Spike")
+    print("Entity Type Embedding Separation Spike")
     print("=" * 70)
 
     # Load data

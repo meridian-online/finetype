@@ -1,6 +1,5 @@
 # Phase 0 Finding: Taxonomy Audit & Simplification
 
-**Task:** NNFT-162
 **Date:** 2026-02-28
 **Author:** @nightingale
 
@@ -13,7 +12,7 @@ Audited all 171 FineType types against collapse criteria. Collapsed 8 types (171
 Each type was evaluated against three questions:
 1. **Structural detectability** — Does the type have a character-level format signal that CharCNN can learn? Types with `designation: broad_words` or `broad_characters` rely on vocabulary, not structure.
 2. **Analyst value** — Would an analyst distinguish this type from its parent category? If they'd say "that's fine, just call it X", collapse it.
-3. **Model confusion risk** — Does the type overlap with another type in training data or inference? Evidence from NNFT-161 regression analysis.
+3. **Model confusion risk** — Does the type overlap with another type in training data or inference? Evidence from regression analysis.
 
 ## Types Collapsed
 
@@ -25,8 +24,8 @@ Each type was evaluated against three questions:
 | 4 | `identity.academic.university` | `representation.text.entity_name` | Named entities — universities are organisations, broad_words designation |
 | 5 | `identity.person.nationality` | `representation.discrete.categorical` | Short enumerated list ("Australian", "French") — broad_words, locale_specific but only 1 locale |
 | 6 | `identity.person.occupation` | `representation.discrete.categorical` | Free text with no format signal ("Engineer", "Doctor") — broad_words designation |
-| 7 | `technology.internet.slug` | `representation.code.alphanumeric_id` | Rarely analytically important; confused with hostname in CLDR regression (NNFT-161) |
-| 8 | `technology.internet.uri` | MERGED into `technology.internet.url` | 37% training data overlap — http/https URIs are indistinguishable from URLs (NNFT-161 regression analysis) |
+| 7 | `technology.internet.slug` | `representation.code.alphanumeric_id` | Rarely analytically important; confused with hostname in CLDR regression |
+| 8 | `technology.internet.uri` | MERGED into `technology.internet.url` | 37% training data overlap — http/https URIs are indistinguishable from URLs (regression analysis) |
 
 ## Types Explicitly Retained
 

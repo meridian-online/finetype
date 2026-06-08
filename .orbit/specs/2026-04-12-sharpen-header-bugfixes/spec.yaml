@@ -26,7 +26,7 @@ acceptance_criteria:
   ac_type: code
 - id: ac-04
   description: |
-    Add 2 hardcoded header hints for unambiguous column names: "icao" → geography.transportation.icao_code, "author" | "authors" → identity.person.full_name. These are stopgaps per decision 0042 — to be absorbed by retraining. "method", "port", and "status_code" are excluded: "method" is ambiguous (payment method, HTTP method, scientific method), "port" was previously removed in NNFT-242, and "status_code" is better served by R12 expansion or retraining.
+    Add 2 hardcoded header hints for unambiguous column names: "icao" → geography.transportation.icao_code, "author" | "authors" → identity.person.full_name. These are stopgaps per decision 0042 — to be absorbed by retraining. "method", "port", and "status_code" are excluded: "method" is ambiguous (payment method, HTTP method, scientific method), "port" was previously removed, and "status_code" is better served by R12 expansion or retraining.
   ac_type: code
 - id: ac-05
   description: |

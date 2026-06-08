@@ -944,7 +944,7 @@ datetime.timestamp.iso_8601:
         assert!(matches!(result, Err(ValidatorError::UnknownLabel(_))));
     }
 
-    // ── CompiledValidator tests (NNFT-116) ──────────────────────────────
+    // ── CompiledValidator tests ──────────────────────────────
 
     #[test]
     fn test_compiled_validator_pattern() {
@@ -1272,7 +1272,7 @@ datetime.timestamp.iso_8601:
 
     #[test]
     fn test_postal_code_maximum_rejects_salary_range() {
-        // NNFT-117: maximum: 99999 on postal_code rejects salary-range values
+        // maximum: 99999 on postal_code rejects salary-range values
         // while preserving valid postal codes (including 6-digit Indian codes
         // which fail individually but don't trigger column-level demotion
         // because <50% of a real postal code column would exceed 99999).

@@ -97,7 +97,7 @@ finance.banking.iban:
     - "IT60X0542811101000000123456"
   references: null
   notes: >
-    New in v0.5.1 (NNFT-180). IBAN check digit algorithm (ISO 7064 Mod 97-10):
+    New in v0.5.1. IBAN check digit algorithm (ISO 7064 Mod 97-10):
     move first 4 characters to end, convert letters to numbers (A=10..Z=35),
     compute mod 97 — result must equal 1. Country-specific BBAN lengths and
     formats exist but the regex validates the general structure.
@@ -159,7 +159,7 @@ finance.currency.amount:
     - "($999.99)"
   references: null
   notes: >
-    New in v0.5.1 (NNFT-180). US/international format uses comma as thousands
+    New in v0.5.1. US/international format uses comma as thousands
     separator and period as decimal separator. Transform handles both standard
     negatives (-$X) and accounting notation (($X)). Casts to DECIMAL(18,2).
     Distinct from amount_comma which uses the inverted separator convention.
@@ -196,7 +196,7 @@ finance.currency.amount_comma:
     - "€100,00"
   references: null
   notes: >
-    New in v0.5.1 (NNFT-180). European format uses period as thousands separator
+    New in v0.5.1. European format uses period as thousands separator
     and comma as decimal separator. Transform strips currency symbol, removes
     period thousands separators, replaces comma with period, then casts to
     DECIMAL(18,2). Distinct from amount (period decimal) which uses US separator convention.
@@ -438,7 +438,7 @@ finance.securities.figi:
     - "BBG000GZQ728"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). FIGI is the open standard for
+    New in taxonomy expansion. FIGI is the open standard for
     financial instrument identification, replacing proprietary Bloomberg tickers
     for many use cases. The 'G' in position 3 is always present. No vowels
     allowed in consonant positions (prevents forming words, like SEDOL).
@@ -508,7 +508,7 @@ finance.banking.aba_routing:
     - "121000358"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). ABA routing numbers identify US
+    New in taxonomy expansion. ABA routing numbers identify US
     financial institutions for ACH and wire transfers. The first two digits
     indicate the Federal Reserve district. Check digit: sum of
     (3*d1 + 7*d2 + 1*d3 + 3*d4 + 7*d5 + 1*d6 + 3*d7 + 7*d8 + 1*d9) mod 10 = 0.
@@ -545,7 +545,7 @@ finance.banking.bsb:
     - "013-252"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). BSB numbers are used in Australian
+    New in taxonomy expansion. BSB numbers are used in Australian
     domestic payments (BECS). The hyphen in position 4 is always present.
     Bank codes: 01=ANZ, 03=WBC, 06=CBA, 08=NAB, 01x=other. State: 2=NSW,
     3=VIC, 4=QLD, 5=SA, 6=WA, 7=TAS.
@@ -614,7 +614,7 @@ finance.crypto.ethereum_address:
     is preferable for storage.
 
 # ═════════════════════════════════════════════════════════════════════
-# NEW CURRENCY FORMATS (Format Coverage Expansion — NNFT-223)
+# NEW CURRENCY FORMATS (Format Coverage Expansion)
 #
 # 11 additional currency amount formats covering:
 #   - Accounting notation (parentheses for negatives)

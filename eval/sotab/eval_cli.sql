@@ -1,4 +1,4 @@
--- SOTAB CTA Evaluation: FineType CLI pipeline (NNFT-130)
+-- SOTAB CTA Evaluation: FineType CLI pipeline
 -- =============================================================================
 -- Scores CLI batch predictions against ground truth using the same schema
 -- mapping and accuracy metrics as eval_sotab.sql, but reads pre-computed
@@ -312,7 +312,7 @@ GROUP BY expected_ft_domain
 ORDER BY total_columns DESC;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 5. PRECISION PER PREDICTED TYPE (NNFT-147)
+-- 5. PRECISION PER PREDICTED TYPE
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- When FineType says "this is type X", how often is it right?
 -- This is the analyst trust metric. Precision > recall for building confidence.
@@ -400,7 +400,7 @@ ORDER BY
     END;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 6. OVERCALL ANALYSIS (NNFT-147)
+-- 6. OVERCALL ANALYSIS
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- For high-risk types, what are the false positives actually made of?
 -- This directly measures the "don't mislead the analyst" principle.
@@ -539,7 +539,7 @@ ORDER BY columns DESC
 LIMIT 20;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 8. CONFIDENCE CALIBRATION (NNFT-147)
+-- 8. CONFIDENCE CALIBRATION
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Does FineType know when it's wrong? A well-calibrated model has
 -- accuracy ≈ confidence. Enables downstream threshold decisions.

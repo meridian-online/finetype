@@ -46,7 +46,7 @@ impl ValueClassifier for NoopClassifier {
 }
 
 /// Aggregated column-level features: mean, variance, min, and max of per-value
-/// feature vectors (NNFT-250, expanded in NNFT-266).
+/// feature vectors (expanded with column-level statistics).
 ///
 /// Used by disambiguation rules for column-level decisions. Variance is the
 /// critical new signal: zero length-variance distinguishes structured codes,
@@ -131,7 +131,7 @@ pub fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
     }
 }
 
-/// Feature index constants for disambiguation rules (NNFT-250, expanded NNFT-266).
+/// Feature index constants for disambiguation rules (expanded with column-level statistics).
 /// Must match the indices in `features::FEATURE_NAMES`.
 mod feature_idx {
     pub const IS_FLOAT: usize = 2;
@@ -183,17 +183,17 @@ fn strip_locale_suffix(label: &str) -> (&str, Option<&str>) {
 /// All known boolean type labels (current and legacy).
 /// Centralised to avoid label mismatches across disambiguation rules.
 const BOOLEAN_LABELS: &[&str] = &[
-    "representation.boolean.binary",   // NNFT-075: 0/1
-    "representation.boolean.initials", // NNFT-075: T/F, Y/N
-    "representation.boolean.terms",    // NNFT-075: true/false, yes/no, on/off
-    "technology.development.boolean",  // legacy (pre-NNFT-075 model)
+    "representation.boolean.binary",   // 0/1
+    "representation.boolean.initials", // T/F, Y/N
+    "representation.boolean.terms",    // true/false, yes/no, on/off
+    "technology.development.boolean",  // legacy
     "representation.logical.boolean",  // legacy interim label
     "technology.data.boolean",         // legacy
 ];
 
 /// Geography location types used by both geography protection (header hints)
 /// and entity demotion geography rescue. Extracted to module level so both
-/// code paths share the same definition. (NNFT-156)
+/// code paths share the same definition.
 const LOCATION_TYPES: &[&str] = &[
     "geography.location.city",
     "geography.location.country",
@@ -205,7 +205,7 @@ const LOCATION_TYPES: &[&str] = &[
 /// Person-name hint types that trigger geography protection.
 /// Model2Vec can return any of these for "name" headers — not just full_name.
 /// All should trigger the geography guard to prevent overriding correct
-/// location predictions. (NNFT-156)
+/// location predictions.
 const PERSON_NAME_HINTS: &[&str] = &[
     "identity.person.full_name",
     "identity.person.last_name",
@@ -243,7 +243,7 @@ const HARDCODED_GENERIC_LABELS: &[&str] = &[
 /// 3. Hardcoded list of known catch-all labels (always applies).
 /// 4. When taxonomy is available, broad designations (BroadWords, BroadCharacters,
 ///    BroadNumbers, BroadObject) are additionally generic — the CharCNN cannot
-///    reliably distinguish these types from character patterns (NNFT-139).
+/// reliably distinguish these types from character patterns.
 ///
 /// Signal 4 is **additive**: it expands the generic set beyond the hardcoded
 /// list (e.g., `gender`, `occupation` become generic via their `broad_words`
@@ -264,7 +264,7 @@ fn is_generic_prediction(
 
     // Signal 1b: Numeric postal code heuristic is pattern-based, not model-driven.
     // It should yield to explicit header hints (e.g., a column with 3-digit
-    // values detected as postal_code). Preserves postal code detection for headerless columns. (NNFT-156)
+    // values detected as postal_code). Preserves postal code detection for headerless columns.
     if disambiguation_rule
         .as_ref()
         .is_some_and(|r| r == "numeric_postal_code_detection")
@@ -282,7 +282,7 @@ fn is_generic_prediction(
         return true;
     }
 
-    // Signal 4: Designation-aware expansion (NNFT-139).
+    // Signal 4: Designation-aware expansion.
     // When the taxonomy is available, broad designations mark types that the
     // CharCNN cannot reliably distinguish from character patterns alone.
     // This is ADDITIVE — it catches types like gender, occupation, nationality
@@ -303,7 +303,7 @@ fn is_generic_prediction(
 }
 
 /// Detect the most likely locale for a column by running sample values against
-/// each locale's validation pattern from `validation_by_locale` (NNFT-140).
+/// each locale's validation pattern from `validation_by_locale`.
 ///
 /// Returns the locale code with the highest pass rate above 50%, or None if
 /// no locale patterns exist or none reach the threshold.
@@ -417,12 +417,12 @@ pub struct ColumnClassifier {
     /// When present, enables Signal 1 (validation failure) in the
     /// attractor demotion disambiguation rule (Rule 14).
     taxonomy: Option<Taxonomy>,
-    /// Optional entity classifier for full_name demotion (NNFT-152).
+    /// Optional entity classifier for full_name demotion.
     /// When present and majority vote is full_name, runs a binary demotion
     /// check: if the column is confidently non-person, demotes to entity_name.
     /// Bypassed when Sense is active (Sense entity subtype replaces this).
     entity_classifier: Option<EntityClassifier>,
-    /// Optional Sense classifier for broad semantic category prediction (NNFT-170).
+    /// Optional Sense classifier for broad semantic category prediction.
     /// When present, enables the Sense→Sharpen pipeline in classify_column_with_header.
     sense: Option<SenseClassifier>,
     /// Shared Model2Vec resources for Sense encoding.
@@ -431,7 +431,7 @@ pub struct ColumnClassifier {
     /// Label → category mapping for Sense output masking.
     /// Required when `sense` is Some.
     label_map: Option<LabelCategoryMap>,
-    /// Optional sibling-context attention module (NNFT-268).
+    /// Optional sibling-context attention module.
     /// When present and Sense is active, enriches column header embeddings with
     /// cross-column context before Sense classification. Requires `model2vec` to
     /// encode headers. Without a trained model artifact, this is None and the
@@ -519,7 +519,7 @@ impl ColumnClassifier {
         self.taxonomy = Some(taxonomy);
     }
 
-    /// Attach an entity classifier for full_name demotion (NNFT-152).
+    /// Attach an entity classifier for full_name demotion.
     ///
     /// When present and the majority vote is `identity.person.full_name`,
     /// the entity classifier runs a binary demotion check. If the column
@@ -529,7 +529,7 @@ impl ColumnClassifier {
         self.entity_classifier = Some(entity);
     }
 
-    /// Attach a Sense classifier with its required resources (NNFT-170).
+    /// Attach a Sense classifier with its required resources.
     ///
     /// When all three are present, `classify_column_with_header` uses the
     /// Sense→Sharpen pipeline instead of the legacy header-hint path.
@@ -550,7 +550,7 @@ impl ColumnClassifier {
         self.sense.is_some() && self.model2vec.is_some() && self.label_map.is_some()
     }
 
-    /// Attach a sibling-context attention module (NNFT-268).
+    /// Attach a sibling-context attention module.
     ///
     /// When present and Sense is active, `classify_columns_with_context` will
     /// encode all column headers with Model2Vec, run sibling-context attention
@@ -718,7 +718,7 @@ impl ColumnClassifier {
         let mut votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
         votes.sort_by_key(|b| std::cmp::Reverse(b.1));
 
-        // Validation-based candidate elimination (NNFT-188): reject candidates
+        // Validation-based candidate elimination: reject candidates
         // whose JSON Schema validation contract is violated by >50% of sample
         // values. Uses pre-compiled validators from taxonomy cache.
         if let Some(taxonomy) = self.taxonomy.as_ref() {
@@ -816,7 +816,7 @@ impl ColumnClassifier {
             }
         };
 
-        // Step 5: Entity demotion gate (NNFT-152).
+        // Step 5: Entity demotion gate.
         // When the majority label is full_name and the entity classifier is loaded,
         // check whether the column actually contains person names. If confidently
         // non-person, demote to entity_name. Fires after disambiguation but before
@@ -839,7 +839,7 @@ impl ColumnClassifier {
             }
         }
 
-        // Step 5b: Feature-based disambiguation (NNFT-250, extended to legacy path).
+        // Step 5b: Feature-based disambiguation (extended to legacy path).
         // Compute aggregated column features and apply feature disambiguation rules
         // (F1–F6). Previously only ran in Sense→Sharpen path; now also in legacy
         // to fix decimal/numeric_code (F5) when Sense is absent.
@@ -860,7 +860,7 @@ impl ColumnClassifier {
             schema_validation_gate(&mut result, &sample, &votes, taxonomy);
         }
 
-        // Step 6: Post-hoc locale detection via validation patterns (NNFT-140).
+        // Step 6: Post-hoc locale detection via validation patterns.
         // When taxonomy is available, run sample values against validation_by_locale
         // patterns to detect the most likely locale. This takes priority over any
         // model-derived locale from vote aggregation, because validation patterns
@@ -891,7 +891,7 @@ impl ColumnClassifier {
         &*self.classifier
     }
 
-    /// Classify multiple columns with sibling context (NNFT-268).
+    /// Classify multiple columns with sibling context.
     ///
     /// When sibling-context attention is available:
     /// 1. Encode all column headers with Model2Vec → `[N_cols, 128]`
@@ -997,7 +997,7 @@ impl ColumnClassifier {
             return self.classify_multi_branch(mb, values, header);
         }
 
-        // Sense→Sharpen pipeline (NNFT-170): when Sense is active, use it
+        // Sense→Sharpen pipeline: when Sense is active, use it
         // instead of the legacy header-hint path.
         if self.has_sense() {
             return self.classify_sense_sharpen(values, header);
@@ -1005,7 +1005,7 @@ impl ColumnClassifier {
 
         let mut result = self.classify_column(values)?;
 
-        // Entity demotion guard (NNFT-152): when the entity classifier has
+        // Entity demotion guard: when the entity classifier has
         // made a deliberate data-driven demotion (full_name → entity_name),
         // skip header hint override. The entity classifier analyzed the actual
         // column values; header hints are a weaker signal that would undo the
@@ -1033,9 +1033,9 @@ impl ColumnClassifier {
         }
 
         // Apply header hint: hardcoded first (curated knowledge), then Model2Vec.
-        // Hardcoded hints have been curated through NNFT-065/091/102/127/128/156
+        // Hardcoded hints have been curated through multiple iterations
         // and cover known cases precisely. Model2Vec adds value for unknown headers
-        // but can override correct hardcoded mappings (NNFT-188).
+        // but can override correct hardcoded mappings.
         let hardcoded_hint_legacy = header_hint(header).map(|h| h.to_string());
         let hinted_type: Option<String> = hardcoded_hint_legacy.clone().or_else(|| {
             self.semantic_hint
@@ -1074,7 +1074,7 @@ impl ColumnClassifier {
                 self.finalize_is_generic(&mut result);
                 return Ok(result);
             }
-            // Scientific measurement override (NNFT-188): header contains
+            // Scientific measurement override: header contains
             // measurement keywords (pressure, temperature, etc.) and model
             // predicts latitude/longitude. Header is authoritative.
             if hinted_type == "representation.numeric.decimal_number"
@@ -1100,7 +1100,7 @@ impl ColumnClassifier {
             // Only override if model confidence is low (< 0.5)
             // or the result is a generic type AND the hint matches a candidate.
             //
-            // Designation-aware gating (NNFT-139): when taxonomy is available,
+            // Designation-aware gating: when taxonomy is available,
             // types with broad designations (broad_words, broad_characters,
             // broad_numbers, broad_object) are treated as generic because the
             // CharCNN cannot reliably distinguish them from character patterns
@@ -1115,7 +1115,7 @@ impl ColumnClassifier {
             // (full_name, last_name, first_name), check if the model sees
             // geography.location signal. Many geographic datasets use "name"
             // as a header for city, country, or region columns. Model2Vec may
-            // return any person-name type for "name" headers. (NNFT-156)
+            // return any person-name type for "name" headers.
             if PERSON_NAME_HINTS.contains(&hinted_type) {
                 // Case 1: Model already predicts a location type — keep it
                 // rather than overriding to a person-name type.
@@ -1152,7 +1152,7 @@ impl ColumnClassifier {
                 }
             }
 
-            // Same-domain geographic override (NNFT-188): when both the hint
+            // Same-domain geographic override: when both the hint
             // and prediction are location types, trust the header name.
             if LOCATION_TYPES.contains(&hinted_type)
                 && LOCATION_TYPES.contains(&result.label.as_str())
@@ -1170,7 +1170,7 @@ impl ColumnClassifier {
                 return Ok(result);
             }
 
-            // Same-category hardcoded hint override (NNFT-194):
+            // Same-category hardcoded hint override:
             // When the hardcoded header hint and prediction share the same
             // domain.category (e.g., both datetime.timestamp.*), the header
             // is authoritative for format disambiguation. Only applies when
@@ -1196,7 +1196,7 @@ impl ColumnClassifier {
                 }
             }
 
-            // Cross-domain hardcoded hint override (NNFT-254):
+            // Cross-domain hardcoded hint override:
             // When a hardcoded hint and prediction differ in both domain AND
             // base type name, the header is authoritative. Catches structural
             // confusion (postal_code vs CPT, epoch vs NPI) where patterns are
@@ -1275,7 +1275,7 @@ impl ColumnClassifier {
             }
 
             // If header hint changed the label, re-detect locale for the new type
-            // (NNFT-140, NNFT-141). The detected_locale from classify_column was
+            //. The detected_locale from classify_column was
             // for the original label — re-run detection against the new label's
             // validation_by_locale patterns.
             if result.label != original_label {
@@ -1290,7 +1290,7 @@ impl ColumnClassifier {
         Ok(result)
     }
 
-    /// Sense → Sharpen pipeline (NNFT-170).
+    /// Sense → Sharpen pipeline.
     ///
     /// 1. Sample 100 values → encode header + first 50 with Model2Vec
     /// 2. Run Sense for broad category + entity subtype
@@ -1307,7 +1307,7 @@ impl ColumnClassifier {
         self.classify_sense_sharpen_inner(values, header, None)
     }
 
-    /// Sense → Sharpen with a pre-computed context-enriched header (NNFT-268).
+    /// Sense → Sharpen with a pre-computed context-enriched header.
     ///
     /// Same as `classify_sense_sharpen` but uses the enriched header embedding
     /// from sibling-context attention instead of encoding the header from scratch.
@@ -1323,7 +1323,7 @@ impl ColumnClassifier {
     /// Inner implementation of the Sense → Sharpen pipeline.
     ///
     /// When `enriched_header_emb` is Some, uses the pre-computed context-enriched
-    /// header for Sense classification (NNFT-268). When None, encodes the header
+    /// header for Sense classification. When None, encodes the header
     /// normally via Model2Vec (standard path).
     fn classify_sense_sharpen_inner(
         &self,
@@ -1360,7 +1360,7 @@ impl ColumnClassifier {
         };
         let n_samples = sample.len();
 
-        // Step 1b: Extract deterministic features for all sampled values (NNFT-250).
+        // Step 1b: Extract deterministic features for all sampled values.
         // Runs before Sense and CharCNN — features are used both for CharCNN
         // augmentation (when model supports it) and for disambiguation rules.
         let per_value_features: Vec<[f32; FEATURE_DIM]> =
@@ -1373,7 +1373,7 @@ impl ColumnClassifier {
         // Step 2: Run Sense — encode header + first 50 values
         let sense_values: Vec<&str> = sample.iter().take(50).map(|s| s.as_str()).collect();
         let sense_result = if let Some(enriched_emb) = enriched_header_emb {
-            // NNFT-268: use pre-computed context-enriched header embedding
+            // use pre-computed context-enriched header embedding
             sense.classify_with_enriched_header(m2v, enriched_emb, &sense_values)?
         } else {
             // Standard path: encode header from scratch
@@ -1418,7 +1418,7 @@ impl ColumnClassifier {
             }
         }
 
-        // Save unmasked vote distribution for geography rescue (Step 6, NNFT-188).
+        // Save unmasked vote distribution for geography rescue (Step 6).
         // Must be saved BEFORE masking, as masked votes won't contain location
         // types when Sense routes to Entity category.
         let unmasked_votes: Vec<(String, usize)> = {
@@ -1489,7 +1489,7 @@ impl ColumnClassifier {
             (masked_votes, true)
         };
 
-        // Validation-based candidate elimination (NNFT-188): reject candidates
+        // Validation-based candidate elimination: reject candidates
         // whose JSON Schema validation contract is violated by >50% of sample
         // values. The type's own contract becomes the arbiter — if a type says
         // its values look like `^\d{4}-\d{2}-\d{2}T...` and 100% of the column's
@@ -1592,7 +1592,7 @@ impl ColumnClassifier {
         // Attach column features to result for downstream analysis (spike AC-2).
         result.column_features = Some(column_features.clone());
 
-        // Step 6b: Feature-based disambiguation (NNFT-250).
+        // Step 6b: Feature-based disambiguation.
         // Use aggregated deterministic features to resolve known confusion pairs
         // that the CharCNN model struggles with.
         feature_disambiguate(&mut result, &column_features, &votes, n_samples);
@@ -1622,7 +1622,7 @@ impl ColumnClassifier {
             }
         }
 
-        // Step 7b: Geography rescue from unmasked votes (NNFT-188).
+        // Step 7b: Geography rescue from unmasked votes.
         // When Sense misroutes (e.g., country names → Temporal or Entity),
         // location types get masked out. Check unmasked CharCNN votes for
         // geography signal. Only fire when location types are the PLURALITY
@@ -1633,7 +1633,7 @@ impl ColumnClassifier {
         // overridden). Person-name hints (full_name, first_name, etc.) are
         // ambiguous with location names so we still allow rescue for those.
         //
-        // Step 7b-pre: Header-hint location override (NNFT-226).
+        // Step 7b-pre: Header-hint location override.
         // When the hardcoded header hint IS a location type (country, city,
         // state, region, continent) but the current result is NOT a location
         // type, the header is authoritative. This catches Sense misrouting
@@ -1697,7 +1697,7 @@ impl ColumnClassifier {
             .as_ref()
             .is_some_and(|r| r.starts_with("sense_entity_demotion"));
         if !entity_demoted && !header.is_empty() {
-            // Hardcoded first (curated knowledge), then Model2Vec (NNFT-188).
+            // Hardcoded first (curated knowledge), then Model2Vec.
             let hardcoded_hint = header_hint(header).map(|h| h.to_string());
             let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
                 self.semantic_hint
@@ -1733,7 +1733,7 @@ impl ColumnClassifier {
                     } else if hinted_type == "representation.numeric.decimal_number"
                         && COORDINATE_TYPES.contains(&result.label.as_str())
                     {
-                        // Scientific measurement override (NNFT-188): when the
+                        // Scientific measurement override: when the
                         // header contains measurement keywords (pressure,
                         // temperature, etc.) and the model predicts latitude/
                         // longitude, the header is authoritative. Small decimal
@@ -1760,7 +1760,7 @@ impl ColumnClassifier {
                         );
 
                         // Geography protection: person-name hints don't override
-                        // location types (NNFT-156). Uses early-continue pattern
+                        // location types. Uses early-continue pattern
                         // so non-location cases fall through to general logic.
                         let mut geo_handled = false;
                         if PERSON_NAME_HINTS.contains(&hinted_type) {
@@ -1770,7 +1770,7 @@ impl ColumnClassifier {
                                 // header → first_name), trust the header over CharCNN's
                                 // location prediction — person names and place names
                                 // overlap in CharCNN vocabulary but the header is
-                                // authoritative. (NNFT-235)
+                                // authoritative.
                                 if hint_is_hardcoded {
                                     result.label = hinted_type.to_string();
                                     result.confidence = result.confidence.max(0.6);
@@ -1794,9 +1794,9 @@ impl ColumnClassifier {
                                 // check UNMASKED votes for location types. Low confidence
                                 // (<0.3) suggests Sense may have misrouted this column,
                                 // so masked votes are unreliable. Unmasked CharCNN votes
-                                // give the true value-level signal. (NNFT-194)
+                                // give the true value-level signal.
                                 // Skip this for hardcoded hints — they're authoritative
-                                // and should fall through to general hint logic. (NNFT-235)
+                                // and should fall through to general hint logic.
                                 let top_unmasked_location = unmasked_votes
                                     .iter()
                                     .find(|(label, _)| LOCATION_TYPES.contains(&label.as_str()));
@@ -1816,7 +1816,7 @@ impl ColumnClassifier {
                             }
                         }
 
-                        // Same-domain geographic override (NNFT-188, NNFT-235):
+                        // Same-domain geographic override:
                         // when both hint and prediction are location types (e.g.,
                         // city vs country), the header is authoritative. Hardcoded
                         // hints (e.g., "Country" → country) override at any
@@ -1839,7 +1839,7 @@ impl ColumnClassifier {
                             geo_handled = true;
                         }
 
-                        // Same-category hardcoded hint override (NNFT-194):
+                        // Same-category hardcoded hint override:
                         // When the hardcoded header hint and prediction share the
                         // same domain.category (e.g., both datetime.timestamp.*),
                         // the header is authoritative for distinguishing format
@@ -1869,7 +1869,7 @@ impl ColumnClassifier {
                             }
                         }
 
-                        // Cross-domain hardcoded hint override (NNFT-254):
+                        // Cross-domain hardcoded hint override:
                         // When a hardcoded hint and prediction differ in domain AND
                         // the predicted type's base name differs from the hint's base
                         // name, the header is authoritative. This catches cases where
@@ -1949,7 +1949,7 @@ impl ColumnClassifier {
                                     ));
                                 }
                             } else if hint_is_hardcoded && !hint_in_votes {
-                                // Hardcoded hint authority (NNFT-235, refined NNFT-254):
+                                // Hardcoded hint authority (refined):
                                 // Hardcoded hints are curated knowledge. Threshold depends
                                 // on domain relationship:
                                 // - Cross-domain (hint=repr, pred=identity): 0.85 threshold
@@ -2456,7 +2456,7 @@ impl ColumnClassifier {
             && LOCATION_TYPES.contains(&result.label.as_str())
         {
             if !disable_person_override && hint_is_hardcoded {
-                // Hardcoded person-name hint overrides location (NNFT-235)
+                // Hardcoded person-name hint overrides location
                 result.label = hinted_type.to_string();
                 result.confidence = result.confidence.max(0.6);
                 result.disambiguation_applied = true;
@@ -2501,7 +2501,7 @@ impl ColumnClassifier {
             return;
         }
 
-        // Same-category hardcoded hint override (NNFT-194)
+        // Same-category hardcoded hint override
         // Hardcoded hints are definitive for same-category overrides — no confidence
         // threshold. E.g. "phone" → phone_number overrides ssn@1.00 because both
         // are identity.person.* and the header is unambiguous.
@@ -2523,7 +2523,7 @@ impl ColumnClassifier {
             }
         }
 
-        // Cross-domain hardcoded hint override (NNFT-254)
+        // Cross-domain hardcoded hint override
         if !disable_cross_domain && hint_is_hardcoded && result.label != hinted_type {
             let hint_domain = hinted_type.split('.').next().unwrap_or("");
             let pred_domain = result.label.split('.').next().unwrap_or("");
@@ -2603,7 +2603,7 @@ impl ColumnClassifier {
         // After ALL header hint processing, if the label is "country" but >=95%
         // of values are strict ISO 3166-1 alpha-2 codes (^[A-Z]{2}$), override
         // to country_code. This guard fires LAST — after the same-category
-        // hardcoded hint override (NNFT-194) which would otherwise overwrite
+        // hardcoded hint override which would otherwise overwrite
         // a value_sharpen correction. See spec review finding A1/F1.
         if result.label == "geography.location.country" {
             let non_empty: Vec<&str> = sample
@@ -3383,12 +3383,12 @@ fn sharpen_select_fallback(
 }
 
 /// Feature-based disambiguation: use aggregated column features to resolve
-/// known confusion pairs that the CharCNN model cannot distinguish (NNFT-250).
+/// known confusion pairs that the CharCNN model cannot distinguish.
 ///
 /// Runs after standard disambiguation rules. Modifies `result` in place when
 /// a feature signal is strong enough to override the current prediction.
 ///
-/// NNFT-266: expanded to use variance/min/max statistics and float-parseability
+/// expanded to use variance/min/max statistics and float-parseability
 /// for hs_code/decimal_number disambiguation.
 fn feature_disambiguate(
     result: &mut ColumnResult,
@@ -3398,7 +3398,7 @@ fn feature_disambiguate(
 ) {
     let label_before = result.label.clone();
 
-    // Rule F1: Leading-zero pre-filter — numeric_code vs postal_code (NNFT-250).
+    // Rule F1: Leading-zero pre-filter — numeric_code vs postal_code.
     //
     // When a significant fraction of values have leading zeros (e.g., "00123",
     // "04500") and the winner is postal_code or cpt, override to numeric_code.
@@ -3451,13 +3451,13 @@ fn feature_disambiguate(
     // dot-separated segments. decimal_number also has dots but typically lower
     // digit_ratio (mixed with other chars in real columns) and fewer segments.
     //
-    // NNFT-266: Enhanced with float-parseability signal. HS codes with 3+
+    // Enhanced with float-parseability signal. HS codes with 3+
     // segments (e.g., "6204.62.40") don't parse as float, while decimal_number
     // values always do. Two trigger paths:
     //   Path A (original): digit_ratio >= 0.75 AND dot_segments >= 2.0
     //   Path B (new):      digit_ratio >= 0.75 AND is_float_fraction < 1.0
     //
-    // NNFT-270: Enhanced with two guards to reduce false positives:
+    // Enhanced with two guards to reduce false positives:
     //   Guard 1 — Negative prefix: HS codes never have negative values. If any
     //     values start with '-' followed by a digit, this is a financial/numeric
     //     column, not HS codes. Uses has_negative_prefix mean > 0 as the signal.
@@ -3503,7 +3503,7 @@ fn feature_disambiguate(
     // Rule F4: git_sha collapsed into technology.cryptographic.hash — rule removed.
 
     // Rule F5: numeric_code without leading zeros → integer_number or decimal_number
-    // (NNFT-272, extended for decimal disambiguation).
+    // (extended for decimal disambiguation).
     //
     // numeric_code exists to preserve leading zeros (ZIP codes, NAICS, FIPS).
     // Without leading zeros, the values are plain numbers and should be typed
@@ -3685,7 +3685,7 @@ fn disambiguate(
         }
     }
 
-    // Rule 19: Percentage without '%' sign → decimal_number (NNFT-188).
+    // Rule 19: Percentage without '%' sign → decimal_number.
     // When percentage wins the vote but no values contain a '%' character, the
     // prediction is based purely on numeric range overlap (small decimals look
     // like percentages). Real percentage columns have explicit "35.36%" values.
@@ -4182,11 +4182,11 @@ fn header_hint(header: &str) -> Option<&'static str> {
             "gender" | "sex" => {
                 return Some("identity.person.gender");
             }
-            // "age" — type REMOVED in v0.5.2 (NNFT-192); redirect to integer_number (NNFT-254)
+            // "age" — type REMOVED in v0.5.2; redirect to integer_number
             "age" | "patient age" | "customer age" | "user age" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Epoch / Unix timestamps — 10-digit integers confused with NPI (NNFT-254)
+            // Epoch / Unix timestamps — 10-digit integers confused with NPI
             "epoch" | "unix epoch" | "unix timestamp" | "epoch time" | "unix time"
             | "epoch seconds" | "unix seconds" | "epoch s" | "posix time"
             | "unix epoch seconds" => {
@@ -4195,42 +4195,42 @@ fn header_hint(header: &str) -> Option<&'static str> {
             "epoch ms" | "unix ms" | "epoch milliseconds" | "unix milliseconds" => {
                 return Some("datetime.epoch.unix_milliseconds");
             }
-            // Altitude / elevation — numeric measurements confused with numeric_code (NNFT-254)
+            // Altitude / elevation — numeric measurements confused with numeric_code
             "altitude" | "elevation" | "alt" | "elev" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Duration in numeric units (NNFT-254)
+            // Duration in numeric units
             // Note: bare "duration" excluded — could be ISO 8601 (PT1H30M).
             // Only specific numeric-unit variants match.
             "duration minutes" | "duration min" | "duration seconds" | "duration sec"
             | "duration hours" | "duration hrs" | "duration ms" | "elapsed" | "elapsed time" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Attendance / headcount — large integers (NNFT-254)
+            // Attendance / headcount — large integers
             "attendance" | "headcount" | "participants" | "crowd size" | "capacity" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Heart rate / vital signs — numeric measurements (NNFT-254)
+            // Heart rate / vital signs — numeric measurements
             "heart rate" | "heartrate" | "hr" | "bpm" | "pulse" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Pages — book/document page counts (NNFT-254)
+            // Pages — book/document page counts
             "pages" | "page count" | "num pages" | "total pages" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Language — programming or natural language names (NNFT-254)
+            // Language — programming or natural language names
             "language" | "lang" | "programming language" | "spoken language" => {
                 return Some("representation.discrete.categorical");
             }
-            // Sport / athletic discipline (NNFT-254)
+            // Sport / athletic discipline
             "sport" | "discipline" | "event type" | "game type" => {
                 return Some("representation.discrete.categorical");
             }
-            // Species / taxonomy (NNFT-254)
+            // Species / taxonomy
             "species" | "genus" | "taxon" | "breed" | "variety" => {
                 return Some("representation.discrete.categorical");
             }
-            // Exchange — financial exchange names (NNFT-254)
+            // Exchange — financial exchange names
             "exchange" | "stock exchange" | "market" | "bourse" => {
                 return Some("representation.discrete.categorical");
             }
@@ -4281,12 +4281,12 @@ fn header_hint(header: &str) -> Option<&'static str> {
             | "gmtoffset" => {
                 return Some("datetime.offset.utc");
             }
-            // IANA timezone columns (NNFT-188)
+            // IANA timezone columns
             "timezone" | "tz" | "time zone" | "iana timezone" | "iana tz" | "olson timezone" => {
                 return Some("datetime.offset.iana");
             }
-            // Publisher / publishing (NNFT-188)
-            // Company / venue / station — entity names confused with city (NNFT-235)
+            // Publisher / publishing
+            // Company / venue / station — entity names confused with city
             "publisher" | "publishing house" | "published by" | "company" | "employer"
             | "organization" | "organisation" | "venue" | "stadium" | "arena" | "theater"
             | "theatre" | "station" | "station name" | "facility" | "building" | "hotel"
@@ -4322,7 +4322,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             "os" | "operating system" | "platform" => {
                 return Some("technology.development.os");
             }
-            // Occupation / job title — collapsed to categorical (NNFT-162)
+            // Occupation / job title — collapsed to categorical
             "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role"
             | "position" => {
                 return Some("representation.discrete.categorical");
@@ -4342,7 +4342,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
             "cabin" | "room" | "compartment" | "berth" | "seat" => {
                 return Some("representation.alphanumeric.alphanumeric_id");
             }
-            // Fare / fee columns (NNFT-270: → finance.currency.amount)
+            // Fare / fee columns (→ finance.currency.amount)
             "fare" | "fee" | "toll" | "charge" => {
                 return Some("finance.currency.amount");
             }
@@ -4440,7 +4440,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
         // Bare "name" is ambiguous (could be person, city, country, company) — let
         // Sense + CharCNN decide based on value evidence.
         // Exclude datetime component names (month_name, day_name) — those are
-        // temporal, not person names (NNFT-254).
+        // temporal, not person names.
         if h.contains("month") || h.contains("day") || h.contains("weekday") {
             // Let the model decide — these are datetime components
         } else {
@@ -4459,7 +4459,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         // "street address" or "street_address" → street_address
         // "full address" → full_address
-        // Bare "address" → full_address (NNFT-235: more commonly means full address)
+        // Bare "address" → full_address (more commonly means full address)
         if h.contains("street") {
             return Some("geography.address.street_address");
         }
@@ -4483,7 +4483,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("datetime.timestamp.sql_standard");
     }
-    // Epoch/Unix timestamp substrings — must precede generic date/timestamp catch-all (NNFT-254).
+    // Epoch/Unix timestamp substrings — must precede generic date/timestamp catch-all.
     // "timestamp_unix", "unix_timestamp_ms", "epoch_created" etc.
     if !disable_datetime && (h.contains("epoch") || h.contains("unix")) {
         if h.contains("ms") || h.contains("milli") {
@@ -4528,7 +4528,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("finance.currency.amount");
     }
-    // "count" must not match "country" — use word boundary check (NNFT-254)
+    // "count" must not match "country" — use word boundary check
     if !disable_representation
         && ((h.contains("count") && !h.contains("country") && !h.contains("county"))
             || h.contains("quantity")
@@ -4553,7 +4553,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("finance.currency.amount");
     }
-    // Scientific / engineering measurement keywords → decimal_number (NNFT-188).
+    // Scientific / engineering measurement keywords → decimal_number.
     // Numeric measurement columns like "pressure_atm" get misclassified as
     // latitude when values fall in [-90, 90]. Header keywords disambiguate.
     if !disable_representation
@@ -4570,7 +4570,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("representation.numeric.decimal_number");
     }
-    // Latency / elapsed / duration — numeric measurements (NNFT-254)
+    // Latency / elapsed / duration — numeric measurements
     // "response time" removed — model correctly handles both integer and decimal
     // response time columns (v15, Option C keyword audit).
     // "duration" excluded when it looks like ISO 8601 (duration_iso, duration_8601)
@@ -4581,7 +4581,7 @@ fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("representation.numeric.integer_number");
     }
-    // Payload / byte size — numeric measurements (NNFT-254)
+    // Payload / byte size — numeric measurements
     if !disable_representation
         && (h.contains("payload") || h.contains("bytes") || h.contains("size"))
     {
@@ -5035,7 +5035,7 @@ fn disambiguate_numeric(
         ));
     }
 
-    // ("geography.address.street_number" detection block — REMOVED in v0.5.2, NNFT-192)
+    // ("geography.address.street_number" detection block — REMOVED in v0.5.2)
 
     // Fallback: if we couldn't determine more specifically, use the model majority
     // (return None to let the majority vote stand)
@@ -5235,7 +5235,7 @@ fn disambiguate_text_length_demotion(
 /// 3. Cardinality mismatch: text attractor + 1-20 unique values → categorical
 ///    (skipped when locale-confirmed)
 ///
-/// **Validation Precision (NNFT-132):** For locale-specific types (those with
+/// **Validation Precision:** For locale-specific types (those with
 /// `validation_by_locale`), only locale-level confirmation gates Signals 2 and 3.
 /// Universal validation can reject (Signal 1) but cannot confirm — passing a
 /// permissive universal pattern like `^[+]?[0-9\s()\-\.]+$` is not evidence.
@@ -5265,7 +5265,7 @@ fn disambiguate_attractor_demotion(
     // If taxonomy available and predicted type has a validation schema with a
     // regex pattern, check sample values against it. Demote if >50% fail.
     //
-    // Tracks two independent confirmation signals (NNFT-132 Precision Principle):
+    // Tracks two independent confirmation signals (Precision Principle):
     // - locale_confirmed: locale-specific pattern matched >50% (strong evidence)
     // - validation_confirmed: universal validation pattern passed (weaker evidence)
     //
@@ -5278,7 +5278,7 @@ fn disambiguate_attractor_demotion(
     let mut validation_confirmed = false;
     let mut has_locale_validators = false;
     if let Some(taxonomy) = taxonomy {
-        // Use pre-compiled validator from taxonomy cache (NNFT-116).
+        // Use pre-compiled validator from taxonomy cache.
         // Falls back to compile-per-call if cache not populated.
         let has_pattern = taxonomy
             .get(top_label)
@@ -5357,7 +5357,7 @@ fn disambiguate_attractor_demotion(
     // True positives for attractor types cluster at >0.9 confidence.
     // False positives cluster at 0.3–0.8.
     //
-    // Confirmation gating (NNFT-132 Precision Principle):
+    // Confirmation gating (Precision Principle):
     // - Locale-specific types: only locale_confirmed skips this signal.
     //   Universal validation passing is "format-compatible" not "confirmed".
     // - Other types: validation_confirmed (universal pattern match) suffices.
@@ -5376,7 +5376,7 @@ fn disambiguate_attractor_demotion(
     // strongest possible signal (e.g., "airport" repeated 7k times is NOT a
     // person's first_name).
     //
-    // SKIP if locale-confirmed (NNFT-132): locale-specific patterns are
+    // SKIP if locale-confirmed: locale-specific patterns are
     // strong structural evidence that overcomes low cardinality. Small tables
     // (common in web-scraped datasets like SOTAB) legitimately have few unique
     // phone numbers or postal codes — cardinality alone shouldn't override
@@ -5401,7 +5401,7 @@ fn disambiguate_attractor_demotion(
     None
 }
 
-/// Column schema-validation gate (Precision Principle, NNFT-272).
+/// Column schema-validation gate (Precision Principle).
 ///
 /// Computes the column's pass-rate against the predicted type's JSON Schema
 /// validator. When >50% of non-empty values fail, the prediction is not
@@ -5413,7 +5413,7 @@ fn disambiguate_attractor_demotion(
 /// the column violates (notably `geography.coordinate.latitude` on decimal
 /// columns where longitude/depth values exceed ±90). Locale-specific types are
 /// skipped — their real validation lives in `validation_by_locale`, and a
-/// permissive universal pattern is not evidence either way (NNFT-132).
+/// permissive universal pattern is not evidence either way.
 ///
 /// Runs AFTER feature disambiguation and BEFORE locale detection, so a demoted
 /// label can still pick up a locale on the fallback type if applicable.
@@ -5774,7 +5774,7 @@ mod tests {
         assert_eq!(label, "representation.identifier.increment");
     }
 
-    // test_numeric_port_detection: REMOVED in NNFT-242 (port type removed)
+    // test_numeric_port_detection: REMOVED (port type removed)
 
     #[test]
     fn test_numeric_postal_code_detection() {
@@ -5963,7 +5963,7 @@ mod tests {
         assert_eq!(label, "representation.identifier.increment");
     }
 
-    // test_year_not_triggered_for_ports: REMOVED in NNFT-242 (port type removed)
+    // test_year_not_triggered_for_ports: REMOVED (port type removed)
 
     #[test]
     fn test_year_with_outlier_not_postal_code() {
@@ -6124,8 +6124,8 @@ mod tests {
         }
     }
 
-    // test_age_column_not_detected_as_port: REMOVED in NNFT-242 (port type removed)
-    // test_age_column_with_mixed_values_not_port: REMOVED in NNFT-242 (port type removed)
+    // test_age_column_not_detected_as_port: REMOVED (port type removed)
+    // test_age_column_with_mixed_values_not_port: REMOVED (port type removed)
 
     #[test]
     fn test_empty_column() {
@@ -6497,7 +6497,7 @@ mod tests {
     fn test_header_hint_identity() {
         assert_eq!(header_hint("gender"), Some("identity.person.gender"));
         assert_eq!(header_hint("Sex"), Some("identity.person.gender"));
-        // "age" type removed in v0.5.2 (NNFT-192), hint redirects to integer_number (NNFT-254)
+        // "age" type removed in v0.5.2, hint redirects to integer_number
         assert_eq!(
             header_hint("age"),
             Some("representation.numeric.integer_number")
@@ -6515,7 +6515,7 @@ mod tests {
         assert_eq!(header_hint("website"), Some("technology.internet.url"));
         assert_eq!(header_hint("ip_address"), Some("technology.internet.ip_v4"));
         assert_eq!(header_hint("uuid"), Some("technology.identifier.uuid"));
-        // "port" header hint removed in NNFT-242
+        // "port" header hint removed
     }
 
     #[test]
@@ -6539,7 +6539,7 @@ mod tests {
             header_hint("sql_timestamp"),
             Some("datetime.timestamp.sql_standard")
         );
-        // Epoch/Unix timestamps (NNFT-254) — exact match
+        // Epoch/Unix timestamps — exact match
         assert_eq!(
             header_hint("unix_epoch"),
             Some("datetime.epoch.unix_seconds")
@@ -6564,8 +6564,8 @@ mod tests {
     }
 
     #[test]
-    fn test_header_hint_categorical_nnft254() {
-        // NNFT-254: text types confused with region/country
+    fn test_header_hint_categorical() {
+        // text types confused with region/country
         assert_eq!(
             header_hint("language"),
             Some("representation.discrete.categorical")
@@ -6585,8 +6585,8 @@ mod tests {
     }
 
     #[test]
-    fn test_header_hint_measurements_nnft254() {
-        // NNFT-254: numeric measurements confused with numeric_code
+    fn test_header_hint_measurements() {
+        // numeric measurements confused with numeric_code
         assert_eq!(
             header_hint("altitude"),
             Some("representation.numeric.integer_number")
@@ -6622,7 +6622,7 @@ mod tests {
 
     #[test]
     fn test_header_hint_numeric() {
-        // Financial hints → finance.currency.amount (NNFT-270)
+        // Financial hints → finance.currency.amount
         assert_eq!(header_hint("price"), Some("finance.currency.amount"));
         assert_eq!(header_hint("amount"), Some("finance.currency.amount"));
         assert_eq!(header_hint("salary"), Some("finance.currency.amount"));
@@ -6901,7 +6901,7 @@ mod tests {
         );
     }
 
-    // ── NNFT-076: Small-integer disambiguation tests ────────────────────
+    // ── Small-integer disambiguation tests ────────────────────
 
     #[test]
     fn test_boolean_override_with_current_model_label() {
@@ -6944,7 +6944,7 @@ mod tests {
 
     // disambiguate_small_integer_ordinal tests REMOVED — Sharpen rule audit (MADR 0069)
 
-    // ── NNFT-076: New header hint tests ─────────────────────────────────
+    // ── New header hint tests ─────────────────────────────────
 
     #[test]
     fn test_header_hint_class_columns() {
@@ -7047,7 +7047,7 @@ mod tests {
         );
     }
 
-    // ── NNFT-084: SI number override tests ─────────────────────────────
+    // ── SI number override tests ─────────────────────────────
 
     #[test]
     fn test_si_number_override_plain_decimals() {
@@ -7119,7 +7119,7 @@ mod tests {
         );
     }
 
-    // ── NNFT-090: Day-of-week / month name / boolean sub-type tests ─────
+    // ── Day-of-week / month name / boolean sub-type tests ─────
 
     #[test]
     fn test_day_of_week_full_names() {
@@ -7751,7 +7751,7 @@ mod tests {
 
     // ── Attractor demotion tests (Rule 14) ──────────────────────────────
 
-    // test_attractor_validation_demotion — REMOVED in v0.5.2 (NNFT-192)
+    // test_attractor_validation_demotion — REMOVED in v0.5.2
     // Was testing street_number demotion which no longer exists.
 
     #[test]
@@ -8130,7 +8130,7 @@ technology.internet.url:
         );
     }
 
-    // test_attractor_no_demotion_true_positive — REMOVED in v0.5.2 (NNFT-192)
+    // test_attractor_no_demotion_true_positive — REMOVED in v0.5.2
     // Was testing street_number non-demotion which no longer exists.
 
     #[test]
@@ -8432,7 +8432,7 @@ geography.address.postal_code:
 
     #[test]
     fn test_attractor_locale_confirmed_skips_cardinality() {
-        // NNFT-132: Phone numbers with locale confirmation should NOT be demoted
+        // Phone numbers with locale confirmation should NOT be demoted
         // by Signal 3 (cardinality), even with few unique values. Small tables
         // with legitimate phone numbers are common in web-scraped datasets.
         let values: Vec<String> = vec![
@@ -8481,7 +8481,7 @@ identity.person.phone_number:
 
     #[test]
     fn test_attractor_universal_only_does_not_confirm_locale_type() {
-        // NNFT-132 Precision Principle: For locale-specific types, passing the
+        // Precision Principle: For locale-specific types, passing the
         // universal validation pattern does NOT count as confirmation. Only locale
         // patterns can confirm. These values pass universal phone validation
         // (digits + formatting chars) but don't match any locale pattern.
@@ -8537,7 +8537,7 @@ identity.person.phone_number:
 
     #[test]
     fn test_attractor_first_name_cardinality_unchanged() {
-        // NNFT-132: first_name has no locale validators, so cardinality demotion
+        // first_name has no locale validators, so cardinality demotion
         // still works exactly as before — this is a regression guard.
         let values: Vec<String> = vec![
             "John", "Jane", "Bob", "John", "Jane", "Bob", "John", "Jane", "Bob", "John",
@@ -8835,7 +8835,7 @@ identity.person.phone_number:
     }
 
     // ==========================================================================
-    // NNFT-139: Designation-aware is_generic_prediction tests
+    // Designation-aware is_generic_prediction tests
     // ==========================================================================
 
     #[test]
@@ -8992,7 +8992,7 @@ identity.person.phone_number:
     }
 
     // ==========================================================================
-    // NNFT-140: Post-hoc locale detection tests
+    // Post-hoc locale detection tests
     // ==========================================================================
 
     #[test]
@@ -9179,7 +9179,7 @@ identity.person.phone_number:
     }
 
     // ==========================================================================
-    // NNFT-141: Locale detection tests for calling_code, month_name, day_of_week
+    // Locale detection tests for calling_code, month_name, day_of_week
     // ==========================================================================
 
     #[test]
@@ -9386,7 +9386,7 @@ datetime.component.day_of_week:
     }
 
     // ==========================================================================
-    // NNFT-156: Rule fixes for 3 profile eval misses
+    // Rule fixes for 3 profile eval misses
     // ==========================================================================
 
     #[test]
@@ -9399,7 +9399,7 @@ datetime.component.day_of_week:
             "numeric_postal_code_detection should be treated as generic to yield to header hints"
         );
 
-        // numeric_port_detection assertion removed in NNFT-242 (port type removed)
+        // numeric_port_detection assertion removed (port type removed)
     }
 
     #[test]
@@ -9456,7 +9456,7 @@ datetime.component.day_of_week:
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Sense→Sharpen pipeline tests (NNFT-170)
+    // Sense→Sharpen pipeline tests
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Helper: load Sense resources if available. Returns None if artifacts missing.
@@ -9639,7 +9639,7 @@ datetime.component.day_of_week:
     }
 
     // ==========================================================================
-    // NNFT-188: Accuracy improvements — new rule tests
+    // Accuracy improvements — new rule tests
     // ==========================================================================
 
     #[test]
@@ -10042,7 +10042,7 @@ datetime.component.day_of_week:
         );
     }
 
-    // ── ColumnFeatures aggregation tests (NNFT-266) ─────────────────────
+    // ── ColumnFeatures aggregation tests ─────────────────────
 
     #[test]
     fn test_aggregate_features_empty() {

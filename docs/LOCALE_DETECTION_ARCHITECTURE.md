@@ -3,7 +3,7 @@
 ## Why CharCNN Can't Classify Locales (and What Can)
 
 This document captures the findings from the tiered-v3 locale training experiment
-(NNFT-126, February 2026) and the comparative analysis with the original finetype
+(February 2026) and the comparative analysis with the original finetype
 prototype. It explains why we chose post-hoc locale detection over model-based
 locale classification, and what would need to change to revisit that decision.
 
@@ -133,7 +133,7 @@ architecture**. It should be revisited if:
 
 ## Current Locale Coverage
 
-As of NNFT-141, `validation_by_locale` patterns exist for 5 types:
+`validation_by_locale` patterns exist for 5 types:
 
 | Type | Locales | Source |
 |---|---|---|
@@ -159,6 +159,5 @@ roadmap for expanding validation coverage to more types and locales.
 
 - **Decision record:** `.orbit/choices/0002-locale-detection-post-hoc-validation.md`
 - **Old prototype:** `hughcameron/finetype` (Python + Burn Transformer)
-- **Tiered-v3 training log:** NNFT-126 implementation notes
-- **Precision Principle:** NNFT-132, decision-001
-- **Locale validation infrastructure:** NNFT-118, NNFT-121, NNFT-136, NNFT-141
+- **Tiered-v3 training log:** implementation notes
+- **Precision Principle:** decision-001

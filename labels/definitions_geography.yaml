@@ -591,7 +591,7 @@ geography.address.full_address:
     requires more sophisticated parsing for reliability.
   pii: true
 
-# geography.address.street_number: REMOVED in v0.5.2 (NNFT-192)
+# geography.address.street_number: REMOVED in v0.5.2
 # Indistinguishable from plain integers. Values fall to integer_number or alphanumeric_id.
 
 geography.address.street_name:
@@ -1554,7 +1554,7 @@ geography.contact.calling_code:
   validation_by_locale:
     # Source: ITU-T E.164 country calling codes (public domain)
     # Each locale validates the specific calling code(s) for that country/region.
-    # Optional + prefix, exact digit match. (NNFT-141)
+    # Optional + prefix, exact digit match.
     EN:
       type: string
       pattern: "^\\+?1$"

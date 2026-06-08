@@ -10,7 +10,7 @@ body: |
 
   FineType's ML training pipeline (Sense, Entity, CharCNN, data preparation) was originally implemented in Python/PyTorch. The inference pipeline was already pure Rust. The question: should training remain in Python, or should it be ported to Rust via Candle (Hugging Face's Rust ML framework)?
 
-  A feasibility spike (NNFT-182/187) in `crates/finetype-candle-spike/` validated the Candle 0.8 API against FineType's specific requirements.
+  A feasibility spike in `crates/finetype-candle-spike/` validated the Candle 0.8 API against FineType's specific requirements.
 
   ## Considered Options
 

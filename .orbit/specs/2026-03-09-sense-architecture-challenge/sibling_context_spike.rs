@@ -1,4 +1,4 @@
-//! Spike B: Sibling-Context Self-Attention Prototype (NNFT-263)
+//! Spike B: Sibling-Context Self-Attention Prototype
 //!
 //! Validates feasibility of cross-column self-attention over Model2Vec column
 //! embeddings in Candle 0.8. Measures latency for 1–20 columns, verifies

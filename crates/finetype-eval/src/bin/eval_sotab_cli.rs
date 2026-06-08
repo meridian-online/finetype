@@ -1,10 +1,10 @@
-//! SOTAB CTA CLI evaluation (NNFT-184)
+//! SOTAB CTA CLI evaluation
 //!
 //! Reads pre-extracted column_values.parquet, groups by column, pipes through
 //! `finetype infer --mode column --batch` (no header hints — SOTAB uses integer
 //! column indices), writes cli_predictions.csv.
 //!
-//! Rust port of eval/sotab/eval_cli.py (NNFT-130).
+//! Rust port of eval/sotab/eval_cli.py.
 
 use anyhow::{Context, Result};
 use clap::Parser;

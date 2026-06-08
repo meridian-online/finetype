@@ -12,9 +12,9 @@
 
 ### A1/F1: Country_code rule ordering bug — RESOLVED
 
-The v1.1 review's critical finding was that placing the country_code guard in `value_sharpen` would be overwritten by `apply_header_sharpen`'s same-category override (NNFT-194). v1.2 moves it correctly:
+The v1.1 review's critical finding was that placing the country_code guard in `value_sharpen` would be overwritten by `apply_header_sharpen`'s same-category override. v1.2 moves it correctly:
 
-- AC-05 now says "post-hint guard in apply_header_sharpen (column.rs)" placed "AFTER the same-category hardcoded hint override block (NNFT-194, ~line 2252-2268)."
+- AC-05 now says "post-hint guard in apply_header_sharpen (column.rs)" placed "AFTER the same-category hardcoded hint override block (~line 2252-2268)."
 - Constraint line 15 explicitly states: "Country_code guard must be placed AFTER apply_header_sharpen's same-category override."
 - The verification now requires an integration test through the "FULL classify_multi_branch pipeline" with header="country" and 2-letter code values.
 

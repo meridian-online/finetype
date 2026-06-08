@@ -658,7 +658,7 @@ identity.person.gender_code:
     enum so case-insensitive matching flows from ac-02; the transform still
     uppercases for materialisation.
 
-# identity.person.nationality: REMOVED in Phase 0 (NNFT-162)
+# identity.person.nationality: REMOVED in Phase 0
 # Collapsed into representation.discrete.categorical. Short enumerated list.
 
 identity.person.blood_type:
@@ -762,22 +762,22 @@ identity.person.weight:
     v1 migration: Was person.weight. Transform converts to kilograms.
     Handles kg, lbs, pounds, stones. Decompose extracts value and unit.
 
-# identity.person.age: REMOVED in v0.5.2 (NNFT-192)
-# CAST(col AS SMALLINT) is identical to integer_number. 205 SOTAB false positives. Resolves NNFT-135.
+# identity.person.age: REMOVED in v0.5.2
+# CAST(col AS SMALLINT) is identical to integer_number. 205 SOTAB false positives.
 
-# identity.person.occupation: REMOVED in Phase 0 (NNFT-162)
+# identity.person.occupation: REMOVED in Phase 0
 # Collapsed into representation.discrete.categorical. Broad words, no format signal.
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: payment — MOVED to finance domain in v0.5.1 (NNFT-179)
+# CATEGORY: payment — MOVED to finance domain in v0.5.1
 #
 # All identity.payment types moved to finance.{banking,payment,securities,crypto,currency}.
-# identity.payment.cvv removed (NNFT-177).
+# identity.payment.cvv removed.
 # See labels/definitions_finance.yaml for new locations.
 # ═════════════════════════════════════════════════════════════════════
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: academic — REMOVED in Phase 0 (NNFT-162)
+# CATEGORY: academic — REMOVED in Phase 0
 #
 # identity.academic.degree: Collapsed into representation.discrete.categorical.
 #   Low cardinality enumerated list (BSc, PhD, etc.).

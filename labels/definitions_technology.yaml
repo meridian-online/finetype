@@ -169,9 +169,9 @@ technology.internet.url:
   notes: >
     v1 migration: Was internet.url. Includes optional decompose for parsing
     scheme, hostname, and path components.
-    Phase 0 (NNFT-162): Merged technology.internet.uri into this type.
+    Phase 0: Merged technology.internet.uri into this type.
     URI had 37% training data overlap with URL (both use http/https schemes).
-    Model could not distinguish them (NNFT-161 regression analysis).
+    Model could not distinguish them (regression analysis).
 
 technology.internet.hostname:
   title: "Hostname"
@@ -201,7 +201,7 @@ technology.internet.hostname:
     v1 migration: Was internet.hostname. Pattern requires lowercase (use LOWER()
     to normalize). Does not validate DNS resolution.
 
-# technology.internet.port: REMOVED in NNFT-242
+# technology.internet.port: REMOVED
 # False positives on plain integer columns. Range 0-65535 overlaps heavily with integer_number.
 
 technology.internet.top_level_domain:
@@ -233,7 +233,7 @@ technology.internet.top_level_domain:
     v1 migration: Was internet.tld (aliased to top_level_domain for clarity).
     Pattern allows IDN (xn--) format.
 
-# technology.internet.slug: REMOVED in Phase 0 (NNFT-162)
+# technology.internet.slug: REMOVED in Phase 0
 # Collapsed into representation.code.alphanumeric_id.
 # Rarely analytically important; confused with hostname in CLDR regression.
 
@@ -310,7 +310,7 @@ technology.internet.http_method:
     feature becomes ~1.0 for real HTTP-method columns regardless of case
     (was ~1/3 when only UPPER variants passed). Realised only after retrain.
 
-# technology.internet.http_status_code: REMOVED in NNFT-242
+# technology.internet.http_status_code: REMOVED
 # False positives on plain integer columns. Range 100-599 overlaps heavily with integer_number.
 
 # ═════════════════════════════════════════════════════════════════════
@@ -321,7 +321,7 @@ technology.internet.http_method:
 # random tokens used for security purposes.
 # ═════════════════════════════════════════════════════════════════════
 
-# technology.cryptographic.uuid: MOVED to representation.identifier.uuid in v0.5.1 (NNFT-178)
+# technology.cryptographic.uuid: MOVED to representation.identifier.uuid in v0.5.1
 # UUID is a universal identifier, not crypto-specific.
 
 technology.cryptographic.hash:
@@ -387,7 +387,7 @@ technology.cryptographic.token_urlsafe:
 # These have formal specifications and may include check digits.
 # ═════════════════════════════════════════════════════════════════════
 
-# technology.code.isbn: MOVED to identity.commerce.isbn in v0.5.1 (NNFT-179)
+# technology.code.isbn: MOVED to identity.commerce.isbn in v0.5.1
 
 technology.code.imei:
   title: "IMEI"
@@ -416,9 +416,9 @@ technology.code.imei:
     v1 migration: Was code.imei. 15 numeric digits. Check digit (last digit)
     uses Luhn algorithm but validation is done via crate, not regex.
 
-# technology.code.ean: MOVED to identity.commerce.ean in v0.5.1 (NNFT-179)
+# technology.code.ean: MOVED to identity.commerce.ean in v0.5.1
 
-# technology.code.issn: MOVED to identity.commerce.issn in v0.5.1 (NNFT-179)
+# technology.code.issn: MOVED to identity.commerce.issn in v0.5.1
 
 technology.code.doi:
   title: "DOI"
@@ -483,7 +483,7 @@ technology.code.locale_code:
   notes: >
     v1 migration: Was code.locale_code. IETF BCP 47 format. Common codes:
     en, en-US, fr, de, zh-Hans, zh-Hant. Decompose extracts language and country.
-    bcp47 alias added in NNFT-244.02 — locale_code already covers BCP 47 format.
+    bcp47 alias added — locale_code already covers BCP 47 format.
 
 technology.development.version:
   title: "Version Number"
@@ -580,7 +580,7 @@ technology.development.docker_ref:
     - "gcr.io/project/service@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   references: null
   notes: >
-    New in NNFT-244.02. OCI image reference format. Includes optional registry,
+    OCI image reference format. Includes optional registry,
     repository path, tag, and digest components.
 
 # ═════════════════════════════════════════════════════════════════════
@@ -616,7 +616,7 @@ technology.identifier.ulid:
     - "01FWHE4G8R2SXHM3F07YR3FW0T"
   references: null
   notes: >
-    New in NNFT-244.02. Crockford Base32 excludes I, L, O, U to avoid
+    Crockford Base32 excludes I, L, O, U to avoid
     ambiguity. Always uppercase. First 10 chars encode millisecond timestamp.
 
 technology.identifier.tsid:
@@ -644,7 +644,7 @@ technology.identifier.tsid:
     - "0191c8e4f2a30000fedcba9876543210"
   references: null
   notes: >
-    New in NNFT-244.02. Leading 8-10 hex chars decode to a reasonable
+    Leading 8-10 hex chars decode to a reasonable
     timestamp (2010-2050). Disambiguation from hash/token_hex requires
     header hints or timestamp validation.
 
@@ -675,7 +675,7 @@ technology.identifier.snowflake_id:
     - "80351110224678912"
   references: null
   notes: >
-    New in NNFT-244.02. Twitter epoch: 1288834974657 (2010-11-04).
+    Twitter epoch: 1288834974657 (2010-11-04).
     Bits: 41 timestamp + 10 worker + 12 sequence. Range ~10^17 to ~10^19.
 
 # ═════════════════════════════════════════════════════════════════════
@@ -714,7 +714,7 @@ technology.cloud.aws_arn:
     - "arn:aws:lambda:eu-west-1:123456789012:function:my-function"
   references: null
   notes: >
-    New in NNFT-244.02. Region and account-id may be empty for global
+    Region and account-id may be empty for global
     resources (e.g., S3 buckets, IAM). Three partitions: aws, aws-cn, aws-us-gov.
 
 technology.cloud.s3_uri:
@@ -743,7 +743,7 @@ technology.cloud.s3_uri:
     - "s3://data-lake-raw/ingestion/batch-001/part-00000.json"
   references: null
   notes: >
-    New in NNFT-244.02. Bucket names: 3-63 chars, lowercase, no underscores.
+    Bucket names: 3-63 chars, lowercase, no underscores.
     Key paths can contain any characters after the bucket name.
 
 technology.cryptographic.jwt:
@@ -773,7 +773,7 @@ technology.cryptographic.jwt:
     - "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoLmV4YW1wbGUuY29tIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
   references: null
   notes: >
-    New in NNFT-244.02. Each segment is at least 10 base64url chars to
+    Each segment is at least 10 base64url chars to
     distinguish from other dot-separated formats. Header typically starts
     with "eyJ" (base64 for '{"').
 
@@ -805,7 +805,7 @@ technology.internet.cidr:
     - "0.0.0.0/0"
   references: null
   notes: >
-    New in NNFT-244.02. IPv4 CIDR only. Prefix length 0-32. Distinguished
+    IPv4 CIDR only. Prefix length 0-32. Distinguished
     from plain IPv4 by the /prefix suffix.
 
 technology.internet.urn:
@@ -836,7 +836,7 @@ technology.internet.urn:
     - "urn:oid:2.16.840"
   references: null
   notes: >
-    New in NNFT-244.02. NID (Namespace ID) is 1-32 lowercase alphanumeric
+    NID (Namespace ID) is 1-32 lowercase alphanumeric
     or hyphen chars. NSS (Namespace Specific String) is the remainder.
 
 technology.internet.data_uri:
@@ -867,6 +867,6 @@ technology.internet.data_uri:
     - "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
   references: null
   notes: >
-    New in NNFT-244.02. Media type is optional (defaults to text/plain;charset=US-ASCII).
+    Media type is optional (defaults to text/plain;charset=US-ASCII).
     Base64 encoding is indicated by ;base64 before the comma.
 

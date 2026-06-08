@@ -1,7 +1,7 @@
 id: 2026-03-11-sibling-context-training
 status: closed
 goal: |
-  Train the sibling-context attention module (NNFT-268) to improve Sense classification accuracy by enriching Model2Vec column embeddings with cross-column context from real-world tables. Ship a trained model artifact that the existing pipeline loads automatically.
+  Train the sibling-context attention module to improve Sense classification accuracy by enriching Model2Vec column embeddings with cross-column context from real-world tables. Ship a trained model artifact that the existing pipeline loads automatically.
 acceptance_criteria:
 - id: ac-01
   description: 'Data pipeline: reads 508 CSVs from data/csvs/, runs FineType profile to extract per-column Sense labels, produces training dataset (table_id, column_headers, model2vec_embeddings, sense_labels)'

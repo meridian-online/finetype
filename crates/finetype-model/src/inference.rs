@@ -44,7 +44,7 @@ pub trait ValueClassifier: Send + Sync {
     fn classify_batch(&self, texts: &[String])
         -> Result<Vec<ClassificationResult>, InferenceError>;
 
-    /// Classify a batch with pre-computed feature vectors (NNFT-250).
+    /// Classify a batch with pre-computed feature vectors.
     ///
     /// Default implementation ignores features and delegates to `classify_batch`.
     /// `CharClassifier` overrides this to pass features to the model when
@@ -569,12 +569,12 @@ impl CharClassifier {
     ///
     /// Returns `true` when the model was trained with `--use-features` and has
     /// `feature_dim > 0` in its config. When `false`, features passed to
-    /// `classify_batch_with_features` are silently ignored. (NNFT-250)
+    /// `classify_batch_with_features` are silently ignored.
     pub fn has_features(&self) -> bool {
         self.model.config().feature_dim > 0
     }
 
-    /// Classify a batch of texts with pre-computed feature vectors (NNFT-250).
+    /// Classify a batch of texts with pre-computed feature vectors.
     ///
     /// When the model has `feature_dim > 0`, the features are passed to the CharCNN
     /// classifier head alongside the CNN output. When `feature_dim == 0` (current

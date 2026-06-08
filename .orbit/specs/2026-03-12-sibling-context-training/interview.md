@@ -7,9 +7,9 @@
 
 ## Context
 
-The sibling-context attention module (NNFT-268) is architecturally complete and integrated into the Sense pipeline, but has no trained weights — it's currently inert. The module enriches column embeddings with cross-column context via 2-layer pre-norm transformer self-attention over Model2Vec embeddings (396,800 params, 1.51 MB). It addresses 3/7 remaining bare-name ambiguity errors in profile eval (180/186).
+The sibling-context attention module is architecturally complete and integrated into the Sense pipeline, but has no trained weights — it's currently inert. The module enriches column embeddings with cross-column context via 2-layer pre-norm transformer self-attention over Model2Vec embeddings (396,800 params, 1.51 MB). It addresses 3/7 remaining bare-name ambiguity errors in profile eval (180/186).
 
-An earlier LLM distillation run (NNFT-269) produced 5,359 labelled columns from 508 real CSVs via Qwen3 8B, but only achieved 20% agreement with FineType. The key insight: the **table structure** (which columns appear together) is the valuable asset, not the LLM labels. FineType's own predictions at 96.8% accuracy are a cleaner supervision signal.
+An earlier LLM distillation run produced 5,359 labelled columns from 508 real CSVs via Qwen3 8B, but only achieved 20% agreement with FineType. The key insight: the **table structure** (which columns appear together) is the valuable asset, not the LLM labels. FineType's own predictions at 96.8% accuracy are a cleaner supervision signal.
 
 ## Interview Q&A
 
@@ -46,7 +46,7 @@ An earlier LLM distillation run (NNFT-269) produced 5,359 labelled columns from 
 ## Summary
 
 ### Goal
-Train the sibling-context attention module (NNFT-268) to improve Sense classification accuracy by enriching column embeddings with cross-column context from real-world tables.
+Train the sibling-context attention module to improve Sense classification accuracy by enriching column embeddings with cross-column context from real-world tables.
 
 ### Constraints
 - Frozen Model2Vec embeddings and Sense classifier weights — only attention parameters are trainable

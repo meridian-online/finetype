@@ -10,7 +10,7 @@ body: |
 
   FineType needed to expose its type inference capabilities to AI agents via the Model Context Protocol (MCP). This required choosing a Rust MCP library or building a custom implementation. The server would run as a subprocess (`finetype mcp`) over stdio transport.
 
-  A spike (NNFT-240) evaluated available Rust MCP SDKs.
+  A spike evaluated available Rust MCP SDKs.
 
   ## Considered Options
 

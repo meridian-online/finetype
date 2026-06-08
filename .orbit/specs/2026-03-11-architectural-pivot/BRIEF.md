@@ -2,15 +2,15 @@
 
 **Date:** 2026-02-28
 **Author:** @hughcameron
-**Status:** Accepted — decision-004 recorded, Phase 0 (NNFT-162) and Phase 1 (NNFT-163) created
+**Status:** Accepted — decision-004 recorded, Phase 0 and Phase 1 created
 
 ## Context
 
-FineType's current architecture — a tiered graph of 46 CharCNN models with 18 disambiguation rules, a Model2Vec semantic classifier, and a Deep Sets entity classifier — has reached diminishing returns. The CLDR-enriched retraining (NNFT-157–161) regressed from 116/120 to 107/120 on profile eval, revealing systemic fragility rather than isolated training data issues. Three categories of root cause were identified: training data overlap (URL/URI), T1 routing degradation from shifted decision boundaries, and training diversity gaps. The model was rolled back to v0.3.0.
+FineType's current architecture — a tiered graph of 46 CharCNN models with 18 disambiguation rules, a Model2Vec semantic classifier, and a Deep Sets entity classifier — has reached diminishing returns. The CLDR-enriched retraining regressed from 116/120 to 107/120 on profile eval, revealing systemic fragility rather than isolated training data issues. Three categories of root cause were identified: training data overlap (URL/URI), T1 routing degradation from shifted decision boundaries, and training diversity gaps. The model was rolled back to v0.3.0.
 
 Meanwhile, the disambiguation rule count continues to grow. Each new rule patches a specific failure mode but adds interaction complexity — Rule 18 (entity demotion) already requires a guard to prevent header hints from overriding it. We are spending more effort on rule engineering than on the core model's ability to classify.
 
-The CharCNN architecture has a documented capacity ceiling: it handles ≤20 labels per T2 model well, degrades between 20–50, and fails above 50 (NNFT-126, `docs/LOCALE_DETECTION_ARCHITECTURE.md`). This is a fundamental limit of fixed filter banks operating on local character n-grams. It means we cannot scale the taxonomy (more types, locale variants) without fracturing the model graph further.
+The CharCNN architecture has a documented capacity ceiling: it handles ≤20 labels per T2 model well, degrades between 20–50, and fails above 50 (`docs/LOCALE_DETECTION_ARCHITECTURE.md`). This is a fundamental limit of fixed filter banks operating on local character n-grams. It means we cannot scale the taxonomy (more types, locale variants) without fracturing the model graph further.
 
 We have evidence that this ceiling is not inherent to the problem. The original finetype prototype (`hughcameron/finetype`) used a Transformer model (Burn framework) with 4-level locale-in-label classification and succeeded where the CharCNN failed — particularly on locale-aware classification and larger label spaces.
 
@@ -28,13 +28,13 @@ Our north star remains the same. FineType should spark joy for analysts:
 
 ### Evidence of architectural limits
 
-1. **CLDR regression (NNFT-157–161):** A well-planned, five-phase retraining with richer locale data made things worse. 9 regressions from 3 systemic causes — all traceable to the CharCNN's inability to handle increased training complexity without cascading confusion across the tier graph.
+1. **CLDR regression:** A well-planned, five-phase retraining with richer locale data made things worse. 9 regressions from 3 systemic causes — all traceable to the CharCNN's inability to handle increased training complexity without cascading confusion across the tier graph.
 
-2. **CharCNN capacity ceiling:** ≤20 labels per T2 model (documented in NNFT-126). VARCHAR/person at 94 labels hit 51% accuracy. VARCHAR/location at 65 labels hit 55%. This ceiling blocks both taxonomy expansion and locale integration.
+2. **CharCNN capacity ceiling:** ≤20 labels per T2 model. VARCHAR/person at 94 labels hit 51% accuracy. VARCHAR/location at 65 labels hit 55%. This ceiling blocks both taxonomy expansion and locale integration.
 
-3. **Rule proliferation:** 18 disambiguation rules and growing. The entity classifier (NNFT-151), attractor demotion (Rule 15), text length demotion (Rule 16), UTC offset override (Rule 17), and entity demotion (Rule 18) are all compensating for what the model cannot learn. Each rule is correct in isolation but the interaction surface is becoming difficult to reason about.
+3. **Rule proliferation:** 18 disambiguation rules and growing. The entity classifier, attractor demotion (Rule 15), text length demotion (Rule 16), UTC offset override (Rule 17), and entity demotion (Rule 18) are all compensating for what the model cannot learn. Each rule is correct in isolation but the interaction surface is becoming difficult to reason about.
 
-4. **Entity overcall:** `full_name` is FineType's biggest false positive — 3,500+ SOTAB columns incorrectly classified. The entity classifier (75.8% 4-class accuracy) helps, but the embedding spike (NNFT-150) showed within-class spread is 3–4× larger than between-class centroid distance. Individual value embeddings cannot solve entity disambiguation alone.
+4. **Entity overcall:** `full_name` is FineType's biggest false positive — 3,500+ SOTAB columns incorrectly classified. The entity classifier (75.8% 4-class accuracy) helps, but the embedding spike showed within-class spread is 3–4× larger than between-class centroid distance. Individual value embeddings cannot solve entity disambiguation alone.
 
 5. **Locale remains out of reach:** Post-hoc locale detection (Decision 002) was the right call given CharCNN limits, but locale is critical for analyst workflows. Date format interpretation, phone number validation, address parsing — all require locale awareness that the current architecture cannot provide at the model level.
 
@@ -44,7 +44,7 @@ Not everything needs replacing. The following are genuine strengths:
 
 - **Format-type detection** for structurally distinct types (emails, UUIDs, IPs, URLs, ISO timestamps, MAC addresses) — CharCNN excels here and accuracy is high
 - **Validation schemas** — regex + function validators are a powerful safety net and produce actionable DuckDB transforms
-- **CLDR infrastructure** — extraction scripts, 31-locale data, DateOrder enum (NNFT-157–158) are ready for reuse
+- **CLDR infrastructure** — extraction scripts, 31-locale data, DateOrder enum are ready for reuse
 - **Entity classifier training data** — 2,911 labelled SOTAB entity columns across 4 categories
 - **Model2Vec embeddings** — `potion-base-4M` for header hints and entity features, with pure Rust inference
 - **Evaluation infrastructure** — profile eval (120 columns), SOTAB mapping (92 types), GitTables 1M pipeline
@@ -73,7 +73,7 @@ A small transformer operates on *column-level representations* — not raw chara
 
 This is where the Burn prototype's strengths are recaptured. The transformer sees *column context* — the distribution of values, not just individual strings — which is exactly the signal needed for semantic disambiguation. A column of ["Microsoft", "Apple", "Google"] reads differently from ["Melbourne", "Sydney", "Brisbane"] even though individual values are indistinguishable at the character level.
 
-The key insight from the entity disambiguation spike (NNFT-150): individual value embeddings have massive within-class overlap, but *column-level aggregations* carry usable signal (73.6% with off-the-shelf Random Forest, 75.8% with the trained MLP). A purpose-built attention model over sampled values should exceed both.
+The key insight from the entity disambiguation spike: individual value embeddings have massive within-class overlap, but *column-level aggregations* carry usable signal (73.6% with off-the-shelf Random Forest, 75.8% with the trained MLP). A purpose-built attention model over sampled values should exceed both.
 
 **Stage 2 — Sharpen (CharCNN + validation, value-level)**
 
@@ -176,7 +176,7 @@ The Burn prototype demonstrated that locale-in-label classification works with a
 
 The approach: the Sense stage detects column-level locale (e.g., "these dates are in DMY order", "these phone numbers are Australian format"). This locale context is passed to the Sharpen stage, which uses it to select the appropriate validation schema and format interpretation. Locale becomes a *column attribute* rather than a *label suffix* — avoiding the label explosion that broke tiered-v3.
 
-The CLDR infrastructure (NNFT-157–158) — 706 locales of date/time patterns, 31 locales of month/weekday names, DateOrder enum — feeds directly into this. It was the right investment; it just needs the right model architecture to leverage it.
+The CLDR infrastructure — 706 locales of date/time patterns, 31 locales of month/weekday names, DateOrder enum — feeds directly into this. It was the right investment; it just needs the right model architecture to leverage it.
 
 ## Speed
 

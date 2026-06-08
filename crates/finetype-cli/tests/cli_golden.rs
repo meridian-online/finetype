@@ -322,7 +322,7 @@ fn golden_profile_titanic() {
 
     assert_eq!(cols.len(), 12, "titanic should have 12 columns");
 
-    // Core assertions — the showstoppers that NNFT-254 fixed
+    // Core assertions — the showstoppers that the hint expansion fixed
     assert_column_type(&cols, "Name", "identity.person.full_name");
     assert_column_type(&cols, "Survived", "representation.boolean.binary");
     assert_column_type(&cols, "Sex", "identity.person.gender");

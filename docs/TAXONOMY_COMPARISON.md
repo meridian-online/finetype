@@ -175,10 +175,10 @@ Based on real-world GitTables data and the Titanic profiling analysis:
 
 | Proposed Type | Informed By | Priority | Backlog |
 |---|---|---|---|
-| `representation.categorical` | GitTables: category, class, type, status | High | NNFT-063 |
-| `representation.ordinal` | GitTables: rank, rating, score | High | NNFT-063 |
-| `representation.code.alphanumeric_id` | GitTables: id, serial number, code | High | NNFT-063 |
-| `identity.person.age` (disambiguation) | DBpedia: age; Titanic analysis | Medium | NNFT-065 |
+| `representation.categorical` | GitTables: category, class, type, status | High | — |
+| `representation.ordinal` | GitTables: rank, rating, score | High | — |
+| `representation.code.alphanumeric_id` | GitTables: id, serial number, code | High | — |
+| `identity.person.age` (disambiguation) | DBpedia: age; Titanic analysis | Medium | — |
 | Semver / version string | schema.org: version; DBpedia: version | Low | — |
 | Language code (ISO 639) | schema.org: language; DBpedia: language | Low | — |
 
@@ -217,7 +217,7 @@ The most powerful approach uses FineType for format detection and semantic syste
 2. Column name "author" maps to `schema:author` (semantic: this column represents authors)
 3. Combined: "This column contains person names that represent authors"
 
-This layered approach is the direction FineType's column-name heuristic (NNFT-067) begins to explore — using column metadata as a semantic signal alongside format detection.
+This layered approach is the direction FineType's column-name heuristic begins to explore — using column metadata as a semantic signal alongside format detection.
 
 ## References
 

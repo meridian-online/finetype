@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NNFT-150: Extended spike — embeddings + statistical features.
+"""Extended spike — embeddings + statistical features.
 
 Tests whether combining embeddings with simple surface-level features
 improves entity type separation.
@@ -215,7 +215,7 @@ def show_feature_importance(X_features, labels, le, feature_names):
 
 def main():
     print("=" * 70)
-    print("NNFT-150: Extended Spike — Embeddings + Statistical Features")
+    print("Extended Spike — Embeddings + Statistical Features")
     print("=" * 70)
 
     columns = load_entity_columns()

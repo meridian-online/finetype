@@ -59,7 +59,7 @@ Option 2 (value-pattern guards) is the pragmatic choice — it's the "regex guar
 | model2vec             | 250 type labels via cosine similarity (threshold 0.65)| Retrain, adjust threshold, or add post-guards |
 ```
 
-The header_hint() table is actually well-curated (NNFT-065/091/102/127/128/156/254 iterations). The problems in the distillation are overwhelmingly from **model2vec** overriding correct CharCNN predictions when the header semantically matches a financial type.
+The header_hint() table is actually well-curated (multiple iterations). The problems in the distillation are overwhelmingly from **model2vec** overriding correct CharCNN predictions when the header semantically matches a financial type.
 
 ### Recommendation
 

@@ -1,4 +1,4 @@
-//! YAML → CSV schema mapping converter (NNFT-184)
+//! YAML → CSV schema mapping converter
 //!
 //! Replaces the Python one-liner in the Makefile eval-mapping target.
 //! Reads eval/schema_mapping.yaml and writes eval/schema_mapping.csv.

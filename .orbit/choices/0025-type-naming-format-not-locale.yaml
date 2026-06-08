@@ -18,7 +18,7 @@ body: |
 
   ## Decision Outcome
 
-  Chosen option: **Format-structural naming** — "describe the format, not the locale." Applied across 10 type renames in NNFT-234:
+  Chosen option: **Format-structural naming** — "describe the format, not the locale." Applied across 10 type renames:
 
   | Old name | New name |
   |----------|----------|

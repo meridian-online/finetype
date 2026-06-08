@@ -7,7 +7,7 @@
 //! - **Tier 3 — Structural** (8 features): delimiter patterns and shape signals
 //!
 //! All features are deterministic: same input always produces the same output.
-//! Designed for fusion with CharCNN at the classifier head (NNFT-248).
+//! Designed for fusion with CharCNN at the classifier head.
 
 use std::collections::HashSet;
 
@@ -51,13 +51,13 @@ pub const FEATURE_NAMES: [&str; FEATURE_DIM] = [
     "starts_with_digit",   // 29
     "ends_with_digit",     // 30
     "length_bucket",       // 31
-    // Tier 4 — Character-presence binary features (NNFT-266)
+    // Tier 4 — Character-presence binary features
     "has_colon", // 32
     "has_dash",  // 33
-    // Tier 5 — Semantic binary features (NNFT-270)
+    // Tier 5 — Semantic binary features
     "has_negative_prefix", // 34 — starts with '-' followed by digit (negative number)
     "has_percent",         // 35 — contains '%' character
-    // Tier 6 — Numeric precision (NNFT-272)
+    // Tier 6 — Numeric precision
     "decimal_places", // 36 — count of fractional digits (latitude 4dp vs magnitude 1dp)
 ];
 
@@ -255,7 +255,7 @@ pub fn extract_features(value: &str) -> [f32; FEATURE_DIM] {
     // 31: length_bucket — log2(length+1) for scale-invariant length signal
     f[31] = (char_count as f32 + 1.0).log2();
 
-    // ─── Tier 4: Character-presence binary features (NNFT-266) ────────
+    // ─── Tier 4: Character-presence binary features ────────
     // These support column-level disambiguation rules for docker_ref vs
     // hostname (colon = port/tag separator) and UUID/date patterns (dash).
 
@@ -265,7 +265,7 @@ pub fn extract_features(value: &str) -> [f32; FEATURE_DIM] {
     // 33: has_dash — contains '-' character
     f[33] = if value.contains('-') { 1.0 } else { 0.0 };
 
-    // ─── Tier 5: Semantic binary features (NNFT-270) ─────────────────
+    // ─── Tier 5: Semantic binary features ─────────────────
     // These support disambiguation rules that require semantic understanding
     // of value meaning, not just character presence.
 
@@ -282,7 +282,7 @@ pub fn extract_features(value: &str) -> [f32; FEATURE_DIM] {
     // Supports percentage detection and future percentage rules.
     f[35] = if value.contains('%') { 1.0 } else { 0.0 };
 
-    // ─── Tier 6: Numeric precision (NNFT-272) ────────────────────────
+    // ─── Tier 6: Numeric precision ────────────────────────
     // 36: decimal_places — count of fractional digits for a numeric value.
     // Separates types that share a magnitude but differ in measured precision:
     // geographic latitude is reported to ~4dp ("35.6895"), seismic magnitude
@@ -646,7 +646,7 @@ mod tests {
         assert_eq!(feat(&f, "has_mixed_case"), 1.0);
     }
 
-    // ─── Tier 4: Character-presence features (NNFT-266) ────────────────
+    // ─── Tier 4: Character-presence features ────────────────
 
     #[test]
     fn test_has_colon() {
@@ -675,7 +675,7 @@ mod tests {
         assert_eq!(feat(&extract_features("12345"), "has_dash"), 0.0);
     }
 
-    // ─── Tier 5: Semantic binary features (NNFT-270) ───────────────────
+    // ─── Tier 5: Semantic binary features ───────────────────
 
     #[test]
     fn test_has_negative_prefix() {
@@ -749,7 +749,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         // 10k values should complete in <2 seconds in debug mode (0.2ms/value budget).
-        // Release mode is ~10x faster. Budget increased from 1s in NNFT-266 (34→36 features in NNFT-270).
+        // Release mode is ~10x faster. Budget increased from 1s when column-level statistics were added (34→36 features).
         assert!(
             elapsed.as_secs_f64() < 2.0,
             "10k extractions took {:.3}s — exceeds 2s budget",

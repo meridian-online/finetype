@@ -229,7 +229,7 @@ fn build_header_hint_entries() -> Vec<(String, String)> {
         // Person
         ("gender", "identity.person.gender"),
         ("sex", "identity.person.gender"),
-        // ("age", "identity.person.age") — REMOVED in v0.5.2 (NNFT-192)
+        // ("age", "identity.person.age") — REMOVED in v0.5.2
         // Geo coordinates
         ("latitude", "geography.coordinate.latitude"),
         ("lat", "geography.coordinate.latitude"),

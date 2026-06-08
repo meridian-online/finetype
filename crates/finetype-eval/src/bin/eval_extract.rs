@@ -1,4 +1,4 @@
-//! GitTables 1M metadata extraction (NNFT-184)
+//! GitTables 1M metadata extraction
 //!
 //! Samples tables per topic from the GitTables corpus, extracts parquet metadata
 //! (schema.org / dbpedia column type annotations), writes catalog.csv, metadata.csv,

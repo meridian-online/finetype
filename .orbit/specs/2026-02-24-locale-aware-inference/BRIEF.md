@@ -44,7 +44,7 @@ The current phone_number regex is `^[+]?[0-9\s()\-\.]+$` — this matches port n
 **Geography (9):** country, region, city, full_address, street_number, street_name, street_suffix, postal_code, calling_code
 **Identity (6):** full_name, first_name, last_name, phone_number, username, nationality
 
-These are exactly the types that cause the most false positives in profile eval. Of the 10 attractor types identified in NNFT-115, 7 are locale-specific.
+These are exactly the types that cause the most false positives in profile eval. Of the 10 attractor types identified, 7 are locale-specific.
 
 ## Proposed Approach
 
@@ -97,7 +97,7 @@ If locale is inferred for a column, Signal 1 in `disambiguate_attractor_demotion
 
 4. **Schema format**: Should `validation_by_locale` live in the YAML definitions (static, version-controlled) or in a separate locale data file (could be generated from CLDR or libphonenumber)?
 
-5. **Interaction with NNFT-116 (JSON Schema migration):** Does JSON Schema have a natural way to express conditional validation by locale? (`if`/`then` keywords, `oneOf` with discriminators?)
+5. **Interaction with the JSON Schema migration:** Does JSON Schema have a natural way to express conditional validation by locale? (`if`/`then` keywords, `oneOf` with discriminators?)
 
 6. **Priority**: Which locale-specific types benefit most from locale-aware validation? Postal code and phone number are the clear top two. Is it worth tackling names (first_name, last_name) where the locale signal is character set rather than regex pattern?
 
@@ -108,9 +108,9 @@ If locale is inferred for a column, Signal 1 in `disambiguate_attractor_demotion
 - `designation: locale_specific` field already marks which types need this
 - `locales: [EN, EN_AU, ...]` already lists supported locales per type
 - `finetype-core::validator::validate_value()` already runs validation schemas
-- NNFT-115 attractor demotion already uses validation as Signal 1
-- NNFT-116 JSON Schema migration provides the opportunity to add richer validation
-- NNFT-058/060 (CLDR locale data) is already in the backlog as future domain work
+- Attractor demotion already uses validation as Signal 1
+- The JSON Schema migration provides the opportunity to add richer validation
+- CLDR locale data is already in the backlog as future domain work
 
 ## Success Criteria
 

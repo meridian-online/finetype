@@ -14,7 +14,7 @@
 **Category:** Rule interaction
 **Severity:** Blocker
 
-**Description:** R28 (email -> email_display) and R29 (phone_number -> phone_e164) are placed in `value_sharpen()` which runs at Step 4. But `apply_header_sharpen()` runs at Step 5 and contains a same-category hardcoded hint override (NNFT-194, lines 2248-2267) with NO confidence threshold. The header_hint function matches substrings:
+**Description:** R28 (email -> email_display) and R29 (phone_number -> phone_e164) are placed in `value_sharpen` which runs at Step 4. But `apply_header_sharpen` runs at Step 5 and contains a same-category hardcoded hint override (lines 2248-2267) with NO confidence threshold. The header_hint function matches substrings:
 
 - `h.contains("email")` matches "email_display" -> hints `identity.person.email`
 - `h.contains("phone")` matches "phone_e164" -> hints `identity.person.phone_number`

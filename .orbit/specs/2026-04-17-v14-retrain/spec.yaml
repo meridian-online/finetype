@@ -21,7 +21,7 @@ acceptance_criteria:
   ac_type: code
 - id: ac-05
   description: |
-    Country/country_code post-hint guard in apply_header_sharpen (column.rs). MUST be placed AFTER the same-category hardcoded hint override block (NNFT-194, ~line 2252-2268) — NOT in value_sharpen, which runs before header hints and would be overwritten. Logic: after all header hint processing, if final label is "geography.location.country" and >=95% of values match ^[A-Z]{2}$ (strict alpha-2 per taxonomy), override to "geography.location.country_code". Use ^[A-Z]{2}$ not ^[A-Z]{2,3}$ to avoid collision with state_code.
+    Country/country_code post-hint guard in apply_header_sharpen (column.rs). MUST be placed AFTER the same-category hardcoded hint override block (~line 2252-2268) — NOT in value_sharpen, which runs before header hints and would be overwritten. Logic: after all header hint processing, if final label is "geography.location.country" and >=95% of values match ^[A-Z]{2}$ (strict alpha-2 per taxonomy), override to "geography.location.country_code". Use ^[A-Z]{2}$ not ^[A-Z]{2,3}$ to avoid collision with state_code.
   ac_type: code
 - id: ac-06
   description: |

@@ -1,6 +1,5 @@
 # Finding: Model2Vec Specialisation for Column Name Classification
 
-**Task:** NNFT-119
 **Date:** 2026-02-25
 **Time budget:** 4 hours
 **Status:** Complete

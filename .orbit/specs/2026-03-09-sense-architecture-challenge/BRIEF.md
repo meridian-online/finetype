@@ -14,7 +14,7 @@ FineType is a Rust/Candle type inference engine with 250 types across 7 domains,
 - 3× model confusions between visually similar types (git_sha/hash, hs_code/decimal_number, docker_ref/hostname)
 - 1× GT edge case (response_time_ms integer vs decimal)
 
-**Key constraint:** Rules currently outperform learned features (NNFT-253 showed feature_dim=32 CharCNN causes city attractor regression). Training data is 100% synthetic.
+**Key constraint:** Rules currently outperform learned features (an earlier experiment showed feature_dim=32 CharCNN causes city attractor regression). Training data is 100% synthetic.
 
 ## Design Decisions from Interview
 

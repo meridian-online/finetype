@@ -6,7 +6,7 @@
 //! Locales follow the taxonomy convention:
 //! - Base locales: EN, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR
 //! - Regional EN: EN_AU, EN_GB, EN_CA, EN_US
-//! - CLDR-sourced (NNFT-158): BG, CS, DA, EL, ET, FI, HR, HU, LT, LV,
+//! - CLDR-sourced: BG, CS, DA, EL, ET, FI, HR, HU, LT, LV,
 //!   NO, PT, PT_BR, RO, SK, SL, SV, TR, UK
 
 /// Get first names for a locale. Returns None if locale has no specific data.
@@ -1853,7 +1853,7 @@ pub fn month_names(locale: &str) -> &'static [&'static str] {
             "نوفمبر",
             "ديسمبر",
         ],
-        // ── CLDR-sourced locales (NNFT-158) ──────────────────────────────
+        // ── CLDR-sourced locales ──────────────────────────────
         "BG" => &[
             "януари",
             "февруари",
@@ -2151,7 +2151,7 @@ pub fn month_abbreviations(locale: &str) -> &'static [&'static str] {
             "نوفمبر",
             "ديسمبر",
         ],
-        // ── CLDR-sourced locales (NNFT-158) ──────────────────────────────
+        // ── CLDR-sourced locales ──────────────────────────────
         "BG" => &[
             "яну", "фев", "март", "апр", "май", "юни", "юли", "авг", "сеп", "окт", "ное", "дек",
         ],
@@ -2336,7 +2336,7 @@ pub fn weekday_names(locale: &str) -> &'static [&'static str] {
             "السبت",
             "الأحد",
         ],
-        // ── CLDR-sourced locales (NNFT-158) ──────────────────────────────
+        // ── CLDR-sourced locales ──────────────────────────────
         "BG" => &[
             "понеделник",
             "вторник",
@@ -2496,7 +2496,7 @@ pub fn weekday_abbreviations(locale: &str) -> &'static [&'static str] {
         "ZH" => &["一", "二", "三", "四", "五", "六", "日"],
         "KO" => &["월", "화", "수", "목", "금", "토", "일"],
         "AR" => &["إثن", "ثلث", "أرب", "خمس", "جمع", "سبت", "أحد"],
-        // ── CLDR-sourced locales (NNFT-158) ──────────────────────────────
+        // ── CLDR-sourced locales ──────────────────────────────
         "BG" => &["пн", "вт", "ср", "чт", "пт", "сб", "нд"],
         "CS" => &["po", "út", "st", "čt", "pá", "so", "ne"],
         "DA" => &["man.", "tirs.", "ons.", "tors.", "fre.", "lør.", "søn."],

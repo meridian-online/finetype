@@ -1,4 +1,4 @@
-//! Label → Sense BroadCategory mapping for output masking (NNFT-169).
+//! Label → Sense BroadCategory mapping for output masking.
 //!
 //! Maps all 216 FineType type labels to their primary `BroadCategory`.
 //! Used during column classification to mask CharCNN predictions to
@@ -183,7 +183,7 @@ const FORMAT_LABELS: &[&str] = &[
     "container.object.json_array",
     "container.object.xml",
     "container.object.yaml",
-    // finance.* (moved from identity.payment in v0.5.1, NNFT-179)
+    // finance.* (moved from identity.payment in v0.5.1)
     "finance.banking.aba_routing",
     "finance.banking.bsb",
     "finance.banking.iban",
@@ -198,7 +198,7 @@ const FORMAT_LABELS: &[&str] = &[
     "finance.securities.sedol",
     // identity.academic.*
     "identity.academic.orcid",
-    // identity.commerce.* (moved from technology.code in v0.5.1, NNFT-179)
+    // identity.commerce.* (moved from technology.code in v0.5.1)
     "identity.commerce.ean",
     "identity.commerce.isbn",
     "identity.commerce.isrc",

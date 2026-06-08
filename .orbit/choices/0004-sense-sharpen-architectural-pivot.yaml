@@ -10,7 +10,7 @@ body: |
 
   FineType's tiered CharCNN architecture (34 models, 18 disambiguation rules) reached a structural ceiling:
 
-  1. CLDR-enriched retraining (NNFT-157–161) regressed from 116/120 to 107/120, revealing cascading fragility in the tier graph
+  1. CLDR-enriched retraining regressed from 116/120 to 107/120, revealing cascading fragility in the tier graph
   2. CharCNN capacity ceiling of ≤20 labels per T2 model blocks taxonomy expansion and locale integration
   3. 18 disambiguation rules with strict ordering dependencies — each new accuracy fix adds interaction complexity
   4. Entity overcall (`full_name` on 3,500+ SOTAB columns) requires column-level context the CharCNN cannot provide

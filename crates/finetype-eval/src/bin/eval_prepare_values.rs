@@ -1,4 +1,4 @@
-//! GitTables value preparation (NNFT-184)
+//! GitTables value preparation
 //!
 //! Read sampled parquet files, unpivot columns, sample values per column.
 //! Outputs column_values.parquet for DuckDB classification.

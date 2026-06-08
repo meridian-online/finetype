@@ -4,7 +4,7 @@
 //! - Character embedding
 //! - Multiple parallel 1D convolutions (kernel sizes 2,3,4,5)
 //! - Max pooling over sequence
-//! - Optional parallel feature vector fusion at classifier head (NNFT-248)
+//! - Optional parallel feature vector fusion at classifier head
 //! - Fully connected layers
 //! - Softmax classifier
 
@@ -83,7 +83,7 @@ impl Default for CharVocab {
     }
 }
 
-/// Classification head type for the CharCNN (NNFT-267).
+/// Classification head type for the CharCNN.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub enum HeadType {
     /// Standard flat softmax over all classes.
@@ -106,9 +106,9 @@ pub struct CharCnnConfig {
     pub dropout: f64,
     /// Dimension of the parallel feature vector (0 = no features, backward compatible).
     /// When > 0, fc1 input becomes `total_filters + feature_dim` to accommodate
-    /// the concatenated feature vector at the classifier head. (NNFT-248)
+    /// the concatenated feature vector at the classifier head.
     pub feature_dim: usize,
-    /// Classification head type (NNFT-267). Default: Flat.
+    /// Classification head type. Default: Flat.
     pub head_type: HeadType,
 }
 
@@ -130,7 +130,7 @@ impl Default for CharCnnConfig {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HIERARCHY MAP (NNFT-267)
+// HIERARCHY MAP
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Maps between flat label indices and the hierarchical (domain, category, type) tree.
@@ -321,7 +321,7 @@ impl HierarchyMap {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HIERARCHICAL HEAD (NNFT-267)
+// HIERARCHICAL HEAD
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Hierarchical classification head: domain → category → leaf type.
@@ -480,7 +480,7 @@ impl HierarchicalHead {
 
 /// Character-level CNN classifier.
 ///
-/// Supports two head types (NNFT-267):
+/// Supports two head types:
 /// - **Flat**: Standard fc2 → n_classes softmax (existing, default)
 /// - **Hierarchical**: Tree softmax via `HierarchicalHead` (domain → category → leaf)
 pub struct CharCnn {
@@ -510,7 +510,7 @@ impl CharCnn {
         })
     }
 
-    /// Create a new character-level CNN with hierarchical head (NNFT-267).
+    /// Create a new character-level CNN with hierarchical head.
     ///
     /// The hierarchy is derived from the sorted label strings (domain.category.type).
     pub fn new_hierarchical(
@@ -592,7 +592,7 @@ impl CharCnn {
         // Concatenate all pooled conv outputs: (batch, total_filters)
         let conv_out = Tensor::cat(&pooled_outputs, 1)?;
 
-        // Fuse with feature vector if feature_dim > 0 (NNFT-248)
+        // Fuse with feature vector if feature_dim > 0
         let fused = if self.config.feature_dim > 0 {
             let feat = match features {
                 Some(f) => f.clone(),
@@ -617,7 +617,7 @@ impl CharCnn {
         self.forward_with_features(input_ids, None)
     }
 
-    /// Forward pass with optional parallel feature vector (NNFT-248).
+    /// Forward pass with optional parallel feature vector.
     ///
     /// Returns logits for flat mode, or product probabilities for hierarchical mode.
     /// Shape is always (batch, n_classes).
@@ -644,7 +644,7 @@ impl CharCnn {
         self.infer_with_features(input_ids, None)
     }
 
-    /// Inference with softmax probabilities and optional features (NNFT-248).
+    /// Inference with softmax probabilities and optional features.
     ///
     /// For flat mode, applies softmax to logits.
     /// For hierarchical mode, forward already returns probabilities.

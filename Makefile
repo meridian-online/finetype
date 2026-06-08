@@ -142,7 +142,7 @@ eval-benchmark: $(EXTENSION)
 eval-all: eval-extract eval-values eval-1m
 	@echo "═══ Full evaluation pipeline complete ═══"
 
-# ─── GitTables CLI Evaluation (NNFT-130) ──────
+# ─── GitTables CLI Evaluation ──────
 # Uses CLI batch mode (tiered + Model2Vec + disambiguation) instead of DuckDB extension.
 # Prerequisites: make eval-extract eval-values eval-mapping
 # Full pipeline: make eval-extract eval-values eval-1m-cli
@@ -183,7 +183,7 @@ eval-sotab: $(EXTENSION)
 eval-sotab-all: eval-sotab-values eval-sotab
 	@echo "═══ SOTAB evaluation pipeline complete ═══"
 
-# ─── SOTAB CLI Evaluation (NNFT-130) ─────────
+# ─── SOTAB CLI Evaluation ─────────
 # Uses CLI batch mode (tiered + disambiguation) instead of DuckDB extension.
 # No header hints — SOTAB uses integer column indices.
 # Prerequisites: make eval-sotab-values
@@ -199,7 +199,7 @@ eval-sotab-cli:
 	export SOTAB_DIR="$(SOTAB_DATA)" SOTAB_SPLIT="$(SOTAB_SPLIT)" && \
 		envsubst $(ENVSUBST_VARS) < $(SOTAB_EVAL_DIR)/eval_cli.sql | duckdb
 
-# ─── Actionability Evaluation (NNFT-147) ────
+# ─── Actionability Evaluation ────
 # Tests whether FineType's format_string predictions work on real data.
 # Runs TRY_STRPTIME on profile eval datasets to measure parse success rates.
 # Prerequisites: make eval-profile (generates profile_results.csv)
@@ -216,7 +216,7 @@ eval-actionability:
 		--labels-dir labels \
 		--output eval/eval_output/actionability_results.csv
 
-# ─── Eval Report (NNFT-147) ─────────────────
+# ─── Eval Report ─────────────────
 # Generates a unified markdown dashboard from all eval outputs.
 # Prerequisites: make eval-profile eval-actionability
 #

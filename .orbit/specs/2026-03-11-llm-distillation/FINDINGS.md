@@ -1,4 +1,4 @@
-# LLM Distillation Findings — NNFT-269
+# LLM Distillation Findings
 
 ## Summary
 

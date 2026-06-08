@@ -133,7 +133,7 @@ representation.numeric.decimal_number_comma:
     - "-1.234,00"
   references: null
   notes: >
-    New in v0.5.1 (NNFT-180). European decimal format uses period for thousands
+    New in v0.5.1. European decimal format uses period for thousands
     and comma for decimal — the exact inverse of US format. Transform removes
     period thousands separators, replaces comma with period, then casts to DOUBLE.
     Column-level detection is important since single values like "1.234" are
@@ -200,7 +200,7 @@ representation.numeric.percentage:
     v1 migration: New for v2. Percentage as string representation.
     Transform extracts numeric value (0-100 range expected).
 
-# representation.numeric.increment: MOVED to representation.identifier.increment in v0.5.1 (NNFT-178)
+# representation.numeric.increment: MOVED to representation.identifier.increment in v0.5.1
 # Increment is an identifier type, not a numeric computation type.
 
 representation.numeric.si_number:
@@ -405,7 +405,7 @@ representation.format.color_hsl:
     - "hsla(300, 50%, 50%, 0.8)"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). HSL completes the CSS colour
+    New in taxonomy expansion. HSL completes the CSS colour
     representation family alongside hex and RGB. HSL is arguably more intuitive
     for designers (hue = colour wheel position, saturation = intensity,
     lightness = brightness). HSLA adds an alpha transparency channel.
@@ -469,7 +469,7 @@ representation.text.entity_name:
     - "Super Bowl LVIII"
   references: null
   notes: >
-    NNFT-137. Addresses full_name overcall: 3,086 SOTAB columns misclassified
+    Addresses full_name overcall: 3,086 SOTAB columns misclassified
     as person names are actually entity names (songs, restaurants, products,
     venues). CharCNN can learn to distinguish entity_name from full_name via
     business suffixes, numbers, and mixed-case patterns. broad_words designation
@@ -811,7 +811,7 @@ representation.scientific.cas_number:
     - "71-43-2"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). CAS numbers are the global standard
+    New in taxonomy expansion. CAS numbers are the global standard
     for chemical substance identification. Over 200 million substances registered.
     Check digit algorithm: number all digits right-to-left (excluding check),
     multiply each by its position, sum, mod 10. Water=7732-18-5, Ethanol=64-17-5.
@@ -846,7 +846,7 @@ representation.scientific.inchi:
     - "InChI=1S/CO2/c2-1-3"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). InChI is the IUPAC standard for
+    New in taxonomy expansion. InChI is the IUPAC standard for
     machine-readable chemical identifiers. The "1S" prefix means standard InChI
     version 1. The formula layer (first after version) gives the molecular formula.
     Widely used in cheminformatics databases (PubChem, ChEBI, ChemSpider).
@@ -882,7 +882,7 @@ representation.scientific.smiles:
     - "C(=O)(N)N"
   references: null
   notes: >
-    New in taxonomy expansion (NNFT-244.04). SMILES is extremely common in
+    New in taxonomy expansion. SMILES is extremely common in
     chemical and pharmaceutical datasets. The broad_characters designation
     reflects that single values like "O" or "CC" are indistinguishable from
     plain text — column-level disambiguation (header hints) is essential.
@@ -894,7 +894,7 @@ representation.scientific.smiles:
 # Discrete value types — low cardinality categorical and ordinal data.
 # These are partially semantic types: the single-value model learns common
 # patterns (e.g., "male"/"female", "A"/"B"/"C"), but full accuracy
-# requires column-level cardinality analysis (see NNFT-065).
+# requires column-level cardinality analysis.
 # ═════════════════════════════════════════════════════════════════════
 
 representation.discrete.categorical:
@@ -928,9 +928,9 @@ representation.discrete.categorical:
     - "Type A"
   references: null
   notes: >
-    New for NNFT-063. Covers low-cardinality string columns common in tabular data.
+    Covers low-cardinality string columns common in tabular data.
     Single-value model learns common categorical vocabulary; column-mode
-    disambiguation (NNFT-065) resolves ambiguous cases via cardinality analysis.
+    disambiguation resolves ambiguous cases via cardinality analysis.
 
 representation.discrete.ordinal:
   title: "Ordinal Value"
@@ -963,13 +963,13 @@ representation.discrete.ordinal:
     - "excellent"
   references: null
   notes: >
-    New for NNFT-063. Ordinal values have natural ordering but may not be
+    Ordinal values have natural ordering but may not be
     numeric. Common in survey data, grading systems, and priority fields.
     At the single-value level, hard to distinguish from categorical or integer.
-    Column-level analysis (NNFT-065) needed for reliable detection.
+    Column-level analysis needed for reliable detection.
 
 # ═════════════════════════════════════════════════════════════════════
-# CATEGORY: code — REMOVED in v0.5.1 (NNFT-178)
+# CATEGORY: code — REMOVED in v0.5.1
 #
 # representation.code.alphanumeric_id moved to representation.identifier.alphanumeric_id
 # The code category is now empty and removed.
@@ -981,7 +981,7 @@ representation.discrete.ordinal:
 # Boolean values split by string format. Enables format-aware casting
 # and normalization. All subtypes map to DuckDB BOOLEAN.
 #
-# NNFT-075: Replaces technology.development.boolean (single catch-all)
+# Replaces technology.development.boolean (single catch-all)
 # and representation.logical.boolean (interim location).
 # ═════════════════════════════════════════════════════════════════════
 
@@ -1009,7 +1009,7 @@ representation.boolean.binary:
     - "1"
   references: null
   notes: >
-    NNFT-075. The simplest boolean format — just 0 and 1. The model must
+    The simplest boolean format — just 0 and 1. The model must
     distinguish this from single-digit integers in count/ordinal columns
     (handled by column-level disambiguation rules).
 
@@ -1043,7 +1043,7 @@ representation.boolean.initials:
     - "n"
   references: null
   notes: >
-    NNFT-075. Single-character boolean encoding. The model must distinguish
+    Single-character boolean encoding. The model must distinguish
     these from categorical single-char columns (handled by boolean_set check
     in column classifier).
 
@@ -1080,7 +1080,7 @@ representation.boolean.terms:
     - "False"
   references: null
   notes: >
-    NNFT-075. Full-word boolean encoding. The most common format in
+    Full-word boolean encoding. The most common format in
     application data and user-facing systems. DuckDB natively accepts
     true/false, yes/no, on/off (case-insensitive) for CAST to BOOLEAN.
 
@@ -1088,7 +1088,7 @@ representation.boolean.terms:
 # CATEGORY: identifier
 #
 # Key/identifier columns — types that indicate "this column is a key."
-# Moved here in v0.5.1 (NNFT-178) from various prior locations.
+# Moved here in v0.5.1 from various prior locations.
 # ═════════════════════════════════════════════════════════════════════
 
 representation.identifier.uuid:
@@ -1116,7 +1116,7 @@ representation.identifier.uuid:
     - "f47ac10b-58cc-4372-a567-0e02b2c3d479"
   references: null
   notes: >
-    Moved from technology.cryptographic.uuid in v0.5.1 (NNFT-178).
+    Moved from technology.cryptographic.uuid in v0.5.1.
     UUID is a universal identifier used in database design far beyond
     technology contexts. DuckDB UUID type accepts standard 8-4-4-4-12
     format. Also accepts without hyphens via UPPER() or normalization.
@@ -1155,7 +1155,7 @@ representation.identifier.alphanumeric_id:
     - "FL-2087"
   references: null
   notes: >
-    Moved from representation.code.alphanumeric_id in v0.5.1 (NNFT-178).
+    Moved from representation.code.alphanumeric_id in v0.5.1.
     Catches mixed letter+digit identifiers that fall through more specific
     types (UUID, ISIN, IATA, etc.). The validation pattern requires at
     least one letter AND one digit. Format-detectable.
@@ -1185,7 +1185,7 @@ representation.identifier.increment:
     - "3"
   references: null
   notes: >
-    Moved from representation.numeric.increment in v0.5.1 (NNFT-178).
+    Moved from representation.numeric.increment in v0.5.1.
     Often appears as auto-incrementing primary keys or row numbers.
     Difficult to distinguish from regular integers without column context.
 
@@ -1221,7 +1221,7 @@ representation.identifier.numeric_code:
     - "99"
   references: null
   notes: >
-    Added in v0.5.2 (NNFT-192). Addresses the #2 analyst frustration:
+    Added in v0.5.2. Addresses the #2 analyst frustration:
     leading zeros stripped when numeric-looking codes are auto-inferred as
     integers. Column-level disambiguation (header hints, consistent length,
     leading-zero presence) differentiates from plain integer_number.

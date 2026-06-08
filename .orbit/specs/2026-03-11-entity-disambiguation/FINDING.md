@@ -1,6 +1,5 @@
 # Finding: Column-Level Value Embeddings for Entity Type Disambiguation
 
-**Task:** NNFT-150
 **Date:** 2026-02-27
 **Author:** @nightingale
 **Status:** Complete

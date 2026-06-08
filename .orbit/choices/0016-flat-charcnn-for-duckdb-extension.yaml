@@ -10,7 +10,7 @@ body: |
 
   FineType has two model architectures: flat (single model, 1 pass) and tiered (T0→T1→T2, 34 models, 3 passes). The CLI uses tiered for its higher interpretability and modular retraining. The DuckDB extension needed to choose between them.
 
-  Benchmarking (NNFT-016) showed flat CharCNN at 91.97% accuracy vs tiered at 90.00%, with flat being 1.7× faster (single forward pass vs cascade of 3).
+  Benchmarking showed flat CharCNN at 91.97% accuracy vs tiered at 90.00%, with flat being 1.7× faster (single forward pass vs cascade of 3).
 
   ## Considered Options
 

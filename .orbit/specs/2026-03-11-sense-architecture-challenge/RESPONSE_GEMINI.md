@@ -131,7 +131,7 @@ Training on unlabelled data using contrastive objectives (where columns from the
 
 ## **Dataset Recommendations and Mappability**
 
-Training a 250-class model requires a volume of data that exceeds what can be generated synthetically. The transition to real-world datasets is essential to address the "attractor regression" noted in the NNFT-253 experiments.
+Training a 250-class model requires a volume of data that exceeds what can be generated synthetically. The transition to real-world datasets is essential to address the "attractor regression" noted in the earlier experiments.
 
 ### **Labeled Datasets for Fine-Tuning**
 

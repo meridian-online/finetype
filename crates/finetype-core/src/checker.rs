@@ -248,7 +248,7 @@ impl Checker {
             None => (false, 0),
         };
 
-        // Pre-compile validator once for this definition (NNFT-116)
+        // Pre-compile validator once for this definition
         let compiled = definition
             .and_then(|d| d.validation.as_ref())
             .and_then(|v| CompiledValidator::new_for_label(v, key).ok());
