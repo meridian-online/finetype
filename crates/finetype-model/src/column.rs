@@ -243,7 +243,7 @@ const HARDCODED_GENERIC_LABELS: &[&str] = &[
 /// 3. Hardcoded list of known catch-all labels (always applies).
 /// 4. When taxonomy is available, broad designations (BroadWords, BroadCharacters,
 ///    BroadNumbers, BroadObject) are additionally generic — the CharCNN cannot
-/// reliably distinguish these types from character patterns.
+///    reliably distinguish these types from character patterns.
 ///
 /// Signal 4 is **additive**: it expands the generic set beyond the hardcoded
 /// list (e.g., `gender`, `occupation` become generic via their `broad_words`
