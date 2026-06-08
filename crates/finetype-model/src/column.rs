@@ -1698,7 +1698,9 @@ impl ColumnClassifier {
             .is_some_and(|r| r.starts_with("sense_entity_demotion"));
         if !entity_demoted && !header.is_empty() {
             // Hardcoded first (curated knowledge), then Model2Vec.
-            let hardcoded_hint = header_hint(header).map(|h| h.to_string());
+            let hardcoded_hint = header_hint(header)
+                .filter(|&h| !hints_delete_enabled() || header_hint_is_load_bearing(h))
+                .map(|h| h.to_string());
             let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
                 self.semantic_hint
                     .as_ref()
@@ -2414,7 +2416,9 @@ impl ColumnClassifier {
         let disable_fallback = rhh::is_disabled("header_hint_fallback");
 
         // Get header hint: hardcoded first, then Model2Vec semantic
-        let hardcoded_hint = header_hint(header).map(|h| h.to_string());
+        let hardcoded_hint = header_hint(header)
+            .filter(|&h| !hints_delete_enabled() || header_hint_is_load_bearing(h))
+            .map(|h| h.to_string());
         let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
             self.semantic_hint
                 .as_ref()
@@ -4182,6 +4186,16 @@ fn disambiguate_boolean_override(
 /// proved it cannot yet cover. Per choice 0042.
 fn hints_defer_enabled() -> bool {
     std::env::var("FINETYPE_HINTS_DEFER").is_ok_and(|v| v == "1" || v == "true")
+}
+
+/// Whether non-load-bearing hardcoded header hints should be SUPPRESSED entirely
+/// (FINETYPE_HINTS_DELETE, default OFF) — true delete semantics for measurement:
+/// the hint never fires, so the model (and learned classifier) decide alone even
+/// when uncertain. Stronger than [`hints_defer_enabled`], which keeps the hint as
+/// a tiebreaker on uncertain predictions. Used to gate the delete config on all
+/// instruments BEFORE committing to actual arm removal.
+fn hints_delete_enabled() -> bool {
+    std::env::var("FINETYPE_HINTS_DELETE").is_ok_and(|v| v == "1" || v == "true")
 }
 
 /// Types where the hardcoded header hint is LOAD-BEARING — the model regresses
