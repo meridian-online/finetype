@@ -2737,7 +2737,7 @@ fn feature_sharpen(result: &mut ColumnResult, column_features: &ColumnFeatures) 
     // threshold alone — high slash segments is a strong enough signal.
     let slash_segments = column_features.mean[feature_idx::SEGMENT_COUNT_SLASH];
     if result.label == "technology.internet.hostname" && slash_segments >= 1.5 {
-        result.label = "technology.container.docker_ref".to_string();
+        result.label = "technology.development.docker_ref".to_string();
         result.confidence = result.confidence.max(0.7);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!("feature_slash_segments:{:.1}", slash_segments));
@@ -3459,9 +3459,9 @@ fn feature_disambiguate(
         // Multiple slash segments → likely docker refs
         let docker_in_votes = votes
             .iter()
-            .any(|(l, _)| l == "technology.container.docker_ref");
+            .any(|(l, _)| l == "technology.development.docker_ref");
         if docker_in_votes {
-            result.label = "technology.container.docker_ref".to_string();
+            result.label = "technology.development.docker_ref".to_string();
             result.confidence = result.confidence.max(0.7);
             result.disambiguation_applied = true;
             result.disambiguation_rule =
@@ -10611,7 +10611,7 @@ datetime.component.day_of_week:
         feature_sharpen(&mut result, &cf);
 
         assert_eq!(
-            result.label, "technology.container.docker_ref",
+            result.label, "technology.development.docker_ref",
             "F2 should fire on hostname with high slash segments even without docker_ref in votes"
         );
         assert!(result.disambiguation_applied);
