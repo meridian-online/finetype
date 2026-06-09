@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.25] - 2026-06-09
+
+A precision patch built on a diagnosis. The starting point was a worry that the
+eval suite or the data was capping precision — and it was: the metric we judged
+progress with was structurally blind to the rare-type errors recent rounds were
+trying to fix. The headline change is the first fix that diagnosis unblocked —
+FineType no longer mistakes plain numbers for map coordinates.
+
+### Fixed
+
+- **Coordinate header-veto.** A `latitude`/`longitude` prediction on a column
+  whose header carries no coordinate token (e.g. `magnitude`, `gpa`, `rms`,
+  `error`, `price`) and whose values are generic numbers is now demoted to
+  `decimal_number`. These false positives are sibling-context-driven and
+  value-identical to real coordinates — only the header separates them — so the
+  rule vetoes a false coordinate by header and never promotes one. Cuts the
+  latitude false-positive rate ~12× on the corpus with no recall loss and no
+  cross-type regression (cleared the corpus-honest gate and the curated breadth
+  eval). Choice 0094.
+
+### Discovery
+
+- **The precision "ceiling" was a measurement artifact.** Aggregate corpus
+  precision (~0.49 vs the gated-YDF oracle) is 52% plain integer/decimal, while
+  the rare types recent rounds fought over (latitude/longitude/url/utc) are
+  ~0.0003% of scored columns — so it counted a fix's collateral damage but never
+  its gain. Added an oracle-free, header-anchored **rare-type scoreboard** as the
+  headline pre-promotion check (choice 0093). Full diagnosis in
+  `output/eval-ceiling-diagnosis/`.
+- **Hardcoded header hints are mixed, not removable yet.** A corpus-scale +
+  curated multi-instrument ablation showed deleting/deferring them regresses
+  (curated −4pp, corpus gate NO-GO) even though the corpus gate alone green-lit
+  defer — the hints remain load-bearing for url/datetime/isbn until the model
+  can cover them. Lesson recorded: a single GO is not safety.
+
+### Changed
+
+- Removed 10 genuinely-unused dependencies and added a `cargo machete` CI gate;
+  consolidated six duplicate `get_device` helpers; added a pre-push lint gate.
+
+### Removed
+
+- Stripped ~700 internal issue-tracker identifiers from the public-repo source
+  and docs, and pruned stale "removed in vN" history comments.
+
 ## [0.6.24] - 2026-06-08
 
 A precision-hardening patch. The theme is **FineType says fewer wrong
