@@ -66,7 +66,6 @@ goal: |
   (gated-YDF, not truth; GO-precision still accruing). So verdicts are
   evidence-graded, and every "remove" ships with a precondition. Success is the map
   and actionable verdicts, NOT a leaner pipeline — removal is downstream.
-
 cards:
 - 0002-semantic-type-detection
 status: open
@@ -74,9 +73,6 @@ labels:
 - topology
 acceptance_criteria:
 - id: ac-01
-  ac_type: code
-  gate: true
-  checked: false
   description: |
     CANONICAL INVENTORY. Enumerate every deterministic step in the pipeline (the
     in-model Sharpen rules in finetype-model/column.rs — feature/F-rules,
@@ -88,10 +84,9 @@ acceptance_criteria:
     per step and per validator. Acceptance: zero deterministic steps present in code
     but absent from the inventory (cross-checked against the trace-tag set and a code
     grep). This gates the rest — you cannot audit what you have not enumerated.
+  gate: true
+  checked: true
 - id: ac-02
-  ac_type: code
-  gate: false
-  checked: false
   description: |
     BEHAVIOURAL TRIGGER. Each of the ~18 pipeline steps has a constructed input
     column that fires it under `finetype profile -v`, with the trace line captured as
@@ -99,29 +94,28 @@ acceptance_criteria:
     flagged for AC-06/the ledger, never removed here). For each firing step, the
     trace decision is checked against the step's intent (AC-03). Closes the half of
     the layer the eval suite never exercises.
-- id: ac-03
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+- id: ac-03
   description: |
     INTENT RECONCILIATION. Each step's ledger row cites the decision/spec/memory that
     introduced it and states whether current behaviour still matches that intent
     (matches / drifted / no-recoverable-rationale). A step with no recoverable
     rationale is itself a finding.
-- id: ac-04
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
+- id: ac-04
   description: |
     COVERAGE CLOSURE (verdict-only). Every rule dormant on the current eval suite is
     resolved to one of: (a) a delivered trigger fixture (a proposed eval column that
     exercises it — recommended for addition, NOT landed under verdict-only), or
     (b) a dead-candidate verdict with evidence. Net: dormant-without-a-disposition →
     0. Landing the fixtures is a separate decision.
-- id: ac-05
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
+- id: ac-05
   description: |
     VALIDATOR PRECISION REVIEW. All 240 taxonomy validators classified against the
     Precision Principle: precise (real pattern/enum/locale/range that distinguishes
@@ -129,10 +123,10 @@ acceptance_criteria:
     `.{0,N}`, etc.) / locale-gap (universal where a locale-specific validation
     belongs). Deliverable: a per-validator verdict table; the weak and locale-gap
     ones surfaced as the candidate work-list. No validator is edited.
-- id: ac-06
-  ac_type: observation
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
+- id: ac-06
   description: |
     NET-VALUE ABLATION (defers — dated empirical). For each pipeline step Stage 1
     flags questionable (drifted intent, false-veto suspect, dead-candidate, or
@@ -142,20 +136,20 @@ acceptance_criteria:
     toward/away-from-oracle number and a verdict; every net-negative verdict carries
     an explicit removal precondition (what must be true — e.g. model coverage — before
     removal is safe). Scope is whatever Stage 1 flags, reviewed by the author first.
-- id: ac-07
-  ac_type: doc
   gate: false
   checked: false
+  ac_type: observation
+- id: ac-07
   description: |
     FALSE-VETO RESOLUTION. The three suspects from the quick pass — `gender` (0%
     pass), `npi` (32%), `price` (33%) — each get a root cause (invalid data vs
     validator/coverage gap vs deterministic-step conflict) and a recommended fix.
     Verdict-only: no fix lands; any that later does must clear the eval + corpus-
     honest gates.
-- id: ac-08
+  gate: false
+  checked: true
   ac_type: doc
-  gate: true
-  checked: false
+- id: ac-08
   description: |
     THE LEDGER. A single deliverable — one row per deterministic step plus a
     per-validator-precision summary — with columns: intent / fires? / correct? / net
@@ -163,6 +157,9 @@ acceptance_criteria:
     remove). Readable in a sitting, sufficient for the author to make a
     keep / fix / remove-eventually call per step. This is the spec's product; AC-01
     gates it, every other AC feeds it.
+  gate: true
+  checked: true
+  ac_type: doc
 memories_considered:
 - key: header-hint-deletion-blocked-multi-instrument
   disposition: adopted
