@@ -70,6 +70,17 @@ VETO_SAFE_OUT = REPO / "labels/veto_safe.txt"
 # the mechanical rate. The single documented exception to the rule.
 VETO_SAFE_EXCEPTIONS = ["datetime.component.day_of_week"]
 
+# A DIFFERENT class of exception: labels the both-lens sweep cannot measure
+# at all (< MIN_AGREEMENT agreement columns — ydf rarely agrees with sense,
+# so the agreement set is starved) but which the corpus-honest gate MEASURED
+# as hard-veto safe at corpus scale. These are NOT "just over the ceiling";
+# they are unmeasurable-here, validated-elsewhere. Provenance is the gate run,
+# not this sweep — see output/corpus-honest-gate/veto_statusbp_finding.md.
+GATE_VALIDATED_EXCEPTIONS = [
+    "datetime.component.periodicity",
+    "representation.numeric.decimal_number",
+]
+
 
 # Residual veto that inspection confirmed is CORRECT (the agreement proxy
 # mislabelled the column, the validation is right to reject it) — NOT a
@@ -86,6 +97,16 @@ RESIDUAL_NOTES: dict[str, str] = {
         "('MondayNight', 'Tonight'). Both lenses mislabelled these; the "
         "validation rightly rejects them. Validation-attributable false-veto "
         "rate is ~0%.",
+    "datetime.component.periodicity":
+        "Rare-starved here (ydf rarely agrees, so < MIN_AGREEMENT agreement "
+        "columns). Corpus-honest gate (gate_veto-statusbp.json, GO) measured "
+        "the hard-veto at scale: 13,967 v19 over-emissions demoted to unknown, "
+        "net_contra_in 0 (the oracle confirmed NONE of them), zero collapse.",
+    "representation.numeric.decimal_number":
+        "Rare-starved here (huge in sense predictions but ydf almost never "
+        "agrees). Corpus-honest gate (gate_veto-statusbp.json, GO): marginal "
+        "1.9M->1.89M (ratio 0.996), net_contra_in -287 — the veto REMOVES "
+        "oracle-refuted FPs, does not create them. No collapse.",
 }
 
 
@@ -170,7 +191,7 @@ def main() -> int:
             continue
         if ra.get(label, 1.0) < TARGET_CEIL:
             veto_safe.append(label)
-    for exc in VETO_SAFE_EXCEPTIONS:
+    for exc in VETO_SAFE_EXCEPTIONS + GATE_VALIDATED_EXCEPTIONS:
         if exc not in veto_safe:
             veto_safe.append(exc)
     veto_safe.sort()
@@ -190,6 +211,9 @@ def main() -> int:
         "#",
         "# Documented exceptions (correct-veto residual just over the",
         f"# ceiling, validation is precise): {', '.join(VETO_SAFE_EXCEPTIONS)}.",
+        "# Gate-validated exceptions (rare-starved here, but the corpus-honest",
+        "# gate measured the hard-veto safe at scale — see",
+        f"# output/corpus-honest-gate/veto_statusbp_finding.md): {', '.join(GATE_VALIDATED_EXCEPTIONS)}.",
         f"# {len(veto_safe)} labels total.",
         "",
     ]

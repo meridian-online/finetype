@@ -12,8 +12,12 @@
 #
 # Documented exceptions (correct-veto residual just over the
 # ceiling, validation is precise): datetime.component.day_of_week.
-# 69 labels total.
+# Gate-validated exceptions (rare-starved here, but the corpus-honest
+# gate measured the hard-veto safe at scale — see
+# output/corpus-honest-gate/veto_statusbp_finding.md): datetime.component.periodicity, representation.numeric.decimal_number.
+# 71 labels total.
 datetime.component.day_of_week
+datetime.component.periodicity
 datetime.component.year
 datetime.date.abbreviated_month
 datetime.date.compact_mdy
@@ -70,6 +74,7 @@ representation.identifier.alphanumeric_id
 representation.identifier.increment
 representation.identifier.numeric_code
 representation.identifier.uuid
+representation.numeric.decimal_number
 representation.numeric.decimal_number_comma
 representation.numeric.integer_number
 representation.numeric.percentage
