@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.26] - 2026-06-09
+
+A validation-honesty patch. The thread through every fix: FineType was being
+wrong about *real* data — rejecting values that were valid, or asserting a type
+its own values contradict. This release makes the checks honest: accept what's
+genuinely valid, withdraw a guess the data refutes, and never abort a run.
+
+### Fixed
+
+- **Case-insensitive enum validation.** A column matched to a learned value set
+  (e.g. `gender`) no longer rejects valid values over capitalisation alone —
+  `Male`/`MALE`/`male` all pass where the learned set happened to be lower-case.
+  Membership folds case while a co-attached pattern stays exact; no taxonomy
+  enum distinguishes two members by case, so nothing is wrongly merged. Fixes
+  every row of a Title-cased column being rejected against a lower-cased enum.
+- **IANA timezones validate by pattern.** `datetime.offset.iana` ANDed a correct
+  `Region/City` pattern with a 12-zone enum stub, so every real timezone outside
+  those twelve was rejected (~5,700 spurious rejects on one corpus file). The
+  stub is gone; the structural pattern — which already matches the full 500+ tz
+  database — is the validator. A hardcoded enum would only go stale and silently
+  reject newly-added zones.
+- **No crash on text nanosecond-epoch columns.** A text-stored
+  `datetime.timestamp.epoch_nanoseconds` column aborted the whole `validate` run
+  (its transform had no binder overload for text input). It now casts then
+  converts, matching the sibling unix-epoch types, so a bad cell becomes an
+  ordinary reject instead of killing the run.
+- **Two more over-emitted types step back to `unknown` instead of asserting
+  wrong.** FineType was confidently labelling order-status columns as a "how
+  often" type (`periodicity`) and composite values like `155/82` as decimals —
+  ~14,000 corpus columns for periodicity alone, none confirmed by the gated-YDF
+  oracle. When a column's values fail its predicted type's validation, these two
+  now demote to `unknown` rather than assert a label the data refutes. Cleared
+  the corpus-honest gate with zero regressions; the safety net only acts on
+  types proven safe at corpus scale.
+
 ## [0.6.25] - 2026-06-09
 
 A precision patch built on a diagnosis. The starting point was a worry that the
