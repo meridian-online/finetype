@@ -1124,19 +1124,6 @@ datetime.offset.iana:
   validation:
     type: string
     pattern: "^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$"
-    enum:
-      - "America/New_York"
-      - "Europe/London"
-      - "Asia/Tokyo"
-      - "Australia/Sydney"
-      - "Pacific/Auckland"
-      - "America/Los_Angeles"
-      - "Europe/Paris"
-      - "Asia/Shanghai"
-      - "America/Chicago"
-      - "Europe/Berlin"
-      - "Asia/Singapore"
-      - "Africa/Cairo"
   tier: [VARCHAR, offset]
   release_priority: 5
   aliases: [timezone]
@@ -1148,9 +1135,11 @@ datetime.offset.iana:
     - title: "IANA Time Zone Database"
       link: "https://www.iana.org/time-zones"
   notes: >
-    v1 name: datetime.timezone. Enum in validation is a subset —
-    full list has 500+ entries. Validation should use the pattern
-    for general matching and enum for common values.
+    v1 name: datetime.timezone. Validation is pattern-only: the tz database
+    has 500+ zones and ships several releases a year, so any hardcoded enum
+    goes stale and silently rejects newly-added zones. The Region/City pattern
+    is the stable structural invariant. Add an enum only if generated from
+    tzdata at build time, never hand-maintained.
 
 datetime.offset.utc:
   title: UTC Offset
