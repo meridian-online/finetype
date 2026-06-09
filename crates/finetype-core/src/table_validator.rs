@@ -214,13 +214,12 @@ fn build_column_validator(
         None
     };
 
-    let validator =
-        jsonschema::validator_for(&schema_for_jsonschema).map_err(|e| {
-            TableValidatorError::SchemaCompilation {
-                column: col_name.to_string(),
-                detail: e.to_string(),
-            }
-        })?;
+    let validator = jsonschema::validator_for(&schema_for_jsonschema).map_err(|e| {
+        TableValidatorError::SchemaCompilation {
+            column: col_name.to_string(),
+            detail: e.to_string(),
+        }
+    })?;
     Ok((validator, enum_check))
 }
 
