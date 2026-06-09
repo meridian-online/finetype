@@ -137,7 +137,7 @@ acceptance_criteria:
     an explicit removal precondition (what must be true — e.g. model coverage — before
     removal is safe). Scope is whatever Stage 1 flags, reviewed by the author first.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-07
   description: |
