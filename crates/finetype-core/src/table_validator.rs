@@ -156,6 +156,75 @@ fn map_kind(kind: &ValidationErrorKind) -> (String, Option<String>) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CASE-FOLDED ENUM MEMBERSHIP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-column enum membership, matched case-insensitively.
+///
+/// The CLI/MCP validation path compiles a `jsonschema::Validator` per column,
+/// but the jsonschema crate matches `enum` byte-exactly. Learned enums (gender,
+/// status) are sampled lower-case while the data is Title-case, so an exact
+/// match rejects valid values purely on letter-case. The taxonomy's own
+/// case-variant enums (`representation.boolean.*`, HTTP methods) explicitly
+/// document "any case", so case-insensitive membership is the authorial intent
+/// universally — no taxonomy enum distinguishes two members by case alone.
+///
+/// We strip `enum` from the schema the jsonschema crate compiles and check
+/// membership here against a lower-cased set, mirroring `CompiledValidator`.
+/// A co-attached `pattern` stays byte-exact on the raw value.
+struct EnumCheck {
+    /// Lower-cased members for case-insensitive membership.
+    folded: HashSet<String>,
+    /// Original members rendered as a JSON array string, for the reject
+    /// `constraint_value` / error message (matches the jsonschema crate's
+    /// `options` token shape).
+    options_token: String,
+}
+
+/// Split a column schema into a jsonschema validator (with `enum` removed) and
+/// an optional case-folded `EnumCheck`. When the schema carries no `enum`, the
+/// validator is compiled unchanged and the check is `None`.
+fn build_column_validator(
+    col_name: &str,
+    col_schema: &Value,
+) -> Result<(jsonschema::Validator, Option<EnumCheck>), TableValidatorError> {
+    let mut schema_for_jsonschema = col_schema.clone();
+    let enum_check = if let Value::Object(map) = &mut schema_for_jsonschema {
+        match map.remove("enum") {
+            Some(Value::Array(members)) if !members.is_empty() => {
+                let folded = members
+                    .iter()
+                    .filter_map(|m| m.as_str())
+                    .map(|s| s.to_lowercase())
+                    .collect::<HashSet<String>>();
+                let options_token = Value::Array(members).to_string();
+                Some(EnumCheck {
+                    folded,
+                    options_token,
+                })
+            }
+            // Empty array or non-array enum: leave it for jsonschema to handle.
+            Some(other) => {
+                map.insert("enum".to_string(), other);
+                None
+            }
+            None => None,
+        }
+    } else {
+        None
+    };
+
+    let validator =
+        jsonschema::validator_for(&schema_for_jsonschema).map_err(|e| {
+            TableValidatorError::SchemaCompilation {
+                column: col_name.to_string(),
+                detail: e.to_string(),
+            }
+        })?;
+    Ok((validator, enum_check))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // NULL DETECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -211,24 +280,19 @@ pub fn validate_table(
     // Sort by column index so iteration order is deterministic and matches
     // the column order in `headers` (ac-03: byte-identical output on repeat
     // calls). `serde_json::Map` iteration is arbitrary otherwise.
-    let mut validators: Vec<(usize, String, jsonschema::Validator)> = Vec::new();
+    let mut validators: Vec<(usize, String, jsonschema::Validator, Option<EnumCheck>)> = Vec::new();
     for (col_name, col_schema) in properties {
         if let Some(&col_idx) = header_index.get(col_name.as_str()) {
-            let validator = jsonschema::validator_for(col_schema).map_err(|e| {
-                TableValidatorError::SchemaCompilation {
-                    column: col_name.clone(),
-                    detail: e.to_string(),
-                }
-            })?;
-            validators.push((col_idx, col_name.clone(), validator));
+            let (validator, enum_check) = build_column_validator(col_name, col_schema)?;
+            validators.push((col_idx, col_name.clone(), validator, enum_check));
         }
         // Columns in schema but not in data are tracked in missing_columns
     }
-    validators.sort_by_key(|(col_idx, _, _)| *col_idx);
+    validators.sort_by_key(|(col_idx, _, _, _)| *col_idx);
 
     // Per-column counters
     let mut col_stats: HashMap<String, (usize, usize, usize)> = HashMap::new(); // (valid, invalid, null)
-    for (_, name, _) in &validators {
+    for (_, name, _, _) in &validators {
         col_stats.insert(name.clone(), (0, 0, 0));
     }
 
@@ -240,7 +304,7 @@ pub fn validate_table(
     for (row_idx, row) in rows.iter().enumerate() {
         let mut errors: Vec<CellError> = Vec::new();
 
-        for (col_idx, col_name, validator) in &validators {
+        for (col_idx, col_name, validator, enum_check) in &validators {
             let cell = row.get(*col_idx).unwrap_or(&None);
 
             if is_null(cell) {
@@ -254,8 +318,63 @@ pub fn validate_table(
             let value_str = cell.as_deref().unwrap_or("");
             let json_value = Value::String(value_str.to_string());
 
-            let validation_result = validator.validate(&json_value);
-            if validation_result.is_ok() {
+            // Per-cell: collect one RejectRecord per constraint violation
+            // (ac-02). A cell can fail multiple constraints; each gets its own
+            // record so downstream SQL can count rejects by constraint token.
+            // jsonschema covers pattern/length/type; enum membership is checked
+            // here case-insensitively (the `enum` keyword was stripped before
+            // compiling `validator`).
+            let mut cell_rejects: Vec<RejectRecord> = Vec::new();
+            let mut cell_errors: Vec<CellError> = Vec::new();
+
+            for err in validator.iter_errors(&json_value) {
+                let (token, value) = map_kind(err.kind());
+                cell_rejects.push(RejectRecord {
+                    row_index: row_idx,
+                    column_index: *col_idx,
+                    column_name: col_name.clone(),
+                    value: Some(value_str.to_string()),
+                    expected_type: None,
+                    type_confidence: None,
+                    constraint_failed: token,
+                    constraint_value: value,
+                    error_message: err.to_string(),
+                });
+                cell_errors.push(CellError {
+                    column: col_name.clone(),
+                    value: Some(value_str.to_string()),
+                    error: err.to_string(),
+                    schema_path: err.schema_path().to_string(),
+                });
+            }
+
+            // Case-insensitive enum membership (scoped to enum only; any
+            // co-attached pattern stayed exact via `validator` above).
+            if let Some(check) = enum_check {
+                if !check.folded.contains(&value_str.to_lowercase()) {
+                    let error_message =
+                        format!("{} is not one of {}", json_value, check.options_token);
+                    cell_rejects.push(RejectRecord {
+                        row_index: row_idx,
+                        column_index: *col_idx,
+                        column_name: col_name.clone(),
+                        value: Some(value_str.to_string()),
+                        expected_type: None,
+                        type_confidence: None,
+                        constraint_failed: "enum".to_string(),
+                        constraint_value: Some(check.options_token.clone()),
+                        error_message: error_message.clone(),
+                    });
+                    cell_errors.push(CellError {
+                        column: col_name.clone(),
+                        value: Some(value_str.to_string()),
+                        error: error_message,
+                        schema_path: "/enum".to_string(),
+                    });
+                }
+            }
+
+            if cell_rejects.is_empty() {
                 if let Some(stats) = col_stats.get_mut(col_name) {
                     stats.0 += 1;
                 }
@@ -263,61 +382,11 @@ pub fn validate_table(
                 if let Some(stats) = col_stats.get_mut(col_name) {
                     stats.1 += 1;
                 }
-
-                // Per-cell: emit one RejectRecord per constraint violation
-                // (ac-02). A cell can fail multiple constraints; each gets
-                // its own record so downstream SQL can count rejects by
-                // constraint token.
-                let cell_errors: Vec<_> = validator.iter_errors(&json_value).collect();
-                if cell_errors.is_empty() {
-                    // Defensive: validator.validate() said invalid but
-                    // iter_errors yielded nothing — fall back to "other".
-                    rejects.push(RejectRecord {
-                        row_index: row_idx,
-                        column_index: *col_idx,
-                        column_name: col_name.clone(),
-                        value: Some(value_str.to_string()),
-                        expected_type: None,
-                        type_confidence: None,
-                        constraint_failed: "other".to_string(),
-                        constraint_value: None,
-                        error_message: "validation failed".to_string(),
-                    });
-                } else {
-                    for err in &cell_errors {
-                        let (token, value) = map_kind(err.kind());
-                        rejects.push(RejectRecord {
-                            row_index: row_idx,
-                            column_index: *col_idx,
-                            column_name: col_name.clone(),
-                            value: Some(value_str.to_string()),
-                            expected_type: None,
-                            type_confidence: None,
-                            constraint_failed: token,
-                            constraint_value: value,
-                            error_message: err.to_string(),
-                        });
-                    }
-                }
+                rejects.extend(cell_rejects);
 
                 // Preserve legacy row_errors field (first error only — the
                 // canonical behaviour for the pre-existing CSV path).
-                let first = &cell_errors[0..cell_errors.len().min(1)];
-                let err_msg = first
-                    .first()
-                    .map(|e| e.to_string())
-                    .unwrap_or_else(|| "validation failed".to_string());
-                let schema_path = first
-                    .first()
-                    .map(|e| e.schema_path().to_string())
-                    .unwrap_or_default();
-
-                errors.push(CellError {
-                    column: col_name.clone(),
-                    value: Some(value_str.to_string()),
-                    error: err_msg,
-                    schema_path,
-                });
+                errors.push(cell_errors.swap_remove(0));
             }
         }
 
@@ -346,7 +415,7 @@ pub fn validate_table(
     // Build column stats
     let columns: Vec<ColumnValidationStats> = validators
         .iter()
-        .map(|(_, name, _)| {
+        .map(|(_, name, _, _)| {
             let (valid, invalid, null) = col_stats.get(name).copied().unwrap_or((0, 0, 0));
             let total = valid + invalid + null;
             let non_null = valid + invalid;
@@ -851,6 +920,45 @@ mod tests {
             "constraint_value '{}' should contain enum members",
             cv
         );
+    }
+
+    /// Enum membership is case-insensitive: a learned lower-case enum
+    /// ({male, female, ...}) must accept Title-case data (Male, Female,
+    /// Non-binary). Regression for the gender/case bug — every row of
+    /// people_directory.csv's gender column rejected purely on letter-case.
+    #[test]
+    fn test_enum_membership_case_insensitive() {
+        let headers = vec!["gender".into()];
+        let rows: Vec<Vec<Option<String>>> = vec![
+            vec![s("Male")],
+            vec![s("Female")],
+            vec![s("Non-binary")],
+            vec![s("MALE")],
+            vec![s("female")],
+        ];
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "gender": {
+                    "type": "string",
+                    "enum": ["male", "female", "non-binary", "other"]
+                }
+            }
+        });
+
+        let result = validate_table(&headers, &rows, &schema).unwrap();
+        assert!(
+            result.rejects.is_empty(),
+            "case-only differences must not reject: {:?}",
+            result.rejects
+        );
+        assert_eq!(result.valid_rows, 5);
+
+        // A value absent from the set (ignoring case) still rejects.
+        let bad_rows: Vec<Vec<Option<String>>> = vec![vec![s("unknown")]];
+        let bad = validate_table(&headers, &bad_rows, &schema).unwrap();
+        assert_eq!(bad.rejects.len(), 1);
+        assert_eq!(bad.rejects[0].constraint_failed, "enum");
     }
 
     #[test]
