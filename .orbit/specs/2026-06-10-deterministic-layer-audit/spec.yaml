@@ -1,0 +1,175 @@
+id: 2026-06-10-deterministic-layer-audit
+goal: |
+  Produce a complete, evidence-graded ledger of every deterministic (non-neural)
+  step in the inference pipeline AND every taxonomy validator — what each is for,
+  whether it still fires, whether it is correct, and its net value at corpus scale —
+  so we know which earn their place. The audit changes NO pipeline behaviour; its
+  deliverable is the ledger and its verdicts, not the cleanup.
+
+  ## Why now
+
+  A session that started as a cheat-file check surfaced how much deterministic
+  machinery sits on top of the neural Sense model — and how little of it is
+  interrogated. A quick `-v` trace of all 449 columns across the 32 eval files
+  (`/tmp/vtrace_clean.log` methodology) found two structural problems:
+
+  1. COVERAGE GAP. Roughly half the deterministic rules never fire on the eval
+     suite — 6 of 7 feature sharpen rules and 6 of 11 header-hint kinds, INCLUDING
+     `header_hint_coord_veto`, the fix shipped in 0.6.25. A rule the eval suite never
+     exercises ships without regression coverage; we cannot tell rare-but-correct
+     from quietly-broken, and only the corpus can.
+
+  2. FALSE-VETO SUSPECTS. A handful of HARD vetoes null columns that look correctly
+     typed: `gender` → unknown (0% pass, AFTER the 0.6.26 case-fold — likely an
+     M/F-abbreviation coverage gap), `npi` → unknown (32% pass), `price` → unknown
+     (33% pass, where a hardcoded header hint asserts currency.amount and the veto
+     then retracts it — two deterministic steps fighting).
+
+  The deterministic logic is large (column.rs alone exceeds 10k lines) and has
+  accreted across ~6 architectural decisions and many specs: header hints (11 kinds),
+  feature/F-rules, locale detection, leading-zero, entity/attractor demotion, the
+  validation veto (hard + advisory), value-based disambiguation — plus the 240
+  taxonomy validators each rule leans on. Nothing maps each piece's HEALTH;
+  docs/ARCHITECTURE.md maps only its structure.
+
+  ## Scope (locked 2026-06-10)
+
+  FULL: every deterministic pipeline step (~18: in-model Sharpen rules in column.rs +
+  the CLI-layer veto/header-hint/locale steps + value-based disambiguation) AND a
+  Precision-Principle review of all 240 taxonomy validators (is each a real
+  validation, not one that confirms ~any input — `^.+$`, `^[A-Za-z0-9]+$`, etc.).
+
+  ## Authority (locked 2026-06-10) — VERDICT-ONLY
+
+  The audit makes NO pipeline code changes. No step is removed, no validator edited,
+  no false-veto fix landed — every change is a separate, gated decision the author
+  approves later. A "remove" verdict ALWAYS carries an explicit removal precondition,
+  never a unilateral cut: the header-hint precedent (memory
+  header-hint-deletion-blocked-multi-instrument) stands — a step can be net-negative
+  on the corpus and still be load-bearing until the model can cover what it does.
+  The only writes the audit performs are throwaway trigger inputs and the ledger.
+
+  ## Approach — staged dynamic workflow, gated by author review
+
+  Stage 1 (cheap, no corpus passes): enumerate, then fan out one track per step /
+  per validator-group through intent → trigger → behavioural check → verdict.
+  Produces the ledger and flags the questionable steps. Stage 1's ledger gates
+  Stage 2's scope — the author reviews before any corpus spend.
+  Stage 2 (expensive, targeted): corpus-ablation (step on/off vs the gated-YDF
+  oracle) ONLY for the steps Stage 1 flags. Each is a ~25-min corpus pass, so scope
+  is deliberately minimised by Stage 1's findings.
+
+  ## Honest scope limits
+
+  Behavioural checks prove "correct on a constructed case" — necessary, not
+  sufficient. Corpus ablation proves "net help/harm vs an imperfect oracle"
+  (gated-YDF, not truth; GO-precision still accruing). So verdicts are
+  evidence-graded, and every "remove" ships with a precondition. Success is the map
+  and actionable verdicts, NOT a leaner pipeline — removal is downstream.
+
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- topology
+acceptance_criteria:
+- id: ac-01
+  ac_type: code
+  gate: true
+  checked: false
+  description: |
+    CANONICAL INVENTORY. Enumerate every deterministic step in the pipeline (the
+    in-model Sharpen rules in finetype-model/column.rs — feature/F-rules,
+    leading-zero, entity/attractor demotion; the CLI-layer validation veto, header-
+    hint application across all 11 kinds, locale detection; value-based
+    disambiguation) AND every taxonomy validator (240). Each entry records: code
+    location (file:symbol), trigger condition, toggle flag if one exists, and the
+    decision/spec/memory that introduced it. Deliverable: an inventory with one row
+    per step and per validator. Acceptance: zero deterministic steps present in code
+    but absent from the inventory (cross-checked against the trace-tag set and a code
+    grep). This gates the rest — you cannot audit what you have not enumerated.
+- id: ac-02
+  ac_type: code
+  gate: false
+  checked: false
+  description: |
+    BEHAVIOURAL TRIGGER. Each of the ~18 pipeline steps has a constructed input
+    column that fires it under `finetype profile -v`, with the trace line captured as
+    evidence — OR documented proof it cannot be triggered at all (a dead-candidate,
+    flagged for AC-06/the ledger, never removed here). For each firing step, the
+    trace decision is checked against the step's intent (AC-03). Closes the half of
+    the layer the eval suite never exercises.
+- id: ac-03
+  ac_type: doc
+  gate: false
+  checked: false
+  description: |
+    INTENT RECONCILIATION. Each step's ledger row cites the decision/spec/memory that
+    introduced it and states whether current behaviour still matches that intent
+    (matches / drifted / no-recoverable-rationale). A step with no recoverable
+    rationale is itself a finding.
+- id: ac-04
+  ac_type: doc
+  gate: false
+  checked: false
+  description: |
+    COVERAGE CLOSURE (verdict-only). Every rule dormant on the current eval suite is
+    resolved to one of: (a) a delivered trigger fixture (a proposed eval column that
+    exercises it — recommended for addition, NOT landed under verdict-only), or
+    (b) a dead-candidate verdict with evidence. Net: dormant-without-a-disposition →
+    0. Landing the fixtures is a separate decision.
+- id: ac-05
+  ac_type: doc
+  gate: false
+  checked: false
+  description: |
+    VALIDATOR PRECISION REVIEW. All 240 taxonomy validators classified against the
+    Precision Principle: precise (real pattern/enum/locale/range that distinguishes
+    is-type from is-not) / weak (confirms ~any input — `^.+$`, `^[A-Za-z0-9_]+$`,
+    `.{0,N}`, etc.) / locale-gap (universal where a locale-specific validation
+    belongs). Deliverable: a per-validator verdict table; the weak and locale-gap
+    ones surfaced as the candidate work-list. No validator is edited.
+- id: ac-06
+  ac_type: observation
+  gate: false
+  checked: false
+  description: |
+    NET-VALUE ABLATION (defers — dated empirical). For each pipeline step Stage 1
+    flags questionable (drifted intent, false-veto suspect, dead-candidate, or
+    weak-validator-dependent), a corpus-ablation delta vs the stable gated-YDF oracle:
+    run the stratified-sample corpus pass with the step toggled OFF and diff against
+    on, reusing the corpus-honest-gate machinery. Each flagged step gets a
+    toward/away-from-oracle number and a verdict; every net-negative verdict carries
+    an explicit removal precondition (what must be true — e.g. model coverage — before
+    removal is safe). Scope is whatever Stage 1 flags, reviewed by the author first.
+- id: ac-07
+  ac_type: doc
+  gate: false
+  checked: false
+  description: |
+    FALSE-VETO RESOLUTION. The three suspects from the quick pass — `gender` (0%
+    pass), `npi` (32%), `price` (33%) — each get a root cause (invalid data vs
+    validator/coverage gap vs deterministic-step conflict) and a recommended fix.
+    Verdict-only: no fix lands; any that later does must clear the eval + corpus-
+    honest gates.
+- id: ac-08
+  ac_type: doc
+  gate: true
+  checked: false
+  description: |
+    THE LEDGER. A single deliverable — one row per deterministic step plus a
+    per-validator-precision summary — with columns: intent / fires? / correct? / net
+    value / verdict / recommended action (+ removal precondition where the verdict is
+    remove). Readable in a sitting, sufficient for the author to make a
+    keep / fix / remove-eventually call per step. This is the spec's product; AC-01
+    gates it, every other AC feeds it.
+memories_considered:
+- key: header-hint-deletion-blocked-multi-instrument
+  disposition: adopted
+  reason: Sets the verdict-only authority and the removal-precondition halt condition. A deterministic step can be net-negative at corpus scale and still be load-bearing until the model covers what it does, so the audit produces verdicts plus preconditions, never unilateral cuts.
+- key: eval-precision-metric-blind-to-rare-targets
+  disposition: adopted
+  reason: Grounds the honest-scope-limit clause. Aggregate corpus precision is structurally blind to rare-type movement, so net-value verdicts (ac-06) lean on the gated-YDF oracle and per-step ablation deltas, not aggregate precision.
+- key: eval-csv-review-2026-06-09
+  disposition: adopted
+  reason: The quick-pass evidence the spec is built on — the coverage gap (6/7 feature rules, 6/11 header hints dormant) and the gender/npi/price false-veto suspects were surfaced there.
