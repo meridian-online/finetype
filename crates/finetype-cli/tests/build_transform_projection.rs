@@ -143,3 +143,49 @@ fn build_transform_projection_no_try_wrap_matches_legacy_load_shape() {
     let proj_raw = build_transform_projection(&["raw_col".to_string()], &ext_raw, &tax, false);
     assert_eq!(proj_raw, "\"raw_col\"");
 }
+
+#[test]
+fn epoch_nanoseconds_transform_does_not_bind_error_on_varchar() {
+    // Regression: epoch_nanoseconds columns arrive as VARCHAR. The old
+    // transform `epoch_ns({col})` has no DuckDB binder overload for VARCHAR
+    // (epoch_ns expects TIMESTAMP/TIME/DATE), so the whole validate run
+    // aborted with a Binder Error — TRY(...) cannot catch a *bind*-time
+    // failure. The fix converts the 19-digit text via a BIGINT cast first
+    // (make_timestamp_ns({col}::BIGINT)), so the only argument fed to a
+    // typed function is the cast, and the projection binds cleanly.
+    let tax = test_taxonomy();
+    let label = "datetime.timestamp.epoch_nanoseconds";
+    let info = tax
+        .ddl_info(label)
+        .expect("epoch_nanoseconds is a known label");
+    let transform = info
+        .transform
+        .as_ref()
+        .expect("epoch_nanoseconds has a transform");
+
+    // Must NOT call epoch_ns(...) directly on the (VARCHAR) column.
+    assert!(
+        !transform.contains("epoch_ns({col})"),
+        "epoch_nanoseconds must not feed a bare VARCHAR column to epoch_ns \
+         (no binder overload → aborts validate); got: {}",
+        transform
+    );
+    // Must cast the textual column to BIGINT before any timestamp function,
+    // matching the sibling unix_seconds/milliseconds/microseconds shape.
+    assert!(
+        transform.contains("{col}::BIGINT"),
+        "expected a `{{col}}::BIGINT` cast so the VARCHAR storage binds, got: {}",
+        transform
+    );
+
+    // The rendered projection is TRY-wrapped and aliased like every other
+    // typed transform — no special-casing in the codegen.
+    let ext = ext_with_label("epoch_nanoseconds", Some(label));
+    let headers = vec!["epoch_nanoseconds".to_string()];
+    let proj = build_transform_projection(&headers, &ext, &tax, true);
+    assert!(
+        proj.starts_with("TRY(") && proj.ends_with("AS \"epoch_nanoseconds\""),
+        "expected TRY(...) AS alias, got: {}",
+        proj
+    );
+}

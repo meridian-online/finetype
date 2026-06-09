@@ -1983,7 +1983,7 @@ datetime.timestamp.epoch_nanoseconds:
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
   format_string: null
-  transform: "epoch_ns({col})"
+  transform: "make_timestamp_ns({col}::BIGINT)"
   transform_ext: null
   decompose: null
   validation:
@@ -2003,7 +2003,9 @@ datetime.timestamp.epoch_nanoseconds:
       link: "https://opentelemetry.io/docs/specs/otel/metrics/data-model/"
   notes: >
     New in format coverage expansion. OpenTelemetry, Go time.UnixNano().
-    Transform uses DuckDB epoch_ns() function.
+    Transform casts the 19-digit text to BIGINT then converts via DuckDB
+    make_timestamp_ns() — input is VARCHAR storage, so epoch_ns() (which
+    expects a TIMESTAMP/TIME) has no binder overload and aborts validate.
 
 datetime.timestamp.iso_space_zulu:
   title: ISO with Space Separator and Z
