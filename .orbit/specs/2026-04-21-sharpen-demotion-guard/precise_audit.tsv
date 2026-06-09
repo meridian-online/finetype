@@ -58,7 +58,7 @@ datetime.duration.iso_8601	false	^-?P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)[DW
 datetime.epoch.unix_microseconds	false	^\d{16}$	true
 datetime.epoch.unix_milliseconds	false	^\d{13}$	true
 datetime.epoch.unix_seconds	false	^\d{10}$	true
-datetime.offset.iana	true	^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$	true
+datetime.offset.iana	false	^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$	true
 datetime.offset.utc	false	^UTC [+-]\d{2}:\d{2}$	true
 datetime.period.fiscal_year	false	^FY\d{2,4}$	true
 datetime.period.quarter	false	^(Q[1-4]\s?\d{4}|\d{4}[\s-]?Q[1-4])$	true
