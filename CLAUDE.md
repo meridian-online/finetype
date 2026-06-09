@@ -52,9 +52,14 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 
 ## Current sprint
 
-**Multi-lens diagnostic SHIPPED — next Sense retrain bets follow.** Spec `2026-05-20-gittables-multi-lens-diagnostic` closed 13/13 ACs (commit `31fe887`); it superseded m-19 via MADR 0087 and folded the three m-19 deliverables in as design constraints (realism = corroboration filter; coverage = full-corpus pass; leakage firewall = `file_content_sha256 MOD 2` partition). The v18+ retrain block is lifted.
+**Precision "ceiling" diagnosed as a measurement artifact; first fix shipped (0.6.25).** The flat precision across v22/v23/v24/latdec was the *metric*, not the model: aggregate corpus precision (~0.49 cell-2 vs gated-YDF) is 52% plain integer/decimal and ~0.0003% the rare types the rounds fought over (latitude/longitude/url/utc) — so it counts a bet's collateral damage but never its rare-type gain. Full diagnosis: `output/eval-ceiling-diagnosis/finding.md`; memory `eval-precision-metric-blind-to-rare-targets`.
 
-The diagnostic's deliverable is `eval/gittables/corpus_pass/report.md` — a ranked list of corroborated `(criterion × mechanism)` gaps. Each gap entry carries `action: {training_data_addition, model_retrain, validator_widening, taxonomy_addition, fallback_adjustment}`. Top gaps under `reject_rate_ceil × misclassification` are dominated by v22 false positives (`identity.person.gender_code` on basketball `START_POSITION`, `datetime.offset.utc` on integer columns) — these are the load-bearing input for the next v22+ patch retrain spec. Decisions 0055/0056/0057/0066/0087.
+What changed:
+- **Headline gate is now the rare-type scoreboard** (`scripts/build_rare_type_gold.py`, choice 0093): oracle-free, header-anchored FP-rate/recall on the contested types, which *moves* per round where corpus precision is flat. It NEVER overrides a NO-GO corpus-honest gate — the breadth gates still own cross-type regression protection. Aggregate corpus precision is demoted to a context guardrail.
+- **Shipped (v0.6.25):** the coordinate header-veto (`header_hint_coord_veto`, choice 0094) — the first fix the scoreboard unblocked. Demotes latitude/longitude false positives on non-coordinate numeric headers (~12× fewer, no recall loss, GO on every instrument). Sharpen-only patch on the v19 model — no model swap.
+- **Superseded:** the "next v22+ retrain bet" path. Additive hard-negative retrains are 0-for-N because they optimised against the blind metric. New rounds judge on the **full instrument map together** (rare-type scoreboard + corpus-honest gate + gold-anchor + m-19) — a single GO is not safety (memory `header-hint-deletion-blocked-multi-instrument`).
+
+Open follow-ups (orbit tasks): canonicalise the scoreboard via human review (`scripts/rare_type_gold_review.py`); header-hint deletion is blocked on training-data fortification (0094); re-baseline the multi-lens diagnostic on v19 (its gaps were v22 FPs scored by the blind metric). The diagnostic deliverable `eval/gittables/corpus_pass/report.md` and decisions 0055/0056/0057/0066/0087 remain valid background.
 
 ## Eval baseline — gated YDF is canonical
 

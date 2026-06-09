@@ -1,0 +1,5 @@
+key: corpus-pass-and-duckdb-scripting-friction
+body: 'Two recurring friction points when scripting FineType eval/corpus work (2026-06-09): (1) scripts/gittables_corpus_pass.py imports ''ydf'' at top-level even for --execute (which doesn''t need it), so run it via the project venv: eval/gittables/.venv/bin/python scripts/gittables_corpus_pass.py ... — NOT system python (fails ''No module named ydf''). (2) When scripting the duckdb CLI, pass -init /dev/null to skip ~/.duckdbrc, which injects ANSI colour codes that pollute parsed output (e.g. prepends \x1b[00m to the first row, breaking string matches). Pattern that works: duckdb -init /dev/null -noheader -list -c ''<sql>'', then strip ANSI defensively. The corpus pass on the 33k stratified sample takes ~41 min at --jobs 10; profile --files batch mode only supports -o json-schema (use single-file -f -o csv for per-column disambiguation tags).'
+timestamp: 2026-06-09T03:39:07.588612Z
+labels:
+- code-investigate
