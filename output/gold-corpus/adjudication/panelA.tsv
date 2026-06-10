@@ -1,0 +1,350 @@
+0	correct	representation.numeric.integer_number	ms offset written as plain integer, not +HH:MM offset format
+1	correct	representation.numeric.decimal_number	ms offset written with .0 decimal point
+2	wrong	representation.discrete.categorical	timezone abbreviations are a small closed vocab, not free text
+3	wrong	representation.discrete.categorical	timezone abbreviations are a small closed vocab, not free text
+4	wrong	representation.discrete.categorical	timezone abbreviations are a small closed vocab, not free text
+5	wrong	representation.discrete.categorical	timezone abbreviations are a small closed vocab, not free text
+6	wrong	representation.discrete.categorical	timezone abbreviations are a small closed vocab, not free text
+7	correct	representation.numeric.integer_number	ms offset written as plain integer
+8	correct	representation.numeric.integer_number	ms offset written as plain integer
+9	wrong	datetime.timestamp.sql_standard	YYYY-MM-DD HH:MM:SS has a time part; date.iso is date-only
+10	correct	representation.text.plain_text	news headlines are free text; header is a stray datetime
+11	correct	representation.numeric.decimal_number	offset ms written as decimal
+12	correct	representation.numeric.integer_number	ms offset written as plain integer
+13	correct	representation.numeric.integer_number	ms offset written as plain integer
+14	correct	representation.numeric.decimal_number	offset ms written as decimal
+15	correct	representation.numeric.decimal_number	offset ms written as decimal
+16	wrong	datetime.timestamp.dmy_hm	D/M/YYYY HH:MM is a DMY timestamp, not a bare date
+17	unsure		DD/MM/YYYY HH:MM:SS — no DMY-slash-with-seconds key
+18	wrong	datetime.timestamp.sql_standard	YYYY-MM-DD HH:MM:SS timestamp, not date-only
+19	wrong	representation.discrete.categorical	US timezone abbrevs CST/PST/EST = small closed vocab
+20	correct	representation.numeric.integer_number	ms value written as plain integer
+21	unsure		ISO T-separated timestamp without Z/offset — no exact taxonomy key
+22	correct	representation.text.plain_text	news headlines are free text
+23	wrong	datetime.offset.iana	Pacific/Pitcairn etc are IANA timezone names — dedicated key exists
+24	wrong	datetime.timestamp.iso_8601_milliseconds	JS toISOString format .987Z exactly matches this key
+25	correct	representation.numeric.integer_number	all-zero integers; no evidence of richer type
+26	correct	datetime.date.dmy_slash	pure DD/MM/YYYY dates, no time part
+27	correct	datetime.epoch.unix_seconds	10-digit epochs (~Jan 2019)
+28	unsure		mostly small vocab but one free-form FWS date breaks closed-set reading
+29	wrong	datetime.offset.iana	America/New_York is an IANA timezone name
+30	wrong	representation.boolean.terms	false/true word booleans, not TLDs
+31	wrong	representation.boolean.terms	false/true word booleans
+32	correct	technology.internet.url	https URLs
+33	wrong	geography.address.full_address	multi-line US street+city+state+zip addresses
+34	wrong	representation.boolean.terms	false/true word booleans
+35	wrong	representation.boolean.terms	false/true word booleans
+36	wrong	representation.identifier.alphanumeric_id	hipc_ctf_24725414_7 is an identifier token, not free text
+37	wrong	representation.boolean.terms	false/true word booleans
+38	correct	representation.text.plain_text	GCP resource paths; no specific key, plain_text fallback
+39	wrong	representation.identifier.alphanumeric_id	hipc_gene_28549970_7 is an identifier token
+40	wrong	representation.discrete.categorical	guardian relation = small closed vocab, not TLD
+41	wrong	representation.identifier.alphanumeric_id	hipc_ctf_27764254_2 is an identifier token
+42	correct	representation.numeric.decimal_number	Dec = astronomical declination, no geographic context
+43	wrong	representation.numeric.decimal_number	52-week price change, not latitude
+44	correct	representation.numeric.decimal_number	exposure z-scores
+45	correct	representation.numeric.decimal_number	GPA feature floats
+46	wrong	representation.numeric.decimal_number	52-week-high price, not latitude
+47	correct	representation.numeric.decimal_number	logloss metric
+48	correct	representation.numeric.decimal_number	elapsed ms decimals
+49	correct	representation.numeric.decimal_number	elapsed ms decimals
+50	correct	representation.numeric.decimal_number	small monotonic decimals, not an epoch format
+51	correct	representation.numeric.decimal_number	cluster scores
+52	correct	representation.numeric.decimal_number	starch % feature floats
+53	correct	representation.numeric.decimal_number	exposure z-scores
+54	correct	representation.numeric.decimal_number	exposure z-scores
+55	correct	representation.numeric.decimal_number	feature floats
+56	correct	representation.numeric.decimal_number	house price in $10k units, written as plain decimal
+57	wrong	representation.numeric.decimal_number	52-week price change, not latitude
+58	correct	representation.numeric.decimal_number	magnitude feature float despite lat-range values
+59	correct	representation.numeric.decimal_number	GPA-like decimals, headerless
+60	correct	geography.coordinate.longitude	header Lng, values cluster at 2.36 (Paris)
+61	correct	geography.coordinate.longitude	header Lng, in-range clustered coords
+62	correct	geography.coordinate.longitude	header Lng, in-range clustered coords
+63	correct	geography.coordinate.longitude	header Lng, in-range clustered coords
+64	correct	geography.coordinate.longitude	header lon, plausible US longitudes
+65	correct	representation.numeric.integer_number	"flu how long" = duration counts, not longitude
+66	correct	geography.coordinate.longitude	header Lng, in-range clustered coords
+67	wrong	representation.numeric.integer_number	longTermDebt dollars, not unix timestamps
+68	correct	geography.coordinate.longitude	header Lon, in-range values
+69	wrong	representation.text.entity_name	company name with Corporation suffix
+70	wrong	representation.text.entity_name	company name with Inc. suffix
+71	correct	geography.coordinate.longitude	header longitude, values in range
+72	wrong	representation.text.entity_name	company name with Inc. suffix
+73	wrong	representation.text.entity_name	company name with AG suffix
+74	correct	representation.text.plain_text	.NET XML-doc member refs; plain_text fallback
+75	wrong	representation.text.entity_name	company name with Inc. suffix
+76	wrong	representation.boolean.terms	false/true word booleans
+77	correct	representation.numeric.integer_number	constant 1 integers
+78	correct	representation.numeric.decimal_number	velocity component floats
+79	correct	representation.numeric.decimal_number	velocity component floats
+80	correct	representation.numeric.decimal_number	velocity component floats
+81	correct	representation.numeric.decimal_number	velocity component floats
+82	correct	representation.numeric.decimal_number	mobility index written with .0
+83	correct	representation.numeric.decimal_number	price-like decimals, numeric header
+84	correct	representation.numeric.decimal_number	price-like decimals, numeric header
+85	correct	representation.numeric.decimal_number	velocity component floats
+86	correct	representation.numeric.decimal_number	price-like decimals, numeric header
+87	correct	representation.numeric.decimal_number	velocity component floats
+88	correct	representation.numeric.decimal_number	headerless numeric column, plain decimals
+89	correct	representation.numeric.decimal_number	velocity component, signed decimals
+90	correct	geography.location.city	TEAM_CITY = Orlando
+91	correct	geography.location.city	TEAM_CITY = Philadelphia
+92	wrong	geography.location.city	TEAM_CITY header; Washington is the team's city
+93	correct	geography.location.city	TEAM_CITY = Phoenix
+94	correct	geography.location.city	TEAM_CITY = Philadelphia
+95	correct	geography.location.city	city = Eschborn
+96	correct	geography.location.city	Texas town names under CITY header
+97	correct	geography.location.city	City = ROSEVILLE
+98	correct	geography.location.city	city = Toronto
+99	correct	geography.location.city	city = Houston
+100	correct	geography.location.city	Nevada city names
+101	correct	geography.location.city	venue_city, mostly real cities
+102	correct	geography.location.city	Arizona city names
+103	correct	geography.location.city	Montana city names
+104	correct	geography.location.city	Vermont city names
+105	correct	geography.location.city	West Virginia city names
+106	wrong	geography.address.full_address	full multi-line street+city+state+zip addresses, not city names
+107	correct	geography.location.city	Reading/Sudbury/Vancouver
+108	wrong	representation.discrete.categorical	game asset tokens, 4 distinct repeated values; not cities
+109	wrong	geography.address.full_address	full multi-line addresses, not city names
+110	wrong	geography.address.full_address	full multi-line addresses incl APO boxes, not city names
+111	correct	geography.location.city	Chinese city names
+112	correct	geography.location.city	Australian cities
+113	correct	geography.location.region	Zimbabwe provinces
+114	correct	representation.identifier.alphanumeric_id	6-letter species codes, high-cardinality code tokens
+115	correct	geography.location.region	Ecuadorian provinces
+116	correct	representation.discrete.categorical	constant LOCAL, type field
+117	correct	representation.discrete.categorical	small closed vocab gate events
+118	correct	geography.location.city	Texas city names
+119	correct	representation.discrete.categorical	small closed vocab gate events
+120	correct	geography.location.country	full country name Argentina
+121	correct	geography.location.country	full country name Ireland
+122	correct	geography.location.country_code	ISO alpha-3 FRA
+123	wrong	representation.numeric.integer_number	constant -1 sentinel id, nothing to do with UTC offsets
+124	correct	geography.location.country	full country name Luxembourg
+125	correct	geography.location.country	Canada
+126	correct	geography.location.country	Brazil
+127	correct	geography.location.country	Cyprus
+128	correct	geography.location.country	Malta
+129	wrong	representation.numeric.integer_number	constant -1 sentinel id, not a UTC offset
+130	correct	geography.location.country	Germany
+131	wrong	geography.location.country_code	ABW/AFG/AGO are ISO alpha-3 country codes
+132	wrong	representation.numeric.integer_number	constant -1 sentinel id, not a UTC offset
+133	wrong	representation.discrete.categorical	"Chinese" is a nationality/language word, not a country code
+134	correct	geography.location.country_code	ISO alpha-2 codes
+135	correct	geography.location.country_code	ISO alpha-2 codes
+136	correct	geography.location.country_code	ISO alpha-2 codes
+137	correct	geography.location.country_code	ISO alpha-2 codes
+138	correct	geography.location.country_code	constant US, valid alpha-2
+139	correct	geography.location.country_code	constant US, valid alpha-2
+140	wrong	representation.discrete.categorical	BOS is a team abbreviation from a small closed vocab, not a city name
+141	correct	geography.location.country_code	constant US, valid alpha-2
+142	wrong	representation.discrete.categorical	header TYPE with single token CAN; country not proven
+143	correct	geography.location.country_code	ISO alpha-2 codes
+144	correct	geography.location.country_code	constant US, valid alpha-2
+145	correct	geography.location.country_code	constant US, valid alpha-2
+146	correct	representation.discrete.categorical	LTE/NR network type vocab
+147	wrong	representation.discrete.categorical	single-letter labels I/O/L, small closed vocab, not cities
+148	correct	representation.text.plain_text	free-text survey explanations
+149	wrong	geography.location.country	"United States" is a full country name, not a code
+150	wrong	representation.discrete.categorical	Static/Dynamic is a state-machine vocab, not a geographic region
+151	wrong	geography.location.state_code	GA/FL US state codes under State header
+152	wrong	representation.discrete.categorical	Static/Dynamic vocab, not geographic
+153	wrong	representation.discrete.categorical	Static/Dynamic vocab, not geographic
+154	correct	geography.location.region	UK regions
+155	correct	geography.location.region	Zimbabwe provinces
+156	correct	representation.numeric.integer_number	constant 0, written integer format
+157	wrong	geography.location.state_code	header state with CA = California state code, not Canada
+158	correct	representation.numeric.integer_number	small numeric ids, written integers
+159	correct	geography.location.region	US county names, region is closest granularity
+160	correct	representation.numeric.integer_number	numeric district ids
+161	wrong	geography.location.continent	Africa/Asia/Europe/Oceania are continent-level names
+162	correct	representation.numeric.decimal_number	signed decimals despite Rank header
+163	correct	geography.location.region	US county names
+164	correct	representation.numeric.integer_number	constant 0
+165	correct	geography.location.region	Italian region LOMBARDIA
+166	correct	geography.location.region	Georgia county names
+167	correct	representation.numeric.integer_number	population-style integer estimates
+168	wrong	geography.location.state_code	NM is a US state code under Provider State header
+169	wrong	geography.location.region	county names, not cities
+170	wrong	container.object.csv	whole CSV records embedded in one column
+171	correct	representation.numeric.integer_number	constant 0 counts
+172	correct	geography.location.region	US county names
+173	correct	geography.location.country_code	constant US, valid alpha-2
+174	wrong	geography.location.state_code	GA/FL driver-licence state codes
+175	correct	geography.location.country_code	constant US, valid alpha-2
+176	wrong	geography.location.state_code	NV is a US state code, not country
+177	correct	representation.numeric.integer_number	plain integers
+178	wrong	geography.location.state_code	TX is a US state code, not country
+179	correct	representation.numeric.integer_number	large plain integers
+180	wrong	representation.discrete.categorical	data-type names (Strings/Date), not a city
+181	correct	representation.discrete.categorical	single repeated token
+182	correct	representation.discrete.categorical	comment/story closed vocab
+183	correct	representation.discrete.categorical	comment/story closed vocab
+184	correct	representation.discrete.categorical	comment/story closed vocab
+185	correct	representation.discrete.categorical	closed set of class names
+186	correct	representation.discrete.categorical	closed facet vocab
+187	correct	representation.discrete.categorical	closed set of class names
+188	correct	representation.discrete.categorical	status vocab
+189	correct	representation.discrete.categorical	repeated group tokens
+190	wrong	representation.discrete.categorical	male/female is gender, not region
+191	correct	representation.discrete.categorical	closed group-id vocab
+192	unsure		integer-coded category, format vs semantics ambiguous
+193	correct	representation.discrete.categorical	single repeated value
+194	correct	representation.discrete.categorical	single repeated cell line
+195	correct	representation.discrete.categorical	closed set of class names
+196	wrong	representation.discrete.categorical	sale/purchase, not a city
+197	correct	representation.discrete.categorical	payout/growth vocab
+198	correct	representation.discrete.categorical	closed set of foul/call types
+199	wrong	representation.numeric.integer_number	-1 integer code, not a UTC offset
+200	correct	representation.numeric.integer_number	all 1, plain integer
+201	wrong	representation.discrete.categorical	letter-only enum codes, low cardinality
+202	wrong	representation.discrete.categorical	PNK exchange code, not a city
+203	correct	representation.discrete.categorical	closed group vocab
+204	correct	representation.discrete.categorical	food category vocab
+205	correct	representation.discrete.categorical	status vocab
+206	correct	representation.discrete.categorical	category vocab
+207	unsure		single value 1.0, grade decimal vs category ambiguous
+208	correct	representation.discrete.categorical	single-letter closed vocab
+209	correct	representation.discrete.categorical	closed class-name set
+210	correct	representation.numeric.integer_number	pure integer IDs
+211	correct	representation.numeric.integer_number	pure integer IDs
+212	correct	representation.numeric.integer_number	pure integer IDs
+213	correct	representation.numeric.integer_number	pure integer IDs
+214	correct	representation.numeric.integer_number	constant integer ID
+215	correct	representation.numeric.integer_number	pure integer IDs
+216	correct	representation.numeric.integer_number	pure integer IDs
+217	correct	representation.numeric.integer_number	all 1, integer
+218	correct	representation.numeric.integer_number	integer IDs
+219	correct	representation.numeric.integer_number	integer IDs
+220	correct	representation.numeric.integer_number	constant integer ID
+221	wrong	representation.numeric.integer_number	NBA team ID constant, not unix time
+222	correct	representation.numeric.integer_number	integer IDs
+223	wrong	representation.numeric.integer_number	NBA team ID constant, not unix time
+224	correct	representation.numeric.integer_number	integer IDs
+225	correct	representation.numeric.integer_number	integer IDs
+226	unsure		field-name keys, identifier vs categorical ambiguous
+227	correct	representation.numeric.integer_number	integer IDs
+228	correct	representation.numeric.integer_number	integer IDs
+229	correct	representation.numeric.integer_number	integer IDs
+230	wrong	representation.discrete.categorical	team abbreviation code, not a city
+231	wrong	representation.discrete.categorical	team abbreviation code, not a city
+232	wrong	representation.discrete.categorical	team abbreviation code, not a city
+233	correct	representation.identifier.alphanumeric_id	letter+digit layer tokens
+234	correct	representation.identifier.alphanumeric_id	Q-prefixed Wikidata IDs
+235	wrong	representation.identifier.uuid	8-4-4-4-12 UUID format
+236	correct	representation.identifier.alphanumeric_id	digit-dash token
+237	wrong	representation.discrete.categorical	views/twitter small vocab
+238	correct	representation.identifier.alphanumeric_id	num_num composite IDs
+239	correct	representation.identifier.alphanumeric_id	Q-prefixed Wikidata ID
+240	wrong	representation.identifier.alphanumeric_id	msg+digits message IDs, not URLs
+241	correct	technology.internet.url	href link with query string
+242	wrong	representation.boolean.terms	Yes/Yes boolean, not URL
+243	correct	representation.numeric.integer_number	-1/0 integers despite header
+244	wrong	representation.numeric.integer_number	count of 1, not URL
+245	wrong	representation.text.plain_text	.pdf filenames, not URLs
+246	wrong	representation.identifier.alphanumeric_id	Bilibili video IDs, not URLs
+247	correct	technology.internet.url	href link with query string
+248	wrong	representation.numeric.integer_number	all 1 integer, not URL
+249	wrong	representation.text.plain_text	free-text descriptions, not URLs
+250	wrong	representation.text.plain_text	relative archive file paths, not URLs
+251	correct	technology.internet.url	full http schema.org URLs
+252	correct	technology.internet.url	full https URLs
+253	correct	technology.internet.url	full https URLs
+254	correct	technology.internet.url	full https URLs
+255	correct	technology.internet.url	full http schema.org URLs
+256	correct	technology.internet.url	full https URLs
+257	correct	technology.internet.url	full https URLs
+258	correct	technology.internet.url	full http schema.org URLs
+259	correct	technology.internet.url	full http schema.org URLs
+260	correct	technology.internet.url	full https URL
+261	correct	technology.internet.url	full https URL
+262	correct	technology.internet.url	full http URL
+263	correct	technology.internet.url	full http URLs under URL header
+264	correct	technology.internet.url	full http URLs
+265	wrong	representation.text.plain_text	values are words/phrases, not URLs
+266	unsure		all values are "-"; no evidence of type
+267	wrong	representation.text.word	hyphenated slugs, no scheme/domain — not URLs
+268	wrong	representation.text.word	same slug values, not URLs
+269	wrong	representation.identifier.alphanumeric_id	msg32812262 letter+digit tokens, not URLs
+270	correct	datetime.component.year	2016 values under checkoutyear
+271	unsure		messy MARC year strings — year vs text ambiguous
+272	correct	datetime.date.mdy_slash	06/17/2020 with day>12 in second slot
+273	correct	datetime.date.mdy_slash	MDY slash dates
+274	correct	datetime.date.mdy_slash	02/26, 10/31 confirm MDY
+275	correct	datetime.date.mdy_slash	10/22/2019 confirms MDY
+276	wrong	datetime.offset.iana	Pacific/Port_Moresby = IANA timezone names
+277	correct	representation.numeric.decimal_number	bare decimals, no currency markers
+278	wrong	representation.numeric.decimal_number	bare decimals like siblings; no currency formatting
+279	correct	representation.numeric.decimal_number	bare decimals incl 0.0
+280	correct	representation.numeric.integer_number	plain integers, no currency formatting
+281	correct	representation.numeric.decimal_number	bare decimals
+282	correct	geography.address.postal_code	NYC 5-digit zips under zip_code
+283	correct	geography.address.postal_code	CA zips under business_zip
+284	correct	geography.coordinate.longitude	-73.99 NYC longitudes, coord header
+285	correct	geography.coordinate.longitude	-87.7 Chicago longitudes, coord header
+286	correct	geography.location.city	city names under city header
+287	correct	geography.location.city	US town names under municipality
+288	correct	geography.location.city	UK town names
+289	correct	geography.location.country	full country names
+290	correct	geography.location.country_code	US ISO codes
+291	wrong	geography.location.region	NYC boroughs are subdivisions, not cities
+292	wrong	geography.location.region	boroughs are subdivisions, not cities
+293	correct	geography.location.region	US-PA ISO 3166-2 region codes
+294	wrong	geography.location.state_code	CA under state header = California state code
+295	correct	geography.location.region	UK district names
+296	correct	representation.text.plain_text	neighborhood names, no taxonomy label fits
+297	correct	geography.location.region	UK counties
+298	correct	identity.commerce.isbn	ISBN-13 values, minor comma-list noise
+299	wrong	representation.discrete.categorical	"airport" closed vocab; not a city
+300	wrong	representation.discrete.categorical	A2/NB/DM closed job-type codes; not a city
+301	correct	representation.discrete.categorical	repeated agency enum values
+302	wrong	representation.discrete.categorical	NA = continent code; not country_code
+303	wrong	representation.boolean.terms	yes/no values — boolean terms enum
+304	correct	representation.discrete.categorical	closed location-type vocab
+305	correct	representation.discrete.categorical	industry description enum
+306	correct	representation.discrete.categorical	U/E single-letter codes
+307	correct	representation.discrete.categorical	md/mb/ml magnitude types
+308	correct	representation.discrete.categorical	pr/us network codes
+309	correct	representation.discrete.categorical	BOOK/EBOOK enum
+310	correct	representation.discrete.categorical	Digital/Physical enum
+311	correct	representation.discrete.categorical	OverDrive/Horizon enum
+312	correct	representation.discrete.categorical	"per Annum" repeated enum
+313	wrong	representation.boolean.terms	true/false values
+314	correct	representation.discrete.categorical	L/F codes, not a boolean pair
+315	unsure		only 2 neighborhood-name samples; categorical vs plain_text undecidable
+316	wrong	geography.transportation.iata_code	3-letter airport codes, dedicated label exists
+317	wrong	representation.identifier.numeric_code	leading-zero digit codes must stay VARCHAR
+318	wrong	geography.transportation.iata_code	GKA/MAG/POM 3-letter airport codes
+319	wrong	geography.transportation.icao_code	AYGA/BGBW 4-letter ICAO codes
+320	unsure		sample values empty; header alone insufficient
+321	unsure		mixed 08B vs leading-zero digits; unclear
+322	wrong	representation.identifier.numeric_code	NAICS codes explicitly covered by numeric_code
+323	correct	representation.identifier.alphanumeric_id	structured digit-hyphen IDs
+324	correct	representation.identifier.alphanumeric_id	braced uppercase GUIDs fail canonical uuid format
+325	wrong	representation.identifier.numeric_code	IUCR leading-zero digit codes
+326	wrong	representation.numeric.decimal_number	earthquake magnitudes are feature floats, not latitude
+327	correct	representation.numeric.integer_number	small district ints
+328	correct	representation.numeric.integer_number	counts
+329	correct	representation.numeric.integer_number	month 10; no numeric-month label exists
+330	correct	representation.text.plain_text	free-text place descriptions
+331	wrong	identity.person.full_name	author names; full_name allows "Last, First" forms
+332	correct	representation.text.plain_text	publisher org names, messy punctuation
+333	correct	representation.text.plain_text	job titles, open vocab
+334	correct	representation.text.plain_text	anonymised block addresses
+335	wrong	technology.internet.hostname	google.com bare domains = hostname label
+336	wrong	technology.internet.hostname	bare domains
+337	wrong	datetime.component.year	year header, 7/8 in range; 9230 is dirty data
+338	wrong	representation.numeric.decimal_number	0.0 values fail year pattern
+339	wrong	datetime.component.year	year pattern explicitly allows trailing .0
+340	wrong	representation.boolean.terms	Yes values — boolean terms
+341	wrong	representation.numeric.decimal_number	price/EPS ratio is a feature float, not latitude
+342	correct	representation.numeric.decimal_number	cites-per-year ratios
+343	correct	datetime.component.year	1998 constant year column
+344	wrong	representation.numeric.integer_number	header conversation_no is not year-ish
+345	correct	representation.numeric.decimal_number	ML epoch counts 11.0/12.0, not unix epochs
+346	wrong	datetime.epoch.unix_milliseconds	13-digit epochs under timestamp header
+347	wrong	datetime.epoch.unix_milliseconds	13-digit epochs
+348	unsure		ISO datetime with 9 fractional digits; no nanosecond ISO label
+349	wrong	representation.identifier.increment	near-consecutive sequence under ID header
