@@ -84,7 +84,7 @@ acceptance_criteria:
     gold detects relocation at least as well — column-intrinsic accuracy alone is
     not sufficient grounds.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-08
   description: |
