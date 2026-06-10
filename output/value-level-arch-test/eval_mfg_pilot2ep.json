@@ -1,0 +1,794 @@
+{
+  "label": "mfg_pilot2ep",
+  "model": "models/char-cnn-mfg-pilot",
+  "model_type": "char-cnn",
+  "n_eval": 30684,
+  "skipped_multiline": 293,
+  "overall_recall": 0.0535,
+  "confusion_family": {
+    "geography.coordinate.latitude": {
+      "recall": 0.0,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code",
+          "pct": 84.3
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 14.8
+        },
+        {
+          "label": "representation.numeric.percentage",
+          "pct": 0.5
+        },
+        {
+          "label": "geography.coordinate.longitude",
+          "pct": 0.2
+        }
+      ]
+    },
+    "geography.coordinate.longitude": {
+      "recall": 0.0053,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code",
+          "pct": 87.1
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 11.3
+        },
+        {
+          "label": "identity.person.username",
+          "pct": 0.7
+        },
+        {
+          "label": "geography.coordinate.longitude",
+          "pct": 0.5
+        }
+      ]
+    },
+    "representation.numeric.decimal_number": {
+      "recall": 0.0155,
+      "n": 970,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code",
+          "pct": 81.0
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 15.9
+        },
+        {
+          "label": "representation.numeric.decimal_number",
+          "pct": 1.5
+        },
+        {
+          "label": "identity.person.username",
+          "pct": 1.1
+        }
+      ]
+    },
+    "representation.numeric.integer_number": {
+      "recall": 0.0,
+      "n": 343,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code.JA",
+          "pct": 34.7
+        },
+        {
+          "label": "geography.address.postal_code.EN_SG",
+          "pct": 24.2
+        },
+        {
+          "label": "geography.address.postal_code.LT",
+          "pct": 9.3
+        },
+        {
+          "label": "geography.address.postal_code.DE_CH",
+          "pct": 8.2
+        }
+      ]
+    },
+    "geography.location.city": {
+      "recall": 0.0,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code",
+          "pct": 93.2
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 5.1
+        },
+        {
+          "label": "representation.discrete.ordinal",
+          "pct": 0.8
+        },
+        {
+          "label": "geography.location.country",
+          "pct": 0.6
+        }
+      ]
+    },
+    "geography.location.region": {
+      "recall": 0.0009,
+      "n": 1056,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code",
+          "pct": 87.0
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 9.1
+        },
+        {
+          "label": "representation.discrete.ordinal",
+          "pct": 1.7
+        },
+        {
+          "label": "geography.location.country",
+          "pct": 1.3
+        }
+      ]
+    },
+    "geography.address.postal_code": {
+      "recall": 0.0993,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code.LT",
+          "pct": 47.2
+        },
+        {
+          "label": "geography.address.postal_code.DE_CH",
+          "pct": 20.9
+        },
+        {
+          "label": "geography.address.postal_code",
+          "pct": 9.9
+        },
+        {
+          "label": "geography.address.postal_code.SK",
+          "pct": 6.1
+        }
+      ]
+    }
+  },
+  "per_type_recall": {
+    "container.array.comma_separated": {
+      "recall": 0.0,
+      "n": 18
+    },
+    "datetime.component.day_of_week": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.component.month_name": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.component.year": {
+      "recall": 0.0345,
+      "n": 87
+    },
+    "datetime.date.abbrev_month_no_comma": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.abbreviated_month": {
+      "recall": 0.0147,
+      "n": 750
+    },
+    "datetime.date.compact_dmy": {
+      "recall": 0.0,
+      "n": 97
+    },
+    "datetime.date.compact_mdy": {
+      "recall": 0.0,
+      "n": 109
+    },
+    "datetime.date.compact_ym": {
+      "recall": 0.0,
+      "n": 75
+    },
+    "datetime.date.compact_ymd": {
+      "recall": 0.0,
+      "n": 429
+    },
+    "datetime.date.dmy_dash": {
+      "recall": 0.0,
+      "n": 11
+    },
+    "datetime.date.dmy_dash_abbrev": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.date.dmy_dash_abbrev_short": {
+      "recall": 0.0,
+      "n": 5
+    },
+    "datetime.date.dmy_dot": {
+      "recall": 0.0,
+      "n": 13
+    },
+    "datetime.date.dmy_short_dot": {
+      "recall": 0.0,
+      "n": 10
+    },
+    "datetime.date.dmy_short_slash": {
+      "recall": 0.2941,
+      "n": 17
+    },
+    "datetime.date.dmy_slash": {
+      "recall": 0.0,
+      "n": 62
+    },
+    "datetime.date.dmy_space_abbrev": {
+      "recall": 0.0,
+      "n": 14
+    },
+    "datetime.date.dmy_space_full": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.date.full_month_no_comma": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.iso": {
+      "recall": 0.0,
+      "n": 322
+    },
+    "datetime.date.iso_week": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.date.long_full_month": {
+      "recall": 0.0,
+      "n": 149
+    },
+    "datetime.date.mdy_dash": {
+      "recall": 0.0,
+      "n": 12
+    },
+    "datetime.date.mdy_short_slash": {
+      "recall": 0.1875,
+      "n": 16
+    },
+    "datetime.date.mdy_slash": {
+      "recall": 0.0,
+      "n": 542
+    },
+    "datetime.date.month_year_abbrev": {
+      "recall": 0.0,
+      "n": 5
+    },
+    "datetime.date.month_year_full": {
+      "recall": 0.0,
+      "n": 12
+    },
+    "datetime.date.month_year_slash": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.ordinal": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.short_dmy": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.weekday_full_month": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.year_month": {
+      "recall": 0.1333,
+      "n": 15
+    },
+    "datetime.date.ymd_dot": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.ymd_slash": {
+      "recall": 0.0,
+      "n": 72
+    },
+    "datetime.epoch.unix_microseconds": {
+      "recall": 0.0,
+      "n": 28
+    },
+    "datetime.epoch.unix_milliseconds": {
+      "recall": 0.0,
+      "n": 1035
+    },
+    "datetime.epoch.unix_seconds": {
+      "recall": 0.0,
+      "n": 1007
+    },
+    "datetime.period.quarter": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.time.hm_12h": {
+      "recall": 0.0,
+      "n": 10
+    },
+    "datetime.time.hm_24h": {
+      "recall": 0.953,
+      "n": 298
+    },
+    "datetime.time.hms_12h": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "datetime.time.hms_24h": {
+      "recall": 0.4103,
+      "n": 156
+    },
+    "datetime.time.iso": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.timestamp.dmy_hm": {
+      "recall": 0.0,
+      "n": 14
+    },
+    "datetime.timestamp.dot_dmy_24h": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.timestamp.dot_ymd_24h": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "datetime.timestamp.epoch_nanoseconds": {
+      "recall": 0.0,
+      "n": 34
+    },
+    "datetime.timestamp.iso_8601": {
+      "recall": 0.0,
+      "n": 637
+    },
+    "datetime.timestamp.iso_8601_micros_offset": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.timestamp.iso_8601_microseconds": {
+      "recall": 0.0,
+      "n": 17
+    },
+    "datetime.timestamp.iso_8601_millis_offset": {
+      "recall": 0.0,
+      "n": 20
+    },
+    "datetime.timestamp.iso_8601_milliseconds": {
+      "recall": 0.0,
+      "n": 464
+    },
+    "datetime.timestamp.iso_8601_offset": {
+      "recall": 0.0,
+      "n": 253
+    },
+    "datetime.timestamp.iso_microseconds": {
+      "recall": 0.0,
+      "n": 17
+    },
+    "datetime.timestamp.iso_space_zulu": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.timestamp.mdy_12h": {
+      "recall": 0.0,
+      "n": 4
+    },
+    "datetime.timestamp.mdy_24h": {
+      "recall": 0.0,
+      "n": 703
+    },
+    "datetime.timestamp.pg_short_offset": {
+      "recall": 0.0,
+      "n": 5
+    },
+    "datetime.timestamp.rfc_2822": {
+      "recall": 0.0,
+      "n": 8
+    },
+    "datetime.timestamp.rfc_3339": {
+      "recall": 0.0,
+      "n": 30
+    },
+    "datetime.timestamp.slash_ymd_24h": {
+      "recall": 0.0,
+      "n": 22
+    },
+    "datetime.timestamp.sql_microseconds": {
+      "recall": 0.0,
+      "n": 88
+    },
+    "datetime.timestamp.sql_microseconds_offset": {
+      "recall": 0.0,
+      "n": 13
+    },
+    "datetime.timestamp.sql_milliseconds": {
+      "recall": 0.0,
+      "n": 75
+    },
+    "datetime.timestamp.sql_standard": {
+      "recall": 0.0,
+      "n": 1316
+    },
+    "datetime.timestamp.syslog_bsd": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "finance.banking.aba_routing": {
+      "recall": 0.0,
+      "n": 491
+    },
+    "finance.banking.iban": {
+      "recall": 0.0,
+      "n": 7
+    },
+    "finance.banking.swift_bic": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "finance.crypto.ethereum_address": {
+      "recall": 0.0,
+      "n": 39
+    },
+    "finance.currency.amount": {
+      "recall": 0.0,
+      "n": 194
+    },
+    "finance.currency.amount_comma": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "finance.currency.amount_nodecimal": {
+      "recall": 0.9072,
+      "n": 194
+    },
+    "finance.currency.currency_code": {
+      "recall": 0.0,
+      "n": 33
+    },
+    "finance.currency.currency_symbol": {
+      "recall": 0.0,
+      "n": 4
+    },
+    "finance.payment.credit_card_number": {
+      "recall": 0.0,
+      "n": 136
+    },
+    "finance.rate.yield": {
+      "recall": 0.2,
+      "n": 25
+    },
+    "finance.securities.cusip": {
+      "recall": 0.0,
+      "n": 42
+    },
+    "finance.securities.isin": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "finance.securities.sedol": {
+      "recall": 0.0,
+      "n": 7
+    },
+    "geography.address.full_address": {
+      "recall": 0.0,
+      "n": 325
+    },
+    "geography.address.postal_code": {
+      "recall": 0.0993,
+      "n": 1500
+    },
+    "geography.address.street_name": {
+      "recall": 0.0,
+      "n": 411
+    },
+    "geography.address.street_suffix": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.contact.calling_code": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.coordinate.coordinates": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "geography.coordinate.latitude": {
+      "recall": 0.0,
+      "n": 1500
+    },
+    "geography.coordinate.longitude": {
+      "recall": 0.0053,
+      "n": 1500
+    },
+    "geography.format.wkt": {
+      "recall": 0.0,
+      "n": 25
+    },
+    "geography.location.city": {
+      "recall": 0.0,
+      "n": 1500
+    },
+    "geography.location.continent": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.location.country": {
+      "recall": 0.0731,
+      "n": 616
+    },
+    "geography.location.country_code": {
+      "recall": 0.0,
+      "n": 37
+    },
+    "geography.location.region": {
+      "recall": 0.0009,
+      "n": 1056
+    },
+    "geography.location.state_code": {
+      "recall": 0.0,
+      "n": 8
+    },
+    "geography.transportation.iata_code": {
+      "recall": 0.0,
+      "n": 18
+    },
+    "geography.transportation.icao_code": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.transportation.unlocode": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "identity.academic.orcid": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "identity.commerce.ean": {
+      "recall": 0.0,
+      "n": 9
+    },
+    "identity.commerce.isbn": {
+      "recall": 0.0,
+      "n": 656
+    },
+    "identity.commerce.isrc": {
+      "recall": 0.0,
+      "n": 78
+    },
+    "identity.commerce.issn": {
+      "recall": 1.0,
+      "n": 41
+    },
+    "identity.commerce.upc": {
+      "recall": 0.0,
+      "n": 1480
+    },
+    "identity.government.abn": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "identity.government.ein": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "identity.government.eu_vat": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "identity.government.ssn": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "identity.government.vin": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "identity.medical.cpt": {
+      "recall": 0.0,
+      "n": 23
+    },
+    "identity.medical.dea_number": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "identity.medical.hcpcs": {
+      "recall": 0.0,
+      "n": 17
+    },
+    "identity.medical.npi": {
+      "recall": 0.0,
+      "n": 279
+    },
+    "identity.person.blood_type": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "identity.person.email": {
+      "recall": 0.0,
+      "n": 30
+    },
+    "identity.person.first_name": {
+      "recall": 0.0,
+      "n": 5
+    },
+    "identity.person.full_name": {
+      "recall": 0.0,
+      "n": 475
+    },
+    "identity.person.gender": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "identity.person.gender_code": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "identity.person.phone_number": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "identity.person.username": {
+      "recall": 0.0023,
+      "n": 432
+    },
+    "representation.discrete.ordinal": {
+      "recall": 0.0,
+      "n": 21
+    },
+    "representation.file.excel_format": {
+      "recall": 0.0,
+      "n": 4
+    },
+    "representation.file.file_size": {
+      "recall": 0.2969,
+      "n": 64
+    },
+    "representation.file.mime_type": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "representation.identifier.alphanumeric_id": {
+      "recall": 0.1724,
+      "n": 551
+    },
+    "representation.identifier.increment": {
+      "recall": 0.0,
+      "n": 16
+    },
+    "representation.identifier.numeric_code": {
+      "recall": 0.0,
+      "n": 1110
+    },
+    "representation.identifier.uuid": {
+      "recall": 0.0,
+      "n": 1166
+    },
+    "representation.numeric.decimal_number": {
+      "recall": 0.0155,
+      "n": 970
+    },
+    "representation.numeric.decimal_number_comma": {
+      "recall": 0.1242,
+      "n": 322
+    },
+    "representation.numeric.integer_number": {
+      "recall": 0.0,
+      "n": 343
+    },
+    "representation.numeric.percentage": {
+      "recall": 0.6814,
+      "n": 295
+    },
+    "representation.numeric.scientific_notation": {
+      "recall": 0.0,
+      "n": 17
+    },
+    "representation.numeric.si_number": {
+      "recall": 0.9939,
+      "n": 163
+    },
+    "representation.scientific.cas_number": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "representation.scientific.dna_sequence": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "representation.scientific.protein_sequence": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "representation.text.entity_name": {
+      "recall": 0.0,
+      "n": 1169
+    },
+    "representation.text.plain_text": {
+      "recall": 0.2723,
+      "n": 1146
+    },
+    "representation.text.word": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.code.doi": {
+      "recall": 0.0,
+      "n": 248
+    },
+    "technology.code.imei": {
+      "recall": 0.0,
+      "n": 65
+    },
+    "technology.code.locale_code": {
+      "recall": 0.0,
+      "n": 111
+    },
+    "technology.cryptographic.hash": {
+      "recall": 0.0,
+      "n": 169
+    },
+    "technology.cryptographic.token_urlsafe": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "technology.development.version": {
+      "recall": 0.0,
+      "n": 4
+    },
+    "technology.identifier.snowflake_id": {
+      "recall": 0.0,
+      "n": 15
+    },
+    "technology.identifier.tsid": {
+      "recall": 0.0,
+      "n": 249
+    },
+    "technology.internet.cidr": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.internet.http_method": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.internet.ip_v4": {
+      "recall": 0.0,
+      "n": 53
+    },
+    "technology.internet.ip_v4_with_port": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.internet.mac_address": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.internet.top_level_domain": {
+      "recall": 0.0,
+      "n": 24
+    },
+    "technology.internet.url": {
+      "recall": 0.0,
+      "n": 4
+    }
+  }
+}

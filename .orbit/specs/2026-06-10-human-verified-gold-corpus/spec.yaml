@@ -22,7 +22,7 @@ acceptance_criteria:
     choice 0057's deferred Phase C (~400-column target).
     GATE: author reviews quotas and budget before any build spend.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |

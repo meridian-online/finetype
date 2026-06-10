@@ -252,3 +252,32 @@ output/eval-ceiling-diagnosis/coord_veto_candidate.parquet
 
 # Header-hint ablation pass outputs (large, real values; regenerable)
 output/eval-ceiling-diagnosis/abl_*/
+
+# Fossil-cleanup ac-03 (spec 2026-06-10-fossil-cleanup): keep-class dirs'
+# regenerable run outputs. Verdict JSONs / reports / fixed file lists in
+# the same dirs ARE tracked — these patterns exclude only the bulk.
+# Corpus-honest gate: per-candidate sample passes (~33 MB each,
+# real corpus values) + stderr/stdout captures. Regenerable from
+# scripts/corpus_honest_gate.py + gittables_corpus_pass.py.
+output/corpus-honest-gate/*_pass/
+output/corpus-honest-gate/*.err
+output/corpus-honest-gate/*.out
+output/corpus-honest-gate/refined/*.err
+# Drift-precheck stderr/runlogs (verdict JSONs + .files.txt are tracked).
+output/destination-drift-precheck/*.err
+output/destination-drift-precheck/*.runlog
+# latdec corpus pass: mirror the corpus_pass/ parquet rules (the
+# columns.parquet is the MODELS-table input, kept on disk only).
+eval/gittables/corpus_pass_latdec/corpus_pass/columns.parquet
+eval/gittables/corpus_pass_latdec/corpus_pass/files.parquet
+eval/gittables/corpus_pass_latdec/corpus_pass/execute_log.jsonl
+# Mining-factory distilled training inputs (regenerable from
+# scripts/mining_factory/manufacture.py + distillation pipeline).
+output/mining-factory/*.csv.gz
+# Mining-factory working CharCNN models (campaign-local, like the
+# char-cnn-v13/v14/v15 experiment dirs above).
+models/char-cnn-base/
+models/char-cnn-mfg/
+# Value-level arch-test working models (eval_*.json verdicts tracked).
+output/value-level-arch-test/model_base_nf/
+output/value-level-arch-test/model_mfg_nf/

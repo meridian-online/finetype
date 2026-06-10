@@ -1,0 +1,794 @@
+{
+  "label": "v25_prod",
+  "model": "models/value-charcnn-v25",
+  "model_type": "char-cnn",
+  "n_eval": 30684,
+  "skipped_multiline": 293,
+  "overall_recall": 0.7892,
+  "confusion_family": {
+    "geography.coordinate.latitude": {
+      "recall": 0.7287,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.coordinate.latitude",
+          "pct": 72.9
+        },
+        {
+          "label": "geography.coordinate.longitude",
+          "pct": 22.6
+        },
+        {
+          "label": "representation.numeric.decimal_number",
+          "pct": 4.4
+        },
+        {
+          "label": "geography.address.postal_code",
+          "pct": 0.1
+        }
+      ]
+    },
+    "geography.coordinate.longitude": {
+      "recall": 0.8133,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.coordinate.longitude",
+          "pct": 81.3
+        },
+        {
+          "label": "geography.coordinate.latitude",
+          "pct": 11.7
+        },
+        {
+          "label": "representation.numeric.decimal_number",
+          "pct": 6.5
+        },
+        {
+          "label": "representation.numeric.percentage",
+          "pct": 0.3
+        }
+      ]
+    },
+    "representation.numeric.decimal_number": {
+      "recall": 0.8031,
+      "n": 970,
+      "top_predicted": [
+        {
+          "label": "representation.numeric.decimal_number",
+          "pct": 80.3
+        },
+        {
+          "label": "geography.coordinate.longitude",
+          "pct": 11.5
+        },
+        {
+          "label": "geography.coordinate.latitude",
+          "pct": 6.1
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 1.0
+        }
+      ]
+    },
+    "representation.numeric.integer_number": {
+      "recall": 0.3761,
+      "n": 343,
+      "top_predicted": [
+        {
+          "label": "representation.numeric.integer_number",
+          "pct": 37.6
+        },
+        {
+          "label": "representation.identifier.numeric_code",
+          "pct": 32.7
+        },
+        {
+          "label": "geography.address.postal_code",
+          "pct": 22.7
+        },
+        {
+          "label": "representation.text.plain_text",
+          "pct": 1.5
+        }
+      ]
+    },
+    "geography.location.city": {
+      "recall": 0.7413,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.location.city",
+          "pct": 74.1
+        },
+        {
+          "label": "geography.location.region",
+          "pct": 8.1
+        },
+        {
+          "label": "geography.location.country",
+          "pct": 7.8
+        },
+        {
+          "label": "identity.person.full_name",
+          "pct": 3.9
+        }
+      ]
+    },
+    "geography.location.region": {
+      "recall": 0.2102,
+      "n": 1056,
+      "top_predicted": [
+        {
+          "label": "geography.location.city",
+          "pct": 47.7
+        },
+        {
+          "label": "geography.location.region",
+          "pct": 21.0
+        },
+        {
+          "label": "geography.location.country",
+          "pct": 16.8
+        },
+        {
+          "label": "identity.person.username",
+          "pct": 5.5
+        }
+      ]
+    },
+    "geography.address.postal_code": {
+      "recall": 0.952,
+      "n": 1500,
+      "top_predicted": [
+        {
+          "label": "geography.address.postal_code",
+          "pct": 95.2
+        },
+        {
+          "label": "datetime.component.year",
+          "pct": 2.1
+        },
+        {
+          "label": "representation.numeric.integer_number",
+          "pct": 1.1
+        },
+        {
+          "label": "representation.identifier.numeric_code",
+          "pct": 0.6
+        }
+      ]
+    }
+  },
+  "per_type_recall": {
+    "container.array.comma_separated": {
+      "recall": 0.1667,
+      "n": 18
+    },
+    "datetime.component.day_of_week": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.component.month_name": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.component.year": {
+      "recall": 0.7471,
+      "n": 87
+    },
+    "datetime.date.abbrev_month_no_comma": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.abbreviated_month": {
+      "recall": 0.9813,
+      "n": 750
+    },
+    "datetime.date.compact_dmy": {
+      "recall": 0.0928,
+      "n": 97
+    },
+    "datetime.date.compact_mdy": {
+      "recall": 0.4954,
+      "n": 109
+    },
+    "datetime.date.compact_ym": {
+      "recall": 0.1733,
+      "n": 75
+    },
+    "datetime.date.compact_ymd": {
+      "recall": 0.7669,
+      "n": 429
+    },
+    "datetime.date.dmy_dash": {
+      "recall": 0.9091,
+      "n": 11
+    },
+    "datetime.date.dmy_dash_abbrev": {
+      "recall": 1.0,
+      "n": 2
+    },
+    "datetime.date.dmy_dash_abbrev_short": {
+      "recall": 1.0,
+      "n": 5
+    },
+    "datetime.date.dmy_dot": {
+      "recall": 1.0,
+      "n": 13
+    },
+    "datetime.date.dmy_short_dot": {
+      "recall": 1.0,
+      "n": 10
+    },
+    "datetime.date.dmy_short_slash": {
+      "recall": 0.6471,
+      "n": 17
+    },
+    "datetime.date.dmy_slash": {
+      "recall": 0.1613,
+      "n": 62
+    },
+    "datetime.date.dmy_space_abbrev": {
+      "recall": 0.8571,
+      "n": 14
+    },
+    "datetime.date.dmy_space_full": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "datetime.date.full_month_no_comma": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.iso": {
+      "recall": 1.0,
+      "n": 322
+    },
+    "datetime.date.iso_week": {
+      "recall": 1.0,
+      "n": 2
+    },
+    "datetime.date.long_full_month": {
+      "recall": 0.7785,
+      "n": 149
+    },
+    "datetime.date.mdy_dash": {
+      "recall": 0.4167,
+      "n": 12
+    },
+    "datetime.date.mdy_short_slash": {
+      "recall": 0.375,
+      "n": 16
+    },
+    "datetime.date.mdy_slash": {
+      "recall": 0.9945,
+      "n": 542
+    },
+    "datetime.date.month_year_abbrev": {
+      "recall": 1.0,
+      "n": 5
+    },
+    "datetime.date.month_year_full": {
+      "recall": 0.8333,
+      "n": 12
+    },
+    "datetime.date.month_year_slash": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "datetime.date.ordinal": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "datetime.date.short_dmy": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "datetime.date.weekday_full_month": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "datetime.date.year_month": {
+      "recall": 1.0,
+      "n": 15
+    },
+    "datetime.date.ymd_dot": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "datetime.date.ymd_slash": {
+      "recall": 1.0,
+      "n": 72
+    },
+    "datetime.epoch.unix_microseconds": {
+      "recall": 0.6429,
+      "n": 28
+    },
+    "datetime.epoch.unix_milliseconds": {
+      "recall": 0.9729,
+      "n": 1035
+    },
+    "datetime.epoch.unix_seconds": {
+      "recall": 0.9414,
+      "n": 1007
+    },
+    "datetime.period.quarter": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "datetime.time.hm_12h": {
+      "recall": 1.0,
+      "n": 10
+    },
+    "datetime.time.hm_24h": {
+      "recall": 1.0,
+      "n": 298
+    },
+    "datetime.time.hms_12h": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "datetime.time.hms_24h": {
+      "recall": 1.0,
+      "n": 156
+    },
+    "datetime.time.iso": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "datetime.timestamp.dmy_hm": {
+      "recall": 0.5714,
+      "n": 14
+    },
+    "datetime.timestamp.dot_dmy_24h": {
+      "recall": 0.5,
+      "n": 2
+    },
+    "datetime.timestamp.dot_ymd_24h": {
+      "recall": 0.6667,
+      "n": 3
+    },
+    "datetime.timestamp.epoch_nanoseconds": {
+      "recall": 0.3529,
+      "n": 34
+    },
+    "datetime.timestamp.iso_8601": {
+      "recall": 0.9984,
+      "n": 637
+    },
+    "datetime.timestamp.iso_8601_micros_offset": {
+      "recall": 0.5,
+      "n": 2
+    },
+    "datetime.timestamp.iso_8601_microseconds": {
+      "recall": 1.0,
+      "n": 17
+    },
+    "datetime.timestamp.iso_8601_millis_offset": {
+      "recall": 1.0,
+      "n": 20
+    },
+    "datetime.timestamp.iso_8601_milliseconds": {
+      "recall": 1.0,
+      "n": 464
+    },
+    "datetime.timestamp.iso_8601_offset": {
+      "recall": 1.0,
+      "n": 253
+    },
+    "datetime.timestamp.iso_microseconds": {
+      "recall": 1.0,
+      "n": 17
+    },
+    "datetime.timestamp.iso_space_zulu": {
+      "recall": 1.0,
+      "n": 2
+    },
+    "datetime.timestamp.mdy_12h": {
+      "recall": 1.0,
+      "n": 4
+    },
+    "datetime.timestamp.mdy_24h": {
+      "recall": 1.0,
+      "n": 703
+    },
+    "datetime.timestamp.pg_short_offset": {
+      "recall": 1.0,
+      "n": 5
+    },
+    "datetime.timestamp.rfc_2822": {
+      "recall": 1.0,
+      "n": 8
+    },
+    "datetime.timestamp.rfc_3339": {
+      "recall": 1.0,
+      "n": 30
+    },
+    "datetime.timestamp.slash_ymd_24h": {
+      "recall": 1.0,
+      "n": 22
+    },
+    "datetime.timestamp.sql_microseconds": {
+      "recall": 1.0,
+      "n": 88
+    },
+    "datetime.timestamp.sql_microseconds_offset": {
+      "recall": 1.0,
+      "n": 13
+    },
+    "datetime.timestamp.sql_milliseconds": {
+      "recall": 0.9467,
+      "n": 75
+    },
+    "datetime.timestamp.sql_standard": {
+      "recall": 1.0,
+      "n": 1316
+    },
+    "datetime.timestamp.syslog_bsd": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "finance.banking.aba_routing": {
+      "recall": 0.9226,
+      "n": 491
+    },
+    "finance.banking.iban": {
+      "recall": 1.0,
+      "n": 7
+    },
+    "finance.banking.swift_bic": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "finance.crypto.ethereum_address": {
+      "recall": 1.0,
+      "n": 39
+    },
+    "finance.currency.amount": {
+      "recall": 0.7526,
+      "n": 194
+    },
+    "finance.currency.amount_comma": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "finance.currency.amount_nodecimal": {
+      "recall": 0.8247,
+      "n": 194
+    },
+    "finance.currency.currency_code": {
+      "recall": 0.9394,
+      "n": 33
+    },
+    "finance.currency.currency_symbol": {
+      "recall": 1.0,
+      "n": 4
+    },
+    "finance.payment.credit_card_number": {
+      "recall": 0.8676,
+      "n": 136
+    },
+    "finance.rate.yield": {
+      "recall": 0.44,
+      "n": 25
+    },
+    "finance.securities.cusip": {
+      "recall": 0.9286,
+      "n": 42
+    },
+    "finance.securities.isin": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "finance.securities.sedol": {
+      "recall": 0.7143,
+      "n": 7
+    },
+    "geography.address.full_address": {
+      "recall": 0.64,
+      "n": 325
+    },
+    "geography.address.postal_code": {
+      "recall": 0.952,
+      "n": 1500
+    },
+    "geography.address.street_name": {
+      "recall": 0.8491,
+      "n": 411
+    },
+    "geography.address.street_suffix": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.contact.calling_code": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.coordinate.coordinates": {
+      "recall": 1.0,
+      "n": 2
+    },
+    "geography.coordinate.latitude": {
+      "recall": 0.7287,
+      "n": 1500
+    },
+    "geography.coordinate.longitude": {
+      "recall": 0.8133,
+      "n": 1500
+    },
+    "geography.format.wkt": {
+      "recall": 0.68,
+      "n": 25
+    },
+    "geography.location.city": {
+      "recall": 0.7413,
+      "n": 1500
+    },
+    "geography.location.continent": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.location.country": {
+      "recall": 0.487,
+      "n": 616
+    },
+    "geography.location.country_code": {
+      "recall": 0.7568,
+      "n": 37
+    },
+    "geography.location.region": {
+      "recall": 0.2102,
+      "n": 1056
+    },
+    "geography.location.state_code": {
+      "recall": 0.0,
+      "n": 8
+    },
+    "geography.transportation.iata_code": {
+      "recall": 0.2222,
+      "n": 18
+    },
+    "geography.transportation.icao_code": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "geography.transportation.unlocode": {
+      "recall": 0.5,
+      "n": 2
+    },
+    "identity.academic.orcid": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "identity.commerce.ean": {
+      "recall": 0.0,
+      "n": 9
+    },
+    "identity.commerce.isbn": {
+      "recall": 0.8735,
+      "n": 656
+    },
+    "identity.commerce.isrc": {
+      "recall": 0.9487,
+      "n": 78
+    },
+    "identity.commerce.issn": {
+      "recall": 0.9268,
+      "n": 41
+    },
+    "identity.commerce.upc": {
+      "recall": 0.9966,
+      "n": 1480
+    },
+    "identity.government.abn": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "identity.government.ein": {
+      "recall": 1.0,
+      "n": 6
+    },
+    "identity.government.eu_vat": {
+      "recall": 1.0,
+      "n": 6
+    },
+    "identity.government.ssn": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "identity.government.vin": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "identity.medical.cpt": {
+      "recall": 0.0,
+      "n": 23
+    },
+    "identity.medical.dea_number": {
+      "recall": 0.6667,
+      "n": 6
+    },
+    "identity.medical.hcpcs": {
+      "recall": 0.9412,
+      "n": 17
+    },
+    "identity.medical.npi": {
+      "recall": 0.4086,
+      "n": 279
+    },
+    "identity.person.blood_type": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "identity.person.email": {
+      "recall": 0.9667,
+      "n": 30
+    },
+    "identity.person.first_name": {
+      "recall": 0.0,
+      "n": 5
+    },
+    "identity.person.full_name": {
+      "recall": 0.5368,
+      "n": 475
+    },
+    "identity.person.gender": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "identity.person.gender_code": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "identity.person.phone_number": {
+      "recall": 0.0,
+      "n": 3
+    },
+    "identity.person.username": {
+      "recall": 0.3218,
+      "n": 432
+    },
+    "representation.discrete.ordinal": {
+      "recall": 0.2381,
+      "n": 21
+    },
+    "representation.file.excel_format": {
+      "recall": 0.0,
+      "n": 4
+    },
+    "representation.file.file_size": {
+      "recall": 1.0,
+      "n": 64
+    },
+    "representation.file.mime_type": {
+      "recall": 0.0,
+      "n": 2
+    },
+    "representation.identifier.alphanumeric_id": {
+      "recall": 0.824,
+      "n": 551
+    },
+    "representation.identifier.increment": {
+      "recall": 0.0,
+      "n": 16
+    },
+    "representation.identifier.numeric_code": {
+      "recall": 0.7405,
+      "n": 1110
+    },
+    "representation.identifier.uuid": {
+      "recall": 1.0,
+      "n": 1166
+    },
+    "representation.numeric.decimal_number": {
+      "recall": 0.8031,
+      "n": 970
+    },
+    "representation.numeric.decimal_number_comma": {
+      "recall": 0.8075,
+      "n": 322
+    },
+    "representation.numeric.integer_number": {
+      "recall": 0.3761,
+      "n": 343
+    },
+    "representation.numeric.percentage": {
+      "recall": 0.7627,
+      "n": 295
+    },
+    "representation.numeric.scientific_notation": {
+      "recall": 0.5294,
+      "n": 17
+    },
+    "representation.numeric.si_number": {
+      "recall": 0.9816,
+      "n": 163
+    },
+    "representation.scientific.cas_number": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "representation.scientific.dna_sequence": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "representation.scientific.protein_sequence": {
+      "recall": 1.0,
+      "n": 2
+    },
+    "representation.text.entity_name": {
+      "recall": 0.3884,
+      "n": 1169
+    },
+    "representation.text.plain_text": {
+      "recall": 0.5977,
+      "n": 1146
+    },
+    "representation.text.word": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.code.doi": {
+      "recall": 0.9798,
+      "n": 248
+    },
+    "technology.code.imei": {
+      "recall": 0.1692,
+      "n": 65
+    },
+    "technology.code.locale_code": {
+      "recall": 0.8198,
+      "n": 111
+    },
+    "technology.cryptographic.hash": {
+      "recall": 0.7811,
+      "n": 169
+    },
+    "technology.cryptographic.token_urlsafe": {
+      "recall": 0.0,
+      "n": 6
+    },
+    "technology.development.version": {
+      "recall": 0.75,
+      "n": 4
+    },
+    "technology.identifier.snowflake_id": {
+      "recall": 0.0667,
+      "n": 15
+    },
+    "technology.identifier.tsid": {
+      "recall": 0.9277,
+      "n": 249
+    },
+    "technology.internet.cidr": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "technology.internet.http_method": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.internet.ip_v4": {
+      "recall": 0.8302,
+      "n": 53
+    },
+    "technology.internet.ip_v4_with_port": {
+      "recall": 0.0,
+      "n": 1
+    },
+    "technology.internet.mac_address": {
+      "recall": 1.0,
+      "n": 1
+    },
+    "technology.internet.top_level_domain": {
+      "recall": 0.2917,
+      "n": 24
+    },
+    "technology.internet.url": {
+      "recall": 0.0,
+      "n": 4
+    }
+  }
+}
