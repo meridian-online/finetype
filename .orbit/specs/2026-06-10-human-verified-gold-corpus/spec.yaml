@@ -53,7 +53,7 @@ acceptance_criteria:
     rare-type-scoreboard canonicalisation task (t-0001692818b74c8d50b76340) so the
     ~120-row scoreboard sample is adjudicated as part of the same pass.
   gate: false
-  checked: false
+  checked: true
   ac_type: ops
 - id: ac-05
   description: |
