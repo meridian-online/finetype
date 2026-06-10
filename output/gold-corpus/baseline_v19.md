@@ -18,16 +18,16 @@ construction, being the queue's most contested cases.)
 
 ## What drags it down (the stories, in user terms)
 
-- **Postal code is the worst over-emitter measured so far: precision 0.074.** When v19 says
-  "postal code" on this corpus, it is wrong 25 times for every 2 it is right — five-digit
+- **Postal code is the worst over-emitter measured so far: precision 0.133.** When v19 says
+  "postal code" on this corpus, it is wrong 26 times for every 4 it is right — five-digit
   integers and zip-shaped quantities absorb the label. (FineType says postal; validation
   would then reject most rows — the round-trip failure mode.)
-- **Identifier columns vanish: alphanumeric_id recall 0.128.** v19 demotes 34 of 39 real
+- **Identifier columns vanish: alphanumeric_id recall 0.113.** v19 demotes 47 of 53 real
   id columns (to unknown or specific codes) — the anchor's A-family finding, now confirmed
   at corpus diversity.
-- **Plain integer recall is 0.390** — not because integers are hard, but because contested
-  strata pull them into utc/year/postal/etc. This is the over-emit collateral measured
-  column-by-column instead of via oracle proxies.
+- **Plain integer recall is 0.467 at support 195** — not because integers are hard, but
+  because contested strata pull them into utc/year/postal/etc. This is the over-emit
+  collateral measured column-by-column instead of via oracle proxies.
 - **Categorical columns are half-invisible: recall 0.390 at support 100.** Real
   status/type/category vocabularies routinely land elsewhere — the single biggest
   miss-pool in the corpus.
@@ -58,7 +58,7 @@ rules earn their keep), iso dates (P=1.0), decimals (P=1.0/R=0.865), year
 3. **Predictions run on the truncated sample values** (same path as the anchor baseline) —
    comparable across models, but not identical to a full-file profile.
 4. **Selection bias is by design**: half the corpus was drawn where v19 emits contested
-   types, so 68.6% is NOT "v19's accuracy on random tables" — it is accuracy on the
+   types, so 66.2% is NOT "v19's accuracy on random tables" — it is accuracy on the
    contested + backbone mix the sizing memo specified. Compare models on this fixture,
    not this number to other corpora.
 
