@@ -70,7 +70,7 @@ acceptance_criteria:
     per-type CIs and a single headline number. No parallel scorer. Baseline run
     on shipped v19 committed as output/gold-corpus/baseline_v19.md.
   gate: false
-  checked: false
+  checked: true
 - id: ac-07
   description: |
     Instrument audit: gated-YDF oracle, rare-type scoreboard, corpus-honest-gate

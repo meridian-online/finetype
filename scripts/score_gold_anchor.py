@@ -86,6 +86,87 @@ def _profile_column(binary: Path, column_name: str, values: list[str]) -> str:
     return defn.get("x-finetype-label", "") if isinstance(defn, dict) else ""
 
 
+def cmd_build_gold(args: argparse.Namespace) -> int:
+    """Merge the verified gold layers into one fixture (gold_corpus_v1.tsv).
+
+    Layers (spec 2026-06-10-human-verified-gold-corpus ac-06):
+      anchor      eval/gold/gold_eval_anchor.tsv (240, human-curated)
+      consensus   gold_lens_labels.tsv rows with verdict=consensus (ac-03)
+      adjudicated gold_review_queue_v1_review.csv rows where the author has
+                  filled human_verdict (correct -> proposed_label;
+                  wrong -> correct_label_if_wrong; unsure -> skipped)
+    Later layers never override the anchor; duplicate keys keep first layer.
+    Re-run as author verdicts land — the fixture grows monotonically."""
+    fields = ["family", "file_path", "file_content_sha256", "column_name",
+              "curated_label", "ydf_context", "sense_context", "labeller", "provenance"]
+    out_rows: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(row: dict) -> None:
+        key = (row["file_content_sha256"], row["column_name"])
+        if key in seen or not row.get("curated_label"):
+            return
+        seen.add(key)
+        out_rows.append({f: row.get(f, "") for f in fields})
+
+    for r in load_gold(args.anchor):
+        add(r)
+    n_anchor = len(out_rows)
+    if args.lens_labels.exists():
+        for r in load_gold(args.lens_labels):
+            if r.get("verdict") != "consensus":
+                continue
+            add({**r, "family": r.get("tier", "") + ":" + r.get("stratum_label", ""),
+                 "curated_label": r.get("consensus_label", ""),
+                 "ydf_context": r.get("ydf_context", ""),
+                 "sense_context": r.get("sense_context", ""),
+                 "labeller": "lens-consensus",
+                 "provenance": "ac-03 " + r.get("verdict_basis", "")})
+    n_consensus = len(out_rows) - n_anchor
+    n_adj = 0
+    if args.review.exists():
+        with args.review.open() as fh:
+            for r in csv.DictReader(fh):
+                verdict = (r.get("human_verdict") or "").strip().lower()
+                if verdict not in ("correct", "wrong"):
+                    continue
+                label = (r.get("proposed_label") if verdict == "correct"
+                         else r.get("correct_label_if_wrong") or "").strip()
+                if not label:
+                    continue
+                add({"family": "adjudicated:" + r.get("stratum", ""),
+                     "file_path": "", "file_content_sha256": r["file_content_sha256"],
+                     "column_name": r["column_name"], "curated_label": label,
+                     "ydf_context": "", "sense_context": "",
+                     "labeller": "author-adjudicated",
+                     "provenance": "ac-04 sitting; " + (r.get("note") or "")})
+                n_adj += 1
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    with args.out.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields, delimiter="\t", lineterminator="\n")
+        w.writeheader()
+        w.writerows(out_rows)
+    print(f"gold v1: {len(out_rows)} columns (anchor {n_anchor}, consensus "
+          f"{n_consensus}, adjudicated {n_adj}) -> {args.out}", file=sys.stderr)
+    return 0
+
+
+def _vendored_values(file_path: str, column_name: str, cap: int = 100) -> list[str]:
+    """External gold columns live in vendored CSVs, not the corpus parquet."""
+    p = Path(file_path)
+    if not file_path or not p.exists() or p.suffix.lower() not in (".csv", ".dat"):
+        return []
+    vals: list[str] = []
+    with p.open(newline="", encoding="utf-8", errors="replace") as fh:
+        for row in csv.DictReader(fh):
+            v = (row.get(column_name) or "").strip()
+            if v:
+                vals.append(v)
+            if len(vals) >= cap:
+                break
+    return vals
+
+
 def cmd_predict(args: argparse.Namespace) -> int:
     import pyarrow.parquet as pq
 
@@ -113,6 +194,8 @@ def cmd_predict(args: argparse.Namespace) -> int:
         for i, r in enumerate(gold, 1):
             key = (r["file_content_sha256"], r["column_name"])
             vals = samples.get(key)
+            if not vals:
+                vals = _vendored_values(r.get("file_path", ""), r["column_name"])
             if not vals:
                 n_err += 1
                 continue
@@ -148,6 +231,17 @@ def cmd_score(args: argparse.Namespace) -> int:
             continue
         pairs[r["family"]].append((r["curated_label"], pred))
 
+    def wilson(k: int, n: int) -> tuple[float, float]:
+        """95% Wilson interval for k/n; returns (lo, hi). (nan, nan) if n=0."""
+        if n == 0:
+            return float("nan"), float("nan")
+        z = 1.96
+        ph = k / n
+        denom = 1 + z * z / n
+        centre = (ph + z * z / (2 * n)) / denom
+        half = z * ((ph * (1 - ph) / n + z * z / (4 * n * n)) ** 0.5) / denom
+        return max(0.0, centre - half), min(1.0, centre + half)
+
     def prf(curated_pred: list[tuple[str, str]], label: str) -> tuple[int, int, int, float, float]:
         tp = sum(1 for c, p in curated_pred if c == label and p == label)
         fp = sum(1 for c, p in curated_pred if c != label and p == label)
@@ -161,32 +255,38 @@ def cmd_score(args: argparse.Namespace) -> int:
     tsv_path = args.out_dir / f"metrics_{args.model_name}_{stamp}.tsv"
     md_path = args.out_dir / f"report_{args.model_name}_{stamp}.md"
 
+    all_pairs: list[tuple[str, str]] = [t for cp in pairs.values() for t in cp]
     rows_out: list[dict] = []
     fam_acc: dict[str, float] = {}
     for family in sorted(pairs):
         cp = pairs[family]
-        labels = sorted({c for c, _ in cp})
-        acc = sum(1 for c, p in cp if c == p) / len(cp)
-        fam_acc[family] = acc
-        for label in labels:
-            tp, fp, fn, pr, rc = prf(cp, label)
-            rows_out.append(
-                {
-                    "family": family,
-                    "label": label,
-                    "support": tp + fn,
-                    "tp": tp,
-                    "fp": fp,
-                    "fn": fn,
-                    "precision": pr,
-                    "recall": rc,
-                }
-            )
+        fam_acc[family] = sum(1 for c, p in cp if c == p) / len(cp)
+    # Per-label metrics over the WHOLE scored set: a false positive counts
+    # against a label no matter which family the column was drawn for.
+    for label in sorted({c for c, _ in all_pairs}):
+        tp, fp, fn, pr, rc = prf(all_pairs, label)
+        plo, phi = wilson(tp, tp + fp)
+        rlo, rhi = wilson(tp, tp + fn)
+        rows_out.append(
+            {
+                "family": "(global)",
+                "label": label,
+                "support": tp + fn,
+                "tp": tp,
+                "fp": fp,
+                "fn": fn,
+                "precision": pr,
+                "recall": rc,
+                "precision_ci": f"{plo:.2f}-{phi:.2f}" if plo == plo else "n/a",
+                "recall_ci": f"{rlo:.2f}-{rhi:.2f}" if rlo == rlo else "n/a",
+            }
+        )
 
     with tsv_path.open("w") as fh:
         w = csv.DictWriter(
             fh,
-            fieldnames=["family", "label", "support", "tp", "fp", "fn", "precision", "recall"],
+            fieldnames=["family", "label", "support", "tp", "fp", "fn",
+                        "precision", "recall", "precision_ci", "recall_ci"],
             delimiter="\t",
             lineterminator="\n",
         )
@@ -222,18 +322,23 @@ def cmd_score(args: argparse.Namespace) -> int:
         "Per-label precision/recall (the curated label is ground truth; YDF is "
         "not consulted):",
         "",
-        "| Family | Curated label | Support | TP | FP | FN | Precision | Recall |",
-        "|--------|---------------|--------:|---:|---:|---:|----------:|-------:|",
+        "| Curated label | Support | TP | FP | FN | Precision (95% CI) | Recall (95% CI) |",
+        "|---------------|--------:|---:|---:|---:|-------------------:|----------------:|",
     ]
     for row in rows_out:
         lines.append(
-            f"| {row['family']} | {row['label']} | {row['support']} | {row['tp']} | "
-            f"{row['fp']} | {row['fn']} | {fmt(row['precision'])} | {fmt(row['recall'])} |"
+            f"| {row['label']} | {row['support']} | {row['tp']} | "
+            f"{row['fp']} | {row['fn']} | {fmt(row['precision'])} ({row.get('precision_ci', 'n/a')}) "
+            f"| {fmt(row['recall'])} ({row.get('recall_ci', 'n/a')}) |"
         )
     macro_p = [r["precision"] for r in rows_out if r["precision"] == r["precision"]]
     macro_r = [r["recall"] for r in rows_out if r["recall"] == r["recall"]]
+    n_correct = sum(1 for c, pr2 in all_pairs if c == pr2)
+    alo, ahi = wilson(n_correct, len(all_pairs))
     lines += [
         "",
+        f"**Headline — column accuracy:** {n_correct}/{len(all_pairs)} = "
+        f"{n_correct/len(all_pairs):.3f} (95% CI {alo:.3f}-{ahi:.3f})  ",
         f"**Macro precision** (mean over labels): {sum(macro_p)/len(macro_p):.3f}  ",
         f"**Macro recall** (mean over labels): {sum(macro_r)/len(macro_r):.3f}  ",
     ]
@@ -246,6 +351,17 @@ def cmd_score(args: argparse.Namespace) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="mode", required=True)
+
+    b = sub.add_parser("build-gold")
+    b.add_argument("--anchor", type=Path,
+                   default=Path("eval/gold/gold_eval_anchor.tsv"))
+    b.add_argument("--lens-labels", type=Path,
+                   default=Path("eval/gold/gold_lens_labels.tsv"))
+    b.add_argument("--review", type=Path,
+                   default=Path("eval/gold/gold_review_queue_v1_review.csv"))
+    b.add_argument("--out", type=Path,
+                   default=Path("eval/gold/gold_corpus_v1.tsv"))
+    b.set_defaults(func=cmd_build_gold)
 
     p = sub.add_parser("predict")
     p.add_argument("--gold", required=True, type=Path)
