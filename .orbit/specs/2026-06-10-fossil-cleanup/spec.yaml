@@ -2,7 +2,7 @@ id: 2026-06-10-fossil-cleanup
 goal: 'Reclaim the repo''s working surface without eval risk: archive fossil eval artefacts, prune author-approved dead model dirs, fix stale CLAUDE.md claims, and bring the dirty git tree to zero — only changes that need no accuracy evidence; code deletions and file splits stay gated on the gold corpus.'
 cards:
 - 0019-human-verified-gold-corpus
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -23,7 +23,7 @@ acceptance_criteria:
     reclaimed reported (before/after du). No dir referenced by an open spec, task,
     or CLAUDE.md is touched. Models are archived (recoverable), never silently rm'd.
   gate: false
-  checked: false
+  checked: true
   ac_type: ops
 - id: ac-03
   description: |
@@ -31,7 +31,7 @@ acceptance_criteria:
     committed, .gitignore'd, or removed per the manifest. git status --porcelain
     is empty on main after the sweep.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-04
   description: |
@@ -40,7 +40,7 @@ acceptance_criteria:
     scripts/ eval-tooling reality (110 Python files, build+runtime still
     Python-free); any other figure the manifest pass catches.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-05
   description: |
@@ -50,4 +50,5 @@ acceptance_criteria:
     output/fossil-cleanup/inference_baseline.md. No optimisation work — just the
     number, so "very fast inference" becomes testable.
   gate: false
-  checked: false
+  checked: true
+closed_at: 2026-06-10T01:31:04.044895Z
