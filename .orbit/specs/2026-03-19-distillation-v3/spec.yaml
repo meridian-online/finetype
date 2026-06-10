@@ -1,38 +1,51 @@
 id: 2026-03-19-distillation-v3
-status: closed
 goal: |
   Distill all downloaded benchmark datasets (Sherlock, SOTAB, GitTables, eval CSVs) using the Phase 2 blind-first adjudication protocol. Bank comprehensive disagreement data while Claude Max token budget allows. Triple objective: (1) establish a baseline for PR-2 rescore, (2) identify FineType weaknesses across diverse external benchmarks, (3) map Sherlock's 78-type ground truth against FineType's 250-type taxonomy to find coverage gaps.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: All four datasets distilled with merged_labels.csv containing source column
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: 'Sherlock: test split (137K columns) distilled with three-way comparison available'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: 'SOTAB: Round 2 CTA tables (44K) extracted and distilled, or deferred with documented reason'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: 'GitTables: 50 files per topic (~4,700 files, ~50K columns) extracted and distilled'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: 'Eval CSVs: all 27 files distilled'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: Invalid label rate <5% across all datasets (validated by scripts/validate_distillation.py)
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: Per-dataset agreement rates computed and reported
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: Sherlock→FineType type mapping reviewed by Hugh, coverage gaps identified
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: Disagreement breakdown by PR-2 weakness category via post-merge tagging script
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-10
   description: Data sufficient to run rescore_distillation.py for PR-2 before/after comparison
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-11
   description: Per-batch CSVs committed to branch — no output exists only on local disk
-  ac_type: code
+  gate: false
+  checked: false

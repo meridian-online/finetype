@@ -1,7 +1,9 @@
 id: 2026-03-25-overnight-training-v5
-status: closed
 goal: |
   Push raw multi-branch model accuracy from 121/190 to 140+/190 (and post-Sharpen from 155/190 to 170+/190) through improved training data quality, value-level augmentation, hard-negative oversampling, and an architecture scale-up experiment. Ship the best model as sherlock-v5 default before v0.6.13 release.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
@@ -11,6 +13,8 @@ acceptance_criteria:
         clustering, include negative-only distributions.
     (c) version — always generate ≥3-part versions (M.N.P minimum), increase v-prefix rate to ≥40%. (d) ssn — add area-number range constraints (001–899 for area, 01–99 for group) to make
         generated SSNs structurally distinguishable from phone numbers.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     Implement augmentation in the data preparation pipeline that applies controlled noise to 30-40% of training samples. Augmentation is in-place replacement (does not increase total record count — same number of records, 30-40% have augmented values). Augmentation types: (a) Whitespace: leading/trailing spaces, tabs, \r\n artifacts (10% of augmented samples) (b) Encoding artifacts: common mojibake patterns (Ã© for é, â€™ for ') (5% of augmented) (c) Format mixing: within a column, vary format for 10-20% of values (e.g., phone column
@@ -18,12 +22,18 @@ acceptance_criteria:
     (d) Null representation mixing: inject NULL/N-A/n-a/-/empty values into 5-10% of column
         positions (10% of augmented)
     (e) Case variation: random case changes for text types (5% of augmented)
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     Increase samples_per_type to 2-3x for the top-10 confused type pairs from eval: hs_code, decimal_number, latitude, longitude, version, ssn, phone_number, ean, upc, npi. These types get 6000-9000 samples vs the standard 3000-5000 for other types.
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Run a quick format-check pass on distilled labels before blending. For each distilled row, check if the column values are plausible for the assigned label by running them through FineType's validation patterns. Flag rows where <50% of values match the label's validation pattern. Exclude flagged rows from training.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     Update prepare_multibranch_data.py (or equivalent) to: (a) Accept --samples-per-type (default 3000) and --oversample-types (comma-separated list) (b) Apply augmentation at configured rate (--augmentation-rate, default 0.35) — in-place replacement (c) Run label validation pass before blending (--validate-labels flag) (d) Write FTMB v3 format with table grouping for sibling-context (e) Log comprehensive manifest with per-type counts, augmentation stats, exclusion stats,
@@ -31,9 +41,13 @@ acceptance_criteria:
     (f) Verify eval dataset exclusion: cross-reference the 31 profile eval dataset names
         (titanic, iris, earthquakes_2024, etc.) against distilled corpus sources. Exclude any
         overlapping columns. Log exclusion count.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     Define a second model configuration (~50% wider than current sherlock-v4-sibling). Current architecture (verified from models/sherlock-v4-sibling/config.json): - char branch: 960 → Dense(300, ReLU) → Dense(300) → [300] - embed branch: 512 → Dense(200, ReLU) → Dense(200) → [200] - stats branch: 27 → Dense(128, ReLU) → Dense(64) → [64] - header branch: 128 → Dense(128, ReLU) → Dense(64) → [64] - merge trunk: concat([300,200,64,64]=628) → Dense(500) → Dense(500) → Dense(250) Scaled configuration (~50% wider): - char branch: 960 → Dense(450, ReLU) → Dense(450) → [450] - embed branch: 512 → Dense(300, ReLU) → Dense(300) → [300] - stats branch: 27 → Dense(192, ReLU) → Dense(96) → [96] - header branch: 128 → Dense(192, ReLU) → Dense(96) → [96] - merge trunk: concat([450,300,96,96]=942) → Dense(750) → Dense(750) → Dense(250) Train both current and scaled configs on the same prepared data.
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     Create overnight_v5.sh that orchestrates the full pipeline: 0. Preflight checks:
@@ -43,12 +57,20 @@ acceptance_criteria:
            Project total wall time for both architectures × target epochs. If projection
            exceeds 7 hours, reduce epochs adaptively (minimum 20 epochs).
     1. Fix generators (Rust changes already compiled) 2. Prepare data (AC-5 pipeline) 3. Train current architecture → sherlock-v5-current 4. Train scaled architecture → sherlock-v5-scaled 5. Run profile eval on both (raw + post-Sharpen) 6. Per-column regression check against current 155/190 baseline 7. Write comparison report to output/overnight-v5/comparison.md Script must be idempotent and resumable: each stage writes a completion marker file. On re-run, skip stages with existing markers. Stage markers are in output/overnight-v5/.
+  gate: false
+  checked: false
 - id: AC-8
   description: |
     Best-of-two trained models achieves ≥140/190 raw label accuracy on profile eval (29 datasets, 190 format-detectable columns).
+  gate: false
+  checked: false
 - id: AC-9
   description: |
     Best-of-two trained models achieves ≥170/190 post-Sharpen label accuracy on profile eval (full inference pipeline with feature_sharpen + value_sharpen + apply_header_sharpen). No more than 5 columns that currently pass (in the 155/190 baseline) may regress to failing.
+  gate: false
+  checked: false
 - id: AC-10
   description: |
     Update models/default symlink to point to the winning sherlock-v5-* variant. Publish to HuggingFace meridian-online/finetype-model. Update config.json with architecture metadata.
+  gate: false
+  checked: false

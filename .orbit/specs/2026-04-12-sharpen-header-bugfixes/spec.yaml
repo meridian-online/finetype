@@ -1,16 +1,20 @@
 id: 2026-04-12-sharpen-header-bugfixes
-status: closed
 goal: |
   Fix header hint bugs and threshold logic in Sharpen that block correct overrides, then re-evaluate v11 to exceed 205/227 profile eval target. Three categories: (1) header_hint() returning wrong types, (2) threshold logic in apply_header_sharpen() too permissive for same-domain predictions, (3) two high-impact new header hints for unambiguous column names.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
     Fix header_hint() to exclude "bitcoin" from address keyword match. "bitcoin_address" currently matches h.contains("address") and returns full_address, overriding the correct bitcoin_address prediction.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Fix header_hint() to return ip_v6 when header contains "v6" or "ipv6", before the ip_v4 substring catch-all (line ~4000) fires. Currently "ip_v6" normalizes to "ip v6" which matches h.starts_with("ip ") and returns ip_v4.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Fix two threshold paths in apply_header_sharpen() for hardcoded hints:
@@ -23,18 +27,25 @@ acceptance_criteria:
         same domain → hardcoded authority path → (B) 0.83 < 0.90 → OVERRIDE ✓
       url→docker_ref@0.60: different category (technology.internet ≠ technology.development),
         same domain → hardcoded authority path → (B) 0.60 < 0.90 → OVERRIDE ✓
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Add 2 hardcoded header hints for unambiguous column names: "icao" → geography.transportation.icao_code, "author" | "authors" → identity.person.full_name. These are stopgaps per decision 0042 — to be absorbed by retraining. "method", "port", and "status_code" are excluded: "method" is ambiguous (payment method, HTTP method, scientific method), "port" was previously removed, and "status_code" is better served by R12 expansion or retraining.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Re-evaluate v11 with Sharpen fixes. Profile eval >= 205/227. Expected: ac-01 fixes 1, ac-02 fixes 1, ac-03 fixes 4, ac-04 fixes 2 = +8 → 211/227 if all land. Conservative estimate with interactions: +5.
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     No actionability regression — actionability >= 99.8%.
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     All existing header_hint and Sharpen tests pass (no regressions).
-  ac_type: code
+  gate: false
+  checked: false

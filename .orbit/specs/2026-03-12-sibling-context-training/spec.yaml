@@ -1,32 +1,43 @@
 id: 2026-03-12-sibling-context-training
-status: closed
 goal: |
   Train the sibling-context attention module to improve Sense classification accuracy by enriching Model2Vec column embeddings with cross-column context from real-world tables. Ship a trained model artifact that the existing pipeline loads automatically.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: 'Data pipeline: reads 508 CSVs from data/csvs/, runs FineType profile to extract per-column Sense labels, produces training dataset (table_id, column_headers, model2vec_embeddings, sense_labels)'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: 'Training loop: forward pass through attention → frozen Sense → cross-entropy loss against silver labels; backward pass updates only attention weights'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: 'Padding/masking: variable column counts (1–191) handled correctly — padding columns do not contribute to loss or attention scores'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: 'Train/validation split: 80/20 random split by table (not column), validation loss logged each epoch'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: 'Model artifact: trained weights saved to models/sibling-context/ as safetensors + config.yaml'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: 'Profile eval delta: at least 1 improvement on the 6 remaining misclassifications (target 181+/186)'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: 'No regression: profile eval ≥ 180/186 with attention model loaded vs without'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: 'N=1 invariance: single-column tables produce identical Sense predictions with and without attention'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: cargo test passes — no compilation errors, existing tests unbroken
-  ac_type: code
+  gate: false
+  checked: false

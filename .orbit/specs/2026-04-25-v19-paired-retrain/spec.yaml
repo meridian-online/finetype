@@ -1,37 +1,57 @@
 id: 2026-04-25-v19-paired-retrain
-status: closed
 goal: |
   Ship the best-scoring multi-branch model on the 448-row eval manifest through the MADR 0066 hard gate, using a paired ReLU+BN vs GELU+LN sweep on improved training data. The v4 corpus (UA loader, LOINC, excel_format improvements) is adopted as the base, with new TABLE_TEMPLATES entries for container types and improved datetime generators for the 6 failing subtypes.
   Supersedes MADR 0046 (GELU+LN not adopted) — the Sharpen layer has changed substantially since the original -5 label measurement (demotion guard PR #44, amount-variant fix PR #47, header-hint regex removal PR #48).
   Diagnostic evidence: 13/14 failing columns have GT absent from raw softmax top-5 — genuine model representation gap, not hint-layer. Container types (8 columns) are excluded from training data entirely. Datetime subtypes (6 columns) are in training but model can't distinguish them.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: 'Cherry-pick v4 corpus additions from origin/distilled-data-relabel-7-types-v17 onto main: UA loader (~17.8k UAs), LOINC loader (~2.1k codes), generator improvements for swift_bic/cpt/ssn/excel_format, http_method ENUM-only strategy. Pre-flight: run git diff --stat main...origin/distilled-data-relabel-7-types-v17 to verify conflict surface is bounded to .gitignore and generator.rs. If conflicts touch inference logic (column.rs, multi_branch.rs), pause and reassess.'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: Add container-type TABLE_TEMPLATES to prepare_multibranch_data.py. At least 3 new templates covering all 8 failing container types (csv, html, json_array, query_string, semicolon_separated, whitespace_separated, xml, yaml). Templates include container columns alongside other realistic column types for co-occurrence context.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: 'Improve datetime generators for the 6 failing subtypes to produce more distinctive value shapes. Current generators are minimal (1-5 lines); improved versions should capture format-specific variation. Confused-neighbour pairs from diagnostic: iso_8601_compact vs isbn/alphanumeric_id, iso_8601_milliseconds vs numeric_code/iso_microseconds, iso_microseconds vs numeric_code, jp_era_short vs alphanumeric_id, pg_short_offset vs rfc_3339/iso_8601_offset, ordinal vs month_year_full/abbreviated_month.'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: 'FTMB v5 data prepared successfully. The overnight script includes an inline pre-training audit gate (reusing the v16 pattern from overnight_v16_retraining.sh lines 280-384): valid_dim=240, min type count >=50, total types >=239, dropped types absent, container types present with >=50 columns each. FTMB is identical for both architectures — single data-prep step before the 6 training runs.'
+  gate: false
+  checked: false
 - id: ac-05
   description: 'Supersede MADR 0046 with a new decision (0068 or next available). Status: proposed. Rationale: Sharpen layer changes since original measurement warrant a re-evaluation. Outcome field left blank — to be filled after sweep results.'
+  gate: false
+  checked: false
 - id: ac-06
   description: 'Write overnight_v19_paired.sh sweep script. 6 runs: seeds 42/43/44 × ReLU+BN and GELU+LN. Each run produces a separate model directory (sherlock-v19-relu-s{42,43,44}, sherlock-v19-gelu-s{42,43,44}) with results.json and epochs.jsonl. Script continues past individual run failures. Per-run timing logged. Summary table at end.'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: 'ReLU+BN config: models/sherlock-v13-config.json (existing, unchanged). GELU+LN config: models/sherlock-v19-gelu-config.json (copy of v13 config with activation: GELU, use_layer_norm: true). Both configs have n_classes: 240, valid_dim: 240.'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: 'Write post-sweep eval script (scripts/v19_compare.sh or .py). Takes 6 model directories, runs profile eval on each, produces three-way comparison table: v16 baseline vs best-ReLU-v19 vs best-GELU-v19. Reports per-column diff, per-domain delta, MADR 0066 gate pass/fail for each architecture.'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: 'At least one architecture passes all 6 MADR 0066 gate conditions: (1) 3 seeds completed with val_acc >= 0.912 — a partial-seed architecture (fewer than 3 completed seeds) automatically fails this condition, no makeup runs, (2) winner selected, (3) net_label_delta >= +1, (4) net_domain_delta >= 0, (5) no domain regresses > 3, (6) per-column diff published.'
+  gate: false
+  checked: false
 - id: ac-10
   description: 'Three-way diff published: v16 baseline vs ReLU-v19 winner vs GELU-v19 winner. Per-column diff enumerates fixes / regressions / persistent-same / persistent-churn for each architecture vs v16.'
+  gate: false
+  checked: false
 - id: ac-11
   description: 'Conditional on AC-09 PASS. Winner promoted to models/default. MADR 0046-superseding decision (ac-05) updated with outcome. If GELU+LN wins: config.json in promoted model has activation: GELU. If ReLU+BN wins: MADR updated to ''reconfirmed ReLU+BN with stronger evidence''. If AC-09 fails (neither passes gate): skip this AC, update MADR to ''reconfirmed: neither architecture improves over v16 on improved data''.'
+  gate: false
+  checked: false
 - id: ac-12
   description: 'Conditional on AC-09 PASS. CLAUDE.md updated: version bumped, current state reflects v19 model, GELU+LN decision outcome recorded, container/datetime training data improvements noted. If AC-09 fails: CLAUDE.md updated to note that v19 was HELD with findings.'
+  gate: false
+  checked: false

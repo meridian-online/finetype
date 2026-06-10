@@ -1,44 +1,72 @@
 id: 2026-03-12-validate-command
-status: closed
 goal: |
   Separate validation from profiling into a standalone, schema-driven quality gate. Extend `finetype schema` to auto-generate table-level JSON Schema from CSV data. New `finetype validate` consumes that schema to produce predictable sidecar files. Remove the old validate command and profile --validate flag.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
     `finetype schema data.csv` profiles the CSV and emits a JSON Schema document with per-column properties derived from FineType taxonomy definitions (type, validation pattern, format, broad_type).
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     `finetype schema data.csv --stats` adds observed data constraints (min, max, cardinality, null rate) to the type-level schema.
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     `finetype schema <type-key>` continues to work as today for type-level JSON Schema export, including glob patterns.
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Table-level schema includes x-finetype-* extension fields per column (x-finetype-label, x-finetype-domain, x-finetype-confidence) for round-trip with other FineType commands.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     `finetype validate data.csv schema.json` produces three sidecar files: data.csv.valid.csv, data.csv.invalid.csv, data.csv.errors.jsonl. Summary report prints to stdout.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     When all rows are valid: .valid.csv = full input, .invalid.csv = headers only (0 data rows), .errors.jsonl = empty file. Exit code 0.
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     When some rows are invalid: .valid.csv contains only valid rows, .invalid.csv contains only invalid rows (with headers), .errors.jsonl contains one JSONL object per invalid row with row_index, column, error message, and original value. Exit code 1.
+  gate: false
+  checked: false
 - id: AC-8
   description: |
     `finetype validate data.csv schema.json --summary-only` prints the summary report to stdout but creates no sidecar files.
+  gate: false
+  checked: false
 - id: AC-9
   description: |
     Summary report includes: total rows, valid count, invalid count, per-column pass rate, and file-level grade (A/B/C/D/F).
+  gate: false
+  checked: false
 - id: AC-10
   description: |
     Old `finetype validate` command (NDJSON/plain text, quarantine/repair strategies) is removed. `--validate` flag removed from `profile`.
+  gate: false
+  checked: false
 - id: AC-11
   description: |
     MCP server exposes a `validate` tool that accepts CSV data (path or inline) plus a JSON Schema, returns validation results as JSON.
+  gate: false
+  checked: false
 - id: AC-12
   description: |
     MCP `schema` tool extended to accept file paths, returning table-level JSON Schema (same as CLI `finetype schema data.csv`).
+  gate: false
+  checked: false
 - id: AC-13
   description: |
     DuckDB extension exposes `finetype_validate(col, schema_json)` or equivalent function for schema-driven validation within SQL queries.
+  gate: false
+  checked: false

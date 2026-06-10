@@ -1,23 +1,37 @@
 id: 2026-03-27-autoresearch-architecture-search
-status: closed
 goal: |
   Build a Python-based autoresearch loop that autonomously searches for the best multi-branch fusion architecture for FineType. An agent iterates on train.py, evaluating each variant against raw model accuracy on 214 eval columns within a 10-minute wall-clock training budget. The single best architecture is ported back to Rust for production training.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
     prepare.py contains: (a) a Python FTMB reader that parses v2 and v3 binary format into PyTorch tensors (char[960], embed[512], stats[27], header[128], label string) per the byte layout in research/FTMB_FORMAT.md, (b) an evaluate() function that runs a model forward pass on the 214 eval columns and returns label accuracy (X/214) and domain accuracy, (c) a label-to-index mapping generated at runtime from labels/definitions_*.yaml (not hard-coded), (d) a train/val split function for the training FTMB data, (e) validation of eval.ftmb metadata header (timestamp, finetype version, taxonomy hash) on load.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     train.py implements the v7 early-fusion multi-branch model in PyTorch: 4 branch MLPs (char 960→[300,300], embed 512→[200,200], stats 27→[128,64], header 128→[128,64] with LayerNorm), concatenation to 628-dim merged vector, BatchNorm→Dense(500)→Dense(500) trunk, flat 239-class softmax head. Training enforces a 10-minute wall-clock timeout (signal.alarm(600)) with fixed hyperparams. Determinism enforced via torch.manual_seed(42) and torch.use_deterministic_algorithms(True). At completion, train.py prints structured metrics to stdout and runs the eval function from prepare.py. Inference timing uses 5 warmup passes + 10 timed passes, reporting median.
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     A one-time script (extract_eval_features.sh) uses the Rust finetype binary to extract 4-branch features for all 214 format-detectable eval columns from the manifest, writing them as an eval .ftmb file with ground truth labels. The file includes a metadata header: extraction timestamp, finetype binary version, taxonomy hash (sha256 of sorted label list), and feature dimensions. prepare.py validates this metadata on load.
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     program.md contains complete instructions for an autonomous agent to run the research loop including: (a) experiment lifecycle (modify train.py → syntax check → run → parse output → keep/discard → log to results.tsv → repeat), (b) branch diagnostic evidence (fusion destroys 84, header suppressed, integer_number family, phone→SSN), (c) the 239-type taxonomy for reference, (d) explicit allow/deny list for modifications (architecture yes, hyperparams no, loss function no), (e) NEVER STOP directive, (f) pre-commit safety: python -m py_compile train.py + import check before every git commit, (g) crash recovery: if train.py fails to compile or import, git checkout train.py and log status=error, (h) convergence detection: if 40 consecutive experiments show no improvement, stop and log status=converged, (i) results.tsv format specification with exact columns and example row.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     The research loop runs unattended overnight. The agent modifies train.py, trains within the 10-minute budget, evaluates on 214 columns, logs results, keeps improvements (git commit), discards regressions (git reset), and continues indefinitely.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     The winning architecture from the research loop is documented clearly enough to port to Rust. train.py uses standard PyTorch primitives (nn.Linear, nn.BatchNorm1d, nn.ReLU, nn.Dropout, nn.Softmax) that have direct Candle equivalents. The model class has a clear forward() method showing the complete data flow.
+  gate: false
+  checked: false

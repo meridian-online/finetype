@@ -1,4 +1,4 @@
-id: 0092
+id: '0092'
 title: 'Reference-data ingestion: build-time fetch + normalise to tracked Parquet sieve-tables, large/licensed sources downloaded on demand'
 status: accepted
 date_created: 2026-06-05
@@ -144,7 +144,6 @@ body: |
     judgement rule, not a hard byte limit; the gate names the qualifying
     sources explicitly so the boundary cases (compact Geonames city table)
     are decided per-source at integration time.
-
 references:
 - .orbit/specs/2026-06-05-reference-data-inventory/spec.yaml
 - .orbit/choices/0090-dataset-provenance-pattern.yaml

@@ -52,7 +52,6 @@ acceptance_criteria:
     `licence: CC0-1.0`, attribution preserved.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-02
   description: |
     Hard negatives mined from the v21 corpus-pass output.
@@ -122,7 +121,6 @@ acceptance_criteria:
     `output/distillation-v22/wikidata_persons_manifest.json`.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-03
   description: |
     Real-world positive labels mined from corroborated_gaps.
@@ -184,7 +182,6 @@ acceptance_criteria:
     conf 0.51 — a known noise floor of the two-lens AND filter).
   gate: false
   checked: true
-  ac_type: code
 - id: ac-04
   description: |
     v22 distillation blend.
@@ -231,7 +228,6 @@ acceptance_criteria:
     `output/distillation-v22/v22_blend_manifest.json`.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-05
   description: |
     Train v22 — three ReLU seeds, baseline-comparable hyperparameters.
@@ -279,7 +275,6 @@ acceptance_criteria:
     output is informational), worth fixing in a follow-up.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-06
   description: |
     Embed-branch utilisation diagnostic — does Model2Vec finally help?
@@ -346,7 +341,6 @@ acceptance_criteria:
     fine; the data composition was load-bearing.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-07
   description: |
     v22 corpus pass + four-way cell deltas.
@@ -409,7 +403,6 @@ acceptance_criteria:
     can recover them without a retrain.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-08
   description: |
     Cell-2 lift ≥ 20% vs v19 baseline — the falsifiable target.

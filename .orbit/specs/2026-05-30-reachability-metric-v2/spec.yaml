@@ -123,7 +123,6 @@ goal: |
 
   If v2 fails its fixture, the redesign memo's Sense-embedding
   alternative becomes the v3 starting point.
-
 cards:
 - 0002-semantic-type-detection
 status: open
@@ -174,7 +173,6 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
-
 - id: ac-02
   description: |
     v2 scoring script.
@@ -223,8 +221,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-03
   description: |
     v23 validation fixture — score the six v23 clusters and check
@@ -272,8 +268,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: true
   checked: true
-  ac_type: code
-
 - id: ac-04
   description: |
     Disposition of the v23 fixture verdict — ship-or-redesign,
@@ -309,8 +303,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-05
   description: |
     Integrate the v2 score into the corroborated-gaps artefact.
@@ -342,8 +334,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-06
   description: |
     Update CLAUDE.md guidance.

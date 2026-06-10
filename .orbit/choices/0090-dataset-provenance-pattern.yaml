@@ -1,4 +1,4 @@
-id: 0090
+id: '0090'
 title: 'Dataset provenance: extend sources.yaml with snapshot integrity fields, two snapshot modes'
 status: accepted
 date_created: 2026-05-24
@@ -117,7 +117,6 @@ body: |
     doesn't catch silent modification of files outside the 1000-file
     sample. The maintainer mitigates by periodic full re-snapshots.
     Documented in `datasets/README.md` so the trade-off is visible.
-
 references:
 - .orbit/choices/0056-train-eval-leakage-prevention.yaml
 - .orbit/specs/2026-05-24-dataset-provenance-registry/spec.yaml

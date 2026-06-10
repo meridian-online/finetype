@@ -1,17 +1,31 @@
 id: 2026-03-20-distillation-next-phase
-status: closed
 goal: |
   Build a Tier 2 evaluation benchmark from distilled and synthetic data. 2,500 columns covering all 250 taxonomy types (~10 per type). Distilled types use all adjudicated rows from sherlock_distilled.csv.gz (any row with a final_label, regardless of agreement status); missing types use FineType's generators. Output is a reproducible benchmark that the retraining spike (Spec 2) will measure against.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: Benchmark contains ~2,500 columns covering all 250 taxonomy types
+  gate: false
+  checked: false
 - id: AC-2
   description: Distilled samples have valid provenance
+  gate: false
+  checked: false
 - id: AC-3
   description: Build script is reproducible and documented
+  gate: false
+  checked: false
 - id: AC-4
   description: Scoring script measures model accuracy against Tier 2
+  gate: false
+  checked: false
 - id: AC-5
   description: Baseline score established for current model
+  gate: false
+  checked: false
 - id: AC-6
   description: Sampling is stratified and fair
+  gate: false
+  checked: false

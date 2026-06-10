@@ -1,4 +1,4 @@
-id: 0091
+id: '0091'
 title: 'Validation is an asymmetric signal: ship validation-as-veto in profile, keep YES-disambiguation blocked; case-fold enums (membership-scoped); source enums to standards'
 status: accepted
 date_created: 2026-06-05
@@ -151,7 +151,6 @@ body: |
   - Runtime/eval parity: 16/16 fixture values agree across the Rust
     `CompiledValidator` and the Python eval gate.
   - Taxonomy↔generator alignment: 240/240.
-
 references:
 - .orbit/specs/2026-06-05-validation-gate-precision-fixes/spec.yaml
 - .orbit/specs/2026-06-04-value-level-ydf-labelling/spec.yaml

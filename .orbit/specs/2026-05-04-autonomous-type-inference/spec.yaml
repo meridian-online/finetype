@@ -1,5 +1,4 @@
 id: 2026-05-04-autonomous-type-inference
-status: closed
 goal: |
   Ship a deterministic, autonomous type-inference module that fills
   `failure_log.tsv`'s `inferred_correct_type` and `mechanism` columns
@@ -16,6 +15,9 @@ goal: |
   are written to a sidecar `inference_signals.tsv` so failure_log's
   9-column schema is never altered (avoiding any conflict with the
   contract's H08 append-only invariant).
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
@@ -23,6 +25,8 @@ acceptance_criteria:
     "triangulator over validator pass-rate + header-name match (Phase
     1)". This `spec.yaml` plus the linked `interview.md` satisfy the
     bead's spec-doc requirement.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-02
   description: |
@@ -43,7 +47,8 @@ acceptance_criteria:
     threshold) curve in `progress.md`, computed on the calibrate
     half (bucket 0) for educational reference and as evidence for
     the Phase 2 case (see follow-on bead filed at close).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     `scripts/cron_cycle_work.py` integrates the inference module at
@@ -55,7 +60,8 @@ acceptance_criteria:
     `"mechanism": "value-shape"` literals are removed. The cycle
     worker also writes a corresponding row to
     `eval/gittables/inference_signals.tsv` for each B01/B04 column.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Inference is deterministic. Re-running the module on the same
@@ -70,6 +76,8 @@ acceptance_criteria:
            runs;
       (iii) tie-breaking on equal-rounded-score: lexicographically
             smaller taxonomy ID wins.
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Median latency <100ms per column on M1 over a 1000-column
@@ -80,6 +88,8 @@ acceptance_criteria:
     socket round-trip per column for server form. The benchmarked
     invocation pattern is recorded in `progress.md` alongside p50
     and p95 numbers.
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     Smoke test wired into `scripts/cron_preamble.sh`. Module loads,
@@ -90,6 +100,8 @@ acceptance_criteria:
     check; the validator-broken cases (titanic Sex / airports
     timezone) are exercised by `labelled_eval.tsv` (ac-13) and the
     held-out floor (ac-02), not here.
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Triangulator architecture: Phase 1 inference fuses
@@ -104,7 +116,8 @@ acceptance_criteria:
     half exists only to populate the curve in `progress.md` for
     future Phase-2 calibration work. Confidence is `max_type score`.
     Inferred type is the argmax with lexicographic tie-break (ac-04).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     Read-only validator authority. The module emits mechanism =
@@ -117,7 +130,8 @@ acceptance_criteria:
     does not, the cascade falls through to MADR 0075's
     `enum_overfit` (rule 1) or `format_diversity_path_a` (rule 4)
     depending on validator type — that's the intended behaviour.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: |
     Mechanism vocabulary is the closed set of MADR 0075's
@@ -175,7 +189,8 @@ acceptance_criteria:
       Rule 9: misclassification       — predicted != inferred,
                                         catch-all (per MADR 0075
                                         rule 6).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-10
   description: |
     Fallback policy. Rule 1 of the cascade (ac-09) emits
@@ -185,7 +200,8 @@ acceptance_criteria:
     empty-samples PRECONDITION (structurally before the cascade)
     emits `inferred_correct_type = "unknown"`, confidence = 0.0,
     mechanism = `fallthrough`.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-11
   description: |
     Phase 1 signal scope is locked to validator pass-rate +
@@ -194,7 +210,8 @@ acceptance_criteria:
     Model2Vec embeddings. Phase 2 signals are explicitly out of
     scope and surface as TODO comments only if their integration
     points need to be sketched.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-12
   description: |
     Sidecar inference signals file `eval/gittables/inference_signals.tsv`
@@ -208,7 +225,8 @@ acceptance_criteria:
     hardcoded). The new sidecar respects the contract's H08/H09
     append-only invariant by being append-only from creation; no
     existing append-only file is rewritten.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-13
   description: |
     Ground-truth labelled eval subset published at
@@ -226,6 +244,8 @@ acceptance_criteria:
     precision-on-labelled (= fraction where module's
     `inferred_correct_type` matches `truth_inferred_type`) at the
     ac-02 threshold.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-14
   description: |
@@ -236,6 +256,8 @@ acceptance_criteria:
     block and the existing MADR 0078.) Each MADR includes context,
     considered options, decision outcome, and consequences. Status:
     at minimum `proposed`; `accepted` once the spec lands.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-15
   description: |
@@ -246,4 +268,5 @@ acceptance_criteria:
     The same N is applied uniformly across the calibration sweep
     (ac-07), the floor benchmark (ac-02), the latency benchmark
     (ac-05), the labelled eval (ac-13), and the smoke test (ac-06).
-  ac_type: code
+  gate: false
+  checked: false

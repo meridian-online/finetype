@@ -1,9 +1,15 @@
 id: _template
-status: open
 goal: |
   {Clear primary objective — what must be true when this work is done.}
+cards: []
+status: open
+labels: []
 acceptance_criteria:
 - id: ac-1
   description: '{Measurable criterion 1}'
+  gate: false
+  checked: false
 - id: ac-2
   description: '{Measurable criterion 2}'
+  gate: false
+  checked: false

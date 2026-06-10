@@ -1,17 +1,27 @@
 id: 2026-03-23-multibranch-eval-diagnosis
-status: closed
 goal: |
   Fix the multi-branch eval harness (hierarchical returns 0/0), diagnose the 41-point accuracy gap vs production (97.7% Sense→Sharpen → 56.8% multi-branch on profile eval) via manual trace of misclassifications, refactor eval output to per-run JSON queryable by DuckDB, and document findings with a clear plan for closing the accuracy gap. Ship all fixes on PR #21 before merge.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
     Hierarchical multi-branch model eval produces real accuracy numbers (label ≥ 10%, domain ≥ 10% — sanity floor proving inference runs correctly, not garbage output). Results preserved in model-specific eval directories (models/<model>/eval/), not shared staging.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     Counterfactual trace of 10 worst misclassifications completed, each categorised by which pipeline layer would catch it. Tally shows distribution across categories (Sense, header hint, disambiguation, training data, ambiguous).
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     Eval pipeline emits per-run JSON files (profile_results.json, actionability_results.json) in model-specific eval dirs. Overnight script reads them with duckdb -json and displays correct summary on macOS. DuckDB CLI preflight check present.
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Findings document committed with gap attribution (vs production 97.7% baseline), distinguishing post-processing, distribution shift, and training data factors. Integration plan and accuracy target for next PR. Reviewed before merge.
+  gate: false
+  checked: false

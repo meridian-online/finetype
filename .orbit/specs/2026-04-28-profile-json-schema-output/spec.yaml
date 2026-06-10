@@ -1,5 +1,4 @@
 id: 2026-04-28-profile-json-schema-output
-status: closed
 goal: |
   Add `OutputFormat::JsonSchema` to `finetype profile` so `profile -f
   <file> -o json-schema [--stats] [--enum-threshold N]` emits table-level
@@ -11,13 +10,17 @@ goal: |
   table-mode of `finetype schema <file.csv>` byte-for-content (modulo the
   trimmed extensions already shipped in PR #51); the verb deletion itself
   belongs to card 0006.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
     `OutputFormat::JsonSchema` enum variant added to the `OutputFormat`
     enum in `crates/finetype-cli/src/main.rs` (~line 476-483). Variant
     surfaces as `json-schema` on the CLI via clap's `value_enum` derive.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Shared JSON Schema emitter lifted into a new CLI-internal helper
@@ -26,7 +29,8 @@ acceptance_criteria:
     profile result + flags (`stats: bool`, `enum_threshold: usize`)
     and returning a `serde_json::Value` matching today's
     `cmd_schema_table` byte shape (modulo PR #51's trimmed extensions).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     `cmd_profile`'s match arm in `main.rs` (~line 4386-4757) gains a
@@ -34,14 +38,16 @@ acceptance_criteria:
     and writes the resulting JSON to stdout (pretty-printed, trailing
     newline). The branch reuses `cmd_profile`'s existing
     `enum_threshold` argument with no rebinding.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     `Profile`'s clap variant gains a `--stats` boolean flag (default
     false). When `--stats` is set with any `OutputFormat` other than
     `JsonSchema`, dispatch errors with a clap-style message naming the
     conflict (`--stats requires -o json-schema`).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Under `--stats` + `-o json-schema`, the helper attaches
@@ -51,7 +57,8 @@ acceptance_criteria:
     columns (gated by `--enum-threshold`); and the
     `x-finetype-null-rate` / `x-finetype-cardinality` extensions
     where they appear today.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     MCP `profile` tool (`crates/finetype-mcp/src/tools/profile.rs`)
@@ -60,7 +67,8 @@ acceptance_criteria:
     through the same shared emitter (ac-02) and returns a JSON Schema
     document in the primary content slot. JSON-mode output stays
     byte-identical to today's behaviour.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     MCP `schema` tool (`crates/finetype-mcp/src/tools/schema.rs`)
@@ -69,7 +77,8 @@ acceptance_criteria:
     `Table-mode schema export was folded into profile in v0.6.19. Use
     profile with format: "json-schema" instead.` The type-key branch
     remains unchanged (card 0006's concern).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     Three new golden tests added under a `PROFILE JSON SCHEMA OUTPUT`
@@ -81,7 +90,8 @@ acceptance_criteria:
     (top-level `$schema`/`type`/`properties`; presence/absence of
     `--stats`-gated keywords; `enum` keyword toggling on
     `--enum-threshold`).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: |
     Inline `--help` text for `profile` updated: the `-o`/--output
@@ -90,6 +100,8 @@ acceptance_criteria:
     example at line ~82 migrated from `finetype schema data.csv
     --stdout > schema.json` to `finetype profile -f data.csv -o
     json-schema > schema.json`.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-10
   description: |
@@ -101,8 +113,12 @@ acceptance_criteria:
     implementation time, this AC degrades to: helper output parses
     as valid JSON Schema (Draft 2020-12) via a dependency-free
     shape check.
+  gate: false
+  checked: false
 - id: ac-11
   description: |
     `make ci` passes (fmt, clippy, test, taxonomy check) on the
     branch head. Zero new clippy warnings introduced. No regression
     in any pre-existing `golden_*` test.
+  gate: false
+  checked: false

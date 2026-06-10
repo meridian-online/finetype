@@ -52,7 +52,6 @@ goal: |
   - A leverage_score column. The redesign memo names leverage as a
     per-spec author judgement, not a substrate-level number.
   - A v3 fixture pass/fail gate.
-
 cards:
 - 0002-semantic-type-detection
 status: open
@@ -89,7 +88,6 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
-
 - id: ac-02
   description: |
     Safety-score scoring script.
@@ -119,8 +117,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-03
   description: |
     v23 fixture illustration (non-gating).
@@ -152,8 +148,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-04
   description: |
     Fold safety_score into corroborated_gaps.parquet.
@@ -186,8 +180,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-05
   description: |
     Regenerate report.md with safety_score in cluster headers.
@@ -214,8 +206,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-06
   description: |
     Update CLAUDE.md training_data_addition guidance.

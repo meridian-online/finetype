@@ -1,26 +1,42 @@
 id: 2026-04-20-ci-decouple-default-symlink
-status: closed
 goal: |
   Decouple CI model fetches from the `models/default` symlink so that a promotion PR can land before (or in the same PR as) the HuggingFace publish, without CI failing on the intermediate state. Implement option A: introduce a `FINETYPE_CI_MODEL` env var that CI uses as the authoritative model name, with `models/default` remaining the runtime default for the CLI, MCP server, and DuckDB extension.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
     `.github/scripts/download-model.sh` resolves the model name with the following precedence: (1) `FINETYPE_CI_MODEL` if set AND non-empty, (2) `readlink models/default`, (3) `cat models/default`. Uses `${FINETYPE_CI_MODEL:-...}` shell form (colon-dash) so empty string is treated as unset. If all three sources yield an empty/whitespace model name, the script exits non-zero with a clear error message (e.g. "ERROR: cannot resolve model — FINETYPE_CI_MODEL unset and models/default missing") BEFORE any curl invocation. Existing behaviour is preserved when the env var is absent — readlink→cat fallback unchanged.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     `.github/workflows/ci.yml` sets `FINETYPE_CI_MODEL` at workflow-level `env:` (single key, top of file). Value matches the currently- promoted model name (sherlock-v16 as of this spec). All four jobs that invoke download-model.sh (Test, Clippy, CLI Smoke Tests, Taxonomy Check — lines 22-65 of current ci.yml) inherit the value automatically via workflow-level env propagation; no per-job duplication.
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     `.github/workflows/release.yml` sets `FINETYPE_CI_MODEL` at workflow-level `env:` (single key). The single `build` job uses a 5-entry platform matrix (x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin, x86_64-windows) — workflow-level env covers all matrix legs automatically. As a side-benefit, the Windows build leg no longer depends on git's symlink checkout behaviour for `models/default` (the env var sidesteps both `readlink` and `cat`).
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Ordering-independence is proven by a non-destructive, mechanical verification — the `FINETYPE_CI_MODEL` override path is exercised without mutating `models/default` on any real branch. Two cases are confirmed: (1) env var pointing at a published model succeeds regardless of the symlink state; (2) env var pointing at an unpublished model fails loudly (non-zero exit + HTTP 404 in the log), not silently.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     Documentation updated: `CLAUDE.md` Release section (or equivalent) describes the new promotion workflow and includes a small table disambiguating the three env vars (`FINETYPE_CI_MODEL` — download-model.sh only; `FINETYPE_MODEL` — CLI/eval-script model path; `FINETYPE_MODEL_DIR` — DuckDB extension only). The new promotion flow reads: (1) publish to HF, (2) bump `FINETYPE_CI_MODEL` in workflow `env:` blocks, (3) flip `models/default` — steps 2 and 3 may land in the same PR. `.orbit/specs/2026-04-20-v16-release/handover.md` gets a one-line back-reference noting this spec is the fix for the "HuggingFace-first" dance.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     Local development on an already-bootstrapped dev machine is unaffected. Running `cargo test`, `make eval-report`, and `./scripts/eval.sh` without setting `FINETYPE_CI_MODEL` produces identical behaviour to today. Fresh-clone bootstrap is explicitly unchanged — devs still run `download-model.sh` (it falls back to `models/default` when the env var is unset).
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     Divergence is visible: a lightweight check warns (not fails) when `FINETYPE_CI_MODEL` and `readlink models/default` disagree on `main`. This prevents silent drift where CI tests against model-N while `models/default` points at model-M for weeks. The check runs as a non-blocking CI step (warning in job output, optional annotation) — not a gate. Divergence is legitimate during a promotion PR; the warning just ensures someone sees it.
+  gate: false
+  checked: false

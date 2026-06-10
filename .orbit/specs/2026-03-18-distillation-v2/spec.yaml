@@ -1,29 +1,39 @@
 id: 2026-03-18-distillation-v2
-status: closed
 goal: |
   Re-run LLM distillation using Claude Code batch agents (Max 20x subscription) with a blind-first adjudication design on 10K+ columns across GitTables, SOTAB, and real-world datasets. Triple objective: improve CharCNN training data, expand the eval manifest with verified ground truth, and identify systematic FineType inference gaps.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: Phase 1 pilot completes on 500 columns with measurable plan impact data
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: Claude exact agreement with FineType >50% (vs Qwen3 8B baseline of 20%)
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: Invalid label rate <5% (vs Qwen3 8B baseline of 2.3%)
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: Blind-first design produces genuine independent classifications (not rubber-stamping)
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: Disagreement cases include actionable reasoning text
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: Per-phase gate review before proceeding to next phase
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: Phase 3 adds ≥50 new columns to eval manifest with human-verified ground truth
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: 'Final deliverable: gap analysis report identifying top FineType weaknesses by domain'
-  ac_type: code
+  gate: false
+  checked: false

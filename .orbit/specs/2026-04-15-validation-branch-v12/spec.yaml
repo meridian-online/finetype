@@ -1,16 +1,20 @@
 id: 2026-04-15-validation-branch-v12
-status: closed
 goal: |
   Add a 5th "validation" branch to the multi-branch model that provides JSON Schema pass rates per type as input features. For each column, validate sampled values against all 239 type schemas using CompiledValidator (which handles both pattern matching and numeric range checks) and feed the 239-dim pass-rate vector into a new model branch. Retrain as v12, targeting 215/227 (95%) on the profile eval. This addresses the 26 remaining model-level misclassifications that Sharpen tuning cannot reach (decision 0038 ceiling), and restores actionability from 96.7% as a side-effect (the drop was caused by mispredictions, not missing format_strings).
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
     Add ISO 3166-1 alpha-2 enum to geography.location.country_code validation in definitions_geography.yaml. The enum field contains all ~249 officially-assigned 2-letter codes (US, FR, JP, ...). Existing pattern (^[A-Z]{2}$) is retained alongside the enum. Source: ISO 3166-1 alpha-2 standard. User-assigned codes (AA, QM-QZ, XA-XZ, ZZ) are excluded unless officially assigned.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Implement extract_validation_features() in finetype-model that takes a slice of string values and returns a 239-dim f32 vector. For each type in the taxonomy (sorted by key), compute the fraction of sampled values that pass that type's CompiledValidator::is_valid() check. CompiledValidator already handles both string pattern validation AND numeric range checks (e.g., latitude -90/+90, longitude -180/+180 are already defined in the taxonomy). No new range-check code is needed. Validators are compiled once from the taxonomy at startup and held in memory for reuse across all columns.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Define FTMB v4 binary format in finetype-train. Header layout (30 bytes):
@@ -28,44 +32,60 @@ acceptance_criteria:
       28      2B    valid_dim (little-endian u16)
 
     Each record appends valid_dim x f32 validation features after header_features. Writer function write_ftmb_v4() serialises records with all 5 feature vectors.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     FTMB v4 reader is backward-compatible with v1/v2/v3 files. When reading v1-v3 files, validation features default to a zero vector of valid_dim length. Reader detects version from header and adapts. v3 readers encountering v4 files reject with a clear version error (existing behaviour: "Unsupported FTMB version: 4").
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Add 5th validation branch to MultiBranchModel in finetype-model. Architecture: validation(239) -> Dense(128, Act) -> Dense(64, Act) -> [64]. No input LayerNorm — pass rates are already bounded [0, 1] and well-conditioned. Merge layer concatenates all 5 branch outputs: [300+200+64+64+64] = [692]. Branch is gated on valid_dim > 0 in config (same pattern as header branch).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     Store type-to-index mapping in the model config (config.json in model directory). The mapping is a sorted list of type keys used at training time. At inference time, the current taxonomy keys are mapped to training-time indices. Types added after training get index -1 (ignored). Types removed after training get a zero pass rate. This decouples the validation branch from exact taxonomy size — future taxonomy changes do not require immediate retraining (though retraining is recommended to benefit from new types).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Inference pipeline (classify_column in column.rs) computes validation features at inference time. Validators are compiled once at model load (or first use) from the taxonomy and held in memory. Per-column cost is validation only (100 values x 239 is_valid calls), not compilation. When validation branch is absent (v11 model, valid_dim=0), skip validation computation entirely.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     DuckDB extension can compute validation features at inference time. The taxonomy definitions needed for CompiledValidator are available to the extension — either bundled in the model directory (e.g., models/sherlock-v12/taxonomy.bin or compiled_validators.bin) or loaded from the embedded taxonomy. The extension's existing SCHEMA_CACHE pattern informs the caching strategy.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: |
     The extract-features CLI command gains validation feature output. When invoked with a column of values, it computes validation features alongside char/embed/stats/header features and includes them in its JSON output. prepare_multibranch_data.py passes --format v4 to write FTMB v4 files. The Python script is a build-time tool (not runtime) — it orchestrates feature extraction by shelling out to the Rust CLI.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-10
   description: |
     Train v12 model on FTMB v4 data with 5-branch architecture. Training loop reads validation features from FTMB v4 and feeds them to the validation branch. Hyperparameters: same as v11 baseline except validation branch hidden dims [128, 64].
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-11
   description: |
     Profile eval achieves >= 215/227 (95% label accuracy) on the 35-dataset eval suite with sherlock-v12 + Sharpen.
+  gate: false
+  checked: false
 - id: ac-12
   description: |
     No regression on previously-correct columns. Every column that v11+Sharpen classified correctly (201/227) must remain correct in v12+Sharpen. Net improvement only — no trading existing accuracy for new wins. Tolerance: at most 2 regressions are acceptable if net improvement is >= +10.
+  gate: false
+  checked: false
 - id: ac-13
   description: |
     Actionability does not regress below 96.7% (current level). Expected to improve as mispredictions are the root cause.
+  gate: false
+  checked: false
 - id: ac-14
   description: |
     All existing model tests pass (374+). No regressions in Sharpen rules, feature extraction, or CLI behaviour.
+  gate: false
+  checked: false

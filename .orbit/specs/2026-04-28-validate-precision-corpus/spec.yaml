@@ -1,7 +1,9 @@
 id: 2026-04-28-validate-precision-corpus
-status: closed
 goal: |
   Build a profile→validate round-trip precision harness that runs over a real-world corpus of whole CSVs, reports `N of M datasets pass at P=99%`, and attributes every failing column to one of four named mechanisms. Ship the harness mechanics + a 7-CSV iter-1 corpus (sourced fresh from public open-data URLs, disjoint from the m-19 eval corpus) + the two in-scope fixes (enum-overfit on the profile side, ≤5 validator widenings on the taxonomy side). Sourcing beyond 7 datasets toward the 30–50-CSV target is a separate curation sprint (stub card 0015) that consumes the harness this iteration delivers. Misclassification and code-vs-canonical defer to follow-up cards.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
@@ -36,15 +38,18 @@ acceptance_criteria:
       - `gt_sidecar_path`: relative to repo root, pointing at
          `eval/datasets/validate_corpus/<name>.gt.yaml`.
     The schema admits new rows via PR with no harness code change.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     `eval/datasets/sources.yaml` is extended with role-`validate` entries for the 7 validate-corpus CSVs. Existing role-`eval` and role-`train` and role-`both-forbidden` entries are byte-unchanged. Each new validate-corpus source mirrors the live sources.yaml schema: `source_url` (the public URL pinned in implementation_notes — NOT a `repo://` self-reference, since these CSVs originate externally), `role: validate`, `licence` (SPDX value from `eval/licence_allowlist.txt`), `fetched_date` (ISO 8601), `attribution` (one-line free-text prose pointing at the upstream project), `datasets` (a YAML list whose single element is the dataset slug from `validate_manifest.csv`). The `id`/`name`/ `provenance_status` keys do NOT appear in sources.yaml — they live exclusively on `validate_manifest.csv`. The `role` enum is extended from `{eval, train, both-forbidden}` to `{eval, train, both-forbidden, validate}`; the header comment block of sources.yaml documents the new value with the same paragraph shape as the existing three roles.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     The row-hash leakage firewall is extended. `scripts/compute_row_hashes.py` regenerates `eval/row_hashes.tsv` from BOTH `eval/datasets/manifest.csv` (eval role) AND `eval/datasets/validate_manifest.csv` (validate role) such that any row appearing in either manifest contributes a hash. `scripts/prepare_multibranch_data.py`'s leakage-filter behaviour remains active-by-default and now excludes validate-corpus rows from training data via the same hash table. The shared normaliser at `scripts/eval_leakage/__init__.py` is the single source of truth for hash computation; extension is at the manifest-iteration layer only.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Ground-truth sidecars exist for all 7 iter-1 corpus CSVs at `eval/datasets/validate_corpus/<name>.gt.yaml` (a new directory that holds validate-corpus assets — sidecars and the CSVs live here, NOT in `eval/datasets/csv/` which is m-19 eval data). The seven sidecars are `pokemon.gt.yaml`, `rio2016_athletes.gt.yaml`, `us_baby_names.gt.yaml`, `co2_emissions_by_nation.gt.yaml`, `world_population.gt.yaml`, `un_locode.gt.yaml`, and `global_temp_annual.gt.yaml`. Each sidecar has the schema:
@@ -56,7 +61,8 @@ acceptance_criteria:
         Optional free-text rationale for ambiguous labels.
       ```
     Every column in the source CSV appears in the `columns` map. The `expected x-finetype-label` value is a string that exists in the taxonomy (the harness validates this — see ac-07). The combined column count across all sidecars is approximately 58 columns (pokemon 13, rio2016_athletes 12, us_baby_names 4, co2_emissions_by_nation 10, world_population 4, un_locode 12, global_temp_annual 3 = 58 — implementation_notes pins the per- dataset column inventories once the CSVs are committed; the figure may shift by ±2 if upstream sources change schemas between spec landing and CSV fetch).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     A new eval binary exists at `crates/finetype-eval/src/bin/validate_corpus.rs`. Invocation: `cargo run -p finetype-eval --bin validate-corpus --release --
@@ -76,11 +82,13 @@ acceptance_criteria:
          to a mechanism per ac-07's table.
       6. Writes a single `validate_corpus.md` report per ac-08's shape.
     Exit code 0 always (the harness reports — it does not gate).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     `Makefile` gains a `validate-corpus` target that runs the binary from ac-05 against `eval/datasets/validate_manifest.csv` and writes to `eval/eval_output/validate_corpus.md`. `make eval-report` is extended to invoke `make validate-corpus` as part of its pipeline AND to surface the headline `N of M datasets pass at P=99%` line in the dashboard at `eval/eval_output/report.md` alongside the existing profile-eval and actionability-eval headlines.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Mechanism attribution is implemented in `crates/finetype-eval/src/bin/validate_corpus.rs` (or a sibling module). For each failing column with a GT sidecar entry, the mechanism is one of: `enum_overfit`, `format_diversity`, `misclassification`, `code_vs_canonical`, or `unknown`. The attribution rules (deterministic, in this order):
@@ -99,7 +107,8 @@ acceptance_criteria:
          (and not rule 3) → `format_diversity`.
       5. Otherwise → `unknown`.
     Failing columns WITHOUT a GT sidecar contribute to the corpus headline but their mechanism is `no_gt` (separate count, not `unknown`).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     `eval/eval_output/validate_corpus.md` shape (the harness writes this verbatim; column widths and exact whitespace are means-level):
@@ -128,7 +137,8 @@ acceptance_criteria:
       … one row per dataset …
       ```
     Baseline numbers come from a `eval/eval_output/validate_corpus.baseline.md` file written by the FIRST harness run before any in-scope fix lands (ac-09, ac-10). Subsequent runs read the baseline file and report delta.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: |
     In-scope fix 1: enum-overfit. Two distinct sub-fixes ship under this AC; both target the JSON Schema enum emission path that `2026-04-28-profile-json-schema-output/` introduced.
@@ -163,11 +173,13 @@ acceptance_criteria:
           with 40 distinct values at default threshold (32) → no enum
           (regression bound on sub-fix (a)).
     Post-fix harness re-run: the corpus-level count of failing columns attributed to `enum_overfit` is ≤ baseline's count for that mechanism. The fix is mechanism-monotonic on `enum_overfit` only — counts of OTHER mechanisms (e.g. `format_diversity`, `unknown`) may rise as enum-suppressed columns fall through to broader pattern checks; this is expected and not a regression. If baseline shows 0 `enum_overfit` attributions, the three unit tests alone satisfy the fix's behavioural contract; the harness baseline- vs-post-fix delta is recorded honestly with prose noting why.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-10
   description: |
     In-scope fix 2: validator format-diversity. The implementer runs the iteration-1 baseline harness over the 7-CSV corpus, reads the per-column `format_diversity` attributions, and chooses 1–5 type widenings whose widened patterns honour the precision principle (MADR 0001) — the widened validator must still REJECT clearly invalid input. Each widening is a one-line edit to the relevant `labels/definitions_*.yaml` `validation:` block (universal layer only — locale-specific blocks remain untouched, since MADR 0001 requires that locale-specific types' universal validators only reject, never accept widely). For each widening: (a) the YAML edit lands; (b) a regression test in `crates/finetype-core/tests/precision_widenings.rs` asserts both an accept-set (≥3 real-world variants the prior pattern rejected) AND a reject-set (≥3 clearly-invalid strings the widened pattern still rejects). Iteration-1 widening count: ≥1 (proves the widening pattern works) and ≤5 (bounds scope — further widenings ship under follow-up cards). Likely candidates from the iter-1 corpus, in priority order: `un_locode.Date` (yyMM short-form datetime), `un_locode.Coordinates` (DDMMNS DDDMMEW geo format), `rio2016_athletes.height` (decimal metres), or any other type the baseline surfaces; implementer chooses based on baseline measurement, NOT the list above.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-11
   description: |
     Three MADRs land at: `.orbit/choices/0072-round-trip-pass-as-validate-metric.md`, `.orbit/choices/0073-validate-corpus-reuses-m19-infrastructure.md`, `.orbit/choices/0074-validate-corpus-in-scope-fix-mechanisms.md`. Each follows the MADR template (status, date-created, date-modified, Context and Problem Statement, Considered Options ≥3, Decision Outcome, Consequences). Status: `accepted` on merge, dated `2026-04-28`.
@@ -181,6 +193,8 @@ acceptance_criteria:
         vs deferred (misclassification, code-vs-canonical)
         partition. References MADR 0066 (v19 retrain hard gate)
         for why misclassification defers.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-12
   description: |
@@ -201,14 +215,22 @@ acceptance_criteria:
         variants while still rejecting clearly-invalid input
         (precision principle preserved per MADR 0001).
     `CLAUDE.md` "What's next" section gains a one-line entry pointing at `.orbit/specs/2026-04-28-validate-precision-corpus/` (with the baseline N-of-M figure once measured) and the three new MADRs in the Decision Register count.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-13
   description: |
     `make ci` passes (cargo fmt --check, cargo clippy --workspace -- -D warnings, cargo test --workspace, cargo run -- check). Zero new clippy warnings vs main. The new harness binary is included in the workspace test matrix.
+  gate: false
+  checked: false
 - id: ac-14
   description: |
     Baseline measurement is committed. The baseline file `eval/eval_output/validate_corpus.baseline.md` is committed in this PR alongside the post-fix `validate_corpus.md`. Both files are committed; the post-fix file shows `delta: +N` where N ≥ 0 (movement-based success — N may be 0 if the iteration's two fixes happen to not flip any dataset across P=99%, which is acceptable given the bound nature of the iteration; the spec success criterion is the harness shipping with measurement capability, not a numerical movement floor).
+  gate: false
+  checked: false
 - id: ac-15
   description: |
     A stub card for the corpus-curation follow-up exists at `.orbit/cards/0015-validate-corpus-curation.yaml`. The stub follows the standard card schema (`feature`, `as_a`, `i_want`, `so_that`, `scenarios`, `maturity`, `goal`, `references`), carries `maturity: emerging`, declares ≥1 scenario, and lists `.orbit/specs/2026-04-28-validate-precision-corpus/spec.yaml` in its `references` array. The stub's goal is to grow the validate-precision corpus from 7 datasets toward the 30–50-CSV target set out in this spec's goal statement.
+  gate: false
+  checked: false
   ac_type: doc

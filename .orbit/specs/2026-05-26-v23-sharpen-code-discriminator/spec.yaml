@@ -44,7 +44,6 @@ goal: |
   Follow-up spec: 2026-05-26-ydf-validation-gate — apply JSON Schema
   validation post-hoc to YDF predictions, recompute v19/.../v22 cell-2
   against the cleaned baseline, document where v22 actually lands.
-
 cards:
 - 0002-semantic-type-detection
 status: closed
@@ -67,8 +66,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-04
   description: |
     R26 country_code Sharpen rule — built, hardened, reverted.
@@ -89,8 +86,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-08
   description: |
     Cell-2 lift band — closed at "Lift ≈ 0".

@@ -83,3 +83,4 @@ body: |
 
   Substrate: `output/eval-ceiling-diagnosis/{finding,rare_type_gold}.md`,
   `scripts/build_rare_type_gold.py`, memory `eval-precision-metric-blind-to-rare-targets`.
+references: []

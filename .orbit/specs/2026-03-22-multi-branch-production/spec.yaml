@@ -1,26 +1,42 @@
 id: 2026-03-22-multi-branch-production
-status: closed
 goal: |
   Make multi-branch the production successor to CharCNN as FineType's primary column-type classifier. Multi-branch replaces the Sense stage with deterministic feature extraction (960 char + 512 embed + 27 stats = 1,499 dims) fed through a multi-branch MLP. Existing Sharpen rules (F1-F6, locale detection, leading-zero, entity demotion) preserved as deterministic post-processing. Single-value inference degrades gracefully; CharCNN retained as lightweight fallback for n=1 if needed. Ship gate: ≥95% Tier 1 label accuracy + demonstrable speed win over CharCNN.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
     Multi-branch model loadable by `finetype profile` — eval harness produces Tier 1 scores for multi-branch models without errors on all 30 eval datasets.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     True Tier 1 baseline established for multi-branch — real-world accuracy measured (not val accuracy on training split) with per-type breakdown and gap analysis vs CharCNN.
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     29 non-canonical distilled labels remapped to canonical taxonomy. ~131 columns of real-world training signal recovered. ≥180 taxonomy-matched types in training data.
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Synthetic column generation pipeline produces column-level .ftmb records for all 250 types at scale. ≥100 synthetic columns per type.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     Blend-30-70 column-level training data at ≥300,000 records. No type below 50 samples. Median samples-per-type ≥500.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     Best multi-branch model achieves ≥95% Tier 1 label accuracy on format- detectable columns (190 columns across 30 datasets — a subset of the 250-type taxonomy). Tier 2 per-type regression analysis covers long-tail types not in the eval set. Demonstrably faster inference than CharCNN.
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     Production pipeline uses multi-branch as default Sense model with Sharpen deterministic corrections preserved. Single-value inference works (with documented accuracy characteristics). CLI output format unchanged.
+  gate: false
+  checked: false

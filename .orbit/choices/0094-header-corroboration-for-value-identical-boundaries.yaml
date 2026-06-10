@@ -88,3 +88,4 @@ body: |
   **feature-flagged, off-by-default** candidate against this design for review,
   but does not promote it or accept this decision. Amends 0048; when accepted,
   updates the "Architectural direction" section of CLAUDE.md.
+references: []

@@ -1,5 +1,4 @@
 id: 2026-04-28-validate-corpus-iter3
-status: closed
 goal: |
   Wire the validate-corpus harness's per-mechanism attribution to surface what
   iter-2's curated mechanism-coverage datasets were designed to exercise, and
@@ -29,6 +28,9 @@ goal: |
   `crates/finetype-eval/src/bin/validate_corpus.rs`. Iter-2 GT sidecars,
   validate-corpus CSVs, the manifest, sources.yaml, and row_hashes.tsv are
   byte-unchanged.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
@@ -59,7 +61,8 @@ acceptance_criteria:
     `try_code_vs_canonical_b`) with rustdoc explaining trigger condition,
     example input, and what it does NOT fire on. The `attribute()` entry
     point becomes a thin dispatcher iterating the rules in order.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Code-typed taxonomy allowlist module within
@@ -119,7 +122,8 @@ acceptance_criteria:
     after tuning). The implementer MAY add or remove labels during
     fixture construction; the seed above is a starting point, not a
     ceiling.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Per-(dataset, column) fixture file at
@@ -156,7 +160,8 @@ acceptance_criteria:
 
     The fixture is committed to the repo and is the authoritative
     ground-truth for what each failure means.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Per-mechanism positive and negative tests for the 4 mechanism buckets
@@ -197,7 +202,8 @@ acceptance_criteria:
     format_diversity boundary test.)
 
     Total: ≥12 attribution tests (6 positive + 6 negative minimum).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Fixture-iteration **regression test** that asserts per-(dataset,
@@ -226,7 +232,8 @@ acceptance_criteria:
 
     Failure messages include the offending row's `(dataset, column,
     expected, actual, rationale)` for clear diff in CI.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     Cascade-order test that asserts the 7 rules fire in the documented
@@ -251,7 +258,8 @@ acceptance_criteria:
       `vci3_attribute_cascade_order_rule5_before_rule4` — implementer
       choice. Either way, the case lives under ac-06's cascade-order
       coverage, NOT under ac-04's format_diversity negatives.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Test naming reconciliation. Iter-1's `pvc_attribute_rule_*` tests
@@ -264,7 +272,8 @@ acceptance_criteria:
     Verification text in this spec uses `vci3_attribute_*` exclusively;
     no `mechanism_attribution_*` or `pvc_attribute_*` references in
     verification fields after this iteration ships.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     Analyst-facing markdown doc at `docs/mechanism-attribution.md`
@@ -286,6 +295,8 @@ acceptance_criteria:
 
     Linked from the header of `eval/eval_output/validate_corpus.md`
     (top of the file, above the headline) via a relative markdown link.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-09
   description: |
@@ -306,7 +317,8 @@ acceptance_criteria:
     returns its trigger label as part of the `(Mechanism, &'static str)`
     tuple (see implementation_notes); the dispatcher does not infer the
     label from the Mechanism variant.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-10
   description: |
     Run `make validate-corpus` to regenerate
@@ -341,7 +353,8 @@ acceptance_criteria:
        now matches the "expected" column (or carries the
        "pending value-shape escalation" annotation per
        sub-criterion 3).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-11
   description: |
     Three MADRs landed at `.orbit/choices/` capturing the architectural
@@ -361,6 +374,8 @@ acceptance_criteria:
 
     Numbers (`00NN`) chosen sequentially from the next available slots
     after the highest-numbered existing MADR.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-12
   description: |
@@ -376,6 +391,8 @@ acceptance_criteria:
     - Card `.orbit/cards/0014-profile-validate-precision.yaml` `specs[]`
       array already contains `.orbit/specs/2026-04-28-validate-corpus-iter3/`
       from iter-2 — verify it's still there post-iter-3.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-13
   description: |
@@ -443,7 +460,8 @@ acceptance_criteria:
     for every other failing column. Phase 1 commits BEFORE Phase
     2 runs, so the 4 hard anchors can never be silently
     regenerated from harness output.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-14
   description: |
     `make ci` exits 0. This includes fmt + clippy + test + check. The
@@ -463,3 +481,5 @@ acceptance_criteria:
       `vci3_fixture_anchor_count_4_hard_1_gap`)
     Total: ≥19 net new `vci3_*` tests. No clippy warnings on the
     new code. The taxonomy `cargo run -- check` step remains green.
+  gate: false
+  checked: false

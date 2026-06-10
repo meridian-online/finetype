@@ -58,7 +58,6 @@ goal: |
       (memory `taxonomy-country-code-enum-contamination`) — separate
       follow-up; doesn't block this spec because we read the
       validation `pattern`, not the contaminated `enum`.
-
 cards:
 - 0002-semantic-type-detection
 status: closed
@@ -102,8 +101,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-02
   description: |
     Apply the gate to v19/v20/v21/v22 corpus passes.
@@ -125,8 +122,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-03
   description: |
     Per-type coverage report — what does the gate refuse?
@@ -147,8 +142,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-04
   description: |
     Recompute cell deltas against the cleaned baseline.
@@ -174,8 +167,6 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code
-
 - id: ac-05
   description: |
     Document where v22 lands against the cleaned baseline.
@@ -193,7 +184,6 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
-
 - id: ac-06
   description: |
     Adoption — wire the gate into the corpus-pass pipeline so
@@ -216,4 +206,3 @@ acceptance_criteria:
     `ac_type: code`.
   gate: false
   checked: true
-  ac_type: code

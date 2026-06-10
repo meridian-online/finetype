@@ -1,35 +1,49 @@
 id: 2026-04-27-sharpen-rule-audit
-status: closed
 goal: |
   Full audit of all Sharpen post-processing rules. Measure each rule's net impact on the 448-row eval manifest through both v16 and v19-relu. Remove net-negative rules. Ship rule removals alongside v19-relu-s42 model promotion. Amend MADR 0066 to accept a tie (net_label_delta >= 0) when rule count decreases.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
     Ablation script that measures each Sharpen rule's individual net impact. For each rule: disable it, run v19-relu through the pipeline, score against the full manifest, report (fixes, regressions, net_delta). Output a TSV summary sorted by net impact.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Ablation results reviewed. Each rule categorised as KEEP (net-positive), REMOVE (net-negative or net-zero), or NARROW (net-positive but overly broad). Categorisation recorded in diagnostics/sharpen_audit_verdicts.tsv.
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     All REMOVE-verdict rules deleted from column.rs. Associated tests deleted. Code compiles (cargo check) and remaining tests pass (cargo test).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     All NARROW-verdict rules edited to reduce their match scope. Existing tests updated to reflect narrowed conditions. If no rules receive a NARROW verdict, AC-04 is satisfied vacuously.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     MADR 0069 recorded: amend MADR 0066 gate to accept net_label_delta >= 0 when the change reduces Sharpen rule count (fewer rules + same accuracy = net maintainability improvement). Drafted BEFORE the gate evaluation in ac-06 so the threshold is unambiguous.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-06
   description: |
     v19-relu-s42 + cleaned pipeline scored against full 448-row manifest. Profile eval result recorded. Gate check per amended MADR 0066 (ac-05): net_label_delta >= 0 vs v16 baseline (371/448). If rule cleanup recovers fewer than 6 labels, the amended gate (>= 0 with fewer rules) applies.
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     v19-relu-s42 promoted as models/default. models/default symlink updated. FINETYPE_CI_MODEL updated in CI workflows. HuggingFace upload is a manual pre-requisite performed before PR merge (not gated by this AC but noted in implementation_notes).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     CLAUDE.md updated: current model version, rule count, profile eval score, architectural direction updated to reflect audit outcome.
+  gate: false
+  checked: false
   ac_type: doc

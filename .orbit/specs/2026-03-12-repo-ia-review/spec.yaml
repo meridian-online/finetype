@@ -1,35 +1,47 @@
 id: 2026-03-12-repo-ia-review
-status: closed
 goal: |
   Restructure FineType's user-facing documentation for end users (analysts/data engineers). Fix all broken links, update stale content, trim the README from ~390 to ~200 lines by moving architecture/contributor content to docs/, and align file placement with Rust ecosystem conventions (delta/bat/fd pattern).
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: 'AC1: Zero broken links — all markdown URLs return 200, all relative paths resolve'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: 'AC2: Zero stale type counts — all references say 250 types, 7 domains, 43 categories'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: 'AC3: Zero stale version references — no v0.5.x references in user-facing docs'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: 'AC4: Zero ''Noon'' brand references — all say ''Meridian'''
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: 'AC5: README.md is ≤220 lines (currently 389)'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: 'AC6: Architecture content (mermaid diagram, pipeline stages table, crate table, repo tree, Why Sense→Sharpen, Why Candle) lives in docs/ARCHITECTURE.md, linked from README'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: 'AC7: TAXONOMY_QUICK_REFERENCE.md removed from root (content is stale beyond repair)'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: 'AC8: DEVELOPMENT.md moved to docs/DEVELOPMENT.md'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: 'AC9: README accuracy stats match current eval (170/174 label, 97.7%)'
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-10
   description: 'AC10: backlog/ references removed from all files'
-  ac_type: code
+  gate: false
+  checked: false

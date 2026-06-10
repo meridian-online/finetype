@@ -1,33 +1,42 @@
 id: 2026-04-18-v15-value-rules
-status: closed
 goal: |
   Add 6 value-based disambiguation rules (R25–R30) to the Sharpen pipeline to fix 8 of the 12 remaining misclassifications in the v14 eval. Each rule checks actual column values — no header/metadata dependency. No retraining required. Target: 215/227 → 223/227 (98.2% label accuracy).
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
     R25: HTTP status code gate. If label is "geography.address.postal_code" and ≥90% of non-empty values are 3-digit integers in range 100–599, override to "representation.numeric.integer_number". Must fire BEFORE R12 (disambiguate_numeric) to prevent R12 from reconfirming postal_code for 3-digit HTTP status values (review finding H1). Implementation: add the check at the top of value_sharpen, before the R12 call at ~line 2654.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     R26: Hash length gate. If label is "technology.identifier.tsid" and ≥90% of non-empty values are hexadecimal strings (characters 0-9, a-f, A-F only) of length 40 or 64, override to "technology.cryptographic.hash". TSID is strictly 32-char hex. 40-char = SHA-1, 64-char = SHA-256.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     R27: Year vs compact_ym gate. If label is "datetime.date.compact_ym" and ≥90% of non-empty values are exactly 4 digits (matching ^\d{4}$) AND ≥80% of those 4-digit values fall in 1900–2100 (plausible year range), override to "datetime.component.year". compact_ym is strictly 6 digits (YYYYMM). The year range check prevents false positives on 4-digit non-year values (review finding L1).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     R28: Email display format post-hint guard. Placed in apply_header_sharpen() AFTER all header hint processing (same position as country_code guard). If final label is "identity.person.email" and ≥80% of non-empty values match the display format pattern .+\s*<.+@.+> (name followed by angle- bracketed email), override to "identity.person.email_display". Must survive same-category header hint override where h.contains("email") in the header triggers a hint back to email (review finding B1).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     R29: Phone E.164 format post-hint guard. Placed in apply_header_sharpen() AFTER all header hint processing (same position as country_code guard). If final label is "identity.person.phone_number" and ≥80% of non-empty values match ^\+\d{7,15}$ (E.164: plus sign followed by 7–15 digits, no spaces/dashes/parens), override to "identity.person.phone_e164". Must survive same-category header hint override where h.contains("phone") in the header triggers a hint back to phone_number (review finding B1).
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     R30: Accounting format gate. If label is "finance.currency.amount_accounting" and 0% of non-empty values contain any currency formatting character (from the set: $, €, £, ¥, ₹, ₩, comma used as thousands separator), override to "representation.numeric.decimal_number". The distinguishing feature of amount_accounting is currency formatting — without it, the values are plain numbers. Thousands separator detection: comma followed by exactly 3 digits before end or next comma (e.g., "1,000" or "1,000,000"). Indian lakhs notation (1,00,000) is a known limitation.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Profile eval: run eval on all 35 datasets (227 columns) and verify ≥223/227 label accuracy. Column-level regression diff vs v14 baseline (215/227): all 215 correct columns must remain correct. Document any new misclassifications.
-  ac_type: code
+  gate: false
+  checked: false

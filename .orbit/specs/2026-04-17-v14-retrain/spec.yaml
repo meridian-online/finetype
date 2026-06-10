@@ -1,41 +1,52 @@
 id: 2026-04-17-v14-retrain
-status: closed
 goal: |
   Retrain multi-branch model (v14) with targeted training data curation to fix 15 known misclassifications from the v13 audit. No architecture changes — all fixes are data quality improvements: subtype decontamination, training collision separation, data gap filling, and a post-hint country_code guard for country/country_code disambiguation. Target: ≥220/227 label accuracy (96.9%+).
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
     Subtype decontamination: Per-value filtering within parent type columns in the training data pipeline. (a) url training data must not include data: scheme URIs — filter values matching ^data: from url columns. (b) email training data must not include "Name <email>" display format — filter values matching .+\s*<.+@.+> from email columns. (c) phone_number training data must not include pure E.164 format — filter values matching ^\+\d{7,15}$ (no spaces/dashes) from phone columns. Add dedicated training examples for data_uri, email_display, and phone_e164 subtypes. Log before/after row counts per type to detect excessive filtering.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     Training collision fixes: (a) compact_ym training data must be strictly 6-digit YYYYMM — no 4-digit years. (b) amount_accounting training data must include currency formatting (symbols, commas, decimal points) — no bare integers. Add hard-negative decimal_number examples with accounting- adjacent headers ("amount", "total", "sum", "balance"). (c) Separate postal_code from HTTP status codes: add 3-digit integer training examples with "status" headers to integer_number, ensure postal_code training doesn't include status-code-range values (100-599) without postal context. (d) Separate tsid (32-char hex) from hash (40/64-char hex) — ensure hash training includes SHA-256 (64-char) and SHA-1 (40-char) examples, tsid training is strictly 32-char. Note: MD5 (32-char) overlaps with tsid — document as known limitation. (e) Separate username from alphanumeric_id — add prefix+code pattern examples (e.g., "us6000pgkh") to alphanumeric_id.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Data gap filling: (a) Add JSON-as-string training examples for the json type — valid JSON objects/arrays as column values in CSV context. Verify json generator exists in finetype-core; if not, create one. (b) Add diverse user_agent training examples including short tool UAs (curl/, python-requests/, kube-probe/) alongside full browser UAs. Also add JWT negative examples — strings that superficially resemble JWTs (long, dotted) but are UAs — to break the 1.00-confidence false pattern on audit item #7.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Latitude/decimal_number separation: Expand hard-negative mining from v13. Generate decimal_number examples in [-90, 90] range with headers covering the specific audit failures: "error", "depth", "score", "gap", "dmin", "depthError". Ensure latitude training data uses geographic headers exclusively.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Country/country_code post-hint guard in apply_header_sharpen (column.rs). MUST be placed AFTER the same-category hardcoded hint override block (~line 2252-2268) — NOT in value_sharpen, which runs before header hints and would be overwritten. Logic: after all header hint processing, if final label is "geography.location.country" and >=95% of values match ^[A-Z]{2}$ (strict alpha-2 per taxonomy), override to "geography.location.country_code". Use ^[A-Z]{2}$ not ^[A-Z]{2,3}$ to avoid collision with state_code.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     Pre-training data audit gate: A script or check that runs BEFORE the overnight training loop and validates: (a) no contamination patterns in parent type data (ac-01 checks), (b) volume per type within expected range (no type dropped below 50% of v13 volume), (c) VALID_DIM=240, (d) distilled cap <= 600/type. If any check fails, abort before training.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-07
   description: |
     Rule rationalisation Phase 1 (safe removals from rule audit): (a) Remove h.contains("uri") keyword match from header_hint() at ~line 4135. The exact match for "uri" at ~line 3859 already covers the intended case. The keyword match actively causes audit item #1 by mapping "data_uri" headers to url. (b) Remove F3 (HS code feature rule) from feature_sharpen(). R20 (HS code validation gate) in value_sharpen is the definitive check. F3 creates false hs_code predictions that R20 then cleans up — net zero with extra complexity.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-08
   description: |
     Training run: Train v14 with all ac-01 through ac-04 data changes. Same config as v13 (50 epochs, 1200 cols/type, 70/30 blend, Metal). Model saved to models/sherlock-v14/.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-09
   description: |
     Eval run: Profile eval on all 35 datasets (227 columns). Generate eval report. Compare against v13 baseline (212/227). Target: >=220/227. Document which of the 15 audit items were fixed and which remain. Column-level regression diff: compare every column prediction between v13 and v14 to catch label swaps where one fix causes a different regression. For removed rules (ac-07), verify no regression on columns those rules previously corrected.
-  ac_type: code
+  gate: false
+  checked: false

@@ -1,7 +1,9 @@
 id: 2026-04-21-sharpen-demotion-guard
-status: closed
 goal: |
   Add a validator-confirmed demotion guard to `disambiguate_categorical` in crates/finetype-model/src/column.rs that preserves a named-type prediction when every non-empty sampled value passes the named type's validator AND the validator is precise (enum-constrained OR regex whose anchored body genuinely constrains the character set, length, or structure — not `^.+$`, not `^[A-Za-z0-9_]+$`, etc.). Ships the fix for `excel_format` identified in the validator-signal-attribution discovery; does not require a retrain; narrow Sharpen-layer change.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: ac-01
   description: |
@@ -21,32 +23,44 @@ acceptance_criteria:
           against a checked-in constant list in the defining module;
           regex-parsing is NOT required.
     Returns `false` for validations with neither enum nor pattern. Unit-tested in the same module.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-01b
   description: |
     A one-time taxonomy audit exercises `Validation::is_precise()` against EVERY definition in `labels/definitions_*.yaml`. The audit emits a sorted TSV under `.orbit/specs/2026-04-21-sharpen-demotion-guard/precise_audit.tsv` with columns `(type_key, has_enum, pattern, is_precise)`. The audit is implemented as a Rust integration test (`cargo test -p finetype-core --test precise_audit -- --nocapture`) so it re-runs on CI and the TSV is regenerated (diffable in PRs). In addition, at least 3 real taxonomy patterns sampled from the TSV's `is_precise=false` rows are included as explicit assertions in ac-01's unit tests (concrete patterns, not synthetic examples), to anchor the predicate against the real dataset.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-02
   description: |
     A demotion guard is added at the top of `disambiguate_categorical` in crates/finetype-model/src/column.rs (near line 3881). Before the existing demotion logic runs, the guard checks: (a) `taxonomy.get_validation(current_label).is_some()`; (b) that validation returns `true` from `is_precise()`; (c) every value in the `values` slice whose `s.trim().is_empty()` is `false` passes the validator via `is_valid()`. When all three hold, the function returns the current `(label, confidence)` unchanged (skipping demotion). When any fails, the existing demotion logic runs as before. The guard operates on the `values` slice as-passed — no re-sampling, no re-trimming beyond the non-empty filter. MADR 0059 must exist in `proposed` status before this AC begins implementation.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-03
   description: |
     Unit tests in `column.rs` tests module cover the four guard branches: (a) precise validator + all values pass → guard fires, returns current label; (b) precise validator + some values fail → guard doesn't fire, existing demotion runs; (c) imprecise validator + all values pass → guard doesn't fire; (d) no validation for current label → guard doesn't fire. Test function names use the spec's `test_prefix` (see metadata) — e.g. `test_dgd_ac03_guard_fires_precise_and_all_pass`.
-  ac_type: code
+  gate: false
+  checked: false
 - id: ac-04
   description: |
     Targeted END-TO-END behavioural test — `finetype profile` on `eval/datasets/csv/coverage_closure_phase_ab.csv` for the `excel_format` column NO LONGER returns `representation.discrete.categorical` after ALL Sharpen layers run. A demotion guard can only PRESERVE the raw multi-branch top-1 label; it cannot PROMOTE a wrong top-1 to a right label. For this column the raw model predicts `representation.text.word` (see eval-artefacts/changes.tsv post-value), so the guard fires on text.word's precise validator and preserves it. This AC proves the end-to-end effect of the guard: the canonical failure case no longer demotes to `categorical`. Closing the remaining label gap (`text.word` → `file.excel_format`) is a promotion problem — out of scope for this spec (MADR 0059) and tracked for a data-quality follow-up.
     AMENDED v1.2 (2026-04-21) — Original verification expected the CLI to emit `representation.file.excel_format`. Implementation evidence (progress.md Assumption Reversal section + eval-artefacts/changes.tsv) showed this was inconsistent with the raw model's behaviour documented in the discovery's own findings.md: the raw multi-branch returns `text.word`, not `excel_format`. The guard preserves raw top-1 — promotion is a different problem. Verification amended to match observable evidence.
+  gate: false
+  checked: false
 - id: ac-05
   description: |
     Full regression eval — `./eval/profile_eval.sh` on the 448-row expanded manifest produces: (a) label accuracy ≥ pre-patch baseline (297/352 on the implementation branch's merge base with main); (b) domain accuracy ≥ pre-patch baseline; (c) zero regressions on previously-passing columns per the delta script. **Baseline MUST be re-run on the implementation branch's merge base with main** — stale baselines from earlier in the sprint are rejected. Both profile_results.csv files (pre and post) are attached under .orbit/specs/2026-04-21-sharpen-demotion-guard/eval-artefacts/ with filenames `profile_results.pre.csv` and `profile_results.post.csv`. The `excel_format` column appears as a fix. `http_method` may appear unchanged — see ac-06.
     Delta-script contract (v1.2 amendment, 2026-04-21) — the originally-pinned `scripts/eval_delta_by_coverage.py --pre/--post --json | jq '.regressions'` contract turned out not to exist: the script on `main` is a single-snapshot reporter, not a pre/post differ, and has no `--json` mode. Rather than amend the sprint script (out of scope — this spec is Sharpen-layer only), the AC's regression count is computed by `.orbit/specs/2026-04-21-sharpen-demotion-guard/eval-artefacts/compute_regressions.py`, which implements the same label-match logic (schema_mapping.yaml + manifest join) and writes `regressions.tsv`, `improvements.tsv`, `changes.tsv`, and `summary.txt` alongside the pre/post CSVs. A regression is a (dataset, column) pair where pre matched ground truth and post did not. Contract: `summary.txt` line 1 must read `regressions: 0`.
+  gate: false
+  checked: false
 - id: ac-06
   description: |
     `progress.md` contains an `## http_method outcome` section with: (a) the exact observed label and confidence returned by `finetype profile --file eval/datasets/csv/coverage_closure_phase_ab.csv` for the `http_method` column post-patch; (b) a named next step — one of {`no action — rescued`, `follow-up card opened at <path>`, `no action — evidence logged for future spec`}. AC passes IFF both (a) and (b) are present; it does NOT pass on section existence alone. This gates documentation quality, not just structural presence.
+  gate: false
+  checked: false
   ac_type: doc
 - id: ac-07
   description: |
     MADR 0059 `demotion-guard-over-promotion` is committed under .orbit/choices/. Status starts `proposed` (before ac-02 begins); moves to `accepted` after ac-05 verifies no regression. References: (a) the validator-signal-attribution discovery findings; (b) MADR 0058 (whose follow-up this supersedes in direction); (c) MADR 0051 (http_method enum-only, the decision that framed the original promotion hypothesis). Rejects the originally-proposed `categorical → named_type` promotion rule in favour of a `named_type → categorical` demotion guard, citing the discovery evidence. Also records the rollback contingency (see constraints) so the decision is honest about downside branches.
+  gate: false
+  checked: false
   ac_type: doc

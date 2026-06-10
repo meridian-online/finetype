@@ -1,35 +1,57 @@
 id: 2026-03-21-sherlock-architecture
-status: closed
 goal: |
   Build a Sherlock-style multi-branch neural network that replaces CharCNN as FineType's primary column-type classifier. The new model combines character distribution features, Model2Vec value embeddings, and statistical features into a multi-branch architecture targeting 250 types. Train with blend-30-70 data (30% distilled, 70% synthetic). Ablation study: 4 configurations (flat/hierarchical × with/without sibling-context). Redefine the pipeline so Sense = this model, Sharpen = deterministic corrections.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
     Character distribution feature extractor implemented in Rust. For each of 96 printable ASCII characters, compute per-value character frequency (count of char c in value / length of value), then aggregate across all sampled column values using 10 statistics: any (>0 in any value), all (>0 in all values), mean, variance, min, max, median, sum, skewness, kurtosis. Output: 960-dim feature vector per column (96 chars × 10 stats).
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     Model2Vec value embedding branch implemented. For each sampled value in a column, compute Model2Vec embedding (128d). Aggregate across column using mean, variance, min, max (4 × 128 = 512 dims). Output: 512-dim feature vector per column. Benchmarked: ~1ms for 100 values on x86 CPU (verified in pre-implementation benchmark).
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     Statistical feature branch implemented with its own hidden layer (36→128→64, not passthrough). Column-level statistics including: entropy, fraction unique, fraction numeric/text/special cells, avg/std word count, value length stats (mean, var, min, max, median, skew, kurtosis), null fraction. Output: 36-dim feature vector per column (extends current 36-dim extractor with any additional Sherlock-inspired stats).
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Multi-branch model architecture implemented in finetype-train. Three branches (char: 960→300→300, embedding: 512→200→200, stats: 36→128→64) with ReLU + dropout per branch. Branches merge via concatenation (300+200+64 = 564 dims) → BatchNorm → shared layers (564→500→500) → head. Separate subnetwork per branch with independent hidden dimensions matching Sherlock proportions.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     Training data pipeline produces feature vectors (not raw text). The prepare script reads distilled CSV + synthetic NDJSON, extracts all three feature branches per column, and writes binary feature-vector training files. On-disk format: one record per column containing label (string), char_features ([f32; 960]), embed_features ([f32; 512]), stat_features ([f32; 36]). Full-scale test on 119K distilled rows with wall-clock time reported.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     Ablation study: 4 experiments on blend-30-70 data with the multi-branch architecture. All use same hyperparameters (seed 42, batch 32, 10 epochs, L2 reg 0.0001, dropout 0.35, Adam lr 0.0001). (1) Flat head, no sibling-context. (2) Flat head, with sibling-context enriching headers before embedding branch. (3) Hierarchical head (7→43→250), no sibling-context. (4) Hierarchical head, with sibling-context.
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     Tier 2 evaluation: best ablation experiment exceeds 85% overall accuracy on the 2,490-column benchmark. No individual type regresses by more than 3 columns compared to the PRE-1 baseline artifact. Pivot threshold: if best experiment scores <82%, findings document recommends next approach.
+  gate: false
+  checked: false
 - id: AC-8
   description: |
     Tier 1 profile evaluation shows no regression from PRE-1 baseline (expected ≥170/174, 97.7%).
+  gate: false
+  checked: false
 - id: AC-9
   description: |
     Pipeline redefined: Sense stage uses the new multi-branch model for direct 250-type classification. When profiling multi-column CSVs, sibling-context attention (if enabled) enriches header embeddings before the embedding branch. Sharpen stage applies existing deterministic corrections (leading-zero, locale detection, pandas artifact cleanup, cardinality checks). No Sense→category routing.
+  gate: false
+  checked: false
 - id: AC-10
   description: |
     Inference latency within budget. Column classification (100 values) completes in ≤ 50ms on M1. Full CSV profile (20 columns) completes in ≤ 2 seconds. Benchmark on x86 CPU also reported.
+  gate: false
+  checked: false

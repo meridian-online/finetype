@@ -1,7 +1,9 @@
 id: 2026-03-26-overnight-v6-data-quality
-status: closed
 goal: |
   Close the accuracy gap by fixing root causes upstream of training: (1) purge 9 stale label references from the Sharpen/header_hint pipeline that inject phantom labels into model output, (2) audit all generators for cross-type collisions and fix with Hugh's approval, (3) fix augmentation under-delivery and oversampling shortfall, (4) expand eval coverage from 131 to ~156 types so we can measure what we're improving. Then retrain as sherlock-v6 and re-tune Sharpen rules based on systematic error analysis. Ship on expanded eval baseline — old 190-column denominator becomes historical.
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
@@ -18,6 +20,8 @@ acceptance_criteria:
       - technology.development.boolean / technology.data.boolean → remove (lines 186-188)
 
     For labels with no taxonomy match: remove the hint entirely (let the model decide). Update corresponding test assertions (lines 5767, 5779-5780, 5950-5978, 8960/8977/ 8982/9221) to assert the correct canonical labels — do not simply delete tests.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     Systematically test every generator pair that shares a broad_type (VARCHAR, BIGINT, DOUBLE, etc.) for output overlap. For each collision found, document:
@@ -28,9 +32,13 @@ acceptance_criteria:
 
     Known collision to fix: hs_code ↔ decimal_number. Decision: 2-level dotted values (e.g., 8471.30) are decimal. Only 3+ dot-separated levels (e.g., 0901.11.00.10) are hs_code. Change validation pattern from ^\d{4}\.?\d{2}(\.\d{2}){0,2}$ to ^\d{4}\.\d{2}(\.\d{2}){1,2}$. Remove 10% 2-level bucket from generator (was: 10% XXXX.XX, 70% XXXX.XX.XX, 20% XXXX.XX.XX.XX → becomes: 80% XXXX.XX.XX, 20% XXXX.XX.XX.XX).
     Present collision table to Hugh for approval before implementing fixes.
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     The stale header_hint reference (identity.financial.currency_code) reflects a taxonomy move that happened in v0.5.1. The canonical type is finance.currency.currency_code. Ensure no references to the old location remain anywhere in the codebase (training data, eval mappings, Sharpen rules, tests). Also scan the distilled training corpus for stale identity.financial labels — exclude or relabel before training. Record as MADR decision.
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Add eval datasets for the ~25 highest-priority uncovered types identified in the investigation. Priority types include:
@@ -41,15 +49,21 @@ acceptance_criteria:
       - identity: username
 
     For each new type: create or source a CSV with ≥20 representative values, add to eval/datasets/manifest.csv with ground truth labels, update eval/schema_mapping.csv if needed. New datasets must NOT overlap with training corpus.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     Root cause identified by spec review: double-probability gate in prepare_multibranch_data.py. augment_column() has 13/20 internal slots as "no_aug" (~65% no-op rate). augment_columns() gates on rng.random() < augmentation_rate. Combined effect: 0.35 × 0.35 = 12.25%, exactly matching v5's observed 12.2%.
     Fix: remove "no_aug" slots from augment_column()'s weighted choice table so that when a column is selected for augmentation (by the rate check), it always gets augmented. The --augmentation-rate flag then directly controls coverage.
     After fix: manifest must show augmented_columns/total_columns ≥ 30%. Augmentation types: whitespace, encoding, null_mix, case_variation (4 existing). format_mixing was never implemented — it is out of scope for this AC. If needed, it should be a separate feature AC with a design spec.
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     Root cause identified by spec review: blend_columns() correctly computes effective_spt = samples_per_type × oversample_multiplier (e.g., 9000). But the synthetic pool is generated flat at samples_per_type (3000) per type via generate_synthetic_columns(). When blend_columns() tries to allocate 9000, actual_s is capped by len(s_cols) = 3000, so total never exceeds ~5000.
     Fix: generate_synthetic_columns() must produce samples_per_type × oversample_multiplier synthetic columns for oversampled types. Either pass the oversample list to the generation step, or generate effective_spt columns per type when that type is in the oversample list.
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     Prerequisite: instrument the Sharpen pipeline to log a trace per column. Currently ColumnResult only records one disambiguation_rule, and feature_sharpen()/ value_sharpen() return on first match with no intermediate logging. Build minimal trace infrastructure: for each column, log the label before and after each rule stage (feature_sharpen, value_sharpen, header_sharpen), and which rules were evaluated (not just which fired).
@@ -58,6 +72,8 @@ acceptance_criteria:
       (b) Rules that fire incorrectly for v5 (rescuing the wrong direction)
       (c) New rules justified by v5's specific error patterns
     Known candidate: iso vs iso_date T-separator check — the difference is meaningful for analysts and is exactly the kind of pattern Sharpen excels at. Per decision 0038: prefer retraining over new rules. Only add rules where the model demonstrably cannot learn the pattern.
+  gate: false
+  checked: false
 - id: AC-8
   description: |
     Run the fixed pipeline end-to-end using v5 overnight infrastructure as base. CLI parameters match v5: 3000 samples/type, 3x oversample on confused types, 0.35 augmentation rate, adaptive epochs (minimum 20), seed 42. Only train one architecture (current — v5-scaled showed no benefit).
@@ -67,6 +83,8 @@ acceptance_criteria:
       - AC-2: generator collision fixes change training data distribution
     These changes are intentional. Document all behavioral differences from v5 in the overnight v6 script header.
     All generator fixes from AC-2 and data quality fixes from AC-5/AC-6 must land before training starts.
+  gate: false
+  checked: false
 - id: AC-8b
   description: |
     Hugh reviewed the collision audit and identified types that don't spark joy for analysts. Remove 11 types (250 → 239) across 10 collapses:
@@ -110,12 +128,18 @@ acceptance_criteria:
       - S5: Percentage vs yield — +/- sign prefix check
       - S6: Coordinate range check — lat must be ±90, long ±180 (5 eval misses)
       - S7: dmy_short_dot false positive check — basic date range validation (2 eval misses)
+  gate: false
+  checked: false
 - id: AC-9
   description: |
     Evaluate sherlock-v6 on the expanded eval set (AC-4). Report both:
       - Expanded eval accuracy (new primary metric)
       - Legacy 190-column accuracy (historical comparison only)
     Target: ≥5 net column improvements over v5-current on expanded eval (stale label fixes alone should recover 2-3, so 5 is a reasonable floor for the combined work). Hard floor: no regression below v4 baseline (155/190) on the legacy set.
+  gate: false
+  checked: false
 - id: AC-10
   description: |
     If AC-9 passes: update models/default symlink to sherlock-v6-current. Publish to HuggingFace meridian-online/finetype-model. Update CLAUDE.md with new accuracy numbers (on expanded eval). Update version to 0.6.13.
+  gate: false
+  checked: false

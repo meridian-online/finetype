@@ -1,8 +1,10 @@
 id: 2026-03-23-multibranch-training-strategy
-status: closed
 goal: |
   Add a 4th header embedding branch to the multi-branch (Sherlock-style) model architecture and retrain with a 50/50 distilled/synthetic data mix. The header branch encodes the column name via Model2Vec (128-dim compact model), giving the model direct access to the strongest disambiguation signal. Target: ≥150/190 (79%+) on the 190-column profile eval, proving multi-branch + headers is a viable path toward replacing CharCNN + hand-tuned disambiguation.
   Phase 1 (post-processing overlay) is deliberately skipped. The user's strategy is to reduce disambiguation dependency through better models, not to layer more post-processing. This training run answers: does header signal improve the raw multi-branch model? The comparison is against sherlock-v2-flat (128/190, 67.4% on the current eval set after PR #23 eval fixes).
+cards: []
+status: closed
+labels: []
 acceptance_criteria:
 - id: AC-1
   description: |
@@ -11,6 +13,8 @@ acceptance_criteria:
         MultiBranchClassifier (inference).
     (d) Update forward pass: concatenate 4 branch outputs before merge trunk. (e) Update MultiBranchClassifier::load() to load the 4th branch weights.
     Input: 128-dim Model2Vec embedding of column header string. Branch hidden dims: 128→128→64, matching the stats branch pattern. Merge layer updated: char 300 + embed 200 + stats 64 + header 64 = 628 dims.
+  gate: false
+  checked: false
 - id: AC-2
   description: |
     FTMB binary format extended with header embedding field.
@@ -23,6 +27,8 @@ acceptance_criteria:
     (e) Update read_ftmb.py Python reader similarly: accept version 1 with
         zero header features.
     (f) Add Rust unit test for FTMB v1↔v2 round-trip.
+  gate: false
+  checked: false
 - id: AC-3
   description: |
     Data preparation pipeline updated to extract header embeddings.
@@ -37,21 +43,33 @@ acceptance_criteria:
         to cheat on perfect type-key headers unavailable at inference.
     (d) For distilled data: use the original column headers from the Sherlock
         corpus (already present in the distilled CSV).
+  gate: false
+  checked: false
 - id: AC-4
   description: |
     Training data prepared with 50/50 distilled/synthetic mix. No eval dataset columns included. Total volume: ≥200K column-level training samples. Type coverage: all 250 taxonomy types represented.
     The distillation pipeline (output/distillation-v3/) is known to be sourced from Sherlock web-table data, not from eval/datasets/. Contamination check is by provenance of the distillation pipeline, not by post-hoc file-path inspection of the .ftmb file.
+  gate: false
+  checked: false
 - id: AC-5
   description: |
     Model trained with header branch on 50/50 data. Hyperparameters: seed 42, batch 32, 20 epochs, dropout 0.35, Adam lr 0.0001, weight decay 0.0001, patience 10. Training completes on M1 Pro with Metal acceleration.
     overnight_sherlock.sh updated with --ratio-distilled 0.5 and new model output paths (sherlock-v3-flat/).
+  gate: false
+  checked: false
 - id: AC-6
   description: |
     Profile eval on 190-column benchmark achieves ≥150/190 (79%+) label accuracy. This is compared against the raw sherlock-v2-flat baseline of 128/190 (67.4%) measured on the same eval set (post-PR#23 eval pipeline). Note: this is raw multi-branch output with NO post-processing — the comparison is architecture- to-architecture, not against the CharCNN + disambiguation production pipeline (188/190).
+  gate: false
+  checked: false
 - id: AC-7
   description: |
     Ablation comparison: train one model WITH header branch and one WITHOUT (same 50/50 data, same hyperparameters). The header branch model must outperform the no-header model by a meaningful margin (≥10 columns). This isolates the header signal's contribution.
+  gate: false
+  checked: false
 - id: AC-8
   description: |
     MultiBranchClassifier inference path updated to accept header string. The classify_multi_branch method in column.rs passes the header to the classifier, which embeds it via Model2Vec and feeds it through the 4th branch. When header is empty/absent, zero-vector used (graceful degradation).
     Additional test: measure accuracy with headers vs without headers (zero-vector) at inference time on the eval set. This validates graceful degradation and quantifies the header signal's inference-time contribution.
+  gate: false
+  checked: false
