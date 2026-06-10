@@ -281,3 +281,9 @@ models/char-cnn-mfg/
 # Value-level arch-test working models (eval_*.json verdicts tracked).
 output/value-level-arch-test/model_base_nf/
 output/value-level-arch-test/model_mfg_nf/
+
+# Postal-veto gate sample pass (regenerable from scripts/gittables_corpus_pass.py
+# with the patched binary over stratified_sample.files.txt; verdict JSON is tracked).
+output/postal-veto/sample_pass/
+output/postal-veto/sample_pass.err
+output/postal-veto/sample_pass.out
