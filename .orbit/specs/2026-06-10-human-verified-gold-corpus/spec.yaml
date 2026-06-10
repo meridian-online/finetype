@@ -35,7 +35,7 @@ acceptance_criteria:
     so the existing 240 anchor rows fold in as the seed rather than a parallel
     fixture. Sanitised per the corpus-pass artefact discipline.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     Agent pre-labelling: every candidate column labelled by >= 3 independent lenses
