@@ -14,7 +14,7 @@ acceptance_criteria:
     scoreboard's MODELS list). Nothing is moved or removed under this AC.
     GATE: author signs the manifest before any archive/delete executes.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |

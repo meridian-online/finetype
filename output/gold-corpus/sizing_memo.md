@@ -77,13 +77,51 @@ diversity per the Precision Principle), amount. Every external column passes the
 choice-0055 realism pre-screen and registers in `eval/datasets/sources.yaml` with
 role=gold.
 
+**Why GeoNames and CLDR are not gold column sources.** Both are already in the toolset —
+on the other side of the firewall. GeoNames generated v21's geography training columns
+and both are top-ranked ingestion sources for the reference-data mining factory (open
+spec, `reference_data_inventory.md`). The gold-anchor independence contract exists
+precisely to bar gold labels from deriving from "any authoritative source the mining
+factory ingests" — otherwise a Sense model trained on factory-mined GeoNames labels
+would pass a GeoNames-derived gold set by construction, telling us nothing. They also
+fail the realism screen as *columns*: they are canonical reference vocabularies, and the
+v21 post-mortem recorded that real-world city columns are messier than GeoNames-derived
+ones — the mess is what gold must capture. **Where they do serve: as evidence inside the
+labelling lenses** (set-membership checks — is this value a real GeoNames place, a CLDR
+month vocabulary?), under the rule below that keeps the human, not the reference set,
+as the label source.
+
+## Lineage and reproducibility
+
+Every gold column carries a verifiable chain back to bytes on disk, reusing the
+dataset-provenance registry (card 0018, `scripts/dataset_register.py` /
+`dataset_verify.py`):
+
+- **GitTables share** — content-addressed already: the fixture keys on
+  `(file_content_sha256, column_name)`, the sample is drawn from a committed fixed file
+  list, and the corpus is a local snapshot. Rebuild is deterministic today.
+- **External share** — every source is downloaded once, vendored locally, and registered
+  (snapshot JSON under `eval/datasets/snapshots/` with per-file SHA256 + size +
+  fetched-date + licence; `sources.yaml` entry with role=gold). The fixture references
+  the registered snapshot, never a URL — re-scoring and rebuilding require **no network
+  and survive source-site drift**. `dataset_verify.py` re-hashes before any run that
+  consumes gold.
+- **Labels** — `labeller` + `provenance` columns (anchor convention) record which lens
+  votes and/or which human verdict produced each label, so any label is auditable to
+  its evidence.
+
 ## Labelling and the adjudication budget
 
 Independence contract (inherited from spec 2026-06-05-gold-eval-anchor ac-01): no gold
 label may derive from YDF, the Sense cascade, or mining-factory sources. Pre-labelling
 lenses: (1) value-validator (taxonomy JSON-Schema pass rates), (2) header-semantic,
-(3) external-reference / model-free heuristic. Unanimous agreement → consensus label;
-any disagreement or low confidence → the author's queue.
+(3) external-reference (set-membership against GeoNames, CLDR, ISO code lists) /
+model-free heuristic. Unanimous agreement → consensus label; any disagreement or low
+confidence → the author's queue. **Decisive-lens rule:** because GeoNames/CLDR are also
+mining-factory ingestion sources, the external-reference lens may corroborate but never
+decide alone — any column where it is the tie-breaking vote routes to the human queue,
+so the independence contract holds (the human is the label source; reference sets are
+evidence).
 
 Expected queue: 15–25% of 1,400 ≈ **210–350 columns**. At 30–40 seconds per verdict
 (the `rare_type_gold_review.py` format: header + sample values + correct/wrong/unsure)
