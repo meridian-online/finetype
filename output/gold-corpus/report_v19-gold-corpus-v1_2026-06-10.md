@@ -1,9 +1,9 @@
 # Gold eval anchor — v19-gold-corpus-v1
 
 **Date:** 2026-06-10  
-**Gold fixture:** `eval/gold/gold_corpus_v1.tsv` (915 columns)  
+**Gold fixture:** `eval/gold/gold_corpus_v1.tsv` (931 columns)  
 **Predictions:** `output/gold-corpus/predictions_v19.tsv`  
-**Scored:** 915 columns (0 gold columns had no prediction)  
+**Scored:** 931 columns (0 gold columns had no prediction)  
 
 Per-family accuracy (fraction of columns where the model's prediction equals the curated gold label — labels neither lens produced):
 
@@ -13,6 +13,13 @@ Per-family accuracy (fraction of columns where the model's prediction equals the
 | B_country_vs_categorical | 60 | 0.967 |
 | C_lat_lon_temperature | 90 | 1.000 |
 | D_year_vs_integer | 60 | 0.667 |
+| author-open:datetime.component.year | 1 | 0.000 |
+| author-open:finance.currency.amount | 5 | 0.400 |
+| author-open:geography.location.region | 2 | 0.000 |
+| author-open:representation.discrete.categorical | 4 | 0.250 |
+| author-open:representation.identifier.alphanumeric_id | 1 | 0.000 |
+| author-open:representation.text.plain_text | 2 | 0.500 |
+| author-open:technology.internet.url | 1 | 0.000 |
 | backbone:datetime.date.iso | 51 | 1.000 |
 | backbone:representation.numeric.decimal_number | 12 | 1.000 |
 | backbone:representation.numeric.integer_number | 21 | 0.810 |
@@ -81,35 +88,37 @@ Per-label precision/recall (the curated label is ground truth; YDF is not consul
 | datetime.timestamp.dmy_hm | 1 | 1 | 0 | 0 | 1.000 (0.21-1.00) | 1.000 (0.21-1.00) |
 | datetime.timestamp.iso_8601_milliseconds | 1 | 1 | 2 | 0 | 0.333 (0.06-0.79) | 1.000 (0.21-1.00) |
 | datetime.timestamp.sql_standard | 2 | 2 | 6 | 0 | 0.250 (0.07-0.59) | 1.000 (0.34-1.00) |
+| finance.currency.amount | 5 | 2 | 18 | 3 | 0.100 (0.03-0.30) | 0.400 (0.12-0.77) |
 | geography.address.full_address | 4 | 4 | 4 | 0 | 0.500 (0.22-0.78) | 1.000 (0.51-1.00) |
 | geography.address.postal_code | 4 | 4 | 26 | 0 | 0.133 (0.05-0.30) | 1.000 (0.51-1.00) |
 | geography.coordinate.latitude | 39 | 39 | 1 | 0 | 0.975 (0.87-1.00) | 1.000 (0.91-1.00) |
 | geography.coordinate.longitude | 45 | 44 | 0 | 1 | 1.000 (0.92-1.00) | 0.978 (0.88-1.00) |
-| geography.location.city | 24 | 24 | 12 | 0 | 0.667 (0.50-0.80) | 1.000 (0.86-1.00) |
+| geography.location.city | 24 | 24 | 14 | 0 | 0.632 (0.47-0.77) | 1.000 (0.86-1.00) |
 | geography.location.continent | 1 | 1 | 0 | 0 | 1.000 (0.21-1.00) | 1.000 (0.21-1.00) |
 | geography.location.country | 10 | 9 | 2 | 1 | 0.818 (0.52-0.95) | 0.900 (0.60-0.98) |
 | geography.location.country_code | 57 | 47 | 2 | 10 | 0.959 (0.86-0.99) | 0.825 (0.71-0.90) |
-| geography.location.region | 13 | 7 | 13 | 6 | 0.350 (0.18-0.57) | 0.538 (0.29-0.77) |
+| geography.location.region | 15 | 7 | 14 | 8 | 0.333 (0.17-0.55) | 0.467 (0.25-0.70) |
 | geography.location.state_code | 7 | 0 | 1 | 7 | 0.000 (0.00-0.79) | 0.000 (0.00-0.35) |
 | geography.transportation.iata_code | 2 | 2 | 6 | 0 | 0.250 (0.07-0.59) | 1.000 (0.34-1.00) |
 | geography.transportation.icao_code | 1 | 1 | 0 | 0 | 1.000 (0.21-1.00) | 1.000 (0.21-1.00) |
 | identity.commerce.isbn | 18 | 15 | 7 | 3 | 0.682 (0.47-0.84) | 0.833 (0.61-0.94) |
 | identity.person.full_name | 1 | 1 | 5 | 0 | 0.167 (0.03-0.56) | 1.000 (0.21-1.00) |
+| identity.person.gender | 1 | 1 | 0 | 0 | 1.000 (0.21-1.00) | 1.000 (0.21-1.00) |
 | representation.boolean.terms | 10 | 8 | 0 | 2 | 1.000 (0.68-1.00) | 0.800 (0.49-0.94) |
-| representation.discrete.categorical | 100 | 39 | 6 | 61 | 0.867 (0.74-0.94) | 0.390 (0.30-0.49) |
-| representation.identifier.alphanumeric_id | 53 | 6 | 1 | 47 | 0.857 (0.49-0.97) | 0.113 (0.05-0.23) |
-| representation.identifier.increment | 1 | 1 | 16 | 0 | 0.059 (0.01-0.27) | 1.000 (0.21-1.00) |
+| representation.discrete.categorical | 101 | 39 | 6 | 62 | 0.867 (0.74-0.94) | 0.386 (0.30-0.48) |
+| representation.identifier.alphanumeric_id | 54 | 6 | 1 | 48 | 0.857 (0.49-0.97) | 0.111 (0.05-0.22) |
+| representation.identifier.increment | 1 | 1 | 17 | 0 | 0.056 (0.01-0.26) | 1.000 (0.21-1.00) |
 | representation.identifier.numeric_code | 3 | 2 | 1 | 1 | 0.667 (0.21-0.94) | 0.667 (0.21-0.94) |
 | representation.identifier.uuid | 1 | 1 | 1 | 0 | 0.500 (0.09-0.91) | 1.000 (0.21-1.00) |
-| representation.numeric.decimal_number | 96 | 83 | 0 | 13 | 1.000 (0.96-1.00) | 0.865 (0.78-0.92) |
-| representation.numeric.integer_number | 195 | 91 | 0 | 104 | 1.000 (0.96-1.00) | 0.467 (0.40-0.54) |
-| representation.text.entity_name | 5 | 4 | 7 | 1 | 0.364 (0.15-0.65) | 0.800 (0.38-0.96) |
-| representation.text.plain_text | 36 | 8 | 3 | 28 | 0.727 (0.43-0.90) | 0.222 (0.12-0.38) |
+| representation.numeric.decimal_number | 97 | 83 | 3 | 14 | 0.965 (0.90-0.99) | 0.856 (0.77-0.91) |
+| representation.numeric.integer_number | 196 | 91 | 0 | 105 | 1.000 (0.96-1.00) | 0.464 (0.40-0.53) |
+| representation.text.entity_name | 6 | 5 | 8 | 1 | 0.385 (0.18-0.64) | 0.833 (0.44-0.97) |
+| representation.text.plain_text | 39 | 8 | 4 | 31 | 0.667 (0.39-0.86) | 0.205 (0.11-0.36) |
 | representation.text.word | 2 | 0 | 13 | 2 | 0.000 (0.00-0.23) | 0.000 (0.00-0.66) |
 | technology.internet.hostname | 2 | 2 | 0 | 0 | 1.000 (0.34-1.00) | 1.000 (0.34-1.00) |
 | technology.internet.top_level_domain | 6 | 2 | 0 | 4 | 1.000 (0.34-1.00) | 0.333 (0.10-0.70) |
-| technology.internet.url | 44 | 44 | 16 | 0 | 0.733 (0.61-0.83) | 1.000 (0.92-1.00) |
+| technology.internet.url | 44 | 44 | 17 | 0 | 0.721 (0.60-0.82) | 1.000 (0.92-1.00) |
 
-**Headline — column accuracy:** 606/915 = 0.662 (95% CI 0.631-0.692)  
-**Macro precision** (mean over labels): 0.667  
-**Macro recall** (mean over labels): 0.784  
+**Headline — column accuracy:** 610/931 = 0.655 (95% CI 0.624-0.685)  
+**Macro precision** (mean over labels): 0.658  
+**Macro recall** (mean over labels): 0.778  

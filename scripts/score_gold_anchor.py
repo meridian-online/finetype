@@ -86,6 +86,25 @@ def _profile_column(binary: Path, column_name: str, values: list[str]) -> str:
     return defn.get("x-finetype-label", "") if isinstance(defn, dict) else ""
 
 
+def _open_row_identity(r: dict) -> dict:
+    """The open-rows CSV carries row_index into the llm TSV; resolve identity."""
+    llm = Path("eval/gold/gold_review_queue_v1_llm.tsv")
+    if not hasattr(_open_row_identity, "_cache"):
+        _open_row_identity._cache = {
+            row["row_index"]: row for row in load_gold(llm)} if llm.exists() else {}
+    row = _open_row_identity._cache.get(r["row_index"], {})
+    paths: dict[str, str] = {}
+    for cand in (Path("eval/gold/gold_corpus_candidates.tsv"),
+                 Path("eval/gold/gold_corpus_candidates_external.tsv")):
+        if cand.exists():
+            for c in load_gold(cand):
+                paths.setdefault(c["file_content_sha256"], c["file_path"])
+    sha = row.get("file_content_sha256", "")
+    return {"family": "author-open:" + row.get("stratum", ""),
+            "file_path": paths.get(sha, ""), "file_content_sha256": sha,
+            "column_name": row.get("column_name", "")}
+
+
 def cmd_build_gold(args: argparse.Namespace) -> int:
     """Merge the verified gold layers into one fixture (gold_corpus_v1.tsv).
 
@@ -161,6 +180,22 @@ def cmd_build_gold(args: argparse.Namespace) -> int:
                                 + ("author spot-check ok" if human
                                    else "author-accepted tier (40/40 spot-check)"))})
             n_llm += 1
+    # open-row resolutions (panel splits/unsures the author settled directly)
+    n_open = 0
+    if args.open_rows.exists():
+        with args.open_rows.open() as fh:
+            for r in csv.DictReader(fh):
+                lkey = next((k for k in r if k.startswith("your_label")), None)
+                label = (r.get(lkey) or "").strip() if lkey else ""
+                if not label or label.lower() == "skip":
+                    continue
+                add({"family": "author-open:" ,
+                     "file_path": "", "file_content_sha256": "", "column_name": "",
+                     **_open_row_identity(r), "curated_label": label,
+                     "ydf_context": "", "sense_context": "",
+                     "labeller": "author-adjudicated",
+                     "provenance": "ac-04 open-row resolution 2026-06-10"})
+                n_open += 1
     n_adj = 0
     if args.review.exists():
         with args.review.open() as fh:
@@ -185,8 +220,8 @@ def cmd_build_gold(args: argparse.Namespace) -> int:
         w.writeheader()
         w.writerows(out_rows)
     print(f"gold v1: {len(out_rows)} columns (anchor {n_anchor}, consensus "
-          f"{n_consensus}, llm-tier {n_llm}, adjudicated {n_adj}) -> {args.out}",
-          file=sys.stderr)
+          f"{n_consensus}, llm-tier {n_llm}, open-rows {n_open}, "
+          f"adjudicated {n_adj}) -> {args.out}", file=sys.stderr)
     return 0
 
 
@@ -402,6 +437,8 @@ def main() -> int:
                    default=Path("eval/gold/gold_review_queue_v1_llm.tsv"))
     b.add_argument("--spotcheck", type=Path,
                    default=Path("eval/gold/gold_spotcheck_author.csv"))
+    b.add_argument("--open-rows", dest="open_rows", type=Path,
+                   default=Path("eval/gold/gold_open_rows_author.csv"))
     b.add_argument("--out", type=Path,
                    default=Path("eval/gold/gold_corpus_v1.tsv"))
     b.set_defaults(func=cmd_build_gold)

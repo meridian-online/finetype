@@ -1,16 +1,17 @@
 # Gold corpus v1 — shipped v19 baseline (ac-06)
 
 **Date:** 2026-06-10 (updated same day after the adjudication tier landed) ·
-**Fixture:** `eval/gold/gold_corpus_v1.tsv` (915 verified columns: 240 anchor +
-349 lens-consensus + 326 two-panel llm-adjudicated, author-accepted via 40/40
-spot-check — 40 of those carry the author tier) ·
+**Fixture:** `eval/gold/gold_corpus_v1.tsv` (931 verified columns: 240 anchor +
+349 lens-consensus + 326 two-panel llm-adjudicated (author-accepted via 40/40
+spot-check; 40 carry the author tier) + 16 author-resolved open rows; 8 queue
+rows skipped as unresolvable) ·
 **Model:** `models/default` → sherlock-v19-relu-s42, real Sense→Sharpen path ·
 **Full tables:** `report_v19-gold-corpus-v1_2026-06-10.md` · **Scorer:** `score_gold_anchor.py`
 (extended: `build-gold` fixture merge, external vendored-CSV predict, Wilson CIs, global per-label metrics)
 
 ## Headline
 
-**v19 gets 606 of 915 verified columns right — 66.2% (95% CI 63.1–69.2).**
+**v19 gets 610 of 931 verified columns right — 65.5% (95% CI 62.4–68.5).**
 This is the first accuracy number in the project scored against verified labels rather than
 a proxy oracle, and the number future candidates must beat. (The first cut, before the
 adjudicated tier landed, read 68.6% on 589 columns — the adjudicated rows are harder by
@@ -50,15 +51,16 @@ rules earn their keep), iso dates (P=1.0), decimals (P=1.0/R=0.865), year
 1. **Provenance tiers:** 240 anchor + 40 author-spot-checked rows are human-grade;
    349 lens-consensus and 286 llm-adjudicated rows are machine-verified with measured
    trust (two-panel agreement, author calibration 40/40, Wilson 95% lower bound on
-   panel-author agreement ≥ 0.91). 24 queue rows remain open (panel splits/unsures)
-   plus a 572-row unreviewed backlog.
+   panel-author agreement ≥ 0.91); 16 panel-split rows were resolved directly by the
+   author. The 350-row queue is fully dispositioned (8 skips); a 572-row unreviewed
+   backlog remains for future sittings.
 2. **utc has support 1** — the corpus's only verified true utc-offset column is external
    (OpenFlights). The utc battle remains FP-side only; that scarcity is now a measured
    fact, not an assumption.
 3. **Predictions run on the truncated sample values** (same path as the anchor baseline) —
    comparable across models, but not identical to a full-file profile.
 4. **Selection bias is by design**: half the corpus was drawn where v19 emits contested
-   types, so 66.2% is NOT "v19's accuracy on random tables" — it is accuracy on the
+   types, so 65.5% is NOT "v19's accuracy on random tables" — it is accuracy on the
    contested + backbone mix the sizing memo specified. Compare models on this fixture,
    not this number to other corpora.
 
