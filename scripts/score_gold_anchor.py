@@ -95,7 +95,12 @@ def cmd_build_gold(args: argparse.Namespace) -> int:
       adjudicated gold_review_queue_v1_review.csv rows where the author has
                   filled human_verdict (correct -> proposed_label;
                   wrong -> correct_label_if_wrong; unsure -> skipped)
-    Later layers never override the anchor; duplicate keys keep first layer.
+      llm tier    gold_review_queue_v1_llm.tsv rows double-confirmed by two
+                  independent panels (status=llm-adjudicated), ACCEPTED by the
+                  author 2026-06-10 via a 40/40 spot-check (Wilson 95% lower
+                  bound on agreement >= 0.91). Spot-checked rows carry the
+                  author tier; the rest carry labeller=llm-adjudicated-2panel.
+    Later layers never override earlier ones; duplicate keys keep first layer.
     Re-run as author verdicts land — the fixture grows monotonically."""
     fields = ["family", "file_path", "file_content_sha256", "column_name",
               "curated_label", "ydf_context", "sense_context", "labeller", "provenance"]
@@ -123,6 +128,39 @@ def cmd_build_gold(args: argparse.Namespace) -> int:
                  "labeller": "lens-consensus",
                  "provenance": "ac-03 " + r.get("verdict_basis", "")})
     n_consensus = len(out_rows) - n_anchor
+    # llm tier (two-panel double-confirmed; author-accepted 2026-06-10)
+    n_llm = 0
+    if args.llm.exists():
+        spot_ok: set[int] = set()
+        if args.spotcheck.exists():
+            with args.spotcheck.open() as fh:
+                for r in csv.DictReader(fh):
+                    vkey = next((k for k in r if k.startswith("author_verdict")), None)
+                    if vkey and (r[vkey] or "").strip().lower() in ("ok", "yes", "y"):
+                        spot_ok.add(int(r["row_index"]))
+        # sha -> file_path so external rows keep their vendored-CSV path
+        paths: dict[str, str] = {}
+        for cand in (Path("eval/gold/gold_corpus_candidates.tsv"),
+                     Path("eval/gold/gold_corpus_candidates_external.tsv")):
+            if cand.exists():
+                for r in load_gold(cand):
+                    paths.setdefault(r["file_content_sha256"], r["file_path"])
+        for r in load_gold(args.llm):
+            if r.get("status") != "llm-adjudicated" or not r.get("final_label"):
+                continue
+            human = int(r["row_index"]) in spot_ok
+            add({"family": "llm:" + r.get("stratum", ""),
+                 "file_path": paths.get(r["file_content_sha256"], ""),
+                 "file_content_sha256": r["file_content_sha256"],
+                 "column_name": r["column_name"],
+                 "curated_label": r["final_label"],
+                 "ydf_context": "", "sense_context": "",
+                 "labeller": ("author-adjudicated" if human
+                              else "llm-adjudicated-2panel"),
+                 "provenance": ("ac-04 two-panel adjudication 2026-06-10; "
+                                + ("author spot-check ok" if human
+                                   else "author-accepted tier (40/40 spot-check)"))})
+            n_llm += 1
     n_adj = 0
     if args.review.exists():
         with args.review.open() as fh:
@@ -147,7 +185,8 @@ def cmd_build_gold(args: argparse.Namespace) -> int:
         w.writeheader()
         w.writerows(out_rows)
     print(f"gold v1: {len(out_rows)} columns (anchor {n_anchor}, consensus "
-          f"{n_consensus}, adjudicated {n_adj}) -> {args.out}", file=sys.stderr)
+          f"{n_consensus}, llm-tier {n_llm}, adjudicated {n_adj}) -> {args.out}",
+          file=sys.stderr)
     return 0
 
 
@@ -359,6 +398,10 @@ def main() -> int:
                    default=Path("eval/gold/gold_lens_labels.tsv"))
     b.add_argument("--review", type=Path,
                    default=Path("eval/gold/gold_review_queue_v1_review.csv"))
+    b.add_argument("--llm", type=Path,
+                   default=Path("eval/gold/gold_review_queue_v1_llm.tsv"))
+    b.add_argument("--spotcheck", type=Path,
+                   default=Path("eval/gold/gold_spotcheck_author.csv"))
     b.add_argument("--out", type=Path,
                    default=Path("eval/gold/gold_corpus_v1.tsv"))
     b.set_defaults(func=cmd_build_gold)

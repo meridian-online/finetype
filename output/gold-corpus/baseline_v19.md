@@ -1,16 +1,20 @@
 # Gold corpus v1 — shipped v19 baseline (ac-06)
 
-**Date:** 2026-06-10 · **Fixture:** `eval/gold/gold_corpus_v1.tsv` (589 verified columns:
-240 anchor + 349 lens-consensus + 0 adjudicated — grows as the author's sitting lands) ·
+**Date:** 2026-06-10 (updated same day after the adjudication tier landed) ·
+**Fixture:** `eval/gold/gold_corpus_v1.tsv` (915 verified columns: 240 anchor +
+349 lens-consensus + 326 two-panel llm-adjudicated, author-accepted via 40/40
+spot-check — 40 of those carry the author tier) ·
 **Model:** `models/default` → sherlock-v19-relu-s42, real Sense→Sharpen path ·
 **Full tables:** `report_v19-gold-corpus-v1_2026-06-10.md` · **Scorer:** `score_gold_anchor.py`
 (extended: `build-gold` fixture merge, external vendored-CSV predict, Wilson CIs, global per-label metrics)
 
 ## Headline
 
-**v19 gets 404 of 589 human-or-consensus-verified columns right — 68.6% (95% CI 64.7–72.2).**
+**v19 gets 606 of 915 verified columns right — 66.2% (95% CI 63.1–69.2).**
 This is the first accuracy number in the project scored against verified labels rather than
-a proxy oracle. It is the number future candidates must beat.
+a proxy oracle, and the number future candidates must beat. (The first cut, before the
+adjudicated tier landed, read 68.6% on 589 columns — the adjudicated rows are harder by
+construction, being the queue's most contested cases.)
 
 ## What drags it down (the stories, in user terms)
 
@@ -24,19 +28,30 @@ a proxy oracle. It is the number future candidates must beat.
 - **Plain integer recall is 0.390** — not because integers are hard, but because contested
   strata pull them into utc/year/postal/etc. This is the over-emit collateral measured
   column-by-column instead of via oracle proxies.
-- **city/region/tld/text recalls are weak** (0.2–0.33 on small supports) — consistent with
-  the known Sense blind spots.
+- **Categorical columns are half-invisible: recall 0.390 at support 100.** Real
+  status/type/category vocabularies routinely land elsewhere — the single biggest
+  miss-pool in the corpus.
+- **State codes are a wholly unhandled family: precision and recall both 0.000** (support
+  7) — v19 reads `CA`/`GA`/`TX` as countries or categoricals, never as
+  geography.location.state_code.
+- **city over-emits (precision 0.667) while catching every real city** — boroughs,
+  counties and team abbreviations absorb the label; region precision 0.350 mirrors it.
+- **tld/text recalls stay weak** (0.33 / 0.22) — consistent with the known Sense blind
+  spots.
 
 ## What holds up
 
-Coordinates (P=1.0, R=1.0 — Sharpen's value-range rules earn their keep), dates
-(iso P=1.0), decimals, year (P=0.947), country_code (P=0.971), unix_seconds, data_uri.
+Coordinates (latitude P=0.975/R=1.0, longitude P=1.0/R=0.978 — Sharpen's value-range
+rules earn their keep), iso dates (P=1.0), decimals (P=1.0/R=0.865), year
+(P=0.930/R=1.0), country_code (P=0.959/R=0.825), boolean terms (P=1.0).
 
 ## Honest scope limits
 
-1. **349 of 589 labels are lens-consensus, not yet human-checked.** The author's 350-column
-   sitting (in progress) both adds adjudicated columns and spot-validates the consensus
-   mechanism. Treat sub-stories on small supports as provisional until then.
+1. **Provenance tiers:** 240 anchor + 40 author-spot-checked rows are human-grade;
+   349 lens-consensus and 286 llm-adjudicated rows are machine-verified with measured
+   trust (two-panel agreement, author calibration 40/40, Wilson 95% lower bound on
+   panel-author agreement ≥ 0.91). 24 queue rows remain open (panel splits/unsures)
+   plus a 572-row unreviewed backlog.
 2. **utc has support 1** — the corpus's only verified true utc-offset column is external
    (OpenFlights). The utc battle remains FP-side only; that scarcity is now a measured
    fact, not an assumption.
