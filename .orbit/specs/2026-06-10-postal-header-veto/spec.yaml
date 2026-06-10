@@ -2,7 +2,7 @@ id: 2026-06-10-postal-header-veto
 goal: 'First gold-gated precision patch: demote postal_code predictions on generic-integer columns whose header does not corroborate a postal code (mirror of the shipped coord veto, choice 0094 pattern) — kills the worst measured over-emitter (gold precision 0.133, 26 FP / 4 TP) without losing real postal recall; ships as 0.6.27 with a release.'
 cards:
 - 0014-profile-validate-precision
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -58,5 +58,6 @@ acceptance_criteria:
     Homebrew tap). No model publish — Sharpen-only patch, models/default
     unchanged.
   gate: false
-  checked: false
+  checked: true
   ac_type: ops
+closed_at: 2026-06-10T11:56:54.172155Z
