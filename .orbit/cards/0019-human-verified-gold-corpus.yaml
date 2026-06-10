@@ -1,0 +1,50 @@
+id: 0019-human-verified-gold-corpus
+feature: Human-verified gold corpus as the canonical accuracy eval
+as_a: data analyst deciding whether to trust FineType's output
+i_want: FineType's accuracy claims scored against column labels a human has actually verified — not against proxy oracles (gated-YDF, header-anchored scoreboards) that disagree with each other and whose own error rates are unknown
+so_that: when FineType says "this column is an email", the claim traces to a measured precision on real data — and the team can retire instruments, delete rules, and simplify the codebase with confidence, instead of gating every change on five mutually-suspicious proxies
+goal: 'A stratified, human-verified gold corpus is the canonical accuracy eval: rare contested types quota''d up, review effort bounded by agent pre-labelling with human adjudication of disagreements only. Existing proxy instruments are re-scored against it so each one''s real error rate is known and redundant ones retire. Simplification (artefact archive, model-dir prune, dead-rule removal, giant-file splits) becomes a downstream phase gated on gold, not on the full multi-instrument map.'
+maturity: emerging
+scenarios:
+- name: Accuracy headline is human-verified
+  given: the gold corpus and a candidate model, rule, or release
+  when: the candidate is evaluated
+  then: per-type precision/recall against human-verified labels is the headline number — proxy-on-proxy scores (gated-YDF cell-2, header-anchored scoreboard) demote to context
+  gate: false
+- name: Review effort is bounded
+  given: agent pre-labelling over the stratified sample (multiple independent lenses per column)
+  when: the human review pass runs
+  then: the human adjudicates only disagreements and low-confidence columns, not every row — total review time is estimated up front and respected
+  gate: false
+- name: Instrument map audited against gold
+  given: the verified corpus
+  when: each existing instrument (gated-YDF oracle, rare-type scoreboard, corpus-honest gate bands, drift proxy) is scored against it
+  then: each instrument's false-alarm and miss rate is a known number; instruments that gold subsumes retire along with their script and artefact tails
+  gate: false
+- name: Gold joins the leakage firewall
+  given: a column admitted to the gold corpus
+  when: the manifest is updated
+  then: its source registers in eval/datasets/sources.yaml and the leakage check forbids its rows in training data
+  gate: false
+- name: Simplification gates on gold
+  given: a proposed deletion (dead rule, redundant instrument, fossil artefact dir, legacy model dir)
+  when: the change is evaluated
+  then: a no-regression run on gold is sufficient evidence to proceed — the deletion no longer waits on the full multi-instrument map
+  gate: false
+specs:
+- .orbit/specs/2026-06-10-human-verified-gold-corpus/spec.yaml
+- .orbit/specs/2026-06-10-fossil-cleanup/spec.yaml
+relations:
+- card: 0014-profile-validate-precision
+  type: feeds
+  reason: trusted ground truth makes round-trip precision claims verifiable
+references:
+- output/eval-ceiling-diagnosis/finding.md
+- .orbit/choices/0093-rare-type-scoreboard-headline-gate.yaml
+- .orbit/choices/0037-eval-serves-the-engine.yaml
+- .orbit/choices/0055-eval-realism-dimensions.yaml
+- .orbit/choices/0056-train-eval-leakage-prevention.yaml
+- .orbit/choices/0057-eval-coverage-floor.yaml
+- .orbit/specs/2026-06-09-rare-type-precision-instrument/spec.yaml
+notes:
+- 'Origin: author direction 2026-06-10 — "we need a breakthrough; convincing profile and validation results, very fast inference, simplified coherent codebase". Diagnosis: four failed retrains (v22/v23/v24/latdec), five proxy instruments, 17GB of eval artefacts and ~100 model dirs all trace to one missing asset — trusted ground truth. Consolidation attempted before gold is churn that cannot be verified.'
