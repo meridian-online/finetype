@@ -28,25 +28,41 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_GOLD = REPO / "eval" / "gold" / "gold_eval_anchor.tsv"
+# Gold-corpus fixtures (spec 2026-06-10-human-verified-gold-corpus ac-05):
+# every CANDIDATE column is excluded from training — not just adjudicated
+# gold — so a column can never be both a training example and a column the
+# author later verifies. Missing fixtures are skipped (pre-corpus checkouts).
+GOLD_CORPUS_FIXTURES = (
+    REPO / "eval" / "gold" / "gold_corpus_candidates.tsv",
+    REPO / "eval" / "gold" / "gold_corpus_candidates_external.tsv",
+)
 
 Identity = tuple[str, str]  # (file_content_sha256, column_name)
 
 
-def load_gold_identities(path: Path = DEFAULT_GOLD) -> set[Identity]:
+def load_gold_identities(path: Path = DEFAULT_GOLD,
+                         include_corpus: bool = True) -> set[Identity]:
     """The (file_content_sha256, column_name) identity of every gold column.
 
     These are the columns excluded from training/mining so the gold anchor
     stays independent of the lens it scores. Rows missing either identity
-    component are dropped (the fixture should carry both for every row)."""
+    component are dropped (the fixture should carry both for every row).
+    By default the gold-corpus candidate fixtures are included alongside
+    the anchor, so every consumer (train_ydf exclusion, the standing audit)
+    covers the full corpus without per-caller changes."""
     ids: set[Identity] = set()
-    if not path.exists():
-        return ids
-    with path.open() as fh:
-        for r in csv.DictReader(fh, delimiter="\t"):
-            sha = (r.get("file_content_sha256") or "").strip()
-            col = (r.get("column_name") or "").strip()
-            if sha and col:
-                ids.add((sha, col))
+    paths = [path]
+    if include_corpus:
+        paths += [p for p in GOLD_CORPUS_FIXTURES if p != path]
+    for p in paths:
+        if not p.exists():
+            continue
+        with p.open() as fh:
+            for r in csv.DictReader(fh, delimiter="\t"):
+                sha = (r.get("file_content_sha256") or "").strip()
+                col = (r.get("column_name") or "").strip()
+                if sha and col:
+                    ids.add((sha, col))
     return ids
 
 

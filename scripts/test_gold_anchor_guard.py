@@ -47,7 +47,20 @@ class LoadIdentitiesTests(unittest.TestCase):
             self.assertTrue(col, "empty column_name in gold identity")
 
     def test_missing_fixture_returns_empty(self):
-        self.assertEqual(load_gold_identities(REPO / "no" / "such.tsv"), set())
+        self.assertEqual(
+            load_gold_identities(REPO / "no" / "such.tsv", include_corpus=False),
+            set())
+
+    def test_corpus_fixtures_included_by_default(self):
+        # spec 2026-06-10-human-verified-gold-corpus ac-05: the candidate
+        # fixtures join the exclusion set without per-caller changes, even
+        # when the explicit path is missing.
+        anchor_only = load_gold_identities(include_corpus=False)
+        full = load_gold_identities()
+        self.assertGreater(len(full), len(anchor_only),
+                           "gold-corpus candidate fixtures not folded in")
+        bogus = load_gold_identities(REPO / "no" / "such.tsv")
+        self.assertEqual(bogus, full - anchor_only)
 
 
 class IsGoldColumnTests(unittest.TestCase):

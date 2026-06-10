@@ -103,6 +103,15 @@ check:
 test:
 	cargo test
 
+# Train<->gold leakage firewall (spec 2026-06-10-human-verified-gold-corpus
+# ac-05): guard unit tests + the standing identity audit over every gold
+# column (anchor + corpus candidates). Non-zero exit on any overlap.
+# Run before any training-data build; train_ydf.py imports the same guard.
+leakage-guard:
+	python3 scripts/test_gold_anchor_guard.py
+	python3 scripts/audit_gold_anchor_leakage.py
+	python3 scripts/eval_leakage/test_validate_corpus_firewall.py
+
 generate:
 	cargo run -- generate --localized -s 1000 -o training.ndjson
 

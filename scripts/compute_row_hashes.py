@@ -155,8 +155,9 @@ def process_manifest(
         print(f"  skipped (missing): {manifest_path}", file=sys.stderr)
         return (0, 0, 0)
 
+    delim = "\t" if manifest_path.suffix.lower() == ".tsv" else ","
     with open(manifest_path, newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
+        reader = csv.DictReader(fh, delimiter=delim)
         fieldnames = reader.fieldnames or []
         manifest_rows = list(reader)
 
@@ -167,7 +168,7 @@ def process_manifest(
     n_missing = 0
 
     for mrow in manifest_rows:
-        dataset = mrow.get("dataset", "")
+        dataset = mrow.get("dataset", "") or mrow.get("source", "")
         file_path_str = mrow.get("file_path", "")
 
         resolved = Path(file_path_str)
@@ -223,6 +224,20 @@ def main() -> int:
         "Default: eval/datasets/validate_manifest.csv",
     )
     parser.add_argument(
+        "--gold-manifest",
+        type=Path,
+        default=REPO_ROOT / "eval" / "gold" / "gold_corpus_candidates_external.tsv",
+        help="Gold external fixture (column-level TSV; spec 2026-06-10-"
+        "human-verified-gold-corpus ac-05). Vendored gold columns are "
+        "forbidden in training data. Default: eval/gold/"
+        "gold_corpus_candidates_external.tsv",
+    )
+    parser.add_argument(
+        "--no-gold",
+        action="store_true",
+        help="Skip the gold external fixture.",
+    )
+    parser.add_argument(
         "--no-validate",
         action="store_true",
         help="Skip the validate manifest (eval-only mode).",
@@ -248,6 +263,8 @@ def main() -> int:
     out_tuples: set[tuple[str, str, str, str]] = set()
 
     eval_stats = process_manifest(args.manifest, out_tuples, args.max_rows, "eval")
+    if not args.no_gold:
+        process_manifest(args.gold_manifest, out_tuples, args.max_rows, "gold")
     if not args.no_validate:
         val_stats = process_manifest(
             args.validate_manifest, out_tuples, args.max_rows, "validate"

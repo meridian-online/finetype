@@ -61,7 +61,7 @@ acceptance_criteria:
     with role=gold; the row-hash leakage check (scripts/eval_leakage/) treats gold
     rows as forbidden in training data; CI or a make target enforces it.
   gate: false
-  checked: false
+  checked: true
 - id: ac-06
   description: |
     Canonical scoreboard: EXTEND scripts/score_gold_anchor.py (its predict mode
