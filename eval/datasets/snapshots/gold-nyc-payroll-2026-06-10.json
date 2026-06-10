@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-nyc-payroll",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/nyc_payroll_sample.csv",
+  "total_size_bytes": 2940514,
+  "file_count": 1,
+  "files": {
+    "nyc_payroll_sample.csv": {
+      "size_bytes": 2940514,
+      "sha256": "b4f5d1b3b5b6501e2e0fe66e4ba6da9234323f8638a45b07d2c023c4e0ebee1e"
+    }
+  }
+}

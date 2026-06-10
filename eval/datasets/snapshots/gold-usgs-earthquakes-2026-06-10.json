@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-usgs-earthquakes",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/usgs_earthquakes_202605.csv",
+  "total_size_bytes": 388136,
+  "file_count": 1,
+  "files": {
+    "usgs_earthquakes_202605.csv": {
+      "size_bytes": 388136,
+      "sha256": "f78d006f0da95d9a299fddfa9eb546da626c40bf01488a9223fed9eb26c5b8a6"
+    }
+  }
+}

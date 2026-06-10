@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-nyc-dob-permits",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/nyc_dob_permits_sample.csv",
+  "total_size_bytes": 3812238,
+  "file_count": 1,
+  "files": {
+    "nyc_dob_permits_sample.csv": {
+      "size_bytes": 3812238,
+      "sha256": "8bdb93de8e95f05e9665c1d5ca0ac306c8cc3427b9962515fe71f13f7fd145d4"
+    }
+  }
+}

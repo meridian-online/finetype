@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-chicago-crimes",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/chicago_crimes_sample.csv",
+  "total_size_bytes": 5780001,
+  "file_count": 1,
+  "files": {
+    "chicago_crimes_sample.csv": {
+      "size_bytes": 5780001,
+      "sha256": "48e9044292d1c3653cb7adfdec1e9185355da79ea93a38be83a5c65fa60ae467"
+    }
+  }
+}

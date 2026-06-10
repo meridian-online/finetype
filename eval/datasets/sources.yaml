@@ -465,14 +465,123 @@ sources:
   role: train
   licence: various-open-source
   fetched_date: '2026-05-27'
-  attribution: v23 precision-retrain hard negatives extracted from the gittables
-    measure-half corpus pass (file_content_sha256 MOD 2 == 1) per spec
-    2026-05-27-v23-precision-retrain ac-01. 114,301 columns matching the six top
-    corroborated false-positive (sense_prediction, ydf_prediction) pairs from the
-    multi-lens diagnostic's report.md, deduped against eval/row_hashes.tsv per
-    MADR 0056 (75 collisions excluded). Underlying licence inherits from gittables
-    (various open source); extraction is derivative and noncommercial-research per
-    the parent dataset entry `dataset://gittables`.
+  attribution: v23 precision-retrain hard negatives extracted from the gittables measure-half
+    corpus pass (file_content_sha256 MOD 2 == 1) per spec 2026-05-27-v23-precision-retrain
+    ac-01. 114,301 columns matching the six top corroborated false-positive (sense_prediction,
+    ydf_prediction) pairs from the multi-lens diagnostic's report.md, deduped against
+    eval/row_hashes.tsv per MADR 0056 (75 collisions excluded). Underlying licence
+    inherits from gittables (various open source); extraction is derivative and noncommercial-research
+    per the parent dataset entry `dataset://gittables`.
   datasets:
   - v23_precision_hard_negatives
   local_path: output/v23-precision-retrain/hard_negatives.parquet
+- source_url: https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat
+  role: gold
+  licence: ODbL-1.0
+  fetched_date: '2026-06-10'
+  attribution: OpenFlights airports database (openflights.org); vendored snapshot
+    with canonical header row added (upstream file is headerless); attribution + share-alike
+  datasets:
+  - gold-openflights-airports
+  local_path: repo://eval/datasets/gold_external/openflights_airports.csv
+  snapshot: eval/datasets/snapshots/gold-openflights-airports-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv&starttime=2026-05-01&endtime=2026-06-01&minmagnitude=2.5
+  role: gold
+  licence: US-PD
+  fetched_date: '2026-06-10'
+  attribution: USGS earthquake catalog May 2026, M>=2.5 (earthquake.usgs.gov); US
+    government public domain
+  datasets:
+  - gold-usgs-earthquakes
+  local_path: repo://eval/datasets/gold_external/usgs_earthquakes_202605.csv
+  snapshot: eval/datasets/snapshots/gold-usgs-earthquakes-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://data.seattle.gov/resource/tmmm-ytt6.csv
+  role: gold
+  licence: PDDL-1.0
+  fetched_date: '2026-06-10'
+  attribution: Seattle Public Library checkouts by title (data.seattle.gov tmmm-ytt6),
+    20k-row sample
+  datasets:
+  - gold-seattle-checkouts
+  local_path: repo://eval/datasets/gold_external/seattle_checkouts_sample.csv
+  snapshot: eval/datasets/snapshots/gold-seattle-checkouts-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://data.cityofnewyork.us/resource/ipu4-2q9a.csv
+  role: gold
+  licence: NYC-OpenData
+  fetched_date: '2026-06-10'
+  attribution: NYC DOB permit issuance (data.cityofnewyork.us ipu4-2q9a), 20k-row
+    sample, person-name columns removed before vendoring
+  datasets:
+  - gold-nyc-dob-permits
+  local_path: repo://eval/datasets/gold_external/nyc_dob_permits_sample.csv
+  snapshot: eval/datasets/snapshots/gold-nyc-dob-permits-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://data.cityofnewyork.us/resource/k397-673e.csv
+  role: gold
+  licence: NYC-OpenData
+  fetched_date: '2026-06-10'
+  attribution: NYC citywide payroll (data.cityofnewyork.us k397-673e), 20k-row sample,
+    employee-name columns removed before vendoring
+  datasets:
+  - gold-nyc-payroll
+  local_path: repo://eval/datasets/gold_external/nyc_payroll_sample.csv
+  snapshot: eval/datasets/snapshots/gold-nyc-payroll-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://downloads.majestic.com/majestic_million.csv
+  role: gold
+  licence: CC-BY-3.0
+  fetched_date: '2026-06-10'
+  attribution: Majestic Million top-20k rows (majestic.com); CC-BY 3.0 with attribution
+  datasets:
+  - gold-majestic-million
+  local_path: repo://eval/datasets/gold_external/majestic_million_top20k.csv
+  snapshot: eval/datasets/snapshots/gold-majestic-million-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://davidmegginson.github.io/ourairports-data/airports.csv
+  role: gold
+  licence: US-PD
+  fetched_date: '2026-06-10'
+  attribution: OurAirports airports.csv (ourairports.com, public domain); 20k-row
+    vendored sample
+  datasets:
+  - gold-ourairports
+  local_path: repo://eval/datasets/gold_external/ourairports_airports.csv
+  snapshot: eval/datasets/snapshots/gold-ourairports-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://data.cityofchicago.org/resource/ijzp-q8t2.csv
+  role: gold
+  licence: Chicago-OpenData
+  fetched_date: '2026-06-10'
+  attribution: City of Chicago crimes (data.cityofchicago.org ijzp-q8t2), 20k-row
+    sample; block-level only, no person fields
+  datasets:
+  - gold-chicago-crimes
+  local_path: repo://eval/datasets/gold_external/chicago_crimes_sample.csv
+  snapshot: eval/datasets/snapshots/gold-chicago-crimes-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: https://data.sfgov.org/resource/g8m3-pdis.csv
+  role: gold
+  licence: PDDL-1.0
+  fetched_date: '2026-06-10'
+  attribution: SF registered businesses (data.sfgov.org g8m3-pdis), 20k-row sample;
+    owner/dba/address name columns removed before vendoring
+  datasets:
+  - gold-sf-businesses
+  local_path: repo://eval/datasets/gold_external/sf_businesses_sample.csv
+  snapshot: eval/datasets/snapshots/gold-sf-businesses-2026-06-10.json
+  dataset_version: '2026-06-10'
+- source_url: http://prod.publicdata.landregistry.gov.uk.s3-website-eu-west-1.amazonaws.com/pp-monthly-update-new-version.csv
+  role: gold
+  licence: OGL-3.0
+  fetched_date: '2026-06-10'
+  attribution: HM Land Registry price paid monthly update, 20k-row vendored sample
+    with canonical header added (upstream is headerless); contains public property-transaction
+    data
+  datasets:
+  - gold-uk-price-paid
+  local_path: repo://eval/datasets/gold_external/uk_price_paid_sample.csv
+  snapshot: eval/datasets/snapshots/gold-uk-price-paid-2026-06-10.json
+  dataset_version: '2026-06-10'

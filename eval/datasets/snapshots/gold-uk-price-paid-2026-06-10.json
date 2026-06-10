@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-uk-price-paid",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/uk_price_paid_sample.csv",
+  "total_size_bytes": 3501103,
+  "file_count": 1,
+  "files": {
+    "uk_price_paid_sample.csv": {
+      "size_bytes": 3501103,
+      "sha256": "5f48e9e4d97834c32013ae31693098b0fb6918d0ebab32c94d5b155e0424194f"
+    }
+  }
+}

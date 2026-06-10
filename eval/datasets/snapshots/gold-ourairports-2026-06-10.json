@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-ourairports",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/ourairports_airports.csv",
+  "total_size_bytes": 2489919,
+  "file_count": 1,
+  "files": {
+    "ourairports_airports.csv": {
+      "size_bytes": 2489919,
+      "sha256": "fee5fe920890d03b813ae038baea8857a8ec59077d238c712ebbdaf891bb479a"
+    }
+  }
+}

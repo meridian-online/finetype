@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-majestic-million",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/majestic_million_top20k.csv",
+  "total_size_bytes": 1480322,
+  "file_count": 1,
+  "files": {
+    "majestic_million_top20k.csv": {
+      "size_bytes": 1480322,
+      "sha256": "aab6d57dc2d5a73420add26802951c7a0bd3847e4f4b2766c4ba0b6c2cd5421f"
+    }
+  }
+}

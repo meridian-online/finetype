@@ -95,7 +95,7 @@ def parse_args() -> argparse.Namespace:
              "file SHA (index-only mode).",
     )
     p.add_argument(
-        "--role", choices=("train", "eval", "validate", "both-forbidden"),
+        "--role", choices=("train", "eval", "validate", "both-forbidden", "gold"),
         default=None,
         help="Role for the sources.yaml entry. Required when creating a "
              "new entry; optional (preserved) when updating an existing "

@@ -1,5 +1,18 @@
 # Gold corpus — external-source fetch plan (ac-02, external share)
 
+> **Executed 2026-06-10.** 10 sources fetched, PII-screened (employee/owner/permittee
+> name columns stripped before vendoring), vendored under
+> `eval/datasets/gold_external/` (~30 MB), snapshot-registered with role=gold, and
+> extracted to `gold_corpus_candidates_external.tsv` — **123 columns across all 18
+> strata** (vs the ~150–180 target; ~8% of the 1,511-column corpus vs the memo's ~30%
+> aspiration). The binding constraint is column-yield per table (~12 useful columns
+> each) — reaching 30% needs ~40 tables. Deviation surfaced to the author 2026-06-10;
+> expanding the table pool is the recorded crank if the ac-07 audit shows a
+> GitTables/external accuracy gap. Sources actually used differ slightly from the
+> plan below: ONS/USAspending/Wikipedia were replaced by OurAirports (ISO country
+> codes, full URLs), Chicago crimes (mdy dates, state-plane near-miss coords), SF
+> businesses (US zips), and UK price paid (UK postcodes, GBP amounts, OGL-3.0).
+
 **State:** the GitTables draw filled 1,148 of 1,160 net-new candidate slots
 (`gold_corpus_candidates.tsv`; + 240 anchor seeds = 1,388 of 1,400). The only hard
 shortfall is `technology.internet.top_level_domain` (12 columns — too few tld-ish

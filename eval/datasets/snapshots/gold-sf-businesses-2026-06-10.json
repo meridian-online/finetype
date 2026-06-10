@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-sf-businesses",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/sf_businesses_sample.csv",
+  "total_size_bytes": 4249046,
+  "file_count": 1,
+  "files": {
+    "sf_businesses_sample.csv": {
+      "size_bytes": 4249046,
+      "sha256": "2fd78946e50ba10fe04a4e2490c8a36c2236550fbcb4a164d47a5400ee160ce1"
+    }
+  }
+}

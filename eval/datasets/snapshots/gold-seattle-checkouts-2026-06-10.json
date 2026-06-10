@@ -1,0 +1,16 @@
+{
+  "dataset": "gold-seattle-checkouts",
+  "dataset_version": "2026-06-10",
+  "snapshot_date": "2026-06-10",
+  "snapshot_mode": "full",
+  "registered_by": "scripts/dataset_register.py@9ce845eeedf4",
+  "local_path": "repo://eval/datasets/gold_external/seattle_checkouts_sample.csv",
+  "total_size_bytes": 5092414,
+  "file_count": 1,
+  "files": {
+    "seattle_checkouts_sample.csv": {
+      "size_bytes": 5092414,
+      "sha256": "66638b7387c9a7f2b464b92459f5f8e2aaa44028b00fc3840c7b17a0fc11ed98"
+    }
+  }
+}
