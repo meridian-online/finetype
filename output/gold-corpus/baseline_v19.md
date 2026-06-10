@@ -9,6 +9,11 @@ rows skipped as unresolvable) ·
 **Full tables:** `report_v19-gold-corpus-v1_2026-06-10.md` · **Scorer:** `score_gold_anchor.py`
 (extended: `build-gold` fixture merge, external vendored-CSV predict, Wilson CIs, global per-label metrics)
 
+> **Post-patch (0.6.27, postal header-veto):** the shipped pipeline now scores
+> **635/931 = 0.682** on this fixture — postal precision 0.133 → 0.667, recall
+> held, 25 flips all fixes (`output/postal-veto/`). The numbers below are the
+> pre-patch v19 baseline this fixture was built against.
+
 ## Headline
 
 **v19 gets 610 of 931 verified columns right — 65.5% (95% CI 62.4–68.5).**

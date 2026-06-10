@@ -2,7 +2,7 @@ id: '0094'
 title: Header corroboration permitted in Sharpen for value-identical boundaries (scoped amendment to 0048)
 status: proposed
 date_created: 2026-06-08
-date_modified: 2026-06-08
+date_modified: 2026-06-10
 body: |
   # 0094. Header corroboration permitted in Sharpen for value-identical boundaries (scoped amendment to 0048)
 
@@ -88,4 +88,10 @@ body: |
   **feature-flagged, off-by-default** candidate against this design for review,
   but does not promote it or accept this decision. Amends 0048; when accepted,
   updates the "Architectural direction" section of CLAUDE.md.
+  ## Status note (2026-06-10)
+
+  Two vetoes on this pattern have now shipped and held: the coordinate veto
+  (0.6.25) and the postal veto (0.6.27, gold-verified 25-fixes-0-regressions,
+  corpus-honest gate GO). Acceptance is de facto; formal author review of the
+  choice text remains open.
 references: []

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.27] - 2026-06-10
+
+The first release whose accuracy claims are verified against human-checked
+ground truth. This cycle built FineType's gold corpus — 931 real-world columns
+with verified labels — measured every eval instrument against it, and shipped
+the first fix the new instrument unblocked.
+
+### Fixed
+
+- **FineType no longer calls your volume and count columns postal codes.**
+  Bare 4–5-digit integer columns (trading volumes, employee counts, sequence
+  numbers) are value-identical with Nordic/Australian postcodes, and the model
+  over-asserted postal on them — measured precision 0.133 on verified data
+  (wrong 26 times for every 4 right). A header-corroboration veto now demotes
+  a postal prediction to plain integer unless the header carries a postal
+  token (`zip`, `postal`, `postcode`, `PLZ`, `CEP`, `pincode`, …). Leading-zero
+  values (`01219`) are treated as postal evidence and are never demoted, and
+  the rule is demotion-only — a header can never create a postal code. On the
+  gold corpus: postal precision 0.133 → 0.667 with recall unchanged at 1.000,
+  overall verified accuracy 65.5% → 68.2%; corpus-honest gate GO with zero
+  triggers. (`header_hint_postal_veto`, spec 2026-06-10-postal-header-veto)
+- **F2 emits valid `technology.development.docker_ref`** (was an orphan label).
+
+### Changed
+
+- **Eval doctrine (choice 0095):** the gold corpus is FineType's canonical
+  accuracy eval; the gated-YDF oracle is demoted to a mining/corroboration
+  lens after measuring its error rate on contested columns (42% of its
+  assertions wrong where promotion fights happened). Engine behaviour is
+  unchanged — this governs how FineType is measured, not how it infers.
+
 ## [0.6.26] - 2026-06-09
 
 A validation-honesty patch. The thread through every fix: FineType was being
