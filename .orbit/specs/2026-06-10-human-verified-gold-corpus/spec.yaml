@@ -2,7 +2,7 @@ id: 2026-06-10-human-verified-gold-corpus
 goal: 'A stratified, human-verified gold corpus (GitTables + external open datasets) becomes the canonical accuracy eval: per-type quotas derived from CI targets, agent pre-labelling with author adjudication of disagreements only, leakage-firewalled, and every existing instrument scored against it so redundant ones can retire.'
 cards:
 - 0019-human-verified-gold-corpus
-status: open
+status: closed
 labels: []
 acceptance_criteria:
 - id: ac-01
@@ -94,5 +94,6 @@ acceptance_criteria:
     measured error rates rather than deleted (deletion is downstream, gated on gold
     per card 0019 scenario 5).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-10T10:17:07.918352Z

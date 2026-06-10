@@ -1,0 +1,84 @@
+id: '0095'
+title: Gold corpus is the canonical accuracy eval; gated-YDF demoted to mining lens
+status: accepted
+date_created: 2026-06-10
+date_modified: 2026-06-10
+body: |
+  # 0095. Gold corpus is the canonical accuracy eval; gated-YDF demoted to mining lens
+
+  ## Context and Problem Statement
+
+  Four retrains (v22, v23, v24, latdec) failed promotion while every accuracy
+  signal was a proxy scored against another proxy. The eval-ceiling diagnosis
+  showed the headline metric was structurally blind to rare-type gains; spec
+  2026-06-10-human-verified-gold-corpus then built the missing asset — a
+  931-column, leakage-firewalled gold corpus with per-row provenance (anchor /
+  lens-consensus / llm-2panel / author tiers) — and audited every instrument
+  against it. The audit's decisive number: on the 809 contested-ground columns,
+  shipped v19 scores 68.2% against verified truth while the gated-YDF oracle
+  scores 57.9% when it asserts (42.1% of assertions wrong, 16.3% abstain). The
+  model has been better than its referee exactly where promotions were decided.
+  Author accepted the audit recommendations 2026-06-10.
+
+  ## Decision
+
+  1. **The gold corpus (`eval/gold/gold_corpus_v1.tsv`, scored by
+     `scripts/score_gold_anchor.py`) is the canonical accuracy eval.** The
+     headline number for any candidate is its gold accuracy with 95% CI;
+     v19 baseline = 610/931 = 0.655 (CI 0.624-0.685).
+  2. **Promotion order:** gold-anchor (efficacy) -> destination-drift proxy
+     (pre-train) -> gold corpus accuracy + rare-type scoreboard (headline,
+     contested types) -> corpus-honest gate (blocking, relocation) -> swap.
+  3. **Gated-YDF is demoted to a mining/corroboration lens.** It must not
+     adjudicate per-column correctness in any gate or metric without a gold
+     cross-check. It remains the corpus-scale candidate generator.
+  4. **Corpus-honest gate keeps its blocking NO-GO role (H05) unchanged** —
+     it is the only proven relocation detector. Its per-label oracle_fp
+     counts are directional, not exact (the oracle's contested-ground error
+     is now measured). Retiring or re-basing it requires demonstrating gold
+     catches relocation at least as well.
+  5. **Rare-type scoreboard is a validated absolute instrument** (gold logic
+     verified 99.0%, 193/195 two-panel-verified). Refinement queued:
+     //-prefixed values count as url-positive.
+  6. **Drift proxy keeps its mandatory pre-train role** unchanged.
+
+  ## Gold evolution policy
+
+  - **Append-only labels.** Verified labels are facts about columns; they are
+    never re-scored when models change. Skips/unsures are recorded, not dropped.
+  - **Emission-driven expansion.** Each promotion round, the candidate draw
+    (`build_gold_corpus_candidates.py`) re-runs against the CURRENT model's
+    corpus emissions so the model_emit buckets chase the new battleground;
+    the corpus-honest gate's trigger list and saturated strata (candidate at
+    ~100% with tight CI) are the expansion signals. The 572-row unreviewed
+    backlog is first-draw stock.
+  - **Calibrated adjudication.** New strata go through the standing pipeline:
+    three lenses -> two independent agent panels (one skeptic) -> author
+    spot-check (>= 30 rows incl. overturns) before the llm tier is trusted.
+    The independence contract (no YDF/Sense/mining-source labels; reference
+    sets corroborate, never decide) and the leakage firewall
+    (`make leakage-guard`) apply to every addition.
+  - **Versioning.** The fixture is versioned (v1, v2, ...) and records the
+    taxonomy version it was labelled under. Headlines quote their fixture
+    version; cross-version comparisons re-score old models on the new fixture
+    (~3 min) rather than freezing the fixture.
+  - **Taxonomy evolution interface.** Key renames are mechanical remaps; type
+    splits trigger targeted re-adjudication of the affected family only. The
+    taxonomy-gap ledger (gaps surfaced during adjudication: DMY-slash-with-
+    seconds, ISO-timestamp-without-Z, tz-abbreviation, numeric-month; plus
+    fallback-heavy plain_text families) seeds a future taxonomy discovery.
+
+  ## Consequences
+
+  - Choice 0093's gate precedence is superseded by §2 (the scoreboard caveat
+    "GO-precision unvalidated" closes — validated at 99.0%). 0093's rule that
+    no headline overrides a blocking corpus-honest NO-GO survives unchanged.
+  - Aggregate corpus precision (~0.49 cell-2) is retired as a decision input;
+    it remains a context guardrail only.
+  - Card 0019 scenario 5 activates: deletions/simplifications gate on a
+    no-regression gold run (plus the corpus-honest gate where model behaviour
+    changes), not on the five-proxy map.
+  - Substrate: output/gold-corpus/instrument_audit.md, baseline_v19.md,
+    output/eval-ceiling-diagnosis/scoreboard_canonicalisation.md,
+    spec 2026-06-10-human-verified-gold-corpus.
+references: []
