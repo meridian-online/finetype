@@ -44,7 +44,7 @@ acceptance_criteria:
     recorded. Output: a verified-by-consensus set plus a disagreement/low-confidence
     adjudication queue, with the queue size within the ac-01 budget.
   gate: false
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     Author adjudication pass complete: review tooling (extend
