@@ -247,7 +247,7 @@ fn main() -> Result<()> {
             "annotations_json",
         ];
         let mut wtr = csv::Writer::from_path(output_dir.join("metadata.csv"))?;
-        wtr.write_record(&fields)?;
+        wtr.write_record(fields)?;
         for row in &metadata_rows {
             let values: Vec<&str> = fields
                 .iter()

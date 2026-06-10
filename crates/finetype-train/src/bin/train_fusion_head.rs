@@ -327,7 +327,7 @@ fn run_predict(args: PredictArgs) -> Result<()> {
 
     let weights = args.head.join("model.safetensors");
     let vb = unsafe {
-        VarBuilder::from_mmaped_safetensors(&[weights.clone()], DType::F32, &device)
+        VarBuilder::from_mmaped_safetensors(std::slice::from_ref(&weights), DType::F32, &device)
             .with_context(|| format!("load head {weights:?}"))?
     };
     let head = FusionHead::new(vb, h1, h2, 0.0, 1.0)?;

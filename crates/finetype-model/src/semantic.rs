@@ -572,7 +572,7 @@ mod tests {
         // K=1: 2 types, 2 rows → K=1
         let type_data_k1: Vec<f32> = vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let type_emb_k1 = Tensor::from_vec(type_data_k1, (2, 4), &device).unwrap();
-        let labels = vec![
+        let labels = [
             "identity.person.email".to_string(),
             "identity.person.phone_number".to_string(),
         ];

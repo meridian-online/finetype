@@ -1815,7 +1815,7 @@ mod amount_widening_tests {
 
     fn load_amount_taxonomy() -> Taxonomy {
         let mut taxonomy =
-            Taxonomy::from_directory(&labels_dir()).expect("taxonomy loads from labels/");
+            Taxonomy::from_directory(labels_dir()).expect("taxonomy loads from labels/");
         taxonomy.compile_validators();
         taxonomy
     }

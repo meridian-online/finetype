@@ -2394,6 +2394,28 @@ impl ColumnClassifier {
             return;
         }
 
+        // 0094 — header hint family `header_hint_postal_veto` (spec
+        // 2026-06-10-postal-header-veto): the same header-corroboration demotion
+        // for the value-identical postal boundary. A postal_code prediction on a
+        // bare-integer column (volumes, counts, sequence numbers — 4–5 digit
+        // integers are indistinguishable from Nordic/Australian postcodes by
+        // value alone; gold-measured precision 0.133) is demoted to
+        // integer_number unless the header carries a postal token. Leading-zero
+        // values are postal evidence (01219-style zips) and block the veto.
+        // Demotion-only — a header can never promote a postal code.
+        if !rhh::is_disabled("header_hint_postal_veto")
+            && result.label == "geography.address.postal_code"
+            && !header_corroborates_postal(header)
+            && values_look_like_generic_integers(sample)
+        {
+            result.label = "representation.numeric.integer_number".to_string();
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("postal_header_veto:{}", header.to_lowercase()));
+            return;
+        }
+
         // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
@@ -4210,6 +4232,54 @@ fn values_look_like_generic_decimals(sample: &[String]) -> bool {
     total > 0 && numeric * 100 >= total * 80
 }
 
+/// True if the header carries a postal token, i.e. it corroborates a
+/// postal_code prediction. Generous by design (recall of genuine postal
+/// columns beats catching every false positive). Token-aware for the short
+/// terms so `zip_code`/`business_zip` corroborate but `zipper`/`unzip` do not;
+/// locale terms included (PLZ, CEP, pincode).
+fn header_corroborates_postal(header: &str) -> bool {
+    // NB: deliberately NOT delegating to header_hint() — its substring matcher
+    // treats any "zip" substring as postal (zipper, gzip), which is exactly the
+    // looseness a corroboration check must not inherit.
+    let h = header.to_lowercase();
+    if h.contains("postal") || h.contains("postcode") || h.contains("pincode") {
+        return true;
+    }
+    let mut has_post = false;
+    let mut has_code = false;
+    for tok in h.split(|c: char| !c.is_alphanumeric()) {
+        match tok {
+            "zip" | "zipcode" | "zip4" | "plz" | "cep" => return true,
+            "post" => has_post = true,
+            "code" => has_code = true,
+            _ => {}
+        }
+    }
+    has_post && has_code
+}
+
+/// True if the sampled values are predominantly bare integers WITHOUT leading
+/// zeros — the value-validation guard for the postal veto. A leading zero
+/// (`01219`) is positive postal evidence, so any such value blocks the veto.
+fn values_look_like_generic_integers(sample: &[String]) -> bool {
+    let (mut bare_int, mut total) = (0usize, 0usize);
+    for v in sample.iter().take(8) {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        total += 1;
+        let digits = t.strip_prefix('-').unwrap_or(t);
+        if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) {
+            if digits.len() > 1 && digits.starts_with('0') {
+                return false; // leading zero — looks like a real code/zip
+            }
+            bare_int += 1;
+        }
+    }
+    total > 0 && bare_int * 100 >= total * 80
+}
+
 /// Map a column header name to a hinted type label.
 ///
 /// Uses case-insensitive substring/keyword matching. Returns the most likely
@@ -5829,7 +5899,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.identifier.increment".to_string(), 8),
             ("representation.numeric.integer_number".to_string(), 2),
         ];
@@ -5862,7 +5932,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("geography.address.postal_code".to_string(), 6),
             ("representation.numeric.integer_number".to_string(), 4),
         ];
@@ -5892,7 +5962,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.numeric.integer_number".to_string(), 5),
             ("geography.address.postal_code".to_string(), 3),
             ("datetime.component.year".to_string(), 2),
@@ -5923,7 +5993,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.numeric.decimal_number".to_string(), 3),
             ("representation.numeric.integer_number".to_string(), 2),
         ];
@@ -5955,7 +6025,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("geography.address.postal_code".to_string(), 6),
             ("representation.numeric.integer_number".to_string(), 4),
         ];
@@ -5988,7 +6058,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.identifier.increment".to_string(), 7),
             ("representation.numeric.integer_number".to_string(), 3),
         ];
@@ -6018,7 +6088,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.identifier.increment".to_string(), 8),
             ("representation.numeric.integer_number".to_string(), 2),
         ];
@@ -6051,7 +6121,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("geography.address.postal_code".to_string(), 5),
             ("representation.numeric.decimal_number".to_string(), 3),
             ("datetime.component.year".to_string(), 2),
@@ -6084,7 +6154,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.numeric.integer_number".to_string(), 5),
             ("geography.address.postal_code".to_string(), 3),
             ("datetime.component.year".to_string(), 2),
@@ -6118,7 +6188,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![
+        let votes = [
             ("representation.numeric.decimal_number".to_string(), 8),
             ("datetime.component.year".to_string(), 2),
         ];
@@ -6152,7 +6222,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![("representation.numeric.decimal_number".to_string(), 10)];
+        let votes = [("representation.numeric.decimal_number".to_string(), 10)];
         let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
 
         let result = disambiguate_numeric(&values, &results, &top_labels);
@@ -6181,7 +6251,7 @@ mod tests {
             })
             .collect();
 
-        let votes = vec![("representation.numeric.decimal_number".to_string(), 10)];
+        let votes = [("representation.numeric.decimal_number".to_string(), 10)];
         let top_labels: Vec<&str> = votes.iter().map(|(l, _)| l.as_str()).collect();
 
         let result = disambiguate_numeric(&values, &results, &top_labels);
@@ -6787,6 +6857,90 @@ mod tests {
         // (rhh::is_disabled is a const `false` when the rhh-instrumentation
         // feature is off) and disableable via RHH_DISABLE_HINTS in ablation builds.
         assert!(!rhh::is_disabled("header_hint_coord_veto"));
+    }
+
+    // === 0094 postal header-veto helpers (spec 2026-06-10-postal-header-veto) ===
+
+    #[test]
+    fn postal_veto_corroborates_real_postal_headers() {
+        for h in [
+            "zip",
+            "ZIP",
+            "zip_code",
+            "zipcode",
+            "business_zip",
+            "billing zip",
+            "postal_code",
+            "PostalCode",
+            "postcode",
+            "post_code",
+            "PLZ",
+            "cep",
+            "pincode",
+            "pin_code_area_pincode",
+        ] {
+            assert!(header_corroborates_postal(h), "should corroborate: {h}");
+        }
+    }
+
+    #[test]
+    fn postal_veto_does_not_corroborate_false_friends_or_quantities() {
+        // the gold-measured FP battleground: bare-integer quantity columns plus
+        // token false friends — none may corroborate, so postal is demotable.
+        for h in [
+            "zipper",
+            "unzip",
+            "gzip_size",
+            "averageDailyVolume10Day",
+            "fullTimeEmployees",
+            "totalCurrentLiabilities",
+            "conversation_no",
+            "voteId",
+            "d_week_seq",
+            "destination_x",
+            "sId",
+            "1001",
+            "code",
+            "postage_paid",
+        ] {
+            assert!(
+                !header_corroborates_postal(h),
+                "should NOT corroborate: {h}"
+            );
+        }
+    }
+
+    #[test]
+    fn postal_veto_value_gate_requires_bare_integers_without_leading_zeros() {
+        // bare 4-digit integers — the measured FP shape — satisfy the gate
+        assert!(values_look_like_generic_integers(&[
+            "1191".into(),
+            "1497".into(),
+            "2200".into(),
+            "5322".into()
+        ]));
+        // a leading zero is postal evidence (01219-style zip): veto blocked
+        assert!(!values_look_like_generic_integers(&[
+            "01219".into(),
+            "1191".into(),
+            "1497".into()
+        ]));
+        // decimals / text / zip+4 / empty do not satisfy the gate
+        assert!(!values_look_like_generic_integers(&[
+            "12.5".into(),
+            "9.1".into(),
+            "3.3".into()
+        ]));
+        assert!(!values_look_like_generic_integers(&[
+            "12345-6789".into(),
+            "98765-4321".into()
+        ]));
+        assert!(!values_look_like_generic_integers(&[]));
+    }
+
+    #[test]
+    fn postal_veto_is_a_default_on_header_hint() {
+        assert!(!rhh::is_disabled("header_hint_postal_veto"));
     }
 
     // === keyword guard tests ===
@@ -7833,7 +7987,6 @@ mod tests {
     }
 
     /// Integration test: verify that semantic hint classifier influences column classification.
-
     /// Skips if Model2Vec model files are not present.
     #[test]
     fn test_classify_column_with_semantic_hint() {

@@ -27,12 +27,11 @@ struct Args {
     finetype_bin: Option<String>,
 }
 
-fn load_column_values(
-    parquet_path: &std::path::Path,
-) -> Result<(
-    BTreeMap<(String, i32), Vec<String>>,
-    BTreeMap<(String, i32), String>,
-)> {
+type ColumnKey = (String, i32);
+type ColumnValues = BTreeMap<ColumnKey, Vec<String>>;
+type ColumnLabels = BTreeMap<ColumnKey, String>;
+
+fn load_column_values(parquet_path: &std::path::Path) -> Result<(ColumnValues, ColumnLabels)> {
     let conn = duckdb::Connection::open_in_memory()?;
     let mut stmt = conn.prepare(&format!(
         "SELECT table_name, col_index, gt_label, col_value FROM read_parquet('{}')",

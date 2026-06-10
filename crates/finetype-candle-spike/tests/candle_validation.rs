@@ -34,7 +34,7 @@ fn test_sense_model_construction() -> Result<()> {
     // Verify parameters were registered
     let vars = varmap.all_vars();
     assert!(
-        vars.len() > 0,
+        !vars.is_empty(),
         "VarMap should contain registered parameters"
     );
 

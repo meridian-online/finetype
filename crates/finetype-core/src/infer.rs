@@ -706,8 +706,8 @@ mod tests {
         // scanned the validator pass-rate would be near 1.0 (8 garbage +
         // 92 emails); with truncation only the 8 garbage are scored and
         // pass-rate is 0.0.
-        for i in 0..8 {
-            samples[i] = format!("garbage_no_at_sign_{}", i);
+        for (i, sample) in samples.iter_mut().enumerate().take(8) {
+            *sample = format!("garbage_no_at_sign_{}", i);
         }
         let input = InferInput {
             column_name: "email".to_string(),

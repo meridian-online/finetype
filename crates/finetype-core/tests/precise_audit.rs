@@ -39,7 +39,7 @@ fn dgd_ac01b_emit_precise_audit_tsv() {
         .expect("load taxonomy from labels/ — is labels/ present in workspace?");
 
     // Stable ordering for diffable output.
-    let mut keys: Vec<String> = taxonomy.labels().iter().cloned().collect();
+    let mut keys: Vec<String> = taxonomy.labels().to_vec();
     keys.sort();
 
     let mut rows: Vec<String> = Vec::with_capacity(keys.len() + 1);

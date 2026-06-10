@@ -800,7 +800,7 @@ mod tests {
         let patterns = DomainPatterns::new();
         // Create a minimal EntityClassifier-like context to test features
         // We'll test the feature count directly
-        let values = vec![
+        let values = [
             "John Smith".to_string(),
             "Jane Doe".to_string(),
             "Robert Johnson".to_string(),

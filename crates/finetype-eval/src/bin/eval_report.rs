@@ -416,9 +416,9 @@ fn main() -> Result<()> {
         );
         p(&mut w, "|---|---|---|---|---|");
         for m in &misses {
-            let ps = m.predicted.split('.').last().unwrap_or(&m.predicted);
+            let ps = m.predicted.split('.').next_back().unwrap_or(&m.predicted);
             let es = if !m.expected.is_empty() {
-                m.expected.split('.').last().unwrap_or(&m.expected)
+                m.expected.split('.').next_back().unwrap_or(&m.expected)
             } else {
                 &m.gt_label
             };
@@ -452,7 +452,7 @@ fn main() -> Result<()> {
             } else {
                 "🔴"
             };
-            let short = ptype.split('.').last().unwrap_or(ptype);
+            let short = ptype.split('.').next_back().unwrap_or(ptype);
             w.push(format!(
                 "| {short} | {predicted} | {correct} | {prec}% | {st} |"
             ));
@@ -504,7 +504,7 @@ fn main() -> Result<()> {
                 0.0
             };
             let st = status_emoji(rate, 95.0, 80.0);
-            let short = t.split('.').last().unwrap_or(t);
+            let short = t.split('.').next_back().unwrap_or(t);
             w.push(format!("| {short} | {cols} | {tot} | {rate}% | {st} |"));
         }
         p(&mut w, "");
@@ -542,7 +542,7 @@ fn main() -> Result<()> {
             for r in &sf {
                 let st = r
                     .get("predicted_type")
-                    .map(|s| s.split('.').last().unwrap_or(s))
+                    .map(|s| s.split('.').next_back().unwrap_or(s))
                     .unwrap_or("");
                 let d = r.get("dataset").map(|s| s.as_str()).unwrap_or("");
                 let c = r.get("column_name").map(|s| s.as_str()).unwrap_or("");

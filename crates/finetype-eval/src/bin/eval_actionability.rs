@@ -488,7 +488,7 @@ fn print_detail_table(results: &[&ActionResult]) {
         let short = r
             .predicted_type
             .split('.')
-            .last()
+            .next_back()
             .unwrap_or(&r.predicted_type);
         println!(
             "{:<20} {:<20} {:<35} {:>5.1}% {}",
