@@ -15,6 +15,11 @@ acceptance_criteria:
     each) plus a proportional common-type backbone (integer, decimal, plain text,
     date). Hard constraint stated and respected: author adjudication budget <= ~350
     columns (~3 hours). External-source share ~30% per the discovery interview.
+    Prior art honoured: inherits the gold-anchor independence contract (spec
+    2026-06-05-gold-eval-anchor ac-01 — labels must not derive from YDF, Sense,
+    or mining-factory sources), applies the choice-0055 realism pre-screen, and
+    positions the corpus as the scaled successor to the anchor's 240 columns and
+    choice 0057's deferred Phase C (~400-column target).
     GATE: author reviews quotas and budget before any build spend.
   gate: true
   checked: false
@@ -23,9 +28,12 @@ acceptance_criteria:
   description: |
     Candidate sample built per the approved quotas. GitTables share reuses the
     build_stratified_sample.py machinery (fixed file list, seed-reproducible);
-    external share sourced from open datasets (data.gov / Kaggle-class) with
-    provenance recorded per column in a manifest (output/gold-corpus/manifest.parquet:
-    column id, source, licence, header, sample values, stratum).
+    external share sourced from open datasets (data.gov / Kaggle-class). The
+    fixture EXTENDS eval/gold/gold_eval_anchor.tsv's conventions — same key
+    (file_content_sha256, column_name) and columns (family, curated_label,
+    labeller, provenance) plus source/licence/stratum for the external share —
+    so the existing 240 anchor rows fold in as the seed rather than a parallel
+    fixture. Sanitised per the corpus-pass artefact discipline.
   gate: false
   checked: false
 - id: ac-03
@@ -56,10 +64,11 @@ acceptance_criteria:
   checked: false
 - id: ac-06
   description: |
-    Canonical scoreboard script (scripts/gold_eval.py): scores any candidate
-    predictions parquet against the gold manifest, emitting per-type precision/recall
-    with CIs and a single headline number. Baseline run on shipped v19 committed as
-    output/gold-corpus/baseline_v19.md.
+    Canonical scoreboard: EXTEND scripts/score_gold_anchor.py (its predict mode
+    already runs the REAL Sense path — finetype profile, not infer --mode column —
+    and its score mode is model-agnostic) to the full corpus fixture, adding
+    per-type CIs and a single headline number. No parallel scorer. Baseline run
+    on shipped v19 committed as output/gold-corpus/baseline_v19.md.
   gate: false
   checked: false
 - id: ac-07
@@ -69,6 +78,11 @@ acceptance_criteria:
     each instrument's false-alarm and miss rate published in
     output/gold-corpus/instrument_audit.md with a retire/keep/demote recommendation
     per instrument. Recommendations are advisory until the author accepts them.
+    Constraint (memory latdec-corpus-fp-relocation): the corpus-honest gate is the
+    only instrument that catches error RELOCATION (incl. the ydf-abstain bucket);
+    its blocking NO-GO role (H05) cannot be retired unless the audit demonstrates
+    gold detects relocation at least as well — column-intrinsic accuracy alone is
+    not sufficient grounds.
   gate: false
   checked: false
   ac_type: observation

@@ -19,6 +19,14 @@ A: "GitTables and some other open source datasets." → Mix: majority GitTables 
 **Q3. When does simplification start?**
 A: "Safe cleanup now, risky after gold." → Companion spec `2026-06-10-fossil-cleanup` proceeds immediately for changes needing no eval evidence (artefact archive, stale-doc fixes, dirty-tree hygiene, author-signed model-dir pruning). Code deletions, dead-rule removal, and giant-file splits wait for gold as their regression gate (card 0019 scenario 5).
 
+## Prior art (checked 2026-06-10, after the author asked — post-hoc to the first draft)
+
+- **Spec `2026-06-05-gold-eval-anchor` (closed)** is the direct ancestor: 240 curated columns (`eval/gold/gold_eval_anchor.tsv`), a gated independence contract (labels must not derive from YDF/Sense/mining sources), per-family floors with auditable exceptions, and a model-agnostic harness (`scripts/score_gold_anchor.py`, real-Sense-path predict mode). This spec scales the anchor; it does not parallel it. ACs 01/02/06 amended accordingly.
+- **Memory `v23-ac08-outcome`** called for exactly this spec ("judge future retrains against honest ground truth") — card 0019 records the lineage.
+- **Choices 0055/0057** supply the realism pre-screen and the phased coverage-floor framing; this corpus supersedes 0057's deferred Phase C (~400-column target).
+- **Memory `latdec-corpus-fp-relocation`** bounds ac-07: the corpus-honest gate's blocking role cannot be retired unless gold demonstrably catches error relocation, not just column-intrinsic accuracy.
+- **`scripts/rare_type_gold_review.py`** already implements the adjudication-queue pattern (deterministic sampling, blank `human_verdict` column) that ac-04 extends.
+
 ## Out of scope (named, not forgotten)
 
 - **Inference speed**: listed as a success criterion but unmeasured — no benchmark evidence either way. A quick measurement belongs in fossil-cleanup follow-up or its own memo before assuming a problem.

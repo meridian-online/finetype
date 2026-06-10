@@ -39,6 +39,11 @@ relations:
   type: feeds
   reason: trusted ground truth makes round-trip precision claims verifiable
 references:
+- .orbit/specs/2026-06-05-gold-eval-anchor/spec.yaml
+- eval/gold/gold_eval_anchor.tsv
+- scripts/score_gold_anchor.py
+- .orbit/memories/v23-ac08-outcome.yaml
+- .orbit/memories/latdec-corpus-fp-relocation.yaml
 - output/eval-ceiling-diagnosis/finding.md
 - .orbit/choices/0093-rare-type-scoreboard-headline-gate.yaml
 - .orbit/choices/0037-eval-serves-the-engine.yaml
@@ -47,4 +52,5 @@ references:
 - .orbit/choices/0057-eval-coverage-floor.yaml
 - .orbit/specs/2026-06-09-rare-type-precision-instrument/spec.yaml
 notes:
+- 'Prior art: this card is the follow-up that memory v23-ac08-outcome explicitly called for ("spec on YDF-label cleanup + cell-2 metric re-baseline so future Sense retrains can be judged against honest ground truth"). It scales the 240-column gold anchor (spec 2026-06-05-gold-eval-anchor — independence contract, fixture format, score_gold_anchor.py harness) from an efficacy instrument on four confusion families to the canonical corpus-wide accuracy eval, and effectively supersedes choice 0057''s deferred Phase C coverage expansion.'
 - 'Origin: author direction 2026-06-10 — "we need a breakthrough; convincing profile and validation results, very fast inference, simplified coherent codebase". Diagnosis: four failed retrains (v22/v23/v24/latdec), five proxy instruments, 17GB of eval artefacts and ~100 model dirs all trace to one missing asset — trusted ground truth. Consolidation attempted before gold is churn that cannot be verified.'
