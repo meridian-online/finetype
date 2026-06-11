@@ -18,6 +18,23 @@ lifts exactly two per-label caps so the additions survive the cap:
 | representation.discrete.categorical | 0.386 | 16,994 (capped at 600) | +2,660 | 3,400 |
 | representation.identifier.alphanumeric_id | 0.111 | 3,065 (capped at 600) | +2,094 | 2,400 |
 
+**Load-bearing discovery during the FTMB build:** v19 trains with ZERO
+distilled categorical rows. `prepare_multibranch_data.py` drops every
+`COLUMN_LEVEL_TYPES` row (categorical, ordinal, increment) by default — a
+legacy negative-transfer guard from the flat single-value era — so the
+shipped model's only categorical signal is ~307 synthetic columns. That is a
+structural explanation for gold categorical recall 0.386, and it means the
+v27 build needs `--include-column-level-types` (the load-bearing v23 flag).
+The first v27 FTMB was built WITHOUT it and silently lost all 2,660 mined
+categorical rows (audit caught it: categorical=307). The rebuild adds the
+flag plus `--type-cap representation.identifier.increment=0`, pinning
+increment OUT — it is gold's worst over-emitter (P=0.056) and v19's status
+quo for that label (synthetic-only) is preserved. Ordinal's 401 base rows
+enter, supporting both sides of the categorical/ordinal boundary that bucket
+B5 trains. Note v23 — the categorical explosion — was also the only prior
+run with this flag on; the difference here is curated, capped, low-cardinality
+positives and the proxy gate in front of the overnight spend.
+
 Everything else is byte-identical to the v19 recipe
 (`overnight_v19_paired.sh`: v3 distilled, samples-per-type 1200, synthetic
 1200, ratio 0.7, aug 0.35, filter+decontaminate, cap 600, hn 75/50/25, v4,
