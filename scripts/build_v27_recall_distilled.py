@@ -118,10 +118,19 @@ def main() -> int:
             if label not in TARGETS:
                 hp_stray_labels += 1
                 continue
-            if not (sample_values or "").strip():
+            # The mined parquet carries the corpus's │-separated raw string;
+            # the distilled-CSV contract is a JSON list (the FTMB loader
+            # json.loads every row and silently drops parse failures — this
+            # conversion is what keeps the mined rows in training). The last
+            # token may be truncated mid-value, so drop it when there are
+            # multiple.
+            vals = [v.strip() for v in (sample_values or "").split("│") if v.strip()]
+            if len(vals) > 1:
+                vals = vals[:-1]
+            if not vals:
                 hp_empty_values += 1
                 continue
-            writer.writerow([label, sample_values, cname or ""])
+            writer.writerow([label, json.dumps(vals), cname or ""])
             per_label_rows[label] += 1
             per_cluster_rows[cluster_id] += 1
             n_hp += 1
