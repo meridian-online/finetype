@@ -120,8 +120,15 @@ acceptance_criteria:
     Record per-bucket counts and per-label addition caps relative to the v19
     training set so neither label's training mass moves more than the blend
     memo justifies.
+    CLOSED 2026-06-11: scripts/mine_v27_recall_positives.py -> 4,754 rows
+    (2,094 alnum across A1-A5, 2,660 categorical across B1-B5), value-based
+    curation (categorical: n_distinct<=12 + repetition; ids: distinct>=0.7 +
+    letter-digit mix), 756 gold file shas excluded, exclusion ledger in
+    output/v27-recall-retrain/mining_manifest.json, spot-check tables
+    reviewed (B2_word species-name contamination removed by the cardinality
+    filter). Memo: output/v27-recall-retrain/blend_memo.md.
   gate: true
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     Blend built on the existing prepare/blend tooling

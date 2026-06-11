@@ -287,3 +287,6 @@ output/value-level-arch-test/model_mfg_nf/
 output/postal-veto/sample_pass/
 output/postal-veto/sample_pass.err
 output/postal-veto/sample_pass.out
+
+# v27 recall blend CSV — regenerable via scripts/build_v27_recall_distilled.py
+output/v27-recall-retrain/sherlock_distilled_v27.csv.gz

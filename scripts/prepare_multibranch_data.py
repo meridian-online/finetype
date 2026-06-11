@@ -52,6 +52,7 @@ Options:
     --filter-distilled      Filter known-bad distilled data (v13 AC-02: ssn, user_agent, phone, postal)
     --decontaminate         Per-value subtype decontamination (v14 AC-01: url, email, phone_number)
     --distilled-cap N       Cap distilled rows per type at N (v13 AC-04: use 600)
+    --type-cap LABEL=N      Per-label override to --distilled-cap (repeatable; replaces a baked-in TYPE_CAP_OVERRIDES edit)
     --hard-negatives N      Generate N hard-negative decimal_number columns in [-90,90] (v13 AC-05: use 75)
     --accounting-negatives N Generate N hard-negative decimal_number columns with accounting headers (v14 AC-02b)
     --status-negatives N    Generate N hard-negative integer_number columns with status headers (v14 AC-02c)
@@ -1474,14 +1475,16 @@ DOMAIN_CAP_OVERRIDES = {
 TYPE_CAP_OVERRIDES = {
     # Per-LABEL overrides, checked before the domain override. Narrower than a
     # domain raise: lifts exactly one type's distilled budget so a targeted
-    # hard-negative injection survives the cap while every other type — even
-    # siblings in the same domain — stays at the global default. Per spec
-    # 2026-06-06-latitude-decimal-hard-negative-retrain ac-02: the 2,540
-    # latitude->decimal hard negatives all carry decimal_number, so without
-    # this they would collapse to the v19 base of 600 and dilute the fix. This
-    # keeps the blend a one-variable change vs v19 (clean proxy/gold-anchor
+    # hard-negative/positive injection survives the cap while every other type
+    # — even siblings in the same domain — stays at the global default. This
+    # keeps a blend a one-variable change vs the base (clean proxy/gold-anchor
     # attribution) instead of the confounded global-cap raise.
-    "representation.numeric.decimal_number": 2600,
+    #
+    # Per-build overrides belong on the command line (--type-cap LABEL=N,
+    # repeatable), NOT in this dict — a baked-in entry silently leaks into
+    # every later build. The latdec build (spec 2026-06-06) used the
+    # equivalent of:
+    #   --type-cap representation.numeric.decimal_number=2600
 }
 
 
@@ -2652,6 +2655,14 @@ def main():
             i += 1
         elif args[i] == "--distilled-cap":
             distilled_cap = int(args[i + 1])
+            i += 2
+        elif args[i] == "--type-cap":
+            label, _, cap_str = args[i + 1].partition("=")
+            if not cap_str:
+                print(f"error: --type-cap expects LABEL=N, got {args[i + 1]!r}",
+                      file=sys.stderr)
+                sys.exit(2)
+            TYPE_CAP_OVERRIDES[label] = int(cap_str)
             i += 2
         elif args[i] == "--filter-distilled":
             filter_distilled = True

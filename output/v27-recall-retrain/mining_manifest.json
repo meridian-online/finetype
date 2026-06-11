@@ -1,0 +1,158 @@
+{
+  "spec": "2026-06-11-categorical-identifier-recall-retrain",
+  "source": "output/ydf-validation-gate/v19_gated.parquet",
+  "gold_firewall_file_shas": 756,
+  "buckets": {
+    "A1_hash": {
+      "label": "representation.identifier.alphanumeric_id",
+      "pool_scanned": 7364,
+      "kept": 900,
+      "cap": 900,
+      "filtered": {
+        "gold_sha": 3,
+        "bad_header": 1,
+        "value_shape": 312,
+        "per_file_cap": 0,
+        "vocab_dedupe": 0
+      }
+    },
+    "A2_h3": {
+      "label": "representation.identifier.alphanumeric_id",
+      "pool_scanned": 2156,
+      "kept": 500,
+      "cap": 500,
+      "filtered": {
+        "gold_sha": 9,
+        "bad_header": 0,
+        "value_shape": 10,
+        "per_file_cap": 0,
+        "vocab_dedupe": 0
+      }
+    },
+    "A3_geohash": {
+      "label": "representation.identifier.alphanumeric_id",
+      "pool_scanned": 2644,
+      "kept": 300,
+      "cap": 300,
+      "filtered": {
+        "gold_sha": 1,
+        "bad_header": 276,
+        "value_shape": 36,
+        "per_file_cap": 3,
+        "vocab_dedupe": 0
+      }
+    },
+    "A4_secur": {
+      "label": "representation.identifier.alphanumeric_id",
+      "pool_scanned": 2981,
+      "kept": 300,
+      "cap": 300,
+      "filtered": {
+        "gold_sha": 7,
+        "bad_header": 81,
+        "value_shape": 454,
+        "per_file_cap": 0,
+        "vocab_dedupe": 0
+      }
+    },
+    "A5_legacy": {
+      "label": "representation.identifier.alphanumeric_id",
+      "pool_scanned": 686,
+      "kept": 94,
+      "cap": 400,
+      "filtered": {
+        "gold_sha": 2,
+        "bad_header": 158,
+        "value_shape": 432,
+        "per_file_cap": 0,
+        "vocab_dedupe": 0
+      }
+    },
+    "B1_tld": {
+      "label": "representation.discrete.categorical",
+      "pool_scanned": 86991,
+      "kept": 900,
+      "cap": 900,
+      "filtered": {
+        "gold_sha": 26,
+        "bad_header": 209,
+        "value_shape": 15821,
+        "per_file_cap": 0,
+        "vocab_dedupe": 43478
+      }
+    },
+    "B2_word": {
+      "label": "representation.discrete.categorical",
+      "pool_scanned": 161950,
+      "kept": 700,
+      "cap": 700,
+      "filtered": {
+        "gold_sha": 13,
+        "bad_header": 270,
+        "value_shape": 2983,
+        "per_file_cap": 0,
+        "vocab_dedupe": 1553
+      }
+    },
+    "B3_gender_code": {
+      "label": "representation.discrete.categorical",
+      "pool_scanned": 22740,
+      "kept": 310,
+      "cap": 450,
+      "filtered": {
+        "gold_sha": 20,
+        "bad_header": 485,
+        "value_shape": 21317,
+        "per_file_cap": 58,
+        "vocab_dedupe": 550
+      }
+    },
+    "B4_blood_type": {
+      "label": "representation.discrete.categorical",
+      "pool_scanned": 19414,
+      "kept": 450,
+      "cap": 450,
+      "filtered": {
+        "gold_sha": 4,
+        "bad_header": 161,
+        "value_shape": 1378,
+        "per_file_cap": 6,
+        "vocab_dedupe": 5342
+      }
+    },
+    "B5_ordinal": {
+      "label": "representation.discrete.categorical",
+      "pool_scanned": 38015,
+      "kept": 300,
+      "cap": 300,
+      "filtered": {
+        "gold_sha": 2,
+        "bad_header": 41,
+        "value_shape": 653,
+        "per_file_cap": 0,
+        "vocab_dedupe": 165
+      }
+    }
+  },
+  "per_label_totals": {
+    "representation.identifier.alphanumeric_id": 2094,
+    "representation.discrete.categorical": 2660
+  },
+  "exclusion_ledger": {
+    "geography.location.city": "v23 blast path (48k absorbed); safety unscored/<0.5",
+    "geography.transportation.iata_code": "v23-adjacent geography code; excluded per spec",
+    "identity.person.full_name": "identity-adjacent; 92.8k pool is mostly genuine names",
+    "datetime.component.periodicity": "v23 empirically unreachable",
+    "technology.internet.url": "v23 empirically unreachable",
+    "representation.boolean.terms": "crisp family, gold P=1.0 \u2014 do not blur",
+    "identity.person.gender": "identity-adjacent, safety 0.524 low-MODERATE",
+    "identity.person.phone_number": "identity-adjacent, no gold-FN corroboration",
+    "finance.currency.amount": "finance-adjacent; gold currency family already broken (P=0.100)",
+    "sense=hash AND ydf=hash": "genuine hashes (523 cols) \u2014 correct as-is"
+  },
+  "filters": {
+    "categorical": "n_values>=4, 2<=n_distinct<=12, distinct_ratio<=0.6, vocab_sig<=40",
+    "alnum": "n_values>=3, distinct_ratio>=0.7, letter+digit mix>=60%",
+    "both": "is_trivial=false, header not __index_level_/Unnamed/hex, <=3 cols/file sha, gold shas excluded"
+  }
+}
