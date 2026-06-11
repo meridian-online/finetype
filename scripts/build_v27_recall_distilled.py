@@ -56,9 +56,24 @@ TARGETS = {
     "representation.identifier.alphanumeric_id",
 }
 
-AUDIT_TOTAL_ROWS = 106_000
-AUDIT_BASE_ROWS = 100_000
-AUDIT_HP_ROWS = 3_800  # round 2: B2_word (700) dropped after proxy NO-GO
+# Round 2 discovery: prepare_multibranch_data.py's per-type caps are COSMETIC
+# for the v4 sibling-grouped path — group_distilled_by_proximity() consumes
+# ordered_distilled, which is never rebuilt after cap_distilled_columns()
+# mutates the capped dict (line ~2429). So the ONLY layer that controls
+# per-type training mass is this blend CSV. The re-scope (categorical ~1,700
+# effective: mined 1,300 + base 400) is therefore enforced HERE, by
+# deterministic downsampling. Base increment is dropped entirely: it only
+# became trainable via --include-column-level-types and v19's status quo
+# (synthetic-only) must be preserved for gold's worst over-emitter (P=0.056).
+CAT = "representation.discrete.categorical"
+ALNUM = "representation.identifier.alphanumeric_id"
+INCREMENT = "representation.identifier.increment"
+BASE_KEEP = {CAT: 400, ALNUM: 300, INCREMENT: 0}
+MINED_KEEP = {CAT: 1_300, ALNUM: 2_094}
+
+AUDIT_TOTAL_ROWS = 85_500
+AUDIT_BASE_ROWS = 82_000
+AUDIT_HP_ROWS = 3_300  # round 2: B2_word dropped + mined categorical trimmed
 
 
 def main() -> int:
@@ -86,19 +101,42 @@ def main() -> int:
         writer = csv.writer(fout)
         writer.writerow(["final_label", "sample_values", "column_name"])
 
-        # ── (1) v19 base distilled (pass-through) ─────────────────────
+        # ── (1) v19 base distilled (pass-through, target labels capped) ──
+        # Deterministic downsample for the three controlled labels: rank by
+        # md5(label|values|header), keep the first BASE_KEEP[label]. Every
+        # other label passes through untouched (v19 status quo).
+        import hashlib
+
         n_base = 0
+        base_dropped: dict[str, int] = defaultdict(int)
+        controlled: dict[str, list] = {k: [] for k in BASE_KEEP}
         with gzip.open(args.v19_distilled, "rt", newline="",
                        encoding="utf-8") as fin:
             for row in csv.DictReader(fin):
                 label = (row.get("final_label") or "").strip()
                 if not label:
                     continue
-                writer.writerow([label, row.get("sample_values") or "",
-                                 row.get("column_name") or ""])
+                sv = row.get("sample_values") or ""
+                cn = row.get("column_name") or ""
+                if label in BASE_KEEP:
+                    controlled[label].append((sv, cn))
+                    continue
+                writer.writerow([label, sv, cn])
                 per_label_rows[label] += 1
                 n_base += 1
                 total += 1
+        for label, rows_c in controlled.items():
+            keep = BASE_KEEP[label]
+            rows_c.sort(key=lambda r: hashlib.md5(
+                f"{label}|{r[0]}|{r[1]}".encode()).hexdigest())
+            for sv, cn in rows_c[:keep]:
+                writer.writerow([label, sv, cn])
+                per_label_rows[label] += 1
+                n_base += 1
+                total += 1
+            base_dropped[label] = max(0, len(rows_c) - keep)
+            print(f"  base {label}: {len(rows_c)} -> {min(keep, len(rows_c))}",
+                  file=sys.stderr)
         print(f"  {'v19_distilled':>20s}: {n_base:>8,} rows", file=sys.stderr)
 
         # ── (2) v27 hard positives (parquet → 3-col CSV) ──────────────
@@ -113,8 +151,24 @@ def main() -> int:
             SELECT correct_label, sample_values, column_name, cluster_id
               FROM read_parquet('{args.hard_positives.as_posix()}')
         """).fetchall()
-        n_hp = 0
+        # Trim mined rows per label to MINED_KEEP, deterministically (same
+        # md5 ranking as the base downsample), proportionally across buckets
+        # by virtue of hash ordering being bucket-blind.
+        by_label: dict[str, list] = defaultdict(list)
         for label, sample_values, cname, cluster_id in rows:
+            by_label[label].append((sample_values, cname, cluster_id))
+        trimmed = []
+        for label, lrows in by_label.items():
+            keep = MINED_KEEP.get(label, len(lrows))
+            lrows.sort(key=lambda r: hashlib.md5(
+                f"{label}|{r[0]}|{r[1]}".encode()).hexdigest())
+            if len(lrows) > keep:
+                print(f"  mined {label}: {len(lrows)} -> {keep}", file=sys.stderr)
+            for sv, cn, cid in lrows[:keep]:
+                trimmed.append((label, sv, cn, cid))
+
+        n_hp = 0
+        for label, sample_values, cname, cluster_id in trimmed:
             if label not in TARGETS:
                 hp_stray_labels += 1
                 continue
@@ -159,10 +213,12 @@ def main() -> int:
         "target_label_rows": {k: per_label_rows[k] for k in sorted(TARGETS)},
         "hp_stray_label_rows": hp_stray_labels,
         "hp_empty_value_rows": hp_empty_values,
-        "ftmb_type_caps": {
-            # round 2 (post proxy NO-GO): categorical halved from 3400
-            "representation.discrete.categorical": 1700,
-            "representation.identifier.alphanumeric_id": 2400,
+        "effective_label_masses": {
+            "note": ("enforced HERE — FTMB --type-cap is cosmetic for the v4 "
+                     "sibling-grouped path (ordered_distilled never re-capped)"),
+            "base_keep": dict(BASE_KEEP),
+            "mined_keep": dict(MINED_KEEP),
+            "base_dropped": dict(base_dropped),
         },
         "audit": {
             "total_rows_gate": AUDIT_TOTAL_ROWS,
