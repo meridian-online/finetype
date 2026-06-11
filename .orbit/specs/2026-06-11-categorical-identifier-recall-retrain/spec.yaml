@@ -97,7 +97,7 @@ goal: |
     the transition table; the negative result seeds the fallback Sharpen spec.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - recall
 - retrain
@@ -140,8 +140,13 @@ acceptance_criteria:
     true-label examples retained for every excluded neighbour (city, iata,
     tld, word, entity_name keep their existing training mass — recall there
     must not be the price).
+    CLOSED 2026-06-12: built three times (JSON sample_values fix; round-2
+    re-scope with blend-layer mass enforcement after the cosmetic-cap
+    discovery). make leakage-guard green each time; manifests in
+    output/v27-recall-retrain/. Final blend: 86,286 rows (82,892 base +
+    3,394 mined).
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     Destination-drift proxy pre-check GO — the binding pre-train gate. Run
@@ -162,6 +167,16 @@ acceptance_criteria:
     proxy_drift_v27-proxy.json. Pre-committed re-scope executed:
     categorical cap 3400->1700, B2_word bucket dropped (mined 4,054 rows).
     Round 2 is the LAST attempt — a second NO-GO closes Failed-informative.
+    ROUND 2 (2026-06-12): NO-GO — categorical 1.71% -> 10.64% (+8.93pp,
+    6.22x) with training mass cut 8x (16,063 -> 1,921 records, B2_word
+    dropped, masses enforced at the blend layer after discovering FTMB
+    per-type caps are cosmetic in the v4 path). alphanumeric_id also
+    tripped (3.18x, band 3.0x). The explosion is PRESENCE-driven, not
+    mass-driven: categorical trained as a flat-softmax shape class is a
+    near-universal attractor; the COLUMN_LEVEL_TYPES guard is load-bearing.
+    city held both rounds. HALT executed per pre-commitment — no overnight
+    run spent. Full analysis: output/v27-recall-retrain/
+    proxy_failed_report.md.
   gate: true
   checked: false
   ac_type: observation
@@ -214,6 +229,14 @@ acceptance_criteria:
     release runbook as a separate deliberate action. If NO-GO, record which
     instrument killed it and what the blend re-scope or the 0094-style
     Sharpen fallback should learn from it.
+    CLOSED 2026-06-12: NO-GO — killed by the destination-drift proxy
+    (ac-03), twice, per the pre-committed halt path. No candidate was
+    trained at full depth; ac-04/05/06 never ran (moot). The decision
+    record, absorption analysis, and the three ranked next bets (Sharpen
+    veto-fallback rule family per 0094/0048; alnum-only retrain; categorical
+    as hierarchical/fusion precedence) are in
+    output/v27-recall-retrain/proxy_failed_report.md.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-11T14:52:07.14995Z

@@ -1,0 +1,5 @@
+key: categorical-is-a-residual-category
+body: 'representation.discrete.categorical cannot be trained as a flat-softmax shape class in the multi-branch Sense model. Three consistent measurements (v23 +529%; v27 round-1 5.76x at 16k records; v27 round-2 6.22x at 1.9k records — 8x mass cut made it WORSE) show the explosion is PRESENCE-driven: any real categorical vocabulary in training makes the label a near-universal attractor over short repeating strings, collapsing word/comma_separated/entity_name/tld. The COLUMN_LEVEL_TYPES guard in prepare_multibranch_data.py is load-bearing, not legacy. Categorical recall belongs in Sharpen veto-fallback rules (0094 pattern, 0048 value-based) or a hierarchical/fusion head with precedence semantics. Substrate: output/v27-recall-retrain/proxy_failed_report.md'
+timestamp: 2026-06-11T14:53:02.287792Z
+labels:
+- topology
