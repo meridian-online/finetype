@@ -154,6 +154,14 @@ acceptance_criteria:
     neighbours (city, iata_code, word, entity_name, tld). GO authorises
     ac-04; NO-GO triggers the pre-committed re-scope-once halt path. Record
     verdict, wall-clock, top movers.
+    ROUND 1 (2026-06-11): NO-GO — categorical 1.71% -> 9.86% (+8.15pp,
+    5.76x, band 3x), absorbing comma_separated (0.00x), word (0.07x), tld
+    (0.04x), entity_name, plain_text. city HELD (0.76x — exclusion ledger
+    worked); alphanumeric_id +1.54pp at 2.99x, just inside the band.
+    30-min proxy spend; output/destination-drift-precheck/
+    proxy_drift_v27-proxy.json. Pre-committed re-scope executed:
+    categorical cap 3400->1700, B2_word bucket dropped (mined 4,054 rows).
+    Round 2 is the LAST attempt — a second NO-GO closes Failed-informative.
   gate: true
   checked: false
   ac_type: observation

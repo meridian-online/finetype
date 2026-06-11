@@ -81,19 +81,6 @@
         "vocab_dedupe": 43478
       }
     },
-    "B2_word": {
-      "label": "representation.discrete.categorical",
-      "pool_scanned": 161950,
-      "kept": 700,
-      "cap": 700,
-      "filtered": {
-        "gold_sha": 13,
-        "bad_header": 270,
-        "value_shape": 2983,
-        "per_file_cap": 0,
-        "vocab_dedupe": 1553
-      }
-    },
     "B3_gender_code": {
       "label": "representation.discrete.categorical",
       "pool_scanned": 22740,
@@ -136,7 +123,7 @@
   },
   "per_label_totals": {
     "representation.identifier.alphanumeric_id": 2094,
-    "representation.discrete.categorical": 2660
+    "representation.discrete.categorical": 1960
   },
   "exclusion_ledger": {
     "geography.location.city": "v23 blast path (48k absorbed); safety unscored/<0.5",
@@ -148,7 +135,8 @@
     "identity.person.gender": "identity-adjacent, safety 0.524 low-MODERATE",
     "identity.person.phone_number": "identity-adjacent, no gold-FN corroboration",
     "finance.currency.amount": "finance-adjacent; gold currency family already broken (P=0.100)",
-    "sense=hash AND ydf=hash": "genuine hashes (523 cols) \u2014 correct as-is"
+    "sense=hash AND ydf=hash": "genuine hashes (523 cols) \u2014 correct as-is",
+    "representation.text.word (B2, dropped round 2)": "proxy round-1 NO-GO: categorical 5.76x over-emit with word collapsing to 0.07x \u2014 the fuzziest boundary bucket, dropped in the pre-committed re-scope alongside the categorical cap halving (3400->1700)"
   },
   "filters": {
     "categorical": "n_values>=4, 2<=n_distinct<=12, distinct_ratio<=0.6, vocab_sig<=40",

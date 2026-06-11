@@ -87,7 +87,6 @@ BUCKETS = {
                         f"'identity.medical.hcpcs','geography.transportation.unlocode') AND ydf_prediction_gated='{ALNUM}'", 300),
     "A5_legacy": (ALNUM, f"sense_prediction='representation.alphanumeric.alphanumeric_id' AND ydf_prediction_gated='{ALNUM}'", 400),
     "B1_tld": (CAT, f"sense_prediction='technology.internet.top_level_domain' AND ydf_prediction_gated='{CAT}'", 900),
-    "B2_word": (CAT, f"sense_prediction='representation.text.word' AND ydf_prediction_gated='{CAT}'", 700),
     "B3_gender_code": (CAT, f"sense_prediction='identity.person.gender_code' AND ydf_prediction_gated='{CAT}'", 450),
     "B4_blood_type": (CAT, f"sense_prediction='identity.person.blood_type' AND ydf_prediction_gated='{CAT}'", 450),
     "B5_ordinal": (CAT, f"sense_prediction='representation.discrete.ordinal' AND ydf_prediction_gated='{CAT}'", 300),
@@ -104,6 +103,10 @@ EXCLUSION_LEDGER = {
     "identity.person.phone_number": "identity-adjacent, no gold-FN corroboration",
     "finance.currency.amount": "finance-adjacent; gold currency family already broken (P=0.100)",
     "sense=hash AND ydf=hash": "genuine hashes (523 cols) — correct as-is",
+    "representation.text.word (B2, dropped round 2)": (
+        "proxy round-1 NO-GO: categorical 5.76x over-emit with word collapsing "
+        "to 0.07x — the fuzziest boundary bucket, dropped in the pre-committed "
+        "re-scope alongside the categorical cap halving (3400->1700)"),
 }
 
 

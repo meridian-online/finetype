@@ -181,36 +181,6 @@
 | `Type` | `comment│story│comment│story│comment│story│story│comment` |
 | `Type` | `comment│comment│comment│comment│comment│story│comment│comment` |
 
-## B2_word (representation.discrete.categorical) — kept 700
-
-| column_name | sample_values (first 100 chars) |
-|---|---|
-| `act_tag` | `o│sd│sd│sd│sd│sd│b│sd` |
-| `Type` | `story│comment│comment│comment│comment` |
-| `Type` | `story│comment│comment│story│comment│comment│comment│comment` |
-| `act_tag` | `qy│na│sd│sd│sd│sd│sd│sd` |
-| `Type` | `comment│story│comment│story│story│story│comment│story` |
-| `difficulty` | `medium│medium│easy│easy│easy` |
-| `Priorità` | `Triviale│Importante│Importante│Importante│Importante│Importante│Importante│Importante` |
-| `pos` | `adjective│noun│noun│proper noun│noun│noun│noun│noun` |
-| `easyColor` | `poor│good│average│good│good│good│average│average` |
-| `Type` | `comment│story│comment│comment│story│comment│comment│story` |
-| `Discourse Facet` | `Aim_Citation│Result_Citation│Method_Citation│Result_Citation│Method_Citation│Result_Citation│Result_` |
-| `helpColor` | `good│poor│average│good│good│good│poor│average` |
-| `Type` | `comment│comment│comment│story│comment│comment│comment│story` |
-| `Type` | `story│comment│comment│comment│comment│comment│comment│comment` |
-| `Type` | `comment│comment│comment│comment│comment│story│comment│comment` |
-| `act_tag` | `sd│ad│aa│sd│sv│sd│sv│sd` |
-| `Type` | `story│comment│comment│comment│comment│comment│comment│comment` |
-| `Type` | `comment│comment│story│story│comment│comment│comment│comment` |
-| `Type` | `comment│comment│comment│comment│comment│comment│story│comment` |
-| `Type` | `comment│comment│comment│comment│comment│story│comment│story` |
-| `Type` | `comment│story│comment│comment│comment│comment│comment│comment` |
-| `Discourse Facet` | `Aim_Citation│Aim_Citation│Method_Citation│Result_Citation│Method_Citation│Method_Citation│Aim_Citati` |
-| `Type` | `story│comment│comment│comment│story│comment│comment│comment` |
-| `topic` | `status│connection│connection│connection│connection│connection│connection│connection` |
-| `Type` | `story│comment│comment│story│comment│comment│story│comment` |
-
 ## B3_gender_code (representation.discrete.categorical) — kept 310
 
 | column_name | sample_values (first 100 chars) |

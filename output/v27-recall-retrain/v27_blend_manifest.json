@@ -1,10 +1,10 @@
 {
   "spec": "2026-06-11-categorical-identifier-recall-retrain",
   "out": "/Users/hugh/github/meridian-online/finetype/output/v27-recall-retrain/sherlock_distilled_v27.csv.gz",
-  "total_rows": 107195,
+  "total_rows": 106495,
   "per_source_rows": {
     "v19_distilled": 102441,
-    "v27_hard_positives": 4754
+    "v27_hard_positives": 4054
   },
   "per_cluster_rows": {
     "A1_hash": 900,
@@ -13,25 +13,24 @@
     "A4_secur": 300,
     "A5_legacy": 94,
     "B1_tld": 900,
-    "B2_word": 700,
     "B3_gender_code": 310,
     "B4_blood_type": 450,
     "B5_ordinal": 300
   },
   "target_label_rows": {
-    "representation.discrete.categorical": 19654,
+    "representation.discrete.categorical": 18954,
     "representation.identifier.alphanumeric_id": 5159
   },
   "hp_stray_label_rows": 0,
   "hp_empty_value_rows": 0,
   "ftmb_type_caps": {
-    "representation.discrete.categorical": 3400,
+    "representation.discrete.categorical": 1700,
     "representation.identifier.alphanumeric_id": 2400
   },
   "audit": {
     "total_rows_gate": 106000,
     "base_rows_gate": 100000,
-    "hp_rows_gate": 4000,
+    "hp_rows_gate": 3800,
     "failures": [],
     "passed": true
   }

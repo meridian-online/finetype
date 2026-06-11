@@ -58,7 +58,7 @@ TARGETS = {
 
 AUDIT_TOTAL_ROWS = 106_000
 AUDIT_BASE_ROWS = 100_000
-AUDIT_HP_ROWS = 4_000
+AUDIT_HP_ROWS = 3_800  # round 2: B2_word (700) dropped after proxy NO-GO
 
 
 def main() -> int:
@@ -160,7 +160,8 @@ def main() -> int:
         "hp_stray_label_rows": hp_stray_labels,
         "hp_empty_value_rows": hp_empty_values,
         "ftmb_type_caps": {
-            "representation.discrete.categorical": 3400,
+            # round 2 (post proxy NO-GO): categorical halved from 3400
+            "representation.discrete.categorical": 1700,
             "representation.identifier.alphanumeric_id": 2400,
         },
         "audit": {
