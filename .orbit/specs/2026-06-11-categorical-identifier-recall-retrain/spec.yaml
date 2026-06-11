@@ -1,0 +1,204 @@
+id: 2026-06-11-categorical-identifier-recall-retrain
+goal: |
+  First gold-era retrain: recover the two largest recall pools the gold corpus
+  measured — representation.discrete.categorical (recall 0.386, 62 FN of 101)
+  and representation.identifier.alphanumeric_id (recall 0.111, 48 FN of 54) —
+  with a curated positive-addition blend on the multi-branch v19 lineage
+  (candidate sherlock-v27-recall), judged end-to-end by the choice-0095
+  promotion order. The two pools are 110 of the ~296 remaining gold misses
+  against the post-0.6.27 baseline (635/931 = 0.682); recovering half is worth
+  roughly +5.5pp headline.
+
+  ## Mechanism diagnosis (measured at design time, 2026-06-11)
+
+  The two miss-pools fail by DIFFERENT mechanisms — the blend must address
+  each, and the gates must watch each:
+
+  **alphanumeric_id — exotic-tight-code assertion, then veto-to-unknown.**
+  32 of 48 gold FNs land on `unknown`: Sense asserts geography.index.h3 (17)
+  or technology.cryptographic.hash (8) on generic id columns (msg_id, link_id,
+  wfo_id…), the validation veto correctly rejects, and the column falls to
+  unknown instead of alphanumeric_id. The remaining 16 are absorbed by tight
+  code validators (url, isbn, eu_vat, uuid, sedol, cusip, dea). Corpus mirror
+  of the same mechanism in output/ydf-validation-gate/v19_gated.parquet:
+  17,518 hash + 3,625 h3 sense assertions, plus ~8.8k ydf-gated-alnum columns
+  where sense lands on geohash/cusip/sedol/hcpcs/url/unlocode. Root cause is
+  trainable: the model lacks generic-id positives, so id-shaped strings snap
+  to whichever tight code is nearest and die at the veto.
+
+  **categorical — scatter into adjacent text/code labels.** 62 gold FNs spread
+  across word (10), ordinal (6), entity_name (6), iata_code (5), unknown (5),
+  city (4), http_method (3)… on classic vocabulary headers (type, status,
+  class, team_abbreviation). Corpus mirror: the reachability scoring already
+  ranked the categorical-direction clusters — the tld→categorical bucket is
+  HIGH safety (0.972, 87k cluster columns; short status/type vocabularies
+  misread as TLDs) and a MODERATE tail (safety 0.5–0.73) totals ~71k affected
+  columns. (Latdec ac-01 established the corpus diagnostic's predictions ARE
+  v19's, so these pools are the shipped model's own mistakes — no re-baseline
+  needed for mining.)
+
+  ## Why this is safe to attempt NOW — and why it nearly wasn't
+
+  This is the first RECALL-direction retrain since v23, and v23 is the exact
+  cautionary precedent: it pushed columns INTO categorical, exploded the label
+  +529.6% and ate ~48,000 city columns. Four things are different:
+
+  1. **Curated mining, not cluster-dumping.** Positives come only from
+     safety-scored clusters (HIGH first, MODERATE allowed with the pre/post
+     check per the advisory bands), with an explicit exclusion ledger for the
+     known blast paths: geography.location.city (19,845 cols in the
+     ydf=categorical pool), iata_code (19,335), identity.person.full_name
+     (92,826) and all geography/identity-adjacent buckets are EXCLUDED from
+     categorical positives regardless of what the ydf lens says — gated-YDF is
+     a mining lens, wrong in 42.1% of contested assertions, never an
+     adjudicator.
+  2. **Destination-drift proxy pre-check** (mandatory, blocking) — calibrated
+     on v23's exact failure mode, full-label-space band, runs BEFORE the
+     overnight spend.
+  3. **Corpus-honest gate post-train** (blocking, H05) — the only instrument
+     that catches relocation, with over_emit/collapse/oracle_fp bands that are
+     oracle-aware as of 0.6.24.
+  4. **The gold corpus adjudicates** — per-label precision/recall with Wilson
+     CIs against human-verified truth, not a proxy oracle.
+
+  ## Promotion order (choice 0095, in full)
+
+  gold-anchor efficacy → drift proxy (pre-train, blocking) → gold corpus
+  headline + rare-type scoreboard → corpus-honest gate (blocking) → swap via
+  the release runbook. The mandatory post-train Sense-distribution check runs
+  alongside; no headline ever overrides a blocking NO-GO. Training blend must
+  pass the leakage firewall (make leakage-guard; row-hash dedup vs
+  eval/row_hashes.tsv, gold rows excluded — choice 0056).
+
+  ## Out of scope
+
+  - The legacy label `representation.alphanumeric.alphanumeric_id` emitted by
+    hardcoded paths in crates/finetype-model/src/column.rs (~4479–4688) — a
+    non-taxonomy string that cost ≥1 gold column and carries 686 ydf-gated
+    corpus columns. Routed to spec 2026-06-10-deterministic-layer-audit as a
+    ledger entry; fixing it is deterministic-layer work, not retrain work.
+  - geography.location.state_code (P=R=0.000) — wholly unhandled family,
+    taxonomy-gap ledger territory, not reachable by adding positives to
+    existing labels.
+  - A 0094-style Sharpen fallback ("veto-rejected tight code on id-shaped
+    values → alphanumeric_id"). It is the cheaper fallback if this retrain
+    NO-GOs twice (decision 0038 prefers retraining; 0048 requires any such
+    rule be value-based). Recorded here so the fallback starts informed; not
+    built in this spec.
+  - Promotion/HuggingFace publish mechanics — the release runbook is a
+    separate deliberate action; ac-07 records the GO/NO-GO and evidence only.
+
+  ## Pre-committed halt conditions
+
+  - Proxy NO-GO (ac-03): re-scope the blend ONCE (drop the riskiest bucket,
+    re-run proxy). A second NO-GO closes the spec Failed-informative — do not
+    relax the band, do not spend the overnight run.
+  - Corpus-honest NO-GO (ac-06): blocking, final for this candidate. Record
+    the transition table; the negative result seeds the fallback Sharpen spec.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- recall
+- retrain
+- eval
+- gold
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Blend sources mined and CURATED, with the exclusion ledger recorded. From
+    output/ydf-validation-gate/v19_gated.parquet deliver two positive pools:
+    (a) alphanumeric_id positives — columns where sense asserts
+    h3/hash/iso6346-class tight codes or where ydf_gated=alphanumeric_id with
+    sense on geohash/cusip/sedol/hcpcs/url/unlocode, value-spot-checked
+    (sample ≥20 columns per bucket, confirm id-shaped values, not genuine
+    hashes/geohashes); (b) categorical positives — drawn ONLY from
+    safety-scored clusters ≥0.50 (HIGH tld→categorical bucket first), each
+    bucket value-spot-checked for genuine low-cardinality vocabularies. The
+    exclusion ledger names every bucket dropped and why (city, iata_code,
+    full_name, all geography/identity-adjacent buckets — v23 blast paths).
+    Record per-bucket counts and per-label addition caps relative to the v19
+    training set so neither label's training mass moves more than the blend
+    memo justifies.
+  gate: true
+  checked: false
+- id: ac-02
+  description: |
+    Blend built on the existing prepare/blend tooling
+    (scripts/overnight_v24_numeric.sh / overnight_latdec.sh lineage,
+    parameterised as scripts/overnight_v27_recall.sh — not forked). Leakage
+    firewall passes: make leakage-guard green, row-hash dedup vs
+    eval/row_hashes.tsv, zero overlap with eval/gold/gold_corpus_v1.tsv rows.
+    Blend composition memo records: positives added per label, buckets used,
+    true-label examples retained for every excluded neighbour (city, iata,
+    tld, word, entity_name keep their existing training mass — recall there
+    must not be the price).
+  gate: false
+  checked: false
+- id: ac-03
+  description: |
+    Destination-drift proxy pre-check GO — the binding pre-train gate. Run
+    scripts/proxy_pretrain.sh on the v27 blend FTMB vs the v19 baseline
+    snapshot (shared fixed file list), then scripts/drift_report.py with the
+    calibrated band (--abs-floor 0.0040 --rel-mult 3.0 --direction up).
+    Watch in particular (informational — the full-label band is what gates):
+    representation.discrete.categorical (v23's +529% precedent),
+    representation.identifier.alphanumeric_id over-emit, and the excluded
+    neighbours (city, iata_code, word, entity_name, tld). GO authorises
+    ac-04; NO-GO triggers the pre-committed re-scope-once halt path. Record
+    verdict, wall-clock, top movers.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-04
+  description: |
+    Full overnight 3-seed run + gold corpus scoring (only if ac-03 = GO).
+    Train sherlock-v27-recall at full depth, score the best seed end-to-end
+    (real Sense→Sharpen pipeline, 0.6.27 Sharpen surface) via
+    scripts/score_gold_anchor.py build-gold → predict → score. Success bands
+    vs the post-patch baseline (635/931 = 0.682,
+    output/postal-veto/metrics_v19-postal-veto_2026-06-10.tsv):
+    categorical recall ≥ 0.55 (from 0.386) with precision ≥ 0.80 (from
+    0.867); alphanumeric_id recall ≥ 0.45 (from 0.111) with precision ≥
+    0.80; headline ≥ 0.70; NO label with support ≥ 10 loses more than 5pp
+    precision or recall (watch integer_number, city, word, plain_text,
+    country_code, url, isbn). Record the full per-label table vs baseline.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-05
+  description: |
+    Mandatory post-train Sense-distribution check + rare-type scoreboard.
+    Full-label-space drift report on the real run's snapshot vs v19 (same
+    fixed file list as ac-03) — confirm the proxy's GO held at full
+    convergence; any divergence is a calibration finding logged against the
+    proxy's forward-use track record (currently 1-for-1 from latdec era).
+    Run the rare-type scoreboard (spec 2026-06-09 instrument, validated
+    99.0%) and record it alongside.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-06
+  description: |
+    Corpus-honest gate GO — blocking (H05). Score the candidate's predictions
+    on the ac-01 stratified sample (scripts/corpus_honest_gate.py vs the
+    stable v19 gated-YDF oracle, oracle-aware bands). A NO-GO blocks the
+    models/default swap regardless of the gold headline — no headline
+    overrides a blocking NO-GO. If this candidate clears with a genuine GO,
+    that is ALSO the gate's first true GO-precision validation (its one open
+    scope limit) — record that explicitly either way.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-07
+  description: |
+    Promotion decision recorded. Judge sherlock-v27-recall against the full
+    0095 instrument table (gold anchor, proxy, gold corpus + scoreboard,
+    corpus-honest gate, Sense-distribution check) and emit an explicit
+    GO/NO-GO to promote to models/default. If GO, the publish runs via the
+    release runbook as a separate deliberate action. If NO-GO, record which
+    instrument killed it and what the blend re-scope or the 0094-style
+    Sharpen fallback should learn from it.
+  gate: false
+  checked: false
+  ac_type: doc
