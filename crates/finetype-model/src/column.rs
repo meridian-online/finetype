@@ -3214,22 +3214,20 @@ fn value_sharpen(
         }
     }
 
-    // R32: text-family low-cardinality vocabulary override (spec
-    // 2026-06-12-text-vocab-override). The three free-text labels carry no
-    // validators, so neither the validation veto nor schema_fail_demotion
-    // can ever correct them — a status/type vocabulary asserted as free
-    // text stays wrong. A genuine free-text column is mostly distinct; a
-    // vocabulary repeats a bounded set. Scoped to the TEXT family ONLY:
-    // geography labels (city/region) are legitimately low-cardinality and
-    // measured to misfire (4/17 true-city gold columns), and a true
-    // http-method column is itself a small vocabulary — value shape cannot
-    // separate those. Value-based per decision 0048.
-    if matches!(
-        result_label,
-        "representation.text.word"
-            | "representation.text.entity_name"
-            | "representation.text.plain_text"
-    ) {
+    // R32: word low-cardinality vocabulary override (spec
+    // 2026-06-12-text-vocab-override). `word` carries no validator, so
+    // neither the validation veto nor schema_fail_demotion can ever correct
+    // it — a status/type vocabulary asserted as free words stays wrong. A
+    // genuine word column is mostly distinct; a vocabulary repeats a
+    // bounded set of generic words. Scoped to `word` ONLY: the corpus-honest
+    // gate round 1 measured entity_name (3,752) and plain_text (2,115)
+    // oracle-refuted moves — a column repeating eight manufacturer names IS
+    // entity_name and repeated boilerplate IS plain_text; low cardinality
+    // does not make named entities or prose an enum. Geography labels
+    // (city/region) misfire likewise (4/17 true-city gold columns), and a
+    // true http-method column is itself a small vocabulary. Value-based per
+    // decision 0048.
+    if result_label == "representation.text.word" {
         let non_empty: Vec<&str> = values
             .iter()
             .map(|v| v.trim())
@@ -7249,8 +7247,11 @@ mod tests {
 
     #[test]
     fn r32_out_of_scope_labels_untouched() {
-        // city/region/http_method are excluded by design — legitimately
-        // low-cardinality columns exist under those labels.
+        // Excluded by design: city/region (legitimately low-cardinality
+        // vocabularies exist) and — measured by the corpus-honest gate
+        // round 1 — entity_name/plain_text, where the oracle refuted
+        // 3,752/2,115 moves (repeating manufacturer names ARE entity_name;
+        // repeated boilerplate IS plain_text).
         let values: Vec<String> = vec![
             "Sydney",
             "Melbourne",
@@ -7262,12 +7263,18 @@ mod tests {
         .into_iter()
         .map(String::from)
         .collect();
-        let result = value_sharpen(&values, "geography.location.city", 0.9, None);
-        if let Some((_, rule)) = &result {
-            assert!(
-                !rule.starts_with("text_vocab_override:"),
-                "R32 must not fire outside the text family"
-            );
+        for label in [
+            "geography.location.city",
+            "representation.text.entity_name",
+            "representation.text.plain_text",
+        ] {
+            let result = value_sharpen(&values, label, 0.9, None);
+            if let Some((_, rule)) = &result {
+                assert!(
+                    !rule.starts_with("text_vocab_override:"),
+                    "R32 must not fire on {label}"
+                );
+            }
         }
     }
 
