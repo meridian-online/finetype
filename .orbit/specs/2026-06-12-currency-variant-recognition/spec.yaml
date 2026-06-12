@@ -1,0 +1,72 @@
+id: 2026-06-12-currency-variant-recognition
+goal: 'Make FineType resolve a currency column to the correct finance.currency.amount_* variant by value shape (euro-suffix, comma-decimal, space-grouped, apostrophe, lakh, ...) instead of collapsing every hinted price/cost column to the US-format generic amount or losing currency entirely to decimal_number — closing the price false-veto (spec 2026-06-12-false-veto-trio-resolution ac-04) at its real root: a locale-format recognition gap, not a veto bug.'
+cards:
+- '0002'
+status: open
+labels:
+- precision
+- locale-coverage
+acceptance_criteria:
+- id: ac-01
+  description: |
+    DESIGN LOCKED (this session's investigation). The diagnosis: a column of
+    euro-format currency (e.g. "9.140,88 €") never reaches its correct type
+    finance.currency.amount_comma_suffix. Three measured paths on the 0.6.29
+    binary: (a) header "price" + the value forces finance.currency.amount via
+    header_hint_cross_domain — generic US type, WRONG variant; (b) the same
+    values under a neutral header classify to representation.numeric.
+    decimal_number — currency lost entirely; (c) the shipped fixture value
+    "9140,88 €" (no thousands separator) matches NO amount_* validator at all,
+    so it hard-vetoes to unknown — doubly artificial, like the npi fixture.
+    The corpus has real euro formats (amount_comma 408, amount_space 516,
+    amount_comma_suffix 101 on the stratified sample), so the variants are
+    live and worth recognising. ROOT: not a veto bug — a locale-format
+    recognition gap + a header hint (price→US amount) that overrides value
+    shape. Evidence: interview.md.
+  gate: false
+  checked: true
+  ac_type: doc
+- id: ac-02
+  description: |
+    FIXTURE. Correct eval/datasets/csv/multilingual.csv price column to
+    representative CLDR de-DE ("9.140,88 €" with the thousands dot), so the
+    fixture exercises a real eurozone shape that a variant validator accepts.
+    Validators untouched. This is the npi-class half of the fix.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-03
+  description: |
+    ENGINE — value-aware amount-variant selector. When a column is currency-
+    family (a price/cost/amount header hint fires, OR the model/value-rules
+    land on any finance.currency.amount*), select the amount_* variant whose
+    validator the column's values actually satisfy (>= the standard sample
+    pass threshold) instead of forcing the generic US amount or leaving
+    decimal_number. Mirror the gender guard's principle: a value-grounded
+    sibling beats the same-family header hint (0048 value-based). Scope the
+    dispatcher to the amount_* family only; do NOT widen any validator.
+    Unit tests for euro-suffix / comma / space / apostrophe / lakh shapes and
+    a negative (plain decimal stays decimal_number). cargo test + clippy green.
+  gate: false
+  checked: false
+- id: ac-04
+  description: |
+    GATES (blocking). Gold corpus no-regression vs 0.6.29 (0.719) — the
+    amount-family changes must not relocate any non-currency label; rare-type
+    scoreboard sanity. Corpus-honest gate GO on the stratified sample
+    (relocation detector, H05) — watch the amount_* family for over-emit of a
+    specific variant. No headline overrides a NO-GO.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-05
+  description: |
+    SHIP. Batched with the gender fix into one release (author chose to batch,
+    2026-06-12): workspace version bump, CHANGELOG (user-experience framing —
+    "FineType reads your €1.234,56 columns as currency, in the right
+    European format"), gold baseline doc updated, spec notes record the
+    instrument verdicts. Cross-links spec 2026-06-12-false-veto-trio-resolution
+    ac-04 (closes it by delegation).
+  gate: false
+  checked: false
+  ac_type: ops
