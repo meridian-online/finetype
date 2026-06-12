@@ -53,6 +53,7 @@ specs:
 - .orbit/specs/2026-06-11-categorical-identifier-recall-retrain/spec.yaml
 - .orbit/specs/2026-06-12-veto-shape-fallback/spec.yaml
 - .orbit/specs/2026-06-12-text-vocab-override/spec.yaml
+- .orbit/specs/2026-06-08-late-fusion-sense-classifier/spec.yaml
 relations: []
 references:
 - README.md

@@ -2,7 +2,7 @@ id: 2026-06-08-late-fusion-sense-classifier
 goal: 'Build B3, a late-fusion Sense-stage classifier that becomes the general column-classification primary for all 240 types, replacing multi-branch: a learned residual fusion head combines a value-level CharCNN view, the multi-branch column-logit view, and sibling-context, validated through the corpus-honest gate + gold anchor (pre-port Python kill switch, then post-port Rust ship gate) and promoted to models/default as release 0.7.0.'
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - release
 - fusion
@@ -83,8 +83,18 @@ acceptance_criteria:
     mandatory Sense-distribution pre/post snapshot (snapshot_sense_distribution.py +
     advisory drift_report.py), corpus-honest gate GO (BLOCKING, H05), gold anchor with no
     per-family regression. A corpus-honest NO-GO blocks the models/default swap.
+    CLOSED 2026-06-12 (gate RAN 2026-06-08, recorded in output/late-fusion/
+    ac07_ship_gate_decision.md): NO-GO, twice — fusion-v26 collapsed the
+    label space at corpus scale; the lever-fixed variant (alpha floor 1.0 +
+    cardinality gate) cut categorical 10.7x -> 6.05x and STILL failed (47
+    types collapsed, unknown +68%, 63 labels flagged). The learning-to-defer
+    selector (deferral_finding.md) was collapse-proof and banked no win.
+    Mechanism: at corpus breadth most columns carry no per-value fingerprint,
+    so the value view defaults to the generic attractors — the same
+    residual-category law later measured from the training side (v27, memory
+    categorical-is-a-residual-category).
   gate: true
-  checked: false
+  checked: true
 - id: ac-08
   description: |
     Promotion per docs/RELEASE.md: publish models/fusion-v25 to HuggingFace, bump
@@ -97,6 +107,16 @@ acceptance_criteria:
   description: |
     Decision/release memo: did general fusion hold-and-improve? Gate results, release notes,
     and whether to extend manufacture to Tier-2 next.
+    CLOSED 2026-06-12: it did not hold — the fork in ac07_ship_gate_decision.md
+    is resolved as option 3 (author-approved): ABANDON the general
+    value-fusion Sense replacement. ac-08 (promotion) is moot; 0.7.0 is not
+    cut from this line. Findings banked: the value view's lat/lon recovery
+    and the family-A (tight-code vs alphanumeric) 17%->93% efficacy — most
+    of which the 0.6.28 veto shape-fallback later captured with a value
+    rule (alnum recall 0.111->0.593). Local-only weights and the value
+    corpus were swept post-NO-GO (fossil-cleanup); any future fusion work is
+    a fresh spec with precedence semantics designed in (choice 0096).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-12T03:55:17.825513Z
