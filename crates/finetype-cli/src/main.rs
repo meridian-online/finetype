@@ -3893,6 +3893,39 @@ fn col_validation_veto(
     (v.pass_rate, v.vetoed, v.advisory_low)
 }
 
+/// Resolve a HARD veto into the column's final label (spec
+/// 2026-06-12-veto-shape-fallback). Without a veto the prediction stands.
+/// With one, the value shape decides between the two residual labels
+/// (generic id / vocabulary) instead of an unconditional `unknown` — the
+/// precedence decision the flat Sense head cannot express. The fallback
+/// never re-asserts the vetoed label itself, and
+/// `FINETYPE_NO_VETO_FALLBACK=1` restores the pre-spec demotion. Returns
+/// `(final_label, vetoed_type, fallback_rule)`.
+fn resolve_veto_outcome(
+    vetoed: bool,
+    predicted: &str,
+    values: &[String],
+) -> (String, Option<String>, Option<&'static str>) {
+    if !vetoed {
+        return (predicted.to_string(), None, None);
+    }
+    let disabled = std::env::var("FINETYPE_NO_VETO_FALLBACK").is_ok_and(|v| v == "1");
+    if !disabled {
+        let opt: Vec<Option<&str>> = values.iter().map(|s| Some(s.as_str())).collect();
+        if let Some(fallback) = finetype_core::veto_shape_fallback(&opt) {
+            if fallback != predicted {
+                let rule = if fallback.ends_with("alphanumeric_id") {
+                    "veto_fallback:id"
+                } else {
+                    "veto_fallback:vocab"
+                };
+                return (fallback.to_string(), Some(predicted.to_string()), Some(rule));
+            }
+        }
+    }
+    ("unknown".to_string(), Some(predicted.to_string()), None)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn cmd_profile(
     file: Option<PathBuf>,
@@ -4221,11 +4254,13 @@ fn cmd_profile(
                     &veto_safe,
                     veto_enabled,
                 );
-                let (final_label, vetoed_type) = if vetoed {
-                    ("unknown".to_string(), Some(result.label.clone()))
-                } else {
-                    (result.label.clone(), None)
-                };
+                let (final_label, vetoed_type, fallback_rule) =
+                    resolve_veto_outcome(vetoed, &result.label, &values);
+                let mut result = result;
+                if let Some(rule) = fallback_rule {
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(rule.to_string());
+                }
                 let (broad_type, format_string, transform) =
                     if let Some(ref taxonomy) = enrichment_taxonomy {
                         if let Some(def) = taxonomy.get(&final_label) {
@@ -4323,11 +4358,13 @@ fn cmd_profile(
                     &veto_safe,
                     veto_enabled,
                 );
-                let (final_label, vetoed_type) = if vetoed {
-                    ("unknown".to_string(), Some(result.label.clone()))
-                } else {
-                    (result.label.clone(), None)
-                };
+                let (final_label, vetoed_type, fallback_rule) =
+                    resolve_veto_outcome(vetoed, &result.label, col_values);
+                let mut result = result;
+                if let Some(rule) = fallback_rule {
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(rule.to_string());
+                }
 
                 // Look up taxonomy contract fields for the (possibly vetoed) label
                 let (broad_type, format_string, transform) =

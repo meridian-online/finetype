@@ -101,6 +101,61 @@ pub fn evaluate_validation_veto(
     }
 }
 
+/// Fallback label for a HARD-vetoed column, decided from value shape alone
+/// (spec 2026-06-12-veto-shape-fallback). A veto means "the asserted tight
+/// type is contradicted by the values" — but the column may still carry a
+/// RESIDUAL shape the flat Sense head cannot express as a precedence:
+///
+/// - id-shape: mostly-distinct values that mix letters and digits →
+///   `representation.identifier.alphanumeric_id`
+/// - vocab-shape: a small vocabulary repeated across the column →
+///   `representation.discrete.categorical`
+///
+/// Returns `None` (the column stays `unknown`) for everything else —
+/// free text, pure-numeric ids, constant columns, columns too short to
+/// judge. Callers must not apply a fallback equal to the vetoed label.
+///
+/// Why a rule and not training data: categorical trained as a flat-softmax
+/// shape class is a presence-driven attractor (memory
+/// `categorical-is-a-residual-category`; v23 +529%, v27 proxy 5.76×/6.22×).
+pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
+    let non_null: Vec<&str> = values
+        .iter()
+        .filter_map(|v| *v)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let n = non_null.len();
+    if n < 3 {
+        return None;
+    }
+
+    let distinct: HashSet<&str> = non_null.iter().copied().collect();
+    let distinct_ratio = distinct.len() as f64 / n as f64;
+
+    // id-shape: mostly distinct AND most values mix letters with digits.
+    if distinct_ratio >= 0.7 {
+        let mixed = non_null
+            .iter()
+            .filter(|v| {
+                v.chars().any(|c| c.is_ascii_alphabetic())
+                    && v.chars().any(|c| c.is_ascii_digit())
+            })
+            .count();
+        if mixed as f64 / n as f64 >= 0.6 {
+            return Some("representation.identifier.alphanumeric_id");
+        }
+        return None;
+    }
+
+    // vocab-shape: a small vocabulary, genuinely repeated.
+    if n >= 4 && (2..=12).contains(&distinct.len()) && distinct_ratio <= 0.6 {
+        return Some("representation.discrete.categorical");
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,5 +258,71 @@ identity.person.gender_code:
         assert!(veto.pass_rate.unwrap() < VETO_THRESHOLD);
         assert!(!veto.vetoed, "not audited-safe => never hard-vetoed");
         assert!(veto.advisory_low);
+    }
+
+    // === veto_shape_fallback (spec 2026-06-12-veto-shape-fallback) ===
+
+    fn opts(vals: &[&'static str]) -> Vec<Option<&'static str>> {
+        vals.iter().map(|v| Some(*v)).collect()
+    }
+
+    #[test]
+    fn fallback_id_shape_on_generic_ids() {
+        // The gold mechanism: msg/wfo-style ids asserted as h3/hash, vetoed.
+        let msg = opts(&["msg24159928", "msg24161498", "msg24168398", "msg24173983"]);
+        assert_eq!(
+            veto_shape_fallback(&msg),
+            Some("representation.identifier.alphanumeric_id")
+        );
+        let wfo = opts(&["wfo-4000021847", "wfo-0001278270", "wfo-0000891258"]);
+        assert_eq!(
+            veto_shape_fallback(&wfo),
+            Some("representation.identifier.alphanumeric_id")
+        );
+    }
+
+    #[test]
+    fn fallback_vocab_shape_on_small_repeating_vocabulary() {
+        let vocab = opts(&[
+            "comment", "story", "comment", "comment", "story", "comment",
+        ]);
+        assert_eq!(
+            veto_shape_fallback(&vocab),
+            Some("representation.discrete.categorical")
+        );
+    }
+
+    #[test]
+    fn fallback_none_on_free_text() {
+        // Mostly distinct but no letter+digit mix — not an id, not a vocab.
+        let text = opts(&["alpha", "bravo", "charlie", "delta", "echo"]);
+        assert_eq!(veto_shape_fallback(&text), None);
+    }
+
+    #[test]
+    fn fallback_none_on_pure_numeric_ids() {
+        // Distinct numerics carry no letter — numeric territory, not alnum.
+        let nums = opts(&["10234", "10235", "10240", "10299"]);
+        assert_eq!(veto_shape_fallback(&nums), None);
+    }
+
+    #[test]
+    fn fallback_none_on_constant_and_short_columns() {
+        let constant = opts(&["s", "s", "s", "s", "s"]);
+        assert_eq!(veto_shape_fallback(&constant), None, "1 distinct value");
+        let short = opts(&["ab1", "cd2"]);
+        assert_eq!(veto_shape_fallback(&short), None, "below n>=3 floor");
+        let empties: Vec<Option<&str>> = vec![Some("  "), None, Some("")];
+        assert_eq!(veto_shape_fallback(&empties), None);
+    }
+
+    #[test]
+    fn fallback_none_on_wide_vocabularies() {
+        // 13 distinct repeating values — beyond the <=12 vocab ceiling.
+        let mut vals: Vec<&'static str> = vec![
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+        ];
+        vals.extend_from_slice(&["a", "b", "c", "d", "e", "f", "g"]);
+        assert_eq!(veto_shape_fallback(&opts(&vals)), None);
     }
 }

@@ -34,7 +34,8 @@ pub use taxonomy::{
 };
 pub use tokenizer::Tokenizer;
 pub use validation_veto::{
-    audited_safe_labels, evaluate_validation_veto, ValidationVeto, VETO_THRESHOLD,
+    audited_safe_labels, evaluate_validation_veto, veto_shape_fallback, ValidationVeto,
+    VETO_THRESHOLD,
 };
 pub use validator::{
     validate_column, validate_column_for_label, validate_value, validate_value_for_label,
