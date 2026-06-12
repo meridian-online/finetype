@@ -30,7 +30,10 @@ canonical scoring lens. Against the stable gated oracle, latdec's new latitude c
 are not "hidden on ydf=NULL" — they sit on columns the oracle positively labels
 decimal (421 of 457 sample moves; 36 silent). Three bands read the scaled flows:
 
-  over_emit  — est. candidate marginal / v19 marginal >= rel-mult            (v23: +529%)
+  over_emit  — (est. candidate marginal − oracle-CONFIRMED correct growth)
+               / v19 marginal >= rel-mult — composition-aware so stacked
+               honest fixes cannot trip it while relocation still does
+               (refined/composition_aware_over_emit.md)                      (v23: +529%)
   collapse   — oracle-CONFIRMED candidate support / v19 confirmed support
                <= collapse-frac (a loss of CORRECT mass, not raw marginal)    (v22: country)
   oracle_fp  — CREATED false positives: a move A->B the oracle refutes (oracle
@@ -211,8 +214,18 @@ def main() -> int:
         # not of raw marginal (demoting an over-emitted label is not a collapse).
         bc, cc = base_correct[b], cand_correct[b]
         correct_ratio = (cc / bc) if bc else (float("inf") if cc else 1.0)
+        # over_emit is composition-aware (author-accepted 2026-06-12, sibling
+        # of the 0.6.24 oracle-aware refinement): growth the oracle CONFIRMS
+        # as correct is netted out of the ratio, so stacked honest fixes in
+        # one direction cannot trip the band while relocation still does.
+        # v23's explosion stays caught: its categorical growth was oracle-
+        # refuted, not confirmed, so netting confirmed growth changes nothing
+        # for it (four-verdict reproduction re-run with this band — see
+        # output/corpus-honest-gate/refined/composition_aware_over_emit.md).
+        confirmed_growth = max(0.0, cc - bc)
+        adj_ratio = ((em - confirmed_growth) / v19m) if v19m else ratio
         bands = []
-        if v19m >= args.marginal_floor and ratio >= args.rel_mult:
+        if v19m >= args.marginal_floor and adj_ratio >= args.rel_mult:
             bands.append("over_emit")
         if bc >= args.collapse_correct_floor and correct_ratio <= args.collapse_frac:
             bands.append("collapse")
@@ -226,6 +239,7 @@ def main() -> int:
         rows.append({
             "label": b, "v19_marginal": v19m,
             "est_cand_marginal": round(em), "ratio": round(ratio, 3),
+            "adj_ratio": round(adj_ratio, 3),
             "base_correct": round(bc), "cand_correct": round(cc),
             "correct_ratio": round(correct_ratio, 3),
             "contra_in": round(contra_in[b]), "contra_out": round(contra_out[b]),

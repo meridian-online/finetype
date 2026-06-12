@@ -74,13 +74,32 @@ acceptance_criteria:
   description: |
     Corpus-honest gate GO (BLOCKING, H05) on the stratified sample with
     oracle-aware bands. NO-GO blocks the ship regardless of ac-02.
+    ROUND 1 (broad text-family rule): NO-GO — 47,785 oracle-refuted moves;
+    entity_name (3,752 observed) and plain_text (2,115) columns are
+    genuinely entities/prose at corpus scale. Re-scoped to word-only (gold
+    +7 instead of +12 — the 5 columns given back were the price of 5,867
+    corpus errors).
+    ROUND 2 (word-only): raw over_emit 3.152x tripped by STACKING (0.6.28's
+    passed 2.61x + R32's increment) with oracle-refuted count 1,154 =
+    identical to the passed baseline. Author-accepted amendment: over_emit
+    made composition-aware (nets oracle-CONFIRMED growth; adj_ratio 2.26x).
+    Verdict preservation re-run: v19self GO, latdec NO-GO, 0.6.28 GO,
+    broad-R32 STAYS NO-GO (negative control — relocation still caught),
+    word-R32 GO. v22/v23 preserved analytically (oracle_fp legs untouched;
+    their growth was refuted, not confirmed). Doc:
+    output/corpus-honest-gate/refined/composition_aware_over_emit.md.
+    FINAL: GO.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
     Ship decision recorded; on double-green release 0.6.29 via the runbook,
     CHANGELOG + CLAUDE.md updated. On failure, record and do not ship.
+    SHIP DECISION 2026-06-12: GO — gold 662 -> 669 (0.711 -> 0.719),
+    categorical R 0.396 -> 0.465 / P 0.870, zero regressions; corpus-honest
+    GO under the composition-aware band with full verdict preservation.
+    Author approved the band amendment explicitly.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.29] - 2026-06-12
+
+### Added
+
+- **Word vocabulary override (R32)** (spec `2026-06-12-text-vocab-override`):
+  a column labelled `representation.text.word` that repeats a small
+  vocabulary (2–12 distinct, ≤60% distinct ratio) now profiles as
+  `representation.discrete.categorical` — the missing correction for the
+  no-validator text family. Gold corpus: 662 → 669 of 931 (0.711 → 0.719),
+  categorical recall 0.396 → 0.465 with precision up (0.870), zero
+  regressions. Deliberately scoped to `word` only: the corpus-honest gate
+  measured that low-cardinality entity_name/plain_text columns are usually
+  genuinely entities/prose (5,867 oracle-refuted moves in the broad
+  variant, which was rejected).
+
+### Changed
+
+- **Corpus-honest gate `over_emit` band is composition-aware** (sibling of
+  the 0.6.24 oracle-aware refinement): oracle-confirmed correct growth is
+  netted out of the ratio, so consecutive honest fixes in one direction
+  cannot stack into a false NO-GO while relocation is still caught in full.
+  All preserved verdicts re-validated, including the broad-R32 negative
+  control (`output/corpus-honest-gate/refined/composition_aware_over_emit.md`).
+
 ## [0.6.28] - 2026-06-12
 
 ### Added
