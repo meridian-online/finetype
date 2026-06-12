@@ -1,0 +1,48 @@
+{
+  "column_size": 50,
+  "min_values": 5,
+  "seed": 42,
+  "documented_distilled_cap": 600,
+  "total_columns": 100,
+  "total_values": 5000,
+  "per_type": {
+    "geography.coordinate.latitude": {
+      "distinct_values": 21436,
+      "columns": 50,
+      "values_in_columns": 2500
+    },
+    "geography.coordinate.longitude": {
+      "distinct_values": 29137,
+      "columns": 50,
+      "values_in_columns": 2500
+    }
+  },
+  "categorical_columns": 0,
+  "firewall_decimated_types": [
+    "datetime.component.day_of_week",
+    "datetime.component.month_name",
+    "datetime.date.abbreviated_month",
+    "finance.currency.currency_code",
+    "finance.currency.currency_symbol",
+    "geography.address.postal_code",
+    "geography.address.street_name",
+    "geography.address.street_suffix",
+    "geography.location.city",
+    "geography.location.continent",
+    "geography.location.country",
+    "geography.location.country_code",
+    "geography.location.region",
+    "geography.location.state_code",
+    "identity.person.blood_type",
+    "identity.person.gender_code",
+    "technology.code.locale_code",
+    "technology.internet.http_method",
+    "technology.internet.top_level_domain"
+  ],
+  "blend": {
+    "base": "output/distillation-v3/sherlock_distilled.csv.gz",
+    "base_rows": 102461,
+    "mfg_rows": 100,
+    "blend_out": "output/mining-factory/coord-only/sherlock_distilled_coords.csv.gz"
+  }
+}
