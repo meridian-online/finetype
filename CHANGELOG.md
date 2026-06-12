@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.28] - 2026-06-12
+
+### Added
+
+- **Veto shape-fallback** (spec `2026-06-12-veto-shape-fallback`): when the
+  validation veto hard-rejects a Sense assertion, the column's value shape
+  now decides between the two residual labels instead of an unconditional
+  `unknown` — mostly-distinct letter+digit values fall back to
+  `representation.identifier.alphanumeric_id`; a small repeated vocabulary
+  falls back to `representation.discrete.categorical`. Gold corpus: 635 →
+  662 of 931 (0.682 → 0.711), alphanumeric_id recall 0.111 → 0.593 with
+  precision held, zero per-label regressions. Corpus-honest gate GO with
+  zero bands fired (alphanumeric_id's oracle-contradicted count net
+  NEGATIVE — the fallback removes more wrong assertions than it adds).
+  Recorded in profile output as `veto_fallback:id` / `veto_fallback:vocab`;
+  disable with `FINETYPE_NO_VETO_FALLBACK=1`.
+
 ## [0.6.27] - 2026-06-10
 
 The first release whose accuracy claims are verified against human-checked

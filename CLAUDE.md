@@ -43,7 +43,7 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 
 ## Project state
 
-**Version:** 0.6.27
+**Version:** 0.6.28
 **Taxonomy:** 240 definitions across 7 domains (container 11, datetime 84, finance 28, geography 25, identity 33, representation 33, technology 26) — all generators pass, 100% alignment.
 **Shipped default Sense-stage model:** `models/default` → **`sherlock-v19-relu-s42`** (multi-branch, inside the Sense→Sharpen pipeline). This is what every `finetype` invocation runs unless `FINETYPE_MODEL` overrides it. v19 baseline profile eval = 369/448 on the 448-row manifest.
 **Campaign head (NOT shipped):** `sherlock-v22-boundary-relu-s44` is the newest trained multi-branch model (5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9305) and the training-target baseline the corpus diagnostic ran against. **Promotion to default was deferred** (spec `2026-05-26-v22-gated-direction-review`): gated cell-2 vs v19 = **−10.4% (Partial band)** on 503k columns — country **−31.5%**, region −12.8%, city −10.2% per `output/v22-direction-review/` — and it is not published to HuggingFace. So the diagnostic's gaps are *v22* false positives; on the shipped v19 default they may differ (re-baseline before treating them as ground truth — see v24 ac-00). Original Sense implementation remains in code as an alternative.
@@ -55,6 +55,8 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 **The gold corpus shipped — FineType's accuracy is now scored against human-verified truth (card 0019, spec `2026-06-10-human-verified-gold-corpus`, choice 0095).** 931 verified columns (`eval/gold/gold_corpus_v1.tsv`), leakage-firewalled (`make leakage-guard`), per-row provenance (anchor / lens-consensus / llm-2panel / author tiers). **v19 baseline = 610/931 = 0.655 (95% CI 0.624–0.685)** — the number every candidate must beat (`output/gold-corpus/baseline_v19.md`).
 
 **First gold-gated fix shipped (0.6.27):** the postal header-veto (`header_hint_postal_veto`, spec `2026-06-10-postal-header-veto`) — postal precision 0.133→0.667 on gold, recall held, verified headline 0.655→0.682, corpus-honest gate GO. Second consecutive ship on the 0094 header-corroboration pattern.
+
+**Third gold-gated fix shipped (0.6.28):** the veto shape-fallback (`veto_shape_fallback`, spec `2026-06-12-veto-shape-fallback`) — when the validation veto hard-rejects a Sense assertion, value shape decides between alphanumeric_id (high-cardinality letter+digit) and categorical (small repeating vocab) instead of unconditional unknown. Gold headline 0.682→**0.711**, alphanumeric_id recall 0.111→0.593 (P held 0.842), zero regressions, corpus-honest GO with alnum's oracle-contradicted count net NEGATIVE. Born from the v27 retrain's Failed-informative close: **categorical is a residual category and cannot be trained as a flat-softmax shape class** (memory `categorical-is-a-residual-category`; the `COLUMN_LEVEL_TYPES` guard in `prepare_multibranch_data.py` is load-bearing). Also discovered: per-type distilled caps were cosmetic for v4-format training (memo `2026-06-12-ordered-distilled-cap-bug`).
 
 What the first verified reading shows (the new target list):
 - **postal_code precision 0.133** (worst over-emitter measured), **state_code P=R=0.000** (wholly unhandled family), **categorical recall 0.390** at support 100 (largest miss-pool), **alphanumeric_id recall 0.113**, city over-emit (P=0.667, R=1.0). Coordinates/dates/decimals/booleans hold at P≈1.0.

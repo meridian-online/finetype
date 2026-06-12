@@ -94,8 +94,15 @@ acceptance_criteria:
     predictions on the ac-01 stratified sample vs the stable gated-YDF
     oracle with the oracle-aware bands. A NO-GO blocks the ship regardless
     of ac-02's headline.
+    CLOSED 2026-06-12: GO (output/corpus-honest-gate/gate_veto-fallback.json;
+    sample pass 33,007 files, 0.7% errors, 24 min). Target-label readings:
+    categorical marginal 2.61x BUT oracle-CONFIRMED correct 1.77x (+30,439)
+    with contra_in only 1,154 — honest growth the oracle-aware bands
+    correctly pass; alphanumeric_id 1.08x with net contra_in NEGATIVE
+    (-204; the fallback removes more oracle-refuted assertions than it
+    adds). Zero bands fired.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
@@ -103,6 +110,10 @@ acceptance_criteria:
     via the release runbook (binary release; no model artefact changes) and
     update CLAUDE.md project state + CHANGELOG. On any gate failure, record
     the evidence and do not ship.
+    SHIP DECISION 2026-06-12: GO — double-green (ac-02 gold +27 columns,
+    zero regressions; ac-03 corpus-honest GO, zero bands). Version bumped
+    0.6.28, CHANGELOG + CLAUDE.md updated, 246 tests green. Binary release
+    via the runbook pending author confirmation (deliberate action).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
