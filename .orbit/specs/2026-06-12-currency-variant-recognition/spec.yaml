@@ -28,10 +28,18 @@ acceptance_criteria:
   ac_type: doc
 - id: ac-02
   description: |
-    FIXTURE. Correct eval/datasets/csv/multilingual.csv price column to
-    representative CLDR de-DE ("9.140,88 €" with the thousands dot), so the
-    fixture exercises a real eurozone shape that a variant validator accepts.
-    Validators untouched. This is the npi-class half of the fix.
+    FIXTURE — do NOT mutate multilingual.csv. Investigation found it is a
+    COHERENT per-row-locale table: each row carries locale + country columns
+    and its price format matches them (de-DE rows euro, pt-BR rows R$, en-US
+    rows $). The price column honestly mixes three formats because the rows
+    span three countries — realistic, not a torture test. Mutating price to
+    single-locale would desync it from locale/country. Instead: (1) ADD a new
+    single-locale euro fixture (e.g. eval/datasets/csv/de_prices.csv, CLDR
+    "9.140,88 €" with thousands dots) that the selector resolves to
+    amount_comma_suffix; (2) leave multilingual.csv as the multi-locale case
+    and set its price EXPECTED output to the honest answer (generic
+    finance.currency.amount family OR decimal_number — author's (a)/(b)/(c)
+    call, deferred, low priority). Validators untouched.
   gate: false
   checked: false
   ac_type: config
