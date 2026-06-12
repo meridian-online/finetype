@@ -18,6 +18,8 @@ GOLD="eval/gold/gold_corpus_v1.tsv"
 COLS="eval/gittables/corpus_pass/columns.parquet"
 SEEDS=(42 43 44)
 LOG="$LFDIR/eval.log"
+# gold scorer + snapshot need pyarrow/duckdb from the gittables venv, not system python3.
+VPY="eval/gittables/.venv/bin/python"
 exec > >(tee -a "$LOG") 2>&1
 
 echo "================================================================"
@@ -42,15 +44,15 @@ echo "$BEST_SEED" > "$LFDIR/best_seed.txt"
 # ── 1. Gold anchor ──────────────────────────────────────────────────────
 echo ""; echo "── [1/4] Gold anchor ──"
 GOLD_PRED="$LFDIR/predictions_mfg-localefmt.tsv"
-FINETYPE_MODEL="$MODEL" python3 scripts/score_gold_anchor.py predict \
+FINETYPE_MODEL="$MODEL" "$VPY" scripts/score_gold_anchor.py predict \
     --gold "$GOLD" --columns "$COLS" --binary "$BIN" --out "$GOLD_PRED" || echo "  predict failed"
-python3 scripts/score_gold_anchor.py score \
+"$VPY" scripts/score_gold_anchor.py score \
     --gold "$GOLD" --predictions "$GOLD_PRED" \
     --model-name "mfg-localefmt-s${BEST_SEED}" --out-dir "$LFDIR" || echo "  score failed"
 
 # ── 2. Sense pre/post (mandatory post-train check) ──────────────────────
 echo ""; echo "── [2/4] Sense distribution drift vs v19 ──"
-FINETYPE_MODEL="$MODEL" python3 scripts/snapshot_sense_distribution.py \
+FINETYPE_MODEL="$MODEL" "$VPY" scripts/snapshot_sense_distribution.py \
     --label mfg-localefmt-full \
     --file-list output/destination-drift-precheck/sense_dist_v19fx_s42.files.txt \
     --out-dir "$LFDIR" || echo "  snapshot failed"

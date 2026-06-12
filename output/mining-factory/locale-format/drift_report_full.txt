@@ -1,0 +1,27 @@
+drift report: v19fx_s42 (n=13533) -> mfg-localefmt-full (n=13533)
+band: |Δrate| >= 0.400pp AND move >= 3.00×
+
+label                                                  base         cand      Δpp       ×  flag
+-----------------------------------------------------------------------------------------------
+container.array.comma_separated                  404/ 2.99%     6/ 0.04%  -2.941   0.02×  
+representation.discrete.categorical              231/ 1.71%   572/ 4.23%  +2.520   2.47×  
+technology.internet.user_agent                    45/ 0.33%   376/ 2.78%  +2.446   8.27×  NO-GO
+unknown                                         1470/10.86%  1308/ 9.67%  -1.197   0.89×  
+representation.text.word                         359/ 2.65%   199/ 1.47%  -1.182   0.55×  
+technology.internet.top_level_domain             163/ 1.20%     4/ 0.03%  -1.175   0.03×  
+representation.text.plain_text                   847/ 6.26%   987/ 7.29%  +1.035   1.17×  
+representation.identifier.increment              699/ 5.17%   830/ 6.13%  +0.968   1.19×  
+representation.numeric.integer_number           1752/12.95%  1874/13.85%  +0.902   1.07×  
+representation.identifier.numeric_code           100/ 0.74%     6/ 0.04%  -0.695   0.06×  
+representation.identifier.alphanumeric_id        104/ 0.77%   191/ 1.41%  +0.643   1.83×  
+identity.commerce.isbn                            13/ 0.10%    64/ 0.47%  +0.377   4.78×  
+geography.address.postal_code                     45/ 0.33%    10/ 0.07%  -0.259   0.23×  
+representation.text.entity_name                  457/ 3.38%   489/ 3.61%  +0.236   1.07×  
+representation.identifier.uuid                    57/ 0.42%    26/ 0.19%  -0.229   0.46×  
+representation.numeric.decimal_number           4234/31.29%  4263/31.50%  +0.214   1.01×  
+identity.medical.npi                              77/ 0.57%    49/ 0.36%  -0.207   0.64×  
+datetime.component.periodicity                    24/ 0.18%     0/ 0.00%  -0.177   0.02×  
+representation.discrete.ordinal                  152/ 1.12%   133/ 0.98%  -0.140   0.88×  
+geography.location.region                         38/ 0.28%    54/ 0.40%  +0.118   1.42×  
+
+VERDICT: NO-GO — 1 label(s) drifted beyond the band: technology.internet.user_agent
