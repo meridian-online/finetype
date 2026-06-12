@@ -52,7 +52,7 @@ goal: |
   blocks the ship regardless of the gold headline (H05).
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - recall
 - sharpen
@@ -117,3 +117,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-12T01:28:47.84863Z
