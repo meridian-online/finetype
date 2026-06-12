@@ -60,3 +60,36 @@ pass-rate against each is the selector.
 - The model still won't recognise currency without a header signal; this fix
   improves the *hinted* path and the *already-currency* path, not bare decimals.
   Teaching the model the euro shape is a separate (training) lever.
+
+## DECISIVE FINDING (supersedes the single-variant fix sketch above)
+
+The `multilingual.csv` price column is an even THREE-WAY locale split, 20 each:
+- US: 33% match the US `amount` validator (`$…` / plain comma-thousands)
+- euro-suffix: `9140,88 €` (de-DE)
+- real-prefix: `R$ 22871,99` (pt-BR `amount_multisym`)
+
+No single `amount_*` variant exceeds **33%** coverage — and CLDR-correcting the
+euro third still leaves 33/33/33. So a value-aware variant selector (the ac-03
+sketch) CANNOT resolve this column: no variant clears a 50% sample threshold,
+by construction.
+
+**This reframes "price false-veto".** The hard veto on `finance.currency.amount`
+(33% pass) is arguably HONEST: two-thirds of the values are not US amounts. A
+column mixing three currency locales has no single correct leaf type. So the
+question is a semantics decision the audit never surfaced, not a bug to patch:
+
+**What SHOULD a multi-locale currency column profile as?**
+- (a) `finance.currency.amount` as a family representative — but its validator is
+  US-specific (samples are all `$/£` comma-thousands), so this needs a taxonomy
+  notion of a format-agnostic currency parent that does not exist today.
+- (b) `unknown` / `decimal_number` — honest "no single type" (≈ current).
+- (c) A new family-level `finance.currency.amount` semantics / mixed type.
+- (d) The fixture is unrealistic — real currency columns are single-locale; make
+  multilingual.csv single-locale (de-DE euro, CLDR-correct) and a value-aware
+  selector then correctly emits `amount_comma_suffix`. Defeats the fixture's
+  multi-locale test intent.
+
+Recommendation: (d) for the engine win that generalises (single-locale currency
+columns are the real-world case and the selector handles them precisely), keeping
+a separate, smaller fixture for the genuine multi-locale case whose EXPECTED
+output is whatever (a)–(c) the author picks. Blocked on the author's call.
