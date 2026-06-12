@@ -3919,7 +3919,11 @@ fn resolve_veto_outcome(
                 } else {
                     "veto_fallback:vocab"
                 };
-                return (fallback.to_string(), Some(predicted.to_string()), Some(rule));
+                return (
+                    fallback.to_string(),
+                    Some(predicted.to_string()),
+                    Some(rule),
+                );
             }
         }
     }

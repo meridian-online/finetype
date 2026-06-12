@@ -138,8 +138,7 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
         let mixed = non_null
             .iter()
             .filter(|v| {
-                v.chars().any(|c| c.is_ascii_alphabetic())
-                    && v.chars().any(|c| c.is_ascii_digit())
+                v.chars().any(|c| c.is_ascii_alphabetic()) && v.chars().any(|c| c.is_ascii_digit())
             })
             .count();
         if mixed as f64 / n as f64 >= 0.6 {
@@ -283,9 +282,7 @@ identity.person.gender_code:
 
     #[test]
     fn fallback_vocab_shape_on_small_repeating_vocabulary() {
-        let vocab = opts(&[
-            "comment", "story", "comment", "comment", "story", "comment",
-        ]);
+        let vocab = opts(&["comment", "story", "comment", "comment", "story", "comment"]);
         assert_eq!(
             veto_shape_fallback(&vocab),
             Some("representation.discrete.categorical")
