@@ -2452,6 +2452,24 @@ impl ColumnClassifier {
             return;
         }
 
+        // Value-grounded gender sibling is authoritative over the header hint.
+        // value_sharpen's gender_detection routes a bare M/F column to
+        // gender_code; the VALUES (not the "gender"/"sex" header) distinguish the
+        // single-char code from the word type. A same-family header hint agrees
+        // it is gender — so it must not override the sibling the values chose.
+        // Without this, the same-category / hardcoded-authority overrides revert
+        // gender_code → gender and the validation veto then rejects M/F (0% pass)
+        // — the two-deterministic-steps-fighting trap the deterministic-layer
+        // audit flagged. Per spec 2026-06-12-false-veto-trio-resolution.
+        if result.disambiguation_rule.as_deref() == Some("gender_detection")
+            && matches!(
+                hinted_type,
+                "identity.person.gender" | "identity.person.gender_code"
+            )
+        {
+            return;
+        }
+
         // Measurement disambiguation: height/weight
         const MEASUREMENT_TYPES: &[&str] = &["identity.person.height", "identity.person.weight"];
         const COORDINATE_TYPES: &[&str] = &[
@@ -4092,6 +4110,22 @@ fn disambiguate_gender(values: &[String]) -> Option<String> {
 
     if non_empty.len() < 3 {
         return None;
+    }
+
+    // Single-character alpha sex codes (ICAO Doc 9303: M/F/X) are gender_code,
+    // not gender. The gender enum is the word set [male,female,other,unknown],
+    // so a column of bare M/F validates against gender_code's enum
+    // [M,F,X,0,1,2,9] and is hard-vetoed against gender. Alpha-only: the
+    // ISO-5218 numeric codes (0/1/2/9) are deliberately NOT a value-only
+    // trigger — they would over-emit gender_code onto every boolean/ordinal
+    // numeric column (boolean_subtype owns 0/1 and runs first). Per the
+    // deterministic-layer audit false-veto resolution (spec
+    // 2026-06-12-false-veto-trio-resolution).
+    let all_code = non_empty
+        .iter()
+        .all(|v| matches!(v.to_ascii_uppercase().as_str(), "M" | "F" | "X"));
+    if all_code {
+        return Some("identity.person.gender_code".to_string());
     }
 
     let all_gender = non_empty.iter().all(|v| GENDER_VALUES.contains(v));
@@ -6377,14 +6411,53 @@ mod tests {
     }
 
     #[test]
-    fn test_gender_detection_single_char() {
+    fn test_gender_detection_single_char_is_gender_code() {
+        // Bare single-char sex codes (ICAO M/F/X) are gender_code, not gender:
+        // they validate against [M,F,X,0,1,2,9], not the word enum
+        // [male,female,other,unknown] which would hard-veto them.
         let values: Vec<String> = vec!["M", "F", "M", "F", "M", "F", "M", "F", "M", "F"]
             .into_iter()
             .map(String::from)
             .collect();
 
         let result = disambiguate_gender(&values);
+        assert_eq!(result, Some("identity.person.gender_code".to_string()));
+    }
+
+    #[test]
+    fn test_gender_detection_single_char_mixed_case_with_x() {
+        let values: Vec<String> = vec!["m", "f", "X", "M", "f", "x", "F"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(result, Some("identity.person.gender_code".to_string()));
+    }
+
+    #[test]
+    fn test_gender_detection_word_and_code_mix_stays_gender() {
+        // Mixed word + single-char (not all single-char) -> word type gender.
+        let values: Vec<String> = vec!["male", "M", "female", "F", "male"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_gender(&values);
         assert_eq!(result, Some("identity.person.gender".to_string()));
+    }
+
+    #[test]
+    fn test_gender_detection_numeric_codes_do_not_fire() {
+        // ISO-5218 numerics are NOT a value-only trigger (boolean/ordinal
+        // over-emit guard) — a bare 0/1/2 column must not become gender_code.
+        let values: Vec<String> = vec!["0", "1", "2", "1", "0", "2"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let result = disambiguate_gender(&values);
+        assert_eq!(result, None);
     }
 
     #[test]

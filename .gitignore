@@ -294,3 +294,9 @@ output/v27-recall-retrain/sherlock_distilled_v27.csv.gz
 # v27/R32-era sample-pass outputs — regenerable via gittables_corpus_pass.py (verdict JSONs tracked in output/corpus-honest-gate/)
 output/text-vocab-override/
 output/veto-fallback/
+
+# False-veto-trio gender fix sample pass — regenerable via gittables_corpus_pass.py
+# over stratified_sample.files.txt (verdict JSON tracked in output/corpus-honest-gate/).
+output/false-veto-trio/sample_pass/
+output/false-veto-trio/sample_pass.err
+output/false-veto-trio/sample_pass.out
