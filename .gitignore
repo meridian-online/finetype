@@ -290,3 +290,7 @@ output/postal-veto/sample_pass.out
 
 # v27 recall blend CSV — regenerable via scripts/build_v27_recall_distilled.py
 output/v27-recall-retrain/sherlock_distilled_v27.csv.gz
+
+# v27/R32-era sample-pass outputs — regenerable via gittables_corpus_pass.py (verdict JSONs tracked in output/corpus-honest-gate/)
+output/text-vocab-override/
+output/veto-fallback/
