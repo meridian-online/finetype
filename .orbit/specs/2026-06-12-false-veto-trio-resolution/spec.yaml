@@ -49,7 +49,7 @@ acceptance_criteria:
     for the fixture). Validator UNTOUCHED. medical_records npi then profiles
     to identity.healthcare.npi (or its taxonomy id) without the veto firing.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-04
   description: |
