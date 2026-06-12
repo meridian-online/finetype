@@ -230,6 +230,152 @@ def manufacture_datetime(rows: list, rng: random.Random) -> None:
                      "datetime.date.abbreviated_month", src, locale)
 
 
+# ────────────────────────────────────────────────────────────────────
+#  Currency amount locale-format variants (CLDR number formats)
+#  spec 2026-06-12-currency-variant-recognition ac-02. The 12 amount_*
+#  format variants are absent from the synthetic training templates — the
+#  model has never seen a euro/real/lakh amount and votes decimal_number.
+#  Manufacture them from deterministic number-format rules (per-locale
+#  grouping separator, decimal separator, symbol position). Each formatter
+#  was verified to satisfy its taxonomy validator 300/300; the precision
+#  funnel is the authoritative check downstream.
+# ────────────────────────────────────────────────────────────────────
+
+def _grp(n: int, sep: str) -> str:
+    """Western 3-digit thousands grouping with `sep`."""
+    s = str(n)
+    parts = []
+    while len(s) > 3:
+        parts.insert(0, s[-3:])
+        s = s[:-3]
+    parts.insert(0, s)
+    return sep.join(parts)
+
+
+def _grp_lakh(n: int) -> str:
+    """Indian grouping: rightmost 3 digits, then 2-digit groups (12,34,567)."""
+    s = str(n)
+    if len(s) <= 3:
+        return s
+    last3, rest = s[-3:], s[:-3]
+    groups = []
+    while len(rest) > 2:
+        groups.insert(0, rest[-2:])
+        rest = rest[:-2]
+    if rest:
+        groups.insert(0, rest)
+    return ",".join(groups + [last3])
+
+
+def manufacture_currency_amounts(rows: list, rng: random.Random,
+                                 per_variant: int = 800) -> None:
+    src = "cldr-numfmt"
+
+    # (type, locale, list of formatters). Multiple symbols per variant teach the
+    # FORMAT (grouping/decimal/symbol-position), not one symbol.
+    def suffix(sym):
+        return lambda i, c: f"{_grp(i, '.')},{c:02d} {sym}"
+
+    def multisym(sym):
+        return lambda i, c: f"{sym} {_grp(i, '.')},{c:02d}"
+
+    def nodec(sym):
+        return lambda i, *_: f"{sym}{_grp(i, ',')}"  # no decimal part
+
+    variants = [
+        ("finance.currency.amount_comma_suffix", "de",
+         [suffix("€"), suffix("£"), suffix("kr")]),
+        ("finance.currency.amount_comma", "de",
+         [lambda i, c: f"€{_grp(i, '.')},{c:02d}",
+          lambda i, c: f"{_grp(i, '.')},{c:02d} €"]),
+        ("finance.currency.amount_space", "fr",
+         [lambda i, c: f"{_grp(i, ' ')},{c:02d} €",
+          lambda i, c: f"{_grp(i, ' ')},{c:02d} kr"]),
+        ("finance.currency.amount_multisym", "pt-BR",
+         [multisym("R$"), multisym("kr"), multisym("zł"),
+          multisym("Kč"), multisym("Ft")]),
+        ("finance.currency.amount_apostrophe", "de-CH",
+         [lambda i, c: f"CHF {_grp(i, chr(39))}.{c:02d}",
+          lambda i, c: f"{_grp(i, chr(39))}.{c:02d} CHF"]),
+        ("finance.currency.amount_lakh", "en-IN",
+         [lambda i, c: f"₹{_grp_lakh(i)}.{c:02d}"]),
+        ("finance.currency.amount_nodecimal", "ja",
+         [nodec("¥"), nodec("₩")]),
+        ("finance.currency.amount_accounting", "en-US",
+         [lambda i, c: f"(${_grp(i, ',')}.{c:02d})",
+          lambda i, c: f"${_grp(i, ',')}.{c:02d}"]),
+        ("finance.currency.amount_neg_trailing", "en-US",
+         [lambda i, c: f"${_grp(i, ',')}.{c:02d}-",
+          lambda i, c: f"{_grp(i, ',')}.{c:02d} CR",
+          lambda i, c: f"{_grp(i, ',')}.{c:02d} DR"]),
+        ("finance.currency.amount_code_prefix", "und",
+         [lambda i, c: f"{code} {_grp(i, ',')}.{c:02d}"
+          for code in ("USD", "EUR", "GBP", "JPY")]),
+    ]
+
+    for type_key, locale, fmts in variants:
+        for n in range(per_variant):
+            i = rng.randint(1000, 9_999_999)
+            c = rng.randint(0, 99)
+            fmt = fmts[n % len(fmts)]
+            emit(rows, fmt(i, c), type_key, src, locale)
+
+
+# ────────────────────────────────────────────────────────────────────
+#  Datetime locale-format dates (CLDR month/weekday names composed)
+#  spec 2026-06-12-currency-variant-recognition ac-02. Co-traveller of the
+#  currency variants: long_full_month / weekday_abbreviated_month /
+#  weekday_full_month are absent from training (only month_name/day_of_week
+#  ship). Compose dates from CLDR names; self-validate against the taxonomy
+#  pattern so only Latin-script (validator-passing) locales emit.
+# ────────────────────────────────────────────────────────────────────
+
+def _load_cldr_names(fname: str, n_names: int) -> dict:
+    """locale -> {width: [names]} for the first n_names columns."""
+    out: dict = defaultdict(dict)
+    for parts in _read_cldr(CLDR_DIR / fname):
+        locale, width = parts[0], parts[1]
+        out[locale][width] = parts[2:2 + n_names]
+    return out
+
+
+def manufacture_datetime_locale_dates(rows: list, rng: random.Random,
+                                      per_locale: int = 12) -> None:
+    src = "cldr"
+    months = _load_cldr_names("cldr_month_names.tsv", 12)
+    weekdays = _load_cldr_names("cldr_weekday_names.tsv", 7)
+
+    def ascii_alpha(s: str) -> bool:
+        return s.replace(" ", "").isascii() and any(ch.isalpha() for ch in s)
+
+    for locale, mw in months.items():
+        wide_m = mw.get("wide", [])
+        abbr_m = mw.get("abbreviated", [])
+        ww = weekdays.get(locale, {}).get("wide", [])
+        for _ in range(per_locale):
+            day = rng.randint(1, 28)
+            year = rng.randint(1970, 2025)
+            mi = rng.randrange(12)
+            wd = ww[rng.randrange(7)] if ww else ""  # draw ONCE, validate + emit the same
+            fm = wide_m[mi] if wide_m else ""
+            am = abbr_m[mi] if abbr_m else ""
+            # long_full_month: "January 15, 2024" / "15 January 2024"
+            if fm and ascii_alpha(fm):
+                v = (f"{fm} {day}, {year}" if rng.random() < 0.5
+                     else f"{day} {fm} {year}")
+                emit(rows, v, "datetime.date.long_full_month", src, locale)
+            # weekday_full_month: "Monday, January 15, 2024"
+            if fm and wd and ascii_alpha(fm) and ascii_alpha(wd):
+                v = (f"{wd}, {fm} {day}, {year}" if rng.random() < 0.5
+                     else f"{wd}, {day} {fm} {year}")
+                emit(rows, v, "datetime.date.weekday_full_month", src, locale)
+            # weekday_abbreviated_month: "Monday, Jan 15, 2024"
+            if am and wd and ascii_alpha(am) and ascii_alpha(wd):
+                v = (f"{wd}, {am} {day}, {year}" if rng.random() < 0.5
+                     else f"{wd}, {day} {am} {year}")
+                emit(rows, v, "datetime.date.weekday_abbreviated_month", src, locale)
+
+
 def manufacture_locale_codes(rows: list) -> None:
     """BCP-47 / ISO 639 locale identifiers — the CLDR locale set (706) is the
     authoritative vocabulary, far richer than the embedded generator stub (29)."""
@@ -315,6 +461,22 @@ ALL_TIER1_TYPES = [
     "finance.currency.currency_symbol",
     "identity.person.gender_code",
     "identity.person.blood_type",
+    # Locale-format family — spec 2026-06-12-currency-variant-recognition.
+    # Currency amount format variants (CLDR number formats):
+    "finance.currency.amount_comma",
+    "finance.currency.amount_comma_suffix",
+    "finance.currency.amount_space",
+    "finance.currency.amount_multisym",
+    "finance.currency.amount_apostrophe",
+    "finance.currency.amount_lakh",
+    "finance.currency.amount_nodecimal",
+    "finance.currency.amount_accounting",
+    "finance.currency.amount_neg_trailing",
+    "finance.currency.amount_code_prefix",
+    # Datetime locale-format date variants (CLDR names composed):
+    "datetime.date.long_full_month",
+    "datetime.date.weekday_full_month",
+    "datetime.date.weekday_abbreviated_month",
 ]
 
 # GitTables starved baselines for the load-bearing comparison (2026-06-04 memo).
@@ -446,6 +608,10 @@ def main() -> int:
     manufacture_country_codes(rows)
     print("manufacturing datetime names (CLDR)...", file=sys.stderr)
     manufacture_datetime(rows, rng)
+    print("manufacturing datetime locale-format dates (CLDR)...", file=sys.stderr)
+    manufacture_datetime_locale_dates(rows, rng)
+    print("manufacturing currency amount variants (CLDR number formats)...", file=sys.stderr)
+    manufacture_currency_amounts(rows, rng)
     print("manufacturing locale codes (CLDR)...", file=sys.stderr)
     manufacture_locale_codes(rows)
     print("manufacturing embedded enums (finetype generate)...", file=sys.stderr)

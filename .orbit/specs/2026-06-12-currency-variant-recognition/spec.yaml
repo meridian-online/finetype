@@ -2,11 +2,11 @@ id: 2026-06-12-currency-variant-recognition
 goal: 'Teach FineType''s value-level model to recognise currency locale-format variants (finance.currency.amount_*) by MANUFACTURING CLDR currency-format training data and retraining — closing the price gap at its real root (training-data starvation, not a rule gap) per decision 0038 (strength through simplification: model over rules). The deterministic value-aware selector is demoted to a documented last-resort fallback. Run as the currency slice of the long-deferred CharCNN-vs-multi-branch value-level probe — currency is the ideal low-collateral case (the in-value symbol is an explicit marker, so CharCNN''s no-context weakness does not bite).'
 cards:
 - '0002'
+status: open
 labels:
 - precision
 - locale-coverage
 - training-data
-status: open
 acceptance_criteria:
 - id: ac-01
   description: |
@@ -45,7 +45,7 @@ acceptance_criteria:
     variant clears the 50-distinct floor by a wide margin (the starvation-
     dissolution proof).
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-03
   description: |
