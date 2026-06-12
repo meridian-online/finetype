@@ -3214,6 +3214,40 @@ fn value_sharpen(
         }
     }
 
+    // R32: text-family low-cardinality vocabulary override (spec
+    // 2026-06-12-text-vocab-override). The three free-text labels carry no
+    // validators, so neither the validation veto nor schema_fail_demotion
+    // can ever correct them — a status/type vocabulary asserted as free
+    // text stays wrong. A genuine free-text column is mostly distinct; a
+    // vocabulary repeats a bounded set. Scoped to the TEXT family ONLY:
+    // geography labels (city/region) are legitimately low-cardinality and
+    // measured to misfire (4/17 true-city gold columns), and a true
+    // http-method column is itself a small vocabulary — value shape cannot
+    // separate those. Value-based per decision 0048.
+    if matches!(
+        result_label,
+        "representation.text.word"
+            | "representation.text.entity_name"
+            | "representation.text.plain_text"
+    ) {
+        let non_empty: Vec<&str> = values
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        let n = non_empty.len();
+        if n >= 4 {
+            let distinct: std::collections::HashSet<&str> = non_empty.iter().copied().collect();
+            let d = distinct.len();
+            if (2..=12).contains(&d) && (d as f32 / n as f32) <= 0.6 {
+                return Some((
+                    "representation.discrete.categorical".to_string(),
+                    format!("text_vocab_override:distinct={}/{}", d, n),
+                ));
+            }
+        }
+    }
+
     None
 }
 
@@ -7149,6 +7183,90 @@ mod tests {
             assert!(
                 !rule.starts_with("version_dmy_short_dot_gate:"),
                 "R31 should not fire when most values are valid dates"
+            );
+        }
+    }
+
+    // ── R32: text-family low-cardinality vocabulary override ────────────
+
+    #[test]
+    fn r32_vocab_overrides_word() {
+        // A status vocabulary asserted as free text is a categorical.
+        let values: Vec<String> = vec![
+            "active", "inactive", "active", "pending", "active", "inactive",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let result = value_sharpen(&values, "representation.text.word", 0.9, None);
+        assert!(
+            result.is_some(),
+            "R32 should fire on a small repeated vocab"
+        );
+        let (label, rule) = result.unwrap();
+        assert_eq!(label, "representation.discrete.categorical");
+        assert!(rule.starts_with("text_vocab_override:"));
+    }
+
+    #[test]
+    fn r32_preserves_distinct_free_text() {
+        // Species names / free words are mostly distinct — never a vocab.
+        let values: Vec<String> = vec![
+            "Dichocarpum",
+            "adiantifolium",
+            "sutchuenense",
+            "arisanense",
+            "auriculatum",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        for label in [
+            "representation.text.word",
+            "representation.text.entity_name",
+            "representation.text.plain_text",
+        ] {
+            assert!(
+                value_sharpen(&values, label, 0.9, None).is_none(),
+                "R32 must not fire on distinct free text ({label})"
+            );
+        }
+    }
+
+    #[test]
+    fn r32_preserves_constant_and_short_columns() {
+        let constant: Vec<String> = vec!["s"; 6].into_iter().map(String::from).collect();
+        assert!(
+            value_sharpen(&constant, "representation.text.word", 0.9, None).is_none(),
+            "single distinct value is not a vocabulary"
+        );
+        let short: Vec<String> = vec!["a".into(), "b".into(), "a".into()];
+        assert!(
+            value_sharpen(&short, "representation.text.word", 0.9, None).is_none(),
+            "below the n>=4 floor"
+        );
+    }
+
+    #[test]
+    fn r32_out_of_scope_labels_untouched() {
+        // city/region/http_method are excluded by design — legitimately
+        // low-cardinality columns exist under those labels.
+        let values: Vec<String> = vec![
+            "Sydney",
+            "Melbourne",
+            "Sydney",
+            "Sydney",
+            "Melbourne",
+            "Sydney",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let result = value_sharpen(&values, "geography.location.city", 0.9, None);
+        if let Some((_, rule)) = &result {
+            assert!(
+                !rule.starts_with("text_vocab_override:"),
+                "R32 must not fire outside the text family"
             );
         }
     }
