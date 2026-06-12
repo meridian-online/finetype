@@ -1,0 +1,355 @@
+{
+  "floor": 50,
+  "types": {
+    "geography.location.city": {
+      "distinct": 28574,
+      "rows": 30000,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 231
+    },
+    "geography.location.region": {
+      "distinct": 3780,
+      "rows": 3861,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 228
+    },
+    "geography.location.country": {
+      "distinct": 252,
+      "rows": 252,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 1
+    },
+    "geography.location.country_code": {
+      "distinct": 504,
+      "rows": 504,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 1
+    },
+    "geography.location.continent": {
+      "distinct": 7,
+      "rows": 252,
+      "class": "closed",
+      "verdict": "closed-vocab-complete",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 1
+    },
+    "geography.location.state_code": {
+      "distinct": 706,
+      "rows": 3861,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 228
+    },
+    "geography.address.postal_code": {
+      "distinct": 20788,
+      "rows": 30000,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 106
+    },
+    "geography.address.street_name": {
+      "distinct": 96,
+      "rows": 3200,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "finetype-generate"
+      ],
+      "n_locales": 16
+    },
+    "geography.address.street_suffix": {
+      "distinct": 76,
+      "rows": 2400,
+      "class": "closed",
+      "verdict": "closed-vocab-complete",
+      "sources": [
+        "finetype-generate"
+      ],
+      "n_locales": 12
+    },
+    "geography.coordinate.latitude": {
+      "distinct": 28286,
+      "rows": 30000,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 1,
+      "gittables_distinct": 10,
+      "lift": 2828.6
+    },
+    "geography.coordinate.longitude": {
+      "distinct": 29219,
+      "rows": 30000,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "geonames-2026-05-24"
+      ],
+      "n_locales": 1
+    },
+    "datetime.component.day_of_week": {
+      "distinct": 1617,
+      "rows": 4942,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 706
+    },
+    "datetime.component.month_name": {
+      "distinct": 2486,
+      "rows": 8472,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 706
+    },
+    "datetime.date.abbreviated_month": {
+      "distinct": 8348,
+      "rows": 8472,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 706
+    },
+    "technology.internet.top_level_domain": {
+      "distinct": 249,
+      "rows": 251,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "iana-iso4217-via-countryInfo"
+      ],
+      "n_locales": 1
+    },
+    "technology.internet.http_method": {
+      "distinct": 7,
+      "rows": 200,
+      "class": "closed",
+      "verdict": "closed-vocab-complete",
+      "sources": [
+        "finetype-generate"
+      ],
+      "n_locales": 1
+    },
+    "technology.code.locale_code": {
+      "distinct": 706,
+      "rows": 706,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 706
+    },
+    "finance.currency.currency_code": {
+      "distinct": 155,
+      "rows": 251,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "iana-iso4217-via-countryInfo"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.currency_symbol": {
+      "distinct": 30,
+      "rows": 200,
+      "class": "closed",
+      "verdict": "closed-vocab-complete",
+      "sources": [
+        "finetype-generate"
+      ],
+      "n_locales": 1
+    },
+    "identity.person.gender_code": {
+      "distinct": 7,
+      "rows": 200,
+      "class": "closed",
+      "verdict": "closed-vocab-complete",
+      "sources": [
+        "finetype-generate"
+      ],
+      "n_locales": 1
+    },
+    "identity.person.blood_type": {
+      "distinct": 8,
+      "rows": 200,
+      "class": "closed",
+      "verdict": "closed-vocab-complete",
+      "sources": [
+        "finetype-generate"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_comma": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_comma_suffix": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_space": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_multisym": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_apostrophe": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_lakh": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_nodecimal": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_accounting": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_neg_trailing": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "finance.currency.amount_code_prefix": {
+      "distinct": 800,
+      "rows": 800,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr-numfmt"
+      ],
+      "n_locales": 1
+    },
+    "datetime.date.long_full_month": {
+      "distinct": 5466,
+      "rows": 5506,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 511
+    },
+    "datetime.date.weekday_full_month": {
+      "distinct": 4942,
+      "rows": 4943,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 495
+    },
+    "datetime.date.weekday_abbreviated_month": {
+      "distinct": 5090,
+      "rows": 5094,
+      "class": "high-cardinality",
+      "verdict": "pass",
+      "sources": [
+        "cldr"
+      ],
+      "n_locales": 509
+    }
+  },
+  "missing": [],
+  "summary": {
+    "n_types": 34,
+    "pass_high_card": 28,
+    "closed_complete": 6,
+    "fail": 0,
+    "missing": 0
+  }
+}
