@@ -38,7 +38,7 @@ acceptance_criteria:
     categorical (veto_fallback:vocab); this AC measures categorical ->
     gender_code precision, not unknown rescue.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-03
   description: |
