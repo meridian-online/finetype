@@ -37,7 +37,7 @@ goal: |
   precision (0.851).
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - recall
 - sharpen
@@ -103,3 +103,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-12T03:24:12.673303Z
