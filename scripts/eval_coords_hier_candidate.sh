@@ -29,14 +29,14 @@ echo "================================================================"
 # ── Pick best seed by val_accuracy ──────────────────────────────────────
 BEST_SEED=""; BEST_ACC=0
 for s in "${SEEDS[@]}"; do
-    R="models/sherlock-mfg-coords-hier-hier-s${s}/results.json"
+    R="models/sherlock-mfg-coords-hier-s${s}/results.json"
     [[ -f "$R" ]] || { echo "  seed $s: no results.json (skip)"; continue; }
     ACC=$(python3 -c "import json;r=json.load(open('$R'));print(max(e['val_accuracy'] for e in r))" 2>/dev/null)
     echo "  seed $s: best val_acc=$ACC"
     awk "BEGIN{exit !($ACC>$BEST_ACC)}" && { BEST_ACC=$ACC; BEST_SEED=$s; }
 done
 [[ -n "$BEST_SEED" ]] || { echo "FAIL: no trained seed found"; exit 2; }
-MODEL="models/sherlock-mfg-coords-hier-hier-s${BEST_SEED}"
+MODEL="models/sherlock-mfg-coords-hier-s${BEST_SEED}"
 echo ""
 echo ">> Best seed: $BEST_SEED  (val_acc=$BEST_ACC)  -> $MODEL"
 echo "$BEST_SEED" > "$LFDIR/best_seed.txt"
