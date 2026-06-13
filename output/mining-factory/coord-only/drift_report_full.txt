@@ -1,0 +1,27 @@
+drift report: v19fx_s42 (n=13533) -> mfg-coords-full (n=13533)
+band: |Δrate| >= 0.400pp AND move >= 3.00×
+
+label                                                  base         cand      Δpp       ×  flag
+-----------------------------------------------------------------------------------------------
+representation.discrete.categorical              231/ 1.71%   676/ 5.00%  +3.288   2.92×  
+container.array.comma_separated                  404/ 2.99%     6/ 0.04%  -2.941   0.02×  
+representation.text.plain_text                   847/ 6.26%  1175/ 8.68%  +2.424   1.39×  
+technology.internet.top_level_domain             163/ 1.20%    10/ 0.07%  -1.131   0.06×  
+representation.text.word                         359/ 2.65%   225/ 1.66%  -0.990   0.63×  
+unknown                                         1470/10.86%  1351/ 9.98%  -0.879   0.92×  
+representation.text.entity_name                  457/ 3.38%   528/ 3.90%  +0.525   1.16×  
+representation.numeric.integer_number           1752/12.95%  1806/13.35%  +0.399   1.03×  
+representation.identifier.alphanumeric_id        104/ 0.77%   150/ 1.11%  +0.340   1.44×  
+datetime.epoch.unix_microseconds                   0/ 0.00%    46/ 0.34%  +0.340  93.00×  
+identity.person.gender_code                       51/ 0.38%     6/ 0.04%  -0.333   0.13×  
+technology.internet.user_agent                    45/ 0.33%     3/ 0.02%  -0.310   0.08×  
+identity.medical.npi                              77/ 0.57%    40/ 0.30%  -0.273   0.52×  
+representation.numeric.decimal_number           4234/31.29%  4201/31.04%  -0.244   0.99×  
+geography.address.postal_code                     45/ 0.33%    13/ 0.10%  -0.236   0.30×  
+datetime.component.periodicity                    24/ 0.18%     0/ 0.00%  -0.177   0.02×  
+representation.identifier.numeric_code           100/ 0.74%    79/ 0.58%  -0.155   0.79×  
+finance.currency.amount                           82/ 0.61%   101/ 0.75%  +0.140   1.23×  
+datetime.epoch.unix_seconds                       59/ 0.44%    76/ 0.56%  +0.126   1.29×  
+representation.discrete.ordinal                  152/ 1.12%   135/ 1.00%  -0.126   0.89×  
+
+VERDICT: GO — no label drifted beyond the band
