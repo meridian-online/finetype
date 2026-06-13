@@ -1,0 +1,108 @@
+id: '0097'
+title: Train-time forgetting mitigation (balanced replay + logit-adjusted loss) over additive-volume blends
+status: accepted
+date_created: 2026-06-13
+date_modified: 2026-06-13
+body: |
+  # 0097. Train-time forgetting mitigation over additive-volume blends
+
+  ## Context and Problem Statement
+
+  Four consecutive additive-blend retrains (v22, v23, v24, and the
+  2026-06-12/13 mining-factory locale-format candidate) each fixed their
+  target class and silently broke an UNTARGETED boundary at corpus scale:
+
+  - v22: country −31.5%. v23: categorical +529%, 48k city columns absorbed.
+  - v24: geography.coordinate.latitude 4.3x. locale-format: identifier
+    collapse (numeric_code 59k→4k, npi 43k→7.6k) + user_agent/isbn explosions
+    (corpus-honest gate, 7 triggers — `output/mining-factory/locale-format/
+    ac06_verdict.md`).
+
+  We named this internally the "fixed attention budget": teaching a new
+  distinction steals capacity from existing ones. A deep-research pass
+  (2026-06-13, 10 findings each adversarially verified 3-0;
+  `output/mining-factory/catastrophic-forgetting-research.md`) identified the
+  mechanism and the cheapest cure.
+
+  The mechanism is textbook CLASS-INCREMENTAL interference (a shared softmax
+  with no task identity at inference; van de Ven et al., Nature Machine
+  Intelligence 2022). The actionable leg is PCGrad's "tragic triad" (Yu et al.,
+  NeurIPS 2020): negative transfer requires conflicting gradients PLUS a large
+  gradient-MAGNITUDE difference PLUS high curvature — conflict alone is benign.
+  Our failure is the magnitude leg: flooding manufactured VOLUME for one
+  starved class makes its gradient dominate the shared update and stamp over
+  untargeted classes. Confirmed empirically the same week: the locale-format
+  blend HELD the numerics by spreading mass across 34 types (balanced) where
+  the geography-heavy blend COLLAPSED them (concentrated); the coord-only
+  minimal blend (lat+lon, 100 cols) cut the corpus collateral from 7 triggers
+  to a single coordinate-adjacent one (`geography.format.wkt`).
+
+  ## Decision
+
+  When strengthening a starved/rare class, prefer TRAIN-TIME forgetting
+  mitigation over adding raw manufactured volume. All recommended levers are
+  zero-inference-cost (the engine's CPU/Rust/Candle budget is untouched):
+
+  1. **Balanced replay FIRST.** Keep prior real columns balanced against new
+     manufactured data; do not dump volume. Replay is the only continual-
+     learning strategy that performs well across all incremental scenarios and
+     beats costlier gradient methods (A-GEM/FROMP) at lower cost. For FineType
+     this is the existing `--ratio-distilled` / `--distilled-cap` /
+     `--max-cols-per-type` mix — a recipe discipline, not new code.
+  2. **Class-balanced / logit-adjusted loss** to strengthen rare classes by
+     REWEIGHTING, not by manufacturing volume — attacks the dominating-gradient
+     leg directly. NOT yet implemented (`train-multi-branch` has no loss-weight
+     flag); this is the one sanctioned new-code investment.
+  3. **PCGrad gradient surgery** as a second-order add-on (zero inference cost,
+     optimizer-step only) if 1+2 are insufficient.
+
+  ## Explicitly rejected
+
+  - **EWC / Synaptic Intelligence / MAS regularizers.** Fail almost completely
+    in class-incremental settings (near the no-protection baseline; EWC 20.6%
+    vs 19.9% on Split-MNIST class-IL) and all three approximate the same Fisher
+    information (Benzing, AISTATS 2022). The tempting cheap option; the evidence
+    says it buys nothing for cross-class interference. Do not invest.
+  - **PackNet / HAT (mask-based expert isolation).** Require a per-column task
+    ID at inference that a flat-softmax column classifier does not have.
+  - **Adding manufactured VOLUME as the primary rare-class lever.** This is the
+    CAUSE of the collateral (the dominating-gradient leg), not the cure.
+
+  ## Held open (need experiments, not settled here)
+
+  - Mergeable LoRA / adapters: the zero-cost weight-merge is real and
+    architecture-agnostic, but the forgetting-cure is unproven below
+    Transformer scale. A genuine research bet, not a safe one.
+  - Hierarchical / per-family heads vs the flat softmax (`--head hierarchical`
+    already exists): may reduce cross-class interference; inference-cost and
+    efficacy at our scale unmeasured.
+
+  ## Relationship to existing decisions
+
+  Amends the spirit of 0038 (strength through simplification / prefer
+  retraining): retraining stays preferred, but the HOW of retraining is now
+  constrained — balanced replay + reweighting, not volume floods. Complements
+  0096 (residual-precedence decisions are rule-shaped): where a distinction is
+  a residual attractor, route to a Sharpen rule; where it is a trainable
+  starved class, route to balanced-replay retraining. Both reject "dump it into
+  the flat softmax and hope".
+
+  ## Consequences
+
+  - Every future rare-class retrain states its replay-balance ratio and is
+    gated by the destination-drift proxy (pre) and corpus-honest gate (post),
+    as now.
+  - The logit-adjusted-loss implementation is the next sanctioned engine change
+    to the training loop.
+  - Manufacturing remains validated as an EFFICACY tool (it made the lat/lon
+    confusion family perfect on gold) but is no longer the delivery mechanism
+    by default — delivery is matched to the fix.
+
+  ## Substrate
+
+  - `output/mining-factory/catastrophic-forgetting-research.md` — cited memo.
+  - Memory `catastrophic-forgetting-cure-is-train-time`,
+    `mfg-localefmt-identifier-collapse`, `mining-factory-numeric-collapse-broke`.
+  - `output/mining-factory/locale-format/ac06_verdict.md` — the 4th-NO-GO evidence.
+  - Sources: van de Ven Nature MI 2022; Yu PCGrad NeurIPS 2020; Benzing AISTATS
+    2022; LoRA/RepAdapter/C-LoRA; PackNet CVPR 2018.
