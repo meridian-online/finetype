@@ -1587,6 +1587,18 @@ pub struct MultiBranchTrainConfig {
     pub seed: u64,
     /// Minimum learning rate floor for cosine scheduler.
     pub min_lr: f64,
+    /// Logit-adjustment temperature τ for the train-time loss (choice 0097).
+    ///
+    /// When > 0, the flat-head training cross-entropy is computed on
+    /// `logits + τ·log(π)` where `π` is the per-class training-frequency prior.
+    /// This strengthens rare classes by REWEIGHTING the gradient (Menon et al.,
+    /// "Long-tail learning via logit adjustment", ICLR 2021) instead of by adding
+    /// manufactured volume — the dominating-gradient leg of negative transfer.
+    /// The adjustment is applied ONLY during training; inference uses raw logits,
+    /// so there is ZERO inference cost. `0.0` (default) disables it entirely — the
+    /// kill switch that preserves byte-identical prior behaviour. Flat head only;
+    /// no effect on the hierarchical head.
+    pub logit_adjust_tau: f64,
 }
 
 impl Default for MultiBranchTrainConfig {
@@ -1600,6 +1612,7 @@ impl Default for MultiBranchTrainConfig {
             patience: 10,
             seed: 42,
             min_lr: 1e-6,
+            logit_adjust_tau: 0.0,
         }
     }
 }
@@ -2132,6 +2145,34 @@ fn compute_hierarchical_loss(
     Ok(total)
 }
 
+/// Per-class logit-adjustment prior `τ·log(π)` for the train-time loss (choice 0097).
+///
+/// `π_c` is the training frequency of class `c` (`count_c / total`). The returned
+/// `[n_classes]` vector is broadcast-added to the flat-head logits before cross-entropy:
+/// because `log(π_c)` is large-negative for a rare class, the model must produce a
+/// larger raw logit to minimise the loss, which raises rare-class scores at inference
+/// (where raw logits are used — zero inference cost). See Menon et al., "Long-tail
+/// learning via logit adjustment", ICLR 2021.
+///
+/// `eps` floors empty classes so `log` stays finite (all 240 labels clear the FTMB ≥50
+/// gate in practice, so this only guards a degenerate corpus). `tau == 0` is handled by
+/// the caller (the prior is never built), so this is only invoked for `tau > 0`.
+fn logit_adjust_prior(labels: &[u32], n_classes: usize, tau: f64) -> Vec<f32> {
+    let mut counts = vec![0u64; n_classes];
+    for &l in labels {
+        let idx = l as usize;
+        if idx < n_classes {
+            counts[idx] += 1;
+        }
+    }
+    let total: f64 = counts.iter().map(|&c| c as f64).sum::<f64>().max(1.0);
+    let eps = 1e-12_f64;
+    counts
+        .iter()
+        .map(|&c| (tau * ((c as f64 / total) + eps).ln()) as f32)
+        .collect()
+}
+
 /// Train the multi-branch model.
 ///
 /// Loads feature-vector training data, runs forward/backward passes with Adam,
@@ -2265,6 +2306,22 @@ pub fn train_multi_branch(
     };
     let mut optimizer = AdamW::new(varmap.all_vars(), adamw_params)?;
 
+    // Logit-adjustment prior (choice 0097). Computed once from the training-label
+    // frequencies as a [1, n_classes] row tensor τ·log(π), broadcast-added to the
+    // flat-head logits during the TRAIN loss only. None when τ == 0 (kill switch)
+    // or when the head is hierarchical (unsupported here).
+    let logit_adjust: Option<Tensor> = if config.logit_adjust_tau > 0.0 && !is_hierarchical {
+        let n = model_config.n_classes;
+        let adj = logit_adjust_prior(&train_data.labels, n, config.logit_adjust_tau);
+        tracing::info!(
+            "Logit adjustment ENABLED (τ={:.3}): rare classes up-weighted via train-time logit prior (choice 0097)",
+            config.logit_adjust_tau
+        );
+        Some(Tensor::from_vec(adj, (1, n), &device)?)
+    } else {
+        None
+    };
+
     // Setup scheduler + early stopping
     let scheduler = CosineScheduler::new(config.lr, config.min_lr, config.epochs);
     let mut early_stopping = EarlyStopping::new(config.patience, true);
@@ -2376,7 +2433,15 @@ pub fn train_multi_branch(
                     valid_t.as_ref(),
                     true,
                 )?;
-                candle_nn::loss::cross_entropy(&logits, &labels_t)?
+                // Logit adjustment (choice 0097): add τ·log(π) to the logits before
+                // cross-entropy so rare classes get a larger gradient. Train-time
+                // only — inference (and val accuracy below) uses raw logits.
+                match logit_adjust {
+                    Some(ref adj) => {
+                        candle_nn::loss::cross_entropy(&logits.broadcast_add(adj)?, &labels_t)?
+                    }
+                    None => candle_nn::loss::cross_entropy(&logits, &labels_t)?,
+                }
             };
 
             // Manual backward + step so we can capture gradient norms.
@@ -2622,6 +2687,35 @@ mod tests {
 
     fn make_config() -> MultiBranchConfig {
         MultiBranchConfig::default()
+    }
+
+    #[test]
+    fn test_logit_adjust_prior_upweights_rare_classes() {
+        // labels: class 0 appears 8x, class 1 4x, class 2 1x (the rare one).
+        let labels = vec![0u32, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2];
+        let tau = 1.0;
+        let adj = logit_adjust_prior(&labels, 3, tau);
+        assert_eq!(adj.len(), 3);
+        // τ·log(π): all negative (π < 1), and MORE negative for rarer classes, so the
+        // rare class gets the largest train-time penalty → largest raw logit at
+        // inference. Strict monotonicity: adj[rare] < adj[mid] < adj[common].
+        assert!(adj[2] < adj[1], "rarer class must have more-negative prior");
+        assert!(adj[1] < adj[0], "rarer class must have more-negative prior");
+        // Concrete value check for the common class: log(8/13).
+        let expected0 = (8.0_f64 / 13.0).ln() as f32;
+        assert!((adj[0] - expected0).abs() < 1e-5);
+        // τ scales the prior linearly.
+        let adj_half = logit_adjust_prior(&labels, 3, 0.5);
+        assert!((adj_half[2] - adj[2] * 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_logit_adjust_prior_handles_empty_class() {
+        // class 2 never appears — must stay finite (floored by eps), most-negative.
+        let labels = vec![0u32, 0, 1];
+        let adj = logit_adjust_prior(&labels, 3, 1.0);
+        assert!(adj[2].is_finite(), "empty class prior must be finite");
+        assert!(adj[2] < adj[1] && adj[2] < adj[0]);
     }
 
     #[test]
@@ -3227,6 +3321,7 @@ mod tests {
             patience: 10,
             seed: 42,
             min_lr: 1e-6,
+            logit_adjust_tau: 0.0,
         };
 
         let summary = train_multi_branch(
@@ -3491,6 +3586,7 @@ mod tests {
             patience: 10,
             seed: 42,
             min_lr: 1e-6,
+            logit_adjust_tau: 0.0,
         };
 
         let summary = train_multi_branch(

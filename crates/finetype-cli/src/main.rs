@@ -420,6 +420,14 @@ enum Commands {
         #[arg(long, default_value = "10")]
         patience: usize,
 
+        /// Logit-adjustment temperature τ for the train-time loss (choice 0097).
+        /// 0 = off (default). When > 0, rare classes are up-weighted via a
+        /// train-time logit prior (logit-adjusted loss, Menon et al. ICLR 2021)
+        /// instead of by adding manufactured volume. Inference uses raw logits —
+        /// zero inference cost. Flat head only. Typical values 0.5–1.0.
+        #[arg(long, default_value = "0.0")]
+        logit_adjust_tau: f64,
+
         /// Taxonomy directory (needed for label list)
         #[arg(long, default_value = "labels")]
         taxonomy: PathBuf,
@@ -755,6 +763,7 @@ fn main() -> Result<()> {
             seed,
             head,
             patience,
+            logit_adjust_tau,
             taxonomy,
             val_split,
             no_tui,
@@ -770,6 +779,7 @@ fn main() -> Result<()> {
             seed,
             head,
             patience,
+            logit_adjust_tau,
             taxonomy,
             val_split,
             no_tui,
@@ -926,6 +936,7 @@ fn cmd_train_multi_branch(
     seed: u64,
     head: String,
     patience: usize,
+    logit_adjust_tau: f64,
     taxonomy: PathBuf,
     val_split: f32,
     no_tui: bool,
@@ -1149,6 +1160,7 @@ fn cmd_train_multi_branch(
         weight_decay,
         patience,
         seed,
+        logit_adjust_tau,
         ..Default::default()
     };
 
