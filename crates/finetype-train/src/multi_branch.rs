@@ -2334,6 +2334,15 @@ pub fn train_multi_branch(
         )
     })?;
 
+    // Write the model config BEFORE the epoch loop so any checkpoint saved during
+    // training is loadable on its own. A killed overnight run previously left a
+    // `model_best.safetensors` with no `config.json` (only written at completion),
+    // making the best checkpoint unloadable without hand-regenerating the config.
+    // `model_config` is immutable here, so this is identical to the completion-time
+    // write below — that one stays to enrich the final config if it ever grows
+    // post-training fields (e.g. type_index_keys).
+    model_config.save(&config.output_dir.join("config.json"))?;
+
     let mut epoch_metrics = Vec::new();
     let total_start = std::time::Instant::now();
 
