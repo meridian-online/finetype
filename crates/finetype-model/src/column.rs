@@ -2394,33 +2394,6 @@ impl ColumnClassifier {
             return;
         }
 
-        // 0094 — header hint family `header_hint_coord_promote_guard` (default ON).
-        // The SYMMETRIC counterpart to the coord veto above. The existing
-        // header-driven promotion (`header_hint_cross_domain`, hardcoded) promotes a
-        // coord-headered numeric column (decimal/integer) to latitude/longitude on
-        // the HEADER ALONE — no check that the values are coordinate-shaped. Guard
-        // it: when the header corroborates a coordinate but the values are NOT
-        // coordinate-shaped (out of [-180,180] range, or lacking coordinate decimal
-        // precision — a temperature/ratio/measurement that merely falls in range, or
-        // a spurious `lat`/`lon` header token), suppress the promotion and keep the
-        // numeric label by short-circuiting the hint logic. GUARD-only — it never
-        // promotes, only blocks an unsafe promotion, so a mislabelled header cannot
-        // create a false coordinate (the value-identical-boundary precision pattern,
-        // same as the postal/coord vetoes).
-        if !rhh::is_disabled("header_hint_coord_promote_guard")
-            && matches!(
-                result.label.as_str(),
-                "representation.numeric.decimal_number" | "representation.numeric.integer_number"
-            )
-            && header_corroborates_coordinate(header)
-            && !values_look_like_coordinates(sample)
-        {
-            result.disambiguation_applied = true;
-            result.disambiguation_rule =
-                Some(format!("coord_promote_guard:{}", header.to_lowercase()));
-            return;
-        }
-
         // 0094 — header hint family `header_hint_postal_veto` (spec
         // 2026-06-10-postal-header-veto): the same header-corroboration demotion
         // for the value-identical postal boundary. A postal_code prediction on a
@@ -4323,43 +4296,6 @@ fn values_look_like_generic_decimals(sample: &[String]) -> bool {
         }
     }
     total > 0 && numeric * 100 >= total * 80
-}
-
-/// True if the sampled values are COORDINATE-shaped: predominantly numeric AND
-/// within the longitude range [-180, 180] (the superset of latitude) AND carrying
-/// a coordinate decimal-precision signature (a majority of values have >= 3
-/// fractional digits). The precision term is what separates genuine coordinates
-/// from low-precision decimals that merely fall in range — a temperature column
-/// (`21.5`, `19.8`), a ratio, or a small measurement. This is the value guard for
-/// the coordinate-promotion path: the existing header-driven promotion
-/// (`header_hint_cross_domain`) would otherwise promote a coord-headered numeric
-/// column to latitude/longitude on the header alone, with no check that the values
-/// are actually coordinates. Range-only would admit temperatures; precision-only
-/// would admit any high-precision decimal — both are required.
-fn values_look_like_coordinates(sample: &[String]) -> bool {
-    let (mut in_range, mut precise, mut total) = (0usize, 0usize, 0usize);
-    for v in sample.iter().take(16) {
-        let t = v.trim();
-        if t.is_empty() {
-            continue;
-        }
-        total += 1;
-        if let Ok(n) = t.parse::<f64>() {
-            if (-180.0..=180.0).contains(&n) {
-                in_range += 1;
-                // Fractional-digit count of the literal (not the parsed float, so
-                // trailing zeros in the source are honoured). `len - dot > 3` is
-                // `>= 3` fractional digits (dot occupies one position).
-                if let Some(dot) = t.find('.') {
-                    if t.len() - dot > 3 {
-                        precise += 1;
-                    }
-                }
-            }
-        }
-    }
-    // >= 80% numeric-and-in-range AND a majority carrying coordinate precision.
-    total > 0 && in_range * 100 >= total * 80 && precise * 2 >= total
 }
 
 /// True if the header carries a postal token, i.e. it corroborates a
@@ -7026,50 +6962,6 @@ mod tests {
         // (rhh::is_disabled is a const `false` when the rhh-instrumentation
         // feature is off) and disableable via RHH_DISABLE_HINTS in ablation builds.
         assert!(!rhh::is_disabled("header_hint_coord_veto"));
-    }
-
-    // === 0094 coordinate promote-guard helpers ===
-
-    #[test]
-    fn coord_promote_guard_value_gate() {
-        // Genuine coordinates: in range AND >= 3 fractional digits — promotable.
-        assert!(values_look_like_coordinates(&[
-            "40.7128".into(),
-            "-33.8688".into(),
-            "51.5074".into(),
-            "151.2093".into(), // valid longitude (>90, in [-180,180])
-        ]));
-        // Temperatures: in range but LOW precision — NOT coordinates (the case the
-        // range-only header promotion would wrongly admit).
-        assert!(!values_look_like_coordinates(&[
-            "21.5".into(),
-            "19.8".into(),
-            "23.1".into(),
-            "20.0".into(),
-        ]));
-        // Out-of-range decimals: a majority exceed |180| — not coordinates.
-        assert!(!values_look_like_coordinates(&[
-            "210.8".into(),
-            "350.1234".into(),
-            "999.5".into(),
-        ]));
-        // Bare integers (no fractional precision) — not coordinate-shaped.
-        assert!(!values_look_like_coordinates(&[
-            "40".into(),
-            "-74".into(),
-            "51".into(),
-        ]));
-        // Non-numeric / empty.
-        assert!(!values_look_like_coordinates(&[
-            "alpha".into(),
-            "beta".into()
-        ]));
-        assert!(!values_look_like_coordinates(&[]));
-    }
-
-    #[test]
-    fn coord_promote_guard_is_a_default_on_header_hint() {
-        assert!(!rhh::is_disabled("header_hint_coord_promote_guard"));
     }
 
     // === 0094 postal header-veto helpers (spec 2026-06-10-postal-header-veto) ===
