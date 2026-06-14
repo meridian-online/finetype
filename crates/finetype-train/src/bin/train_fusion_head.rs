@@ -174,7 +174,11 @@ impl FusionHead {
     }
 }
 
-fn read_features(stem: &Path) -> Result<(Vec<f32>, Vec<u32>, usize, Vec<String>)> {
+/// Features read from one stem: `(flattened f32 feature buffer, per-row labels,
+/// row count, label-order names)`.
+type FeatureBundle = (Vec<f32>, Vec<u32>, usize, Vec<String>);
+
+fn read_features(stem: &Path) -> Result<FeatureBundle> {
     let f32_path = with_ext(stem, "f32");
     let labels_path = with_ext(stem, "labels.tsv");
     let meta_path = with_ext(stem, "meta.json");

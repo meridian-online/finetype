@@ -503,15 +503,22 @@ mod tests {
             let broad_idx = i % N_BROAD;
             let entity_idx = i % N_ENTITY;
 
-            // Create slightly separable embeddings per class (bias toward class index)
+            // Create slightly separable embeddings per class. Bias distinct dim
+            // partitions on BOTH the broad class and the entity subtype so each
+            // head has a learnable signal — without an entity signal the entity
+            // loss is pure noise weighted into the total, which masks the broad
+            // loss decrease across the short 5-epoch run and makes the
+            // loss-decrease assertion flaky.
             let header_embed: Vec<f32> = (0..EMBED_DIM)
                 .map(|d| {
-                    let base: f32 = rng.gen::<f32>() * 0.5;
+                    let mut v: f32 = rng.gen::<f32>() * 0.5;
                     if d % N_BROAD == broad_idx {
-                        base + 1.0
-                    } else {
-                        base
+                        v += 1.0;
                     }
+                    if d % N_ENTITY == entity_idx {
+                        v += 1.0;
+                    }
+                    v
                 })
                 .collect();
 
@@ -520,12 +527,14 @@ mod tests {
                 .map(|_| {
                     (0..EMBED_DIM)
                         .map(|d| {
-                            let base: f32 = rng.gen::<f32>() * 0.5;
+                            let mut v: f32 = rng.gen::<f32>() * 0.5;
                             if d % N_BROAD == broad_idx {
-                                base + 0.8
-                            } else {
-                                base
+                                v += 0.8;
                             }
+                            if d % N_ENTITY == entity_idx {
+                                v += 0.8;
+                            }
+                            v
                         })
                         .collect()
                 })
