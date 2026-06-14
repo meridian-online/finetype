@@ -35,17 +35,17 @@ mkdir -p "models/${MODEL_DIR}"
 
 # Check if this is a tiered model by looking for a manifest file
 MANIFEST_URL="${REPO}/${MODEL_DIR}/manifest.txt"
-if curl -sfI "${MANIFEST_URL}" > /dev/null 2>&1; then
+if curl -sfI --retry 3 --retry-all-errors "${MANIFEST_URL}" > /dev/null 2>&1; then
   # Tiered model: download manifest then fetch all listed files
   echo "  Detected tiered model — downloading manifest..."
-  curl -sfL "${MANIFEST_URL}" -o "models/${MODEL_DIR}/manifest.txt"
+  curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${MANIFEST_URL}" -o "models/${MODEL_DIR}/manifest.txt"
 
   while IFS= read -r file; do
     [ -z "${file}" ] && continue
     dir=$(dirname "${file}")
     mkdir -p "models/${MODEL_DIR}/${dir}"
     echo "  Downloading ${file}..."
-    curl -sfL "${REPO}/${MODEL_DIR}/${file}" -o "models/${MODEL_DIR}/${file}"
+    curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/${MODEL_DIR}/${file}" -o "models/${MODEL_DIR}/${file}"
   done < "models/${MODEL_DIR}/manifest.txt"
 else
   # Multi-branch flat model: download 3 fixed files
@@ -53,7 +53,7 @@ else
   cd "models/${MODEL_DIR}"
   for file in model.safetensors label_map.json config.json; do
     echo "  Downloading ${file}..."
-    curl -sfLO "${REPO}/${MODEL_DIR}/${file}"
+    curl -sfLO --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/${MODEL_DIR}/${file}"
   done
   cd ../..
 fi
@@ -70,7 +70,7 @@ mkdir -p models/sibling-context
 SC_OK=true
 for file in model.safetensors config.json; do
   echo "  Downloading sibling-context/${file}..."
-  if ! curl -sfL "${REPO}/sibling-context/${file}" -o "models/sibling-context/${file}"; then
+  if ! curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/sibling-context/${file}" -o "models/sibling-context/${file}"; then
     echo "  WARNING: Failed to download sibling-context/${file} — sibling context will be disabled"
     SC_OK=false
     break
@@ -94,7 +94,7 @@ mkdir -p models/model2vec
 M2V_OK=true
 for file in model.safetensors type_embeddings.safetensors tokenizer.json label_index.json; do
   echo "  Downloading model2vec/${file}..."
-  if ! curl -sfL "${REPO}/model2vec/${file}" -o "models/model2vec/${file}"; then
+  if ! curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/model2vec/${file}" -o "models/model2vec/${file}"; then
     echo "  WARNING: Failed to download model2vec/${file} — semantic hints will be disabled"
     M2V_OK=false
     break
@@ -118,7 +118,7 @@ mkdir -p models/entity-classifier
 EC_OK=true
 for file in model.safetensors config.json label_index.json; do
   echo "  Downloading entity-classifier/${file}..."
-  if ! curl -sfL "${REPO}/entity-classifier/${file}" -o "models/entity-classifier/${file}"; then
+  if ! curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/entity-classifier/${file}" -o "models/entity-classifier/${file}"; then
     echo "  WARNING: Failed to download entity-classifier/${file} — entity demotion will be disabled"
     EC_OK=false
     break
