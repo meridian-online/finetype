@@ -1,0 +1,2806 @@
+//! Column-mode inference for distribution-based type disambiguation.
+//!
+//! Column-mode takes a vector of string values (a column sample), runs
+//! single-value inference on each, aggregates the predictions, and applies
+//! disambiguation rules to determine the most likely type for the entire column.
+//!
+//! This is critical for resolving ambiguous types like:
+//! - `mdy_slash` vs `dmy_slash` dates (MM/DD vs DD/MM)
+//! - `short_dmy` vs `short_mdy` dates
+//! - `latitude` vs `longitude` coordinates
+//! - Numeric types (port, increment, postal_code, integer_number)
+
+use crate::entity::EntityClassifier;
+use crate::features::{extract_features, FEATURE_DIM};
+use crate::fusion::FusionClassifier;
+use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
+use crate::label_category_map::LabelCategoryMap;
+use crate::model2vec_shared::Model2VecResources;
+use crate::multi_branch::MultiBranchClassifier;
+use crate::rhh;
+use crate::semantic::SemanticHintClassifier;
+use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
+use crate::sibling_context::SiblingContextAttention;
+use finetype_core::{Designation, Taxonomy};
+use std::collections::HashMap;
+
+/// No-op classifier used as placeholder when multi-branch is active.
+/// Never actually called — the multi-branch code path bypasses ValueClassifier.
+struct NoopClassifier;
+
+impl ValueClassifier for NoopClassifier {
+    fn classify(&self, _text: &str) -> Result<ClassificationResult, InferenceError> {
+        Err(InferenceError::InvalidPath(
+            "NoopClassifier should never be called — multi-branch bypasses ValueClassifier".into(),
+        ))
+    }
+
+    fn classify_batch(
+        &self,
+        _texts: &[String],
+    ) -> Result<Vec<ClassificationResult>, InferenceError> {
+        Err(InferenceError::InvalidPath(
+            "NoopClassifier should never be called — multi-branch bypasses ValueClassifier".into(),
+        ))
+    }
+}
+
+/// Aggregated column-level features: mean, variance, min, and max of per-value
+/// feature vectors (expanded with column-level statistics).
+///
+/// Used by disambiguation rules for column-level decisions. Variance is the
+/// critical new signal: zero length-variance distinguishes structured codes,
+/// and dot-segment variance distinguishes structured codes from free-form text.
+/// Aggregated column-level features: per-feature mean, variance, min, max
+/// across all sampled values. Used by disambiguation rules and the spike
+/// disambiguator model (AC-2).
+#[derive(Debug, Clone)]
+pub struct ColumnFeatures {
+    /// Element-wise mean across all values.
+    pub mean: [f32; FEATURE_DIM],
+    /// Element-wise variance across all values.
+    pub variance: [f32; FEATURE_DIM],
+    /// Element-wise minimum across all values.
+    pub min: [f32; FEATURE_DIM],
+    /// Element-wise maximum across all values.
+    pub max: [f32; FEATURE_DIM],
+}
+
+impl ColumnFeatures {
+    /// Create a zero-initialized `ColumnFeatures`.
+    fn empty() -> Self {
+        Self {
+            mean: [0.0f32; FEATURE_DIM],
+            variance: [0.0f32; FEATURE_DIM],
+            min: [0.0f32; FEATURE_DIM],
+            max: [0.0f32; FEATURE_DIM],
+        }
+    }
+}
+
+/// Compute aggregated column-level features (mean, variance, min, max) from
+/// per-value feature vectors using a two-pass algorithm.
+///
+/// Pass 1: accumulate sum, track min/max → compute mean.
+/// Pass 2: accumulate squared deviations → compute variance.
+pub fn aggregate_features(per_value: &[[f32; FEATURE_DIM]]) -> ColumnFeatures {
+    if per_value.is_empty() {
+        return ColumnFeatures::empty();
+    }
+
+    let n = per_value.len() as f32;
+
+    // Initialize min/max from first element
+    let mut mean = [0.0f32; FEATURE_DIM];
+    let mut min_vals = per_value[0];
+    let mut max_vals = per_value[0];
+
+    // Pass 1: sum + min/max
+    for features in per_value {
+        for i in 0..FEATURE_DIM {
+            mean[i] += features[i];
+            if features[i] < min_vals[i] {
+                min_vals[i] = features[i];
+            }
+            if features[i] > max_vals[i] {
+                max_vals[i] = features[i];
+            }
+        }
+    }
+    for m in &mut mean {
+        *m /= n;
+    }
+
+    // Pass 2: variance (sum of squared deviations / n)
+    let mut variance = [0.0f32; FEATURE_DIM];
+    for features in per_value {
+        for i in 0..FEATURE_DIM {
+            let diff = features[i] - mean[i];
+            variance[i] += diff * diff;
+        }
+    }
+    for v in &mut variance {
+        *v /= n;
+    }
+
+    ColumnFeatures {
+        mean,
+        variance,
+        min: min_vals,
+        max: max_vals,
+    }
+}
+
+/// Feature index constants for disambiguation rules (expanded with column-level statistics).
+/// Must match the indices in `features::FEATURE_NAMES`.
+mod feature_idx {
+    pub const IS_FLOAT: usize = 2;
+    pub const HAS_LEADING_ZERO: usize = 3;
+    #[allow(dead_code)]
+    pub const IS_HEX_STRING: usize = 7;
+    pub const LENGTH: usize = 10;
+    pub const DIGIT_RATIO: usize = 17;
+    pub const SEGMENT_COUNT_DOT: usize = 24;
+    pub const SEGMENT_COUNT_SLASH: usize = 26;
+    #[allow(dead_code)]
+    pub const HAS_COLON: usize = 32;
+    #[allow(dead_code)]
+    pub const HAS_DASH: usize = 33;
+    pub const ALPHA_RATIO: usize = 18;
+    pub const HAS_NEGATIVE_PREFIX: usize = 34;
+    #[allow(dead_code)]
+    pub const HAS_PERCENT: usize = 35;
+}
+
+/// Strip a locale suffix from a 4-level label to get the 3-level taxonomy key.
+///
+/// Examples:
+///   "geography.address.postal_code.EN_US" → ("geography.address.postal_code", Some("EN_US"))
+///   "geography.address.postal_code.UNIVERSAL" → ("geography.address.postal_code", Some("UNIVERSAL"))
+///   "geography.address.postal_code" → ("geography.address.postal_code", None)
+///   "representation.boolean.binary" → ("representation.boolean.binary", None)
+///
+/// Detection heuristic: if the label has 4+ dot-separated parts and the last part
+/// is ALL_UPPERCASE (locale code or UNIVERSAL), treat it as a locale suffix.
+fn strip_locale_suffix(label: &str) -> (&str, Option<&str>) {
+    if let Some((prefix, suffix)) = label.rsplit_once('.') {
+        // Check if suffix looks like a locale code: all uppercase, 2-5 chars
+        // (e.g., EN, EN_US, UNIVERSAL, FR_FR, DE, AR)
+        let is_locale = !suffix.is_empty()
+            && suffix.len() <= 10
+            && suffix.chars().all(|c| c.is_ascii_uppercase() || c == '_')
+            && prefix.contains('.'); // Must have at least domain.category.type before suffix
+        if is_locale {
+            (prefix, Some(suffix))
+        } else {
+            (label, None)
+        }
+    } else {
+        (label, None)
+    }
+}
+
+/// All known boolean type labels (current and legacy).
+/// Centralised to avoid label mismatches across disambiguation rules.
+const BOOLEAN_LABELS: &[&str] = &[
+    "representation.boolean.binary",   // 0/1
+    "representation.boolean.initials", // T/F, Y/N
+    "representation.boolean.terms",    // true/false, yes/no, on/off
+    "technology.development.boolean",  // legacy
+    "representation.logical.boolean",  // legacy interim label
+    "technology.data.boolean",         // legacy
+];
+
+/// Geography location types used by both geography protection (header hints)
+/// and entity demotion geography rescue. Extracted to module level so both
+/// code paths share the same definition.
+const LOCATION_TYPES: &[&str] = &[
+    "geography.location.city",
+    "geography.location.country",
+    "geography.location.region",
+    "geography.location.state",
+    "geography.location.continent",
+];
+
+/// Person-name hint types that trigger geography protection.
+/// Model2Vec can return any of these for "name" headers — not just full_name.
+/// All should trigger the geography guard to prevent overriding correct
+/// location predictions.
+const PERSON_NAME_HINTS: &[&str] = &[
+    "identity.person.full_name",
+    "identity.person.last_name",
+    "identity.person.first_name",
+];
+
+/// The categorical (enum) catch-all label. Used by the fusion cardinality gate.
+const CATEGORICAL_LABEL: &str = "representation.discrete.categorical";
+
+/// Hardcoded list of labels known to be generic catch-all predictions.
+/// Used as a fallback when taxonomy is not available for designation lookup.
+const HARDCODED_GENERIC_LABELS: &[&str] = &[
+    "representation.text.word",
+    "representation.text.plain_text",
+    "representation.numeric.integer_number",
+    "representation.numeric.decimal_number",
+    "representation.identifier.increment",
+    "representation.discrete.categorical",
+    "datetime.component.day_of_month",
+    // Username/phone are common catch-alls for unrecognized text
+    "identity.person.username",
+    "identity.person.first_name",
+    "identity.person.phone_number",
+    // IATA is the model's default for uppercase 3-letter codes
+    "geography.transportation.iata_code",
+];
+
+/// Determine whether a prediction should be treated as "generic" — i.e.,
+/// a type the CharCNN cannot reliably distinguish from character patterns,
+/// so it should defer to header hints when available.
+///
+/// Uses four signals — any match returns `true`:
+/// 1. Attractor-demoted predictions are always generic (already uncertain).
+/// 2. Boolean types are always generic.
+/// 3. Hardcoded list of known catch-all labels (always applies).
+/// 4. When taxonomy is available, broad designations (BroadWords, BroadCharacters,
+///    BroadNumbers, BroadObject) are additionally generic — the CharCNN cannot
+///    reliably distinguish these types from character patterns.
+///
+/// Signal 4 is **additive**: it expands the generic set beyond the hardcoded
+/// list (e.g., `gender`, `occupation` become generic via their `broad_words`
+/// designation) but never removes types that are already in the hardcoded list.
+fn is_generic_prediction(
+    label: &str,
+    disambiguation_rule: &Option<String>,
+    taxonomy: Option<&Taxonomy>,
+) -> bool {
+    // Signal 1: Attractor-demoted predictions are inherently uncertain —
+    // they should yield to header hints the same way generic types do.
+    if disambiguation_rule
+        .as_ref()
+        .is_some_and(|r| r.starts_with("attractor_demotion"))
+    {
+        return true;
+    }
+
+    // Signal 1b: Numeric postal code heuristic is pattern-based, not model-driven.
+    // It should yield to explicit header hints (e.g., a column with 3-digit
+    // values detected as postal_code). Preserves postal code detection for headerless columns.
+    if disambiguation_rule
+        .as_ref()
+        .is_some_and(|r| r == "numeric_postal_code_detection")
+    {
+        return true;
+    }
+
+    // Signal 2: Boolean types are always generic.
+    if BOOLEAN_LABELS.contains(&label) {
+        return true;
+    }
+
+    // Signal 3: Hardcoded list — always applies regardless of taxonomy.
+    if HARDCODED_GENERIC_LABELS.contains(&label) {
+        return true;
+    }
+
+    // Signal 4: Designation-aware expansion.
+    // When the taxonomy is available, broad designations mark types that the
+    // CharCNN cannot reliably distinguish from character patterns alone.
+    // This is ADDITIVE — it catches types like gender, occupation, nationality
+    // that aren't in the hardcoded list but are still too ambiguous.
+    if let Some(taxonomy) = taxonomy {
+        if let Some(def) = taxonomy.get(label) {
+            return matches!(
+                def.designation,
+                Designation::BroadWords
+                    | Designation::BroadCharacters
+                    | Designation::BroadNumbers
+                    | Designation::BroadObject
+            );
+        }
+    }
+
+    false
+}
+
+/// Detect the most likely locale for a column by running sample values against
+/// each locale's validation pattern from `validation_by_locale`.
+///
+/// Returns the locale code with the highest pass rate above 50%, or None if
+/// no locale patterns exist or none reach the threshold.
+///
+/// This implements post-hoc locale detection (decision-002, Option B):
+/// the type classifier determines WHAT the data is (phone_number, postal_code),
+/// then validation patterns determine WHERE it's from (EN_US, EN_GB, DE).
+fn detect_locale_from_validation(
+    values: &[String],
+    label: &str,
+    taxonomy: &Taxonomy,
+) -> Option<String> {
+    let locale_validators = taxonomy.get_locale_validators(label)?;
+
+    // Count non-empty values for calculating pass rates
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if non_empty.is_empty() {
+        return None;
+    }
+
+    let mut best_locale: Option<String> = None;
+    let mut best_pass_rate: f32 = 0.0;
+
+    for (locale, validator) in locale_validators {
+        let pass_count = non_empty
+            .iter()
+            .filter(|v| validator.validate(v).is_valid)
+            .count();
+        let pass_rate = pass_count as f32 / non_empty.len() as f32;
+
+        if pass_rate > best_pass_rate {
+            best_pass_rate = pass_rate;
+            best_locale = Some(locale.clone());
+        }
+    }
+
+    // Only report locale if >50% of values match the pattern
+    if best_pass_rate > 0.5 {
+        best_locale
+    } else {
+        None
+    }
+}
+
+/// Configuration for column-mode inference.
+#[derive(Debug, Clone)]
+pub struct ColumnConfig {
+    /// Maximum number of values to sample from the column (default: 100).
+    pub sample_size: usize,
+    /// Minimum fraction of votes a type needs to be the winner (default: 0.3).
+    /// If no type reaches this threshold, the result confidence is lowered.
+    pub min_agreement: f32,
+}
+
+impl Default for ColumnConfig {
+    fn default() -> Self {
+        Self {
+            sample_size: 100,
+            min_agreement: 0.3,
+        }
+    }
+}
+
+/// Result of column-mode inference.
+#[derive(Debug, Clone)]
+pub struct ColumnResult {
+    /// The predicted type label for the column (3-level: domain.category.type).
+    pub label: String,
+    /// Confidence score (0.0 to 1.0).
+    pub confidence: f32,
+    /// Vote distribution: label → fraction of samples classified as this type.
+    /// Labels are 3-level (locale suffixes collapsed).
+    pub vote_distribution: Vec<(String, f32)>,
+    /// Whether a disambiguation rule was applied to override the majority vote.
+    pub disambiguation_applied: bool,
+    /// Name of the disambiguation rule applied, if any.
+    pub disambiguation_rule: Option<String>,
+    /// Number of values actually classified.
+    pub samples_used: usize,
+    /// Detected locale for the column, if the winning type is locale-specific.
+    /// e.g., "EN_US", "FR_FR", "UNIVERSAL". None if the model was trained
+    /// without locale labels or the type has no locale variants.
+    pub detected_locale: Option<String>,
+    /// Whether the prediction is generic (low-confidence, attractor-demoted,
+    /// boolean, or designation-based). Generic predictions yield to header hints
+    /// and indicate the type may not be precise enough for downstream transforms.
+    pub is_generic: bool,
+    /// Aggregated column-level features (mean, variance, min, max of 36-dim
+    /// per-value features). Available for disambiguation analysis and the
+    /// learned disambiguator spike.
+    pub column_features: Option<ColumnFeatures>,
+}
+
+/// Column-mode classifier that wraps a single-value classifier.
+///
+/// Accepts any `ValueClassifier` implementation (CharClassifier, TieredClassifier, etc.)
+/// via `Box<dyn ValueClassifier>`.
+pub struct ColumnClassifier {
+    classifier: Box<dyn ValueClassifier>,
+    config: ColumnConfig,
+    /// Optional semantic column name classifier (Model2Vec embeddings).
+    /// When present, used as the primary header hint source before falling
+    /// back to the hardcoded `header_hint()` dictionary.
+    /// Bypassed when Sense is active (Sense already sees the header).
+    semantic_hint: Option<SemanticHintClassifier>,
+    /// Optional taxonomy for validation-based attractor demotion.
+    /// When present, enables Signal 1 (validation failure) in the
+    /// attractor demotion disambiguation rule (Rule 14).
+    taxonomy: Option<Taxonomy>,
+    /// Optional entity classifier for full_name demotion.
+    /// When present and majority vote is full_name, runs a binary demotion
+    /// check: if the column is confidently non-person, demotes to entity_name.
+    /// Bypassed when Sense is active (Sense entity subtype replaces this).
+    entity_classifier: Option<EntityClassifier>,
+    /// Optional Sense classifier for broad semantic category prediction.
+    /// When present, enables the Sense→Sharpen pipeline in classify_column_with_header.
+    sense: Option<SenseClassifier>,
+    /// Shared Model2Vec resources for Sense encoding.
+    /// Required when `sense` is Some.
+    model2vec: Option<Model2VecResources>,
+    /// Label → category mapping for Sense output masking.
+    /// Required when `sense` is Some.
+    label_map: Option<LabelCategoryMap>,
+    /// Optional sibling-context attention module.
+    /// When present and Sense is active, enriches column header embeddings with
+    /// cross-column context before Sense classification. Requires `model2vec` to
+    /// encode headers. Without a trained model artifact, this is None and the
+    /// pipeline is unchanged.
+    sibling_context: Option<SiblingContextAttention>,
+    /// Optional multi-branch column classifier (Sherlock-style).
+    /// When present, `classify_column_with_header` uses the multi-branch forward
+    /// pass directly (column-level features → MLP → label), bypassing both
+    /// ValueClassifier and Sense→Sharpen. The multi-branch model is fundamentally
+    /// column-level, not value-level.
+    multi_branch: Option<MultiBranchClassifier>,
+    /// Optional late-fusion classifier (B3, spec 2026-06-08). When present it is
+    /// the Sense stage: value-CharCNN + multi-branch views → residual head →
+    /// (label, confidence), bypassing both ValueClassifier and Sense→Sharpen for
+    /// the prediction step. Sharpen post-processing still runs after (unless
+    /// `skip_sharpen`). Takes precedence over `multi_branch` when both are set.
+    fusion: Option<FusionClassifier>,
+    /// Diagnostic flag: skip all Sharpen post-processing (feature_sharpen,
+    /// value_sharpen, apply_header_sharpen). Returns raw multi-branch model
+    /// output. Used for ablation studies — not exposed in public API.
+    skip_sharpen: bool,
+}
+
+impl ColumnClassifier {
+    /// Create a new column classifier wrapping any ValueClassifier.
+    pub fn new(classifier: Box<dyn ValueClassifier>, config: ColumnConfig) -> Self {
+        Self {
+            classifier,
+            config,
+            semantic_hint: None,
+            taxonomy: None,
+            skip_sharpen: false,
+            entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
+            sibling_context: None,
+            fusion: None,
+            multi_branch: None,
+        }
+    }
+
+    /// Create with default configuration.
+    pub fn with_defaults(classifier: Box<dyn ValueClassifier>) -> Self {
+        Self::new(classifier, ColumnConfig::default())
+    }
+
+    /// Create a column classifier with a semantic hint classifier.
+    ///
+    /// The semantic classifier uses Model2Vec embeddings to map column names
+    /// to type labels, replacing the hardcoded header_hint() dictionary.
+    /// Falls back to header_hint() when the semantic classifier doesn't match.
+    pub fn with_semantic_hint(
+        classifier: Box<dyn ValueClassifier>,
+        config: ColumnConfig,
+        semantic: SemanticHintClassifier,
+    ) -> Self {
+        Self {
+            classifier,
+            config,
+            semantic_hint: Some(semantic),
+            taxonomy: None,
+            entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
+            sibling_context: None,
+            fusion: None,
+            multi_branch: None,
+            skip_sharpen: false,
+        }
+    }
+
+    /// Attach a semantic hint classifier to an existing ColumnClassifier.
+    pub fn set_semantic_hint(&mut self, semantic: SemanticHintClassifier) {
+        self.semantic_hint = Some(semantic);
+    }
+
+    /// Attach a taxonomy for validation-based attractor demotion.
+    ///
+    /// When the taxonomy is present, the attractor demotion rule (Rule 14)
+    /// can validate predicted type values against their validation schemas,
+    /// enabling Signal 1 (validation failure) to catch over-eager predictions.
+    pub fn set_taxonomy(&mut self, taxonomy: Taxonomy) {
+        self.taxonomy = Some(taxonomy);
+    }
+
+    /// Attach an entity classifier for full_name demotion.
+    ///
+    /// When present and the majority vote is `identity.person.full_name`,
+    /// the entity classifier runs a binary demotion check. If the column
+    /// is confidently non-person (place, organization, creative work),
+    /// the prediction is demoted to `representation.text.entity_name`.
+    pub fn set_entity_classifier(&mut self, entity: EntityClassifier) {
+        self.entity_classifier = Some(entity);
+    }
+
+    /// Attach a Sense classifier with its required resources.
+    ///
+    /// When all three are present, `classify_column_with_header` uses the
+    /// Sense→Sharpen pipeline instead of the legacy header-hint path.
+    /// `classify_column` (no header) is unchanged.
+    pub fn set_sense(
+        &mut self,
+        sense: SenseClassifier,
+        model2vec: Model2VecResources,
+        label_map: LabelCategoryMap,
+    ) {
+        self.sense = Some(sense);
+        self.model2vec = Some(model2vec);
+        self.label_map = Some(label_map);
+    }
+
+    /// Check whether the Sense→Sharpen pipeline is active.
+    pub fn has_sense(&self) -> bool {
+        self.sense.is_some() && self.model2vec.is_some() && self.label_map.is_some()
+    }
+
+    /// Attach a sibling-context attention module.
+    ///
+    /// When present and Sense is active, `classify_columns_with_context` will
+    /// encode all column headers with Model2Vec, run sibling-context attention
+    /// to enrich them, then pass enriched headers to Sense.
+    pub fn set_sibling_context(&mut self, sibling: SiblingContextAttention) {
+        self.sibling_context = Some(sibling);
+    }
+
+    /// Check whether sibling-context attention is available.
+    pub fn has_sibling_context(&self) -> bool {
+        self.sibling_context.is_some()
+    }
+
+    /// Attach Model2Vec resources without Sense.
+    ///
+    /// Used when multi-branch is active: sibling-context attention needs Model2Vec
+    /// to encode headers, but the Sense classifier is not required.
+    pub fn set_model2vec(&mut self, model2vec: Model2VecResources) {
+        self.model2vec = Some(model2vec);
+    }
+
+    /// Create a column classifier using a multi-branch model.
+    ///
+    /// Multi-branch is fundamentally column-level (Vec<String> → features → label),
+    /// not value-level. It does NOT use the `ValueClassifier` trait. When
+    /// `classify_column_with_header` is called and multi-branch is present,
+    /// it takes a dedicated code path that extracts 3-branch features and runs
+    /// the MLP forward pass directly.
+    ///
+    /// A dummy `ValueClassifier` is still required for the struct field, but it
+    /// is never called when multi-branch is active.
+    pub fn with_multi_branch(multi_branch: MultiBranchClassifier, config: ColumnConfig) -> Self {
+        // Use a no-op ValueClassifier as placeholder — never called when
+        // multi-branch is active.
+        let dummy = Box::new(NoopClassifier);
+        Self {
+            classifier: dummy,
+            config,
+            semantic_hint: None,
+            taxonomy: None,
+            entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
+            sibling_context: None,
+            fusion: None,
+            multi_branch: Some(multi_branch),
+            skip_sharpen: false,
+        }
+    }
+
+    /// Create a column classifier using a late-fusion model (B3, spec 2026-06-08).
+    ///
+    /// Fusion is the Sense stage: it combines a value-CharCNN view and the
+    /// multi-branch column-logit view through a learned residual head to produce
+    /// the (label, confidence). It replaces multi-branch as the primary column
+    /// classifier; Sharpen post-processing still runs after (R1-R21, feature
+    /// rules, header hints) unless `skip_sharpen` is set.
+    ///
+    /// A dummy `ValueClassifier` placeholder is required for the struct field but
+    /// is never called — the fusion code path bypasses it.
+    pub fn with_fusion(fusion: FusionClassifier, config: ColumnConfig) -> Self {
+        let dummy = Box::new(NoopClassifier);
+        Self {
+            classifier: dummy,
+            config,
+            semantic_hint: None,
+            taxonomy: None,
+            entity_classifier: None,
+            sense: None,
+            model2vec: None,
+            label_map: None,
+            sibling_context: None,
+            fusion: Some(fusion),
+            multi_branch: None,
+            skip_sharpen: false,
+        }
+    }
+
+    /// Check whether the late-fusion classifier is active.
+    pub fn has_fusion(&self) -> bool {
+        self.fusion.is_some()
+    }
+
+    /// Set the skip_sharpen diagnostic flag. When true, the multi-branch pipeline
+    /// returns raw model output without any Sharpen post-processing.
+    /// Used for ablation studies only — not part of the public API contract.
+    pub fn set_skip_sharpen(&mut self, skip: bool) {
+        self.skip_sharpen = skip;
+    }
+
+    /// Check whether the multi-branch classifier is active.
+    pub fn has_multi_branch(&self) -> bool {
+        self.multi_branch.is_some()
+    }
+
+    /// Classify a column of values, returning a single type prediction.
+    ///
+    /// The algorithm:
+    /// 1. Sample up to `config.sample_size` values
+    /// 2. Run single-value inference on each
+    /// 3. Aggregate votes by predicted label
+    /// 4. Apply disambiguation rules for known ambiguous pairs
+    /// 5. Return the final label with confidence
+    pub fn classify_column(&self, values: &[String]) -> Result<ColumnResult, InferenceError> {
+        // Late-fusion: delegate to the fusion Sense stage (no header context)
+        if let Some(ref fusion) = self.fusion {
+            return self.classify_fusion(fusion, values, "");
+        }
+
+        // Multi-branch: delegate to column-level classifier (no header context)
+        if let Some(ref mb) = self.multi_branch {
+            return self.classify_multi_branch(mb, values, "");
+        }
+
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Step 1: Sample values
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            // Deterministic sampling: evenly spaced
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+
+        let n_samples = sample.len();
+
+        // Step 2: Run batch inference
+        let results = self.classifier.classify_batch(&sample)?;
+
+        // Step 3: Aggregate votes — collapse 4-level locale labels to 3-level.
+        // Track both 3-level type votes and locale distribution within each type.
+        let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
+        let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new(); // 3-level → locale → count
+        for result in &results {
+            let (base_label, locale) = strip_locale_suffix(&result.label);
+            *vote_counts_3level
+                .entry(base_label.to_string())
+                .or_default() += 1;
+            if let Some(loc) = locale {
+                *locale_votes
+                    .entry(base_label.to_string())
+                    .or_default()
+                    .entry(loc.to_string())
+                    .or_default() += 1;
+            }
+        }
+
+        // Sort by count descending (3-level labels)
+        let mut votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
+        votes.sort_by_key(|b| std::cmp::Reverse(b.1));
+
+        // Validation-based candidate elimination: reject candidates
+        // whose JSON Schema validation contract is violated by >50% of sample
+        // values. Uses pre-compiled validators from taxonomy cache.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            let non_empty_count = sample.iter().filter(|v| !v.trim().is_empty()).count();
+            if non_empty_count >= 3 {
+                let validated: Vec<(String, usize)> = votes
+                    .iter()
+                    .filter(|(label, _)| {
+                        taxonomy
+                            .get_validator(label)
+                            .map(|validator| {
+                                let pass_count = sample
+                                    .iter()
+                                    .filter(|v| validator.is_valid(v.trim()))
+                                    .count();
+                                pass_count as f32 / non_empty_count as f32 >= 0.5
+                            })
+                            .unwrap_or(true) // no validator → keep
+                    })
+                    .cloned()
+                    .collect();
+                // Safety: if ALL eliminated, keep original votes
+                if !validated.is_empty() {
+                    votes = validated;
+                }
+            }
+        }
+
+        let vote_distribution: Vec<(String, f32)> = votes
+            .iter()
+            .map(|(label, count)| (label.clone(), *count as f32 / n_samples as f32))
+            .collect();
+
+        // Majority winner (3-level)
+        let (majority_label, majority_count) = votes.first().cloned().unwrap_or_default();
+        let majority_fraction = majority_count as f32 / n_samples as f32;
+
+        // Determine dominant locale for the winning type
+        let detected_locale = locale_votes.get(&majority_label).and_then(|locales| {
+            locales
+                .iter()
+                .max_by_key(|(_, count)| *count)
+                .map(|(locale, _)| locale.clone())
+                .filter(|l| l != "UNIVERSAL") // Don't report UNIVERSAL as a locale
+        });
+
+        // Step 4: Apply disambiguation rules (operates on 3-level labels)
+        let disambiguation =
+            disambiguate(&sample, &results, &votes, n_samples, self.taxonomy.as_ref());
+
+        let mut result = if let Some((label, rule_name)) = disambiguation {
+            // Disambiguation may change the winning label — re-derive locale if needed
+            let disambig_locale = locale_votes.get(&label).and_then(|locales| {
+                locales
+                    .iter()
+                    .max_by_key(|(_, count)| *count)
+                    .map(|(locale, _)| locale.clone())
+                    .filter(|l| l != "UNIVERSAL")
+            });
+            // Attractor demotion rules get moderate confidence; all others get high confidence
+            let confidence = if rule_name.starts_with("attractor_demotion") {
+                majority_fraction.max(0.5)
+            } else {
+                majority_fraction.max(0.8) // Disambiguation rules are high-confidence
+            };
+            ColumnResult {
+                label,
+                confidence,
+                vote_distribution,
+                disambiguation_applied: true,
+                disambiguation_rule: Some(rule_name),
+                samples_used: n_samples,
+                detected_locale: disambig_locale,
+                is_generic: false,
+                column_features: None,
+            }
+        } else {
+            // No disambiguation needed — use majority vote
+            let confidence = if majority_fraction >= self.config.min_agreement {
+                majority_fraction
+            } else {
+                majority_fraction * 0.5 // Low agreement → low confidence
+            };
+
+            ColumnResult {
+                label: majority_label,
+                confidence,
+                vote_distribution,
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: n_samples,
+                detected_locale,
+                is_generic: false,
+                column_features: None,
+            }
+        };
+
+        // Step 5: Entity demotion gate.
+        // When the majority label is full_name and the entity classifier is loaded,
+        // check whether the column actually contains person names. If confidently
+        // non-person, demote to entity_name. Fires after disambiguation but before
+        // header hints (which may later override this).
+        if result.label == "identity.person.full_name" {
+            if let Some(ref entity_model) = self.entity_classifier {
+                match entity_model.should_demote(&sample) {
+                    Ok(true) => {
+                        result.label = "representation.text.entity_name".to_string();
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule = Some("entity_demotion:nonperson".to_string());
+                        result.detected_locale = None;
+                    }
+                    Ok(false) => {} // Keep full_name — classifier thinks it's person
+                    Err(e) => {
+                        // Log but don't fail — entity classifier is optional
+                        tracing::warn!("Entity classifier error, skipping demotion: {}", e);
+                    }
+                }
+            }
+        }
+
+        // Step 5b: Feature-based disambiguation (extended to legacy path).
+        // Compute aggregated column features and apply feature disambiguation rules
+        // (F1–F6). Previously only ran in Sense→Sharpen path; now also in legacy
+        // to fix decimal/numeric_code (F5) when Sense is absent.
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+        result.column_features = Some(column_features.clone());
+        feature_disambiguate(&mut result, &column_features, &votes, n_samples);
+
+        // Step 5c: Column schema-validation gate (Precision Principle).
+        // A per-value classifier (CharCNN) has no column context, so it can
+        // confidently emit a type whose schema the column's values violate —
+        // e.g. decimal magnitude → latitude, where longitude/depth values exceed
+        // the ±90 latitude range. Unlike attractor demotion (Step 4), this gate
+        // applies to ANY predicted label: if most values fail the predicted
+        // type's JSON Schema, the prediction is not supported by the data.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            schema_validation_gate(&mut result, &sample, &votes, taxonomy);
+        }
+
+        // Step 6: Post-hoc locale detection via validation patterns.
+        // When taxonomy is available, run sample values against validation_by_locale
+        // patterns to detect the most likely locale. This takes priority over any
+        // model-derived locale from vote aggregation, because validation patterns
+        // are precise structural rules (see Precision Principle, decision-002).
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    /// Set `is_generic` on a result based on its final label and disambiguation state.
+    /// Called before returning from classification methods to ensure the field is always
+    /// computed on the final (post-hint, post-demotion) label.
+    fn finalize_is_generic(&self, result: &mut ColumnResult) {
+        result.is_generic = is_generic_prediction(
+            &result.label,
+            &result.disambiguation_rule,
+            self.taxonomy.as_ref(),
+        );
+    }
+
+    /// Get a reference to the underlying classifier.
+    pub fn classifier(&self) -> &dyn ValueClassifier {
+        &*self.classifier
+    }
+
+    /// Classify multiple columns with sibling context.
+    ///
+    /// When sibling-context attention is available:
+    /// 1. Encode all column headers with Model2Vec → `[N_cols, 128]`
+    /// 2. Run sibling-context attention → `[N_cols, 128]` (enriched)
+    /// 3. For each column: run the active pipeline with enriched headers
+    ///
+    /// Supports both Sense→Sharpen and multi-branch pipelines:
+    /// - Sense→Sharpen: enriched header feeds into Sense classification
+    /// - Multi-branch: enriched header feeds into the 4th header branch MLP
+    ///
+    /// When sibling context is NOT available (no trained model), falls back to
+    /// per-column `classify_column_with_header` — producing identical results.
+    pub fn classify_columns_with_context(
+        &self,
+        columns: &[(Vec<String>, String)], // (values, header) per column
+    ) -> Result<Vec<ColumnResult>, InferenceError> {
+        // Late-fusion path: View2 (multi-branch logits) is computed with the RAW
+        // header inside the fusion row, matching how the head was trained by the
+        // dump. Sibling-context enrichment is not part of the fusion feature, so
+        // classify per-column with the raw header for exact train/serve parity.
+        if self.has_fusion() {
+            return columns
+                .iter()
+                .map(|(values, header)| self.classify_column_with_header(values, header))
+                .collect();
+        }
+
+        // Fast path: no sibling context or no Model2Vec → per-column classification
+        if !self.has_sibling_context() || self.model2vec.is_none() {
+            return columns
+                .iter()
+                .map(|(values, header)| self.classify_column_with_header(values, header))
+                .collect();
+        }
+
+        // Sense path requires Sense classifier; multi-branch path doesn't
+        let needs_sense = !self.has_multi_branch();
+        if needs_sense && !self.has_sense() {
+            return columns
+                .iter()
+                .map(|(values, header)| self.classify_column_with_header(values, header))
+                .collect();
+        }
+
+        let sibling_ctx = self.sibling_context.as_ref().unwrap();
+        let m2v = self.model2vec.as_ref().unwrap();
+
+        // Step 1: Encode all column headers with Model2Vec
+        let headers: Vec<&str> = columns.iter().map(|(_, h)| h.as_str()).collect();
+        let header_embs = m2v.encode_batch(&headers)?; // [N_cols, D]
+
+        // Step 2: Run sibling-context attention → enriched [N_cols, D]
+        let enriched = sibling_ctx.forward(&header_embs)?;
+
+        // Step 3: For each column, run the active pipeline with enriched header
+        let mut results = Vec::with_capacity(columns.len());
+
+        if let Some(ref mb) = self.multi_branch {
+            // Multi-branch path: enriched header → header branch MLP + Sharpen
+            for (i, (values, header)) in columns.iter().enumerate() {
+                let enriched_header = enriched.get(i)?; // [D]
+                let result =
+                    self.classify_multi_branch_with_enriched(mb, values, header, &enriched_header)?;
+                results.push(result);
+            }
+        } else {
+            // Sense→Sharpen path: enriched header → Sense classification
+            for (i, (values, header)) in columns.iter().enumerate() {
+                let enriched_header = enriched.get(i)?; // [D]
+                let result =
+                    self.classify_sense_sharpen_with_context(values, header, &enriched_header)?;
+                results.push(result);
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Classify a column of values with an optional header name hint.
+    ///
+    /// When the Sense classifier is active, uses the Sense→Sharpen pipeline:
+    /// Sense predicts broad category → CharCNN votes masked to that category →
+    /// entity demotion via Sense subtype → scoped disambiguation rules.
+    /// Header hints, EntityClassifier, and geography protection are all subsumed.
+    ///
+    /// When Sense is absent, falls back to the legacy pipeline:
+    /// CharCNN → vote → disambiguation → entity demotion → header hints.
+    pub fn classify_column_with_header(
+        &self,
+        values: &[String],
+        header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        // Late-fusion pipeline (B3): when fusion is active, it is the Sense
+        // stage. Replaces the (label, confidence) prediction; Sharpen runs after.
+        if let Some(ref fusion) = self.fusion {
+            return self.classify_fusion(fusion, values, header);
+        }
+
+        // Multi-branch pipeline: when multi-branch is active, use it directly.
+        // Multi-branch is column-level (features → MLP → label), bypassing
+        // both ValueClassifier and Sense→Sharpen entirely.
+        if let Some(ref mb) = self.multi_branch {
+            return self.classify_multi_branch(mb, values, header);
+        }
+
+        // Sense→Sharpen pipeline: when Sense is active, use it
+        // instead of the legacy header-hint path.
+        if self.has_sense() {
+            return self.classify_sense_sharpen(values, header);
+        }
+
+        let mut result = self.classify_column(values)?;
+
+        // Entity demotion guard: when the entity classifier has
+        // made a deliberate data-driven demotion (full_name → entity_name),
+        // skip header hint override. The entity classifier analyzed the actual
+        // column values; header hints are a weaker signal that would undo the
+        // demotion (entity_name is broad_words → generic → header overrides).
+        if result
+            .disambiguation_rule
+            .as_ref()
+            .is_some_and(|r| r.starts_with("entity_demotion"))
+        {
+            self.finalize_is_generic(&mut result);
+            return Ok(result);
+        }
+
+        // Epoch seconds detection (legacy pipeline).
+        // Runs before header hints to prevent "created_date" → iso_8601 mismatch.
+        if !result.label.starts_with("datetime.") {
+            if let Some(epoch_label) = detect_epoch_seconds(values) {
+                result.label = epoch_label;
+                result.confidence = 0.85;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+        }
+
+        // Apply header hint: hardcoded first (curated knowledge), then Model2Vec.
+        // Hardcoded hints have been curated through multiple iterations
+        // and cover known cases precisely. Model2Vec adds value for unknown headers
+        // but can override correct hardcoded mappings.
+        let hardcoded_hint_legacy = header_hint(header).map(|h| h.to_string());
+        let hinted_type: Option<String> = hardcoded_hint_legacy.clone().or_else(|| {
+            self.semantic_hint
+                .as_ref()
+                .and_then(|sh| sh.classify_header(header))
+                .map(|r| r.label.clone())
+        });
+        let hint_is_hardcoded_legacy = hardcoded_hint_legacy.is_some();
+
+        if let Some(hinted_type) = hinted_type.as_deref() {
+            // If the model already predicts the hinted type, just boost confidence
+            if result.label == hinted_type {
+                result.confidence = (result.confidence + 0.1).min(1.0);
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+
+            // Measurement disambiguation: height and weight values are
+            // numerically indistinguishable (all small integers in overlapping
+            // ranges). When the header provides a specific measurement hint,
+            // trust it over the model prediction.
+            const MEASUREMENT_TYPES: &[&str] =
+                &["identity.person.height", "identity.person.weight"];
+            const COORDINATE_TYPES: &[&str] = &[
+                "geography.coordinate.latitude",
+                "geography.coordinate.longitude",
+            ];
+            if MEASUREMENT_TYPES.contains(&hinted_type)
+                && MEASUREMENT_TYPES.contains(&result.label.as_str())
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.9;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_measurement:{}", header.to_lowercase()));
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+            // Scientific measurement override: header contains
+            // measurement keywords (pressure, temperature, etc.) and model
+            // predicts latitude/longitude. Header is authoritative.
+            if hinted_type == "representation.numeric.decimal_number"
+                && COORDINATE_TYPES.contains(&result.label.as_str())
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.8;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_sci_measurement:{}",
+                    header.to_lowercase()
+                ));
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+
+            // Check if the hinted type is in the vote distribution
+            let hint_in_votes = result
+                .vote_distribution
+                .iter()
+                .any(|(label, _)| label == hinted_type);
+
+            // Only override if model confidence is low (< 0.5)
+            // or the result is a generic type AND the hint matches a candidate.
+            //
+            // Designation-aware gating: when taxonomy is available,
+            // types with broad designations (broad_words, broad_characters,
+            // broad_numbers, broad_object) are treated as generic because the
+            // CharCNN cannot reliably distinguish them from character patterns
+            // alone. Falls back to a hardcoded list when taxonomy is unavailable.
+            let is_generic = is_generic_prediction(
+                &result.label,
+                &result.disambiguation_rule,
+                self.taxonomy.as_ref(),
+            );
+
+            // Geography protection: when the hint is a person-name type
+            // (full_name, last_name, first_name), check if the model sees
+            // geography.location signal. Many geographic datasets use "name"
+            // as a header for city, country, or region columns. Model2Vec may
+            // return any person-name type for "name" headers.
+            if PERSON_NAME_HINTS.contains(&hinted_type) {
+                // Case 1: Model already predicts a location type — keep it
+                // rather than overriding to a person-name type.
+                if LOCATION_TYPES.contains(&result.label.as_str()) {
+                    result.confidence = result.confidence.max(0.5);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_location_keep:{}",
+                        header.to_lowercase()
+                    ));
+                    self.finalize_is_generic(&mut result);
+                    return Ok(result);
+                }
+
+                // Case 2: Prediction was demoted to generic but geography
+                // votes exist — pick the top geography type.
+                if is_generic {
+                    let top_location = result
+                        .vote_distribution
+                        .iter()
+                        .filter(|(label, _)| LOCATION_TYPES.contains(&label.as_str()))
+                        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    if let Some((loc_label, loc_frac)) = top_location {
+                        if *loc_frac >= 0.10 {
+                            result.label = loc_label.clone();
+                            result.confidence = loc_frac.max(0.5);
+                            result.disambiguation_applied = true;
+                            result.disambiguation_rule =
+                                Some(format!("header_hint_location:{}", header.to_lowercase()));
+                            self.finalize_is_generic(&mut result);
+                            return Ok(result);
+                        }
+                    }
+                }
+            }
+
+            // Same-domain geographic override: when both the hint
+            // and prediction are location types, trust the header name.
+            if LOCATION_TYPES.contains(&hinted_type)
+                && LOCATION_TYPES.contains(&result.label.as_str())
+                && result.label != hinted_type
+                && result.confidence <= 0.90
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_geo_override:{}",
+                    header.to_lowercase()
+                ));
+                self.finalize_is_generic(&mut result);
+                return Ok(result);
+            }
+
+            // Same-category hardcoded hint override:
+            // When the hardcoded header hint and prediction share the same
+            // domain.category (e.g., both datetime.timestamp.*), the header
+            // is authoritative for format disambiguation. Only applies when
+            // confidence is moderate (≤0.80) — high confidence predictions
+            // within the same category are more likely correct than the hint.
+            if hint_is_hardcoded_legacy && result.label != hinted_type && result.confidence <= 0.80
+            {
+                let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
+                let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
+                if !hint_category.is_empty()
+                    && hint_category == pred_category
+                    && hint_category.contains('.')
+                {
+                    result.label = hinted_type.to_string();
+                    result.confidence = result.confidence.max(0.7);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_same_category:{}",
+                        header.to_lowercase()
+                    ));
+                    self.finalize_is_generic(&mut result);
+                    return Ok(result);
+                }
+            }
+
+            // Cross-domain hardcoded hint override:
+            // When a hardcoded hint and prediction differ in both domain AND
+            // base type name, the header is authoritative. Catches structural
+            // confusion (postal_code vs CPT, epoch vs NPI) where patterns are
+            // identical and only the header disambiguates.
+            // Does NOT fire when base type names match (uuid vs uuid).
+            if hint_is_hardcoded_legacy && result.label != hinted_type {
+                let hint_domain = hinted_type.split('.').next().unwrap_or("");
+                let pred_domain = result.label.split('.').next().unwrap_or("");
+                let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
+                let pred_base = result.label.rsplit('.').next().unwrap_or("");
+                if !hint_domain.is_empty()
+                    && !pred_domain.is_empty()
+                    && hint_domain != pred_domain
+                    && hint_base != pred_base
+                {
+                    result.label = hinted_type.to_string();
+                    result.confidence = result.confidence.max(0.5);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "header_hint_cross_domain:{}",
+                        header.to_lowercase()
+                    ));
+                    self.finalize_is_generic(&mut result);
+                    return Ok(result);
+                }
+            }
+
+            let original_label = result.label.clone();
+
+            if (result.confidence < 0.5 || is_generic) && hint_in_votes {
+                let hint_fraction = result
+                    .vote_distribution
+                    .iter()
+                    .find(|(label, _)| label == hinted_type)
+                    .map(|(_, frac)| *frac)
+                    .unwrap_or(0.0);
+
+                result.label = hinted_type.to_string();
+                result.confidence = hint_fraction.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
+            } else if hint_is_hardcoded_legacy && result.confidence < 0.5 && !hint_in_votes {
+                // Hardcoded header hint with low confidence — apply even when the
+                // hinted type was eliminated from votes by validation. Hardcoded hints
+                // are curated human knowledge (e.g., header "npi" → identity.medical.npi).
+                // When the model is uncertain (< 0.5) and the header is an exact match,
+                // the header is more authoritative than validation pass rates on
+                // potentially synthetic data.
+                result.label = hinted_type.to_string();
+                result.confidence = 0.6;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
+            } else if is_generic && !hint_in_votes {
+                // Financial model2vec guard: block model2vec financial hints when
+                // the CharCNN saw no financial signal in values. See Sense pipeline
+                // for detailed rationale.
+                let is_financial_hint = hinted_type.starts_with("finance.");
+                if is_financial_hint && !hint_is_hardcoded_legacy {
+                    // Model2vec financial hint with no value evidence — skip.
+                } else {
+                    result.label = hinted_type.to_string();
+                    result.confidence = 0.5;
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule =
+                        Some(format!("header_hint_generic:{}", header.to_lowercase()));
+                }
+            } else if result.confidence < 0.3 && !hint_in_votes {
+                // Very low confidence and hint type not even in votes —
+                // still apply hint but with low confidence
+                result.label = hinted_type.to_string();
+                result.confidence = 0.4;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_fallback:{}", header.to_lowercase()));
+            }
+
+            // If header hint changed the label, re-detect locale for the new type
+            //. The detected_locale from classify_column was
+            // for the original label — re-run detection against the new label's
+            // validation_by_locale patterns.
+            if result.label != original_label {
+                result.detected_locale = self
+                    .taxonomy
+                    .as_ref()
+                    .and_then(|t| detect_locale_from_validation(values, &result.label, t));
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    /// Sense → Sharpen pipeline.
+    ///
+    /// 1. Sample 100 values → encode header + first 50 with Model2Vec
+    /// 2. Run Sense for broad category + entity subtype
+    /// 3. Run CharCNN batch on all 100 values
+    /// 4. Masked vote aggregation (only category-eligible labels count)
+    /// 5. Disambiguation rules (scoped to winning category)
+    /// 6. Entity demotion via Sense subtype (replaces Rule 18 + EntityClassifier)
+    /// 7. Post-hoc locale detection
+    fn classify_sense_sharpen(
+        &self,
+        values: &[String],
+        header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        self.classify_sense_sharpen_inner(values, header, None)
+    }
+
+    /// Sense → Sharpen with a pre-computed context-enriched header.
+    ///
+    /// Same as `classify_sense_sharpen` but uses the enriched header embedding
+    /// from sibling-context attention instead of encoding the header from scratch.
+    fn classify_sense_sharpen_with_context(
+        &self,
+        values: &[String],
+        header: &str,
+        enriched_header_emb: &candle_core::Tensor,
+    ) -> Result<ColumnResult, InferenceError> {
+        self.classify_sense_sharpen_inner(values, header, Some(enriched_header_emb))
+    }
+
+    /// Inner implementation of the Sense → Sharpen pipeline.
+    ///
+    /// When `enriched_header_emb` is Some, uses the pre-computed context-enriched
+    /// header for Sense classification. When None, encodes the header
+    /// normally via Model2Vec (standard path).
+    fn classify_sense_sharpen_inner(
+        &self,
+        values: &[String],
+        header: &str,
+        enriched_header_emb: Option<&candle_core::Tensor>,
+    ) -> Result<ColumnResult, InferenceError> {
+        let sense = self.sense.as_ref().unwrap();
+        let m2v = self.model2vec.as_ref().unwrap();
+        let label_map = self.label_map.as_ref().unwrap();
+
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Step 1: Sample values (same as classify_column)
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+        let n_samples = sample.len();
+
+        // Step 1b: Extract deterministic features for all sampled values.
+        // Runs before Sense and CharCNN — features are used both for CharCNN
+        // augmentation (when model supports it) and for disambiguation rules.
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+
+        // Compute aggregated column-level features (mean, variance, min, max).
+        // Used by disambiguation rules for column-level decisions.
+        let column_features = aggregate_features(&per_value_features);
+
+        // Step 2: Run Sense — encode header + first 50 values
+        let sense_values: Vec<&str> = sample.iter().take(50).map(|s| s.as_str()).collect();
+        let sense_result = if let Some(enriched_emb) = enriched_header_emb {
+            // use pre-computed context-enriched header embedding
+            sense.classify_with_enriched_header(m2v, enriched_emb, &sense_values)?
+        } else {
+            // Standard path: encode header from scratch
+            let header_opt = if header.is_empty() {
+                None
+            } else {
+                Some(header)
+            };
+            sense.classify(m2v, header_opt, &sense_values)?
+        };
+
+        // Trace point 1: Sense prediction
+        tracing::debug!(
+            column = %header,
+            sense_category = %sense_result.broad_category,
+            sense_confidence = sense_result.broad_confidence,
+            entity_subtype = ?sense_result.entity_subtype,
+            "Sense prediction"
+        );
+
+        // Step 3: Run CharCNN batch on all sampled values.
+        // Pass per-value features for augmented inference when the model supports it.
+        let flat_features: Vec<f32> = per_value_features.iter().flatten().copied().collect();
+        let results =
+            self.classifier
+                .classify_batch_with_features(&sample, &flat_features, FEATURE_DIM)?;
+
+        // Step 4: Aggregate votes — collapse 4-level locale labels to 3-level.
+        let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
+        let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new();
+        for result in &results {
+            let (base_label, locale) = strip_locale_suffix(&result.label);
+            *vote_counts_3level
+                .entry(base_label.to_string())
+                .or_default() += 1;
+            if let Some(loc) = locale {
+                *locale_votes
+                    .entry(base_label.to_string())
+                    .or_default()
+                    .entry(loc.to_string())
+                    .or_default() += 1;
+            }
+        }
+
+        // Save unmasked vote distribution for geography rescue (Step 6).
+        // Must be saved BEFORE masking, as masked votes won't contain location
+        // types when Sense routes to Entity category.
+        let unmasked_votes: Vec<(String, usize)> = {
+            let mut v: Vec<(String, usize)> = vote_counts_3level
+                .iter()
+                .map(|(k, v)| (k.clone(), *v))
+                .collect();
+            v.sort_by_key(|b| std::cmp::Reverse(b.1));
+            v
+        };
+
+        // Trace point 2: Raw CharCNN votes before masking
+        tracing::debug!(
+            column = %header,
+            top_votes = ?unmasked_votes.iter().take(5).collect::<Vec<_>>(),
+            total_votes = n_samples,
+            "Raw CharCNN votes (before mask)"
+        );
+
+        // Step 5: Masked vote aggregation — only count votes for types
+        // eligible under the Sense-predicted category.
+        let category = sense_result.broad_category;
+
+        let mut masked_votes: Vec<(String, usize)> = vote_counts_3level
+            .iter()
+            .filter(|(label, _)| label_map.is_eligible(label, category))
+            .map(|(label, count)| (label.clone(), *count))
+            .collect();
+        masked_votes.sort_by_key(|b| std::cmp::Reverse(b.1));
+
+        // Safety valve: fall back to unmasked aggregation when Sense routing
+        // is likely wrong:
+        // 1. All votes masked out (category completely wrong)
+        // 2. Low Sense confidence (<0.75) AND masking removes >40% of total
+        //    votes — Sense is uncertain and masking discards too much signal
+        // 3. Masking removes >90% of votes regardless of Sense confidence —
+        //    when the model overwhelmingly votes for types outside the Sense
+        //    category, the mask is discarding too much signal
+        //    (e.g. earthquake horizontalError: 98% decimal_number masked by Text)
+        let total_unmasked: usize = vote_counts_3level.values().sum();
+        let total_masked: usize = masked_votes.iter().map(|(_, c)| *c).sum();
+        let masked_out_frac = if total_unmasked > 0 {
+            1.0 - (total_masked as f64 / total_unmasked as f64)
+        } else {
+            0.0
+        };
+        let should_fallback = masked_votes.is_empty()
+            || masked_votes[0].1 == 0
+            || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4)
+            || masked_out_frac > 0.9;
+        // Trace point 3: Mask application
+        tracing::debug!(
+            column = %header,
+            masked_top_votes = ?masked_votes.iter().take(5).collect::<Vec<_>>(),
+            total_unmasked = total_unmasked,
+            total_masked = total_masked,
+            masked_out_fraction = %format!("{:.2}", masked_out_frac),
+            sense_confidence = sense_result.broad_confidence,
+            safety_valve_fired = should_fallback,
+            "Mask application"
+        );
+
+        let (mut votes, mask_applied) = if should_fallback {
+            let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
+            all_votes.sort_by_key(|b| std::cmp::Reverse(b.1));
+            (all_votes, false)
+        } else {
+            (masked_votes, true)
+        };
+
+        // Validation-based candidate elimination: reject candidates
+        // whose JSON Schema validation contract is violated by >50% of sample
+        // values. The type's own contract becomes the arbiter — if a type says
+        // its values look like `^\d{4}-\d{2}-\d{2}T...` and 100% of the column's
+        // values fail that pattern, the model is wrong regardless of confidence.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            let non_empty_count = sample.iter().filter(|v| !v.trim().is_empty()).count();
+            if non_empty_count >= 3 {
+                let validated: Vec<(String, usize)> = votes
+                    .iter()
+                    .filter(|(label, _)| {
+                        taxonomy
+                            .get_validator(label)
+                            .map(|validator| {
+                                let pass_count = sample
+                                    .iter()
+                                    .filter(|v| validator.is_valid(v.trim()))
+                                    .count();
+                                pass_count as f32 / non_empty_count as f32 >= 0.5
+                            })
+                            .unwrap_or(true) // no validator → keep
+                    })
+                    .cloned()
+                    .collect();
+                // Safety: if ALL eliminated, keep original votes
+                if !validated.is_empty() {
+                    votes = validated;
+                }
+            }
+        }
+
+        let vote_distribution: Vec<(String, f32)> = votes
+            .iter()
+            .map(|(label, count)| (label.clone(), *count as f32 / n_samples as f32))
+            .collect();
+
+        // Majority winner
+        let (majority_label, majority_count) = votes.first().cloned().unwrap_or_default();
+        let majority_fraction = majority_count as f32 / n_samples as f32;
+
+        // Determine dominant locale for the winning type
+        let detected_locale = locale_votes.get(&majority_label).and_then(|locales| {
+            locales
+                .iter()
+                .max_by_key(|(_, count)| *count)
+                .map(|(locale, _)| locale.clone())
+                .filter(|l| l != "UNIVERSAL")
+        });
+
+        // Step 6: Disambiguation rules (same rules, but votes are already scoped)
+        let disambiguation =
+            disambiguate(&sample, &results, &votes, n_samples, self.taxonomy.as_ref());
+
+        let mut result = if let Some((label, rule_name)) = disambiguation {
+            let disambig_locale = locale_votes.get(&label).and_then(|locales| {
+                locales
+                    .iter()
+                    .max_by_key(|(_, count)| *count)
+                    .map(|(locale, _)| locale.clone())
+                    .filter(|l| l != "UNIVERSAL")
+            });
+            let confidence = if rule_name.starts_with("attractor_demotion") {
+                majority_fraction.max(0.5)
+            } else {
+                majority_fraction.max(0.8)
+            };
+            ColumnResult {
+                label,
+                confidence,
+                vote_distribution,
+                disambiguation_applied: true,
+                disambiguation_rule: Some(rule_name),
+                samples_used: n_samples,
+                detected_locale: disambig_locale,
+                is_generic: false,
+                column_features: None,
+            }
+        } else {
+            let confidence = if majority_fraction >= self.config.min_agreement {
+                majority_fraction
+            } else {
+                majority_fraction * 0.5
+            };
+            ColumnResult {
+                label: majority_label,
+                confidence,
+                vote_distribution,
+                disambiguation_applied: mask_applied,
+                disambiguation_rule: if mask_applied {
+                    Some(format!("sense_mask:{}", category))
+                } else {
+                    None
+                },
+                samples_used: n_samples,
+                detected_locale,
+                is_generic: false,
+                column_features: None,
+            }
+        };
+
+        // Attach column features to result for downstream analysis (spike AC-2).
+        result.column_features = Some(column_features.clone());
+
+        // Step 6b: Feature-based disambiguation.
+        // Use aggregated deterministic features to resolve known confusion pairs
+        // that the CharCNN model struggles with.
+        feature_disambiguate(&mut result, &column_features, &votes, n_samples);
+
+        // Step 7: Entity handling via Sense subtype (replaces Rule 18 + EntityClassifier).
+        // When Sense predicts Entity category:
+        //   - Non-person subtype + majority is full_name → demote to entity_name
+        //   - Non-person subtype + other entity type → keep majority
+        //   - Person subtype → keep as-is (no demotion needed)
+        if category == BroadCategory::Entity {
+            if let Some(subtype) = sense_result.entity_subtype {
+                match subtype {
+                    EntitySubtype::Person => {
+                        // Person — keep full_name or other person type as-is
+                    }
+                    _ => {
+                        // Non-person (Place, Organization, CreativeWork)
+                        if result.label == "identity.person.full_name" {
+                            result.label = "representation.text.entity_name".to_string();
+                            result.disambiguation_applied = true;
+                            result.disambiguation_rule =
+                                Some(format!("sense_entity_demotion:{}", subtype));
+                            result.detected_locale = None;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 7b: Geography rescue from unmasked votes.
+        // When Sense misroutes (e.g., country names → Temporal or Entity),
+        // location types get masked out. Check unmasked CharCNN votes for
+        // geography signal. Only fire when location types are the PLURALITY
+        // (top vote) in unmasked votes — this ensures CharCNN genuinely sees
+        // geography, not just incidental location votes from text overlap.
+        // Skip when a hardcoded header hint points to a specific non-location,
+        // non-person type (e.g., "publisher" → entity_name should not be
+        // overridden). Person-name hints (full_name, first_name, etc.) are
+        // ambiguous with location names so we still allow rescue for those.
+        //
+        // Step 7b-pre: Header-hint location override.
+        // When the hardcoded header hint IS a location type (country, city,
+        // state, region, continent) but the current result is NOT a location
+        // type, the header is authoritative. This catches Sense misrouting
+        // where CharCNN v12 can't produce enough location votes in unmasked
+        // distribution (e.g., "Afghanistan" → day_of_week, "Albania" →
+        // first_name, so unmasked top vote is NOT a location type). Only
+        // uses LOCATION_TYPES (not address types) to avoid false positives
+        // from keyword matches like "mac_address" → street_address.
+        let header_location_hint = header_hint(header).filter(|h| LOCATION_TYPES.contains(h));
+        if !LOCATION_TYPES.contains(&result.label.as_str()) {
+            if let Some(loc_hint) = header_location_hint {
+                result.label = loc_hint.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("sense_geo_hint_override:{}", header.to_lowercase()));
+            } else {
+                // Original rescue: check unmasked votes for location signal
+                let header_hint_blocks_rescue = header_hint(header).is_some_and(|h| {
+                    !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h)
+                });
+                if !header_hint_blocks_rescue {
+                    if let Some((top_label, top_count)) = unmasked_votes.first() {
+                        if LOCATION_TYPES.contains(&top_label.as_str()) {
+                            let loc_frac = *top_count as f32 / n_samples as f32;
+                            if loc_frac >= 0.15 {
+                                result.label = top_label.clone();
+                                result.confidence = loc_frac.max(0.5);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule =
+                                    Some(format!("sense_geo_rescue:{}", header.to_lowercase()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 7c: Epoch seconds detection.
+        // 10-digit integers in the Unix epoch range (2000-01-01 to 2050-01-01)
+        // are consistently misclassified as NPI or other identity types by
+        // CharCNN. Value-range detection is high-confidence and runs before
+        // header hints to prevent "created_date" → iso_8601 mismatch.
+        if !result.label.starts_with("datetime.") {
+            let epoch_result = detect_epoch_seconds(&sample);
+            if let Some(epoch_label) = epoch_result {
+                result.label = epoch_label;
+                result.confidence = 0.85;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
+            }
+        }
+
+        // Step 8: Header hint application (complements Sense masking).
+        // Sense narrows the broad category, but header hints resolve
+        // within-category ambiguity. Skipped when Sense entity demotion
+        // was applied (the entity classifier's decision is authoritative).
+        let label_before_hints = result.label.clone();
+        let entity_demoted = result
+            .disambiguation_rule
+            .as_ref()
+            .is_some_and(|r| r.starts_with("sense_entity_demotion"));
+        if !entity_demoted && !header.is_empty() {
+            // Hardcoded first (curated knowledge), then Model2Vec.
+            let hardcoded_hint = header_hint(header).map(|h| h.to_string());
+            let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
+                self.semantic_hint
+                    .as_ref()
+                    .and_then(|sh| sh.classify_header(header))
+                    .map(|r| r.label.clone())
+            });
+            let hint_is_hardcoded = hardcoded_hint.is_some();
+
+            if let Some(hinted_type) = hinted_type.as_deref() {
+                // Already predicts the hinted type — boost confidence
+                if result.label == hinted_type {
+                    result.confidence = (result.confidence + 0.1).min(1.0);
+                } else {
+                    // Measurement disambiguation: height/weight
+                    const MEASUREMENT_TYPES: &[&str] =
+                        &["identity.person.height", "identity.person.weight"];
+                    // Coordinate types that can be confused with measurement data
+                    const COORDINATE_TYPES: &[&str] = &[
+                        "geography.coordinate.latitude",
+                        "geography.coordinate.longitude",
+                    ];
+                    if MEASUREMENT_TYPES.contains(&hinted_type)
+                        && MEASUREMENT_TYPES.contains(&result.label.as_str())
+                    {
+                        result.label = hinted_type.to_string();
+                        result.confidence = 0.9;
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule = Some(format!(
+                            "sense_header_hint_measurement:{}",
+                            header.to_lowercase()
+                        ));
+                    } else if hinted_type == "representation.numeric.decimal_number"
+                        && COORDINATE_TYPES.contains(&result.label.as_str())
+                    {
+                        // Scientific measurement override: when the
+                        // header contains measurement keywords (pressure,
+                        // temperature, etc.) and the model predicts latitude/
+                        // longitude, the header is authoritative. Small decimal
+                        // values like pressure_atm (0.685-9.544) are in latitude
+                        // range but the header says "pressure", not "latitude".
+                        result.label = hinted_type.to_string();
+                        result.confidence = 0.8;
+                        result.disambiguation_applied = true;
+                        result.disambiguation_rule = Some(format!(
+                            "sense_header_hint_sci_measurement:{}",
+                            header.to_lowercase()
+                        ));
+                    } else {
+                        // Check hint in votes and generic status
+                        let hint_in_votes = result
+                            .vote_distribution
+                            .iter()
+                            .any(|(label, _)| label == hinted_type);
+
+                        let is_generic = is_generic_prediction(
+                            &result.label,
+                            &result.disambiguation_rule,
+                            self.taxonomy.as_ref(),
+                        );
+
+                        // Geography protection: person-name hints don't override
+                        // location types. Uses early-continue pattern
+                        // so non-location cases fall through to general logic.
+                        let mut geo_handled = false;
+                        if PERSON_NAME_HINTS.contains(&hinted_type) {
+                            if LOCATION_TYPES.contains(&result.label.as_str()) {
+                                // Result is already a location type. If the hint
+                                // is a hardcoded person-name hint (e.g., "first_name"
+                                // header → first_name), trust the header over CharCNN's
+                                // location prediction — person names and place names
+                                // overlap in CharCNN vocabulary but the header is
+                                // authoritative.
+                                if hint_is_hardcoded {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = result.confidence.max(0.6);
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_person_override:{}",
+                                        header.to_lowercase()
+                                    ));
+                                } else {
+                                    result.confidence = result.confidence.max(0.5);
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_location_keep:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
+                                geo_handled = true;
+                            } else if !hint_is_hardcoded && (is_generic || result.confidence < 0.3)
+                            {
+                                // Model2Vec person-name hint + generic/very-low-confidence →
+                                // check UNMASKED votes for location types. Low confidence
+                                // (<0.3) suggests Sense may have misrouted this column,
+                                // so masked votes are unreliable. Unmasked CharCNN votes
+                                // give the true value-level signal.
+                                // Skip this for hardcoded hints — they're authoritative
+                                // and should fall through to general hint logic.
+                                let top_unmasked_location = unmasked_votes
+                                    .iter()
+                                    .find(|(label, _)| LOCATION_TYPES.contains(&label.as_str()));
+                                if let Some((loc_label, loc_count)) = top_unmasked_location {
+                                    let loc_frac = *loc_count as f32 / n_samples as f32;
+                                    if loc_frac >= 0.10 {
+                                        result.label = loc_label.clone();
+                                        result.confidence = loc_frac.max(0.5);
+                                        result.disambiguation_applied = true;
+                                        result.disambiguation_rule = Some(format!(
+                                            "sense_header_hint_location:{}",
+                                            header.to_lowercase()
+                                        ));
+                                        geo_handled = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Same-domain geographic override:
+                        // when both hint and prediction are location types (e.g.,
+                        // city vs country), the header is authoritative. Hardcoded
+                        // hints (e.g., "Country" → country) override at any
+                        // confidence — the header explicitly names the geo type.
+                        // Model2Vec hints use the original ≤0.90 threshold since
+                        // semantic similarity is less precise.
+                        if !geo_handled
+                            && LOCATION_TYPES.contains(&hinted_type)
+                            && LOCATION_TYPES.contains(&result.label.as_str())
+                            && result.label != hinted_type
+                            && (hint_is_hardcoded || result.confidence <= 0.90)
+                        {
+                            result.label = hinted_type.to_string();
+                            result.confidence = result.confidence.max(0.6);
+                            result.disambiguation_applied = true;
+                            result.disambiguation_rule = Some(format!(
+                                "sense_header_hint_geo_override:{}",
+                                header.to_lowercase()
+                            ));
+                            geo_handled = true;
+                        }
+
+                        // Same-category hardcoded hint override:
+                        // When the hardcoded header hint and prediction share the
+                        // same domain.category (e.g., both datetime.timestamp.*),
+                        // the header is authoritative for distinguishing format
+                        // variants. Headers like "rfc_2822_timestamp" explicitly
+                        // name the format — trust them over CharCNN's inability
+                        // to distinguish similar timestamp formats. Only applies
+                        // when confidence is moderate (≤0.80).
+                        if !geo_handled
+                            && hint_is_hardcoded
+                            && result.label != hinted_type
+                            && result.confidence <= 0.80
+                        {
+                            let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
+                            let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
+                            if !hint_category.is_empty()
+                                && hint_category == pred_category
+                                && hint_category.contains('.')
+                            {
+                                result.label = hinted_type.to_string();
+                                result.confidence = result.confidence.max(0.7);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_same_category:{}",
+                                    header.to_lowercase()
+                                ));
+                                geo_handled = true;
+                            }
+                        }
+
+                        // Cross-domain hardcoded hint override:
+                        // When a hardcoded hint and prediction differ in domain AND
+                        // the predicted type's base name differs from the hint's base
+                        // name, the header is authoritative. This catches cases where
+                        // structurally identical patterns (5-digit numbers) get
+                        // classified as the wrong type entirely:
+                        //   "postal" → postal_code vs CPT (medical code)
+                        //   "epoch" → unix_seconds vs NPI (medical ID)
+                        //   "cabin" → alphanumeric_id vs ICD10 (medical code)
+                        // Does NOT fire when the base type name matches (e.g.,
+                        // representation.identifier.uuid vs technology.identifier.uuid)
+                        // or when only the domain prefix differs for the same concept.
+                        if !geo_handled && hint_is_hardcoded && result.label != hinted_type {
+                            let hint_domain = hinted_type.split('.').next().unwrap_or("");
+                            let pred_domain = result.label.split('.').next().unwrap_or("");
+                            let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
+                            let pred_base = result.label.rsplit('.').next().unwrap_or("");
+                            if !hint_domain.is_empty()
+                                && !pred_domain.is_empty()
+                                && hint_domain != pred_domain
+                                && hint_base != pred_base
+                            {
+                                result.label = hinted_type.to_string();
+                                result.confidence = result.confidence.max(0.5);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_cross_domain:{}",
+                                    header.to_lowercase()
+                                ));
+                                geo_handled = true;
+                            }
+                        }
+
+                        // General hint logic (runs for all non-person hints,
+                        // and also for person hints not handled by geography protection)
+                        if !geo_handled {
+                            let original_label = result.label.clone();
+
+                            if (result.confidence < 0.5 || is_generic) && hint_in_votes {
+                                let hint_fraction = result
+                                    .vote_distribution
+                                    .iter()
+                                    .find(|(label, _)| label == hinted_type)
+                                    .map(|(_, frac)| *frac)
+                                    .unwrap_or(0.0);
+
+                                result.label = hinted_type.to_string();
+                                result.confidence = hint_fraction.max(0.6);
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule =
+                                    Some(format!("sense_header_hint:{}", header.to_lowercase()));
+                            } else if is_generic && !hint_in_votes {
+                                // Financial model2vec guard: when model2vec suggests a
+                                // financial type (basis_points, yield, amount variants)
+                                // but the CharCNN saw zero financial signal in values
+                                // (hint NOT in votes), don't override. Headers like
+                                // "points" (vote counts), "yield" (crop yield), "pct"
+                                // (general percentages) trigger false financial hints.
+                                // Only block model2vec financial hints — hardcoded hints
+                                // are curated and handled separately below.
+                                let is_financial_hint = hinted_type.starts_with("finance.");
+                                if is_financial_hint && !hint_is_hardcoded {
+                                    // Model2vec financial hint with no value evidence —
+                                    // skip, let the generic prediction stand.
+                                    tracing::debug!(
+                                        column = %header,
+                                        blocked_hint = %hinted_type,
+                                        current_label = %result.label,
+                                        "Financial model2vec hint blocked (no vote evidence)"
+                                    );
+                                } else {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = 0.5;
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_generic:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
+                            } else if hint_is_hardcoded && !hint_in_votes {
+                                // Hardcoded hint authority (refined):
+                                // Hardcoded hints are curated knowledge. Threshold depends
+                                // on domain relationship:
+                                // - Cross-domain (hint=repr, pred=identity): 0.85 threshold
+                                //   because the header encodes semantic knowledge the model
+                                //   lacks (e.g., "age" → integer vs numeric_code at 0.78)
+                                // - Same-domain (hint=datetime, pred=datetime): 0.5 threshold
+                                //   because within-domain the model is more reliable (e.g.,
+                                //   eu_date → dmy_slash vs iso_8601, model at 0.80 is right)
+                                let h_domain = hinted_type.split('.').next().unwrap_or("");
+                                let p_domain = result.label.split('.').next().unwrap_or("");
+                                let threshold = if h_domain != p_domain { 0.85 } else { 0.5 };
+                                if result.confidence < threshold {
+                                    result.label = hinted_type.to_string();
+                                    result.confidence = 0.5;
+                                    result.disambiguation_applied = true;
+                                    result.disambiguation_rule = Some(format!(
+                                        "sense_header_hint_hardcoded:{}",
+                                        header.to_lowercase()
+                                    ));
+                                }
+                            } else if result.confidence < 0.3 && !hint_in_votes {
+                                result.label = hinted_type.to_string();
+                                result.confidence = 0.4;
+                                result.disambiguation_applied = true;
+                                result.disambiguation_rule = Some(format!(
+                                    "sense_header_hint_fallback:{}",
+                                    header.to_lowercase()
+                                ));
+                            }
+
+                            // Re-detect locale if label changed
+                            if result.label != original_label {
+                                if let Some(taxonomy) = self.taxonomy.as_ref() {
+                                    result.detected_locale = detect_locale_from_validation(
+                                        &sample,
+                                        &result.label,
+                                        taxonomy,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Trace point 4: Header hint outcome
+        if result.label != label_before_hints {
+            tracing::debug!(
+                column = %header,
+                hint_rule = ?result.disambiguation_rule,
+                old_label = %label_before_hints,
+                new_label = %result.label,
+                "Header hint applied"
+            );
+        }
+
+        // Step 9: Post-hoc locale detection (unchanged from legacy pipeline)
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        // Trace point 6: Final column classification result
+        tracing::debug!(
+            column = %header,
+            final_label = %result.label,
+            confidence = result.confidence,
+            disambiguation_rule = ?result.disambiguation_rule,
+            samples_used = result.samples_used,
+            detected_locale = ?result.detected_locale,
+            "Column classification complete"
+        );
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    /// Get a reference to the configuration.
+    pub fn config(&self) -> &ColumnConfig {
+        &self.config
+    }
+
+    /// Multi-branch classification with Sharpen post-processing (AC-1).
+    ///
+    /// Pipeline: multi-branch forward pass → feature_sharpen (F1-F6) →
+    /// value_sharpen (R1-R19) → header hints → locale detection.
+    ///
+    /// Samples values (same as standard pipeline), then extracts 3-branch
+    /// features (960 char + 512 embed + 27 stats), runs the forward pass,
+    /// and applies the lightweight Sharpen layer before returning.
+    /// Late-fusion Sense stage (B3, spec 2026-06-08).
+    ///
+    /// Mirrors `classify_multi_branch` exactly except the (label, confidence)
+    /// prediction comes from the fusion head (value-CharCNN + multi-branch views
+    /// → residual head) instead of the bare multi-branch forward. The identical
+    /// Sharpen post-processing (feature_sharpen, value_sharpen, header hints,
+    /// locale detection) runs after — fusion replaces only the Sense prediction.
+    fn classify_fusion(
+        &self,
+        fusion: &FusionClassifier,
+        values: &[String],
+        header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Sample values (same strategy as classify_multi_branch).
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+        let samples_used = sample.len();
+
+        // Step 1: Fusion Sense prediction (replaces multi-branch's forward).
+        let ranked = fusion.classify_column_ranked(&sample, header, self.taxonomy.as_ref())?;
+        let (mut label, mut confidence) = ranked
+            .first()
+            .cloned()
+            .unwrap_or_else(|| ("unknown".to_string(), 0.0));
+        let mut disambiguation_rule = "late-fusion".to_string();
+
+        // Lever 1 — cardinality gate. The value head cannot see column cardinality,
+        // so it funnels high-cardinality free-text columns (word/entity_name/
+        // plain_text) into `representation.discrete.categorical`. A real enum
+        // repeats a bounded set of values; a free-text column is mostly distinct.
+        // When the top label is categorical but the FULL column is too high-
+        // cardinality to be an enum, demote to the head's best non-categorical
+        // alternative. (Low-cardinality categorical over-emission is recovered by
+        // the head's alpha floor, not here.)
+        if label == CATEGORICAL_LABEL {
+            let mut uniq = std::collections::HashSet::new();
+            let mut total = 0usize;
+            for v in values {
+                let t = v.trim();
+                if !t.is_empty() {
+                    uniq.insert(t);
+                    total += 1;
+                }
+            }
+            let distinct = uniq.len();
+            let frac_unique = if total > 0 {
+                distinct as f32 / total as f32
+            } else {
+                0.0
+            };
+            let too_high_card = distinct > 50 || (frac_unique > 0.7 && distinct > 20);
+            if too_high_card {
+                if let Some((alt_label, alt_conf)) =
+                    ranked.iter().find(|(l, _)| l != CATEGORICAL_LABEL).cloned()
+                {
+                    disambiguation_rule = format!("fusion_cardinality_gate:{distinct}");
+                    label = alt_label;
+                    confidence = alt_conf;
+                }
+            }
+        }
+
+        // Step 2: Deterministic ColumnFeatures (36-dim, no neural inference).
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+
+        let mut result = ColumnResult {
+            label: label.clone(),
+            confidence,
+            vote_distribution: vec![(label, confidence)],
+            disambiguation_applied: disambiguation_rule != "late-fusion",
+            disambiguation_rule: Some(disambiguation_rule),
+            samples_used,
+            detected_locale: None,
+            is_generic: false,
+            column_features: Some(column_features.clone()),
+        };
+
+        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set).
+        if !self.skip_sharpen {
+            feature_sharpen(&mut result, &column_features);
+
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                &sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
+
+            self.sharpen_and_guard(&mut result, header, &sample);
+        }
+
+        // Step 6: Post-hoc locale detection.
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    fn classify_multi_branch(
+        &self,
+        mb: &MultiBranchClassifier,
+        values: &[String],
+        header: &str,
+    ) -> Result<ColumnResult, InferenceError> {
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Sample values (same strategy as classify_column)
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+
+        let samples_used = sample.len();
+
+        // Step 1: Classify via multi-branch (feature extraction + forward pass)
+        let (label, confidence) = mb.classify_column(&sample, header, self.taxonomy.as_ref())?;
+
+        // Step 2: Compute deterministic ColumnFeatures (36-dim, no neural inference)
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+
+        let mut result = ColumnResult {
+            label: label.clone(),
+            confidence,
+            vote_distribution: vec![(label, confidence)],
+            disambiguation_applied: false,
+            disambiguation_rule: Some("multi-branch".to_string()),
+            samples_used,
+            detected_locale: None,
+            is_generic: false,
+            column_features: Some(column_features.clone()),
+        };
+
+        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
+        if !self.skip_sharpen {
+            // Step 3: Feature-based Sharpen rules (F1-F6)
+            feature_sharpen(&mut result, &column_features);
+
+            // Step 4: Value-based Sharpen rules (R1-R19)
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                &sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
+
+            // Step 5: Header hints (Model2Vec semantic matching)
+            self.sharpen_and_guard(&mut result, header, &sample);
+        }
+
+        // Step 6: Post-hoc locale detection
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    /// Multi-branch classification with enriched header + Sharpen (AC-1).
+    ///
+    /// Like `classify_multi_branch()` but uses a sibling-context-enriched
+    /// header tensor instead of the raw header string. Called from
+    /// `classify_columns_with_context()` when both multi-branch and sibling
+    /// context are active.
+    ///
+    /// Note: header hints require the raw header string, which is passed
+    /// separately from the enriched tensor.
+    fn classify_multi_branch_with_enriched(
+        &self,
+        mb: &MultiBranchClassifier,
+        values: &[String],
+        header: &str,
+        enriched_header: &candle_core::Tensor,
+    ) -> Result<ColumnResult, InferenceError> {
+        if values.is_empty() {
+            return Ok(ColumnResult {
+                label: "unknown".to_string(),
+                confidence: 0.0,
+                vote_distribution: vec![],
+                disambiguation_applied: false,
+                disambiguation_rule: None,
+                samples_used: 0,
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            });
+        }
+
+        // Sample values (same strategy as classify_column)
+        let sample = if values.len() <= self.config.sample_size {
+            values.to_vec()
+        } else {
+            let step = values.len() as f64 / self.config.sample_size as f64;
+            (0..self.config.sample_size)
+                .map(|i| values[(i as f64 * step) as usize].clone())
+                .collect()
+        };
+
+        let samples_used = sample.len();
+
+        // Step 1: Classify via multi-branch with enriched header
+        let (label, confidence) = mb.classify_column_with_enriched_header(
+            &sample,
+            enriched_header,
+            self.taxonomy.as_ref(),
+        )?;
+
+        // Step 2: Compute deterministic ColumnFeatures
+        let per_value_features: Vec<[f32; FEATURE_DIM]> =
+            sample.iter().map(|v| extract_features(v)).collect();
+        let column_features = aggregate_features(&per_value_features);
+
+        let mut result = ColumnResult {
+            label: label.clone(),
+            confidence,
+            vote_distribution: vec![(label, confidence)],
+            disambiguation_applied: false,
+            disambiguation_rule: Some("multi-branch-sibling".to_string()),
+            samples_used,
+            detected_locale: None,
+            is_generic: false,
+            column_features: Some(column_features.clone()),
+        };
+
+        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
+        if !self.skip_sharpen {
+            // Step 3: Feature-based Sharpen rules (F1-F6)
+            feature_sharpen(&mut result, &column_features);
+
+            // Step 4: Value-based Sharpen rules (R1-R19)
+            if let Some((resolved_label, rule_name)) = value_sharpen(
+                &sample,
+                &result.label,
+                result.confidence,
+                self.taxonomy.as_ref(),
+            ) {
+                result.label = resolved_label;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(rule_name);
+            }
+
+            // Step 5: Header hints (Model2Vec semantic matching)
+            self.sharpen_and_guard(&mut result, header, &sample);
+        }
+
+        // Step 6: Post-hoc locale detection
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
+                result.detected_locale = Some(locale);
+            }
+        }
+
+        self.finalize_is_generic(&mut result);
+        Ok(result)
+    }
+
+    /// Header hint Sharpen for the multi-branch pipeline (AC-5).
+    ///
+    /// Applies header-based semantic matching to refine multi-branch predictions.
+    /// Simplified from the Sense→Sharpen header logic:
+    /// - No unmasked_votes (no CharCNN votes exist)
+    /// - No Sense entity demotion guard (no Sense)
+    /// - Financial model2vec guard preserved (prevents false financial overrides)
+    /// - Geography protection preserved (prevents person-name hints overriding locations)
+    /// - Same-domain/cross-domain overrides preserved
+    fn apply_header_sharpen(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        let label_before = result.label.clone();
+
+        // 0094 — header hint family `header_hint_coord_veto` (default ON, like the
+        // other header hints; RHH-disableable via RHH_DISABLE_HINTS). Header-
+        // corroboration demotion for the value-identical coordinate boundary: a
+        // latitude/longitude prediction whose header does NOT corroborate a
+        // coordinate, on a generic numeric column, is demoted to decimal_number.
+        // Demotion-only — the header can veto a false coordinate, never promote
+        // one, so a mislabelled header cannot create a coordinate. Fires in the
+        // no-hint gap the sci_measurement override below misses.
+        if !rhh::is_disabled("header_hint_coord_veto")
+            && matches!(
+                result.label.as_str(),
+                "geography.coordinate.latitude" | "geography.coordinate.longitude"
+            )
+            && !header_corroborates_coordinate(header)
+            && values_look_like_generic_decimals(sample)
+        {
+            result.label = "representation.numeric.decimal_number".to_string();
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("coord_header_veto:{}", header.to_lowercase()));
+            return;
+        }
+
+        // 0094 — header hint family `header_hint_postal_veto` (spec
+        // 2026-06-10-postal-header-veto): the same header-corroboration demotion
+        // for the value-identical postal boundary. A postal_code prediction on a
+        // bare-integer column (volumes, counts, sequence numbers — 4–5 digit
+        // integers are indistinguishable from Nordic/Australian postcodes by
+        // value alone; gold-measured precision 0.133) is demoted to
+        // integer_number unless the header carries a postal token. Leading-zero
+        // values are postal evidence (01219-style zips) and block the veto.
+        // Demotion-only — a header can never promote a postal code.
+        if !rhh::is_disabled("header_hint_postal_veto")
+            && result.label == "geography.address.postal_code"
+            && !header_corroborates_postal(header)
+            && values_look_like_generic_integers(sample)
+        {
+            result.label = "representation.numeric.integer_number".to_string();
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("postal_header_veto:{}", header.to_lowercase()));
+            return;
+        }
+
+        // 0094 — header hint family `header_hint_state_code_promote` (default ON).
+        // PROMOTION for the value-identical state_code boundary. state_code scores
+        // P=R=0.000 on gold: a column of 2-letter subdivision codes (TX, FL, NM)
+        // with a `State` header is classified as the state NAME type, region, or
+        // full_address — state_code is never emitted. Unlike the coordinate
+        // promotion (which already exists header-only and so needed a guard), there
+        // is NO existing path to state_code, so this adds one. SAFETY: the
+        // promotion REQUIRES both a closed-vocabulary value match (>=80% of values
+        // in STATE_CODES) AND a state/province header — the header is load-bearing
+        // because 2-letter codes overlap ISO country codes (CA = California AND
+        // Canada), so value-match alone would steal country_code columns. Both
+        // conditions together cannot fire on a country column (country header) or a
+        // state-NAME column (full words fail the code vocab).
+        if !rhh::is_disabled("header_hint_state_code_promote")
+            && result.label != "geography.location.state_code"
+            && header_corroborates_state(header)
+            && values_look_like_state_codes(sample)
+        {
+            result.label = "geography.location.state_code".to_string();
+            result.confidence = result.confidence.max(0.8);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("state_code_promote:{}", header.to_lowercase()));
+            return;
+        }
+
+        // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
+        // is off — every `disable_*` becomes a constant `false`, the optimiser
+        // eliminates the conjunctions, and there is zero runtime overhead).
+        // See .orbit/specs/2026-04-24-remove-header-hints/spec.yaml ac-02.
+        let disable_measurement = rhh::is_disabled("header_hint_measurement");
+        let disable_sci_measurement = rhh::is_disabled("header_hint_sci_measurement");
+        let disable_person_override = rhh::is_disabled("header_hint_person_override");
+        let disable_geo_override = rhh::is_disabled("header_hint_geo_override");
+        let disable_same_category = rhh::is_disabled("header_hint_same_category");
+        let disable_cross_domain = rhh::is_disabled("header_hint_cross_domain");
+        let disable_catchall = rhh::is_disabled("header_hint");
+        let disable_generic = rhh::is_disabled("header_hint_generic");
+        let disable_hardcoded = rhh::is_disabled("header_hint_hardcoded");
+        let disable_fallback = rhh::is_disabled("header_hint_fallback");
+
+        // Get header hint: hardcoded first, then Model2Vec semantic
+        let hardcoded_hint = header_hint(header).map(|h| h.to_string());
+        let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
+            self.semantic_hint
+                .as_ref()
+                .and_then(|sh| sh.classify_header(header))
+                .map(|r| r.label.clone())
+        });
+        let hint_is_hardcoded = hardcoded_hint.is_some();
+
+        let hinted_type = match hinted_type.as_deref() {
+            Some(h) => h,
+            None => return,
+        };
+
+        // Already predicts the hinted type — boost confidence
+        if result.label == hinted_type {
+            result.confidence = (result.confidence + 0.1).min(1.0);
+            return;
+        }
+
+        // Value-grounded gender sibling is authoritative over the header hint.
+        // value_sharpen's gender_detection routes a bare M/F column to
+        // gender_code; the VALUES (not the "gender"/"sex" header) distinguish the
+        // single-char code from the word type. A same-family header hint agrees
+        // it is gender — so it must not override the sibling the values chose.
+        // Without this, the same-category / hardcoded-authority overrides revert
+        // gender_code → gender and the validation veto then rejects M/F (0% pass)
+        // — the two-deterministic-steps-fighting trap the deterministic-layer
+        // audit flagged. Per spec 2026-06-12-false-veto-trio-resolution.
+        if result.disambiguation_rule.as_deref() == Some("gender_detection")
+            && matches!(
+                hinted_type,
+                "identity.person.gender" | "identity.person.gender_code"
+            )
+        {
+            return;
+        }
+
+        // Measurement disambiguation: height/weight
+        const MEASUREMENT_TYPES: &[&str] = &["identity.person.height", "identity.person.weight"];
+        const COORDINATE_TYPES: &[&str] = &[
+            "geography.coordinate.latitude",
+            "geography.coordinate.longitude",
+        ];
+        if !disable_measurement
+            && MEASUREMENT_TYPES.contains(&hinted_type)
+            && MEASUREMENT_TYPES.contains(&result.label.as_str())
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.9;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("header_hint_measurement:{}", header.to_lowercase()));
+            return;
+        }
+
+        // Scientific measurement override (coordinates → decimal when header says measurement)
+        if !disable_sci_measurement
+            && hinted_type == "representation.numeric.decimal_number"
+            && COORDINATE_TYPES.contains(&result.label.as_str())
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.8;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_sci_measurement:{}",
+                header.to_lowercase()
+            ));
+            return;
+        }
+
+        // Check hint in vote distribution (single-entry for multi-branch)
+        let hint_in_votes = result
+            .vote_distribution
+            .iter()
+            .any(|(label, _)| label == hinted_type);
+
+        let is_generic = is_generic_prediction(
+            &result.label,
+            &result.disambiguation_rule,
+            self.taxonomy.as_ref(),
+        );
+
+        // Geography protection: person-name hints don't override location types
+        if PERSON_NAME_HINTS.contains(&hinted_type)
+            && LOCATION_TYPES.contains(&result.label.as_str())
+        {
+            if !disable_person_override && hint_is_hardcoded {
+                // Hardcoded person-name hint overrides location
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.6);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_person_override:{}",
+                    header.to_lowercase()
+                ));
+            }
+            // Model2Vec person-name hints do NOT override locations
+            // (no unmasked votes to check in multi-branch)
+            return;
+        }
+
+        // Same-domain geographic override
+        if !disable_geo_override
+            && LOCATION_TYPES.contains(&hinted_type)
+            && LOCATION_TYPES.contains(&result.label.as_str())
+            && result.label != hinted_type
+            && (hint_is_hardcoded || result.confidence <= 0.90)
+        {
+            result.label = hinted_type.to_string();
+            result.confidence = result.confidence.max(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!(
+                "header_hint_geo_override:{}",
+                header.to_lowercase()
+            ));
+            return;
+        }
+
+        // Guard: iso_8601 date/timestamp catch-all should not override specific
+        // datetime predictions. The catch-all (h.contains("date"/"timestamp") →
+        // iso_8601) fires for any header containing those words, but the model's
+        // header branch processes these words and produces a more specific datetime
+        // prediction (mdy_slash, clf, dmy_hm, etc.). Trust the model's specificity
+        // over the generic catch-all. Aligns with decision 0042 direction.
+        if hinted_type == "datetime.timestamp.iso_8601"
+            && hint_is_hardcoded
+            && result.label.starts_with("datetime.")
+            && result.label != "datetime.timestamp.iso_8601"
+        {
+            return;
+        }
+
+        // Same-category hardcoded hint override
+        // Hardcoded hints are definitive for same-category overrides — no confidence
+        // threshold. E.g. "phone" → phone_number overrides ssn@1.00 because both
+        // are identity.person.* and the header is unambiguous.
+        if !disable_same_category && hint_is_hardcoded && result.label != hinted_type {
+            let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
+            let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
+            if !hint_category.is_empty()
+                && hint_category == pred_category
+                && hint_category.contains('.')
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.7);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_same_category:{}",
+                    header.to_lowercase()
+                ));
+                // No return — fall through to post-hint guards (e.g., country_code guard).
+            }
+        }
+
+        // Cross-domain hardcoded hint override
+        if !disable_cross_domain && hint_is_hardcoded && result.label != hinted_type {
+            let hint_domain = hinted_type.split('.').next().unwrap_or("");
+            let pred_domain = result.label.split('.').next().unwrap_or("");
+            let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
+            let pred_base = result.label.rsplit('.').next().unwrap_or("");
+            if !hint_domain.is_empty()
+                && !pred_domain.is_empty()
+                && hint_domain != pred_domain
+                && hint_base != pred_base
+            {
+                result.label = hinted_type.to_string();
+                result.confidence = result.confidence.max(0.5);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "header_hint_cross_domain:{}",
+                    header.to_lowercase()
+                ));
+                return;
+            }
+        }
+
+        // General hint logic
+        if !disable_catchall && (result.confidence < 0.5 || is_generic) && hint_in_votes {
+            let hint_fraction = result
+                .vote_distribution
+                .iter()
+                .find(|(label, _)| label == hinted_type)
+                .map(|(_, frac)| *frac)
+                .unwrap_or(0.0);
+
+            result.label = hinted_type.to_string();
+            result.confidence = hint_fraction.max(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(format!("header_hint:{}", header.to_lowercase()));
+        } else if !disable_generic && is_generic && !hint_in_votes {
+            // Financial model2vec guard: block model2vec financial hints with no value evidence
+            let is_financial_hint = hinted_type.starts_with("finance.");
+            if is_financial_hint && !hint_is_hardcoded {
+                tracing::debug!(
+                    column = %header,
+                    blocked_hint = %hinted_type,
+                    current_label = %result.label,
+                    "Financial model2vec hint blocked (no vote evidence)"
+                );
+            } else {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.5;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_generic:{}", header.to_lowercase()));
+            }
+        } else if !disable_hardcoded && hint_is_hardcoded && !hint_in_votes {
+            // Hardcoded hint authority with domain-dependent threshold
+            // Same-domain: 0.95 (was 0.90, originally 0.50) — unblocks phone@0.915
+            // overriding ssn, year@0.83 overriding compact_ym, url@0.60 overriding
+            // docker_ref. Only predictions >=0.95 resist a hardcoded same-domain hint.
+            // Cross-domain: 0.85 (unchanged).
+            let h_domain = hinted_type.split('.').next().unwrap_or("");
+            let p_domain = result.label.split('.').next().unwrap_or("");
+            let threshold = if h_domain != p_domain { 0.85 } else { 0.95 };
+            if result.confidence < threshold {
+                result.label = hinted_type.to_string();
+                result.confidence = 0.5;
+                result.disambiguation_applied = true;
+                result.disambiguation_rule =
+                    Some(format!("header_hint_hardcoded:{}", header.to_lowercase()));
+            }
+        } else if !disable_fallback && result.confidence < 0.3 && !hint_in_votes {
+            result.label = hinted_type.to_string();
+            result.confidence = 0.4;
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("header_hint_fallback:{}", header.to_lowercase()));
+        }
+
+        // Country/country_code post-hint guard (v14, ac-05).
+        // After ALL header hint processing, if the label is "country" but >=95%
+        // of values are strict ISO 3166-1 alpha-2 codes (^[A-Z]{2}$), override
+        // to country_code. This guard fires LAST — after the same-category
+        // hardcoded hint override which would otherwise overwrite
+        // a value_sharpen correction. See spec review finding A1/F1.
+        if result.label == "geography.location.country" {
+            let non_empty: Vec<&str> = sample
+                .iter()
+                .map(|v| v.trim())
+                .filter(|v| !v.is_empty())
+                .collect();
+            if non_empty.len() >= 3 {
+                let alpha2_count = non_empty
+                    .iter()
+                    .filter(|v| v.len() == 2 && v.chars().all(|c| c.is_ascii_uppercase()))
+                    .count();
+                let alpha2_rate = alpha2_count as f32 / non_empty.len() as f32;
+                if alpha2_rate >= 0.95 {
+                    result.label = "geography.location.country_code".to_string();
+                    result.confidence = result.confidence.max(0.8);
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(format!(
+                        "country_code_post_hint_guard:alpha2_rate={:.2}",
+                        alpha2_rate
+                    ));
+                }
+            }
+        }
+
+        // Re-detect locale if label changed
+        if result.label != label_before {
+            if let Some(taxonomy) = self.taxonomy.as_ref() {
+                result.detected_locale =
+                    detect_locale_from_validation(sample, &result.label, taxonomy);
+            }
+        }
+    }
+
+    /// Sharpen the label with header hints, then run the post-sharpen guards.
+    ///
+    /// Single entry point for the inference paths: every header-hint application
+    /// is followed by the unconditional guard stage. `apply_header_sharpen`'s
+    /// hint branches early-`return`, so a guard that must inspect a label the
+    /// hint just CREATED is unreachable from inside it (the
+    /// `amount_bare_number_veto` trap). Such guards live in
+    /// `apply_post_sharpen_guards`, which runs here regardless of which hint
+    /// branch fired. No-op on an empty header, matching the previous call-site
+    /// `!header.is_empty()` guard.
+    fn sharpen_and_guard(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if header.is_empty() {
+            return;
+        }
+        self.apply_header_sharpen(result, header, sample);
+        self.apply_post_sharpen_guards(result, header, sample);
+    }
+
+    /// Guards that must fire on the POST-sharpen label — including labels a
+    /// header hint created via an early `return` inside `apply_header_sharpen`.
+    /// Every value-identical-boundary guard whose target a hint can synthesise
+    /// belongs here, where it runs unconditionally, not inside
+    /// `apply_header_sharpen` where the hint branches would make it unreachable.
+    fn apply_post_sharpen_guards(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
+        self.amount_bare_number_veto(result, header, sample);
+    }
+
+    /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
+    /// from the caller, because the currency.amount over-emission is CREATED inside
+    /// the header-hint machinery via an early `return` (a money-ish header promotes
+    /// the model's correct integer/decimal to currency.amount — P=0.105 on gold),
+    /// which a guard *within* apply_header_sharpen cannot reach. The header cannot
+    /// disambiguate (genuine amounts — base_salary, price — carry money headers
+    /// too), but a genuine currency.amount carries a currency signal (£45.17,
+    /// EUR 4 459 807) while the false positives are bare numbers (netIncome
+    /// 795000000). So undo the hint's promotion by value shape: a bare-number
+    /// currency.amount is demoted back to decimal/integer. Demotion only.
+    fn amount_bare_number_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("amount_bare_number_veto") || result.label != "finance.currency.amount"
+        {
+            return;
+        }
+        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
+        if is_bare {
+            result.label = if any_decimal {
+                "representation.numeric.decimal_number".to_string()
+            } else {
+                "representation.numeric.integer_number".to_string()
+            };
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("amount_bare_number_veto:{}", header.to_lowercase()));
+            if let Some(taxonomy) = self.taxonomy.as_ref() {
+                result.detected_locale =
+                    detect_locale_from_validation(sample, &result.label, taxonomy);
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISAMBIGUATION RULES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+mod feature_sharpen;
+mod header_sharpen;
+mod helpers;
+mod value_sharpen;
+
+pub(crate) use feature_sharpen::*;
+pub(crate) use header_sharpen::*;
+pub(crate) use helpers::*;
+pub(crate) use value_sharpen::*;
+
+#[cfg(test)]
+mod tests;
