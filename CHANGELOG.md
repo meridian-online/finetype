@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.30] - 2026-06-15
+
+Two gold-gated Sharpen rules on value-identical boundaries; verified gold-corpus
+accuracy 0.719 → **0.741** (690/931), both corpus-honest GO with no broad regressions.
+
+### Added
+
+- **`--logit-adjust-tau` on `train-multi-branch`** (choice 0097): logit-adjusted
+  loss (Menon et al., ICLR 2021) for strengthening a frequency-starved class by
+  reweighting the training gradient rather than adding data volume. Default `0.0`
+  (off); training-time only, **zero inference cost**; flat head only. Banked for a
+  future frequency-starved (not value-shape-overlapping) class.
+
+### Fixed
+
+- **`state_code` detection** (`header_hint_state_code_promote`): a column of
+  closed-vocabulary subdivision codes (US/CA/AU, from the taxonomy
+  `validation_by_locale`) with a `state`/`province` header now profiles as
+  `geography.location.state_code` instead of the state-name type or `region`. Gold
+  `state_code` precision/recall **0.000 → 0.857** (0 → 6 of 7), headline 0.719 →
+  0.725, zero new false positives. The state header is load-bearing — 2-letter codes
+  overlap ISO country codes (`CA` = California and Canada).
+- **`currency.amount` over-emission** (`amount_bare_number_veto`): a bare-number
+  column (`netIncome` 795000000, `interestExpense` -68000000) promoted to
+  `currency.amount` by a money-ish header is demoted back to `integer`/`decimal`.
+  A genuine amount carries a currency signal (`£45.17`, `EUR 4 459 807`); the false
+  positives are bare numbers. Gold `currency.amount` precision was 0.105 (17 false
+  positives); `integer_number` recall 0.592 → 0.673; headline 0.725 → **0.741**.
+
 ## [0.6.29] - 2026-06-12
 
 ### Added
