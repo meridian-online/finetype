@@ -2158,6 +2158,7 @@ impl ColumnClassifier {
 
             if !header.is_empty() {
                 self.apply_header_sharpen(&mut result, header, &sample);
+                self.amount_bare_number_veto(&mut result, header, &sample);
             }
         }
 
@@ -2244,6 +2245,7 @@ impl ColumnClassifier {
             // Step 5: Header hints (Model2Vec semantic matching)
             if !header.is_empty() {
                 self.apply_header_sharpen(&mut result, header, &sample);
+                self.amount_bare_number_veto(&mut result, header, &sample);
             }
         }
 
@@ -2344,6 +2346,7 @@ impl ColumnClassifier {
             // Step 5: Header hints (Model2Vec semantic matching)
             if !header.is_empty() {
                 self.apply_header_sharpen(&mut result, header, &sample);
+                self.amount_bare_number_veto(&mut result, header, &sample);
             }
         }
 
@@ -2721,6 +2724,39 @@ impl ColumnClassifier {
 
         // Re-detect locale if label changed
         if result.label != label_before {
+            if let Some(taxonomy) = self.taxonomy.as_ref() {
+                result.detected_locale =
+                    detect_locale_from_validation(sample, &result.label, taxonomy);
+            }
+        }
+    }
+
+    /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
+    /// from the caller, because the currency.amount over-emission is CREATED inside
+    /// the header-hint machinery via an early `return` (a money-ish header promotes
+    /// the model's correct integer/decimal to currency.amount — P=0.105 on gold),
+    /// which a guard *within* apply_header_sharpen cannot reach. The header cannot
+    /// disambiguate (genuine amounts — base_salary, price — carry money headers
+    /// too), but a genuine currency.amount carries a currency signal (£45.17,
+    /// EUR 4 459 807) while the false positives are bare numbers (netIncome
+    /// 795000000). So undo the hint's promotion by value shape: a bare-number
+    /// currency.amount is demoted back to decimal/integer. Demotion only.
+    fn amount_bare_number_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("amount_bare_number_veto") || result.label != "finance.currency.amount"
+        {
+            return;
+        }
+        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
+        if is_bare {
+            result.label = if any_decimal {
+                "representation.numeric.decimal_number".to_string()
+            } else {
+                "representation.numeric.integer_number".to_string()
+            };
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("amount_bare_number_veto:{}", header.to_lowercase()));
             if let Some(taxonomy) = self.taxonomy.as_ref() {
                 result.detected_locale =
                     detect_locale_from_validation(sample, &result.label, taxonomy);
@@ -4357,6 +4393,45 @@ fn values_look_like_state_codes(sample: &[String]) -> bool {
         }
     }
     total >= 3 && hit * 100 >= total * 80
+}
+
+/// True if the sampled values are predominantly BARE numbers — a plain integer or
+/// decimal literal (`^-?\d+(\.\d+)?$`) with NO currency symbol, code, grouping, or
+/// other money formatting. The value discriminator for the currency-amount veto:
+/// on gold a genuine `currency.amount` carries a currency signal (`£45.17`,
+/// `EUR 4 459 807`), whereas accounting line items (`netIncome` 795000000,
+/// `interestExpense` -68000000) are bare numbers the gold labels `integer_number` /
+/// `decimal_number` regardless of their money-ish HEADER — so the header cannot
+/// disambiguate (both sides carry money headers) but the value formatting can.
+/// Returns (column-is-bare → demote, any-value-decimal → demote to decimal not integer).
+fn values_look_like_bare_numbers(sample: &[String]) -> (bool, bool) {
+    let (mut bare, mut total, mut any_decimal) = (0usize, 0usize, false);
+    for v in sample.iter().take(16) {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        total += 1;
+        let body = t.strip_prefix('-').unwrap_or(t);
+        let mut dots = 0usize;
+        let is_bare = !body.is_empty()
+            && body.chars().all(|c| {
+                if c == '.' {
+                    dots += 1;
+                    true
+                } else {
+                    c.is_ascii_digit()
+                }
+            })
+            && dots <= 1;
+        if is_bare {
+            bare += 1;
+            if dots == 1 {
+                any_decimal = true;
+            }
+        }
+    }
+    (total >= 3 && bare * 100 >= total * 80, any_decimal)
 }
 
 /// True if the sampled values are predominantly numeric — the value-validation
@@ -7111,6 +7186,45 @@ mod tests {
     #[test]
     fn state_code_promote_is_a_default_on_header_hint() {
         assert!(!rhh::is_disabled("header_hint_state_code_promote"));
+    }
+
+    // === currency-amount bare-number veto ===
+
+    #[test]
+    fn amount_bare_number_gate() {
+        // bare accounting integers (the false-positive shape) → demote, integer
+        let (bare, dec) = values_look_like_bare_numbers(&[
+            "84000000".into(),
+            "-14638000".into(),
+            "795000000".into(),
+            "0".into(),
+        ]);
+        assert!(bare && !dec);
+        // bare decimals → demote, to decimal
+        let (bare, dec) = values_look_like_bare_numbers(&[
+            "-270269883.0".into(),
+            "396458184.0".into(),
+            "2701751944.0".into(),
+        ]);
+        assert!(bare && dec);
+        // currency-symbol / formatted money → NOT bare (kept as amount)
+        let (bare, _) =
+            values_look_like_bare_numbers(&["£45.17".into(), "£23.88".into(), "£35.02".into()]);
+        assert!(!bare);
+        let (bare, _) = values_look_like_bare_numbers(&[
+            "EUR 4 459 807".into(),
+            "EUR 4 626 565".into(),
+            "EUR 4 652 581".into(),
+        ]);
+        assert!(!bare);
+        // below the 3-value floor
+        let (bare, _) = values_look_like_bare_numbers(&["100".into(), "200".into()]);
+        assert!(!bare);
+    }
+
+    #[test]
+    fn amount_bare_number_veto_is_default_on() {
+        assert!(!rhh::is_disabled("amount_bare_number_veto"));
     }
 
     // === 0094 postal header-veto helpers (spec 2026-06-10-postal-header-veto) ===
