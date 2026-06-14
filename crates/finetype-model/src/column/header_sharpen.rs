@@ -54,6 +54,39 @@ pub(crate) fn header_corroborates_state(header: &str) -> bool {
         .split(|c: char| !c.is_alphanumeric())
         .any(|tok| matches!(tok, "state" | "states" | "province" | "provinces" | "prov"))
 }
+
+/// True if the header names an administrative division ABOVE city level — the
+/// disambiguator that separates the value-identical `region`/`city` siblings.
+/// Token-aware so `region`/`county`/`district`/`borough`/`province` match but
+/// false friends do not (`regional`-only words still match on the `region`
+/// stem only when it is a standalone token). Deliberately excludes `city`/`town`
+/// and ambiguous tokens like `name`, which carry no region signal.
+pub(crate) fn header_corroborates_region(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|tok| {
+            matches!(
+                tok,
+                "region"
+                    | "regions"
+                    | "county"
+                    | "counties"
+                    | "district"
+                    | "districts"
+                    | "borough"
+                    | "boroughs"
+                    | "province"
+                    | "provinces"
+                    | "prefecture"
+                    | "oblast"
+                    | "canton"
+                    | "governorate"
+                    | "department"
+                    | "division"
+            )
+        })
+}
 /// True if the sampled values are predominantly closed-vocabulary state/province
 /// codes — the value discriminator for the `state_code` promotion. Requires a
 /// majority (>= 80%) of non-empty values to be members of [`STATE_CODES`]

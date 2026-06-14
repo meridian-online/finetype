@@ -1272,6 +1272,28 @@ fn state_code_header_corroboration() {
 }
 
 #[test]
+fn region_header_corroboration() {
+    // admin divisions above city level — the gold city->region false positives
+    for h in [
+        "Region",
+        "County",
+        "district",
+        "borough",
+        "work_location_borough",
+        "province",
+    ] {
+        assert!(header_corroborates_region(h), "should corroborate: {h}");
+    }
+    // must NOT match city/town or ambiguous tokens, nor substrings
+    for h in ["city", "town", "name", "regional_office", "districting"] {
+        assert!(
+            !header_corroborates_region(h),
+            "should NOT corroborate: {h}"
+        );
+    }
+}
+
+#[test]
 fn state_code_value_vocab_gate() {
     // US codes
     assert!(values_look_like_state_codes(&[

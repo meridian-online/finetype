@@ -2752,6 +2752,39 @@ impl ColumnClassifier {
         sample: &[String],
     ) {
         self.amount_bare_number_veto(result, header, sample);
+        self.city_region_header_corroboration(result, header, sample);
+    }
+
+    /// `city_region_header_corroboration` (default ON). The model's
+    /// `geography.location.city` and `.region` are value-identical siblings —
+    /// both are textual place names — so the flat softmax confuses them. When the
+    /// header explicitly names an administrative division above city level
+    /// (`region`, `county`, `district`, `borough`, `province`, …) the header is
+    /// the disambiguator: promote a `city` prediction to `region`. Measured on
+    /// gold: 6 `region` columns headed `Region`/`County`/`district`/`borough`
+    /// (Zimbabwe & Ecuador provinces, US counties) were emitted as `city`
+    /// (region recall 0.467, city precision 0.632). Header-gated and
+    /// promotion-only, so genuine cities — which do not carry admin-division
+    /// headers — are untouched. Follows the choice-0094 header-corroboration
+    /// pattern; ships default-on pending the corpus-honest relocation gate.
+    fn city_region_header_corroboration(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        _sample: &[String],
+    ) {
+        if rhh::is_disabled("city_region_header_corroboration")
+            || result.label != "geography.location.city"
+            || !header_corroborates_region(header)
+        {
+            return;
+        }
+        result.label = "geography.location.region".to_string();
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "city_region_header_corroboration:{}",
+            header.to_lowercase()
+        ));
     }
 
     /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
