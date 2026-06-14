@@ -1,0 +1,904 @@
+//! `profile` command: discover and classify column types.
+
+use super::*;
+use finetype_cli::enum_emission::collect_unique_values_if_categorical;
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn cmd_profile(
+    file: Option<PathBuf>,
+    files: Option<PathBuf>,
+    out_dir: Option<PathBuf>,
+    output: OutputFormat,
+    sample_size: usize,
+    delimiter: Option<char>,
+    no_header_hint: bool,
+    model_type: ModelType,
+    enum_threshold: usize,
+    stats: bool,
+    verbose: bool,
+    raw_model: bool,
+    no_validation_veto: bool,
+) -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+    use std::io::Write as _;
+
+    // Batch mode (--files) currently writes one output per input to
+    // <out_dir>/<stem>.<ext>. Stems are taken from the input file stem;
+    // ext is chosen per output format (json for json/json-schema, csv
+    // for csv, txt for plain, md for markdown, arrow for arrow).
+    let batch_mode = files.is_some();
+    let paths: Vec<PathBuf> = if let Some(ref single) = file {
+        vec![single.clone()]
+    } else {
+        let files_list = files.as_ref().expect("either file or files is required");
+        std::fs::read_to_string(files_list)
+            .map_err(|e| anyhow::anyhow!("could not read --files list {:?}: {}", files_list, e))?
+            .lines()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && !s.starts_with('#'))
+            .map(PathBuf::from)
+            .collect()
+    };
+    if paths.is_empty() {
+        return Err(anyhow::anyhow!("no input paths to profile"));
+    }
+    let batch_ext = match output {
+        OutputFormat::Json | OutputFormat::JsonSchema => "json",
+        OutputFormat::Csv => "csv",
+        OutputFormat::Plain => "txt",
+        OutputFormat::Markdown => "md",
+        OutputFormat::Arrow => "arrow",
+    };
+    if batch_mode {
+        // Batch mode currently routes only the json-schema output through
+        // the per-file writer. The other format branches still use
+        // `println!` to stdout, which would interleave outputs and ignore
+        // --out-dir. Refuse early until they're converted.
+        if !matches!(output, OutputFormat::JsonSchema) {
+            let mut cmd = <Cli as clap::CommandFactory>::command();
+            let err = cmd.error(
+                clap::error::ErrorKind::ArgumentConflict,
+                "--files currently requires -o json-schema (other formats not yet wired through the per-file writer)",
+            );
+            err.exit();
+        }
+        if let Some(ref od) = out_dir {
+            std::fs::create_dir_all(od)
+                .map_err(|e| anyhow::anyhow!("could not create --out-dir {:?}: {}", od, e))?;
+        }
+    }
+
+    let model = resolve_model_path();
+
+    // Auto-detect late-fusion from the model directory: a `fusion_manifest.json`
+    // means this is a fusion model, regardless of the --model-type default. This
+    // is what lets `models/default` resolve to a fusion model and route every
+    // `finetype profile` through it without a flag.
+    let model_type = if model.join("fusion_manifest.json").exists() {
+        ModelType::LateFusion
+    } else {
+        model_type
+    };
+
+    eprintln!("Loading model from {:?}", model);
+    let config = ColumnConfig {
+        sample_size,
+        ..Default::default()
+    };
+    let mut column_classifier = if matches!(model_type, ModelType::LateFusion) {
+        let fusion = load_fusion_classifier(&model)?;
+        eprintln!(
+            "Loaded late-fusion classifier ({} classes)",
+            fusion.labels().len()
+        );
+        ColumnClassifier::with_fusion(fusion, config)
+    } else if matches!(model_type, ModelType::MultiBranch) {
+        let mb = load_multi_branch_classifier(&model)?;
+        eprintln!(
+            "Loaded multi-branch classifier ({} classes)",
+            mb.n_classes()
+        );
+        ColumnClassifier::with_multi_branch(mb, config)
+    } else {
+        let classifier: Box<dyn ValueClassifier> = match model_type {
+            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+            ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
+        };
+        if let Some(semantic) = load_semantic_hint() {
+            eprintln!("Loaded semantic hint classifier (Model2Vec)");
+            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+            let entity = load_entity_classifier(&semantic);
+            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+            if let Some(entity) = entity {
+                eprintln!("Loaded entity classifier (full_name demotion gate)");
+                cc.set_entity_classifier(entity);
+            }
+            cc
+        } else {
+            ColumnClassifier::new(classifier, config)
+        }
+    };
+
+    // Load taxonomy for validation-based attractor demotion (Rule 14)
+    // Pre-compile validators for the hot path
+    let taxonomy_path = std::path::PathBuf::from("labels");
+    if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
+        taxonomy.compile_validators();
+        taxonomy.compile_locale_validators();
+        eprintln!(
+            "Loaded taxonomy for attractor demotion ({} types, {} validators cached, {} with locale validators)",
+            taxonomy.labels().len(),
+            taxonomy.validator_count(),
+            taxonomy.locale_validator_count()
+        );
+        column_classifier.set_taxonomy(taxonomy);
+    }
+
+    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy models only.
+    // Fusion is its own Sense stage and computes View2 with the raw header, so it
+    // wires neither Sense nor sibling-context.
+    if !column_classifier.has_multi_branch() && !column_classifier.has_fusion() {
+        wire_sense(&mut column_classifier);
+        wire_sibling_context(&mut column_classifier);
+    }
+    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+    if column_classifier.has_multi_branch() {
+        wire_model2vec_and_siblings(&mut column_classifier);
+    }
+
+    // Diagnostic: skip Sharpen post-processing for ablation studies
+    if raw_model {
+        column_classifier.set_skip_sharpen(true);
+        eprintln!("WARNING: --raw-model active — Sharpen post-processing disabled");
+    }
+
+    // Per-file loop. Model + taxonomy + classifier are loaded above and
+    // reused across iterations — that's the batch-mode amortisation
+    // point. Single-file mode (--file) runs this loop once with stdout
+    // as the writer; batch mode (--files + --out-dir) loops over the
+    // listed paths and routes each iteration's output to a file.
+    for path in &paths {
+        let file: &std::path::Path = path.as_path();
+        let mut writer: Box<dyn std::io::Write> = if batch_mode {
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("output");
+            let out_path = out_dir
+                .as_ref()
+                .expect("--out-dir is required with --files (clap-validated)")
+                .join(format!("{}.{}", stem, batch_ext));
+            Box::new(std::io::BufWriter::new(
+                std::fs::File::create(&out_path).map_err(|e| {
+                    anyhow::anyhow!("could not create output {:?}: {}", out_path, e)
+                })?,
+            ))
+        } else {
+            Box::new(std::io::BufWriter::new(std::io::stdout()))
+        };
+
+        eprintln!("Reading {:?}", file);
+
+        // Detect file format by extension
+        let ext = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .unwrap_or_default();
+        let is_json_input = matches!(ext.as_str(), "json" | "ndjson" | "jsonl");
+
+        let (headers, columns, row_count) = if is_json_input {
+            read_json_input(file, &ext)?
+        } else {
+            read_csv_input(file, delimiter)?
+        };
+
+        let n_cols = headers.len();
+        eprintln!("Read {} rows", row_count);
+
+        // Profile each column
+        struct ColProfile {
+            name: String,
+            label: String,
+            confidence: f32,
+            samples_used: usize,
+            non_null_count: usize,
+            null_count: usize,
+            disambiguation_applied: bool,
+            disambiguation_rule: Option<String>,
+            detected_locale: Option<String>,
+            // Taxonomy contract fields
+            broad_type: Option<String>,
+            format_string: Option<String>,
+            transform: Option<String>,
+            is_generic: bool,
+            // Validation quality fields
+            quality: Option<ColProfileQuality>,
+            // Unique values for ENUM/categorical columns
+            unique_values: Option<Vec<String>>,
+            // ac-06 validation-as-veto: fraction of sample values passing
+            // the predicted type's validation (None = no applicable
+            // validation), whether that triggered a HARD veto (label NULLed
+            // to "unknown"), an ADVISORY low-pass flag (sub-threshold but the
+            // type is not audited-safe — surfaced, not NULLed), and the
+            // original predicted label when hard-vetoed.
+            validation_pass_rate: Option<f64>,
+            validation_vetoed: bool,
+            validation_advisory_low: bool,
+            vetoed_type: Option<String>,
+        }
+
+        /// Per-column validation + quality data.
+        struct ColProfileQuality {
+            valid_count: usize,
+            invalid_count: usize,
+            null_count: usize,
+            score: finetype_core::ColumnQualityScore,
+            invalid_samples: Vec<String>,
+        }
+
+        // Load taxonomy for enrichment (may already be loaded for validation)
+        let taxonomy_path = std::path::PathBuf::from("labels");
+        let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
+
+        // ac-06: validation-as-veto. Compile the enrichment taxonomy's
+        // validators once (the per-column veto checks sample values against
+        // the predicted type's schema) and load the audited-safe allowlist
+        // that scopes the HARD veto. Skipped entirely under --no-validation-veto.
+        let veto_enabled = !no_validation_veto;
+        let veto_safe = if veto_enabled {
+            finetype_core::audited_safe_labels()
+        } else {
+            std::collections::HashSet::new()
+        };
+        if veto_enabled {
+            if let Some(ref mut tax) = enrichment_taxonomy {
+                tax.compile_validators();
+            }
+        }
+
+        let mut profiles: Vec<ColProfile> = Vec::new();
+
+        // When sibling-context attention is available, classify all columns
+        // together so each column benefits from cross-column context.
+        if column_classifier.has_sibling_context() && !no_header_hint {
+            // Build column descriptors for all non-empty columns
+            let mut col_inputs: Vec<(usize, Vec<String>, String, String, usize)> = Vec::new(); // (index, values, header_hint, name, null_count)
+            let mut empty_profiles: Vec<(usize, ColProfile)> = Vec::new();
+
+            for (i, col_values) in columns.iter().enumerate() {
+                let name = headers
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("col_{}", i));
+                let null_count = row_count - col_values.len();
+
+                if col_values.is_empty() {
+                    empty_profiles.push((
+                        i,
+                        ColProfile {
+                            name,
+                            label: "unknown".to_string(),
+                            confidence: 0.0,
+                            samples_used: 0,
+                            non_null_count: 0,
+                            null_count,
+                            disambiguation_applied: false,
+                            disambiguation_rule: None,
+                            detected_locale: None,
+                            broad_type: None,
+                            format_string: None,
+                            transform: None,
+                            is_generic: false,
+                            quality: None,
+                            unique_values: None,
+                            validation_pass_rate: None,
+                            validation_vetoed: false,
+                            validation_advisory_low: false,
+                            vetoed_type: None,
+                        },
+                    ));
+                } else {
+                    let header_hint = if is_json_input {
+                        path_leaf(&name)
+                    } else {
+                        name.clone()
+                    };
+                    col_inputs.push((i, col_values.clone(), header_hint, name, null_count));
+                }
+            }
+
+            // Classify all non-empty columns with sibling context
+            let context_columns: Vec<(Vec<String>, String)> = col_inputs
+                .iter()
+                .map(|(_, values, header, _, _)| (values.clone(), header.clone()))
+                .collect();
+            let context_results =
+                column_classifier.classify_columns_with_context(&context_columns)?;
+
+            // Merge results back in original order
+            let mut all_entries: Vec<(usize, ColProfile)> = Vec::new();
+            all_entries.extend(empty_profiles);
+            for ((idx, values, _, name, null_count), result) in
+                col_inputs.into_iter().zip(context_results)
+            {
+                let (vp_rate, vetoed, advisory_low) = col_validation_veto(
+                    &result.label,
+                    &values,
+                    enrichment_taxonomy.as_ref(),
+                    &veto_safe,
+                    veto_enabled,
+                );
+                let (final_label, vetoed_type, fallback_rule) =
+                    resolve_veto_outcome(vetoed, &result.label, &values);
+                let mut result = result;
+                if let Some(rule) = fallback_rule {
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(rule.to_string());
+                }
+                let (broad_type, format_string, transform) =
+                    if let Some(ref taxonomy) = enrichment_taxonomy {
+                        if let Some(def) = taxonomy.get(&final_label) {
+                            (
+                                def.broad_type.clone(),
+                                def.format_string.clone(),
+                                def.transform.clone(),
+                            )
+                        } else {
+                            (None, None, None)
+                        }
+                    } else {
+                        (None, None, None)
+                    };
+                let unique_values =
+                    collect_unique_values_if_categorical(&final_label, &values, enum_threshold);
+                all_entries.push((
+                    idx,
+                    ColProfile {
+                        name,
+                        label: final_label,
+                        confidence: result.confidence,
+                        samples_used: result.samples_used,
+                        non_null_count: values.len(),
+                        null_count,
+                        disambiguation_applied: result.disambiguation_applied,
+                        disambiguation_rule: result.disambiguation_rule,
+                        detected_locale: result.detected_locale,
+                        broad_type,
+                        format_string,
+                        transform,
+                        is_generic: result.is_generic,
+                        quality: None,
+                        unique_values,
+                        validation_pass_rate: vp_rate,
+                        validation_vetoed: vetoed,
+                        validation_advisory_low: advisory_low,
+                        vetoed_type,
+                    },
+                ));
+            }
+            all_entries.sort_by_key(|(idx, _)| *idx);
+            profiles = all_entries.into_iter().map(|(_, p)| p).collect();
+        } else {
+            // Per-column classification (standard path)
+            for (i, col_values) in columns.iter().enumerate() {
+                let name = headers
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("col_{}", i));
+                let null_count = row_count - col_values.len();
+
+                if col_values.is_empty() {
+                    profiles.push(ColProfile {
+                        name,
+                        label: "unknown".to_string(),
+                        confidence: 0.0,
+                        samples_used: 0,
+                        non_null_count: 0,
+                        null_count,
+                        disambiguation_applied: false,
+                        disambiguation_rule: None,
+                        detected_locale: None,
+                        broad_type: None,
+                        format_string: None,
+                        transform: None,
+                        is_generic: false,
+                        quality: None,
+                        unique_values: None,
+                        validation_pass_rate: None,
+                        validation_vetoed: false,
+                        validation_advisory_low: false,
+                        vetoed_type: None,
+                    });
+                    continue;
+                }
+
+                // For JSON paths, extract the leaf as header hint (e.g., "users[].email" → "email")
+                let header_hint = if is_json_input {
+                    path_leaf(&name)
+                } else {
+                    name.clone()
+                };
+
+                let result = if no_header_hint {
+                    column_classifier.classify_column(col_values)?
+                } else {
+                    column_classifier.classify_column_with_header(col_values, &header_hint)?
+                };
+
+                let (vp_rate, vetoed, advisory_low) = col_validation_veto(
+                    &result.label,
+                    col_values,
+                    enrichment_taxonomy.as_ref(),
+                    &veto_safe,
+                    veto_enabled,
+                );
+                let (final_label, vetoed_type, fallback_rule) =
+                    resolve_veto_outcome(vetoed, &result.label, col_values);
+                let mut result = result;
+                if let Some(rule) = fallback_rule {
+                    result.disambiguation_applied = true;
+                    result.disambiguation_rule = Some(rule.to_string());
+                }
+
+                // Look up taxonomy contract fields for the (possibly vetoed) label
+                let (broad_type, format_string, transform) =
+                    if let Some(ref taxonomy) = enrichment_taxonomy {
+                        if let Some(def) = taxonomy.get(&final_label) {
+                            (
+                                def.broad_type.clone(),
+                                def.format_string.clone(),
+                                def.transform.clone(),
+                            )
+                        } else {
+                            (None, None, None)
+                        }
+                    } else {
+                        (None, None, None)
+                    };
+
+                let unique_values =
+                    collect_unique_values_if_categorical(&final_label, col_values, enum_threshold);
+                profiles.push(ColProfile {
+                    name,
+                    label: final_label,
+                    confidence: result.confidence,
+                    samples_used: result.samples_used,
+                    non_null_count: col_values.len(),
+                    null_count,
+                    disambiguation_applied: result.disambiguation_applied,
+                    disambiguation_rule: result.disambiguation_rule,
+                    detected_locale: result.detected_locale,
+                    broad_type,
+                    format_string,
+                    transform,
+                    is_generic: result.is_generic,
+                    quality: None,
+                    unique_values,
+                    validation_pass_rate: vp_rate,
+                    validation_vetoed: vetoed,
+                    validation_advisory_low: advisory_low,
+                    vetoed_type,
+                });
+            }
+        } // end else (per-column path)
+
+        // Output results
+        match output {
+            OutputFormat::Plain => {
+                println!(
+                    "FineType Column Profile — {:?} ({} rows, {} columns)",
+                    file, row_count, n_cols
+                );
+                println!("{}", "═".repeat(80));
+                println!();
+                if false {
+                    // validate removed (AC-10)
+                    println!(
+                        "  {:<25} {:<38} {:>8} {:>6} {:>8}",
+                        "COLUMN", "TYPE", "BROAD", "CONF", "VALID"
+                    );
+                } else {
+                    println!(
+                        "  {:<25} {:<38} {:>8} {:>6}",
+                        "COLUMN", "TYPE", "BROAD", "CONF"
+                    );
+                }
+                println!("  {}", "─".repeat(78));
+
+                for p in &profiles {
+                    let conf_str = if p.non_null_count > 0 {
+                        format!("{:.1}%", p.confidence * 100.0)
+                    } else {
+                        "—".to_string()
+                    };
+                    let broad =
+                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+                    let disambig = if p.disambiguation_applied {
+                        format!(" [{}]", p.disambiguation_rule.as_deref().unwrap_or("rule"))
+                    } else {
+                        String::new()
+                    };
+                    let locale_str = if let Some(locale) = &p.detected_locale {
+                        format!(" locale:{}", locale)
+                    } else {
+                        String::new()
+                    };
+                    // ac-06: annotate a hard veto (predicted type NULLed) or an
+                    // advisory low-pass (sub-threshold but not audited-safe).
+                    let veto_str = if p.validation_vetoed {
+                        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
+                        format!(
+                            " ⊘ vetoed:{} ({:.0}% pass)",
+                            p.vetoed_type.as_deref().unwrap_or("?"),
+                            rate
+                        )
+                    } else if p.validation_advisory_low {
+                        let rate = p.validation_pass_rate.unwrap_or(0.0) * 100.0;
+                        format!(" ⚠ low-pass {:.0}% (advisory)", rate)
+                    } else {
+                        String::new()
+                    };
+                    let quality_str = if false {
+                        // validate removed (AC-10)
+                        match &p.quality {
+                            Some(q) => format!(" {:>7.1}%", q.score.type_conforming_rate * 100.0),
+                            None => "      —".to_string(),
+                        }
+                    } else {
+                        String::new()
+                    };
+                    println!(
+                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}",
+                        p.name,
+                        p.label,
+                        broad,
+                        conf_str,
+                        quality_str,
+                        disambig,
+                        locale_str,
+                        veto_str
+                    );
+                    // Show top 3 invalid samples inline (plain output, validate mode)
+                    if false {
+                        // validate removed (AC-10)
+                        if let Some(ref q) = p.quality {
+                            for sample in q.invalid_samples.iter().take(3) {
+                                println!("  {:>25} ⚠ \"{}\"", "", sample);
+                            }
+                        }
+                    }
+                }
+
+                println!();
+                let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
+                if false {
+                    // validate removed (AC-10)
+                    let scores: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                        .collect();
+                    let grade = finetype_core::compute_file_grade(&scores);
+                    println!(
+                        "{}/{} columns typed, {} rows analyzed — Quality: {}",
+                        typed_cols, n_cols, row_count, grade
+                    );
+                } else {
+                    println!(
+                        "{}/{} columns typed, {} rows analyzed",
+                        typed_cols, n_cols, row_count
+                    );
+                }
+            }
+            OutputFormat::Json => {
+                let cols: Vec<serde_json::Value> = profiles
+                    .iter()
+                    .map(|p| {
+                        let mut obj = serde_json::Map::new();
+                        obj.insert("column".to_string(), json!(p.name));
+                        obj.insert("type".to_string(), json!(p.label));
+                        obj.insert("confidence".to_string(), json!(p.confidence));
+                        let resolved_broad =
+                            resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+                        obj.insert("broad_type".to_string(), json!(resolved_broad));
+                        if let Some(fs) = &p.format_string {
+                            obj.insert("format_string".to_string(), json!(fs));
+                        }
+                        if let Some(tr) = &p.transform {
+                            obj.insert("transform".to_string(), json!(tr));
+                        }
+                        obj.insert("is_generic".to_string(), json!(p.is_generic));
+                        obj.insert("samples_used".to_string(), json!(p.samples_used));
+                        obj.insert("non_null".to_string(), json!(p.non_null_count));
+                        obj.insert("null".to_string(), json!(p.null_count));
+                        if p.disambiguation_applied {
+                            obj.insert("disambiguation_applied".to_string(), json!(true));
+                            if let Some(rule) = &p.disambiguation_rule {
+                                obj.insert("disambiguation_rule".to_string(), json!(rule));
+                            }
+                        }
+                        if let Some(locale) = &p.detected_locale {
+                            obj.insert("locale".to_string(), json!(locale));
+                        }
+                        // ac-06: validation-as-veto signals. pass_rate is
+                        // emitted whenever the predicted type had an applicable
+                        // validation; the veto/advisory flags and the original
+                        // label surface only when they fired.
+                        if let Some(rate) = p.validation_pass_rate {
+                            let r = (rate * 10000.0).round() / 10000.0;
+                            obj.insert("validation_pass_rate".to_string(), json!(r));
+                        }
+                        if p.validation_vetoed {
+                            obj.insert("validation_vetoed".to_string(), json!(true));
+                            if let Some(vt) = &p.vetoed_type {
+                                obj.insert("vetoed_type".to_string(), json!(vt));
+                            }
+                        }
+                        if p.validation_advisory_low {
+                            obj.insert("validation_advisory_low".to_string(), json!(true));
+                        }
+                        // Include unique values for categorical columns in verbose mode
+                        if verbose {
+                            if let Some(ref uv) = p.unique_values {
+                                obj.insert("unique_values".to_string(), json!(uv));
+                            }
+                        }
+                        if false {
+                            // validate removed (AC-10)
+                            match &p.quality {
+                                Some(q) => {
+                                    let r = |v: f64| (v * 10000.0).round() / 10000.0;
+                                    obj.insert(
+                                        "quality".to_string(),
+                                        json!({
+                                            "valid": q.valid_count,
+                                            "invalid": q.invalid_count,
+                                            "null": q.null_count,
+                                            "type_conforming_rate": r(q.score.type_conforming_rate),
+                                            "null_rate": r(q.score.null_rate),
+                                            "completeness": r(q.score.completeness),
+                                            "quality_score": r(q.score.quality_score),
+                                        }),
+                                    );
+                                    if !q.invalid_samples.is_empty() {
+                                        obj.insert(
+                                            "invalid_samples".to_string(),
+                                            json!(q.invalid_samples),
+                                        );
+                                    }
+                                }
+                                None => {
+                                    obj.insert("quality".to_string(), json!(null));
+                                }
+                            }
+                        }
+                        serde_json::Value::Object(obj)
+                    })
+                    .collect();
+
+                // Compute file-level grade when validation is active
+                let file_grade = if false {
+                    // validate removed (AC-10)
+                    let scores: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                        .collect();
+                    Some(finetype_core::compute_file_grade(&scores))
+                } else {
+                    None
+                };
+
+                if is_json_input {
+                    // Structured JSON output: reconstruct nested hierarchy
+                    let schema_input: Vec<(String, String, Option<String>, f32)> = profiles
+                        .iter()
+                        .map(|p| {
+                            (
+                                p.name.clone(),
+                                p.label.clone(),
+                                p.broad_type.clone(),
+                                p.confidence,
+                            )
+                        })
+                        .collect();
+                    let schema = reconstruct_json_schema(&schema_input);
+                    let mut result = json!({
+                        "file": file.to_string_lossy(),
+                        "rows": row_count,
+                        "schema": schema,
+                        "columns": cols,
+                    });
+                    if let Some(grade) = &file_grade {
+                        result["grade"] = json!(grade.to_string());
+                    }
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                } else {
+                    let mut result = json!({
+                        "file": file.to_string_lossy(),
+                        "rows": row_count,
+                        "columns": cols,
+                    });
+                    if let Some(grade) = &file_grade {
+                        result["grade"] = json!(grade.to_string());
+                    }
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                }
+            }
+            OutputFormat::Csv => {
+                println!("column,type,confidence,broad_type,format_string,transform,is_generic,samples_used,non_null,null,disambiguation,locale");
+                for p in &profiles {
+                    println!(
+                        "\"{}\",\"{}\",{:.4},\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\",\"{}\"",
+                        p.name,
+                        p.label,
+                        p.confidence,
+                        p.broad_type.as_deref().unwrap_or(""),
+                        p.format_string.as_deref().unwrap_or(""),
+                        p.transform.as_deref().unwrap_or(""),
+                        p.is_generic,
+                        p.samples_used,
+                        p.non_null_count,
+                        p.null_count,
+                        p.disambiguation_rule.as_deref().unwrap_or(""),
+                        p.detected_locale.as_deref().unwrap_or("")
+                    );
+                }
+            }
+            OutputFormat::Markdown => {
+                println!(
+                    "## FineType Column Profile — `{}`\n",
+                    file.to_string_lossy()
+                );
+                println!("{} rows, {} columns\n", row_count, n_cols);
+                if false {
+                    // validate removed (AC-10)
+                    println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
+                    println!("|--------|------|-----------|----------:|-----------:|--------:|");
+                } else {
+                    println!("| Column | Type | Broad Type | Confidence |");
+                    println!("|--------|------|-----------|----------:|");
+                }
+                for p in &profiles {
+                    let conf_str = if p.non_null_count > 0 {
+                        format!("{:.1}%", p.confidence * 100.0)
+                    } else {
+                        "—".to_string()
+                    };
+                    let broad =
+                        resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
+                    if false {
+                        // validate removed (AC-10)
+                        let (valid_str, score_str) = match &p.quality {
+                            Some(q) => (
+                                format!("{:.1}%", q.score.type_conforming_rate * 100.0),
+                                format!("{:.1}%", q.score.quality_score * 100.0),
+                            ),
+                            None => ("—".to_string(), "—".to_string()),
+                        };
+                        println!(
+                            "| {} | `{}` | {} | {} | {} | {} |",
+                            p.name, p.label, broad, conf_str, valid_str, score_str
+                        );
+                    } else {
+                        println!("| {} | `{}` | {} | {} |", p.name, p.label, broad, conf_str);
+                    }
+                }
+                let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();
+                if false {
+                    // validate removed (AC-10)
+                    let scores: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| p.quality.as_ref().map(|q| q.score.clone()))
+                        .collect();
+                    let grade = finetype_core::compute_file_grade(&scores);
+                    println!(
+                        "\n{}/{} columns typed — **Quality: {}**",
+                        typed_cols, n_cols, grade
+                    );
+                    // Data Issues section for columns with invalid samples
+                    let issues: Vec<_> = profiles
+                        .iter()
+                        .filter_map(|p| {
+                            p.quality.as_ref().and_then(|q| {
+                                if q.invalid_samples.is_empty() {
+                                    None
+                                } else {
+                                    Some((&p.name, &q.invalid_samples))
+                                }
+                            })
+                        })
+                        .collect();
+                    if !issues.is_empty() {
+                        println!("\n### Data Issues\n");
+                        for (name, samples) in &issues {
+                            println!("**{}** — invalid samples:", name);
+                            for s in *samples {
+                                println!("- `{}`", s);
+                            }
+                            println!();
+                        }
+                    }
+                } else {
+                    println!("\n{}/{} columns typed", typed_cols, n_cols);
+                }
+            }
+            OutputFormat::Arrow => {
+                // Arrow IPC JSON schema format
+                let fields: Vec<serde_json::Value> = profiles
+                    .iter()
+                    .map(|p| {
+                        let duckdb_type = p.broad_type.as_deref().unwrap_or("VARCHAR");
+                        let arrow_type = duckdb_to_arrow_type(duckdb_type);
+                        json!({
+                            "name": p.name,
+                            "type": arrow_type,
+                            "nullable": true,
+                            "children": [],
+                        })
+                    })
+                    .collect();
+
+                let schema = json!({
+                    "fields": fields,
+                    "metadata": {
+                        "finetype_version": env!("CARGO_PKG_VERSION"),
+                        "source": file.file_name().and_then(|f| f.to_str()).unwrap_or("unknown"),
+                        "row_count": row_count.to_string(),
+                    }
+                });
+
+                println!("{}", serde_json::to_string_pretty(&schema)?);
+            }
+            OutputFormat::JsonSchema => {
+                // ac-03 / ac-05: emit table-level JSON Schema via the shared
+                // helper. Taxonomy enrichment is required for label → property
+                // shape; without it, we cannot produce a meaningful schema.
+                let taxonomy = enrichment_taxonomy.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "JSON Schema output requires the bundled taxonomy at `labels/`; \
+                     run from the FineType source tree or ship with embedded taxonomy."
+                    )
+                })?;
+
+                let file_stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
+                let file_id = file
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("data.csv");
+
+                // Project profile rows + raw column values into the helper's
+                // borrowed-input shape. `columns` parallels `profiles` by index.
+                let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| {
+                        let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+                        json_schema::TableSchemaColumn {
+                            name: &p.name,
+                            label: &p.label,
+                            values,
+                            null_count: p.null_count,
+                        }
+                    })
+                    .collect();
+
+                let schema = json_schema::emit_table_schema(
+                    &cols,
+                    file_stem,
+                    file_id,
+                    taxonomy,
+                    stats,
+                    enum_threshold,
+                );
+
+                writeln!(writer, "{}", serde_json::to_string_pretty(&schema)?)?;
+            }
+        }
+
+        writer.flush()?;
+    } // end per-file loop
+
+    Ok(())
+}
