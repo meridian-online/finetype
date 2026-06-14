@@ -2156,10 +2156,7 @@ impl ColumnClassifier {
                 result.disambiguation_rule = Some(rule_name);
             }
 
-            if !header.is_empty() {
-                self.apply_header_sharpen(&mut result, header, &sample);
-                self.amount_bare_number_veto(&mut result, header, &sample);
-            }
+            self.sharpen_and_guard(&mut result, header, &sample);
         }
 
         // Step 6: Post-hoc locale detection.
@@ -2243,10 +2240,7 @@ impl ColumnClassifier {
             }
 
             // Step 5: Header hints (Model2Vec semantic matching)
-            if !header.is_empty() {
-                self.apply_header_sharpen(&mut result, header, &sample);
-                self.amount_bare_number_veto(&mut result, header, &sample);
-            }
+            self.sharpen_and_guard(&mut result, header, &sample);
         }
 
         // Step 6: Post-hoc locale detection
@@ -2344,10 +2338,7 @@ impl ColumnClassifier {
             }
 
             // Step 5: Header hints (Model2Vec semantic matching)
-            if !header.is_empty() {
-                self.apply_header_sharpen(&mut result, header, &sample);
-                self.amount_bare_number_veto(&mut result, header, &sample);
-            }
+            self.sharpen_and_guard(&mut result, header, &sample);
         }
 
         // Step 6: Post-hoc locale detection
@@ -2729,6 +2720,33 @@ impl ColumnClassifier {
                     detect_locale_from_validation(sample, &result.label, taxonomy);
             }
         }
+    }
+
+    /// Sharpen the label with header hints, then run the post-sharpen guards.
+    ///
+    /// Single entry point for the inference paths: every header-hint application
+    /// is followed by the unconditional guard stage. `apply_header_sharpen`'s
+    /// hint branches early-`return`, so a guard that must inspect a label the
+    /// hint just CREATED is unreachable from inside it (the
+    /// `amount_bare_number_veto` trap). Such guards live in
+    /// `apply_post_sharpen_guards`, which runs here regardless of which hint
+    /// branch fired. No-op on an empty header, matching the previous call-site
+    /// `!header.is_empty()` guard.
+    fn sharpen_and_guard(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if header.is_empty() {
+            return;
+        }
+        self.apply_header_sharpen(result, header, sample);
+        self.apply_post_sharpen_guards(result, header, sample);
+    }
+
+    /// Guards that must fire on the POST-sharpen label — including labels a
+    /// header hint created via an early `return` inside `apply_header_sharpen`.
+    /// Every value-identical-boundary guard whose target a hint can synthesise
+    /// belongs here, where it runs unconditionally, not inside
+    /// `apply_header_sharpen` where the hint branches would make it unreachable.
+    fn apply_post_sharpen_guards(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        self.amount_bare_number_veto(result, header, sample);
     }
 
     /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
