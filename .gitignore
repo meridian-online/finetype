@@ -300,3 +300,9 @@ output/veto-fallback/
 output/false-veto-trio/sample_pass/
 output/false-veto-trio/sample_pass.err
 output/false-veto-trio/sample_pass.out
+
+# Corpus-pass + snapshot byproducts under output/ (regenerable; multi-MB / transient)
+output/**/sample_pass/
+output/**/*.files.txt
+output/**/sample_pass_hier/
+output/**/*.nohup
