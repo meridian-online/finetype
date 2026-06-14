@@ -2416,6 +2416,32 @@ impl ColumnClassifier {
             return;
         }
 
+        // 0094 — header hint family `header_hint_state_code_promote` (default ON).
+        // PROMOTION for the value-identical state_code boundary. state_code scores
+        // P=R=0.000 on gold: a column of 2-letter subdivision codes (TX, FL, NM)
+        // with a `State` header is classified as the state NAME type, region, or
+        // full_address — state_code is never emitted. Unlike the coordinate
+        // promotion (which already exists header-only and so needed a guard), there
+        // is NO existing path to state_code, so this adds one. SAFETY: the
+        // promotion REQUIRES both a closed-vocabulary value match (>=80% of values
+        // in STATE_CODES) AND a state/province header — the header is load-bearing
+        // because 2-letter codes overlap ISO country codes (CA = California AND
+        // Canada), so value-match alone would steal country_code columns. Both
+        // conditions together cannot fire on a country column (country header) or a
+        // state-NAME column (full words fail the code vocab).
+        if !rhh::is_disabled("header_hint_state_code_promote")
+            && result.label != "geography.location.state_code"
+            && header_corroborates_state(header)
+            && values_look_like_state_codes(sample)
+        {
+            result.label = "geography.location.state_code".to_string();
+            result.confidence = result.confidence.max(0.8);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("state_code_promote:{}", header.to_lowercase()));
+            return;
+        }
+
         // RHH instrumentation hooks (compile out when feature `rhh-instrumentation`
         // is off — every `disable_*` becomes a constant `false`, the optimiser
         // eliminates the conjunctions, and there is zero runtime overhead).
@@ -4279,6 +4305,58 @@ fn header_corroborates_coordinate(header: &str) -> bool {
             "lat" | "lon" | "lng" | "long" | "lats" | "lons" | "latdd" | "londd" | "gps"
         )
     })
+}
+
+/// Closed-vocabulary state/province codes for the three `state_code` locales the
+/// taxonomy defines (EN_US, EN_CA, EN_AU; `geography.location.state_code`
+/// `validation_by_locale`). Duplicated here as the value discriminator for the
+/// Sharpen promotion — the taxonomy enum remains the validation source of truth;
+/// this set is stable (subdivision codes change on the order of decades). US 50 +
+/// DC, Canadian provinces/territories, Australian states/territories (2–3 letters).
+const STATE_CODES: &[&str] = &[
+    // US 50 + DC
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS",
+    "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY",
+    "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV",
+    "WI", "WY", "DC", // Canadian provinces/territories
+    "AB", "BC", "MB", "NB", "NL", "NS", "ON", "PE", "QC", "SK", "NT", "NU", "YT",
+    // Australian states/territories
+    "NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT",
+];
+
+/// True if the header corroborates a state/province subdivision (the disambiguator
+/// the `state_code` promotion REQUIRES, because 2-letter codes overlap ISO country
+/// codes — `CA` is California AND Canada, `GA` is Georgia-state AND Georgia-country).
+/// Token-aware so `state`/`province` match but false friends do not (`statement`,
+/// `status`, `estate` tokenize away from `state`).
+fn header_corroborates_state(header: &str) -> bool {
+    header
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|tok| matches!(tok, "state" | "states" | "province" | "provinces" | "prov"))
+}
+
+/// True if the sampled values are predominantly closed-vocabulary state/province
+/// codes — the value discriminator for the `state_code` promotion. Requires a
+/// majority (>= 80%) of non-empty values to be members of [`STATE_CODES`]
+/// (uppercased). A full state-name column (`California`) fails (not 2-3 letter
+/// codes); a country-code column fails (most ISO codes are not state codes), so
+/// enum membership plus the header guard cleanly separates state_code from its
+/// value-identical neighbours (state, region, country_code).
+fn values_look_like_state_codes(sample: &[String]) -> bool {
+    let (mut hit, mut total) = (0usize, 0usize);
+    for v in sample.iter().take(16) {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        total += 1;
+        let up = t.to_ascii_uppercase();
+        if STATE_CODES.contains(&up.as_str()) {
+            hit += 1;
+        }
+    }
+    total >= 3 && hit * 100 >= total * 80
 }
 
 /// True if the sampled values are predominantly numeric — the value-validation
@@ -6962,6 +7040,77 @@ mod tests {
         // (rhh::is_disabled is a const `false` when the rhh-instrumentation
         // feature is off) and disableable via RHH_DISABLE_HINTS in ablation builds.
         assert!(!rhh::is_disabled("header_hint_coord_veto"));
+    }
+
+    // === state_code promotion helpers ===
+
+    #[test]
+    fn state_code_header_corroboration() {
+        for h in [
+            "State",
+            "Provider State",
+            "DL State",
+            "ADDRESS STATE",
+            "province",
+        ] {
+            assert!(header_corroborates_state(h), "should corroborate: {h}");
+        }
+        // false friends — `state` must not match as a substring
+        for h in [
+            "statement",
+            "status",
+            "real estate",
+            "estate",
+            "country",
+            "city",
+        ] {
+            assert!(!header_corroborates_state(h), "should NOT corroborate: {h}");
+        }
+    }
+
+    #[test]
+    fn state_code_value_vocab_gate() {
+        // US codes
+        assert!(values_look_like_state_codes(&[
+            "GA".into(),
+            "FL".into(),
+            "NM".into(),
+            "TX".into(),
+        ]));
+        // lowercase is uppercased before lookup
+        assert!(values_look_like_state_codes(&[
+            "ca".into(),
+            "ny".into(),
+            "wa".into(),
+        ]));
+        // AU 3-letter codes
+        assert!(values_look_like_state_codes(&[
+            "NSW".into(),
+            "VIC".into(),
+            "QLD".into(),
+        ]));
+        // full state NAMES are not codes
+        assert!(!values_look_like_state_codes(&[
+            "California".into(),
+            "Florida".into(),
+            "Texas".into(),
+        ]));
+        // a country-code column: most ISO codes are not state codes, so it fails
+        // the vocab gate even before the header guard.
+        assert!(!values_look_like_state_codes(&[
+            "GB".into(),
+            "FR".into(),
+            "DE".into(),
+            "JP".into(),
+            "CN".into(),
+        ]));
+        // below the 3-value floor
+        assert!(!values_look_like_state_codes(&["TX".into(), "FL".into()]));
+    }
+
+    #[test]
+    fn state_code_promote_is_a_default_on_header_hint() {
+        assert!(!rhh::is_disabled("header_hint_state_code_promote"));
     }
 
     // === 0094 postal header-veto helpers (spec 2026-06-10-postal-header-veto) ===
