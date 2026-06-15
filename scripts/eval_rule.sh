@@ -150,6 +150,11 @@ fi
 
 # ── 3. Candidate corpus pass (33k stratified sample) ─────────────────────────
 echo ""; echo "── Candidate corpus pass (33k stratified sample) ──"
+# gittables_corpus_pass.py has no resume: it refuses to run if files.parquet /
+# columns.parquet already exist, and an INTERRUPTED prior pass leaves a partial,
+# unreadable parquet that the gate then chokes on ("no magic bytes"). Always
+# start from a clean output dir — these artifacts are fully regenerated here.
+rm -rf "$OUT/sample_pass"
 # shellcheck disable=SC1091
 source eval/gittables/.venv/bin/activate   # pyarrow/duckdb live here, not in system python3
 FINETYPE_MODEL="$MODEL" python3 scripts/gittables_corpus_pass.py \
