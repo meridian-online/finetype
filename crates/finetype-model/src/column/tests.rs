@@ -1388,6 +1388,11 @@ fn isbn_checkdigit_veto_is_default_on() {
 }
 
 #[test]
+fn binary_vocab_veto_is_default_on() {
+    assert!(!rhh::is_disabled("binary_vocab_veto"));
+}
+
+#[test]
 fn isbn_checkdigit_validator() {
     // genuine ISBNs (ISBN-10, ISBN-10 with X, ISBN-13, hyphenated) pass
     for v in [

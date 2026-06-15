@@ -2754,7 +2754,55 @@ impl ColumnClassifier {
         self.amount_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
         self.isbn_checkdigit_veto(result, header, sample);
+        self.binary_vocab_veto(result, header, sample);
         self.city_region_header_corroboration(result, header, sample);
+    }
+
+    /// `binary_vocab_veto` (default ON). `representation.boolean.binary` requires
+    /// a strictly two-valued {0,1} domain, but the model over-emits it on sparse
+    /// integer COUNT columns — mostly zeros with the occasional larger value
+    /// (`Points` …0,0,8,0…; `Comments` …5,0,0…). Acts only on all-integer columns
+    /// (so true/false/yes/no binaries are untouched): if any value falls outside
+    /// {0,1}, the column is a count, not a flag — demote to integer. Genuine
+    /// numeric binaries ({0,1} only) carry no out-of-domain value and pass
+    /// through. Measured on gold: 12 of 18 integer columns the model called
+    /// `binary` carry a value above 1.
+    fn binary_vocab_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("binary_vocab_veto") || result.label != "representation.boolean.binary"
+        {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let mut any_outside_01 = false;
+        for v in &non_empty {
+            match v.parse::<i64>() {
+                Ok(n) => {
+                    if n != 0 && n != 1 {
+                        any_outside_01 = true;
+                    }
+                }
+                // Non-integer value (true/false, decimal, text) — not a numeric
+                // binary this veto should touch.
+                Err(_) => return,
+            }
+        }
+        if !any_outside_01 {
+            return;
+        }
+        result.label = "representation.numeric.integer_number".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!("binary_vocab_veto:{}", header.to_lowercase()));
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
+        }
     }
 
     /// `isbn_checkdigit_veto` (default ON). The taxonomy's `identity.commerce.isbn`
