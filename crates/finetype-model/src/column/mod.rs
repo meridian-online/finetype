@@ -2753,7 +2753,52 @@ impl ColumnClassifier {
     ) {
         self.amount_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
+        self.isbn_checkdigit_veto(result, header, sample);
         self.city_region_header_corroboration(result, header, sample);
+    }
+
+    /// `isbn_checkdigit_veto` (default ON). The taxonomy's `identity.commerce.isbn`
+    /// validation checks digit *count* only (10 or 13 digits), so a large
+    /// financial integer (`marketCap` 5150000128) passes as an ISBN. Re-check the
+    /// real ISBN-10/13 check digit: a bare-number column whose values mostly FAIL
+    /// the checksum is not ISBNs — demote to decimal/integer. Acts only on
+    /// all-digit columns (`values_look_like_bare_numbers`); genuine ISBNs pass the
+    /// checksum, or carry an `X`/hyphens that make them non-bare, so they are kept.
+    /// Measured on gold: 4 large-integer columns (marketCap, totalCashFrom…,
+    /// propertyPlantEquipment, otherLiab) were emitted as `isbn`.
+    fn isbn_checkdigit_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("isbn_checkdigit_veto") || result.label != "identity.commerce.isbn" {
+            return;
+        }
+        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
+        if !is_bare {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty.iter().filter(|v| is_valid_isbn(v)).count();
+        // Majority are real ISBNs → keep. Otherwise these are plain numbers.
+        if valid * 2 >= non_empty.len() {
+            return;
+        }
+        result.label = if any_decimal {
+            "representation.numeric.decimal_number".to_string()
+        } else {
+            "representation.numeric.integer_number".to_string()
+        };
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("isbn_checkdigit_veto:{}", header.to_lowercase()));
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
+        }
     }
 
     /// `url_bare_number_veto` (default ON). Twin of `amount_bare_number_veto`.

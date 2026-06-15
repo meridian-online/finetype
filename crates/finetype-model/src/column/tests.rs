@@ -1383,6 +1383,30 @@ fn url_bare_number_veto_is_default_on() {
 }
 
 #[test]
+fn isbn_checkdigit_veto_is_default_on() {
+    assert!(!rhh::is_disabled("isbn_checkdigit_veto"));
+}
+
+#[test]
+fn isbn_checkdigit_validator() {
+    // genuine ISBNs (ISBN-10, ISBN-10 with X, ISBN-13, hyphenated) pass
+    for v in [
+        "0306406152",
+        "043942089X",
+        "9780306406157",
+        "978-3-16-148410-0",
+    ] {
+        assert!(is_valid_isbn(v), "should be valid ISBN: {v}");
+    }
+    // financial figures the model mislabels as ISBN fail the checksum
+    for v in ["5150000128", "6965100000", "7586000000", "1041000000"] {
+        assert!(!is_valid_isbn(v), "should NOT be valid ISBN: {v}");
+    }
+    // a leading sign disqualifies (ISBNs are never signed)
+    assert!(!is_valid_isbn("-1617000000"));
+}
+
+#[test]
 fn url_bare_number_gate() {
     // 0/1/-1 flag columns the model mislabels as url → bare integers, demote
     let (bare, dec) =
