@@ -34,7 +34,7 @@ acceptance_criteria:
     weak → it ships only if it clears). NO-GO (no boundary separates) =
     sibling-context is not our lever; stop before the expensive build.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-02
   description: |
@@ -57,7 +57,6 @@ acceptance_criteria:
     already present) + the bin/train_sibling_context.rs scaffold.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-03
   description: |
     TRAIN + ABLATION. Train the multi-branch WITH sibling-context on v3 data.
@@ -73,7 +72,6 @@ acceptance_criteria:
     upc) — cross-column context must not relocate them.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     PROMOTION GATES (BLOCKING, H05) — the full order, choice 0095. gold-anchor
