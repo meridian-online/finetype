@@ -1377,6 +1377,26 @@ fn amount_bare_number_veto_is_default_on() {
     assert!(!rhh::is_disabled("amount_bare_number_veto"));
 }
 
+#[test]
+fn url_bare_number_veto_is_default_on() {
+    assert!(!rhh::is_disabled("url_bare_number_veto"));
+}
+
+#[test]
+fn url_bare_number_gate() {
+    // 0/1/-1 flag columns the model mislabels as url → bare integers, demote
+    let (bare, dec) =
+        values_look_like_bare_numbers(&["0".into(), "1".into(), "0".into(), "-1".into()]);
+    assert!(bare && !dec);
+    // genuine URLs are non-numeric → not bare, kept as url
+    let (bare, _) = values_look_like_bare_numbers(&[
+        "https://example.com/a".into(),
+        "http://foo.org".into(),
+        "https://bar.net/x".into(),
+    ]);
+    assert!(!bare);
+}
+
 // === 0094 postal header-veto helpers (spec 2026-06-10-postal-header-veto) ===
 
 #[test]

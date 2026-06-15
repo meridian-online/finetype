@@ -2752,7 +2752,41 @@ impl ColumnClassifier {
         sample: &[String],
     ) {
         self.amount_bare_number_veto(result, header, sample);
+        self.url_bare_number_veto(result, header, sample);
         self.city_region_header_corroboration(result, header, sample);
+    }
+
+    /// `url_bare_number_veto` (default ON). Twin of `amount_bare_number_veto`.
+    /// A link-ish header (`Publisher URL`, `perm_unlink`, `link_type`) makes the
+    /// header-hint machinery promote the column to `technology.internet.url` via
+    /// an early `return`, so the early `schema_validation_gate` never re-checks
+    /// the hint's assertion. But a URL is text (`https://…`); a column of bare
+    /// numbers (`0`/`1`/`-1` flags, large integers) cannot be one. Undo the
+    /// hint's promotion by value shape: a bare-number `url` is demoted to
+    /// decimal/integer. Demotion only — genuine URL columns contain non-numeric
+    /// values and pass through untouched. Measured on gold: 6 whole-number
+    /// columns headed `Publisher URL`/`perm_unlink`/`link_type` were emitted as
+    /// `url` (url precision 0.721).
+    fn url_bare_number_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("url_bare_number_veto") || result.label != "technology.internet.url" {
+            return;
+        }
+        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
+        if is_bare {
+            result.label = if any_decimal {
+                "representation.numeric.decimal_number".to_string()
+            } else {
+                "representation.numeric.integer_number".to_string()
+            };
+            result.confidence = result.confidence.min(0.6);
+            result.disambiguation_applied = true;
+            result.disambiguation_rule =
+                Some(format!("url_bare_number_veto:{}", header.to_lowercase()));
+            if let Some(taxonomy) = self.taxonomy.as_ref() {
+                result.detected_locale =
+                    detect_locale_from_validation(sample, &result.label, taxonomy);
+            }
+        }
     }
 
     /// `city_region_header_corroboration` (default ON). The model's
