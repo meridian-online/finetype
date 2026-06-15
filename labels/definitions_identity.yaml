@@ -836,6 +836,7 @@ identity.commerce.isbn:
   validation:
     type: string
     pattern: "^(?:97[89]-)?[0-9]{1,5}-[0-9]+-[0-9]+-[0-9X]$|^[0-9]{9}[0-9X]$|^[0-9]{13}$"
+  checksum: isbn
   tier: [VARCHAR, code]
   release_priority: 3
   aliases: null
@@ -846,8 +847,10 @@ identity.commerce.isbn:
   references: null
   notes: >
     v1 migration: Was code.isbn. Pattern accepts ISBN-10 and ISBN-13 with or
-    without hyphens. Decompose infers version based on length. Check digit
-    validation should be done in application code, not in SQL.
+    without hyphens. Decompose infers version based on length. The `checksum:
+    isbn` directive drives the model's checksum_substance_guard, which demotes a
+    column of same-length integers that fail the ISBN check digit (e.g. a
+    financial figure like marketCap) off the isbn label.
 
 identity.commerce.issn:
   title: "ISSN"

@@ -218,6 +218,18 @@ pub struct Definition {
     pub decompose: Option<serde_yaml::Value>,
     /// JSON Schema fragment for data quality checks
     pub validation: Option<Validation>,
+    /// Substance check-digit scheme for self-validating identifier types
+    /// (Precision Principle). Names a function in [`crate::checksum`] (e.g.
+    /// `isbn`). The model's `checksum_substance_guard` reads this directive to
+    /// scope itself and re-checks a column's values against the real check
+    /// digit — a value of the right *shape* but wrong *check digit* is not that
+    /// type. Deliberately NOT folded into the compiled `validation` validator:
+    /// the generic schema-demotion rules also consult that validator and would
+    /// demote checksum-failing columns to a worse fallback than the dedicated
+    /// guard's target. Sibling to `validation` because it is a property of the
+    /// type, not of the JSON Schema fragment.
+    #[serde(default)]
+    pub checksum: Option<String>,
     /// Per-locale validation schemas for locale-specific types.
     /// When present, attractor demotion can validate values against
     /// locale-specific patterns (e.g., US ZIP code vs UK postcode)

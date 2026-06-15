@@ -2753,7 +2753,7 @@ impl ColumnClassifier {
     ) {
         self.amount_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
-        self.isbn_checkdigit_veto(result, header, sample);
+        self.checksum_substance_guard(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
         self.city_region_header_corroboration(result, header, sample);
     }
@@ -2805,19 +2805,52 @@ impl ColumnClassifier {
         }
     }
 
-    /// `isbn_checkdigit_veto` (default ON). The taxonomy's `identity.commerce.isbn`
-    /// validation checks digit *count* only (10 or 13 digits), so a large
-    /// financial integer (`marketCap` 5150000128) passes as an ISBN. Re-check the
-    /// real ISBN-10/13 check digit: a bare-number column whose values mostly FAIL
-    /// the checksum is not ISBNs — demote to decimal/integer. Acts only on
-    /// all-digit columns (`values_look_like_bare_numbers`); genuine ISBNs pass the
-    /// checksum, or carry an `X`/hyphens that make them non-bare, so they are kept.
-    /// Measured on gold: 4 large-integer columns (marketCap, totalCashFrom…,
-    /// propertyPlantEquipment, otherLiab) were emitted as `isbn`.
-    fn isbn_checkdigit_veto(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
-        if rhh::is_disabled("isbn_checkdigit_veto") || result.label != "identity.commerce.isbn" {
+    /// `checksum_substance_guard` (default ON). Generic substance check for the
+    /// self-validating identifier types — replaces the per-type
+    /// `*_checkdigit_veto` pattern. Any column the model labels with a
+    /// checksum-bearing type (the taxonomy `checksum:` directive — `isbn`
+    /// today; aba/luhn/npi/ean/upc/imei as they enrol) is re-checked against the
+    /// real check-digit arithmetic from the canonical `finetype_core::checksum`
+    /// module rather than a hand-rolled copy.
+    ///
+    /// The taxonomy's shape pattern (10 or 13 digits) lets a large financial
+    /// integer like `marketCap` 5150000128 look like an ISBN; the checksum is
+    /// what distinguishes "is this type" from "is not". A bare-number column
+    /// whose values mostly FAIL their type's validator is not that type —
+    /// demote to decimal/integer by shape. Scoped to bare-number columns
+    /// (`values_look_like_bare_numbers`) so genuine identifiers (which pass) and
+    /// non-numeric content are untouched; this covers the numeric checksum
+    /// types. Measured on gold: 4 large-integer columns (marketCap,
+    /// totalCashFrom…, propertyPlantEquipment, otherLiab) were emitted as `isbn`.
+    ///
+    /// The checksum is owned HERE, not in the shared compiled validator. Wiring
+    /// it into the validator looks tidier but regresses: the generic
+    /// `value_sharpen` schema-demotion rules also consult that validator and,
+    /// on a checksum-failing column, demote it to their own fallback
+    /// (`numeric_code`/categorical) — a worse target than the gold-correct
+    /// `integer_number` this guard produces, and they run first. So the
+    /// directive scopes this guard while the validator stays shape-only.
+    fn checksum_substance_guard(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("checksum_substance_guard") {
             return;
         }
+        let Some(taxonomy) = self.taxonomy.as_ref() else {
+            return;
+        };
+        // Only act on labels carrying a `checksum:` directive; resolve its
+        // canonical validating function from crate::checksum.
+        let Some(checksum) = taxonomy
+            .get(&result.label)
+            .and_then(|def| def.checksum.as_deref())
+            .and_then(finetype_core::checksum::resolve)
+        else {
+            return;
+        };
         let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
         if !is_bare {
             return;
@@ -2830,11 +2863,13 @@ impl ColumnClassifier {
         if non_empty.len() < 3 {
             return;
         }
-        let valid = non_empty.iter().filter(|v| is_valid_isbn(v)).count();
-        // Majority are real ISBNs → keep. Otherwise these are plain numbers.
+        let valid = non_empty.iter().filter(|v| checksum(v)).count();
+        // Majority pass their checksum → genuine identifiers, keep. Otherwise
+        // these are plain numbers wearing the wrong label.
         if valid * 2 >= non_empty.len() {
             return;
         }
+        let demoted_from = result.label.clone();
         result.label = if any_decimal {
             "representation.numeric.decimal_number".to_string()
         } else {
@@ -2842,11 +2877,8 @@ impl ColumnClassifier {
         };
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;
-        result.disambiguation_rule =
-            Some(format!("isbn_checkdigit_veto:{}", header.to_lowercase()));
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
-        }
+        result.disambiguation_rule = Some(format!("checksum_substance_guard:{demoted_from}"));
+        result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
     }
 
     /// `url_bare_number_veto` (default ON). Twin of `amount_bare_number_veto`.

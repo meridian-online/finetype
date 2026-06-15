@@ -1393,22 +1393,29 @@ fn binary_vocab_veto_is_default_on() {
 }
 
 #[test]
-fn isbn_checkdigit_validator() {
-    // genuine ISBNs (ISBN-10, ISBN-10 with X, ISBN-13, hyphenated) pass
+fn checksum_substance_guard_is_default_on() {
+    assert!(!rhh::is_disabled("checksum_substance_guard"));
+}
+
+#[test]
+fn isbn_checksum_distinguishes_genuine_from_lookalikes() {
+    // The check-digit math now lives in the canonical crate::checksum module
+    // (wired into the validator via `checksum: isbn`); the guard delegates to
+    // it. Genuine ISBNs pass; same-length financial figures the model
+    // mislabels as ISBN fail.
+    use finetype_core::checksum::isbn;
     for v in [
         "0306406152",
         "043942089X",
         "9780306406157",
         "978-3-16-148410-0",
     ] {
-        assert!(is_valid_isbn(v), "should be valid ISBN: {v}");
+        assert!(isbn(v), "should be valid ISBN: {v}");
     }
-    // financial figures the model mislabels as ISBN fail the checksum
     for v in ["5150000128", "6965100000", "7586000000", "1041000000"] {
-        assert!(!is_valid_isbn(v), "should NOT be valid ISBN: {v}");
+        assert!(!isbn(v), "should NOT be valid ISBN: {v}");
     }
-    // a leading sign disqualifies (ISBNs are never signed)
-    assert!(!is_valid_isbn("-1617000000"));
+    assert!(!isbn("-1617000000"));
 }
 
 #[test]

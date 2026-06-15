@@ -8,6 +8,7 @@
 //! - `tokenizer` — text tokenization for model training
 
 pub mod checker;
+pub mod checksum;
 pub mod generator;
 pub mod infer;
 pub mod json_reader;
