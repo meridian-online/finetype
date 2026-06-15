@@ -1383,8 +1383,8 @@ fn url_bare_number_veto_is_default_on() {
 }
 
 #[test]
-fn isbn_checkdigit_veto_is_default_on() {
-    assert!(!rhh::is_disabled("isbn_checkdigit_veto"));
+fn country_code_corroboration_is_default_on() {
+    assert!(!rhh::is_disabled("country_code_corroboration"));
 }
 
 #[test]

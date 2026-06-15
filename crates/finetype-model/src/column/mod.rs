@@ -2756,6 +2756,7 @@ impl ColumnClassifier {
         self.checksum_substance_guard(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
         self.city_region_header_corroboration(result, header, sample);
+        self.country_code_corroboration(result, header, sample);
     }
 
     /// `binary_vocab_veto` (default ON). `representation.boolean.binary` requires
@@ -2953,6 +2954,56 @@ impl ColumnClassifier {
             "city_region_header_corroboration:{}",
             header.to_lowercase()
         ));
+    }
+
+    /// `country_code_corroboration` (default ON). Two-letter ISO 3166-1 codes
+    /// (`US`, `HK`, `MT`) are value-identical to other short geographic tokens,
+    /// so the flat softmax files them under `region`/`state`/`city`/`country`.
+    /// The `country_code` enum — 249 official ISO codes, the taxonomy's most
+    /// precise validator — is the disambiguator: a confusable geography label
+    /// whose values are MOSTLY valid ISO codes is a country_code. Value-based
+    /// (decision 0048) and promotion-only — genuine region/state/city columns
+    /// carry place names, not ISO codes, so they fail the enum and are
+    /// untouched. `state`/`state_code` are deliberately NOT confusable here:
+    /// their 2-letter codes legitimately overlap the ISO set, so promoting them
+    /// would trade one error for another. Measured on gold: 5 columns
+    /// (country_code_filter=MT, exchange_country=HK, PA, id=AU/AT/…, Country)
+    /// emitted as `region`/`country`.
+    fn country_code_corroboration(&self, result: &mut ColumnResult, _header: &str, sample: &[String]) {
+        if rhh::is_disabled("country_code_corroboration") {
+            return;
+        }
+        const CONFUSABLE: [&str; 3] = [
+            "geography.location.region",
+            "geography.location.city",
+            "geography.location.country",
+        ];
+        if !CONFUSABLE.contains(&result.label.as_str()) {
+            return;
+        }
+        let Some(taxonomy) = self.taxonomy.as_ref() else {
+            return;
+        };
+        let Some(validator) = taxonomy.get_validator("geography.location.country_code") else {
+            return;
+        };
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let pass = non_empty.iter().filter(|v| validator.is_valid(v)).count();
+        // Promote only on a clear majority of exact ISO codes.
+        if pass * 2 <= non_empty.len() {
+            return;
+        }
+        result.label = "geography.location.country_code".to_string();
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("country_code_corroboration".to_string());
+        result.detected_locale = None;
     }
 
     /// `amount_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
