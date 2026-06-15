@@ -1,0 +1,5 @@
+key: gold-fp-analysis-join-key
+body: 'Gold-corpus FP/FN analysis MUST join predictions to gold on the composite key (file_content_sha256, column_name) — NOT on file_content_sha256 alone. file_content_sha256 is PER-FILE; a file''s many columns all share it. Joining on sha alone and taking head -1 mispairs each prediction with an arbitrary other column''s gold label in the same file, producing a CORRUPTED FP breakdown. Caught 2026-06-15 during the city/region precision work: a sha-only join made it look like coordinate-headed columns were being called city/region (phantom), and a coordinate veto built on it changed zero predictions. Re-joining on (sha, column_name) revealed the real errors are textual (region<->city, region->country_code, place<->plain_text/categorical). predictions_*.tsv key = (file_content_sha256, column_name, predicted_label); gold key = (sha=col3, header=col4, label=col5). Always verify a new rule actually CHANGES the intended gold predictions (diff vs baseline) before trusting the diagnosis.'
+timestamp: 2026-06-15T00:15:51.657751Z
+labels:
+- code-investigate
