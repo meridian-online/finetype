@@ -1,0 +1,5 @@
+key: worktree-agent-gitignored-artifacts
+body: 'GOTCHA (2026-06-15): worktree-isolated agents (Agent isolation:worktree / git worktrees) do NOT get the repo''s gitignored artifacts — models/<weights>, models/default symlink target, eval/gittables/.venv, eval/gittables/corpus_pass/columns.parquet. The finetype-cli build script PANICS (build.rs flat-model assertion) on any cli build when models/default dangles. So a worktree agent can compile/test/clippy/fmt but CANNOT run the gold eval or corpus-honest gate (missing model+venv+parquet). FIX: symlink the real artifacts from the main checkout into the worktree before cli builds (the split agent did this manually), OR keep gold/corpus-honest gating in the MAIN tree and have worktree agents gate only on compile+test+clippy+fmt, with the parent running the byte-identical gold check at merge.'
+timestamp: 2026-06-15T04:22:37.708197Z
+labels:
+- topology
