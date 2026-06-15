@@ -2,7 +2,7 @@ id: 2026-06-16-scoped-late-fusion-boundary-arbiter
 goal: Recover the column-level-ambiguous recall gaps that the flat-softmax Sense model and deterministic guards provably cannot, via a late-fusion arbiter BOUNDED to a pre-declared confusable boundary set so it never collapses the label space (the wall that closed the general-replacement bet) — each boundary proven to beat the rule baseline through the gold corpus + corpus-honest gate before promotion.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - recall
 - fusion
@@ -83,7 +83,6 @@ acceptance_criteria:
     ac-01 of prior spec), the dump-fusion-features Rust subcommand (built).
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     BOUNDED ARBITER HEAD (Python research, fast iteration on cached features).
@@ -97,7 +96,6 @@ acceptance_criteria:
     miss. Deliverable: per-boundary recall table + canary table.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-05
   description: |
     PRE-PORT KILL SWITCH (gate, BLOCKING H05). Score the Python arbiter's
@@ -122,7 +120,6 @@ acceptance_criteria:
     tolerance. Kill switches from ac-02 wired and defaulted per-boundary.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-07
   description: |
     FULL POST-PORT SHIP GATE on the RUST path (gate, BLOCKING H05). The bar is
@@ -158,3 +155,4 @@ acceptance_criteria:
   gate: false
   checked: false
   ac_type: doc
+closed_at: 2026-06-15T23:32:00.984329Z

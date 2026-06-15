@@ -1,0 +1,120 @@
+id: 2026-06-16-finish-sibling-context-attention
+goal: 'Finish the stranded #1 architecture enhancement: train sibling-context (cross-column) attention into the production fine-grained Sense model and ship it as a gated PATCH, recovering the column-level-ambiguous boundaries (coordinate, currency, tight-code) that the context-free flat v19 and deterministic guards provably cannot — efficacy probed before the build, gated against v19 before the swap.'
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- recall
+- architecture
+- sibling-context
+acceptance_criteria:
+- id: ac-01
+  description: |
+    EFFICACY PROBE — cheap, BEFORE any FTMB v3 build. The wall this session
+    hit: the remaining recall gaps are column-level-ambiguous — the
+    disambiguating signal is not in the value (memory currency-gold-gap-is-
+    column-level; the deferral finding's own words, output/late-fusion/
+    deferral_finding.md). Sibling-context attention reads cross-column context,
+    so it is the mechanism aimed at exactly this wall (formal challenge #1:
+    Sato +14.4% macro F1, Pythagoras +17.92% on NUMERIC columns). But its
+    efficacy on OUR boundaries must be measured, not assumed — feasibility is
+    already proven (SPIKE_B), efficacy on the 250-class fine-grained regime is
+    not. Using labelled columns that retain their source-table siblings (incl.
+    the gold external FULL tables: nyc_payroll_sample.csv, uk_price_paid_
+    sample.csv), measure per-boundary whether a cross-column signal SEPARATES
+    the classes v19 confuses:
+      - latitude/longitude-vs-decimal (strong prior — a latitude column almost
+        always has a longitude sibling; the pair is the giveaway).
+      - currency.amount-vs-decimal/integer (uncertain — symbol-less, the lever
+        is table-gestalt: payroll/property table headers around the column).
+      - tight-code-vs-alphanumeric_id (the Sharpen-unreachable family-A case).
+    Deliverable: per-boundary separability read (do sibling/table-context
+    features measurably separate the confused classes?). GO threshold: at
+    LEAST coordinates separate strongly; currency reported honestly (may be
+    weak → it ships only if it clears). NO-GO (no boundary separates) =
+    sibling-context is not our lever; stop before the expensive build.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-02
+  description: |
+    FTMB v3 + TRAINING LOOP — resolve the four CRITICAL blockers that closed
+    spec 2026-03-24-sibling-context-multi-branch at REQUEST_CHANGES (0/7 ACs
+    done; the integration was never built — that is why this enhancement is
+    stranded, NOT a negative result). (a) FTMB v3 table-grouped binary format:
+    records grouped by source table with a sibling-header list — define the
+    byte layout (magic, version, index/group block, record layout) and the
+    v1/v2 back-compat or clean-migration strategy (v2 is flat, 24-byte header,
+    no group structure). (b) Data prep emits v3 from table-grouped GitTables
+    (the value-level/distillation corpora are header-less and ungrouped — that
+    gap is the root blocker, resolve it here). (c) FrozenSiblingContext /
+    trainable attention wired into the multi-branch training loop (the
+    FrozenSense constant-tensor pattern is the proven mechanism). (d) Single-
+    value inference degrades gracefully: `finetype infer -i "alice@example.com"`
+    and a bare value produce a valid label, N=1 attention pass, no NaN/panic.
+    REUSE: crates/finetype-model/src/sibling_context.rs (built, multi-head
+    self-attn) + the CLI wiring (wire_sibling_context in main.rs/profile.rs,
+    already present) + the bin/train_sibling_context.rs scaffold.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    TRAIN + ABLATION. Train the multi-branch WITH sibling-context on v3 data.
+    The 6→250 class transfer is the NAMED RISK: the existing attention weights
+    (models/sibling-context, 1.5M) were trained for the OLD 6-class Sense at
+    78% val — there is no evidence they generalise to the 250-class fine-
+    grained header branch. This AC settles it. Ablation baseline = the SAME
+    architecture re-trained on the SAME v3 data with attention DISABLED (clean
+    comparison; NOT v19-on-v2, which confounds format with architecture).
+    Deliverable: per-boundary recall on the gold corpus + the rare-type
+    scoreboard, with-vs-without attention. Track the collapse canaries the
+    additive cycles gutted (top_level_domain, npi, uuid, geohash, utc-offset,
+    upc) — cross-column context must not relocate them.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    PROMOTION GATES (BLOCKING, H05) — the full order, choice 0095. gold-anchor
+    (efficacy) → destination-drift proxy pre-check vs v19 (this is a real
+    retrain — the proxy is mandatory) → gold corpus no-regression + per-
+    boundary recall win + rare-type scoreboard → corpus-honest gate GO on the
+    candidate's predictions (the only relocation detector; a NO-GO is blocking
+    and final). MUST BEAT THE RULE BASELINE: recover boundaries the shipped
+    guards cannot (coordinate/currency/code), with ZERO regression on what the
+    guard campaign already fixed (postal, checksum, binary, url, city/region,
+    country-code) and on the gold headline (currently 728/931 = 0.782). No
+    headline overrides a blocking NO-GO.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-05
+  description: |
+    PATCH SHIP — on a clean ac-04 only. models/default symlink swap +
+    destination drift/SHA verification, then a PATCH release (0.6.x — this
+    FINISHES stranded work and rides the normal model-promotion mechanism; it
+    is explicitly NOT a 0.7.0 architecture event). Version bump, CHANGELOG in
+    user-experience framing (e.g. "FineType now reads each column in the
+    context of its table — telling coordinates from plain decimals and salaries
+    from counts"), gold baseline doc + CLAUDE.md model line updated. If only a
+    subset of boundaries cleared ac-04, ship that subset honestly.
+  gate: false
+  checked: false
+  ac_type: ops
+- id: ac-06
+  description: |
+    DECISION MEMO + SEQUENCE THE HIERARCHICAL HEAD. Record per-boundary
+    outcome and the architecture verdict: did cross-column context clear the
+    wall the context-free flat model could not? Bank findings either way
+    (pillar 4). Then OPEN THE FOLLOW-ON SPEC for the second sequenced layer —
+    the hierarchical Domain→Family→Type head (already built: char_cnn.rs
+    HeadType::Hierarchical + HierarchyMap; the shipped multi-branch trains
+    flat, use_hierarchical:false), which structurally dissolves the residual-
+    attractor disease (categorical/unknown stop competing as softmax peers,
+    choice 0096) — also a gated PATCH, not a major version. Update card 0002
+    and the relevant memories (sibling-context-is-the-stranded-architecture-
+    layer).
+  gate: false
+  checked: false
+  ac_type: doc
