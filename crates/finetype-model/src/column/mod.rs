@@ -2808,20 +2808,21 @@ impl ColumnClassifier {
     /// `checksum_substance_guard` (default ON). Generic substance check for the
     /// self-validating identifier types — replaces the per-type
     /// `*_checkdigit_veto` pattern. Any column the model labels with a
-    /// checksum-bearing type (the taxonomy `checksum:` directive — `isbn`
-    /// today; aba/luhn/npi/ean/upc/imei as they enrol) is re-checked against the
-    /// real check-digit arithmetic from the canonical `finetype_core::checksum`
-    /// module rather than a hand-rolled copy.
+    /// checksum-bearing type (the taxonomy `checksum:` directive — isbn, aba,
+    /// cusip, sedol today) is re-checked against the real check-digit arithmetic
+    /// from the canonical `finetype_core::checksum` module rather than a
+    /// hand-rolled copy.
     ///
     /// The taxonomy's shape pattern (10 or 13 digits) lets a large financial
     /// integer like `marketCap` 5150000128 look like an ISBN; the checksum is
-    /// what distinguishes "is this type" from "is not". A bare-number column
-    /// whose values mostly FAIL their type's validator is not that type —
-    /// demote to decimal/integer by shape. Scoped to bare-number columns
-    /// (`values_look_like_bare_numbers`) so genuine identifiers (which pass) and
-    /// non-numeric content are untouched; this covers the numeric checksum
-    /// types. Measured on gold: 4 large-integer columns (marketCap,
-    /// totalCashFrom…, propertyPlantEquipment, otherLiab) were emitted as `isbn`.
+    /// what distinguishes "is this type" from "is not". A column whose values
+    /// mostly FAIL their type's checksum is not that type — demote by value
+    /// shape: bare-number columns (ISBN/ABA lookalikes) to decimal/integer,
+    /// alphanumeric columns (CUSIP/SEDOL lookalikes) to alphanumeric_id or
+    /// categorical by cardinality. Genuine identifiers pass the checksum and are
+    /// untouched. Measured on gold: marketCap/otherLiab/… emitted as `isbn`,
+    /// longTermInvestments/… as `aba_routing`, citation_id/case_number as
+    /// `cusip`/`sedol`.
     ///
     /// The checksum is owned HERE, not in the shared compiled validator. Wiring
     /// it into the validator looks tidier but regresses: the generic
@@ -2851,10 +2852,6 @@ impl ColumnClassifier {
         else {
             return;
         };
-        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
-        if !is_bare {
-            return;
-        }
         let non_empty: Vec<&str> = sample
             .iter()
             .map(|v| v.trim())
@@ -2865,15 +2862,27 @@ impl ColumnClassifier {
         }
         let valid = non_empty.iter().filter(|v| checksum(v)).count();
         // Majority pass their checksum → genuine identifiers, keep. Otherwise
-        // these are plain numbers wearing the wrong label.
+        // these values are wearing the wrong label.
         if valid * 2 >= non_empty.len() {
             return;
         }
+        // Demote by value shape. Bare-number columns (ISBN/ABA lookalikes) go to
+        // the numeric family; alphanumeric columns (CUSIP/SEDOL lookalikes, and
+        // ISBN-as-alphanumeric) go to `alphanumeric_id`. Every checksum-bearing
+        // type is itself an identifier, so a checksum-failing lookalike is
+        // overwhelmingly another identifier rather than a small categorical —
+        // gold confirms (citation_id, case_number, coord_id, wfo_id all
+        // alphanumeric_id), so this branch is unconditional, not cardinality-split.
+        let (is_bare, any_decimal) = values_look_like_bare_numbers(sample);
         let demoted_from = result.label.clone();
-        result.label = if any_decimal {
-            "representation.numeric.decimal_number".to_string()
+        result.label = if is_bare {
+            if any_decimal {
+                "representation.numeric.decimal_number".to_string()
+            } else {
+                "representation.numeric.integer_number".to_string()
+            }
         } else {
-            "representation.numeric.integer_number".to_string()
+            "representation.identifier.alphanumeric_id".to_string()
         };
         result.confidence = result.confidence.min(0.6);
         result.disambiguation_applied = true;

@@ -68,17 +68,27 @@ body: |
     names the scheme.
   - `checksum_substance_guard` (column/mod.rs, in `apply_post_sharpen_guards`,
     rhh kill switch `checksum_substance_guard`) reads the directive, resolves
-    the function from `crate::checksum`, and on a bare-number column most of
-    whose values fail the checksum, demotes to decimal/integer by shape.
+    the function from `crate::checksum`, and on a column most of whose values
+    fail the checksum, demotes by value shape: bare-number columns to
+    decimal/integer, alphanumeric columns to `alphanumeric_id`.
   - The checksum is deliberately NOT folded into the compiled validator (the
     cause of the −4 regression). The validator stays shape-only; the dedicated
     guard owns the substance check and the gold-correct demotion target.
   - `isbn_checkdigit_veto` and its hand-rolled `is_valid_isbn` are deleted.
 
-  Scope note: the guard fires only on bare-number columns, so it templates the
-  numeric algo-exists types (aba, credit_card/luhn, npi, ean, upc, imei). The
-  alphanumeric ones (isin, cusip, sedol, lei, iban) need a shape-aware
-  extension before they can enrol — a follow-up, not part of this decision.
+  Enrolled (each via one `crate::checksum` function + a one-line directive):
+  isbn (proof-of-concept, gold +4), aba (gold +2), and — once the guard gained
+  its alphanumeric branch — cusip + sedol (gold +2, plus 2 isbn-on-alphanumeric
+  FPs the bare-only guard couldn't reach). Cumulative gold 717→723.
+
+  Triage note (2026-06-15): on the gold corpus the campaign is near-exhausted.
+  A raw FP count over-states the opportunity — a guard only *fixes* an FP when
+  the column's true label is the guard's demotion target. npi's FPs are
+  timestamps/ISBNs (not integers), so it is +0 and was not shipped;
+  ean/upc/imei/credit_card/isin/lei/iban over-emit onto zero gold columns. The
+  alphanumeric branch demotes unconditionally to `alphanumeric_id` (not a
+  cardinality split) because every checksum-bearing type is itself an
+  identifier, so its lookalikes are identifiers — gold confirmed 5/5.
 
   ### Consequences
 

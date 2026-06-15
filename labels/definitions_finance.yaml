@@ -330,6 +330,7 @@ finance.securities.cusip:
   validation:
     type: string
     pattern: "^[A-Z0-9]{8}[0-9]$"
+  checksum: cusip
   tier: [VARCHAR, payment]
   release_priority: 3
   aliases: null
@@ -393,6 +394,7 @@ finance.securities.sedol:
   validation:
     type: string
     pattern: "^[B-DF-HJ-NP-TV-Z0-9]{6}[0-9]$"
+  checksum: sedol
   tier: [VARCHAR, payment]
   release_priority: 3
   aliases: null
@@ -496,6 +498,7 @@ finance.banking.aba_routing:
   validation:
     type: string
     pattern: "^(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\\d{7}$"
+  checksum: aba
   tier: [VARCHAR, banking]
   release_priority: 3
   aliases: [routing_number, routing_transit_number, aba_number]
