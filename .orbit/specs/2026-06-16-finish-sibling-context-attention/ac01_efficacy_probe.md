@@ -59,3 +59,44 @@ context — so currency should not be carried by this spec.
 - Next sweep worth running before ac-02 locks scope: which OTHER gold boundaries are
   sibling-paired (e.g. city/region/country tables, start/end date pairs)? The probe
   harness extends to them cheaply.
+
+## ac-01 SWEEP (all boundaries) — sobering: the mechanism is real, the gold RECALL headroom is not
+
+`scripts/probe_sibling_sweep.py` · raw: `ac01_sweep_output.txt`. For every label's top
+confusion partner (plus coordinate positive controls), it data-driven-searches for the
+single sibling header token most over-represented in the label's tables, with a real-signal
+bar calibrated to the coordinate exemplar (rate ≥ 50%, gap ≥ 40pp).
+
+**What separates (GO):**
+- latitude vs decimal: a "longitude" sibling in **87%** of latitude tables vs **2%** of
+  decimals. longitude symmetric (80% / 0–2%). The mechanism is confirmed a second way.
+
+**But coordinates are already solved on gold:** latitude recall **1.000**, longitude
+**0.978**. So sibling-context's one clean win has ~**1 column** of gold recall headroom.
+
+**The actual recall gaps are NOT sibling-recoverable.** The deficits — categorical (54 FN),
+integer (40), plain_text (31), alphanumeric_id (18), date.iso (15), decimal (13) — none
+surfaced a distinctive sibling token above the bar. region→city ("scale" 33%) and
+plain_text→city ("theoretical" 15%) fell short; the residual categories produced no
+distinctive sibling fingerprint at all (residuals are grab-bags — by nature they have none).
+
+**The two other "GO" hits are small-n noise.** country vs region ("high" 60%/0%, n=10) and
+terms vs url ("year" 60%/16%, n=10) clear the arithmetic bar but on 10 tables, with
+semantically implausible tokens (a "high" column doesn't make its neighbour a country) and
+**zero recall headroom** anyway (country recall already 0.900, terms 0.800). Discard as
+multiple-comparison survivors.
+
+## Verdict, revised by the sweep
+
+Sibling-context is a **genuine mechanism** (coordinates, twice confirmed) but a **thin gold
+RECALL lever**: its clean target is already solved, and the gaps that remain don't carry a
+sibling signal. The expensive FTMB-v3 build (ac-02) is **not justified as a gold-recall
+bet.** Its remaining honest value is corpus-scale **precision** hardening for coordinates —
+only calling latitude when a longitude sibling is present would kill the corpus over-emit
+the fusion runs showed (latitude ×3.13) — but that is advisory-tier (gold can't see it) and
+a far smaller prize than "the new recall layer".
+
+**Recommendation:** do NOT start the ac-02 sibling build. The residual-dominated recall gaps
+need a different lever; probe the **hierarchical head** (the program's second layer) before
+committing either build. This is the probe-first discipline doing its job — a cheap probe
+just saved a multi-week integration that the gold evidence says would not move the headline.
