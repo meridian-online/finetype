@@ -40,6 +40,7 @@ specs:
 - .orbit/specs/2026-04-27-cli-visibility-cleanup/spec.yaml
 - .orbit/specs/2026-04-28-schema-verb-fold/spec.yaml
 - .orbit/specs/2026-04-27-cli-pipeline-reshape/
+- .orbit/specs/2026-06-16-cli-mcp-surface-parity/spec.yaml
 relations: []
 references:
 - README.md

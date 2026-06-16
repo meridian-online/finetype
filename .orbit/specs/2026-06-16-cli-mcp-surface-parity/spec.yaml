@@ -3,7 +3,7 @@ goal: Bring the MCP server's tool surface back into parity with the CLI's capabi
 cards:
 - 0008-mcp-server
 - 0006-command-line-interface
-status: open
+status: closed
 labels:
 - mcp
 - cli
@@ -21,7 +21,7 @@ acceptance_criteria:
     `format: "json-schema"`. Test: a taxonomy call with the new output returns a
     valid Draft-2020-12 type schema identical to what `schema` returned.
   gate: false
-  ac_type: code
+  checked: true
 - id: ac-02
   description: |
     REMOVE the MCP `schema` tool. Delete the `#[tool]` method in lib.rs and
@@ -30,7 +30,7 @@ acceptance_criteria:
     choice 0070 on the MCP side — the carve-out schema.rs itself flagged for "the
     v0.6.20 audit". Depends on ac-01 (type-mode must land in taxonomy first).
   gate: false
-  ac_type: code
+  checked: true
 - id: ac-03
   description: |
     RETIRE the MCP `ddl` tool (parity DOWN, author's explicit call). Delete the
@@ -39,7 +39,7 @@ acceptance_criteria:
     typed-table surface is `validate --db/--table` (materialise). Verify the
     build is clean and no resource/doc references dangle.
   gate: false
-  ac_type: code
+  checked: true
 - id: ac-04
   description: |
     PARITY GUARD TEST. Add a test (in finetype-mcp) that instantiates the server,
@@ -52,7 +52,7 @@ acceptance_criteria:
     test until the manifest (and thus the parity decision) is updated. This is the
     durable anti-drift mechanism of choice 0101.
   gate: false
-  ac_type: code
+  checked: true
 - id: ac-05
   description: |
     UPDATE the surface docs + close the decision. Card 0008: drop "8 tools" to
@@ -63,4 +63,6 @@ acceptance_criteria:
     capturing the MCP⊆CLI parity rule + the guard's location so future tool
     additions reach for it.
   gate: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-16T11:55:19.150895Z

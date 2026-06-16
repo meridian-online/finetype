@@ -115,13 +115,13 @@ On first use, the extension downloads model weights from HuggingFace and caches 
 
 FineType exposes type inference to AI agents via the [Model Context Protocol](https://modelcontextprotocol.io/). Configure your MCP client to launch `finetype mcp` as a stdio subprocess.
 
+The MCP tool surface mirrors the CLI (one capability surface, enforced by a parity-guard test):
+
 | Tool | Purpose |
 |---|---|
 | `infer` | Classify values (single or column mode with header) |
-| `profile` | Profile all columns in CSV file (path or inline data) |
-| `ddl` | Generate CREATE TABLE DDL from file profiling |
-| `taxonomy` | Search/filter type taxonomy by domain/category/query |
-| `schema` | Export JSON Schema contract for type(s), supports globs |
+| `profile` | Profile all columns in a CSV/Parquet/JSON file (path or inline data); `format: "json-schema"` for a table-level schema |
+| `taxonomy` | Search/filter the type taxonomy; with a `key`/glob + `format: "json-schema"`, export per-type JSON Schema |
 | `validate` | Schema-driven CSV validation — valid/invalid counts + error details |
 | `generate` | Generate synthetic sample data for a type |
 

@@ -3,13 +3,13 @@ feature: MCP server for AI agents
 as_a: developer integrating AI agents with data pipelines
 i_want: to expose FineType's type inference to AI agents via Model Context Protocol
 so_that: agents can profile, classify, validate, and generate data without CLI wrappers
-goal: 8 tools and taxonomy resources over stdio transport, fully wired to multi-branch pipeline
+goal: 5 tools (infer, profile, taxonomy, validate, generate) + taxonomy resources over stdio transport, fully wired to multi-branch pipeline; the tool surface mirrors the CLI and is held in parity by a guard test (choice 0101)
 maturity: established
 scenarios:
 - name: Start MCP server
   given: FineType is installed
   when: I configure my MCP client to launch finetype mcp as a stdio subprocess
-  then: an MCP server starts with 8 tools and taxonomy resources available
+  then: an MCP server starts with 5 tools and taxonomy resources available
   gate: false
 - name: Profile a file via MCP
   given: a running MCP server
@@ -26,9 +26,15 @@ scenarios:
   when: an agent calls the generate tool with a type key
   then: representative sample values are returned for that type
   gate: false
+- name: Export JSON Schema via the taxonomy tool
+  given: a running MCP server
+  when: an agent calls the taxonomy tool with a key/glob and format json-schema
+  then: per-type JSON Schema (Draft 2020-12) is returned — the type-mode of the retired schema tool, now folded into taxonomy in parity with the CLI
+  gate: false
 specs:
 - .orbit/specs/2026-03-07-mcp-server/
 - .orbit/specs/2026-03-25-multi-branch-pipeline-integration/
+- .orbit/specs/2026-06-16-cli-mcp-surface-parity/
 relations: []
 references:
 - README.md
