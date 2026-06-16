@@ -1,6 +1,6 @@
 id: '0099'
 title: 'Dispatch CLI CSV ingestion to DuckDB (gated on a Windows bundled-build spike)'
-status: proposed
+status: rejected
 date_created: 2026-06-16
 date_modified: 2026-06-16
 body: |
@@ -110,6 +110,26 @@ body: |
     mandatory, per the release-skill bundled-DuckDB guard).
   - Neutral: the DuckDB extension already provides the fast CSV path today, so
     Option 2 loses no capability — only consolidation.
+
+  ## Outcome (2026-06-16) — REJECTED, adopt Option 2
+
+  The deciding spike ran (`spike-duckdb-windows` #27607400306, throwaway branch
+  `spike/duckdb-csv-windows`). **windows-msvc RED; linux + macOS GREEN.** Bundled
+  `libduckdb-sys` (Rust `duckdb` crate, `features=["bundled"]`) fails under the
+  Windows runner's MSVC — `cl.exe` exit code 2 compiling the DuckDB amalgamation
+  file `ub_src_storage_compression_chimp.cpp` (MSVC 14.51.36231, pin `=1.10503.1`)
+  — the exact failure class the `cpu` feature was built to dodge. The controls
+  (macOS/Linux) compiled + linked the bundled CLI fine, so the approach is sound
+  everywhere except the one platform that matters for the shipped binary.
+
+  Because single-binary distribution forces bundling (no system-libduckdb
+  option), and bundling breaks the Windows release, **dispatching CLI CSV
+  ingestion to DuckDB is not viable.** Adopt **Option 2**: keep the lean
+  csv-crate reader (`read_csv_input`) as the single-binary baseline; the DuckDB
+  extension (`ft_profile(read_csv(...))`) is the fast/large-CSV path. The
+  deferred free-stats path stays DuckDB-extension-scoped (not universalised via
+  the CLI). REOPEN only if a future DuckDB release compiles clean under MSVC.
+  Spike branch + workflow torn down. Evidence: `output/duckdb-csv-spike/`.
 
   ## Relationship to existing decisions
 

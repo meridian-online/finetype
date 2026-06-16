@@ -1,0 +1,13 @@
+SPIKE VERDICT 2026-06-16 (choice 0099) — windows-msvc RED, linux+macos GREEN.
+Run: spike-duckdb-windows #27607400306.
+Bundled libduckdb-sys (Rust duckdb crate, features=["bundled"]) fails under the
+Windows runner's MSVC (cl.exe exit code 2) compiling the DuckDB amalgamation file
+ub_src_storage_compression_chimp.cpp. Toolchain: MSVC 14.51.36231. Pin: =1.10503.1.
+Same failure class the cpu feature was created to dodge. macOS + Linux compiled+
+linked the bundled CLI fine (controls green), so the spike code is sound — the
+blocker is purely Windows MSVC + the bundled amalgamation.
+DECISION: dispatching CLI CSV ingestion to DuckDB is NOT viable for the shipped
+single-binary (bundling required, Windows breaks). Adopt option 2: keep the lean
+csv-crate reader as the single-binary baseline; the extension (ft_profile(read_csv(...)))
+is the fast/large-CSV path. Reopen only if a future DuckDB release compiles clean
+under MSVC.

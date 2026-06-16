@@ -40,7 +40,6 @@ acceptance_criteria:
     (`profile_io.rs`) once parity holds.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-03
   description: |
     (GREEN-only) UNIVERSAL FREE-STATS + SHORT-CIRCUIT. Full-column statistics
@@ -52,7 +51,6 @@ acceptance_criteria:
     ac-07 (DuckDB free-stats), now universal rather than DuckDB-table-only.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     (GREEN-only) RELEASE HARDENING. Lock the DuckDB pin to the Windows-validated
@@ -70,7 +68,7 @@ acceptance_criteria:
     error and position the extension (`ft_profile(read_csv(...))`) as the
     large-CSV path; keep the bespoke reader as the lean single-binary baseline.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-06
   description: |
@@ -79,5 +77,5 @@ acceptance_criteria:
     fast/large-CSV path. Spec closes; choice 0099 rejected. (This AC is the
     explicit no-op branch so a NO-GO has a recorded landing, not silent drift.)
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
