@@ -2,7 +2,7 @@ id: 2026-06-16-mixed-teacher-gold-readjudication
 goal: Upgrade the ~589 heuristically-labelled gold columns to VERIFIED labels via a blind adjudication panel — model-line-diverse (Opus + Sonnet + Fable, cross-vendor unavailable) and methodologically independent (per-panel value samples + an adversarial challenge pass) — correcting contestable labels, surfacing taxonomy gaps, and giving every contested column a reasoned confidence-banded answer, then re-baseline the honest accuracy ceiling. Append-only with provenance per choice 0095; leakage firewall preserved; panels blind to the FineType model. The anti-goalpost-moving guarantee rests on family-independent controls (negative control, author spot-check, correction model-agree/disagree split), not on panel independence.
 cards:
 - 0019-human-verified-gold-corpus
-status: open
+status: closed
 labels:
 - gold
 - distillation
@@ -135,3 +135,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-16T07:57:35.432655Z
