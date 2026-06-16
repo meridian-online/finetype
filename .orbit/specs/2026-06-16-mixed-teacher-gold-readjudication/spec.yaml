@@ -37,12 +37,12 @@ acceptance_criteria:
     family) is UNAVAILABLE (Ollama retired 2026-06-16), and no non-Anthropic API
     is currently reachable, so true cross-VENDOR independence is not achievable
     now. Approximate it two ways:
-      (1) MODEL-LINE / CAPACITY diversity via Agent model overrides — Opus 4.8 +
-          Sonnet 4.6 + Fable 5. Fable is a distinct model LINE (most independent
-          panelist reachable); Sonnet adds a different-capacity vote. EXPLICIT
-          CAVEAT: Sonnet is the SAME family as Opus and does NOT by itself
-          resolve the shared-prior confound — line/capacity diversity reduces it,
-          it does not eliminate it. Do not market this as cross-family.
+      (1) CAPACITY diversity via Agent model overrides — Opus 4.8 + Sonnet 4.6 +
+          Haiku 4.5. UPDATE 2026-06-16: Fable 5 is also unavailable, so NO model-
+          LINE or cross-vendor panelist is reachable — only the same Claude 4.X
+          family at three capacities. EXPLICIT CAVEAT: this is capacity diversity
+          only; it does NOT resolve the shared-prior confound. Panel consensus is
+          therefore an UPPER BOUND on determinability, not proof of it.
       (2) METHODOLOGICAL independence to compensate for the lost vendor diversity:
           give each panel a DIFFERENT random value-sample from the column
           (decorrelate the EVIDENCE, not just the model), vary prompt framing,
