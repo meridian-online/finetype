@@ -24,7 +24,7 @@ acceptance_criteria:
     faster on the large file (+ profile parity vs csv-crate). RED = fall back
     (ac-06).
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-02
   description: |
@@ -36,7 +36,6 @@ acceptance_criteria:
     validate's Parquet/materialise paths already effectively have.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-03
   description: |
     (GREEN-only) CONSOLIDATE INGESTION via shell-out. Route CSV + Parquet
@@ -48,7 +47,6 @@ acceptance_criteria:
     keep it as the small-file fast path; record the call.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     (GREEN-only) UNIVERSAL FREE-STATS + SHORT-CIRCUIT. The full-column stats from
@@ -60,7 +58,6 @@ acceptance_criteria:
     DuckDB-table-only.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-05
   description: |
     DECISION CLOSE. Flip choice 0100 `accepted` (green, shipped) or `rejected`
