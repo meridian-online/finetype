@@ -89,7 +89,7 @@ acceptance_criteria:
     discipline (commit each rule before the next; scripts/eval_rule.sh
     --label X --out-dir output/X --default).
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-07
   description: |
@@ -112,5 +112,5 @@ acceptance_criteria:
     memories. This is the answer to "find the new architecture layer": it was
     a data-source change (full-column stats), not an encoder.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
