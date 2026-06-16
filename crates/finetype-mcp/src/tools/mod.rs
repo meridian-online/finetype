@@ -5,11 +5,9 @@
 //! - A `handle()` function containing the tool logic
 //! - Response formatted as JSON primary + markdown summary
 
-pub mod ddl;
 pub mod generate;
 pub mod infer;
 pub mod profile;
-pub mod schema;
 pub mod taxonomy;
 pub mod validate;
 

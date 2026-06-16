@@ -79,34 +79,14 @@ impl FineTypeServer {
     }
 
     #[tool(
-        description = "Generate a CREATE TABLE DDL statement from file profiling. Infers column types and maps them to appropriate SQL types."
-    )]
-    async fn ddl(
-        &self,
-        Parameters(request): Parameters<tools::ddl::DdlRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        tools::ddl::handle(self, request).await
-    }
-
-    #[tool(
         name = "taxonomy",
-        description = "Search and browse the FineType type taxonomy. Filter by domain, category, or search query to discover available type definitions."
+        description = "Search and browse the FineType type taxonomy. Filter by domain, category, key, or search query to discover type definitions. Set format: \"json-schema\" with a key/glob to export per-type JSON Schema (Draft 2020-12)."
     )]
     async fn taxonomy_tool(
         &self,
         Parameters(request): Parameters<tools::taxonomy::TaxonomyRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         tools::taxonomy::handle(self, request).await
-    }
-
-    #[tool(
-        description = "Export JSON Schema for a type key or a CSV file. Pass a type_key for per-type schema, or path/data for table-level schema generation via column profiling."
-    )]
-    async fn schema(
-        &self,
-        Parameters(request): Parameters<tools::schema::SchemaRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        tools::schema::handle(self, request).await
     }
 
     #[tool(
@@ -140,18 +120,16 @@ impl ServerHandler for FineTypeServer {
                 .build(),
         )
         .with_server_info(Implementation::from_build_env())
-        // MCP audit follow-up in v0.6.20: card 0006 retired the CLI
-        // `schema` verb (type-mode → `taxonomy KEY -o json-schema`,
-        // table-mode → `profile -f FILE -o json-schema`). The MCP
-        // `schema` tool's type-key branch is RETAINED for v0.6.19 per
-        // the visibility-cleanup carve-out (memo
-        // 2026-04-27-mcp-surface-audit). The v0.6.20 audit will mirror
-        // the CLI fold and remove the asymmetry surfaced here.
+        // CLI↔MCP surface parity (choice 0101): the MCP tool set mirrors the
+        // CLI's capability surface. The former `schema` tool folded into
+        // `taxonomy` (type-mode, format: "json-schema") + `profile`
+        // (table-mode) per choice 0070; the `ddl` tool was retired
+        // (parity-down — the CLI has no DDL command; use validate --db/--table).
         .with_instructions(
             "FineType — semantic type inference engine for tabular data.\n\n\
-             Tools: profile (file -> column types), infer (values -> type), ddl (file -> CREATE TABLE), \
-             taxonomy (browse types), schema (type or file -> JSON Schema), validate (CSV + schema -> quality report), \
-             generate (sample data).\n\n\
+             Tools: profile (file -> column types, or table-level JSON Schema), \
+             infer (values -> type), taxonomy (browse types, or per-type JSON Schema), \
+             validate (CSV + schema -> quality report), generate (sample data).\n\n\
              Resources: finetype://taxonomy for browsing type definitions.",
         )
     }
@@ -203,5 +181,81 @@ impl FineTypeServer {
         let service = self.serve(rmcp::transport::stdio()).await?;
         service.waiting().await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod parity_tests {
+    use super::*;
+
+    /// CLI↔MCP surface-parity manifest (choice 0101).
+    ///
+    /// Every registered MCP tool MUST appear here, each annotated with the CLI
+    /// capability it maps to. The rule is `{MCP tools} ⊆ {CLI capabilities,
+    /// visible ∪ intentionally-hidden}` — the CLI is the canonical surface, and
+    /// MCP must not exceed it. The reverse is allowed: maintainer-internal
+    /// hidden CLI subcommands (`check`, `train-multi-branch`, …) need no MCP
+    /// tool.
+    ///
+    /// To ADD an MCP tool, add it here with its CLI mapping — which forces the
+    /// parity decision (does the CLI carry this capability?) to be explicit, not
+    /// accidental. The `parity_guard` test fails until this manifest matches the
+    /// server's registered tool set exactly.
+    const PARITY_MANIFEST: &[(&str, &str)] = &[
+        ("infer", "mirrors CLI `infer`"),
+        ("profile", "mirrors CLI `profile` (incl. -o json-schema table-mode)"),
+        (
+            "taxonomy",
+            "mirrors CLI `taxonomy` (incl. KEY -o json-schema type-mode; absorbed the retired `schema` tool, choice 0070/0101)",
+        ),
+        ("validate", "mirrors CLI `validate`"),
+        (
+            "generate",
+            "intentional MCP-public surface of the HIDDEN CLI `generate` subcommand (card 0010)",
+        ),
+    ];
+
+    #[test]
+    fn parity_guard_mcp_tools_equal_manifest() {
+        let router = FineTypeServer::tool_router();
+        let mut registered: Vec<String> = router
+            .list_all()
+            .into_iter()
+            .map(|t| t.name.into_owned())
+            .collect();
+        registered.sort();
+
+        let mut expected: Vec<String> = PARITY_MANIFEST
+            .iter()
+            .map(|(name, _)| name.to_string())
+            .collect();
+        expected.sort();
+
+        assert_eq!(
+            registered, expected,
+            "MCP tool set drifted from the CLI↔MCP parity manifest (choice 0101).\n\
+             registered = {registered:?}\n\
+             manifest   = {expected:?}\n\
+             A new/removed/renamed MCP tool must be reflected in PARITY_MANIFEST \
+             with its CLI mapping — which forces the parity decision to be explicit."
+        );
+    }
+
+    /// The two retired tools must not reappear (choice 0101): `schema` folded
+    /// into `taxonomy`/`profile`; `ddl` retired parity-down.
+    #[test]
+    fn retired_tools_absent() {
+        let router = FineTypeServer::tool_router();
+        let names: Vec<String> = router
+            .list_all()
+            .into_iter()
+            .map(|t| t.name.into_owned())
+            .collect();
+        for retired in ["schema", "ddl"] {
+            assert!(
+                !names.contains(&retired.to_string()),
+                "`{retired}` was retired by choice 0101 but is still registered"
+            );
+        }
     }
 }

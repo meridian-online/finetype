@@ -7,7 +7,8 @@
 //!   tool's `format: "json-schema"` branch (card 0003).
 //! - `emit_type_schema()` — per-type, one schema per taxonomy definition.
 //!   Call sites: CLI `taxonomy KEY -o json-schema` (card 0006), MCP
-//!   `schema` tool's type-key branch.
+//!   `taxonomy` tool's `format: "json-schema"` branch (choice 0101 —
+//!   absorbed from the retired `schema` tool's type-key branch).
 //!
 //! Both emitters share the verbosity contract below — exactly two
 //! `x-finetype-*` extensions on emitted schemas (`x-finetype-label` and
@@ -201,7 +202,7 @@ fn attach_stats(
 /// Emit a per-type JSON Schema document for a single taxonomy definition.
 ///
 /// Used by `taxonomy KEY -o json-schema` (CLI, card 0006) and the MCP
-/// `schema` tool's type-key branch. The emitter merges validation
+/// `taxonomy` tool's `format: "json-schema"` branch (choice 0101). The emitter merges validation
 /// keywords from the taxonomy definition (pattern, type, minLength, etc.)
 /// alongside the `$schema` / `$id` / `title` / `description` envelope and
 /// surfaces sample values as JSON Schema `examples`.
