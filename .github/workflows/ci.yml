@@ -89,6 +89,15 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
+      - name: Install duckdb CLI
+        # duckdb is a hard runtime dependency (choice 0100): `profile` and
+        # `validate` shell out to it for CSV/Parquet ingestion. smoke.sh exercises
+        # `profile`, so the CLI must be on PATH.
+        run: |
+          curl -fsSL -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
+          unzip -o duckdb.zip
+          sudo mv duckdb /usr/local/bin/duckdb
+          duckdb --version
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
       - run: ./tests/smoke.sh
