@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.32] - 2026-06-16
+
+Ingestion and interface release: `profile` now reads CSV **and Parquet** through
+the DuckDB engine, and the MCP server's tool surface is brought back into parity
+with the CLI. **Operational note:** the `duckdb` CLI is now a hard runtime
+dependency — install it (`brew install duckdb`, or your platform package manager)
+before running `profile`/`validate`.
+
+### Changed
+
+- **CSV/Parquet ingestion routes through the `duckdb` CLI** (choice 0100).
+  `finetype profile` replaces its bespoke CSV reader with a shell-out to the
+  external `duckdb` binary: DuckDB's parallel sniffer handles dialect detection,
+  quoting, and ragged rows, and the same path now reads **Parquet** (the old
+  reader could not). This is a shell-out, not a link — the release binary is
+  unchanged across platforms (no `libduckdb` compile), so no Windows/MSVC risk.
+  NULL rendering is pinned (`.nullvalue ''`) so ingestion is independent of the
+  user's `~/.duckdbrc`. `validate` already shelled out to duckdb; this unifies
+  the two ingestion paths.
+- **The `duckdb` CLI is a hard runtime dependency** (choice 0100). `profile` and
+  `validate` fail with a single actionable error when it is absent
+  (`could not invoke duckdb CLI (is duckdb on PATH?) … Install it from
+  https://duckdb.org/docs/installation`). Documented in the README +
+  docs/DEVELOPMENT.md; declared in the Homebrew formula.
+- **MCP tool surface now mirrors the CLI** (choice 0101). One capability surface,
+  enforced by a parity-guard test: an agent and an analyst see the same FineType.
+
+### Added
+
+- **MCP `taxonomy` tool gains JSON Schema export.** Pass a `key`/glob plus
+  `format: "json-schema"` to get a per-type Draft-2020-12 schema — identical to
+  CLI `taxonomy KEY -o json-schema`. This absorbs the type-mode of the retired
+  `schema` tool.
+
+### Removed
+
+- **MCP `schema` tool** — folded into `taxonomy` (type-mode, `format:
+  "json-schema"`) and `profile` (table-mode, already present), completing the
+  CLI's choice-0070 fold on the MCP side.
+- **MCP `ddl` tool** — retired (parity-down). The CLI has no DDL command; the
+  typed-table surface is `validate --db/--table`.
+
+### Discovery
+
+- **Gold corpus re-adjudication: 738 → 745 / 931 (0.793 → 0.800).** A
+  mixed-panel (Opus/Sonnet/Haiku blind + adversarial) re-adjudication of the
+  heuristic gold tiers applied 33 label corrections in place to
+  `eval/gold/gold_corpus.tsv` (now a single canonical file — git + per-row
+  provenance is the version history). Corrections skew *away* from the shipped
+  model, so the modest headline shift confirms re-adjudication cleans gold rather
+  than inflating it.
+
 ## [0.6.31] - 2026-06-16
 
 A batch of gold-gated deterministic Sharpen rules on value-identical and

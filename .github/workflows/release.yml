@@ -170,6 +170,10 @@ jobs:
             license "MIT"
             version "${VERSION}"
 
+            # Hard runtime dependency (choice 0100): profile + validate shell out
+            # to the duckdb CLI for all CSV/Parquet ingestion.
+            depends_on "duckdb"
+
             on_macos do
               if Hardware::CPU.arm?
                 url "https://github.com/meridian-online/finetype/releases/download/${TAG}/finetype-${TAG}-aarch64-apple-darwin.tar.gz"
