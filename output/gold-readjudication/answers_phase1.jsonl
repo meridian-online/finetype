@@ -1,0 +1,288 @@
+{"id": "g0000", "header": "Lat", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0001", "header": "latitude", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0002", "header": "Lat", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0003", "header": "longitude", "current_gold": "geography.coordinate.longitude", "model": "geography.coordinate.longitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0004", "header": "deferredLongTermLiab", "current_gold": "representation.numeric.integer_number", "model": "finance.banking.aba_routing", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0005", "header": "deferredLongTermAssetCharges", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0006", "header": "longitude", "current_gold": "geography.coordinate.longitude", "model": "geography.coordinate.longitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0007", "header": "LoneParent", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0008", "header": "deferredLongTermLiab", "current_gold": "representation.numeric.integer_number", "model": "representation.identifier.increment", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0009", "header": "LoneParent", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0010", "header": "longTermInvestments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0011", "header": "longTermDebt", "current_gold": "representation.numeric.integer_number", "model": "representation.identifier.numeric_code", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0012", "header": "vz", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0013", "header": "vz", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0014", "header": "Link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0015", "header": "doi_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0016", "header": "doi_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0017", "header": "status_link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0018", "header": "Eventbrite_link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0019", "header": "link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0020", "header": "document-url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0021", "header": "link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0022", "header": "doi_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0023", "header": "Link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0024", "header": "doi_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0025", "header": "url_opendata", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0026", "header": "filename", "current_gold": "representation.text.plain_text", "model": "representation.discrete.categorical", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0027", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0028", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0029", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0030", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.boolean.binary", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0031", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0032", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0033", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0034", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0035", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0036", "header": "noc", "current_gold": "representation.numeric.integer_number", "model": "representation.boolean.binary", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0037", "header": "noc", "current_gold": "representation.numeric.integer_number", "model": "representation.boolean.binary", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0038", "header": "Submission Time", "current_gold": "representation.numeric.integer_number", "model": "datetime.epoch.unix_milliseconds", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0039", "header": "PC", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0040", "header": "moa", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0041", "header": "moa", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0042", "header": "0.1", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0043", "header": "noc", "current_gold": "representation.numeric.integer_number", "model": "representation.boolean.binary", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0044", "header": "moa", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0045", "header": "noc", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0046", "header": "keyPressed:", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0047", "header": "confirmed", "current_gold": "representation.numeric.integer_number", "model": "representation.boolean.binary", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0048", "header": "answer", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0049", "header": "LDPE", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0050", "header": "moa", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0051", "header": "SUM229neg", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0052", "header": "control", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0053", "header": "HDPE", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0054", "header": "Fan-Out", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0055", "header": "PFIZER_DEPOSITS", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0056", "header": "noc", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0057", "header": "flu report", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0058", "header": "NMI", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0059", "header": "exchange_country", "current_gold": "geography.location.country_code", "model": "geography.location.country_code", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0060", "header": "name", "current_gold": "representation.text.plain_text", "model": "geography.location.city", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0061", "header": "name", "current_gold": "representation.text.plain_text", "model": "geography.location.city", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0062", "header": "name", "current_gold": "representation.text.plain_text", "model": "geography.location.city", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0063", "header": "groupingname", "current_gold": "representation.text.plain_text", "model": "geography.location.region", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0064", "header": "name", "current_gold": "representation.text.plain_text", "model": "representation.discrete.categorical", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0065", "header": "username", "current_gold": "representation.text.plain_text", "model": "representation.discrete.categorical", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0066", "header": "wfo_id", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0067", "header": "id", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.identifier.uuid", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0068", "header": "msg_id", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0069", "header": "ipni_id", "current_gold": "representation.identifier.alphanumeric_id", "model": "unknown", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0070", "header": "year", "current_gold": "datetime.component.year", "model": "datetime.component.year", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0071", "header": "year", "current_gold": "datetime.component.year", "model": "datetime.component.year", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0072", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0073", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "unknown", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0074", "header": "Story", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0075", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "unknown", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0076", "header": "Story", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0077", "header": "Story", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0078", "header": "Story", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0079", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0080", "header": "author_date_unix_timestamp", "current_gold": "datetime.epoch.unix_seconds", "model": "datetime.epoch.unix_seconds", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0081", "header": "updateDate", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0082", "header": "created_at", "current_gold": "datetime.date.iso", "model": "datetime.timestamp.sql_standard", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0083", "header": "Time_stamp", "current_gold": "datetime.date.iso", "model": "datetime.timestamp.sql_standard", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0084", "header": "Time_stamp", "current_gold": "datetime.date.iso", "model": "datetime.timestamp.sql_standard", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0085", "header": "Primary ISBN13", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0086", "header": "isbn", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0087", "header": "ISBNs", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0088", "header": "Primary ISBN10", "current_gold": "identity.commerce.isbn", "model": "identity.medical.npi", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0089", "header": "Primary ISBN13", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0090", "header": "Primary ISBN10", "current_gold": "identity.commerce.isbn", "model": "identity.medical.npi", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0091", "header": "Primary ISBN13", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0092", "header": "Primary ISBN10", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0093", "header": "Primary ISBN13", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0094", "header": "Primary ISBN13", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0095", "header": "ISBNs", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0096", "header": "ISBN13", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0097", "header": "ISBNs", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0098", "header": "Primary ISBN10", "current_gold": "identity.commerce.isbn", "model": "identity.medical.npi", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0099", "header": "ISBNs", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0100", "header": "ISBNs", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0101", "header": "ISBN10", "current_gold": "identity.commerce.isbn", "model": "identity.commerce.isbn", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0102", "header": "BenchmarkName", "current_gold": "representation.text.plain_text", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0103", "header": "idPedido", "current_gold": "representation.numeric.integer_number", "model": "datetime.epoch.unix_milliseconds", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0104", "header": "BenchmarkName", "current_gold": "representation.text.plain_text", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0105", "header": "wfo_id", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0106", "header": "totalCashFromOperatingActivities", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0107", "header": "BenchmarkName", "current_gold": "representation.text.plain_text", "model": "geography.address.full_address", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0108", "header": "BenchmarkName", "current_gold": "representation.text.plain_text", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0109", "header": "BenchmarkName", "current_gold": "representation.text.plain_text", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0110", "header": "wfo_id", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0111", "header": "otherLiab", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0112", "header": "zip", "current_gold": "geography.address.postal_code", "model": "geography.address.postal_code", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0113", "header": "d_week_seq", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0114", "header": "1001", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0115", "header": "Total", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0116", "header": "totalOtherIncomeExpenseNet", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0117", "header": "changeToNetincome", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0118", "header": "netIncome", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0119", "header": "Residents Total Suspected COVID-19", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0120", "header": "netIncomeFromContinuingOps", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0121", "header": "totalOtherIncomeExpenseNet", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0122", "header": "operatingIncome", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0123", "header": "interestExpense", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0124", "header": "interestExpense", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0125", "header": "interestExpense", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0126", "header": "totalOperatingExpenses", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0127", "header": "totalOperatingExpenses", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0128", "header": "totalOperatingExpenses", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0129", "header": "totalOperatingExpenses", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0130", "header": "totalOperatingExpenses", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0131", "header": "host_thumbnail_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0132", "header": "host_thumbnail_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0133", "header": "host_thumbnail_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0134", "header": "host_thumbnail_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0135", "header": "host_thumbnail_url", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0136", "header": "thumbnail_link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0137", "header": "TLD", "current_gold": "technology.internet.top_level_domain", "model": "technology.internet.top_level_domain", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0138", "header": "tld", "current_gold": "technology.internet.top_level_domain", "model": "representation.alphanumeric.alphanumeric_id", "provenance": "ac-03 header+reference", "kind": "ac-03"}
+{"id": "g0139", "header": "TLD", "current_gold": "technology.internet.top_level_domain", "model": "technology.internet.top_level_domain", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0140", "header": "Unnamed: 4", "current_gold": "representation.text.plain_text", "model": "representation.text.word", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0141", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0142", "header": "itemid", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0143", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0144", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0145", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0146", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0147", "header": "Comments", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0148", "header": "Fan-Out", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0149", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0150", "header": "Points", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0151", "header": "Activity", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0152", "header": "POSS", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0153", "header": "course_over_ground", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0154", "header": "Reference Offset", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0155", "header": "Created", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0156", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0157", "header": "Story", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0158", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0159", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0160", "header": "Created", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0161", "header": "Created", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0162", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0163", "header": "Baseline", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0164", "header": "Story", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0165", "header": "Parent", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0166", "header": "Description", "current_gold": "representation.text.plain_text", "model": "representation.text.plain_text", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0167", "header": "Shortname", "current_gold": "representation.text.plain_text", "model": "representation.text.plain_text", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0168", "header": "Title", "current_gold": "representation.text.plain_text", "model": "representation.text.entity_name", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0169", "header": "ObjectName", "current_gold": "representation.text.plain_text", "model": "representation.text.plain_text", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0170", "header": "LayerName", "current_gold": "representation.text.plain_text", "model": "representation.text.word", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0171", "header": "name", "current_gold": "representation.text.plain_text", "model": "representation.text.plain_text", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0172", "header": "variable description (or question text)", "current_gold": "representation.text.plain_text", "model": "representation.text.plain_text", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0173", "header": "Target Date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0174", "header": "date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0175", "header": "transition_25_lower_ci", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0176", "header": "date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0177", "header": "date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0178", "header": "transition_25", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0179", "header": "date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0180", "header": "date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0181", "header": "PermissionDate", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0182", "header": "test_date_post_injury_2", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0183", "header": "Date of Birth", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0184", "header": "publishedAtString", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0185", "header": "Last_Date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0186", "header": "DateTime", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0187", "header": "Since", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0188", "header": "time", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0189", "header": "publishedAtString", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0190", "header": "DateTime", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0191", "header": "Accepted", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0192", "header": "PermissionDate", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0193", "header": "transition_25_upper_ci", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0194", "header": "publishedAtString", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0195", "header": "publishedAtString", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0196", "header": "publishedAtString", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0197", "header": "sample collection date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0198", "header": "entry-date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0199", "header": "transition_10_upper_ci", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0200", "header": "PermissionDate", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0201", "header": "Received", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0202", "header": "EndRentDate", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0203", "header": "last_review", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 reference+value", "kind": "ac-03"}
+{"id": "g0204", "header": "DateTime", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0205", "header": "Received Date", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0206", "header": "DateTime", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0207", "header": "dateId", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0208", "header": "visit_end_datetime", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0209", "header": "BirthDate", "current_gold": "datetime.date.iso", "model": "datetime.date.iso", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0210", "header": "utc_offset", "current_gold": "datetime.offset.utc", "model": "datetime.offset.utc", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0211", "header": "latitude", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0212", "header": "longitude", "current_gold": "geography.coordinate.longitude", "model": "geography.coordinate.longitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0213", "header": "altitude", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0214", "header": "name", "current_gold": "representation.text.plain_text", "model": "geography.location.city", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0215", "header": "latitude", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0216", "header": "longitude", "current_gold": "geography.coordinate.longitude", "model": "geography.coordinate.longitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0217", "header": "depth", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0218", "header": "id", "current_gold": "representation.identifier.alphanumeric_id", "model": "identity.person.username", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0219", "header": "title", "current_gold": "representation.text.plain_text", "model": "container.array.comma_separated", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0220", "header": "gis_latitude", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0221", "header": "permit_status", "current_gold": "representation.discrete.categorical", "model": "technology.internet.http_method", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0222", "header": "permit_type", "current_gold": "representation.discrete.categorical", "model": "geography.location.country_code", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0223", "header": "work_type", "current_gold": "representation.discrete.categorical", "model": "representation.discrete.categorical", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0224", "header": "job__", "current_gold": "representation.numeric.integer_number", "model": "representation.discrete.categorical", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0225", "header": "street_name", "current_gold": "representation.text.plain_text", "model": "identity.person.full_name", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0226", "header": "fiscal_year", "current_gold": "datetime.component.year", "model": "datetime.component.year", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0227", "header": "agency_start_date", "current_gold": "datetime.date.iso", "model": "unknown", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0228", "header": "leave_status_as_of_june_30", "current_gold": "representation.discrete.categorical", "model": "technology.internet.http_method", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0229", "header": "regular_hours", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0230", "header": "ot_hours", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0231", "header": "latitude_deg", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0232", "header": "longitude_deg", "current_gold": "geography.coordinate.longitude", "model": "geography.coordinate.longitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0233", "header": "elevation_ft", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0234", "header": "type", "current_gold": "representation.discrete.categorical", "model": "representation.discrete.categorical", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0235", "header": "gps_code", "current_gold": "representation.identifier.alphanumeric_id", "model": "identity.medical.dea_number", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0236", "header": "home_link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0237", "header": "wikipedia_link", "current_gold": "technology.internet.url", "model": "technology.internet.url", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0238", "header": "name", "current_gold": "representation.text.plain_text", "model": "representation.text.entity_name", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0239", "header": "latitude", "current_gold": "geography.coordinate.latitude", "model": "geography.coordinate.latitude", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0240", "header": "x_coordinate", "current_gold": "representation.numeric.integer_number", "model": "unknown", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0241", "header": "y_coordinate", "current_gold": "representation.numeric.integer_number", "model": "unknown", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0242", "header": "date", "current_gold": "datetime.date.iso", "model": "unknown", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0243", "header": "updated_on", "current_gold": "datetime.date.iso", "model": "datetime.timestamp.iso_8601_micros_offset", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0244", "header": "primary_type", "current_gold": "representation.discrete.categorical", "model": "identity.person.last_name", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0245", "header": "case_number", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0246", "header": "ward", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0247", "header": "city", "current_gold": "geography.location.city", "model": "geography.location.city", "provenance": "ac-03 header+reference", "kind": "ac-03"}
+{"id": "g0248", "header": "dba_start_date", "current_gold": "datetime.date.iso", "model": "datetime.timestamp.iso_8601_millis_offset", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0249", "header": "location_start_date", "current_gold": "datetime.date.iso", "model": "representation.identifier.alphanumeric_id", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0250", "header": "postcode", "current_gold": "geography.address.postal_code", "model": "geography.address.postal_code", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0251", "header": "date_of_transfer", "current_gold": "datetime.date.iso", "model": "unknown", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0252", "header": "property_type", "current_gold": "representation.discrete.categorical", "model": "representation.discrete.categorical", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0253", "header": "street", "current_gold": "representation.text.plain_text", "model": "geography.address.street_address", "provenance": "ac-03 header+value", "kind": "ac-03"}
+{"id": "g0254", "header": "TLD", "current_gold": "technology.internet.top_level_domain", "model": "representation.discrete.categorical", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0255", "header": "IDN_TLD", "current_gold": "technology.internet.top_level_domain", "model": "representation.discrete.categorical", "provenance": "ac-03 header+reference+value", "kind": "ac-03"}
+{"id": "g0256", "header": "GlobalRank", "current_gold": "representation.numeric.integer_number", "model": "representation.discrete.ordinal", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0257", "header": "TldRank", "current_gold": "representation.numeric.integer_number", "model": "representation.discrete.ordinal", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0258", "header": "RefSubNets", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0259", "header": "RefIPs", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-03 value_definitional", "kind": "ac-03"}
+{"id": "g0260", "header": "base_salary", "current_gold": "finance.currency.amount", "model": "representation.numeric.decimal_number", "provenance": "ac-04 open-row resolution 2026-06-10", "kind": "control"}
+{"id": "g0261", "header": "Lng", "current_gold": "geography.coordinate.longitude", "model": "geography.coordinate.longitude", "provenance": "ac-04 two-panel adjudication 2026-06-10; author spot-check ok", "kind": "control"}
+{"id": "g0262", "header": "toCountry", "current_gold": "geography.location.country", "model": "geography.location.country", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0263", "header": "interaction_type", "current_gold": "representation.discrete.categorical", "model": "geography.location.city", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0264", "header": "T:StockSharp.Poloniex.PoloniexMessageAdapter/summary", "current_gold": "representation.text.plain_text", "model": "technology.cloud.s3_uri", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0265", "header": "CDE", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0266", "header": "county", "current_gold": "geography.location.region", "model": "geography.location.region", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0267", "header": "logloss", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0268", "header": "ttxid", "current_gold": "representation.identifier.alphanumeric_id", "model": "representation.alphanumeric.alphanumeric_id", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0269", "header": "Created (UTC)", "current_gold": "datetime.timestamp.dmy_hm", "model": "datetime.timestamp.dmy_hm", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0270", "header": "time-stamp", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0271", "header": "species_code_6", "current_gold": "representation.identifier.alphanumeric_id", "model": "unknown", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0272", "header": "primaryCountry.alpha3Code", "current_gold": "geography.location.country_code", "model": "geography.location.country_code", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0273", "header": "URL rewritten", "current_gold": "representation.text.word", "model": "technology.internet.url", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0274", "header": "checkoutmonth", "current_gold": "representation.numeric.integer_number", "model": "representation.numeric.integer_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0275", "header": "naic_code_description", "current_gold": "representation.discrete.categorical", "model": "representation.text.entity_name", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0276", "header": "Provider City", "current_gold": "geography.location.city", "model": "geography.location.city", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0277", "header": "work_location_borough", "current_gold": "geography.location.region", "model": "geography.location.region", "provenance": "ac-04 open-row resolution 2026-06-10", "kind": "control"}
+{"id": "g0278", "header": "name", "current_gold": "geography.location.region", "model": "geography.location.city", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0279", "header": "naic_code", "current_gold": "representation.identifier.numeric_code", "model": "representation.identifier.numeric_code", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0280", "header": "92.14", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0281", "header": "ADDRESS STATE", "current_gold": "geography.location.state_code", "model": "geography.location.state_code", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0282", "header": "appleMobility", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0283", "header": "Region", "current_gold": "geography.location.region", "model": "geography.location.region", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0284", "header": "StarchDM", "current_gold": "representation.numeric.decimal_number", "model": "representation.numeric.decimal_number", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0285", "header": "Class", "current_gold": "representation.discrete.categorical", "model": "representation.discrete.ordinal", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}
+{"id": "g0286", "header": "Type", "current_gold": "representation.discrete.categorical", "model": "representation.discrete.categorical", "provenance": "ac-04 two-panel adjudication 2026-06-10; author spot-check ok", "kind": "control"}
+{"id": "g0287", "header": "place", "current_gold": "representation.text.plain_text", "model": "geography.address.full_address", "provenance": "ac-04 two-panel adjudication 2026-06-10; author-accepted tier (40/40 spot-check)", "kind": "control"}

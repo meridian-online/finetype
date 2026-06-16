@@ -440,7 +440,7 @@ def main() -> int:
     b.add_argument("--open-rows", dest="open_rows", type=Path,
                    default=Path("eval/gold/gold_open_rows_author.csv"))
     b.add_argument("--out", type=Path,
-                   default=Path("eval/gold/gold_corpus_v1.tsv"))
+                   default=Path("eval/gold/gold_corpus.tsv"))
     b.set_defaults(func=cmd_build_gold)
 
     p = sub.add_parser("predict")

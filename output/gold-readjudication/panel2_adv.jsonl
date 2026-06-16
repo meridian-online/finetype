@@ -1,0 +1,220 @@
+{"id":"p0000","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"'msg' prefix + 8-digit number, high-cardinality near-unique opaque message ids; not a repeating vocabulary","runner_up":"representation.identifier.uuid"}
+{"id":"p0001","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0002","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0003","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0004","label":"representation.identifier.alphanumeric_id","confidence":0.92,"reasoning":"NCT + 8 digits = ClinicalTrials.gov registry id, opaque structured identifier","runner_up":"representation.text.plain_text"}
+{"id":"p0005","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0006","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0007","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0008","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0009","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0010","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0011","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0012","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0013","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0014","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0015","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0016","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"NIH grant/project numbers (R01NS..., R18HS...), structured opaque identifiers","runner_up":"representation.text.plain_text"}
+{"id":"p0017","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"NIH grant/project numbers, structured opaque identifiers","runner_up":"representation.text.plain_text"}
+{"id":"p0018","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"NIH grant/project numbers, structured opaque identifiers","runner_up":"representation.text.plain_text"}
+{"id":"p0019","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"NIH grant/project numbers, structured opaque identifiers","runner_up":"representation.text.plain_text"}
+{"id":"p0020","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"NIH grant/project numbers, structured opaque identifiers","runner_up":"representation.text.plain_text"}
+{"id":"p0021","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0022","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0023","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"link_id holding msg-prefixed opaque ids","runner_up":"representation.identifier.uuid"}
+{"id":"p0024","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0025","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0026","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0027","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0028","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0029","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"msg-prefixed opaque message ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0030","label":"geography.location.country_code","confidence":0.92,"reasoning":"header CountryCode + 2-letter ISO codes (ES,EE,IT,LV...)","runner_up":"representation.discrete.categorical"}
+{"id":"p0031","label":"geography.location.country_code","confidence":0.82,"reasoning":"header Country + mostly 2-letter ISO codes; 'NY' is an outlier but corpus is ISO country codes","runner_up":"representation.discrete.categorical"}
+{"id":"p0032","label":"geography.location.country_code","confidence":0.9,"reasoning":"header country + 2-letter ISO codes (DO,PA,JP,KE...)","runner_up":"representation.discrete.categorical"}
+{"id":"p0033","label":"geography.location.country_code","confidence":0.82,"reasoning":"header countryCode + 2-letter codes (RU,TW,US); 'ZZ' is the ISO user-assigned/unknown code","runner_up":"representation.discrete.categorical"}
+{"id":"p0034","label":"geography.location.country_code","confidence":0.9,"reasoning":"header Country + 2-letter ISO codes","runner_up":"representation.discrete.categorical"}
+{"id":"p0035","label":"geography.location.country_code","confidence":0.9,"reasoning":"header country_id + 2-letter ISO codes (BR,JP,IS,CN...)","runner_up":"representation.discrete.categorical"}
+{"id":"p0036","label":"geography.location.country_code","confidence":0.93,"reasoning":"header country_code + 2-letter ISO codes","runner_up":"representation.discrete.categorical"}
+{"id":"p0037","label":"geography.location.country_code","confidence":0.9,"reasoning":"header country + 2-letter ISO codes","runner_up":"representation.discrete.categorical"}
+{"id":"p0038","label":"geography.coordinate.latitude","confidence":0.85,"reasoning":"header lat + small +/- decimals near equator (-0.34..0.33), valid latitude range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0039","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.5 decimals (London), valid lat range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0040","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.49 decimals, valid lat range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0041","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.5 decimals, valid lat range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0042","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.48 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0043","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.55 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0044","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.5 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0045","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.5 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0046","label":"geography.coordinate.latitude","confidence":0.93,"reasoning":"header Latitude + ~51.42 decimals; one 0.0 placeholder","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0047","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.51 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0048","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.65 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0049","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~50.95 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0050","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~50.95 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0051","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.68 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0052","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.68 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0053","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.64 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0054","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.79 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0055","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.79 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0056","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.62 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0057","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.49 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0058","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.63 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0059","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.6 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0060","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.65 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0061","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.65 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0062","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.63 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0063","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header Latitude + ~51.7 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0064","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header latitude + ~51.8-52.0 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0065","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header latitude + ~51.2-51.3 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0066","label":"geography.coordinate.latitude","confidence":0.95,"reasoning":"header latitude + ~51.2-51.3 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0067","label":"geography.coordinate.latitude","confidence":0.9,"reasoning":"header Lat + 37-42 decimals, valid US latitude range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0068","label":"geography.coordinate.latitude","confidence":0.6,"reasoning":"header 'lon' but values are all ~51.4-51.8, which is in latitude range and matches the paired lat columns; header likely mislabelled, values read as latitude","runner_up":"geography.coordinate.longitude"}
+{"id":"p0069","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.4 decimals (paired with lat ~51.5)","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0070","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.4 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0071","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.4 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0072","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.41 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0073","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.48 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0074","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.46 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0075","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.46 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0076","label":"geography.coordinate.longitude","confidence":0.93,"reasoning":"header Longitude + ~7.51 decimals; one 0.0 placeholder","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0077","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.47 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0078","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.85 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0079","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~6.95 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0080","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~6.95 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0081","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.81 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0082","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.83 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0083","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.84 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0084","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.61 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0085","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.61 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0086","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.9 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0087","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.4 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0088","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.85 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0089","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.5-7.85 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0090","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.85 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0091","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.85 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0092","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.85 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0093","label":"geography.coordinate.longitude","confidence":0.95,"reasoning":"header Longitude + ~7.55 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0094","label":"geography.coordinate.longitude","confidence":0.88,"reasoning":"header longitude + small positive decimals ~0.44-0.74, valid lon range near Greenwich","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0095","label":"geography.coordinate.longitude","confidence":0.92,"reasoning":"header longitude + ~-1.0 to -1.4 decimals, valid lon range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0096","label":"geography.coordinate.longitude","confidence":0.92,"reasoning":"header longitude + ~-1.0 to -1.4 decimals","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0097","label":"geography.coordinate.longitude","confidence":0.9,"reasoning":"header Lon + -82 to -116 decimals, valid US longitude range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0098","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header COG_PER_RATIO + signed floats ~-1.05..1.22, a continuous ratio measure, no coordinate/date structure","runner_up":"geography.coordinate.latitude"}
+{"id":"p0099","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header DEPTH + signed floats, continuous standardised measure","runner_up":"geography.coordinate.latitude"}
+{"id":"p0100","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header DISTINCTIVENESS_KL + signed floats, a KL-divergence metric, continuous","runner_up":"geography.coordinate.latitude"}
+{"id":"p0101","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"anonymous index column with continuous floats ~11.3-13.3","runner_up":"representation.numeric.integer_number"}
+{"id":"p0102","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"anonymous index column with high-precision floats ~11.3-13.4","runner_up":"representation.numeric.integer_number"}
+{"id":"p0103","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"anonymous index column with floats ~12.4-18.0","runner_up":"representation.numeric.integer_number"}
+{"id":"p0104","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"anonymous index column with floats ~18-30","runner_up":"representation.numeric.integer_number"}
+{"id":"p0105","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header rate_tx + bimodal floats (0.3-0.8 and ~22), a continuous rate","runner_up":"representation.numeric.integer_number"}
+{"id":"p0106","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header rate_tx + bimodal floats, continuous rate","runner_up":"representation.numeric.integer_number"}
+{"id":"p0107","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header rate_rx + floats ~0.13-0.2, continuous rate","runner_up":"representation.numeric.integer_number"}
+{"id":"p0108","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header rate_tx + floats ~0.7-1.5, continuous rate","runner_up":"representation.numeric.integer_number"}
+{"id":"p0109","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header mean_acc + floats ~0.43-0.62, a mean accuracy metric","runner_up":"representation.numeric.integer_number"}
+{"id":"p0110","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header mean_acc + floats ~0.63-0.75, accuracy metric","runner_up":"representation.numeric.integer_number"}
+{"id":"p0111","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header mean_kappa + floats ~0.18-0.37, kappa metric","runner_up":"representation.numeric.integer_number"}
+{"id":"p0112","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header mean_acc + floats ~0.3-0.37, accuracy metric","runner_up":"representation.numeric.integer_number"}
+{"id":"p0113","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header mean_acc + floats ~0.82-0.85, accuracy metric","runner_up":"representation.numeric.integer_number"}
+{"id":"p0114","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header mean_kappa + floats ~0.63-0.69, kappa metric","runner_up":"representation.numeric.integer_number"}
+{"id":"p0115","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years 1980-2016","runner_up":"representation.numeric.integer_number"}
+{"id":"p0116","label":"datetime.component.year","confidence":0.92,"reasoning":"header Year + bare 4-digit years 1983-2002","runner_up":"representation.numeric.integer_number"}
+{"id":"p0117","label":"datetime.component.year","confidence":0.92,"reasoning":"header year + bare 4-digit years 1994-2003","runner_up":"representation.numeric.integer_number"}
+{"id":"p0118","label":"datetime.component.year","confidence":0.9,"reasoning":"header year + bare 4-digit years; one '0' placeholder","runner_up":"representation.numeric.integer_number"}
+{"id":"p0119","label":"datetime.component.year","confidence":0.92,"reasoning":"header year + bare 4-digit years 1994-2003","runner_up":"representation.numeric.integer_number"}
+{"id":"p0120","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years 1997-2020","runner_up":"representation.numeric.integer_number"}
+{"id":"p0121","label":"datetime.component.year","confidence":0.92,"reasoning":"header Year + bare 4-digit years 2010-2018","runner_up":"representation.numeric.integer_number"}
+{"id":"p0122","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years 1997-2020","runner_up":"representation.numeric.integer_number"}
+{"id":"p0123","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years 1915-2002","runner_up":"representation.numeric.integer_number"}
+{"id":"p0124","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0125","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0126","label":"datetime.component.year","confidence":0.93,"reasoning":"header year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0127","label":"datetime.component.year","confidence":0.93,"reasoning":"header year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0128","label":"datetime.component.year","confidence":0.93,"reasoning":"header year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0129","label":"datetime.component.year","confidence":0.93,"reasoning":"header release_year + bare 4-digit years 1921-2018","runner_up":"representation.numeric.integer_number"}
+{"id":"p0130","label":"datetime.component.year","confidence":0.92,"reasoning":"header year + bare 4-digit years 2010-2019","runner_up":"representation.numeric.integer_number"}
+{"id":"p0131","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0132","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0133","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0134","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0135","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0136","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0137","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0138","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0139","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0140","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0141","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0142","label":"datetime.component.year","confidence":0.93,"reasoning":"header Year + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0143","label":"datetime.component.year","confidence":0.93,"reasoning":"header PubYear + bare 4-digit years","runner_up":"representation.numeric.integer_number"}
+{"id":"p0144","label":"datetime.component.year","confidence":0.93,"reasoning":"header year + bare 4-digit years 1925-2017","runner_up":"representation.numeric.integer_number"}
+{"id":"p0145","label":"representation.numeric.integer_number","confidence":0.7,"reasoning":"header ID but values are plain 4-digit sequential integers ~9169-9211; reads as integer counter, weak id signal","runner_up":"representation.identifier.alphanumeric_id"}
+{"id":"p0146","label":"representation.numeric.integer_number","confidence":0.88,"reasoning":"header counts + descending integers (frequency counts)","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0147","label":"representation.numeric.integer_number","confidence":0.85,"reasoning":"header Earnings + integer monetary amounts","runner_up":"finance.amount.currency"}
+{"id":"p0148","label":"representation.discrete.categorical","confidence":0.85,"reasoning":"header Class + 3 repeating record-type tokens, small bounded vocabulary","runner_up":"representation.text.entity_name"}
+{"id":"p0149","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header StarchDM + floats ~72-75, a continuous dry-matter measurement","runner_up":"representation.numeric.integer_number"}
+{"id":"p0150","label":"representation.identifier.alphanumeric_id","confidence":0.9,"reasoning":"header link_id + msg-prefixed opaque ids, near-unique","runner_up":"representation.identifier.uuid"}
+{"id":"p0151","label":"representation.discrete.categorical","confidence":0.75,"reasoning":"header supervisor_district + small bounded set of integer district labels 1-11, repeating nominal categories not a measure","runner_up":"representation.numeric.integer_number"}
+{"id":"p0152","label":"technology.internet.url","confidence":0.97,"reasoning":"header URL + http:// web addresses","runner_up":"representation.text.plain_text"}
+{"id":"p0153","label":"other:geography.address.street","confidence":0.7,"reasoning":"header block + Chicago redacted street-block addresses (054XX W MELROSE ST); a street-address type, more specific than plain text","runner_up":"representation.text.plain_text"}
+{"id":"p0154","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header Created (UTC) + YYYY-MM-DD HH:MM:SS","runner_up":"datetime.timestamp.iso_8601"}
+{"id":"p0155","label":"datetime.date.mdy_slash","confidence":0.9,"reasoning":"header expiration_date + MM/DD/YYYY (e.g. 08/15/2020), month-first by US convention","runner_up":"datetime.date.dmy_slash"}
+{"id":"p0156","label":"representation.identifier.alphanumeric_id","confidence":0.75,"reasoning":"header indexfungorum_id + numeric registry ids of varying length; an opaque catalogue identifier, not a measure","runner_up":"representation.numeric.integer_number"}
+{"id":"p0157","label":"representation.numeric.decimal_number","confidence":0.88,"reasoning":"header CitesPerYear + floats ~1-9, a continuous citation rate","runner_up":"representation.numeric.integer_number"}
+{"id":"p0158","label":"other:identity.publication.isbn","confidence":0.92,"reasoning":"header isbn + 10/13-digit ISBNs (some multi-value lists with valid 978/979 prefixes); a specific publication identifier","runner_up":"representation.identifier.alphanumeric_id"}
+{"id":"p0159","label":"representation.discrete.categorical","confidence":0.85,"reasoning":"header group + single repeating letters a-h, small bounded nominal vocabulary","runner_up":"representation.discrete.ordinal"}
+{"id":"p0160","label":"geography.coordinate.longitude","confidence":0.85,"reasoning":"header Lng + ~2.36 decimals (Paris longitude), valid lon range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0161","label":"representation.discrete.categorical","confidence":0.82,"reasoning":"header call_type + repeating basketball foul/violation labels, small bounded vocabulary","runner_up":"representation.text.plain_text"}
+{"id":"p0162","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header vz + signed floats -132..104, a velocity component, wide range rules out lat/lon","runner_up":"geography.coordinate.longitude"}
+{"id":"p0163","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header vx + signed floats -16..171, velocity component, range exceeds coordinates","runner_up":"representation.numeric.integer_number"}
+{"id":"p0164","label":"datetime.date.iso","confidence":0.95,"reasoning":"header issuance_date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0165","label":"technology.internet.url","confidence":0.97,"reasoning":"header URL + http:// web addresses","runner_up":"representation.text.plain_text"}
+{"id":"p0166","label":"geography.coordinate.longitude","confidence":0.9,"reasoning":"header Lon + -79 to -115 decimals, valid US longitude range","runner_up":"representation.numeric.decimal_number"}
+{"id":"p0167","label":"representation.discrete.categorical","confidence":0.8,"reasoning":"header food_category + repeating menu category names (Turkish), small bounded vocabulary","runner_up":"representation.text.entity_name"}
+{"id":"p0168","label":"representation.numeric.decimal_number","confidence":0.85,"reasoning":"header mag + floats ~2.5-5.6, earthquake magnitude measure","runner_up":"representation.numeric.integer_number"}
+{"id":"p0169","label":"geography.location.country_code","confidence":0.82,"reasoning":"header 'id' but values are 2-letter ISO country codes (AW,ES,IO,BR...); values override the generic header","runner_up":"representation.discrete.categorical"}
+{"id":"p0170","label":"representation.discrete.categorical","confidence":0.75,"reasoning":"header pay_basis + 3 repeating tokens (per Annum/Day/Hour); nominal pay-period categories","runner_up":"representation.discrete.ordinal"}
+{"id":"p0171","label":"geography.location.city","confidence":0.92,"reasoning":"header CITY + Texas city names (Denton, Houston, Dallas...)","runner_up":"representation.text.entity_name"}
+{"id":"p0172","label":"datetime.epoch.unix_seconds","confidence":0.92,"reasoning":"header utc + 10-digit epoch values (~1.5e9 = 2019)","runner_up":"representation.numeric.integer_number"}
+{"id":"p0173","label":"datetime.date.iso","confidence":0.95,"reasoning":"header updateDate + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0174","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header created_at + YYYY-MM-DD HH:MM:SS","runner_up":"datetime.timestamp.iso_8601"}
+{"id":"p0175","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header Time_stamp + YYYY-MM-DD HH:MM:SS","runner_up":"datetime.timestamp.iso_8601"}
+{"id":"p0176","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header Time_stamp + YYYY-MM-DD HH:MM:SS","runner_up":"datetime.timestamp.iso_8601"}
+{"id":"p0177","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Target Date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0178","label":"datetime.date.iso","confidence":0.95,"reasoning":"header date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0179","label":"datetime.date.iso","confidence":0.95,"reasoning":"header transition_25_lower_ci + YYYY-MM-DD dates","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0180","label":"datetime.date.iso","confidence":0.95,"reasoning":"header date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0181","label":"datetime.date.iso","confidence":0.95,"reasoning":"header date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0182","label":"datetime.date.iso","confidence":0.95,"reasoning":"header transition_25 + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0183","label":"datetime.date.iso","confidence":0.95,"reasoning":"header date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0184","label":"datetime.date.iso","confidence":0.95,"reasoning":"header date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0185","label":"datetime.date.iso","confidence":0.95,"reasoning":"header PermissionDate + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0186","label":"datetime.date.iso","confidence":0.95,"reasoning":"header test_date_post_injury_2 + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0187","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Date of Birth + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0188","label":"datetime.date.iso","confidence":0.95,"reasoning":"header publishedAtString + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0189","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Last_Date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0190","label":"datetime.date.iso","confidence":0.93,"reasoning":"header DateTime but values are YYYY-MM-DD only (no time component)","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0191","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Since + YYYY-MM-DD dates (1897-1942)","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0192","label":"datetime.date.iso","confidence":0.92,"reasoning":"header time but values are YYYY-MM-DD only","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0193","label":"datetime.date.iso","confidence":0.95,"reasoning":"header publishedAtString + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0194","label":"datetime.date.iso","confidence":0.93,"reasoning":"header DateTime but values are YYYY-MM-DD only","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0195","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Accepted + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0196","label":"datetime.date.iso","confidence":0.95,"reasoning":"header PermissionDate + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0197","label":"datetime.date.iso","confidence":0.95,"reasoning":"header transition_25_upper_ci + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0198","label":"datetime.date.iso","confidence":0.95,"reasoning":"header publishedAtString + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0199","label":"datetime.date.iso","confidence":0.95,"reasoning":"header publishedAtString + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0200","label":"datetime.date.iso","confidence":0.95,"reasoning":"header publishedAtString + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0201","label":"datetime.date.iso","confidence":0.95,"reasoning":"header sample collection date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0202","label":"datetime.date.iso","confidence":0.95,"reasoning":"header entry-date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0203","label":"datetime.date.iso","confidence":0.95,"reasoning":"header transition_10_upper_ci + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0204","label":"datetime.date.iso","confidence":0.95,"reasoning":"header PermissionDate + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0205","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Received + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0206","label":"datetime.date.iso","confidence":0.95,"reasoning":"header EndRentDate + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0207","label":"datetime.date.iso","confidence":0.95,"reasoning":"header last_review + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0208","label":"datetime.date.iso","confidence":0.93,"reasoning":"header DateTime but values are YYYY-MM-DD only","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0209","label":"datetime.date.iso","confidence":0.95,"reasoning":"header Received Date + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0210","label":"datetime.date.iso","confidence":0.93,"reasoning":"header DateTime but values are YYYY-MM-DD only","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0211","label":"datetime.date.iso","confidence":0.9,"reasoning":"header dateId but values are YYYY-MM-DD dates, not opaque ids","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0212","label":"datetime.date.iso","confidence":0.92,"reasoning":"header visit_end_datetime but values are YYYY-MM-DD only","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0213","label":"datetime.date.iso","confidence":0.95,"reasoning":"header BirthDate + YYYY-MM-DD","runner_up":"datetime.timestamp.sql_standard"}
+{"id":"p0214","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header agency_start_date + YYYY-MM-DD HH:MM:SS (time always 00:00:00 but format is full timestamp)","runner_up":"datetime.date.iso"}
+{"id":"p0215","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header date + YYYY-MM-DD HH:MM:SS with real time components","runner_up":"datetime.timestamp.iso_8601"}
+{"id":"p0216","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header updated_on + YYYY-MM-DD HH:MM:SS with real times","runner_up":"datetime.timestamp.iso_8601"}
+{"id":"p0217","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header dba_start_date + YYYY-MM-DD HH:MM:SS (00:00:00 time)","runner_up":"datetime.date.iso"}
+{"id":"p0218","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header location_start_date + YYYY-MM-DD HH:MM:SS (00:00:00 time)","runner_up":"datetime.date.iso"}
+{"id":"p0219","label":"datetime.timestamp.sql_standard","confidence":0.95,"reasoning":"header date_of_transfer + YYYY-MM-DD HH:MM:SS (00:00:00 time)","runner_up":"datetime.date.iso"}

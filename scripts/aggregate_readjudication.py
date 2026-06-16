@@ -6,9 +6,14 @@ check, not a vote. Verdicts: CONFIRM / PROPOSE / CONTESTED / TAXONOMY_GAP.
 Integrity (family-independent): control-confirm rate + correction model-agree/disagree.
 Panels were blind to current gold and to the FineType model.
 """
-import json, os
+import json, os, sys
 from collections import Counter
 D="output/gold-readjudication"
+# phase selector: aggregate_readjudication.py [phase1|phase2]
+PHASE=sys.argv[1] if len(sys.argv)>1 else "phase1"
+PFX="panel_" if PHASE=="phase1" else "panel2_"
+ANS=f"{D}/answers_{PHASE}.jsonl"
+TARGET={"ac-03"} if PHASE=="phase1" else {"header-heuristic","datetime-rerun"}  # target tiers
 def load(f):
     d={}
     if not os.path.exists(f): return d
@@ -29,9 +34,9 @@ def norm(l):
     if l.startswith('other'): return 'OTHER'
     return l.split('.')[-1]
 
-neutral={k:load(f"{D}/panel_{k}.jsonl") for k in ('opus','sonnet','haiku')}
-adv=load(f"{D}/panel_adv.jsonl")
-ans=load(f"{D}/answers_phase1.jsonl")
+neutral={k:load(f"{D}/{PFX}{k}.jsonl") for k in ('opus','sonnet','haiku')}
+adv=load(f"{D}/{PFX}adv.jsonl")
+ans=load(ANS)
 MISSING=[k for k,v in neutral.items() if len(v)<len(ans)*0.95]
 if MISSING: print(f"WARNING: panels incomplete: {MISSING}")
 
@@ -56,14 +61,14 @@ for cid,a in ans.items():
                      votes=votes,adv=norm(adv.get(cid,{}).get('label')),verdict=verdict))
 
 def s(l): return (l or '?').split('.')[-1]
-vc=Counter(r['verdict'] for r in rows if r['kind']=='ac-03')
-print("="*70); print("VERDICTS on ac-03 target columns (n=%d)"%sum(1 for r in rows if r['kind']=='ac-03'))
+vc=Counter(r['verdict'] for r in rows if r['kind'] in TARGET)
+print("="*70); print("VERDICTS on %s target columns (n=%d)"%(PHASE, sum(1 for r in rows if r['kind'] in TARGET)))
 for v in ('CONFIRM','PROPOSE','CONTESTED','TAXONOMY_GAP'): print(f"  {v:13s} {vc.get(v,0)}")
 
 # integrity
 ctl=[r for r in rows if r['kind']=='control']
 ctl_confirm=sum(1 for r in ctl if r['panel']==r['current_gold'])
-props=[r for r in rows if r['kind']=='ac-03' and r['verdict']=='PROPOSE']
+props=[r for r in rows if r['kind'] in TARGET and r['verdict']=='PROPOSE']
 agree_model=sum(1 for r in props if r['panel']==r['model'])
 print("\n"+"="*70); print("INTEGRITY (family-independent)")
 print(f"  negative control: panel==gold on {ctl_confirm}/{len(ctl)} = {ctl_confirm/max(len(ctl),1):.0%}  (should be HIGH)")
@@ -77,9 +82,9 @@ for r in sorted(props,key=lambda r:-r['mean_conf'])[:25]:
     print(f"  [{flag}] {r['header'][:22]:22s} gold={s(r['current_gold']):14s} -> panel={s(r['panel']):16s} conf={r['mean_conf']} adv={s(r['adv'])}")
 
 print("\nTAXONOMY-GAP candidates:")
-for r in [r for r in rows if r['kind']=='ac-03' and r['verdict']=='TAXONOMY_GAP'][:20]:
+for r in [r for r in rows if r['kind'] in TARGET and r['verdict']=='TAXONOMY_GAP'][:20]:
     print(f"  {r['header'][:24]:24s} gold={s(r['current_gold'])}  adv={s(r['adv'])}")
 
-with open(f"{D}/verdicts.jsonl","w") as f:
+with open(f"{D}/verdicts_{PHASE}.jsonl","w") as f:
     for r in rows: f.write(json.dumps(r,ensure_ascii=False)+"\n")
-print(f"\nwrote {D}/verdicts.jsonl ({len(rows)} rows)")
+print(f"\nwrote {D}/verdicts_{PHASE}.jsonl ({len(rows)} rows)")

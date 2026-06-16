@@ -1,0 +1,288 @@
+{"id": "g0000", "label": "geography.coordinate.latitude", "confidence": 0.97, "reasoning": "Header 'Lat', values ~48.84 decimal degrees, all near-Paris cluster — latitude, not a plain decimal.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0001", "label": "geography.coordinate.latitude", "confidence": 0.95, "reasoning": "Header 'latitude', values 42-43 deg high-precision — latitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0002", "label": "geography.coordinate.latitude", "confidence": 0.97, "reasoning": "Header 'Lat', ~48.89 deg cluster — latitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0003", "label": "geography.coordinate.longitude", "confidence": 0.96, "reasoning": "Header 'longitude', values ~-121 to -122 deg — longitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0004", "label": "finance.accounting.monetary_amount", "confidence": 0.8, "reasoning": "Header deferredLongTermLiab, large round 000-ending integers — accounting monetary line item, not a bare integer.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0005", "label": "finance.accounting.monetary_amount", "confidence": 0.8, "reasoning": "deferredLongTermAssetCharges, large 000-ending monetary values.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0006", "label": "geography.coordinate.longitude", "confidence": 0.95, "reasoning": "Header 'longitude', ~174.7 deg (NZ) — longitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0007", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "Header LoneParent, tiny set {-1,0,4} — small coded categorical/flag, -1 likely missing sentinel.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0008", "label": "finance.accounting.monetary_amount", "confidence": 0.8, "reasoning": "deferredLongTermLiab, 000-ending monetary line item.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0009", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "LoneParent {-1,0,3} small coded set with sentinel.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0010", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "longTermInvestments, large 000000-ending monetary values.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0011", "label": "finance.accounting.monetary_amount", "confidence": 0.83, "reasoning": "longTermDebt, billions, 000-ending — monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0012", "label": "representation.numeric.decimal_number", "confidence": 0.7, "reasoning": "Header 'vz' (velocity z?), signed decimals with no geo range — plain decimal measurement.", "runner_up": "geography.coordinate.longitude"}
+{"id": "g0013", "label": "representation.numeric.decimal_number", "confidence": 0.7, "reasoning": "'vz' signed decimals, generic measurement.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0014", "label": "technology.internet.url", "confidence": 0.98, "reasoning": "Scopus record URIs — URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0015", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "doi.org https links — URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0016", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "doi.org https links.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0017", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "facebook/ti.me links — URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0018", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "eventbrite ticket URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0019", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "doi/medrxiv https links.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0020", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "gov.uk document URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0021", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "doi.org links.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0022", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "doi.org links.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0023", "label": "technology.internet.url", "confidence": 0.98, "reasoning": "Scopus record URIs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0024", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "doi.org links.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0025", "label": "technology.internet.url", "confidence": 0.96, "reasoning": "Japanese gov opendata URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0026", "label": "representation.text.file_path", "confidence": 0.9, "reasoning": "Header filename, Windows paths d:\\...\\file — file path, a specific type not plain_text.", "runner_up": "representation.text.plain_text"}
+{"id": "g0027", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Header Points, small non-negative counts — count integer.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0028", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Points counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0029", "label": "representation.numeric.integer_number", "confidence": 0.72, "reasoning": "Comments count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0030", "label": "representation.numeric.integer_number", "confidence": 0.72, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0031", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Points counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0032", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Points counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0033", "label": "representation.numeric.integer_number", "confidence": 0.72, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0034", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0035", "label": "representation.numeric.integer_number", "confidence": 0.72, "reasoning": "Points counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0036", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "Header noc, small integers — count or coded; lean count.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0037", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "noc small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0038", "label": "datetime.timestamp.epoch_millis", "confidence": 0.85, "reasoning": "Header 'Submission Time', 13-digit epoch ms values (1.44e12) with a 0 — epoch millis timestamp.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0039", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "Header PC, dense 0-19 integer set — small integer/code.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0040", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "moa small integers, coded counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0041", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "moa small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0042", "label": "datetime.date.year", "confidence": 0.6, "reasoning": "Header '0.1', values 0 plus 2006/2008/2010 — looks like year values with a sentinel 0.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0043", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "noc small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0044", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "moa small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0045", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "noc small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0046", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "Header keyPressed:, small integer counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0047", "label": "representation.numeric.integer_number", "confidence": 0.85, "reasoning": "Header confirmed, wide-range counts incl 81397 — count integer (COVID confirmed).", "runner_up": "representation.discrete.categorical"}
+{"id": "g0048", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "Header answer, small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0049", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "Header LDPE, small integers {55,0,50,1} — count/measure.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0050", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "moa small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0051", "label": "finance.accounting.monetary_amount", "confidence": 0.75, "reasoning": "Header SUM229neg, large 000-ending values — monetary sum.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0052", "label": "representation.numeric.integer_number", "confidence": 0.75, "reasoning": "Header control, count integers with wide range.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0053", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "HDPE small integers/measures.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0054", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Header Fan-Out, small count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0055", "label": "finance.accounting.monetary_amount", "confidence": 0.6, "reasoning": "Header PFIZER_DEPOSITS, round values 0/975/1950/2925 — deposit amounts, lean monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0056", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "noc small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0057", "label": "representation.numeric.integer_number", "confidence": 0.75, "reasoning": "Header 'flu report', count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0058", "label": "representation.numeric.integer_number", "confidence": 0.65, "reasoning": "Header NMI, small integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0059", "label": "geography.location.country_code", "confidence": 0.95, "reasoning": "Header exchange_country, 2-letter ISO codes JP/BR/US/GB — country_code.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0060", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "Header name, repeating room_NN_state event tokens from bounded vocabulary — categorical event states.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0061", "label": "representation.text.plain_text", "confidence": 0.45, "reasoning": "Header name, CamelCase field/entity identifiers (ProductId etc) — programmatic identifiers; mostly distinct, lean plain_text but could be entity_name.", "runner_up": "representation.text.entity_name"}
+{"id": "g0062", "label": "representation.text.entity_name", "confidence": 0.55, "reasoning": "Header name, taxonomic species/place epithets (ponderosa, Namibia, cinerea) — proper-name-ish entities.", "runner_up": "representation.text.plain_text"}
+{"id": "g0063", "label": "representation.discrete.categorical", "confidence": 0.8, "reasoning": "groupingname Grouping-1/2/3 — small bounded repeating vocabulary, categorical.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0064", "label": "representation.text.entity_name", "confidence": 0.55, "reasoning": "Header name, taxonomic epithets (genus/species) — entity names.", "runner_up": "representation.text.plain_text"}
+{"id": "g0065", "label": "representation.identifier.username", "confidence": 0.7, "reasoning": "Header username, opaque handle strings — usernames.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0066", "label": "representation.identifier.alphanumeric_id", "confidence": 0.85, "reasoning": "Header wfo_id, structured 'wfo-0000......' accession codes — alphanumeric record id.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0067", "label": "representation.identifier.uuid", "confidence": 0.97, "reasoning": "Header id, canonical 8-4-4-4-12 UUIDs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0068", "label": "representation.identifier.alphanumeric_id", "confidence": 0.85, "reasoning": "Header msg_id, 'msg########' opaque ids.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0069", "label": "representation.identifier.alphanumeric_id", "confidence": 0.8, "reasoning": "Header ipni_id, structured 'NNNNNN-N' botanical name id.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0070", "label": "datetime.date.year", "confidence": 0.85, "reasoning": "Header year, 4-digit years.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0071", "label": "datetime.date.year", "confidence": 0.85, "reasoning": "Header year, 4-digit years.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0072", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Header Parent, high-cardinality near-unique numeric ids stored as floats (HN item ids) — record identifier, not a measure.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0073", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0074", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Story, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0075", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0076", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Story, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0077", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Story, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0078", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Story, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0079", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0080", "label": "datetime.timestamp.epoch_seconds", "confidence": 0.85, "reasoning": "Header author_date_unix_timestamp, 10-digit epoch seconds.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0081", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "Header updateDate, YYYY-MM-DD dates.", "runner_up": "representation.text.plain_text"}
+{"id": "g0082", "label": "datetime.timestamp.iso_datetime", "confidence": 0.92, "reasoning": "Header created_at, YYYY-MM-DD HH:MM:SS datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0083", "label": "datetime.timestamp.iso_datetime", "confidence": 0.92, "reasoning": "Header Time_stamp, full datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0084", "label": "datetime.timestamp.iso_datetime", "confidence": 0.92, "reasoning": "Time_stamp full datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0085", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Header Primary ISBN13, 13-digit 978/979 ISBNs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0086", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Header isbn, 13-digit ISBNs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0087", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Header ISBNs, hyphenated 978- ISBN-13s.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0088", "label": "finance.security.isbn", "confidence": 0.85, "reasoning": "Header Primary ISBN10, 10-char ISBNs (incl X check digit, one None).", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0089", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Primary ISBN13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0090", "label": "finance.security.isbn", "confidence": 0.85, "reasoning": "Primary ISBN10.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0091", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Primary ISBN13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0092", "label": "finance.security.isbn", "confidence": 0.85, "reasoning": "Primary ISBN10 (incl X).", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0093", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Primary ISBN13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0094", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "Primary ISBN13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0095", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "ISBNs hyphenated 13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0096", "label": "finance.security.isbn", "confidence": 0.88, "reasoning": "Header ISBN13, '978-' prefixed ISBNs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0097", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "ISBNs mix of 13 and 10 hyphenated.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0098", "label": "finance.security.isbn", "confidence": 0.85, "reasoning": "Primary ISBN10.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0099", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "ISBNs hyphenated 13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0100", "label": "finance.security.isbn", "confidence": 0.9, "reasoning": "ISBNs hyphenated 13.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0101", "label": "finance.security.isbn", "confidence": 0.75, "reasoning": "Header ISBN10, mostly 10-char ISBNs but includes B003... ASINs — predominantly ISBN.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0102", "label": "representation.identifier.alphanumeric_id", "confidence": 0.7, "reasoning": "Header BenchmarkName, opaque OP+huge-hash tokens (POOLING_FWD<hash><...>) — structured machine-generated ids; 'Total' is an outlier.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0103", "label": "representation.identifier.alphanumeric_id", "confidence": 0.6, "reasoning": "Header idPedido, 13-digit order ids (epoch-ms-like but headered as order id).", "runner_up": "datetime.timestamp.epoch_millis"}
+{"id": "g0104", "label": "representation.identifier.alphanumeric_id", "confidence": 0.7, "reasoning": "BenchmarkName hashed op tokens.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0105", "label": "representation.identifier.alphanumeric_id", "confidence": 0.85, "reasoning": "wfo_id accession codes.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0106", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "totalCashFromOperatingActivities, signed 000000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0107", "label": "representation.identifier.alphanumeric_id", "confidence": 0.7, "reasoning": "BenchmarkName hashed op tokens.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0108", "label": "representation.identifier.alphanumeric_id", "confidence": 0.7, "reasoning": "BenchmarkName hashed op tokens.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0109", "label": "representation.identifier.alphanumeric_id", "confidence": 0.7, "reasoning": "BenchmarkName hashed op tokens.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0110", "label": "representation.identifier.alphanumeric_id", "confidence": 0.85, "reasoning": "wfo_id accession codes.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0111", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "otherLiab, large 000000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0112", "label": "geography.postal.postal_code", "confidence": 0.9, "reasoning": "Header zip, US ZIP and ZIP+4 codes — postal code.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0113", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "Header d_week_seq, dense ~5278-5322 sequence integers — sequence id/integer.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0114", "label": "representation.numeric.integer_number", "confidence": 0.5, "reasoning": "Header '1001' (likely spurious), 4-digit integers no pattern — plain integer.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0115", "label": "representation.numeric.integer_number", "confidence": 0.65, "reasoning": "Header Total, wide-range integers — count/total integer.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0116", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "totalOtherIncomeExpenseNet, signed 000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0117", "label": "finance.accounting.monetary_amount", "confidence": 0.8, "reasoning": "changeToNetincome, signed large decimal monetary.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0118", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "netIncome, 000000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0119", "label": "representation.numeric.integer_number", "confidence": 0.8, "reasoning": "Header Residents Total Suspected COVID-19, count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0120", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "netIncomeFromContinuingOps, signed 000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0121", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "totalOtherIncomeExpenseNet, signed 000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0122", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "operatingIncome, signed 000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0123", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "interestExpense, signed 000000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0124", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "interestExpense, signed 000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0125", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "interestExpense, signed monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0126", "label": "finance.accounting.monetary_amount", "confidence": 0.75, "reasoning": "totalOperatingExpenses, integer amounts.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0127", "label": "finance.accounting.monetary_amount", "confidence": 0.8, "reasoning": "totalOperatingExpenses, 000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0128", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "totalOperatingExpenses, 000000-ending monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0129", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "totalOperatingExpenses, monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0130", "label": "finance.accounting.monetary_amount", "confidence": 0.82, "reasoning": "totalOperatingExpenses, monetary.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0131", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "host_thumbnail_url, muscache image URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0132", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "host_thumbnail_url image URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0133", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "host_thumbnail_url image URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0134", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "host_thumbnail_url image URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0135", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "host_thumbnail_url image URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0136", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "thumbnail_link ytimg URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0137", "label": "representation.discrete.categorical", "confidence": 0.6, "reasoning": "Header TLD, bounded set of TLD strings (com,net,uk,gov...) — small repeating vocabulary; not free-form.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0138", "label": "representation.discrete.categorical", "confidence": 0.6, "reasoning": "tld, dotted TLD codes — bounded categorical vocabulary.", "runner_up": "geography.location.country_code"}
+{"id": "g0139", "label": "representation.discrete.categorical", "confidence": 0.6, "reasoning": "TLD bounded vocabulary.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0140", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "Unnamed:4, SPDX license ids (mit, gpl-3.0, apache-2.0) — bounded categorical license enum.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0141", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Points count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0142", "label": "representation.identifier.alphanumeric_id", "confidence": 0.6, "reasoning": "Header itemid, high-cardinality numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0143", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0144", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0145", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Points counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0146", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0147", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Comments counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0148", "label": "representation.numeric.integer_number", "confidence": 0.65, "reasoning": "Fan-Out small count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0149", "label": "representation.numeric.integer_number", "confidence": 0.72, "reasoning": "Points counts incl 262.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0150", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Points counts.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0151", "label": "representation.numeric.integer_number", "confidence": 0.7, "reasoning": "Header Activity, count integers wide range.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0152", "label": "representation.numeric.integer_number", "confidence": 0.65, "reasoning": "Header POSS (possessions?), small integers — count.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0153", "label": "geography.coordinate.bearing", "confidence": 0.6, "reasoning": "Header course_over_ground, integers 0-353 — compass bearing/heading in degrees.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0154", "label": "representation.numeric.integer_number", "confidence": 0.6, "reasoning": "Header Reference Offset, integers — offset count.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0155", "label": "datetime.timestamp.epoch_seconds", "confidence": 0.85, "reasoning": "Header Created, 10-digit epoch seconds (as floats).", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0156", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids as floats.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0157", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Story, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0158", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0159", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0160", "label": "datetime.timestamp.epoch_seconds", "confidence": 0.85, "reasoning": "Created, 10-digit epoch seconds.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0161", "label": "datetime.timestamp.epoch_seconds", "confidence": 0.85, "reasoning": "Created, 10-digit epoch seconds.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0162", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0163", "label": "representation.numeric.decimal_number", "confidence": 0.7, "reasoning": "Header Baseline, wide-range decimals — generic numeric measurement.", "runner_up": "finance.accounting.monetary_amount"}
+{"id": "g0164", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Story, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0165", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "Parent, unique numeric record ids.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0166", "label": "representation.text.plain_text", "confidence": 0.85, "reasoning": "Header Description, long free-form English sentences — plain text.", "runner_up": "representation.text.entity_name"}
+{"id": "g0167", "label": "representation.text.plain_text", "confidence": 0.7, "reasoning": "Header Shortname, mostly free-form competency sentences mixed with short labels — predominantly plain text.", "runner_up": "representation.text.entity_name"}
+{"id": "g0168", "label": "representation.text.entity_name", "confidence": 0.55, "reasoning": "Header Title, article/post titles — work titles as entity names; could read as plain_text.", "runner_up": "representation.text.plain_text"}
+{"id": "g0169", "label": "representation.discrete.categorical", "confidence": 0.5, "reasoning": "Header ObjectName, small set of UI object names (Username,Login,Password,Browser) plus a person name — bounded UI categorical.", "runner_up": "representation.text.entity_name"}
+{"id": "g0170", "label": "representation.discrete.categorical", "confidence": 0.7, "reasoning": "Header LayerName, bounded NN-layer token set (relu_1, conv_2...) — repeating categorical vocabulary.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0171", "label": "representation.discrete.categorical", "confidence": 0.6, "reasoning": "Header name, small set of dotted model names (purchase.requisition.line...) — bounded categorical.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0172", "label": "representation.text.plain_text", "confidence": 0.9, "reasoning": "Header 'variable description (or question text)', long free-form survey descriptions — plain text.", "runner_up": "representation.text.entity_name"}
+{"id": "g0173", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "Target Date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0174", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0175", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "transition_25_lower_ci, YYYY-MM-DD dates.", "runner_up": "representation.text.plain_text"}
+{"id": "g0176", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0177", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0178", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "transition_25, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0179", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0180", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0181", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "PermissionDate, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0182", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "test_date_post_injury_2, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0183", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "Date of Birth, YYYY-MM-DD; specific subtype date_of_birth not in list so iso_date.", "runner_up": "representation.text.plain_text"}
+{"id": "g0184", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "publishedAtString, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0185", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "Last_Date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0186", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "Header DateTime but values are date-only YYYY-MM-DD — iso_date.", "runner_up": "datetime.timestamp.iso_datetime"}
+{"id": "g0187", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "Since, YYYY-MM-DD historical dates.", "runner_up": "representation.text.plain_text"}
+{"id": "g0188", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "Header time but values are dates YYYY-MM-DD.", "runner_up": "datetime.timestamp.iso_datetime"}
+{"id": "g0189", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "publishedAtString, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0190", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "DateTime header, date-only values.", "runner_up": "datetime.timestamp.iso_datetime"}
+{"id": "g0191", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "Accepted, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0192", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "PermissionDate, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0193", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "transition_25_upper_ci, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0194", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "publishedAtString, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0195", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "publishedAtString, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0196", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "publishedAtString, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0197", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "sample collection date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0198", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "entry-date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0199", "label": "datetime.date.iso_date", "confidence": 0.88, "reasoning": "transition_10_upper_ci, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0200", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "PermissionDate, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0201", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "Received, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0202", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "EndRentDate, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0203", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "last_review, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0204", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "DateTime header, date-only values.", "runner_up": "datetime.timestamp.iso_datetime"}
+{"id": "g0205", "label": "datetime.date.iso_date", "confidence": 0.9, "reasoning": "Received Date, YYYY-MM-DD.", "runner_up": "representation.text.plain_text"}
+{"id": "g0206", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "DateTime header, date-only values.", "runner_up": "datetime.timestamp.iso_datetime"}
+{"id": "g0207", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "Header dateId, date-only values used as a date dimension key.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0208", "label": "datetime.date.iso_date", "confidence": 0.8, "reasoning": "Header visit_end_datetime but values are date-only.", "runner_up": "datetime.timestamp.iso_datetime"}
+{"id": "g0209", "label": "datetime.date.iso_date", "confidence": 0.85, "reasoning": "BirthDate, YYYY-MM-DD; specific birth subtype absent so iso_date.", "runner_up": "representation.text.plain_text"}
+{"id": "g0210", "label": "datetime.timezone.utc_offset", "confidence": 0.7, "reasoning": "Header utc_offset, decimals -12..+13 incl half/quarter hours — UTC offset.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0211", "label": "geography.coordinate.latitude", "confidence": 0.85, "reasoning": "Header latitude, values 44-76 deg — latitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0212", "label": "geography.coordinate.longitude", "confidence": 0.9, "reasoning": "Header longitude, -21 to -139 deg — longitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0213", "label": "geography.coordinate.elevation", "confidence": 0.55, "reasoning": "Header altitude, integers 11-3244 — altitude/elevation measurement.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0214", "label": "representation.text.entity_name", "confidence": 0.8, "reasoning": "Header name, airport proper names (Goroka Airport...) — entity names.", "runner_up": "representation.text.plain_text"}
+{"id": "g0215", "label": "geography.coordinate.latitude", "confidence": 0.85, "reasoning": "latitude, -32 to 62 deg.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0216", "label": "geography.coordinate.longitude", "confidence": 0.88, "reasoning": "longitude, -179 to 175 deg.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0217", "label": "representation.numeric.decimal_number", "confidence": 0.6, "reasoning": "Header depth, decimals 0-383 — depth measurement, no finer geo type available.", "runner_up": "geography.coordinate.elevation"}
+{"id": "g0218", "label": "representation.identifier.alphanumeric_id", "confidence": 0.8, "reasoning": "Header id, USGS event ids (us7000spt3, tx2026...) — structured alphanumeric ids.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0219", "label": "representation.text.entity_name", "confidence": 0.6, "reasoning": "Header title, library catalogue work titles — work/entity names; long but proper-name-shaped.", "runner_up": "representation.text.plain_text"}
+{"id": "g0220", "label": "geography.coordinate.latitude", "confidence": 0.9, "reasoning": "gis_latitude, ~40.5-40.85 deg — latitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0221", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "permit_status, tiny set IN PROCESS/RE-ISSUED/ISSUED — categorical status.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0222", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "permit_type, small 2-letter code set — categorical.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0223", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "work_type, small 2-letter code set — categorical.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0224", "label": "representation.identifier.alphanumeric_id", "confidence": 0.65, "reasoning": "Header job__, 9-digit near-unique job numbers — record id.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0225", "label": "representation.text.entity_name", "confidence": 0.7, "reasoning": "street_name, proper street names (WEST 86TH STREET...) — place-name entities, mostly distinct.", "runner_up": "representation.text.plain_text"}
+{"id": "g0226", "label": "datetime.date.year", "confidence": 0.85, "reasoning": "fiscal_year, 4-digit years.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0227", "label": "datetime.timestamp.iso_datetime", "confidence": 0.85, "reasoning": "agency_start_date, YYYY-MM-DD 00:00:00 datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0228", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "leave_status_as_of_june_30, small set ACTIVE/ON LEAVE/CEASED — categorical status.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0229", "label": "representation.numeric.decimal_number", "confidence": 0.7, "reasoning": "regular_hours, decimals incl negatives — hours measurement.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0230", "label": "representation.numeric.decimal_number", "confidence": 0.72, "reasoning": "ot_hours, decimal hours measurement.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0231", "label": "geography.coordinate.latitude", "confidence": 0.92, "reasoning": "latitude_deg, 28-61 deg — latitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0232", "label": "geography.coordinate.longitude", "confidence": 0.92, "reasoning": "longitude_deg, -66 to -122 deg — longitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0233", "label": "geography.coordinate.elevation", "confidence": 0.6, "reasoning": "elevation_ft, integers 5-6120 ft — elevation.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0234", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "type, small airport-type set (small_airport, heliport...) — categorical.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0235", "label": "representation.identifier.alphanumeric_id", "confidence": 0.75, "reasoning": "gps_code, airport identifier codes (00AZ, 01FL...) — structured alphanumeric ids.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0236", "label": "technology.internet.url", "confidence": 0.95, "reasoning": "home_link, website URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0237", "label": "technology.internet.url", "confidence": 0.97, "reasoning": "wikipedia_link, en.wikipedia URLs.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0238", "label": "representation.text.entity_name", "confidence": 0.8, "reasoning": "name, airport/heliport proper names — entity names.", "runner_up": "representation.text.plain_text"}
+{"id": "g0239", "label": "geography.coordinate.latitude", "confidence": 0.9, "reasoning": "latitude, ~41.6-41.97 deg — latitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0240", "label": "geography.coordinate.projected", "confidence": 0.5, "reasoning": "x_coordinate, 7-digit projected (state-plane) coords — projected coordinate, not plain integer.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0241", "label": "geography.coordinate.projected", "confidence": 0.5, "reasoning": "y_coordinate, projected state-plane coords.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0242", "label": "datetime.timestamp.iso_datetime", "confidence": 0.9, "reasoning": "date, YYYY-MM-DD HH:MM:SS datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0243", "label": "datetime.timestamp.iso_datetime", "confidence": 0.9, "reasoning": "updated_on, full datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0244", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "primary_type, bounded crime-type vocabulary (THEFT, ASSAULT...) — categorical.", "runner_up": "representation.text.entity_name"}
+{"id": "g0245", "label": "representation.identifier.alphanumeric_id", "confidence": 0.85, "reasoning": "case_number, JK###### structured case ids — alphanumeric id.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0246", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "ward, integers 1-50 — ward codes, bounded categorical region division; could be integer.", "runner_up": "representation.numeric.integer_number"}
+{"id": "g0247", "label": "geography.location.city", "confidence": 0.85, "reasoning": "city, place names (San Francisco, Fremont...) — city.", "runner_up": "representation.text.entity_name"}
+{"id": "g0248", "label": "datetime.timestamp.iso_datetime", "confidence": 0.9, "reasoning": "dba_start_date, YYYY-MM-DD 00:00:00.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0249", "label": "datetime.timestamp.iso_datetime", "confidence": 0.9, "reasoning": "location_start_date, YYYY-MM-DD 00:00:00.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0250", "label": "geography.postal.postal_code", "confidence": 0.9, "reasoning": "postcode, UK postcodes (BA7 7FP...) — postal code.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0251", "label": "datetime.timestamp.iso_datetime", "confidence": 0.9, "reasoning": "date_of_transfer, YYYY-MM-DD 00:00:00.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0252", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "property_type, single-letter codes F/T/D/O/S (UK Land Registry) — categorical.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0253", "label": "representation.text.entity_name", "confidence": 0.7, "reasoning": "street, proper street names (WOLTERTON ROAD...) — place-name entities.", "runner_up": "representation.text.plain_text"}
+{"id": "g0254", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "TLD, bounded set of TLD strings — categorical vocabulary (incl brand TLDs).", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0255", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "IDN_TLD, bounded TLD string set — categorical.", "runner_up": "representation.identifier.alphanumeric_id"}
+{"id": "g0256", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "GlobalRank, ascending integers — rank/ordinal-ish but numeric; lean integer.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0257", "label": "representation.numeric.integer_number", "confidence": 0.55, "reasoning": "TldRank, ascending integers — rank integer.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0258", "label": "representation.numeric.integer_number", "confidence": 0.8, "reasoning": "RefSubNets, large count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0259", "label": "representation.numeric.integer_number", "confidence": 0.8, "reasoning": "RefIPs, large count integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0260", "label": "finance.accounting.monetary_amount", "confidence": 0.78, "reasoning": "base_salary, decimals 50k-286k — salary monetary amount.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0261", "label": "geography.coordinate.longitude", "confidence": 0.92, "reasoning": "Header Lng, ~2.36 deg (Paris) longitude.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0262", "label": "geography.location.country", "confidence": 0.85, "reasoning": "toCountry, country names (Bulgaria, Singapore, Malta) — country.", "runner_up": "representation.text.entity_name"}
+{"id": "g0263", "label": "representation.discrete.categorical", "confidence": 0.85, "reasoning": "interaction_type, small set RightGate/PickedUp/LeftGate — categorical.", "runner_up": "representation.discrete.ordinal"}
+{"id": "g0264", "label": "representation.identifier.alphanumeric_id", "confidence": 0.6, "reasoning": "Header is an XML-doc member id; values are dotted .NET member-reference strings (P:/M:/T:...) — structured identifiers.", "runner_up": "representation.text.plain_text"}
+{"id": "g0265", "label": "representation.numeric.decimal_number", "confidence": 0.7, "reasoning": "Header CDE, high-precision decimals 0-4.7 — generic decimal measurement.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0266", "label": "geography.location.region", "confidence": 0.6, "reasoning": "county, UK county/unitary names (NORFOLK, SOMERSET...) — administrative region; county subtype absent so region.", "runner_up": "geography.location.city"}
+{"id": "g0267", "label": "representation.numeric.decimal_number", "confidence": 0.75, "reasoning": "logloss, decimals — model loss metric, generic decimal.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0268", "label": "representation.identifier.alphanumeric_id", "confidence": 0.8, "reasoning": "ttxid, structured NNNNNNN-NN-NNN ids — alphanumeric record id.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0269", "label": "datetime.timestamp.iso_datetime", "confidence": 0.75, "reasoning": "Created (UTC), D/M/YYYY HH:MM datetimes.", "runner_up": "datetime.date.iso_date"}
+{"id": "g0270", "label": "representation.numeric.decimal_number", "confidence": 0.55, "reasoning": "Header time-stamp, decimals 11-20 — likely seconds offset/elapsed time as decimal, not a date.", "runner_up": "datetime.time.time_of_day"}
+{"id": "g0271", "label": "representation.identifier.alphanumeric_id", "confidence": 0.55, "reasoning": "species_code_6, 6+ letter species abbreviation codes (CORTO, MYOAUS...) — coded ids; could be categorical.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0272", "label": "geography.location.country_code", "confidence": 0.85, "reasoning": "primaryCountry.alpha3Code, ISO alpha-3 codes GBR/USA/FRA — country_code (alpha3).", "runner_up": "representation.discrete.categorical"}
+{"id": "g0273", "label": "representation.discrete.categorical", "confidence": 0.6, "reasoning": "URL rewritten, small set of slug strings (laptops, accessories-ipod) — bounded category slugs.", "runner_up": "representation.text.plain_text"}
+{"id": "g0274", "label": "representation.discrete.categorical", "confidence": 0.55, "reasoning": "checkoutmonth, small integer set 4/5/9/10 — month as categorical/ordinal.", "runner_up": "datetime.date.month"}
+{"id": "g0275", "label": "representation.discrete.categorical", "confidence": 0.8, "reasoning": "naic_code_description, bounded industry-sector vocabulary (Manufacturing, Utilities...) — categorical.", "runner_up": "representation.text.entity_name"}
+{"id": "g0276", "label": "geography.location.city", "confidence": 0.8, "reasoning": "Provider City, Vermont city names (BURLINGTON, RUTLAND...) — city.", "runner_up": "representation.text.entity_name"}
+{"id": "g0277", "label": "geography.location.region", "confidence": 0.6, "reasoning": "work_location_borough, NYC boroughs (QUEENS, BRONX...) — borough administrative division; lean region. Could be city.", "runner_up": "geography.location.city"}
+{"id": "g0278", "label": "geography.location.region", "confidence": 0.75, "reasoning": "name, Ecuadorian provinces (Pichincha, Guayas...) — region/province.", "runner_up": "geography.location.city"}
+{"id": "g0279", "label": "representation.identifier.alphanumeric_id", "confidence": 0.6, "reasoning": "naic_code, NAICS industry codes incl ranges — coded ids (mixed widths/ranges), not plain integers.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0280", "label": "representation.numeric.decimal_number", "confidence": 0.65, "reasoning": "Header '92.14' (spurious), decimals ~95-137 — generic decimal series (index/mobility-like).", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0281", "label": "geography.location.state", "confidence": 0.7, "reasoning": "ADDRESS STATE, 2-letter US state codes TX/CA/LA/TN — state code.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0282", "label": "representation.numeric.decimal_number", "confidence": 0.7, "reasoning": "appleMobility, decimals ~15-147 — mobility index, generic decimal.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0283", "label": "geography.location.region", "confidence": 0.78, "reasoning": "Region, Zimbabwe provinces (Harare, Manicaland...) — region.", "runner_up": "geography.location.city"}
+{"id": "g0284", "label": "representation.numeric.decimal_number", "confidence": 0.75, "reasoning": "StarchDM, decimals ~72-75 — percentage/measurement, generic decimal.", "runner_up": "representation.numeric.decimal_number"}
+{"id": "g0285", "label": "representation.text.entity_name", "confidence": 0.55, "reasoning": "Class, .NET class names (UnityContainerExtensions, WorkerRole...) — code-identifier entity names, mostly distinct.", "runner_up": "representation.discrete.categorical"}
+{"id": "g0286", "label": "representation.discrete.categorical", "confidence": 0.5, "reasoning": "Type, small set of type-name tokens (Date, Time, Strings...) — bounded vocabulary of class/type names.", "runner_up": "representation.text.entity_name"}
+{"id": "g0287", "label": "representation.text.plain_text", "confidence": 0.65, "reasoning": "place, USGS earthquake location descriptions ('28 km NE of San Martín, Argentina') — templated free-text descriptions, not a clean place name.", "runner_up": "representation.text.entity_name"}
