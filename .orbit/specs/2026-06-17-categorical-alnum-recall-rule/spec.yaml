@@ -1,0 +1,100 @@
+id: 2026-06-17-categorical-alnum-recall-rule
+goal: Recover categorical + alphanumeric_id recall (the two biggest gold accuracy holes) with full-column-statistic POST-PASS Sharpen rules that keep the neural vote — each approach/threshold decided by a gold study, each ship gated on precision-held + headline-non-regression + corpus-honest GO. Consumes ColumnScanStats (f1e047d). Extends text_vocab_override / veto_shape_fallback from 100-sample to full-column stats.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- gold
+- sharpen
+- recall
+- column-statistics
+acceptance_criteria:
+- id: ac-00
+  description: |
+    RE-BASELINE (evidence foundation). Regenerate the CURRENT per-type
+    precision/recall on the shipped default model against the post-re-adjudication
+    gold (eval/gold/gold_corpus.tsv, headline 0.800) via scripts/score_gold_anchor.py
+    (build-gold -> predict -> score). Record categorical + alphanumeric_id support,
+    TP/FP/FN, precision/recall + Wilson CIs as the numbers every later AC measures
+    against. The 2026-06-12 reports are stale (pre-re-adjudication); do NOT design
+    against them. This is the baseline both studies (ac-01/02) and the gate (ac-03)
+    compare to.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-01
+  description: |
+    CATEGORICAL STUDY (gold, no code) — does FULL-COLUMN cardinality (ColumnScanStats)
+    recover more categorical recall than the shipped 100-sample text_vocab_override
+    (value_sharpen.rs:429), at HELD precision? PRIOR EVIDENCE constrains this hard:
+    the corpus-honest gate already KILLED the broad-trigger version (entity_name
+    3,752 + plain_text 2,115 oracle-refuted moves; round 1 of spec
+    2026-06-12-text-vocab-override) — a column repeating eight manufacturer names IS
+    entity_name, repeated boilerplate IS plain_text; low cardinality does not make
+    them an enum (memory categorical-is-a-residual-category). So the study does NOT
+    broaden the trigger label set. It measures one thing: does swapping the
+    100-sample distinct for the EXACT full-column distinct change which `word`
+    columns fire — recovering recall where the sample looked high-card, or removing
+    false fires where the sample looked low-card (precision up). DELIVERABLE: gold
+    categorical recall + precision at current vs full-column cardinality, swept over
+    the distinct-count / cardinality-ratio knob. HONEST PRIOR: headroom is expected
+    NARROW (the label set cannot grow); let the study say whether it clears
+    recall-up-at-held-precision or is a NO-GO. Run BEFORE any code.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-02
+  description: |
+    ALPHANUMERIC_ID STUDY (gold, no code) — find the max recall at held precision.
+    The shipped veto_shape_fallback (mod.rs:3069) only fires on validation-VETOED
+    columns, so alnum columns the model labels url / plain_text / uuid (which pass
+    their own validators, so no veto fires) are never recovered — that is the
+    headroom. Sweep three dials over gold: (a) which neural labels the rule may
+    override, (b) the full-column high-cardinality + alpha-fraction + digit-fraction
+    thresholds (ColumnScanStats), (c) the value-shape EXCLUSION guards that remove
+    the contaminants the ac-04b sweep surfaced — URL (17 of 79 misfires), UUID,
+    street-address. DELIVERABLE: the {trigger x stat-threshold x guards -> captured,
+    recall, precision} curve. SHIP CANDIDATE = the setting with max recall whose
+    precision CI lower bound is NOT below the ac-00 baseline alnum precision. The
+    ac-04b sweep put the compounded ceiling near ~0.82 on gold — a recall rule, not
+    a 98% assertion. Run BEFORE any code.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-03
+  description: |
+    IMPLEMENT the rule(s) that cleared their gold study (ac-01/02) as POST-PASS
+    Sharpen rules in value_sharpen.rs, consuming the full-column ColumnScanStats
+    (column/mod.rs, f1e047d) rather than re-deriving from the 100-sample. Keep the
+    neural vote — these are demotion/override fallbacks (decision 0048/0096), not a
+    skip. Reuse the shipped rule scaffolding (text_vocab_override, veto_shape_fallback).
+    Each rule carries a kill switch (rhh::is_disabled) and a disambiguation_rule tag,
+    per the deterministic-layer audit (decision 0096). A study that returned NO-GO
+    ships NOTHING for that type (explicit no-op; the categorical side may be a no-op
+    if ac-01 finds no held-precision gain).
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    SHIP GATE (BLOCKING, H05). Every shipped rule clears ALL of: (1) gold per-type
+    RECALL up (point estimate, with CI) for its target; (2) gold per-type PRECISION
+    HELD (new precision CI lower bound not below the ac-00 baseline); (3) gold
+    HEADLINE non-regression (total correct not down); (4) corpus-honest gate GO
+    (scripts/corpus_honest_gate.py on the ac-01 stratified sample — the only
+    relocation detector, and the instrument that killed the broad categorical
+    trigger). A NO-GO on any rule blocks that rule (it does not ship); the others
+    may still ship. Record the four dials per shipped rule.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-05
+  description: |
+    DECISION CLOSE. For each type: SHIPPED (rule + gold deltas + corpus-honest GO)
+    or NO-GO (the failing dial, preserved as evidence — a clean no-op like ac-04b).
+    Update CHANGELOG.md + the CLAUDE.md sprint state with the new gold headline.
+    Bank a memory recording which full-column-stat recall rules cleared and which
+    did not, linking decisive-stat-skip-is-no-go and categorical-is-a-residual-category.
+  gate: false
+  checked: false
+  ac_type: doc
