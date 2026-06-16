@@ -82,7 +82,7 @@ cd "$(cd "$(dirname "$0")/.." && pwd)"
 BIN="./target/release/finetype"
 # gold scorer + snapshot need pyarrow/duckdb from the gittables venv, not system python3.
 VPY="eval/gittables/.venv/bin/python"
-GOLD="eval/gold/gold_corpus_v1.tsv"
+GOLD="eval/gold/gold_corpus_v2.tsv"   # re-adjudicated canonical fixture (spec 2026-06-16-mixed-teacher-gold-readjudication); v1 historical
 COLS="eval/gittables/corpus_pass/columns.parquet"
 SAMPLE_FILES="output/corpus-honest-gate/stratified_sample.files.txt"
 DRIFT_BASELINE="output/destination-drift-precheck/sense_dist_v19fx_s42.json"
