@@ -1,6 +1,6 @@
 id: '0100'
 title: 'Require the duckdb CLI as a hard dependency; consolidate ingestion via shell-out (not linking)'
-status: proposed
+status: accepted
 date_created: 2026-06-16
 date_modified: 2026-06-16
 body: |
