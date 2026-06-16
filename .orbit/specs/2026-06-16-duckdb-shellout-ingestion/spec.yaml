@@ -3,7 +3,7 @@ goal: Validate via a no-compile-risk shell-out spike whether the CLI can route C
 cards:
 - 0007-duckdb-sql-extension
 - 0014-profile-validate-precision
-status: open
+status: closed
 labels:
 - duckdb
 - ingestion
@@ -71,7 +71,6 @@ acceptance_criteria:
     (column/mod.rs) with parity tests; nothing consumes it (parity held).
   gate: false
   checked: true
-  ac_type: code
 - id: ac-04b
   description: |
     (GREEN-only) DECISIVE-STAT SWEEP STUDY — settles the conservatism question by
@@ -127,7 +126,6 @@ acceptance_criteria:
     recall spec, NOT this skip. ac-04a free-stats plumbing feeds it.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-05
   description: |
     DECISION CLOSE. Flip choice 0100 `accepted` (green, shipped) or `rejected`
@@ -145,6 +143,16 @@ acceptance_criteria:
     a separate spike; else stay on 0099 Option 2 (lean csv-crate baseline +
     extension as the fast path). Record the failing dimension. Explicit no-op
     branch so a NO-GO lands cleanly.
+    N/A (2026-06-17): the ac-01 spike was GREEN (shell-out shipped, choice 0100
+    accepted) — the RED fallback branch was never taken. Closed as not-applicable.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+memories_considered:
+- key: duckdb-shellout-ingestion-viable
+  disposition: adopted
+  reason: ac-01 spike viability finding — shell-out ingestion shipped, choice 0100 accepted.
+- key: decisive-stat-skip-is-no-go
+  disposition: adopted
+  reason: ac-04b study outcome — the neural short-circuit is a NO-GO; ac-04c ships nothing.
+closed_at: 2026-06-16T23:50:14.291341Z
