@@ -1,0 +1,38 @@
+gold columns: 931
+
+  LEAF   accuracy : 728/931 = 0.782   (the headline)
+  FAMILY accuracy : 746/931 = 0.801
+  DOMAIN accuracy : 817/931 = 0.878
+  → domain-over-leaf headroom: +0.096 (89 cols where v19 gets the DOMAIN right but the LEAF wrong)
+
+v19 leaf errors: 203 (of 931)
+    87  (43% of errors, +9.3% of gold)  CROSS-domain (hierarchy can prevent)
+    27  (13% of errors, +2.9% of gold)  pred=unknown (rescuable if domain known)
+    71  (35% of errors, +7.6% of gold)  cross-family / same-domain (maybe)
+    18  (9% of errors, +1.9% of gold)  WITHIN-family (hierarchy cannot fix)
+
+  HIERARCHY RECALL CEILING (cross-domain + unknown-rescue): 114 cols = +12.2% gold  (only if a domain head is near-perfect)
+
+==============================================================================
+per recall-gap label — are its misses cross-domain (fixable) or within-family?
+==============================================================================
+
+  categorical      54 misses | cross-dom 27  unknown 4  cross-fam 17  within-fam 6
+       → {'ordinal': 6, 'entity_name': 6, 'iata_code': 5, 'unknown': 4}
+
+  integer_number   40 misses | cross-dom 10  unknown 2  cross-fam 28  within-fam 0
+       → {'increment': 17, 'binary': 6, 'year': 3, 'ordinal': 3}
+
+  plain_text       31 misses | cross-dom 18  unknown 2  cross-fam 7  within-fam 4
+       → {'city': 4, 'alphanumeric_id': 4, 'url': 4, 'categorical': 3}
+
+  alphanumeric_id  18 misses | cross-dom 8  unknown 7  cross-fam 2  within-fam 1
+       → {'unknown': 7, 'url': 4, 'eu_vat': 1, 'uuid': 1}
+
+  iso              15 misses | cross-dom 1  unknown 3  cross-fam 11  within-fam 0
+       → {'sql_standard': 6, 'unknown': 3, 'iso_8601_milliseconds': 2, 'iso_8601_millis_offset': 2}
+
+  decimal_number   13 misses | cross-dom 4  unknown 6  cross-fam 3  within-fam 0
+       → {'unknown': 6, 'utc': 4, 'ordinal': 2, 'categorical': 1}
+
+[done]
