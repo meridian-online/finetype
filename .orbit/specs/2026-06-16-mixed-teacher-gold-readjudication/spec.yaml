@@ -1,0 +1,125 @@
+id: 2026-06-16-mixed-teacher-gold-readjudication
+goal: Upgrade the ~589 heuristically-labelled gold columns to VERIFIED labels via a mixed-teacher blind adjudication panel (>=2 model families) — correcting contestable labels, surfacing taxonomy gaps, and giving every contested column a reasoned confidence-banded answer — then re-baseline the honest accuracy ceiling. Append-only with provenance per choice 0095; leakage firewall preserved; panels blind to the FineType model to prevent goalpost-moving.
+cards:
+- 0019-human-verified-gold-corpus
+status: open
+labels:
+- gold
+- distillation
+- eval
+acceptance_criteria:
+- id: ac-01
+  description: |
+    SCOPE + POLICY LOCK. Population = the HEURISTIC tiers only: 349 `ac-03`
+    (value_definitional / header+value / header+reference+value) + 240
+    header-heuristic = ~589 columns. PRIORITY phase 1 = the 349 `ac-03` tier
+    (the determinability probe found gold contestable almost entirely there);
+    phase 2 = the 240 header-heuristic tier as a lighter confirm pass. The 342
+    already-strongly-adjudicated (`ac-04` two-panel / author-accepted) tier is
+    OUT of scope as a target — it is sampled in only as a NEGATIVE CONTROL
+    (ac-04). APPEND-ONLY MECHANIC (choice 0095): re-adjudication UPGRADES a
+    provisional heuristic label to a verified one; it never silently overwrites
+    a verified fact. A panel-vs-verified conflict (only possible via the control
+    sample) is preserved and escalated to the author, not auto-applied. BLINDNESS
+    (anti-circularity): panels see header + sample values ONLY — never the
+    current gold label, never the FineType model's prediction. Basis: the
+    2026-06-16 determinability probe (output/determinability-probe/, memory
+    determinability-probe-gold-is-the-ceiling) — contested columns were 100%
+    determinable, gold contestable on ~49% of the heuristic-tier errors.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-02
+  description: |
+    MIXED-TEACHER PANEL — the independence requirement. The determinability
+    probe used 3 Claude panels and found they SHARE PRIORS (agreement partly
+    reflects a common base model). This run mixes ≥2 model FAMILIES: the Claude
+    blind-pass panels (scripts/distill_run.py / the Agent mechanism, ≥2 passes)
+    PLUS the Qwen3:32b Ollama path (scripts/llm_label.py) as a genuinely-
+    independent third family. Each panel emits, per column, {label, confidence
+    [0,1], reasoning, runner_up} over the CURRENT 240-type taxonomy. Build the
+    blind input (header + N sampled values, N≈25) from the source tables,
+    leakage-firewalled. Reuse scripts/gold_lens_prelabel.py + the two-panel
+    adjudication machinery that built the existing `ac-04` tier. DEPENDENCY
+    footgun: the Qwen path needs `ollama serve` running with qwen3:32b pulled —
+    assert availability before the run (the panel is not "mixed-family" without it).
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    CONSENSUS + VERDICT RULES. Per column, combine the panels:
+      - CONFIRM — strong cross-family consensus == current label → upgrade its
+        provenance to verified (no label change).
+      - PROPOSE-CORRECTION — strong consensus ≠ current label → stage a new
+        verified label (append; preserve the old per append-only).
+      - CONTESTED — split or low mean confidence → keep the current label, emit
+        a confidence-banded multi-label (top-2 + reasoning) for the analyst-
+        answer product and future taxonomy work.
+      - TAXONOMY-GAP — consensus is `other:`/no clean fit → route to taxonomy
+        discovery (ac-07); do NOT change the label.
+    Define "strong consensus" explicitly and calibrate it on the negative
+    control (ac-04): e.g. ≥3 of the panels agree INCLUDING ≥1 from each family,
+    mean confidence ≥ τ. Deliverable: a per-column verdict table.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    INTEGRITY CONTROLS — the proof this is not goalpost-moving toward the model.
+    (i) NEGATIVE CONTROL: blend a random sample (~40) of the strongly-adjudicated
+    tier into the blind set; the panel must CONFIRM the large majority — high
+    churn there means the consensus bar is too aggressive, recalibrate τ before
+    trusting any correction. (ii) Panels are blind to the FineType model (ac-01).
+    (iii) CORRECTION ATTRIBUTION: of the proposed corrections, report how many
+    AGREE vs DISAGREE with the shipped model's prediction. If corrections are
+    predominantly model-DISAGREE, the re-adjudication is demonstrably not
+    flattering the model (the probe already showed 19 panel-third > 7 panel-
+    agrees-model). Publish this split — it is the headline integrity number.
+    (iv) AUTHOR SPOT-CHECK gate: a sample of proposed corrections is author-
+    reviewed before any land (mirrors the 40/40 author-accepted pattern).
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-05
+  description: |
+    AUTHOR ACCEPTANCE → GOLD v2 (gate, BLOCKING). The author reviews the
+    proposed-correction set + the contested set. Accepted corrections produce
+    `eval/gold/gold_corpus_v2.tsv`: append-only, per-row provenance
+    "mixed-teacher re-adjudication 2026-06-16 (families: claude, qwen3-32b)",
+    each row stamped with its taxonomy version (choice 0095). The leakage
+    firewall is RE-VERIFIED (`make leakage-guard` / audit_gold_anchor_leakage.py)
+    — gold stays eval-only; corrected labels do NOT enter training without a
+    separate, firewall-preserving mining step. BLOCKING: zero leakage
+    regression; negative-control churn within the ac-04 bound.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-06
+  description: |
+    HONEST RE-BASELINE. Re-score the shipped model against gold v2
+    (scripts/score_gold_anchor.py) and report BOTH the v1 (0.793) and v2 headline
+    with the delta DECOMPOSED: confirmed-unchanged / corrected-toward-model /
+    corrected-away-from-model / still-contested / taxonomy-gap-excluded. The v2
+    number is the honest ceiling; the decomposition is what makes it credible
+    (not a goalpost move). Update the CLAUDE.md gold baseline line and choice
+    0095's fixture version. Report a "determinable-set accuracy" alongside the
+    headline (excludes the genuinely-contested residue, which carries a
+    confidence-banded answer instead).
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-07
+  description: |
+    DOWNSTREAM HANDOFF + DECISION MEMO. Emit three artefacts: (a) the
+    taxonomy-gap candidate list the panels surfaced (street_name, file_path,
+    publication_year, …) → seed a taxonomy-discovery spec (choice 0095 evolution
+    interface); (b) the contested set with confidence bands → the analyst-answer
+    product (reasoned best-call + confidence, the honest alternative to "not
+    determinable"); (c) the verified corrections as candidate TRAINING signal
+    (distillation-as-judge) — flagged firewall-preserving, not auto-fed. Memo:
+    did mixed-teacher re-adjudication raise the honest ceiling, and by how much,
+    attributed? Update card 0019 + memories.
+  gate: false
+  checked: false
+  ac_type: doc
