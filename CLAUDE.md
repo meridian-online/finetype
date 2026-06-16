@@ -44,7 +44,7 @@ Engineering-internal detail (Rust traces, SQL, perf numbers, error-bucket counts
 
 ## Project state
 
-**Version:** 0.6.30
+**Version:** 0.6.31
 **Taxonomy:** 240 definitions across 7 domains (container 11, datetime 84, finance 28, geography 25, identity 33, representation 33, technology 26) — all generators pass, 100% alignment.
 **Shipped default Sense-stage model:** `models/default` → **`sherlock-v19-relu-s42`** (multi-branch, inside the Sense→Sharpen pipeline). This is what every `finetype` invocation runs unless `FINETYPE_MODEL` overrides it. v19 baseline profile eval = 369/448 on the 448-row manifest.
 **Campaign head (NOT shipped):** `sherlock-v22-boundary-relu-s44` is the newest trained multi-branch model (5-branch: char+embed+stats+header+validation, ReLU+BatchNorm, val_acc 0.9305) and the training-target baseline the corpus diagnostic ran against. **Promotion to default was deferred** (spec `2026-05-26-v22-gated-direction-review`): gated cell-2 vs v19 = **−10.4% (Partial band)** on 503k columns — country **−31.5%**, region −12.8%, city −10.2% per `output/v22-direction-review/` — and it is not published to HuggingFace. So the diagnostic's gaps are *v22* false positives; on the shipped v19 default they may differ (re-baseline before treating them as ground truth — see v24 ac-00). Original Sense implementation remains in code as an alternative.

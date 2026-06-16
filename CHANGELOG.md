@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.31] - 2026-06-16
+
+A batch of gold-gated deterministic Sharpen rules on value-identical and
+column-level boundaries — verified gold-corpus accuracy **0.741 → 0.793**
+(690 → 738 / 931), every rule a corpus-honest GO with no broad regressions. The
+release also records the architecture-search conclusion: model-side delivery is
+exhausted; the next accuracy lever is full-column statistics fed as value-based
+rules, not a bigger model.
+
+### Added
+
+- **`increment_substance_veto`** — the first full-column-statistics rule. The
+  value-level sequential check runs on the 100-value *stepped* sample, which
+  cannot see contiguity (a true `1..N` run sampled every *k*-th value looks like
+  `1, k, 2k…`), so it over-emitted `representation.identifier.increment` on any
+  evenly-spaced numeric column. The veto re-checks the **full column**: a genuine
+  auto-increment fills its own range (`distinct ≈ max−min+1`) with near-no
+  duplicates; otherwise it is a plain integer and is demoted to `integer_number`.
+  Gold `integer_number` recall 0.796 → 0.847, `increment` false positives 17 → 7
+  (precision 0.056 → 0.125), headline 0.782 → **0.793**, corpus-honest GO.
+- **`country_code_corroboration`** — two-letter ISO 3166-1 codes (`US`, `HK`)
+  the flat softmax filed under `region`/`state`/`city`/`country` are promoted to
+  `country_code` when their values are mostly valid ISO codes (the taxonomy's
+  most precise geographic enum). Value-based, promotion-only.
+- **`binary_vocab_veto`** — `representation.boolean.binary` over-emitted on sparse
+  integer count columns; an all-integer column with any value outside `{0,1}` is
+  a count, demoted to `integer_number` (gold 0.757 → 0.770).
+- **`url_bare_number_veto`** — a link-headed column of bare numbers cannot be a
+  URL; demote to decimal/integer by value shape (gold 0.747 → 0.753).
+- **`city_region_header_corroboration`** — a `city` prediction under a header
+  naming an administrative division (`region`/`county`/`district`/`province`) is
+  promoted to `region` (gold 0.741 → 0.747).
+- **`checksum_substance_guard`** — one generic check-digit guard for the
+  self-validating identifier types: a column labelled with a `checksum:`-bearing
+  type (ISBN, ABA, CUSIP, SEDOL) whose values mostly fail the real check-digit
+  arithmetic is demoted by value shape. ABA/CUSIP/SEDOL enrolled with an
+  alphanumeric guard branch.
+
+### Changed
+
+- Large source files split into module trees for maintainability
+  (`column.rs`, `multi_branch.rs`, `main.rs`, `generator.rs`); behaviour
+  unchanged. Six duplicate eval harnesses consolidated into one parameterised
+  `scripts/eval_rule.sh`.
+
+### Removed
+
+- The ISBN-specific check-digit veto, superseded by the generic
+  `checksum_substance_guard`.
+
+### Fixed
+
+- **Training `config.json` written at training start**, not only on completion,
+  so an interrupted run leaves a loadable model directory.
+- **CI HuggingFace model download** hardened against transient `curl` exit-22
+  errors with a retry.
+
+### Discovery
+
+- **The Sense model architecture is at its accuracy ceiling for this corpus.**
+  Six model-side bets were ruled out with evidence — additive hard-negative
+  retrains (0-for-5), value-level late-fusion (additive *and* deferral), a
+  sibling-context attention head (thin gold-recall headroom: its clean target,
+  coordinates, is already solved), and a hierarchical Domain→Family→Type head
+  (trained and falsified — worse than the flat head, because splitting the
+  output head does not fix interference that lives in the shared representation).
+  The surviving lever is **full-column statistics fed as value-based rules**
+  (cardinality, increment signature, binary domain), which separate the residual
+  recall gaps the per-value model is structurally blind to — free inside DuckDB
+  and likely a net inference *saving*. `increment_substance_veto` is its first
+  shipped instance.
+
 ## [0.6.30] - 2026-06-15
 
 Two gold-gated Sharpen rules on value-identical boundaries; verified gold-corpus
