@@ -35,7 +35,7 @@ acceptance_criteria:
     "could not invoke duckdb CLI (is duckdb on PATH?)"). Formalises a dependency
     validate's Parquet/materialise paths already effectively have.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     (GREEN-only) CONSOLIDATE INGESTION via shell-out. Route CSV + Parquet
@@ -46,7 +46,7 @@ acceptance_criteria:
     DELETE `read_csv_input` entirely (full consolidation, the analyst's goal) or
     keep it as the small-file fast path; record the call.
   gate: false
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     (GREEN-only) UNIVERSAL FREE-STATS + SHORT-CIRCUIT. The full-column stats from
