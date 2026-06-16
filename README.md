@@ -29,6 +29,8 @@ identity.person.email
 
 ## Installation
 
+> **Runtime dependency:** the [`duckdb`](https://duckdb.org/docs/installation) CLI must be on `PATH`. `finetype profile` and `finetype validate` shell out to it for all CSV/Parquet ingestion (`brew install duckdb`, or your platform package manager). This is a shell-out, not a link — the release binary is unchanged across platforms.
+
 ### Homebrew (macOS / Linux)
 
 ```bash
