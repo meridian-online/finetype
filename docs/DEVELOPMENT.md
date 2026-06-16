@@ -1,5 +1,15 @@
 # FineType Development
 
+## Runtime requirements
+
+**The `duckdb` CLI is a hard runtime dependency (choice 0100).** `finetype profile` and `finetype validate` shell out to the external `duckdb` binary for all CSV and Parquet ingestion (and for validate's materialise/transform step). It must be on `PATH`; the commands fail with a single actionable error otherwise:
+
+```
+could not invoke duckdb CLI (is duckdb on PATH?): … Install it from https://duckdb.org/docs/installation
+```
+
+Install it via your platform package manager (`brew install duckdb`, etc.) or from <https://duckdb.org/docs/installation>. This is a *shell-out*, not a link — the cross-platform release build is unchanged (no `libduckdb` compile/link), so the Windows/MSVC amalgamation issue that sank choice 0099 cannot occur. Tested against duckdb v1.5.3.
+
 ## Training (Pure Rust)
 
 All model training uses the `finetype-train` crate. No Python required.

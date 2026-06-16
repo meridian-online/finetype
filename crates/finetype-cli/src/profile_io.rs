@@ -113,17 +113,105 @@ pub(crate) fn read_json_input(
     }
 }
 
-/// Read CSV input into (headers, columns, row_count).
+/// Tokens treated as null-ish and dropped from a column's value list,
+/// matching the historical csv-crate reader's filter (empty + these seven).
+const NULLISH_TOKENS: [&str; 7] = ["NULL", "null", "NA", "N/A", "nan", "NaN", "None"];
+
+/// True when `trimmed` is the empty string or one of the null-ish tokens.
+fn is_nullish(trimmed: &str) -> bool {
+    trimmed.is_empty() || NULLISH_TOKENS.contains(&trimmed)
+}
+
+/// Read CSV (or Parquet) input into (headers, columns, row_count) by shelling
+/// out to the external `duckdb` CLI (choice 0100). This replaces the bespoke
+/// csv-crate reader: DuckDB's parallel CSV sniffer handles dialect detection,
+/// quoting, and ragged rows, while Parquet is read by the same path with every
+/// column cast to VARCHAR.
+///
+/// DuckDB reads the file (`read_csv(auto_detect, all_varchar, null_padding)` or
+/// `read_parquet` with a VARCHAR cast) and re-emits it as a canonical CSV on
+/// stdout via the `-csv` output mode (cross-platform; no Unix-only
+/// `/dev/stdout`). We parse that canonical CSV with
+/// the `csv` crate — quoting/escaping is well-defined, so no value is mangled —
+/// and apply the SAME null-ish filtering the old reader did (drop empty strings
+/// and the tokens NULL/null/NA/N/A/nan/NaN/None) into per-column `Vec<String>`.
+///
+/// HARD DEPENDENCY: `duckdb` must be on PATH (ac-02). When it is absent we fail
+/// with the same actionable error shape validate already uses.
 pub(crate) fn read_csv_input(
     file: &std::path::Path,
     delimiter: Option<char>,
 ) -> Result<(Vec<String>, Vec<Vec<String>>, usize)> {
-    let mut reader_builder = csv::ReaderBuilder::new();
-    reader_builder.flexible(true);
-    if let Some(delim) = delimiter {
-        reader_builder.delimiter(delim as u8);
+    let is_parquet = file
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("parquet"))
+        .unwrap_or(false);
+
+    let input_literal = crate::sql::sql_quote(&file.to_string_lossy());
+
+    // Build the SELECT source. Parquet: cast every column to VARCHAR so the
+    // engine sees the same VARCHAR cells the CSV path produces (matches
+    // validate.rs's `COLUMNS(*)::VARCHAR` contract). CSV: auto-detect the
+    // dialect (honouring an explicit delimiter when given) with `all_varchar`
+    // + `null_padding` — short ragged rows are padded with NULLs, the duckdb
+    // analogue of the csv crate's `flexible(true)`.
+    let source = if is_parquet {
+        format!("SELECT COLUMNS(*)::VARCHAR FROM read_parquet({input_literal})")
+    } else {
+        let mut opts = String::from("auto_detect=true, all_varchar=true, null_padding=true");
+        if let Some(delim) = delimiter {
+            // Render the delimiter as a SQL literal so quotes/backslashes are
+            // escaped safely; an explicit delimiter pins the sniffer.
+            opts.push_str(", sep=");
+            opts.push_str(&crate::sql::sql_quote(&delim.to_string()));
+        }
+        format!("SELECT * FROM read_csv({input_literal}, {opts})")
+    };
+
+    // Re-emit as canonical CSV on the child's stdout via duckdb's `-csv` output
+    // mode, then read it back with the csv crate. `-csv` is cross-platform (no
+    // `/dev/stdout`, which is Unix-only and would break the Windows path that is
+    // the whole point of choice 0100); duckdb writes RFC-4180 CSV — header row,
+    // comma-delimited, quoted where needed — straight to stdout.
+    //
+    // `.nullvalue ''` is pinned as a leading command so a genuine NULL (an empty
+    // cell, or a short row padded by `null_padding`) always renders as the empty
+    // string — which `is_nullish` drops. WITHOUT this the null rendering would
+    // inherit the user's `~/.duckdbrc` `.nullvalue`: if it were set to a token
+    // outside NULLISH_TOKENS (e.g. "\\N"), a real NULL would survive as a kept
+    // value and corrupt the column. Pinning it makes ingestion environment-
+    // independent.
+    let query = format!("{source};");
+
+    let out = std::process::Command::new("duckdb")
+        .arg("-csv")
+        .arg("-c")
+        .arg(".nullvalue ''")
+        .arg("-c")
+        .arg(&query)
+        .output();
+    let out = match out {
+        Ok(o) => o,
+        Err(e) => {
+            anyhow::bail!(
+                "could not invoke duckdb CLI (is duckdb on PATH?): {e}. \
+                 Install it from https://duckdb.org/docs/installation"
+            );
+        }
+    };
+    if !out.status.success() {
+        anyhow::bail!(
+            "duckdb failed to read {:?}: {}",
+            file,
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
     }
-    let mut reader = reader_builder.from_path(file)?;
+
+    // Parse the canonical CSV duckdb emitted. It is well-formed (quoted where
+    // needed, comma-delimited, single header row), so the csv crate reads it
+    // back losslessly.
+    let mut reader = csv::ReaderBuilder::new().from_reader(out.stdout.as_slice());
 
     let headers: Vec<String> = reader.headers()?.iter().map(|h| h.to_string()).collect();
     let n_cols = headers.len();
@@ -138,15 +226,7 @@ pub(crate) fn read_csv_input(
         for (i, field) in record.iter().enumerate() {
             if i < n_cols {
                 let trimmed = field.trim();
-                if !trimmed.is_empty()
-                    && trimmed != "NULL"
-                    && trimmed != "null"
-                    && trimmed != "NA"
-                    && trimmed != "N/A"
-                    && trimmed != "nan"
-                    && trimmed != "NaN"
-                    && trimmed != "None"
-                {
+                if !is_nullish(trimmed) {
                     columns[i].push(trimmed.to_string());
                 }
             }
