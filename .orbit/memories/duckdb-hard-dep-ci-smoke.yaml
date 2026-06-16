@@ -1,0 +1,4 @@
+key: duckdb-hard-dep-ci-smoke
+body: Making duckdb a hard runtime dep (choice 0100) means any CI job that runs `finetype profile`/`validate` end-to-end must install the duckdb CLI. The CLI Smoke Tests job (tests/smoke.sh, .github/workflows/ci.yml) exercises profile and broke when profile started shelling out to duckdb — fixed by adding a 'Install duckdb CLI' step (pin v1.5.3, asset duckdb_cli-linux-amd64.zip). The local pre-push gate (fmt+clippy) does NOT catch this — smoke is CI-only, and the cargo-test ingestion tests SKIP when duckdb is absent (duckdb_available() guard). release.yml builds binaries only (no profile), so no duckdb step needed there.
+timestamp: 2026-06-16T11:43:33.093606Z
+labels: []
