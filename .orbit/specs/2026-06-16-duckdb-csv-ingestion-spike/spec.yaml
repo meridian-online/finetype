@@ -1,0 +1,83 @@
+id: 2026-06-16-duckdb-csv-ingestion-spike
+goal: Validate via a Windows bundled-DuckDB build spike whether the CLI can dispatch CSV ingestion to DuckDB without breaking cross-platform releases; on green, implement the unified DuckDB ingestion path (retire the bespoke csv-crate reader, universalise the free-stats path); on red, adopt the lean-CLI + extension-as-fast-path fallback. Per choice 0099.
+cards:
+- 0007-duckdb-sql-extension
+- 0014-profile-validate-precision
+status: open
+labels:
+- duckdb
+- ingestion
+- spike
+acceptance_criteria:
+- id: ac-01
+  description: |
+    WINDOWS BUNDLED-DUCKDB BUILD SPIKE (gate, BLOCKING) — the deciding
+    experiment of choice 0099. The shipped CLI deliberately excludes bundled
+    DuckDB (the `cpu` default pulls no finetype-train) to dodge the
+    bundled-DuckDB Windows/MSVC amalgamation build failure; this spike tests
+    whether that can be reversed. Throwaway branch / PR, CI-only, NO production
+    change: add `duckdb` (features=["bundled"]) to finetype-cli's DEFAULT build
+    (temporary `duckdb-csv` feature in `default`) + a real in-process call
+    (`Connection` → `SELECT * FROM read_csv('<fixture>') LIMIT 1`, so it is not
+    DCE'd), then trigger the cross-platform build on all 5 targets
+    (linux x86/arm, macOS x86/arm, windows-msvc). Try the current pin
+    (`=1.10503.1`) first; on Windows failure sweep a small candidate set.
+    GREEN on all 5 (windows-msvc decisive) = GO; record binary-size delta +
+    a `finetype profile <fixture>.csv` parity smoke vs the bespoke reader.
+    RED = NO-GO → close this spec, adopt option 2 (ac-06).
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-02
+  description: |
+    (GREEN-only) UNIFIED INGESTION. Route CLI CSV ingestion through an
+    in-process DuckDB connection: `read_csv` → per-column sample + full-column
+    stats in SQL → the shared finetype-model engine. PARITY-tested vs the
+    bespoke `read_csv_input` on a fixture set covering the cases it currently
+    handles — null-ish filtering (NULL/NA/NaN/None/empty), flexible/ragged
+    rows, delimiter auto-detect, headers — accepting documented improvements
+    where DuckDB's sniffer is genuinely better. Delete `read_csv_input`
+    (`profile_io.rs`) once parity holds.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    (GREEN-only) UNIVERSAL FREE-STATS + SHORT-CIRCUIT. Full-column statistics
+    from the DuckDB scan (count, approx_distinct, min/max) feed the
+    column-statistics rules for EVERY input (CSV/Parquet/DuckDB table); a
+    decisive stat (binary domain, increment signature, cardinality) skips the
+    neural pass. Measure throughput with vs without the short-circuit. Closes
+    the deferred `2026-06-16-column-statistics-lever` ac-05 (short-circuit) and
+    ac-07 (DuckDB free-stats), now universal rather than DuckDB-table-only.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    (GREEN-only) RELEASE HARDENING. Lock the DuckDB pin to the Windows-validated
+    version and add a PERMANENT windows-bundled-build CI gate so a future pin
+    bump cannot silently break the release (per docs/RELEASE.md's bundled-DuckDB
+    guard). Measure + record the shipped binary-size delta.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-05
+  description: |
+    DECISION CLOSE. Flip choice 0099 to `accepted` (green, implementation
+    shipped) or `rejected` (red, option 2 adopted). Update CLAUDE.md
+    (ingestion path) and docs/RELEASE.md. On red, document the failing pin +
+    error and position the extension (`ft_profile(read_csv(...))`) as the
+    large-CSV path; keep the bespoke reader as the lean single-binary baseline.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-06
+  description: |
+    (RED-only) FALLBACK = option 2. No bundling. Keep `read_csv_input` as the
+    zero-dependency single-binary baseline; document the DuckDB extension as the
+    fast/large-CSV path. Spec closes; choice 0099 rejected. (This AC is the
+    explicit no-op branch so a NO-GO has a recorded landing, not silent drift.)
+  gate: false
+  checked: false
+  ac_type: doc
