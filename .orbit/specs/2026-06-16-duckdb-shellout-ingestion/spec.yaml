@@ -67,8 +67,10 @@ acceptance_criteria:
     The DuckDB-side / un-materialised-column path (never pull a huge column into
     Rust) is a SECONDARY memory optimisation deferred to ac-04c, adopted only if
     profiling shows the read dominates.
+    DONE (f1e047d): ColumnScanStats landed at the classify convergence point
+    (column/mod.rs) with parity tests; nothing consumes it (parity held).
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-04b
   description: |
@@ -88,8 +90,21 @@ acceptance_criteria:
     any setting without relocating does NOT get to skip (categorical is the
     expected such case — a known residual attractor; let the study reject it
     cleanly, do not tune it to pass). Run this BEFORE any skip code.
+    DONE (2026-06-17): study complete — scripts/sweep_decisive_stats.py,
+    output/decisive-stat-sweep/{sweep.md,finding.md}. RESULT: NO-GO for the skip.
+    ALL FOUR predicates fail the >=0.98 gold slice-precision pre-condition by a
+    wide margin (categorical 0.33, alphanumeric_id 0.63, increment ~0.13, binary
+    0.00) — each stat's signature is shared by a high-frequency impostor it can't
+    see past (codes/years under categorical; URLs/UUIDs/addresses under alnum;
+    year-ranges/ranks/IDs gold-labelled integer_number under increment;
+    constants + sparse 0/1 integer counts under binary, gold support 0). The
+    binary/increment skips would re-assert the exact labels two shipped
+    gold-validated vetoes EXIST TO STRIP. corpus-honest is moot (nothing clears
+    the first gate). Conservatism answer, from data: tighter than any bare stat
+    can express -> the skip premise fails; the lever survives only as a post-pass
+    rule that keeps the neural vote.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04c
   description: |
@@ -103,8 +118,15 @@ acceptance_criteria:
     headline non-regression + corpus-honest GO (H05, the only relocation detector).
     Record measured throughput with vs without the short-circuit. Closes the
     deferred `2026-06-16-column-statistics-lever` ac-05 (short-circuit).
+    RESOLVED NO-OP (2026-06-17): ac-04b returned NO-GO — no bare full-column-stat
+    predicate clears the >=0.98 gold pre-condition, so NOTHING ships as a skip
+    (the explicit no-op branch this spec's NO-GO philosophy anticipates). The
+    short-circuit speed premise does not survive the data. The column-statistics
+    accuracy lever survives as a POST-PASS recall rule (keeps the neural vote,
+    layers value-shape guards; 0048/0096 pattern) — to be filed as a SEPARATE
+    recall spec, NOT this skip. ac-04a free-stats plumbing feeds it.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-05
   description: |
