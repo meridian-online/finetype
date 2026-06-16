@@ -43,7 +43,6 @@ acceptance_criteria:
     ratio. Deliverable: the stat-extraction interface + documented bound.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-03
   description: |
     FIRST RULE — full-column cardinality disambiguation (the big win). Generalise
@@ -58,7 +57,6 @@ acceptance_criteria:
     class). Named kill switch. Gold per-boundary recall must improve.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     INCREMENT + BINARY rules. increment signature (contiguous range x near-
@@ -68,8 +66,7 @@ acceptance_criteria:
     gold-gated. Honest caveat: gold increment support is thin (n=1) — lean on
     the rare-type scoreboard + corpus-honest gate for the real read.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-05
   description: |
     SHORT-CIRCUIT (the speed win, the analyst's "run less inference"). When a
@@ -80,7 +77,6 @@ acceptance_criteria:
     inference speed (and likely saves it), unlike the encoder bet.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-06
   description: |
     PROMOTION GATES (BLOCKING, H05). The separability in ac-01 is a CEILING on
@@ -106,7 +102,6 @@ acceptance_criteria:
     through the aggregate pass yields the same label.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-08
   description: |
     DECISION MEMO — close the architecture-search loop. Record the session

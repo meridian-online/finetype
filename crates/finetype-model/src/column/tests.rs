@@ -1393,6 +1393,52 @@ fn binary_vocab_veto_is_default_on() {
 }
 
 #[test]
+fn increment_substance_veto_is_default_on() {
+    assert!(!rhh::is_disabled("increment_substance_veto"));
+}
+
+#[test]
+fn values_form_increment_accepts_genuine_auto_increment() {
+    // Contiguous, unique, non-negative run (1..=200) — a real auto-increment.
+    let vals: Vec<String> = (1..=200).map(|i| i.to_string()).collect();
+    assert_eq!(values_form_increment(&vals), Some(true));
+    // Tolerates a few gaps (deleted rows): still ≥80% range fill, ~unique.
+    let gapped: Vec<String> = (1..=200)
+        .filter(|i| i % 10 != 0)
+        .map(|i| i.to_string())
+        .collect();
+    assert_eq!(values_form_increment(&gapped), Some(true));
+}
+
+#[test]
+fn values_form_increment_rejects_evenly_spaced_non_increment() {
+    // Evenly spaced but sparse (100,200,…,5000): low variance in diffs fools the
+    // sample-based sequential check, but distinct/range is tiny → NOT an increment.
+    let spaced: Vec<String> = (1..=50).map(|i| (i * 100).to_string()).collect();
+    assert_eq!(values_form_increment(&spaced), Some(false));
+    // A genuine integer measurement column (duplicated, non-contiguous).
+    let measures: Vec<String> = ["3", "7", "3", "42", "7", "108", "3", "9", "256", "42"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    assert_eq!(values_form_increment(&measures), Some(false));
+}
+
+#[test]
+fn values_form_increment_abstains_on_too_few_or_nonnumeric() {
+    assert_eq!(
+        values_form_increment(&["1".into(), "2".into(), "3".into()]),
+        None
+    );
+    // 0 integers parsed → too few → None (leave label alone).
+    let words: Vec<String> = ["a", "b", "c", "d", "e", "f"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    assert_eq!(values_form_increment(&words), None);
+}
+
+#[test]
 fn checksum_substance_guard_is_default_on() {
     assert!(!rhh::is_disabled("checksum_substance_guard"));
 }

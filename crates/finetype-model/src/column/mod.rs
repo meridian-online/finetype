@@ -305,6 +305,39 @@ fn is_generic_prediction(
 /// Detect the most likely locale for a column by running sample values against
 /// each locale's validation pattern from `validation_by_locale`.
 ///
+/// Full-column auto-increment test for `increment_substance_veto`
+/// (spec 2026-06-16-column-statistics-lever). A genuine `increment` is a
+/// CONTIGUOUS, near-unique run of non-negative integers — `distinct ≈ max−min+1`
+/// (fills its range, almost no gaps) with almost no duplicates. This is a
+/// FULL-COLUMN fact: the value-sharpen sequential check runs on the 100-value
+/// stepped sample, where a true `1..N` run becomes `1, k, 2k, …` (uniform but not
+/// contiguous) and any evenly-spaced numeric column looks sequential, so it
+/// over-emits increment (gold precision 0.056). Returns `Some(true)` for a genuine
+/// increment, `Some(false)` for a plain integer column wearing the label, and
+/// `None` when there are too few integers to judge (caller leaves the label alone).
+fn values_form_increment(values: &[String]) -> Option<bool> {
+    let n_nonempty = values.iter().filter(|v| !v.trim().is_empty()).count();
+    let ints: Vec<i64> = values
+        .iter()
+        .filter_map(|v| v.trim().parse::<i64>().ok())
+        .collect();
+    if ints.len() < 5 {
+        return None;
+    }
+    let all_int = ints.len() as f32 >= 0.95 * n_nonempty.max(1) as f32;
+    let distinct = ints
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    let min = *ints.iter().min().unwrap();
+    let max = *ints.iter().max().unwrap();
+    let span = (max - min + 1) as f64; // cardinality of the integer range
+    let contiguous = span > 0.0 && distinct as f64 / span >= 0.80; // fills its range
+    let near_unique = distinct as f64 / ints.len() as f64 >= 0.90; // ~no duplicates
+    Some(all_int && min >= 0 && distinct >= 5 && contiguous && near_unique)
+}
+
 /// Returns the locale code with the highest pass rate above 50%, or None if
 /// no locale patterns exist or none reach the threshold.
 ///
@@ -2156,7 +2189,7 @@ impl ColumnClassifier {
                 result.disambiguation_rule = Some(rule_name);
             }
 
-            self.sharpen_and_guard(&mut result, header, &sample);
+            self.sharpen_and_guard(&mut result, header, &sample, values);
         }
 
         // Step 6: Post-hoc locale detection.
@@ -2240,7 +2273,7 @@ impl ColumnClassifier {
             }
 
             // Step 5: Header hints (Model2Vec semantic matching)
-            self.sharpen_and_guard(&mut result, header, &sample);
+            self.sharpen_and_guard(&mut result, header, &sample, values);
         }
 
         // Step 6: Post-hoc locale detection
@@ -2338,7 +2371,7 @@ impl ColumnClassifier {
             }
 
             // Step 5: Header hints (Model2Vec semantic matching)
-            self.sharpen_and_guard(&mut result, header, &sample);
+            self.sharpen_and_guard(&mut result, header, &sample, values);
         }
 
         // Step 6: Post-hoc locale detection
@@ -2732,12 +2765,18 @@ impl ColumnClassifier {
     /// `apply_post_sharpen_guards`, which runs here regardless of which hint
     /// branch fired. No-op on an empty header, matching the previous call-site
     /// `!header.is_empty()` guard.
-    fn sharpen_and_guard(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+    fn sharpen_and_guard(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+        values: &[String],
+    ) {
         if header.is_empty() {
             return;
         }
         self.apply_header_sharpen(result, header, sample);
-        self.apply_post_sharpen_guards(result, header, sample);
+        self.apply_post_sharpen_guards(result, header, sample, values);
     }
 
     /// Guards that must fire on the POST-sharpen label — including labels a
@@ -2750,13 +2789,48 @@ impl ColumnClassifier {
         result: &mut ColumnResult,
         header: &str,
         sample: &[String],
+        values: &[String],
     ) {
         self.amount_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
         self.checksum_substance_guard(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
+        self.increment_substance_veto(result, values);
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
+    }
+
+    /// `increment_substance_veto` (default ON). The first full-column-statistics
+    /// rule (spec 2026-06-16-column-statistics-lever). A genuine auto-increment
+    /// (`representation.identifier.increment`) is a CONTIGUOUS, near-unique run
+    /// of non-negative integers — a fact only the full column reveals. The
+    /// `value_sharpen` sequential check runs on the 100-value STEPPED sample,
+    /// where a true 1..N run becomes `1, k, 2k, …` (uniform diffs but not
+    /// contiguous) and any evenly-spaced numeric column looks sequential — so it
+    /// over-emits increment badly (gold precision 0.056: 1 TP, 17 FP, all gold
+    /// `integer_number`). Re-check the FULL column: a real increment fills its
+    /// own range (distinct ≈ max−min+1) with almost no duplicates. Otherwise the
+    /// values are a plain integer column wearing the wrong label — demote to
+    /// `integer_number`. Value-based (decision 0048); demotion-only, so a true
+    /// increment passes through untouched.
+    fn increment_substance_veto(&self, result: &mut ColumnResult, values: &[String]) {
+        if rhh::is_disabled("increment_substance_veto")
+            || result.label != "representation.identifier.increment"
+        {
+            return;
+        }
+        // Only demote on a confident NOT-an-increment verdict; `None` (too few
+        // integers to judge) leaves the label untouched.
+        if values_form_increment(values) != Some(false) {
+            return;
+        }
+        result.label = "representation.numeric.integer_number".to_string();
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("increment_substance_veto".to_string());
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            result.detected_locale = detect_locale_from_validation(values, &result.label, taxonomy);
+        }
     }
 
     /// `binary_vocab_veto` (default ON). `representation.boolean.binary` requires
