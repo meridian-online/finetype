@@ -1,0 +1,22 @@
+computed full-column stats for 751/931 gold columns
+
+support: {'categorical': 62, 'alphanumeric_id': 47, 'ordinal': 0, 'integer_number': 142, 'increment': 1, 'decimal_number': 79, 'latitude': 39, 'longitude': 45}
+
+=== B1  cardinality: categorical (low) vs alphanumeric_id (high) ===
+    card_ratio  alnum>cat                                AUC 0.985  <= separates
+    median card  categorical=0.036  alnum=1.000
+
+=== B2  categorical vs its real FN destinations (cardinality) ===
+    card  alphanumeric_id>cat                            AUC 0.985  <= separates
+    card  entity_name>cat                                AUC 0.887  <= separates
+    card  city>cat                                       AUC 0.776  <= separates
+
+=== B3  integer_number vs increment (increment signature) ===
+    incr_signature  increment>integer                    AUC 0.972  <= separates
+    card_ratio      increment>integer                    AUC 0.944  <= separates
+
+=== B4  coordinates vs decimal (numeric range — positive control) ===
+    max|val| decimal>latitude (lat in +-90)              AUC 0.581
+    max|val| decimal>longitude(lon in +-180)             AUC 0.692
+
+[done]
