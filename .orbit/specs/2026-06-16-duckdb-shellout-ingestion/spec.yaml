@@ -47,17 +47,65 @@ acceptance_criteria:
     keep it as the small-file fast path; record the call.
   gate: false
   checked: true
-- id: ac-04
+- id: ac-04a
   description: |
-    (GREEN-only) UNIVERSAL FREE-STATS + SHORT-CIRCUIT. The full-column stats from
-    the duckdb scan feed the column-statistics rules for EVERY input (CSV /
-    Parquet / DuckDB table); a decisive stat (binary domain, increment signature,
-    cardinality) skips the neural pass. Measure throughput with vs without the
-    short-circuit. Closes the deferred `2026-06-16-column-statistics-lever` ac-05
-    (short-circuit) + ac-07 (free-stats), now universal rather than
-    DuckDB-table-only.
+    (GREEN-only) FREE-STATS PLUMBING — no behaviour change, parity-gated. Compute
+    per-column full-column stats (count, distinct, numeric min/max, all-integer,
+    and the increment signature: contiguous + near-unique non-negative integer
+    run) at the classify convergence point — `classify_column(values)` in the
+    model crate, where EVERY input (CSV / Parquet / JSON / DuckDB table) already
+    holds the full materialised column. Surface them as a typed struct the rule
+    layer / short-circuit can read BEFORE the neural pass. Free: no extra I/O (the
+    column is already in hand), exact (no HLL needed at this scale). Closes the
+    deferred `2026-06-16-column-statistics-lever` ac-07 (free-stats). GATE: parity
+    only — stats computed and surfaced; nothing yet consumes them to change a
+    label. Build FIRST: ac-04b and ac-04c both read these stats; zero gate risk.
+    NOTE (boundary refined during design, 2026-06-17): the skip's PRIMARY win is
+    skipping the NEURAL PASS, not the file read — the read has already happened by
+    the rule layer. So stats are computed in Rust here, NOT via a DuckDB SQL
+    aggregate (a separate SUMMARIZE query would RE-SCAN the file — a double-read).
+    The DuckDB-side / un-materialised-column path (never pull a huge column into
+    Rust) is a SECONDARY memory optimisation deferred to ac-04c, adopted only if
+    profiling shows the read dominates.
   gate: false
   checked: false
+  ac_type: code
+- id: ac-04b
+  description: |
+    (GREEN-only) DECISIVE-STAT SWEEP STUDY — settles the conservatism question by
+    measurement, not by fiat (design: interview.md, 2026-06-17). The short-circuit
+    is a CARVE-OUT: serve the slice of columns where a full-column stat is >=98%
+    precise, fast, skipping the neural pass; neural handles the rest. For each
+    candidate predicate — increment, exact-binary, low-cardinality->categorical,
+    high-cardinality->alphanumeric_id — build the affirmative predicate with a
+    tunable strictness knob and sweep loose->tight. At each setting read four
+    dials: captured-column count, slice precision on gold (over ONLY captured
+    columns), corpus-honest verdict (ac-01 stratified sample), throughput delta.
+    DELIVERABLE: the per-predicate {knob -> captured-count, slice-precision,
+    corpus-honest, throughput} curve. The ship setting for each predicate is the
+    LOOSEST knob position holding slice precision >= 0.98 AND corpus-honest GO AND
+    no whole-corpus gold-headline regression. A predicate that cannot reach 0.98 at
+    any setting without relocating does NOT get to skip (categorical is the
+    expected such case — a known residual attractor; let the study reject it
+    cleanly, do not tune it to pass). Run this BEFORE any skip code.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-04c
+  description: |
+    (GREEN-only) SHIP ELIGIBLE SKIPS. Wire the neural short-circuit for each
+    predicate the study (ac-04b) cleared, at its loosest-safe knob setting. Reuse
+    the shipped affirmative predicates where they exist (`values_form_increment`
+    == Some(true) -> increment; exact-{0,1} domain -> binary — both already
+    demote-validated in column/mod.rs). Conservative only: skip ONLY when decisive,
+    else neural runs (over-eager skip = silent misclassification). Each shipped
+    skip clears its three blocking co-conditions: slice precision >= 0.98 + gold
+    headline non-regression + corpus-honest GO (H05, the only relocation detector).
+    Record measured throughput with vs without the short-circuit. Closes the
+    deferred `2026-06-16-column-statistics-lever` ac-05 (short-circuit).
+  gate: false
+  checked: false
+  ac_type: code
 - id: ac-05
   description: |
     DECISION CLOSE. Flip choice 0100 `accepted` (green, shipped) or `rejected`
