@@ -2,7 +2,7 @@ id: 2026-06-16-column-statistics-lever
 goal: Give the classifier full-column statistics (cardinality, increment signature, binary domain, range) as cheap value-based signals — free from DuckDB column statistics, a single bounded aggregate elsewhere — to recover the residual recall gaps (categorical / alphanumeric_id / increment) the per-value model is structurally blind to; gold + corpus-honest gated, with a short-circuit that REDUCES neural inference.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - recall
 - deterministic-layer
@@ -114,3 +114,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-16T08:04:07.37872Z
