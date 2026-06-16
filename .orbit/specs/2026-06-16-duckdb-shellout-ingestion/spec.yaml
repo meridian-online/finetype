@@ -1,0 +1,83 @@
+id: 2026-06-16-duckdb-shellout-ingestion
+goal: Validate via a no-compile-risk shell-out spike whether the CLI can route CSV/Parquet ingestion through the external duckdb CLI (cross-platform incl Windows duckdb.exe, faster than the csv crate on large files); on green, require duckdb-on-PATH as a hard dependency, consolidate ingestion via shell-out, and universalise the free-stats + short-circuit path; on red, fall back to a prebuilt-libduckdb link or status quo. Per choice 0100 (supersedes 0099's link framing).
+cards:
+- 0007-duckdb-sql-extension
+- 0014-profile-validate-precision
+status: open
+labels:
+- duckdb
+- ingestion
+- spike
+acceptance_criteria:
+- id: ac-01
+  description: |
+    SHELL-OUT SPIKE (gate, BLOCKING) — the deciding experiment of choice 0100,
+    and crucially NO COMPILE RISK (it invokes a binary; it does not link
+    libduckdb, so the Windows/MSVC amalgamation failure that sank 0099 cannot
+    occur). Prototype an ingestion path that invokes the external `duckdb` CLI to
+    read a CSV (and Parquet) and emit, per column, a value sample + full-column
+    stats (`count(*)`, `approx_count_distinct`, `min`, `max`) in one SQL query —
+    mirroring validate's existing shell-out plumbing (validate.rs). Verify it
+    runs on macOS, Linux, and WINDOWS with `duckdb.exe` (a normal CI matrix).
+    Benchmark vs the csv-crate `read_csv_input` on a LARGE csv + a small one (to
+    find the spawn-overhead crossover). GREEN = works on all three OSes AND
+    faster on the large file (+ profile parity vs csv-crate). RED = fall back
+    (ac-06).
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-02
+  description: |
+    (GREEN-only) HARD DEPENDENCY. Declare the `duckdb` CLI a required runtime
+    dependency: add it to the Homebrew formula deps, document it in
+    docs/DEVELOPMENT.md + the README, and give a single clear actionable error
+    when it is absent (validate already has the shape:
+    "could not invoke duckdb CLI (is duckdb on PATH?)"). Formalises a dependency
+    validate's Parquet/materialise paths already effectively have.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    (GREEN-only) CONSOLIDATE INGESTION via shell-out. Route CSV + Parquet
+    profiling through the duckdb CLI: read → per-column sample + full-column
+    stats in one query → the shared finetype-model engine. PARITY vs the
+    csv-crate reader on a fixture set (null-ish filtering, ragged rows, delimiter
+    auto-detect, headers). Decide from the ac-01 small-file crossover whether to
+    DELETE `read_csv_input` entirely (full consolidation, the analyst's goal) or
+    keep it as the small-file fast path; record the call.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    (GREEN-only) UNIVERSAL FREE-STATS + SHORT-CIRCUIT. The full-column stats from
+    the duckdb scan feed the column-statistics rules for EVERY input (CSV /
+    Parquet / DuckDB table); a decisive stat (binary domain, increment signature,
+    cardinality) skips the neural pass. Measure throughput with vs without the
+    short-circuit. Closes the deferred `2026-06-16-column-statistics-lever` ac-05
+    (short-circuit) + ac-07 (free-stats), now universal rather than
+    DuckDB-table-only.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-05
+  description: |
+    DECISION CLOSE. Flip choice 0100 `accepted` (green, shipped) or `rejected`
+    (red). Update CLAUDE.md (ingestion path) + docs/RELEASE.md. Because shell-out
+    adds NO compile dependency, the cross-platform release build is unchanged —
+    note this explicitly (the contrast with 0099). Bank a memory.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-06
+  description: |
+    (RED-only) FALLBACK. If shell-out fails cross-platform or is too slow:
+    consider option 4 (link a PREBUILT libduckdb via DUCKDB_LIB_DIR — the
+    official Windows binaries, NOT the bundled amalgamation that failed 0099) as
+    a separate spike; else stay on 0099 Option 2 (lean csv-crate baseline +
+    extension as the fast path). Record the failing dimension. Explicit no-op
+    branch so a NO-GO lands cleanly.
+  gate: false
+  checked: false
+  ac_type: doc
