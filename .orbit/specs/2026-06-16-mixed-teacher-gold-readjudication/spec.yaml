@@ -1,5 +1,5 @@
 id: 2026-06-16-mixed-teacher-gold-readjudication
-goal: Upgrade the ~589 heuristically-labelled gold columns to VERIFIED labels via a mixed-teacher blind adjudication panel (>=2 model families) — correcting contestable labels, surfacing taxonomy gaps, and giving every contested column a reasoned confidence-banded answer — then re-baseline the honest accuracy ceiling. Append-only with provenance per choice 0095; leakage firewall preserved; panels blind to the FineType model to prevent goalpost-moving.
+goal: Upgrade the ~589 heuristically-labelled gold columns to VERIFIED labels via a blind adjudication panel — model-line-diverse (Opus + Sonnet + Fable, cross-vendor unavailable) and methodologically independent (per-panel value samples + an adversarial challenge pass) — correcting contestable labels, surfacing taxonomy gaps, and giving every contested column a reasoned confidence-banded answer, then re-baseline the honest accuracy ceiling. Append-only with provenance per choice 0095; leakage firewall preserved; panels blind to the FineType model. The anti-goalpost-moving guarantee rests on family-independent controls (negative control, author spot-check, correction model-agree/disagree split), not on panel independence.
 cards:
 - 0019-human-verified-gold-corpus
 status: open
@@ -31,18 +31,32 @@ acceptance_criteria:
   ac_type: doc
 - id: ac-02
   description: |
-    MIXED-TEACHER PANEL — the independence requirement. The determinability
-    probe used 3 Claude panels and found they SHARE PRIORS (agreement partly
-    reflects a common base model). This run mixes ≥2 model FAMILIES: the Claude
-    blind-pass panels (scripts/distill_run.py / the Agent mechanism, ≥2 passes)
-    PLUS the Qwen3:32b Ollama path (scripts/llm_label.py) as a genuinely-
-    independent third family. Each panel emits, per column, {label, confidence
-    [0,1], reasoning, runner_up} over the CURRENT 240-type taxonomy. Build the
-    blind input (header + N sampled values, N≈25) from the source tables,
-    leakage-firewalled. Reuse scripts/gold_lens_prelabel.py + the two-panel
-    adjudication machinery that built the existing `ac-04` tier. DEPENDENCY
-    footgun: the Qwen path needs `ollama serve` running with qwen3:32b pulled —
-    assert availability before the run (the panel is not "mixed-family" without it).
+    PANEL — independence within accessible models. The determinability probe
+    used 3 Claude panels and found they SHARE PRIORS (agreement partly reflects a
+    common base model). The original plan (Qwen3:32b via Ollama as an independent
+    family) is UNAVAILABLE (Ollama retired 2026-06-16), and no non-Anthropic API
+    is currently reachable, so true cross-VENDOR independence is not achievable
+    now. Approximate it two ways:
+      (1) MODEL-LINE / CAPACITY diversity via Agent model overrides — Opus 4.8 +
+          Sonnet 4.6 + Fable 5. Fable is a distinct model LINE (most independent
+          panelist reachable); Sonnet adds a different-capacity vote. EXPLICIT
+          CAVEAT: Sonnet is the SAME family as Opus and does NOT by itself
+          resolve the shared-prior confound — line/capacity diversity reduces it,
+          it does not eliminate it. Do not market this as cross-family.
+      (2) METHODOLOGICAL independence to compensate for the lost vendor diversity:
+          give each panel a DIFFERENT random value-sample from the column
+          (decorrelate the EVIDENCE, not just the model), vary prompt framing,
+          and add one ADVERSARIAL "challenge" pass that must argue the strongest
+          alternative to the emerging consensus.
+    Each panel emits {label, confidence [0,1], reasoning, runner_up} over the
+    current 240-type taxonomy. Blind input (header + N≈25 sampled values) from the
+    source tables, leakage-firewalled. Reuse scripts/gold_lens_prelabel.py.
+    HONEST DOWNWEIGHTING: treat panel agreement as an UPPER BOUND on
+    determinability (shared priors inflate it). The anti-goalpost-moving
+    guarantee therefore rests on the FAMILY-INDEPENDENT controls in ac-04
+    (negative control, author spot-check, correction model-agree/disagree split),
+    NOT on panel independence. If a non-Anthropic API (GPT/Gemini) becomes
+    available, add it as a genuine cross-vendor panel and re-weight.
   gate: false
   checked: false
   ac_type: code
