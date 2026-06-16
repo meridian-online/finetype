@@ -2,6 +2,17 @@
 
 Reference for promoting a new model and cutting a release.
 
+## Runtime dependency: the `duckdb` CLI (choice 0100, v0.6.32)
+
+`profile` and `validate` shell out to the external `duckdb` CLI for all
+CSV/Parquet ingestion, so it is a **hard runtime dependency** (on PATH). The
+Homebrew formula template (`.github/workflows/release.yml`) declares
+`depends_on "duckdb"`. This is a **shell-out, not a link** — the cross-platform
+release build is unchanged (no `libduckdb` compile), so the Windows/MSVC
+amalgamation risk that applies to a `duckdb` *pin bump* (see the binary-release
+pre-flight) does **not** apply to ingestion. Any CI job that runs `profile`/
+`validate` end-to-end must install the `duckdb` CLI (the smoke job does).
+
 ## Promotion flow (new model → release)
 
 After the v0.6.17 release we decoupled CI from the `models/default` symlink (see `.orbit/specs/2026-04-20-ci-decouple-default-symlink/`). The 3-step flow:

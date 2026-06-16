@@ -65,7 +65,7 @@ acceptance_criteria:
     adds NO compile dependency, the cross-platform release build is unchanged —
     note this explicitly (the contrast with 0099). Bank a memory.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-06
   description: |
