@@ -27,7 +27,7 @@ acceptance_criteria:
     determinability-probe-gold-is-the-ceiling) — contested columns were 100%
     determinable, gold contestable on ~49% of the heuristic-tier errors.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |
@@ -58,8 +58,7 @@ acceptance_criteria:
     NOT on panel independence. If a non-Anthropic API (GPT/Gemini) becomes
     available, add it as a genuine cross-vendor panel and re-weight.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-03
   description: |
     CONSENSUS + VERDICT RULES. Per column, combine the panels:
@@ -76,8 +75,7 @@ acceptance_criteria:
     control (ac-04): e.g. ≥3 of the panels agree INCLUDING ≥1 from each family,
     mean confidence ≥ τ. Deliverable: a per-column verdict table.
   gate: false
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-04
   description: |
     INTEGRITY CONTROLS — the proof this is not goalpost-moving toward the model.
@@ -93,7 +91,7 @@ acceptance_criteria:
     (iv) AUTHOR SPOT-CHECK gate: a sample of proposed corrections is author-
     reviewed before any land (mirrors the 40/40 author-accepted pattern).
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-05
   description: |
@@ -107,7 +105,7 @@ acceptance_criteria:
     separate, firewall-preserving mining step. BLOCKING: zero leakage
     regression; negative-control churn within the ac-04 bound.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-06
   description: |
@@ -121,7 +119,7 @@ acceptance_criteria:
     headline (excludes the genuinely-contested residue, which carries a
     confidence-banded answer instead).
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-07
   description: |
@@ -135,5 +133,5 @@ acceptance_criteria:
     did mixed-teacher re-adjudication raise the honest ceiling, and by how much,
     attributed? Update card 0019 + memories.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
