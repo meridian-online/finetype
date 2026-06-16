@@ -3043,7 +3043,12 @@ impl ColumnClassifier {
     /// would trade one error for another. Measured on gold: 5 columns
     /// (country_code_filter=MT, exchange_country=HK, PA, id=AU/AT/…, Country)
     /// emitted as `region`/`country`.
-    fn country_code_corroboration(&self, result: &mut ColumnResult, _header: &str, sample: &[String]) {
+    fn country_code_corroboration(
+        &self,
+        result: &mut ColumnResult,
+        _header: &str,
+        sample: &[String],
+    ) {
         if rhh::is_disabled("country_code_corroboration") {
             return;
         }

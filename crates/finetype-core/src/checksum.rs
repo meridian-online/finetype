@@ -227,7 +227,7 @@ mod tests {
         // checksum (021000021 with the last digit bumped).
         assert!(!aba("021000022"));
         assert!(!aba("123456789")); // arbitrary 9-digit
-        assert!(!aba("02100002"));  // 8 digits
+        assert!(!aba("02100002")); // 8 digits
         assert!(!aba("0210000210")); // 10 digits
         assert!(!aba("-021000021")); // signed
         assert!(!aba("02100002X")); // non-digit
