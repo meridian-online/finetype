@@ -1,0 +1,25 @@
+# 24 deferred re-adjudication proposals (not applied to gold v2)
+g0072	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, large near-unique numeric ids stored as floats (.0)
+g0074	Story	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Story, large numeric ids as floats
+g0075	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0076	Story	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Story, numeric ids as floats
+g0077	Story	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Story, numeric ids as floats
+g0078	Story	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Story, numeric ids as floats
+g0079	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0156	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0157	Story	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Story, numeric ids as floats
+g0158	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0159	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0162	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0164	Story	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Story, numeric ids as floats
+g0165	Parent	decimal_number -> alphanumeric_id	conf=0.73	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0073	Parent	decimal_number -> alphanumeric_id	conf=0.72	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header Parent, numeric ids as floats
+g0224	job__	integer_number -> alphanumeric_id	conf=0.82	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header job__, near-unique 9-digit job ids
+g0103	idPedido	integer_number -> alphanumeric_id	conf=0.78	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header idPedido, large near-unique numeric order ids
+g0142	itemid	integer_number -> alphanumeric_id	conf=0.77	votes=['alphanumeric_id', 'alphanumeric_id', 'alphanumeric_id']	adv=alphanumeric_id	reason=Header itemid, near-unique numeric ids
+g0060	name	plain_text -> categorical	conf=0.72	votes=['categorical', 'categorical', 'plain_text']	adv=categorical	reason=Header name, short repeating room/event tokens (game state labels)
+g0137	TLD	top_level_domain -> categorical	conf=0.88	votes=['top_level_domain', 'categorical', 'categorical']	adv=categorical	reason=Header TLD, com/net/org/co.uk domain suffixes
+g0138	tld	top_level_domain -> categorical	conf=0.88	votes=['top_level_domain', 'categorical', 'categorical']	adv=categorical	reason=Header tld, dotted TLDs .ar/.by etc
+g0139	TLD	top_level_domain -> categorical	conf=0.88	votes=['top_level_domain', 'categorical', 'categorical']	adv=categorical	reason=Header TLD, com/net/org suffixes
+g0254	TLD	top_level_domain -> categorical	conf=0.88	votes=['top_level_domain', 'categorical', 'categorical']	adv=categorical	reason=Header TLD, domain suffixes me/gov/watch/microsoft
+g0255	IDN_TLD	top_level_domain -> categorical	conf=0.88	votes=['top_level_domain', 'categorical', 'categorical']	adv=categorical	reason=Header IDN_TLD, same TLD suffix vocabulary
