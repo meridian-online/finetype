@@ -1,3 +1,17 @@
+> **CORRECTION (2026-06-16, before any new run): the hierarchical head was ALREADY
+> TRAINED and FALSIFIED.** I recommended a training run from the error-decomposition
+> ceiling below without first checking for prior art — that was a miss. The experiment
+> exists: `output/mining-factory/coord-only/ac06_hierarchical_verdict.md` (choice 0097
+> research arm, 2026-06-13). On identical data, the hierarchical head scored gold **0.685
+> vs the flat head's 0.718** (−3.3pp), Sense drift NO-GO, corpus-honest gate NO-GO (8 vs
+> 7), and `numeric_code` collapsed HARDER (3% kept vs 18%). Crucially it *created* NEW
+> cross-domain instability (`calver` 8.2×, `docker_ref`) — the opposite of the cross-domain
+> fix the ceiling below predicted. Mechanism: "splitting the OUTPUT head does not fix
+> interference that originates in the SHARED REPRESENTATION; it adds interference surface."
+> The +12.2% ceiling below is a real PROPERTY of the errors but is UNREACHABLE by a head
+> split — the probe mis-located the fix. **No new hierarchical run launched.** See memory
+> hierarchical-head-falsified.
+
 # Layer-2 probe — hierarchical Domain→Family→Type head: a REAL recall bet
 
 **Date:** 2026-06-16 · `scripts/probe_hierarchical_head.py` · raw: `ac06_hierarchical_head_probe_output.txt`
