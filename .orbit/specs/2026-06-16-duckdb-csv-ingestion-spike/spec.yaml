@@ -3,7 +3,7 @@ goal: Validate via a Windows bundled-DuckDB build spike whether the CLI can disp
 cards:
 - 0007-duckdb-sql-extension
 - 0014-profile-validate-precision
-status: open
+status: closed
 labels:
 - duckdb
 - ingestion
@@ -79,3 +79,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-16T09:39:59.416368Z
