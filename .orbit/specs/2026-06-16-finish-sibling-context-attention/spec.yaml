@@ -2,7 +2,7 @@ id: 2026-06-16-finish-sibling-context-attention
 goal: 'Finish the stranded #1 architecture enhancement: train sibling-context (cross-column) attention into the production fine-grained Sense model and ship it as a gated PATCH, recovering the column-level-ambiguous boundaries (coordinate, currency, tight-code) that the context-free flat v19 and deterministic guards provably cannot — efficacy probed before the build, gated against v19 before the swap.'
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - recall
 - architecture
@@ -116,3 +116,4 @@ acceptance_criteria:
   gate: false
   checked: false
   ac_type: doc
+closed_at: 2026-06-16T02:30:32.016782Z
