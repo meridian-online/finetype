@@ -1,0 +1,66 @@
+id: 2026-06-16-cli-mcp-surface-parity
+goal: Bring the MCP server's tool surface back into parity with the CLI's capability surface (choice 0101). Fold the stale MCP `schema` tool (mirror the CLI's choice-0070 fold), retire the MCP `ddl` tool (parity DOWN — the CLI has no DDL command and will not gain one), and add a parity-guard test so the two surfaces cannot silently drift again. Preserve the intentional `generate` asymmetry (card 0010).
+cards:
+- 0008-mcp-server
+- 0006-command-line-interface
+status: open
+labels:
+- mcp
+- cli
+- parity
+acceptance_criteria:
+- id: ac-01
+  description: |
+    FOLD schema type-mode INTO the MCP taxonomy tool. Add a `json-schema` output
+    to the MCP `taxonomy` tool that emits a per-type JSON Schema via the existing
+    `finetype_mcp::json_schema::emit_type_schema()` helper — the same helper the
+    retired `schema` tool's type-key branch called and that CLI
+    `taxonomy KEY -o json-schema` calls. After this AC the type-mode capability
+    of the `schema` tool is reachable through `taxonomy`, exactly as on the CLI.
+    Table-mode needs NO work — it is already covered by the MCP `profile` tool's
+    `format: "json-schema"`. Test: a taxonomy call with the new output returns a
+    valid Draft-2020-12 type schema identical to what `schema` returned.
+  gate: false
+  ac_type: code
+- id: ac-02
+  description: |
+    REMOVE the MCP `schema` tool. Delete the `#[tool]` method in lib.rs and
+    `tools/schema.rs`; drop `pub mod schema`. Verify nothing else references it
+    (`cargo build -p finetype-mcp`, ripgrep `schema::handle`). This completes
+    choice 0070 on the MCP side — the carve-out schema.rs itself flagged for "the
+    v0.6.20 audit". Depends on ac-01 (type-mode must land in taxonomy first).
+  gate: false
+  ac_type: code
+- id: ac-03
+  description: |
+    RETIRE the MCP `ddl` tool (parity DOWN, author's explicit call). Delete the
+    `#[tool] async fn ddl` method in lib.rs and `tools/ddl.rs`; drop
+    `pub mod ddl`. The CLI has no DDL command and will not grow one — the
+    typed-table surface is `validate --db/--table` (materialise). Verify the
+    build is clean and no resource/doc references dangle.
+  gate: false
+  ac_type: code
+- id: ac-04
+  description: |
+    PARITY GUARD TEST. Add a test (in finetype-mcp) that instantiates the server,
+    reads its registered tool-name set, and asserts it equals a single
+    in-source MANIFEST. Each manifest entry annotates the MCP tool as either
+    "mirrors CLI command X" or "intentional MCP-public of hidden CLI command X
+    (card ref)". Post-this-spec the manifest is exactly
+    {infer, taxonomy, validate, profile, generate} — generate carrying the
+    card-0010 asymmetry note. A new MCP tool, or a renamed/removed one, fails the
+    test until the manifest (and thus the parity decision) is updated. This is the
+    durable anti-drift mechanism of choice 0101.
+  gate: false
+  ac_type: code
+- id: ac-05
+  description: |
+    UPDATE the surface docs + close the decision. Card 0008: drop "8 tools" to
+    the parity set and remove the schema/ddl scenarios; README + any MCP tool
+    listing: reflect the removed tools and the taxonomy json-schema output;
+    CLAUDE.md if it names the MCP tool count. Confirm choice 0101 `accepted`
+    (already set on authoring) and note the fold/retire as shipped. Bank a memory
+    capturing the MCP⊆CLI parity rule + the guard's location so future tool
+    additions reach for it.
+  gate: false
+  ac_type: doc
