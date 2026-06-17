@@ -93,10 +93,22 @@ acceptance_criteria:
     set; reframed gold 0.800 (no regression, was 0.797); legacy gold recovered 0.743->0.796
     (model now emits word matching migrated truth — phantom dip gone, coherent under both
     scorers); cargo test green (cli_golden status/Embarked/job_title -> word, veto fallback
-    test -> word). REMAINING: the BLOCKING corpus-honest gate (candidate pass on the 33,250-file
-    ac-01 stratified sample vs the v19 gated oracle) — must run GO before the next binary release.
+    test -> word). CORPUS-HONEST GATE: GO (ac03-corpus-honest-gate.md). Run 1 (vs stale
+    default v19_gated baseline) NO-GO on categorical+isbn — both stale-baseline artifacts
+    (the candidate is 0.6.33, baseline ~0.6.19, so it scored 7 months of fixes as the reframe;
+    isbn is logically untouchable by a categorical->word remap). ISOLATED run (reframe-OFF
+    0.6.33 baseline via the kill switch vs reframe-ON) cleared isbn -> proving it, leaving only
+    categorical collapse, which was a referee-vocabulary mismatch (the gated-YDF oracle still
+    emits the abolished label `categorical`; judging word vs categorical on the columns the
+    reframe defines as equivalent is a tautological contradiction). FIX: corpus_honest_gate.py
+    `--label-remap OLD=NEW` reads the oracle in the candidate's vocabulary; default-empty ->
+    identity so the four-verdict regression is preserved (re-confirmed v19self GO, latdec NO-GO
+    on the passes still on disk; v22/v23 parquets cleaned but guaranteed unchanged — no-remap SQL
+    is byte-identical). Isolated + remap -> GO, zero triggers. The relocation is oracle-clean:
+    categorical -25,128 confirmed -> word +25,128 at correct_ratio 1.0, no surviving created FPs.
+    Behind kill switch; safe for the next binary release.
   gate: true
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     NORTH-STAR HANDOFF (observation, defers). With the categorical attractor removed, file

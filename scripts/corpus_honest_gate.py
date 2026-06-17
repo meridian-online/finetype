@@ -85,7 +85,8 @@ def _split_csv(line: str) -> list[str]:
     return [c.strip().strip('"') for c in line.split(",")]
 
 
-def transition_counts(baseline: Path, candidate: Path, sample: Path) -> list[tuple]:
+def transition_counts(baseline: Path, candidate: Path, sample: Path,
+                      remap: dict | None = None) -> list[tuple]:
     """Rows of (s19, scand, oracle_dst, oracle_src, cnt) on the sample.
 
     The oracle is the baseline's gated YDF. We classify it against BOTH ends of
@@ -102,6 +103,22 @@ def transition_counts(baseline: Path, candidate: Path, sample: Path) -> list[tup
     the gate counts every demote-to-unknown as oracle_fp and every correct-FP
     removal as a collapse — punishing the Precision Principle it exists to serve.
     """
+    # Oracle in the CANDIDATE's vocabulary. The gated YDF speaks a FIXED label
+    # space; when a candidate retires/renames a label (e.g. the enum reframe
+    # abolishes `representation.discrete.categorical` -> `representation.text.word`,
+    # spec 2026-06-17-enum-accuracy-reframe), the oracle's old-label verdicts must be
+    # translated or every retired-label column reads as a tautological "contradiction"
+    # (oracle says the abolished label, candidate says its successor) and the collapse
+    # band false-alarms. `--label-remap OLD=NEW` applies the SAME remap to the oracle
+    # `y` so the referee judges in the candidate's vocabulary. DEFAULT EMPTY -> identity:
+    # every other candidate (the four-verdict regression) is byte-identical. Safe: it
+    # only neutralises the remapped label; a genuine misclassification (oracle says
+    # `city`, candidate says `word`) is NOT remapped and still trips oracle_fp.
+    y_expr = "b.y"
+    for old, new in (remap or {}).items():
+        oo = old.replace("'", "''")
+        nn = new.replace("'", "''")
+        y_expr = f"CASE WHEN {y_expr} = '{oo}' THEN '{nn}' ELSE {y_expr} END"
     sql = f"""
 WITH samp AS (SELECT column0 AS file_path
               FROM read_csv('{sample.as_posix()}', header=false)),
@@ -113,10 +130,10 @@ c AS (SELECT file_path, column_name, sense_prediction s
       WHERE file_path IN (SELECT file_path FROM samp)),
 j AS (SELECT b.s AS s19, c.s AS scand,
              CASE WHEN b.y IS NULL THEN 'silent'
-                  WHEN b.y = c.s THEN 'agree'
+                  WHEN ({y_expr}) = c.s THEN 'agree'
                   ELSE 'contradict' END AS oracle_dst,
              CASE WHEN b.y IS NULL THEN 'silent'
-                  WHEN b.y = b.s THEN 'agree'
+                  WHEN ({y_expr}) = b.s THEN 'agree'
                   ELSE 'contradict' END AS oracle_src
       FROM b JOIN c USING(file_path, column_name))
 SELECT s19, scand, oracle_dst, oracle_src, COUNT(*) cnt FROM j GROUP BY 1,2,3,4;
@@ -129,6 +146,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
     ap.add_argument("--candidate", type=Path, required=True)
+    ap.add_argument("--label-remap", action="append", metavar="OLD=NEW",
+                    help="Remap an oracle label before judging, so the referee speaks the "
+                         "candidate's vocabulary when the candidate retires/renames a label "
+                         "(e.g. representation.discrete.categorical=representation.text.word for "
+                         "the enum reframe). Repeatable. Default none -> identity (every other "
+                         "candidate is byte-identical; preserves the four-verdict regression).")
     ap.add_argument("--sample", type=Path, default=DEFAULT_SAMPLE)
     ap.add_argument("--resolution", type=Path, default=DEFAULT_RES)
     ap.add_argument("--label", default="candidate", help="name for the report")
@@ -156,10 +179,18 @@ def main() -> int:
                     default=REPO / "output/corpus-honest-gate")
     args = ap.parse_args()
 
+    remap = {}
+    for pair in (args.label_remap or []):
+        old, _, new = pair.partition("=")
+        if not old or not new:
+            print(f"error: --label-remap expects OLD=NEW, got {pair!r}", file=sys.stderr)
+            return 2
+        remap[old] = new
+
     res = json.load(open(args.resolution))
     corpus_full = {x["label"]: x["full_cols"] for x in res["per_label"]}
 
-    trans = transition_counts(args.baseline, args.candidate, args.sample)
+    trans = transition_counts(args.baseline, args.candidate, args.sample, remap)
 
     # sample rate per v19 source label A = observed sample cols(A) / corpus cols(A)
     sample_src = {}
@@ -253,6 +284,7 @@ def main() -> int:
     report = {
         "label": args.label, "verdict": verdict,
         "candidate": args.candidate.as_posix(),
+        "oracle_label_remap": remap or None,
         "bands": {"rel_mult": args.rel_mult, "collapse_frac": args.collapse_frac,
                   "collapse_correct_floor": args.collapse_correct_floor,
                   "oracle_fp_ratio": args.oracle_fp_ratio,
