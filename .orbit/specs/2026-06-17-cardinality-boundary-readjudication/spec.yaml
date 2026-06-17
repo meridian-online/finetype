@@ -2,7 +2,7 @@ id: 2026-06-17-cardinality-boundary-readjudication
 goal: Re-adjudicate the ~239 categorical-boundary gold columns with TRUE full-column cardinality shown to the adjudicator (the repetition signal absent from gold's original 8-25-value labelling), so ground truth at the categorical-vs-specific boundary reflects real structure — then re-measure whether the model's boundary errors are real or gold-label artifacts.
 cards:
 - 0019-human-verified-gold-corpus
-status: open
+status: closed
 labels:
 - gold
 - readjudication
@@ -71,7 +71,6 @@ acceptance_criteria:
     ALL PASS (membership unchanged).
   gate: false
   checked: true
-  ac_type: code
 - id: ac-03
   description: |
     RE-MEASURE on the cleaned gold (scripts/score_gold_anchor.py, same 8-value
@@ -115,3 +114,11 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+memories_considered:
+- key: cardinality-boundary-error-is-real
+  disposition: adopted
+  reason: the verdict this spec produced — boundary error is real, gold cleanup doesn't move it.
+- key: categorical-is-a-residual-category
+  disposition: adopted
+  reason: explains why more rows make the model over-emit categorical, not better at it.
+closed_at: 2026-06-17T03:08:46.363018Z

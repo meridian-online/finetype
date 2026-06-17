@@ -35,6 +35,7 @@ specs:
 - .orbit/specs/2026-06-10-human-verified-gold-corpus/spec.yaml
 - .orbit/specs/2026-06-10-fossil-cleanup/spec.yaml
 - .orbit/specs/2026-06-16-mixed-teacher-gold-readjudication/spec.yaml
+- .orbit/specs/2026-06-17-cardinality-boundary-readjudication/spec.yaml
 relations:
 - card: 0014-profile-validate-precision
   type: feeds
