@@ -19,8 +19,11 @@ acceptance_criteria:
     against. The 2026-06-12 reports are stale (pre-re-adjudication); do NOT design
     against them. This is the baseline both studies (ac-01/02) and the gate (ac-03)
     compare to.
+    DONE (2026-06-17, output/categorical-alnum-recall/): headline 0.789 (731/927).
+    categorical P=0.870 R=0.443 (59 FN); alphanumeric_id P=0.952 R=0.678 (19 FN).
+    Far healthier than the stale 06-12 snapshot — high precision, real recall gap.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-01
   description: |
@@ -40,8 +43,18 @@ acceptance_criteria:
     the distinct-count / cardinality-ratio knob. HONEST PRIOR: headroom is expected
     NARROW (the label set cannot grow); let the study say whether it clears
     recall-up-at-held-precision or is a NO-GO. Run BEFORE any code.
+    DONE (2026-06-17, scripts/study_recall_rule.py, finding_studies.md): SHIP
+    CANDIDATE = upgrade text_vocab_override to FULL-COLUMN stats on `word` (+4
+    recall, R 0.443->0.481, P held 0.864, 0 correct broken); optionally +ordinal
+    (+9, R->0.528, P held). CRITICAL: broadening to entity_name+plain_text recovers
+    16 (R->0.594) at apparently-held gold precision with 0 broke — but that is the
+    EXACT move corpus-honest killed at scale (3,752+2,115 oracle-refuted); gold has
+    only 12+21 such cols, too few to see the relocation. Gold-GO here is a MIRAGE —
+    the canonical proof gold is necessary-not-sufficient; the gate (ac-04) must
+    adjudicate. Ship word (+optionally ordinal) THROUGH the gate; do NOT ship
+    entity/plain.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-02
   description: |
@@ -58,8 +71,15 @@ acceptance_criteria:
     precision CI lower bound is NOT below the ac-00 baseline alnum precision. The
     ac-04b sweep put the compounded ceiling near ~0.82 on gold — a recall rule, not
     a 98% assertion. Run BEFORE any code.
+    DONE (2026-06-17, scripts/study_recall_rule.py, finding_studies.md): NO-GO.
+    The alnum FN concentrate on `unknown` (7) + `url` (4), but a full-column shape
+    override cannot recover them cleanly: `unknown`->alnum fires on ZERO columns
+    (unknowns lack the alpha+digit shape); adding `url` fires on 20 and BREAKS 18
+    correct URL predictions to recover 2 — precision collapses 0.952->0.68. Alnum's
+    defining shape (high-card alpha+digit) is shared by real URLs (the ac-04b
+    contaminant). No clean stat recall rule for alnum. ac-03 ships NOTHING for alnum.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-03
   description: |
