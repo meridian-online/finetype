@@ -87,3 +87,50 @@ is the only instrument that can see the relocation gold cannot.
 - The categorical word/ordinal candidates' real verdict is the corpus-honest
   gate, not these gold deltas. Gold is necessary, not sufficient — this study is
   itself the proof.
+
+---
+
+## ac-03/04 ADDENDUM — the categorical fix is a NO-GO (full-file verification)
+
+Implemented the `word` full-column upgrade, then verified it on the **actual full
+files** (not the truncated-sample harness). It recovers **nothing real**:
+
+- `Type` (one winner): on the full file the model ALREADY returns `categorical`
+  with no rule — correct without any fix. The baseline called it `word` only
+  because the harness fed it a **1-value** truncated sample.
+- `Unnamed: 4` (other winner): on the full file it is `top_level_domain` — not
+  `word`, so the override never applies.
+
+**Why the +2 was spurious — a measurement confound.** The study joined baseline
+predictions from the *truncated-sample* harness (some columns have `n=1` stored
+samples) with full-column stats from disk — a pairing that occurs in neither
+production (full files → different predictions) nor the harness (truncated → fix
+inert).
+
+**Why the upgrade is worthless even in principle.** `text_vocab_override` fires
+when distinct ∈ [2,12] and distinct/n ≤ 0.6. Sample distinct ≤ full distinct
+always (subset), and a proper 100-value sample of a low-cardinality column gives
+ratio ≤ 12/100 = 0.12 — so the **sample-based rule already fires whenever the
+full-column version would**. The only exception is a degenerate `n=1` sample,
+which is the harness artifact, not production. Code reverted.
+
+## The finding that actually matters
+
+The gold eval harness feeds the binary `sample_values_truncated`, and some columns
+have **degenerate `n=1` samples**. This (a) pessimistically misclassifies columns
+the model gets right on full data (`Type`→categorical), so part of the categorical
+"recall gap" is a harness artifact not a model deficiency; and (b) makes any
+full-column-statistic study invalid, because the baseline predictions and the
+stats come from different value sets. **Full-column-stat Sharpen fixes cannot be
+studied on the truncated-sample harness.**
+
+## Net verdict for the spec
+
+- alphanumeric_id: NO-GO (url-contaminated shape).
+- categorical: NO-GO (full-column upgrade redundant with proper sampling; apparent
+  gap partly a harness artifact).
+- **The column-statistics lever ships nothing** — neither as a skip (ac-04b) nor
+  as a recall rule. ColumnScanStats (ac-04a) remains as tested plumbing with no
+  current consumer.
+- Real follow-up: the truncated-sample harness (n=1 columns) — fix the eval to
+  feed proper samples before trusting low-sample gold verdicts.

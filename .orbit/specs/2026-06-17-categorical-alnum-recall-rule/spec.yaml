@@ -92,8 +92,18 @@ acceptance_criteria:
     per the deterministic-layer audit (decision 0096). A study that returned NO-GO
     ships NOTHING for that type (explicit no-op; the categorical side may be a no-op
     if ac-01 finds no held-precision gain).
+    RESOLVED NO-OP (2026-06-17): implemented the `word` full-column upgrade, then
+    verified on the ACTUAL full files — it recovers nothing real. `Type` is ALREADY
+    categorical on full data (baseline called it `word` from a 1-value truncated
+    sample); `Unnamed: 4` is top_level_domain. The ac-01 +2 was a CONFOUND (truncated
+    baseline preds joined with full-file stats). And it is redundant in principle:
+    text_vocab_override fires at distinct in [2,12] & ratio<=0.6, sample distinct <=
+    full distinct always, and a 100-sample of a low-card column gives ratio <=0.12 —
+    so the sample rule already fires whenever the full-column version would, except
+    on degenerate n=1 samples (the harness artifact, not production). Code REVERTED.
+    Both types NO-GO. ColumnScanStats (ac-04a) stays as tested plumbing, no consumer.
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-04
   description: |
@@ -105,8 +115,12 @@ acceptance_criteria:
     relocation detector, and the instrument that killed the broad categorical
     trigger). A NO-GO on any rule blocks that rule (it does not ship); the others
     may still ship. Record the four dials per shipped rule.
+    N/A (2026-06-17): nothing reached the gate — both types returned NO-GO at the
+    study/implementation stage (ac-02 url-contaminated; ac-03 confound + redundant).
+    No candidate to adjudicate. The gate was never the binding constraint here; the
+    truncated-sample harness was.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-05
   description: |
@@ -115,6 +129,13 @@ acceptance_criteria:
     Update CHANGELOG.md + the CLAUDE.md sprint state with the new gold headline.
     Bank a memory recording which full-column-stat recall rules cleared and which
     did not, linking decisive-stat-skip-is-no-go and categorical-is-a-residual-category.
+    DONE (2026-06-17): VERDICT — the column-statistics lever ships NOTHING, neither
+    as a skip (ac-04b) nor a recall rule (ac-02/03). alnum url-contaminated;
+    categorical full-column upgrade redundant with proper sampling. Headline stays
+    0.789/v19; no model/code change. Memory banked: full-column-stat-sharpen-is-redundant.
+    SEPARATE follow-up (filed): the gold harness's degenerate n=1 truncated samples
+    pessimistically misclassify columns the model gets right on full data and
+    confound full-column studies — fix the eval before trusting low-sample verdicts.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
