@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.34] - 2026-06-17
+
+Enum reframe: `representation.discrete.categorical` is retired as an emitted label.
+Bounded-domain columns now report their real representation type, with bounded-ness
+carried by the descriptive `x-finetype-enum` property shipped in 0.6.33 — completing
+choice 0102 ("categorical is a property, not a type").
+
+### Removed
+
+- **`representation.discrete.categorical` is no longer emitted** (spec
+  `2026-06-17-enum-accuracy-reframe`, choice 0102 deferred scope). It was the single
+  biggest production error mass and, as a flat-softmax residual attractor, the cause
+  of past retrain explosions (decision 0096). Re-adjudication of the gold categorical
+  columns confirmed 71 of 73 have no tighter semantic type — they are genuinely
+  bounded vocabularies (exchange codes, status flags, content tags), not a distinct
+  data type.
+
+### Changed
+
+- Columns that previously profiled as `categorical` now report their honest
+  representation type — `representation.text.word` for short single-token
+  vocabularies, `representation.text.plain_text` for phrase-shaped ones — alongside
+  the `x-finetype-enum` bounded-domain flag. Implemented as an output-boundary remap
+  in the Sharpen layer (`finalize_is_generic`, validation veto-fallback); the Sense
+  model is unchanged. Gold corpus headline is unaffected (reframe scorer 0.800), and
+  the corpus-honest gate is GO (the relocation is oracle-clean: categorical shed
+  −25,128 oracle-confirmed columns, `text.word` gained them at correct_ratio 1.0).
+
 ## [0.6.33] - 2026-06-17
 
 Enum-domain emission: `profile` now reports each column's observed bounded value
