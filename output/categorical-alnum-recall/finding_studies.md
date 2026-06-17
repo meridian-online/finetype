@@ -134,3 +134,30 @@ studied on the truncated-sample harness.**
   current consumer.
 - Real follow-up: the truncated-sample harness (n=1 columns) — fix the eval to
   feed proper samples before trusting low-sample gold verdicts.
+
+---
+
+## CORRECTION (2026-06-17) — the "n=1 harness" finding was wrong
+
+The addendum above claimed the gold harness feeds degenerate `n=1` truncated
+samples. **That was a separator bug in my analysis** — I split
+`sample_values_truncated` on `\x1f` instead of the real `SEP = "│"`
+(score_gold_anchor.py:50), so every multi-value sample collapsed to one element.
+
+Corrected facts:
+- Stored samples are **~8 representative values** (median 8, max 8), not 1.
+- Gold was adjudicated from those samples (the `sense_context`/`ydf_context`
+  fields), so the eval is **internally consistent** — the harness is the right
+  instrument.
+- Re-baselining by reading larger source samples (`scripts/predict_from_source.py`,
+  cap 5000) made accuracy **WORSE: 0.785 → 0.707** (84 columns right→wrong,
+  e.g. `msg_id` alphanumeric_id→h3). Feeding the model more data than the
+  labeller saw breaks consistency with gold.
+
+**The "fix the harness / understates accuracy" claim is RETRACTED.** The harness
+is not broken. Headline of record stands at 0.800 (745/931); a fresh re-run
+measures ~0.785 (4 columns fail to load + variance), same instrument.
+
+What survives unchanged: the column-statistics lever ships nothing (alnum
+url-contaminated; categorical upgrade redundant — full-file profiling confirmed
+the 2 'winners' classify correctly without any fix).
