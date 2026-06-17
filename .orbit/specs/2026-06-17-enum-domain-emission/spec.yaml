@@ -28,8 +28,20 @@ acceptance_criteria:
     the gold signal. Ship the loosest setting holding high enum precision. Note:
     NO enum ground truth exists, so this calibrates the predicate's separation, not
     an accuracy number — state the limit (per the 2026-06-17 over-read discipline).
+    DONE (2026-06-17, scripts/enum_predicate_study.py, finding.md): SETTLED
+    predicate = `distinct <= 32` AND `distinct/rows <= 0.5` AND broad-type NOT in
+    {numeric, datetime, identifier, url} (the denylist). The denylist is
+    load-bearing — without it cardinality+ratio fires on ~190/476 numeric/id
+    columns (cohesion cannot reject them: numbers are shape-cohesive). KEY FINDING:
+    char-shape COHESION as a GATE is net-negative — ablation: coh>=0.7 costs 12 ENUM
+    positives to reject 3 open-text; `ratio` already rejects heterogeneous
+    open-text, and surviving small open-text is shape-indistinguishable from a
+    designed enum. So cohesion ships as an EMITTED SCORE (analyst signal), NOT a
+    gate. Semantic cohesion (Model2Vec) is the untested open question, deferred.
+    Over-emission is low-harm (descriptive output) so the predicate is
+    useful-not-perfect.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-01
   description: |
@@ -38,9 +50,10 @@ acceptance_criteria:
     profile.rs) and the MCP/extension (`json_schema.rs:attach_stats`) call — the
     MCP shadows the CLI, it is NOT a separate feature set (author). Consume
     `ColumnScanStats` (column/mod.rs, f1e047d) for true full-column distinct/rows +
-    a new cohesion fn — this is ac-04a's first real consumer. Replace the CLI
-    LABEL gate and the MCP CARDINALITY-ONLY path with the unified structural+cohesion
-    predicate. Kill-switchable (rhh).
+    a cohesion fn (EMITTED as a score, not gated — ac-00). The GATE predicate is
+    cardinality (distinct <= 32) + ratio (<= 0.5) + broad-type denylist {numeric,
+    datetime, identifier, url}. Replace the CLI LABEL gate and the MCP
+    CARDINALITY-ONLY path with this one unified predicate. Kill-switchable (rhh).
   gate: false
   checked: false
   ac_type: code
