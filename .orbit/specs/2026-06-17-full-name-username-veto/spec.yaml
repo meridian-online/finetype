@@ -37,7 +37,7 @@ acceptance_criteria:
     `full_name_username_veto`). Unit tests: handle column -> username; "First Last" name
     column -> stays full_name; mixed `authors` lists -> stays full_name.
   gate: false
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     GOLD GATE (observation, BLOCKING via no-regression). Score the candidate with
