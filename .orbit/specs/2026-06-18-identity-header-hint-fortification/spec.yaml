@@ -1,0 +1,94 @@
+id: 2026-06-18-identity-header-hint-fortification
+goal: Retrain the identity/person family so the learned multi-branch model carries author/login->username and author/name->full_name from header+value context, unblocking removal of the hardcoded identity header hints (decision 0042); gated by the RHH counterfactual ablation (no_hint identity accuracy >=80%) + drift proxy + gold + corpus-honest.
+cards:
+- 0020-honest-production-typing
+status: open
+labels:
+- retrain
+- header-hint-removal
+- identity
+acceptance_criteria:
+- id: ac-00
+  description: |
+    RE-BASELINE THE RHH IDENTITY COUNTERFACTUAL ON THE CURRENT MODEL (observation,
+    BLOCKING). The April-2026 RHH classification (substring_matcher_identity = model-gap,
+    no_hint accuracy 0.000 on 9 hit columns) is stale (measured against v19 pre-0.6.27).
+    Re-run scripts/rhh/ac04_counterfactual.py + ac05_classify.py with the CURRENT model
+    (rhh-instrumentation build) and record: for the identity header-hint families
+    (substring_matcher_identity, and the cross-domain header_hint_* families that target
+    identity.person.*), how many eval columns they fire on, and the learned model's
+    no_hint label accuracy. This is the bet's STARTING POINT and the gate's baseline. STATE
+    the limit: the 448-row manifest is curated/small; the identity hit-count is single
+    digits, so this measures the curated gap, not production breadth.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-01
+  description: |
+    DESIGN THE HARD-NEGATIVE COMPOSITION (doc, BLOCKING). The retrain must teach the
+    learned branches the header+value CONTEXT, not a flat label. Compose, grounded in
+    corpus + generator data:
+    (a) author/login header + handle values (high-cardinality single-token handle charset)
+        -> identity.person.username;
+    (b) author/name header + real-name values (multi-token "First Last") -> full_name
+        (the legitimately-correct case the hardcoded hint currently serves);
+    (c) hard negatives that must NOT become username: single-token HIGH-distinct name
+        columns (country/state/api_name) and low-cardinality vocabularies (the ac-03
+        false-positive classes from spec 2026-06-17-full-name-username-veto).
+    Positives source: finetype generate (synthetic usernames already exist) + corpus-mined
+    Author/login columns. State the over-emission risk: username is already a generic
+    catch-all attractor (HARDCODED_GENERIC_LABELS) — training it harder is the 0-for-5
+    failure mode. DELIVERABLE: composition memo + counts.
+  gate: true
+  checked: false
+  ac_type: doc
+- id: ac-02
+  description: |
+    DESTINATION-DRIFT PROXY PRE-CHECK (observation, BLOCKING — mandatory, CLAUDE.md).
+    Build the candidate FTMB, run scripts/proxy_pretrain.sh (1 seed, ~10 epochs) +
+    scripts/drift_report.py (--abs-floor 0.0040 --rel-mult 3.0 --direction up) on the fixed
+    file list. NO-GO (exit 1) means DO NOT launch the overnight run — username over-emission
+    into neighbours is the specific risk. Record the full-label-space drift verdict.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-03
+  description: |
+    OVERNIGHT RETRAIN (code). On proxy GO, run the overnight multi-branch retrain (3 seeds,
+    additive over the v22 boundary blend + the ac-01 identity hard negatives), via /train.
+    Pick the best seed by val_accuracy. NOT to be launched until ac-02 is GO.
+  gate: false
+  checked: false
+- id: ac-04
+  description: |
+    THE GATE — RHH IDENTITY ABLATION CLEARS 80% ON THE RETRAINED MODEL (observation,
+    BLOCKING). Re-run the ac-00 counterfactual against the retrained model: with
+    substring_matcher_identity (and the identity cross-domain hints) DISABLED, the learned
+    model's no_hint identity accuracy must reach >=80% (the RHH model-covered threshold).
+    THIS is the crisp GO/NO-GO for BOTH the retrain and the subsequent hint removal: if the
+    learned model now carries identity without the hints, the hints are deletable. Also
+    score gold (--reframe, no-regression) + the rare-type scoreboard.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-05
+  description: |
+    CORPUS-HONEST GATE (observation, BLOCKING, H05). ISOLATED same-binary baseline vs
+    candidate over the 33k stratified sample (fix overnight_username_veto_gate.sh to
+    --fill-ydf BOTH passes so the gate's oracle column exists — the gap that blocked spec
+    2026-06-17-full-name-username-veto ac-03). Watch username over-emission and any
+    untargeted-neighbour relocation. NO-GO is blocking.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-06
+  description: |
+    DELETE THE IDENTITY HEADER HINTS + RETIRE THE DETERMINISTIC VETO (code). On ac-04 GO
+    (learned model carries identity without hints), delete substring_matcher_identity's
+    author/full_name/name arms (header_sharpen.rs:376 et al.) per decision 0042, and REVERT
+    the deterministic full_name_username_veto (spec 2026-06-17-full-name-username-veto) —
+    it becomes redundant and was only ever the stopgap for a semantic problem the retrain
+    now owns. Re-run the full suite + corpus-honest gate to confirm no regression from the
+    deletion. CHANGELOG entry; leave for the next /release binary.
+  gate: false
+  checked: false
