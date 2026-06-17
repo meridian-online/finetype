@@ -6191,3 +6191,69 @@ fn ac05_alpha2_regex_rejects_country_names() {
         );
     }
 }
+
+// ── full_name → username value veto (spec 2026-06-17-full-name-username-veto) ──
+
+fn vals(xs: &[&str]) -> Vec<String> {
+    xs.iter().map(|s| s.to_string()).collect()
+}
+
+#[test]
+fn username_veto_fires_on_login_handles() {
+    // Corpus `author` shape: single-token handles, no internal whitespace.
+    let handles = vals(&[
+        "tptacek", "patio11", "rms", "jacquesm", "petercooper", "dfens", "schof",
+    ]);
+    assert!(is_username_handle_shaped(&handles));
+}
+
+#[test]
+fn username_veto_fires_on_handles_with_digits_underscores() {
+    let handles = vals(&["peter123", "dc2k08", "adam_null", "steve19", "mr-justin"]);
+    assert!(is_username_handle_shaped(&handles));
+}
+
+#[test]
+fn username_veto_skips_real_full_names() {
+    // Multi-token "First Last" → whitespace fraction 1.0, stays full_name.
+    let names = vals(&[
+        "John Smith",
+        "Mary Jane Watson",
+        "Alan Turing",
+        "Ada Lovelace",
+        "Grace Hopper",
+    ]);
+    assert!(!is_username_handle_shaped(&names));
+}
+
+#[test]
+fn username_veto_skips_entity_and_org_names() {
+    // player_name / org-name shape: multi-word, has whitespace.
+    let orgs = vals(&[
+        "Portland Trail Blazers",
+        "Golden State Warriors",
+        "New York Knicks",
+        "Boston Celtics",
+    ]);
+    assert!(!is_username_handle_shaped(&orgs));
+}
+
+#[test]
+fn username_veto_skips_mixed_author_lists() {
+    // `authors` (plural) corpus shape: ~0.58 whitespace fraction — too mixed.
+    let mixed = vals(&[
+        "Jane Doe",
+        "jsmith",
+        "Robert C. Martin",
+        "kent_beck",
+        "Martin Fowler",
+    ]);
+    assert!(!is_username_handle_shaped(&mixed));
+}
+
+#[test]
+fn username_veto_needs_minimum_evidence() {
+    // Too few non-empty values to judge.
+    let scant = vals(&["rms", "", "  "]);
+    assert!(!is_username_handle_shaped(&scant));
+}

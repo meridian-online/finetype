@@ -215,6 +215,55 @@ const PERSON_NAME_HINTS: &[&str] = &[
 /// The categorical (enum) catch-all label. Used by the fusion cardinality gate.
 const CATEGORICAL_LABEL: &str = "representation.discrete.categorical";
 
+/// Max fraction of a column's values that may contain internal whitespace for it
+/// to be treated as login-handle-shaped (username) rather than person names.
+/// Corpus-grounded (spec 2026-06-17-full-name-username-veto ac-00): `author`
+/// columns sit at 0.005, real-name columns (player_name/person/name/artist) at
+/// 0.94-1.0 — a threshold at 0.15 separates them with a wide margin.
+const USERNAME_WHITESPACE_MAX_FRACTION: f32 = 0.15;
+
+/// Value-based username recovery (decision 0048; spec
+/// `2026-06-17-full-name-username-veto`). `identity.person.full_name` is the
+/// model's single largest over-emission (249,568 corpus columns), dominated by
+/// login-handle columns the model reads as person names (~165k `author`). Real
+/// person names are multi-token ("First Last"); login handles are single tokens
+/// over a restricted charset. This detects handle-shaped columns by value alone
+/// (NOT header — decision 0042): low internal-whitespace fraction AND most values
+/// matching a handle charset (ASCII alphanumeric + `. _ -`, at least one letter).
+///
+/// Safe-by-construction for full_name precision: a *correct* full_name column is
+/// always multi-token (has whitespace), so the whitespace guard can never demote
+/// a true positive — it only reclassifies columns full_name could never have been
+/// right about.
+fn is_username_handle_shaped(values: &[String]) -> bool {
+    let non_empty: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
+    // Need enough evidence to judge a column's shape.
+    if non_empty.len() < 4 {
+        return false;
+    }
+    let mut with_space = 0usize;
+    let mut handle_charset = 0usize;
+    for v in &non_empty {
+        if v.chars().any(char::is_whitespace) {
+            with_space += 1;
+        } else if v.chars().any(|c| c.is_ascii_alphabetic())
+            && v
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+        {
+            handle_charset += 1;
+        }
+    }
+    let n = non_empty.len() as f32;
+    let space_frac = with_space as f32 / n;
+    let handle_frac = handle_charset as f32 / n;
+    space_frac <= USERNAME_WHITESPACE_MAX_FRACTION && handle_frac >= 0.80
+}
+
 /// Hardcoded list of labels known to be generic catch-all predictions.
 /// Used as a fallback when taxonomy is not available for designation lookup.
 const HARDCODED_GENERIC_LABELS: &[&str] = &[
@@ -849,6 +898,12 @@ impl ColumnClassifier {
             }
         };
 
+        // Step 4b: Username recovery veto (decision 0048; spec
+        // 2026-06-17-full-name-username-veto). A handle is a username, not a person
+        // name nor an entity name, so run before entity demotion. No header hints
+        // apply on this (header-less) path, so placement here is final.
+        self.apply_username_veto(&mut result, &sample);
+
         // Step 5: Entity demotion gate.
         // When the majority label is full_name and the entity classifier is loaded,
         // check whether the column actually contains person names. If confidently
@@ -906,6 +961,29 @@ impl ColumnClassifier {
 
         self.finalize_is_generic(&mut result);
         Ok(result)
+    }
+
+    /// Value-based username recovery (decision 0048; spec
+    /// `2026-06-17-full-name-username-veto`). Reclassifies a `full_name` result to
+    /// `username` when the column's values are login-handle-shaped
+    /// ([`is_username_handle_shaped`]). `full_name` is the model's single largest
+    /// over-emission (249,568 corpus columns, ~165k of them `author` handle
+    /// columns); the handle shape is decided by value alone, NOT by the header
+    /// (decision 0042 deprecates header hints). Must run AFTER header hints so a
+    /// deprecated `author -> full_name` cross-domain hint cannot resurrect a handle
+    /// column. Safe-by-construction for full_name precision: a correct full_name is
+    /// always multi-token (has whitespace), so the whitespace guard never demotes a
+    /// true positive. RHH-disableable via `full_name_username_veto`.
+    fn apply_username_veto(&self, result: &mut ColumnResult, sample: &[String]) {
+        if result.label == "identity.person.full_name"
+            && !rhh::is_disabled("full_name_username_veto")
+            && is_username_handle_shaped(sample)
+        {
+            result.label = "identity.person.username".to_string();
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some("full_name_username_veto".to_string());
+            result.detected_locale = None;
+        }
     }
 
     /// Set `is_generic` on a result based on its final label and disambiguation state.
@@ -2209,6 +2287,11 @@ impl ColumnClassifier {
             }
 
             self.sharpen_and_guard(&mut result, header, &sample, values);
+
+            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
+            // so a deprecated author->full_name cross-domain hint can't resurrect a
+            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
+            self.apply_username_veto(&mut result, &sample);
         }
 
         // Step 6: Post-hoc locale detection.
@@ -2293,6 +2376,11 @@ impl ColumnClassifier {
 
             // Step 5: Header hints (Model2Vec semantic matching)
             self.sharpen_and_guard(&mut result, header, &sample, values);
+
+            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
+            // so a deprecated author->full_name cross-domain hint can't resurrect a
+            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
+            self.apply_username_veto(&mut result, &sample);
         }
 
         // Step 6: Post-hoc locale detection
@@ -2391,6 +2479,11 @@ impl ColumnClassifier {
 
             // Step 5: Header hints (Model2Vec semantic matching)
             self.sharpen_and_guard(&mut result, header, &sample, values);
+
+            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
+            // so a deprecated author->full_name cross-domain hint can't resurrect a
+            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
+            self.apply_username_veto(&mut result, &sample);
         }
 
         // Step 6: Post-hoc locale detection
