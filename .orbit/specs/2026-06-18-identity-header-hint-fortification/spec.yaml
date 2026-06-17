@@ -40,7 +40,7 @@ acceptance_criteria:
     catch-all attractor (HARDCODED_GENERIC_LABELS) — training it harder is the 0-for-5
     failure mode. DELIVERABLE: composition memo + counts.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-02
   description: |
@@ -61,13 +61,18 @@ acceptance_criteria:
   checked: false
 - id: ac-04
   description: |
-    THE GATE — RHH IDENTITY ABLATION CLEARS 80% ON THE RETRAINED MODEL (observation,
-    BLOCKING). Re-run the ac-00 counterfactual against the retrained model: with
-    substring_matcher_identity (and the identity cross-domain hints) DISABLED, the learned
-    model's no_hint identity accuracy must reach >=80% (the RHH model-covered threshold).
-    THIS is the crisp GO/NO-GO for BOTH the retrain and the subsequent hint removal: if the
-    learned model now carries identity without the hints, the hints are deletable. Also
-    score gold (--reframe, no-regression) + the rare-type scoreboard.
+    THE GATE — USERNAME/FULL_NAME OUTCOME ON THE RETRAINED MODEL (observation, BLOCKING).
+    RE-SCOPED per ac-01 (ac01-composition.md): the family-level ablation is unachievable
+    because substring_matcher_identity also carries header-only types (phone/first_name/
+    height/weight) with no value signal — those are a separate, deferred problem. So the gate
+    is the username RECOVERY outcome, not whole-family deletability:
+    (a) gold (--reframe): username precision/recall UP, full_name precision NO-REGRESSION,
+        headline no-regression;
+    (b) corpus author-column relocation: of the ~108k handle author columns, the retrained
+        model emits username (not full_name) at high correctness, AND does not over-emit
+        username onto the hard-negative classes (country/state/api_name, low-card vocabs).
+    A clean win here makes the author/name ARMS of the hint retargetable (ac-06), not the
+    whole family.
   gate: true
   checked: false
   ac_type: observation
@@ -83,12 +88,14 @@ acceptance_criteria:
   ac_type: observation
 - id: ac-06
   description: |
-    DELETE THE IDENTITY HEADER HINTS + RETIRE THE DETERMINISTIC VETO (code). On ac-04 GO
-    (learned model carries identity without hints), delete substring_matcher_identity's
-    author/full_name/name arms (header_sharpen.rs:376 et al.) per decision 0042, and REVERT
-    the deterministic full_name_username_veto (spec 2026-06-17-full-name-username-veto) —
-    it becomes redundant and was only ever the stopgap for a semantic problem the retrain
-    now owns. Re-run the full suite + corpus-honest gate to confirm no regression from the
-    deletion. CHANGELOG entry; leave for the next /release binary.
+    RETARGET THE AUTHOR/NAME ARMS + RETIRE THE DETERMINISTIC VETO (code). RE-SCOPED per
+    ac-01: do NOT delete the whole substring_matcher_identity family (it carries header-only
+    types phone/first_name/height/weight that have no value signal — deferred). On ac-04 GO,
+    retarget the author/authors/author-name arms (header_sharpen.rs:376) so the learned model
+    carries author+handle→username, and REVERT the deterministic full_name_username_veto
+    (spec 2026-06-17-full-name-username-veto) — it was the stopgap for the semantic problem
+    the retrain now owns. Re-run the full suite + corpus-honest gate to confirm no regression.
+    File the whole-family deletion (phone/height/weight value-learnability) as a separate
+    follow-up. CHANGELOG entry; leave for the next /release binary.
   gate: false
   checked: false

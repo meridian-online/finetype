@@ -386,10 +386,18 @@ def main() -> int:
 
     # Emit TSV
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    def _rel(p: Path) -> str:
+        # Binaries/manifests may live outside the repo (e.g. an ad-hoc
+        # instrumentation build in /tmp); fall back to the absolute path
+        # rather than crashing on relative_to.
+        try:
+            return str(p.relative_to(REPO_ROOT))
+        except ValueError:
+            return str(p)
+
     header_lines = [
         "# rhh_counterfactual.tsv — ac-04 output",
-        f"# Source: {args.binary.relative_to(REPO_ROOT)} "
-        f"profile over {args.manifest.relative_to(REPO_ROOT)}",
+        f"# Source: {_rel(args.binary)} profile over {_rel(args.manifest)}",
         f"# Model dir: {model_real}",
         f"# Model weights sha256: {weights_sha}",
         f"# Families: {len(family_set)}",
@@ -428,7 +436,7 @@ def main() -> int:
         for r in rows_out:
             fh.write("\t".join(r[c] for c in cols_order) + "\n")
 
-    print(f"\n  wrote {args.output.relative_to(REPO_ROOT)} — {len(rows_out)} rows")
+    print(f"\n  wrote {_rel(args.output)} — {len(rows_out)} rows")
 
     # Persist summary for quick inspection
     summary_path = args.output.with_name("rhh_counterfactual_summary.tsv")
