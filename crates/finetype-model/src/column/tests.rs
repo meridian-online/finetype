@@ -6263,3 +6263,32 @@ fn username_veto_needs_minimum_evidence() {
     let scant = vals(&["rms", "", "  "]);
     assert!(!is_username_handle_shaped(&scant));
 }
+
+#[test]
+fn username_veto_skips_low_cardinality_vocab() {
+    // ac-03 false-positive class: single-token handle-charset values that are a
+    // small REPEATING vocabulary (exchange codes, drug names) — not usernames.
+    let drugs = vals(&[
+        "ethanol", "ethanol", "ethanol", "morphine", "morphine", "morphine", "ethanol", "morphine",
+    ]);
+    assert!(!is_username_handle_shaped(&drugs));
+
+    let exchanges = vals(&["NMS", "NYQ", "NMS", "NYQ", "NMS", "NYQ", "PCX", "NMS"]);
+    assert!(!is_username_handle_shaped(&exchanges));
+}
+
+#[test]
+fn username_veto_still_fires_on_high_cardinality_handles() {
+    // Distinct handles per row survive the cardinality guard.
+    let handles = vals(&[
+        "ww520",
+        "KevBurnsJr",
+        "thinkcomp",
+        "cjensen",
+        "pmiller2",
+        "vic_nyc",
+        "andrewcooke",
+        "lanstein",
+    ]);
+    assert!(is_username_handle_shaped(&handles));
+}

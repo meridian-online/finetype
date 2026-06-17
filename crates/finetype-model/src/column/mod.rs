@@ -222,6 +222,13 @@ const CATEGORICAL_LABEL: &str = "representation.discrete.categorical";
 /// 0.94-1.0 — a threshold at 0.15 separates them with a wide margin.
 const USERNAME_WHITESPACE_MAX_FRACTION: f32 = 0.15;
 
+/// Min fraction of DISTINCT values for a handle-shaped column to be treated as a
+/// username. Real username columns are high-cardinality (a distinct handle per
+/// row); low-cardinality repeating vocabularies (exchange codes, drug names) that
+/// happen to be single-token are not. Calibrated against the spec ac-03 isolated
+/// corpus pass (genuine `author` ~1.0; false-positive vocabularies well below 0.9).
+const USERNAME_MIN_DISTINCT_FRACTION: f32 = 0.9;
+
 /// Value-based username recovery (decision 0048; spec
 /// `2026-06-17-full-name-username-veto`). `identity.person.full_name` is the
 /// model's single largest over-emission (249,568 corpus columns), dominated by
@@ -260,7 +267,24 @@ fn is_username_handle_shaped(values: &[String]) -> bool {
     let n = non_empty.len() as f32;
     let space_frac = with_space as f32 / n;
     let handle_frac = handle_charset as f32 / n;
-    space_frac <= USERNAME_WHITESPACE_MAX_FRACTION && handle_frac >= 0.80
+
+    // High-cardinality guard. A real username column has a distinct handle per
+    // row; a low-cardinality repeating vocabulary that merely LOOKS handle-shaped
+    // (exchange codes NMS/NYQ, drug names, role/platform names) is NOT a username
+    // — it is enum/word territory. The isolated corpus pass (spec ac-03) showed
+    // 55% of un-guarded relocations were exactly this class, so the guard is
+    // load-bearing. Threshold calibrated against that pass: genuine `author`
+    // columns sit at distinct-fraction ~1.0; the false-positive vocabularies fall
+    // well below 0.9.
+    let distinct = non_empty
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    let distinct_frac = distinct as f32 / n;
+
+    space_frac <= USERNAME_WHITESPACE_MAX_FRACTION
+        && handle_frac >= 0.80
+        && distinct_frac >= USERNAME_MIN_DISTINCT_FRACTION
 }
 
 /// Hardcoded list of labels known to be generic catch-all predictions.
