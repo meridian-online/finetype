@@ -3,7 +3,7 @@ goal: 'Ship enum-domain emission as a patch (choice 0102 increment): emit a colu
 cards:
 - 0014-profile-validate-precision
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - enum
 - json-schema
@@ -65,7 +65,6 @@ acceptance_criteria:
     threaded ColumnScanStats — same result, fewer moving parts.)
   gate: false
   checked: true
-  ac_type: code
 - id: ac-02
   description: |
     OUTPUT + ROUND-TRIP SAFETY (gate, BLOCKING). Emit the OPEN enum domain as a
@@ -86,7 +85,6 @@ acceptance_criteria:
     REDUCE enum constraints + adds an ignored extension, so it cannot regress.)
   gate: true
   checked: true
-  ac_type: code
 - id: ac-03
   description: |
     MCP/CLI PARITY GUARD. A test asserts the CLI `profile -o json-schema` and the
@@ -103,7 +101,6 @@ acceptance_criteria:
     keyword (conservative gate); a numeric column gets neither (denylist).
   gate: false
   checked: true
-  ac_type: code
 - id: ac-04
   description: |
     PATCH RELEASE. Bump the workspace PATCH version (not 0.7.0 — author), update
@@ -120,6 +117,21 @@ acceptance_criteria:
     memory still to add. NOTE: ColumnScanStats did NOT end up the consumer — the
     label-prefix denylist + direct value counts were simpler; ac-04a remains idle
     plumbing (honest correction to the spec's prediction).
+    DONE (2026-06-17): RELEASED v0.6.33. Pre-flight all-green (CI success on
+    fcf76ae, 452 tests, zero warnings, symlink<->CI agree, model on HF, duckdb pin
+    unchanged). Cargo 0.6.32->0.6.33, CHANGELOG [0.6.33] heading, CLAUDE.md version.
+    Tag v0.6.33 pushed (commit 3e11d23) -> release.yml building cross-platform
+    binaries + Homebrew tap. Docs note in docs/DEVELOPMENT.md; memory
+    enum-domain-emission-shipped. 0.7.0 reframe tracked in memo
+    2026-06-17-enum-accuracy-reframe-0.7.0.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
+memories_considered:
+- key: enum-domain-emission-shipped
+  disposition: adopted
+  reason: the shipped outcome this spec produced (v0.6.33).
+- key: cardinality-boundary-error-is-real
+  disposition: adopted
+  reason: the verdict that motivated 0102 and scoped this to a feature, not an accuracy play.
+closed_at: 2026-06-17T05:40:06.127182Z
