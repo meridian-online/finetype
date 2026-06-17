@@ -1,0 +1,80 @@
+id: 2026-06-17-enum-accuracy-reframe
+goal: Drop representation.discrete.categorical as a competing classification target — score the semantic type with enum-ness as a separate dimension, migrate gold, retire the categorical-emitting Sharpen rules — removing the residual attractor that is both the biggest production error mass and the v23 retrain-explosion cause (choice 0102 deferred scope; step 1 of card 0020).
+cards:
+- 0020-honest-production-typing
+- 0002-semantic-type-detection
+status: open
+labels:
+- enum
+- eval-reframe
+- categorical-residual
+acceptance_criteria:
+- id: ac-00
+  description: |
+    SETTLE THE REFRAME BY MEASUREMENT (no shipped code; design-critical, BLOCKING).
+    Two decisions must come from data on the gold corpus, not fiat:
+    (a) RESIDUAL POLICY — when a column is bounded but has no tighter semantic type
+        (today's `representation.discrete.categorical`), what label carries it? Candidates:
+        the honest `representation.text.plain_text` residual (author philosophy), `word`,
+        or a neutral bounded-unspecified sentinel. Decide from the gold categorical
+        columns: for each, what IS its semantic type when categorical is taken off the
+        table? (re-adjudicate a sample; many resolve to a real type, the rest to the residual).
+    (b) EVAL-REFRAME SCORING — define precisely how the reframed scorer treats enum-ness:
+        the semantic type is scored as today; enum-ness becomes a SEPARATE precision/recall
+        dimension (does the column's bounded-domain flag agree with truth?), NOT a competing
+        label. A prediction is no longer right/wrong for "being categorical".
+    DELIVERABLE: the residual policy + the scoring definition + the MEASURED headline delta
+    under the reframe (the memo's ~-3 dry-run made rigorous and gated). STATE THE LIMIT:
+    there is no enum ground truth, and relabelling is adjudicated not free — report what is
+    measured vs assumed (2026-06-17 over-read discipline; memory representative-baseline-is-068).
+    DONE (2026-06-17, ac00-finding.md): residual policy SETTLED — 71/73 re-adjudicated gold
+    categorical columns have NO semantic type (exchange/team codes, status flags, content tags),
+    residual = text.word (short tokens) / text.plain_text (phrases) + the shipped x-finetype-enum
+    flag. Headline delta MEASURED neutral-to-positive (+0.4 reframe-A / +1.9 reframe-B on gold),
+    NOT the memo's feared -3 — reframe is headline-safe. Bracket stated; exact post-retirement
+    number deferred to ac-01 scorer + ac-03.
+  gate: true
+  checked: true
+  ac_type: observation
+- id: ac-01
+  description: |
+    EVAL REFRAME (code). Implement the ac-00 scoring in score_gold_anchor.py (and the
+    rare-type scoreboard): score the semantic type; emit enum-ness as a separate
+    precision/recall dimension; `categorical` is no longer a competing label in the headline.
+    Backwards-compatible flag so the legacy scoring stays reproducible. Re-baseline v19 under
+    the reframed scorer and record the number alongside the legacy 0.80.
+  gate: false
+  checked: false
+- id: ac-02
+  description: |
+    GOLD MIGRATION (config/data). Relabel the gold `representation.discrete.categorical`
+    columns per the ac-00 residual policy — to their adjudicated semantic type where one
+    exists, else the chosen residual — plus an enum flag. Append-only provenance (the
+    per-row `provenance` string records the prior label); membership and the leakage
+    firewall unaffected (`make leakage-guard`). The fixture records its taxonomy version.
+  gate: false
+  checked: false
+  ac_type: config
+- id: ac-03
+  description: |
+    RETIRE CATEGORICAL AS A TARGET (code, GATED). With the eval no longer rewarding it,
+    drop `representation.discrete.categorical` from emission — retire/limit the Sharpen rules
+    that produce it (text_vocab_override R32, veto_shape_fallback's categorical branch, and
+    any others; codegraph_callers on the label string to enumerate). The enum DIMENSION
+    (x-finetype-enum, already shipped 0.6.33) carries bounded-ness instead. GATE: reframed
+    gold no-regression AND corpus-honest gate (blocking, H05) — this RELOCATES mass off
+    categorical, exactly the relocation the gate exists to police, so it must run.
+  gate: true
+  checked: false
+- id: ac-04
+  description: |
+    NORTH-STAR HANDOFF (observation, defers). With the categorical attractor removed, file
+    the retrain candidate as the next spec under card 0020 and state the hypothesis to test:
+    an additive retrain now rebalances cleanly (no categorical explosion) and lifts the
+    representative + gold headline with no destination-drift NO-GO. Closed-enum dictionaries
+    (native JSON-Schema `enum` for ISO/currency closed domains + out-of-domain validation)
+    are a SEPARATE follow-up spec, not folded here. This AC records the sequencing decision;
+    it does not run the retrain.
+  gate: false
+  checked: false
+  ac_type: observation

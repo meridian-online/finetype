@@ -1,0 +1,1 @@
+{"spec_id":"2026-06-17-enum-accuracy-reframe","body":"ac-00 closed: residual policy = text.word/plain_text + x-finetype-enum (71/73 gold categorical have no semantic type); reframe headline-neutral-to-+1.9 on gold, not -3. ac00-finding.md. Next: ac-01 reframed scorer.","labels":[],"timestamp":"2026-06-17T08:04:08.162967Z"}

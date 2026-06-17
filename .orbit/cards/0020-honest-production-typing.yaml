@@ -1,0 +1,53 @@
+id: 0020-honest-production-typing
+feature: Honest production-grade typing
+as_a: data analyst profiling real, messy tables
+i_want: FineType's type output to reflect what the model can actually distinguish on representative data — bounded domains surfaced as a property, not forced into a competing "categorical" label — and the model to be retrainable toward production accuracy without collapsing into a residual attractor
+so_that: the headline accuracy I'm shown is the accuracy I'll actually get on my own tables (not a curated slice), and each retrain moves that number up instead of trading one boundary for another
+goal: >
+  NORTH-STAR: lift the REPRESENTATIVE-data headline (measured 2026-06-17 at ~0.68 on
+  uniform-random corpus columns — output/representative-baseline/finding.md, memory
+  representative-baseline-is-068) AND the gold headline (0.80) together, with NO
+  destination-drift NO-GO on the corpus-honest gate. The scoreboard to steer against
+  now exists end-to-end: drift-proxy (pre-train) -> gold -> representative baseline ->
+  corpus-honest gate (blocking). What was missing from the 0-for-5 retrain record was a
+  measurable target and a structural reason the next one would behave — both supplied here.
+  SEQUENCING (the bet): (1) the enum reframe (choice 0102 deferred scope) DROPS
+  representation.discrete.categorical as a competing classification target — it is the
+  single biggest production error mass (31% of representative misses) AND, as a flat-softmax
+  residual attractor, the cause of the v23 retrain explosion (+529%, decision 0096). Remove
+  the attractor first. (2) THEN an additive retrain has somewhere clean to rebalance, so the
+  0-for-5 record reflects a missing prerequisite, not a dead lever — HYPOTHESIS, to be proven
+  on the scoreboard, not assumed. Coordinate value-shape drift (v24-type) is a separate,
+  sibling-pair problem and out of scope here.
+maturity: emerging
+scenarios:
+- name: The headline is the production headline
+  given: a candidate model, rule, or release
+  when: its accuracy is reported
+  then: the representative-data baseline is scored alongside gold, so a curated-slice win that
+    does not generalise to random production columns is visible before promotion
+  gate: false
+- name: Bounded domain is a property, not a competing label
+  given: a column drawing from a small bounded set (a status enum, an ISO-code column)
+  when: it is profiled
+  then: FineType emits its semantic type (or the honest plain_text residual) AND an enum
+    dimension carrying the observed domain — it is never scored wrong for failing a
+    categorical-vs-type contest that should not exist
+  gate: false
+- name: A retrain clears the scoreboard
+  given: a retrain candidate produced after the categorical attractor is removed
+  when: it is gated
+  then: it lifts representative + gold without a destination-drift NO-GO on the corpus-honest
+    gate — the north-star outcome, measured not asserted
+  gate: true
+relations:
+- card: 0002-semantic-type-detection
+  type: depends-on
+  reason: sharpens 0002's goal toward representative-data accuracy and an honest output ontology
+- card: 0019-human-verified-gold-corpus
+  type: depends-on
+  reason: the gold corpus plus the new representative baseline are the scoreboard this steers against
+- choice: 0102-categorical-is-an-enum-property
+  type: respects
+  reason: the enum reframe is 0102's deferred model/gold/eval scope, here made the first step of the north-star
+specs: []
