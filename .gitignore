@@ -308,3 +308,18 @@ output/**/sample_pass_hier/
 output/**/*.nohup
 output/cardinality-readjudication/
 output/enum-domain-emission/
+
+# Prior-session research artifacts (closed specs) — keep the tree clean
+output/aba-checksum-guard/
+output/binary-veto/
+output/city-region-corrob/
+output/corpus-honest-gate/
+output/country-code-corrob/
+output/determinability-probe/
+output/duckdb-shellout-spike/
+output/housekeeping-baseline/
+output/increment-veto/
+output/isbn-checksum-guard/
+output/isbn-veto/
+output/securities-checksum-guard/
+output/url-veto/
