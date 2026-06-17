@@ -85,6 +85,32 @@ body: |
   softmax leaf. Retire `representation.discrete.categorical` as a terminal
   classification target.
 
+  ## Patch decomposition (design 2026-06-17, interview in spec
+  `2026-06-17-enum-domain-emission`)
+
+  0102 ships in two increments; the author set the first as a PATCH (not 0.7.0):
+
+  **PATCH increment — enum-domain emission (additive, no model/gold/eval change).**
+  The enum domain is already emitted (`enum_emission.rs`) but gated by LABEL
+  (`label_is_enum_eligible` → categorical/boolean) over the SAMPLE. The patch
+  decouples it: emit the observed enum domain for ANY column whose FULL-COLUMN
+  value structure is a bounded, cohesive domain, regardless of semantic label.
+  The enum PREDICATE is:
+    1. bounded cardinality (full-column distinct ≤ cap AND distinct/rows ≤ ratio);
+    2. **structural cohesion** — a similarity score over the distinct values
+       (author: enums are *designed* to look alike — alpha IDs, verbs, state
+       codes; a low-cardinality column of heterogeneous values is not an enum).
+       Patch primary: character-shape cohesion (deterministic). Semantic cohesion
+       (Model2Vec cluster-tightness) is a future enhancement.
+    3. not denylisted (continuous numeric, datetime, quasi-unique IDs).
+  Thresholds are calibrated by a study, not fiat. **Open detection only** —
+  closed-dictionary validation is deferred. `ColumnScanStats` (ac-04a) becomes the
+  engine. Output is additive (extend `unique_values` / a small `enum` block).
+
+  **0.7.0 increment — the accuracy reframe (deferred).** Eval scores semantic type
+  with enum as a separate dimension; drop `representation.discrete.categorical` as
+  a target; gold migration; residual-label decision; closed-enum dictionaries.
+
   ## Open vs closed enums
 
   Both fall out of Option B for free, because detection is structural:
