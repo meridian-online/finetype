@@ -1,0 +1,76 @@
+id: 2026-06-17-full-name-username-veto
+goal: 'Recover identity.person.username from over-emitted full_name via a value-based handle-shape veto (the cleanest, largest representative-data error mass after the enum reframe); honest scope: representative-side win, gold-neutral.'
+cards:
+- 0020-honest-production-typing
+status: open
+labels:
+- sharpen
+- value-rule
+acceptance_criteria:
+- id: ac-00
+  description: |
+    DESIGN GROUNDED IN DATA (doc, BLOCKING). Establish from real corpus values that
+    (a) full_name is massively over-emitted (corpus pass: 249,568 columns), dominated by
+    login-handle columns (~165k `author` + ~17k `authors`), and (b) a value-based
+    discriminator cleanly separates handles from real names: internal-whitespace fraction
+    across sampled values is 0.005 for `author` vs 0.94-1.0 for `player_name`/`person`/
+    `name`/`artist`/`school_name`/`event_name`. STATE THE CORRECTED SCOPE: the gold
+    full_name precision leak (P=0.167, 1/6) is a SEPARATE shape — its 5 FPs are multi-word
+    Title-Case place/org names (street_name, agency_name, gis_nta_name -> plain_text;
+    country_name -> country; longName -> entity_name), NONE usernames. So this rule is a
+    REPRESENTATIVE-side win and gold-NEUTRAL; it does NOT fix gold full_name (corrects the
+    prior over-read in memory representative-baseline-is-068 / output/representative-baseline/
+    finding.md). DELIVERABLE: design finding doc with the discriminator, thresholds, and
+    corrected scope.
+  gate: true
+  checked: true
+  ac_type: doc
+- id: ac-01
+  description: |
+    IMPLEMENT THE VALUE-BASED VETO (code, GATED). A Sharpen rule alongside the existing
+    full_name entity-demotion gate (crates/finetype-model/src/column/mod.rs:~852): when the
+    resolved label is identity.person.full_name AND the column's sampled values are
+    handle-shaped -- internal-whitespace fraction below a calibrated threshold (data says
+    ~0.15 is safe; author 0.005 vs real names >=0.94) AND values match a handle charset
+    (alphanumeric + [._-], single token) -- reclassify to identity.person.username.
+    Value-based (0048), NOT header-hint (0042). Kill switch (RHH family id, e.g.
+    `full_name_username_veto`). Unit tests: handle column -> username; "First Last" name
+    column -> stays full_name; mixed `authors` lists -> stays full_name.
+  gate: false
+  checked: false
+- id: ac-02
+  description: |
+    GOLD GATE (observation, BLOCKING via no-regression). Score the candidate with
+    `score_gold_anchor.py ... --reframe` (the reframe scorer is primary post-ac-03 of the
+    enum reframe). Expectation: headline NEUTRAL (0.800 +- noise) -- gold full_name FPs are
+    place/org names this rule does not touch, and gold has only 1 username + 1 full_name
+    column, so no headline movement is expected. A REGRESSION (e.g. the rule flips the gold
+    `creator` full_name TP, or any single-token name column) is BLOCKING. Record the number
+    from a clean re-run; do not bank a stale snapshot.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-03
+  description: |
+    CORPUS-HONEST GATE (observation, BLOCKING, H05). The rule relocates a LARGE corpus mass
+    (~165k full_name -> username). ISOLATE against a same-binary kill-switch-off baseline
+    (RHH_DISABLE_HINTS off-pass), NOT the stale v19_gated parquet. The oracle (gated YDF)
+    over-emits full_name too, so a correctness-preserving full_name->username relabel may
+    false-alarm the same way categorical->word did -- if so, read the referee in the
+    candidate vocabulary via `corpus_honest_gate.py --label-remap
+    identity.person.full_name=identity.person.username` ON THE HANDLE-SHAPED SUBSET ONLY
+    (a genuine full_name->city misclassification must still trip oracle_fp). A NO-GO is
+    blocking. Document the relocation volume and oracle correct_ratio.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-04
+  description: |
+    SHIP + CHANGELOG (code). On all gates GO, keep the rule enabled by default, add a
+    CHANGELOG [Unreleased] entry, and leave for the next /release binary (do not auto-cut a
+    release mid-bet). Note residual scope for the deferred follow-up: structural shape-vetoes
+    for the gross value-shape collisions (UUID/Message-ID -> full_address, 10-digit epoch ->
+    npi, "0.0" -> url) are heterogeneous and individually small -- filed separately, not in
+    this spec.
+  gate: false
+  checked: false
