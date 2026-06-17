@@ -60,8 +60,17 @@ acceptance_criteria:
     the 2026-06-16 precedent was 33 changes / +7 headline, i.e. re-adjudication
     CLEANS rather than inflates; a large swing toward categorical would itself be a
     signal worth pausing on.
+    DONE (2026-06-17): author reviewed the 29 proposed changes (review.tsv) and
+    supplied authoritative labels (author_labels.tsv, positionally aligned, 0
+    header mismatch). Applied 21 (8 were keep-as-is, e.g. borough kept as region).
+    The author's signal: 19/21 -> plain_text — messy / misleading-structure
+    columns pulled to the honest residual, NOT forced into specific types
+    (signature_source_url is not a URL; EstadoDoc='Si' is not a country_code).
+    Exceptions: venue...='USA' -> country; publicationyear -> year. Provenance
+    tags `cardinality-readjudication 2026-06-17 (... was <old> ...)`. leakage-guard
+    ALL PASS (membership unchanged).
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-03
   description: |
@@ -74,8 +83,14 @@ acceptance_criteria:
     Either outcome is valuable — it tells us whether the dominant error mass is a
     model problem worth a fix or a measurement problem now resolved. Honest prior:
     expect mostly confirmation + a handful of corrections, not a headline jump.
+    DONE (2026-06-17): headline UNCHANGED — 731/927 = 0.789 before and after the 21
+    corrections (gains and losses balanced exactly). Confirmed TWICE (panel dry-run
+    -3, author labels net 0). VERDICT: the model's categorical-boundary errors are
+    REAL, not gold artifacts — cleaning gold improves its correctness without moving
+    the dial. The 0.800 record stands (the 21 changes net ~0 on the canonical run
+    too). No hidden accuracy behind the boundary labels.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-04
   description: |
@@ -86,6 +101,17 @@ acceptance_criteria:
     gate, because cardinality cannot separate the dominant cat-vs-country/city/region
     pairs (proven in ac-01). Update CLAUDE.md sprint state + bank a memory. Do NOT
     bundle a model change into this gold-quality spec.
+    DONE (2026-06-17): VERDICT banked (memory cardinality-boundary-error-is-real).
+    The categorical boundary is a REAL, hard model limit: gold cleanup doesn't move
+    it, cardinality can't gate it (semantics needed), and even 3 blind panels +
+    cardinality only 88% confirm with 6 fully contested — part of the gap to 98% is
+    IRREDUCIBLE label ambiguity, not fixable model error. Gold improved by 21
+    author-authoritative corrections (mostly ->plain_text) at zero headline cost.
+    Taxonomy gap surfaced: geography.location.neighborhood (author chose plain_text
+    for now; a future taxonomy-discovery candidate). Model-side semantic fix NOT
+    scoped here (past semantic bets — sibling-context, fusion — are stranded/dead).
+    Recommendation: treat ~0.80 on contested gold as near the practical ceiling for
+    the current architecture; stop chasing this boundary.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
