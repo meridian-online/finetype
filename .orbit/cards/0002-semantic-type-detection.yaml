@@ -57,6 +57,7 @@ specs:
 - .orbit/specs/2026-06-16-scoped-late-fusion-boundary-arbiter/spec.yaml
 - .orbit/specs/2026-06-16-finish-sibling-context-attention/spec.yaml
 - .orbit/specs/2026-06-16-column-statistics-lever/spec.yaml
+- .orbit/specs/2026-06-17-categorical-alnum-recall-rule/spec.yaml
 relations: []
 references:
 - README.md

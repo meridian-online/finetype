@@ -2,7 +2,7 @@ id: 2026-06-17-categorical-alnum-recall-rule
 goal: Recover categorical + alphanumeric_id recall (the two biggest gold accuracy holes) with full-column-statistic POST-PASS Sharpen rules that keep the neural vote — each approach/threshold decided by a gold study, each ship gated on precision-held + headline-non-regression + corpus-honest GO. Consumes ColumnScanStats (f1e047d). Extends text_vocab_override / veto_shape_fallback from 100-sample to full-column stats.
 cards:
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - gold
 - sharpen
@@ -104,7 +104,6 @@ acceptance_criteria:
     Both types NO-GO. ColumnScanStats (ac-04a) stays as tested plumbing, no consumer.
   gate: false
   checked: true
-  ac_type: code
 - id: ac-04
   description: |
     SHIP GATE (BLOCKING, H05). Every shipped rule clears ALL of: (1) gold per-type
@@ -139,3 +138,14 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+memories_considered:
+- key: decisive-stat-skip-is-no-go
+  disposition: adopted
+  reason: ac-04b precedent — the skip form of the same lever; this spec is its recall-rule counterpart, also NO-GO.
+- key: categorical-is-a-residual-category
+  disposition: adopted
+  reason: framed why categorical broadening is dangerous; the gate-refuted entity/plain broadening confirmed it.
+- key: full-column-stat-sharpen-is-redundant
+  disposition: adopted
+  reason: the verdict this spec produced — column-statistics lever ships nothing.
+closed_at: 2026-06-17T01:01:27.201999Z
