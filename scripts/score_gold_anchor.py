@@ -306,8 +306,29 @@ def cmd_predict(args: argparse.Namespace) -> int:
     return 0
 
 
+# The text residual under the enum reframe (spec 2026-06-17-enum-accuracy-reframe,
+# choice 0102): `categorical` is retired as a competing leaf — it, `word`, and
+# `plain_text` are one untyped-bounded-text residual, scored as a single class.
+# `entity_name` is a real semantic type and stays DISTINCT (it is not the residual).
+# enum-ness itself moves to the orthogonal x-finetype-enum property (shipped 0.6.33),
+# which carries bounded-domain info and is NOT part of this semantic-type headline
+# (no enum ground truth exists — see ac00-finding.md).
+REFRAME_RESIDUAL = {
+    "representation.discrete.categorical",
+    "representation.text.word",
+    "representation.text.plain_text",
+}
+REFRAME_RESIDUAL_LABEL = "representation.text.RESIDUAL"
+
+
+def _reframe(label: str) -> str:
+    return REFRAME_RESIDUAL_LABEL if label in REFRAME_RESIDUAL else label
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     gold = load_gold(args.gold)
+    reframe = getattr(args, "reframe", False)
+    norm = _reframe if reframe else (lambda x: x)
     preds: dict[tuple[str, str], str] = {}
     with args.predictions.open() as fh:
         for r in csv.DictReader(fh, delimiter="\t"):
@@ -322,7 +343,7 @@ def cmd_score(args: argparse.Namespace) -> int:
         if pred is None:
             n_unpredicted += 1
             continue
-        pairs[r["family"]].append((r["curated_label"], pred))
+        pairs[r["family"]].append((norm(r["curated_label"]), norm(pred)))
 
     def wilson(k: int, n: int) -> tuple[float, float]:
         """95% Wilson interval for k/n; returns (lo, hi). (nan, nan) if n=0."""
@@ -398,6 +419,7 @@ def cmd_score(args: argparse.Namespace) -> int:
         "",
         f"**Date:** {stamp}  ",
         f"**Gold fixture:** `{args.gold}` ({len(gold)} columns)  ",
+        f"**Scoring mode:** {'ENUM REFRAME (categorical/word/plain_text = one text residual)' if reframe else 'legacy (categorical is a competing label)'}  ",
         f"**Predictions:** `{args.predictions}`  ",
         f"**Scored:** {sum(len(v) for v in pairs.values())} columns "
         f"({n_unpredicted} gold columns had no prediction)  ",
@@ -474,6 +496,12 @@ def main() -> int:
     s.add_argument("--predictions", required=True, type=Path)
     s.add_argument("--model-name", required=True)
     s.add_argument("--out-dir", required=True, type=Path)
+    s.add_argument("--reframe", action="store_true",
+                   help="Enum reframe (spec 2026-06-17-enum-accuracy-reframe / choice 0102): "
+                        "score the semantic type with {categorical, word, plain_text} collapsed "
+                        "to one text residual (entity_name stays distinct); enum-ness is the "
+                        "orthogonal x-finetype-enum property, not a competing label. Headline "
+                        "becomes invariant to the categorical-vs-residual boundary on both sides.")
     s.set_defaults(func=cmd_score)
 
     args = ap.parse_args()

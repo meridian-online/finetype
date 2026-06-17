@@ -43,8 +43,15 @@ acceptance_criteria:
     precision/recall dimension; `categorical` is no longer a competing label in the headline.
     Backwards-compatible flag so the legacy scoring stays reproducible. Re-baseline v19 under
     the reframed scorer and record the number alongside the legacy 0.80.
+    DONE (2026-06-17): `--reframe` flag on score_gold_anchor.py `score` collapses
+    {categorical, word, plain_text} -> one text residual on BOTH truth and prediction
+    (entity_name kept DISTINCT — it is a real type, not the residual); enum-ness is the
+    orthogonal x-finetype-enum property (shipped 0.6.33), not scored here (no enum ground
+    truth). Verified on pre-migration gold + v19 predictions: legacy 0.789 -> reframe 0.800
+    (+1.1). Report header records the mode. Legacy path unchanged (default). The rare-type
+    scoreboard reframe is deferred with the broader scoreboard integration (not blocking).
   gate: false
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     GOLD MIGRATION (config/data). Relabel the gold `representation.discrete.categorical`
@@ -52,8 +59,18 @@ acceptance_criteria:
     exists, else the chosen residual — plus an enum flag. Append-only provenance (the
     per-row `provenance` string records the prior label); membership and the leakage
     firewall unaffected (`make leakage-guard`). The fixture records its taxonomy version.
+    DONE (2026-06-17, scripts/migrate_gold_reframe.py): all 95 gold categorical rows
+    relabelled — 87 text.word, 3 text.plain_text, 3 identifier.alphanumeric_id, 1
+    datetime.offset.iana, 1 file.extension (73 via the off-categorical panel keyed on
+    (column,values); 22 with no corpus values -> text.word residual default). 0 categorical
+    remain. Provenance appended (reversible). `make leakage-guard` PASS. Re-score on the
+    migrated fixture: REFRAME 0.797 (coherent; matches the pre-migration 0.800 within the
+    5 semantic reclassifications), LEGACY 0.743 (a PHANTOM dip — model still emits categorical
+    vs word truth). eval_rule.sh updated to report REFRAME as primary with legacy labelled as
+    misleading-until-ac-03. CAVEAT: the per-column residual/semantic split rests on a single
+    off-categorical panel, auditable + revisable via provenance — not canonical-grade adjudication.
   gate: false
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-03
   description: |

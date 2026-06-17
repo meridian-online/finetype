@@ -127,6 +127,16 @@ GOLD_PRED="$OUT/predictions_${LABEL}.tsv"
 FINETYPE_MODEL="$MODEL" "$VPY" scripts/score_gold_anchor.py predict \
     --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
     --out "$GOLD_PRED" || echo "  predict failed"
+# Reframe (spec 2026-06-17-enum-accuracy-reframe) is the PRIMARY headline: the gold
+# fixture migrated `categorical` -> text residual, so the legacy scorer reports a
+# phantom regression (model still emits `categorical` until the rules are retired in
+# ac-03). The --reframe scorer collapses {categorical, word, plain_text} on both sides
+# and is the coherent number. Legacy is kept below for continuity, clearly labelled.
+echo "  [PRIMARY] enum-reframe scoring:"
+"$VPY" scripts/score_gold_anchor.py score \
+    --gold "$GOLD" --predictions "$GOLD_PRED" --reframe \
+    --model-name "${LABEL}${SEED_TAG}-reframe" --out-dir "$OUT" || echo "  reframe score failed"
+echo "  [legacy — misleads until ac-03 retires the categorical Sharpen rules]:"
 "$VPY" scripts/score_gold_anchor.py score \
     --gold "$GOLD" --predictions "$GOLD_PRED" \
     --model-name "${LABEL}${SEED_TAG}" --out-dir "$OUT" || echo "  score failed"
