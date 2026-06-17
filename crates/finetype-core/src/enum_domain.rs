@@ -64,6 +64,24 @@ pub fn is_enum_denylisted(label: &str) -> bool {
         || label == "technology.internet.url"
 }
 
+/// Labels eligible for the CONSERVATIVE, validation-enforced JSON-Schema `enum`
+/// KEYWORD (a closed constraint `validate` enforces). Kept deliberately narrow —
+/// categorical + boolean — to avoid `enum_overfit` (card 0014): a closed `enum`
+/// on an open domain rejects legitimate new values. The OPEN domain goes to the
+/// descriptive `x-finetype-enum` extension instead (`detect_enum_domain`). Shared
+/// so the CLI and MCP emit the SAME conservative keyword (the MCP shadows the CLI,
+/// not a separate feature set). Moved here from the CLI's `enum_emission.rs` so
+/// both surfaces depend on one policy.
+pub fn label_is_enum_keyword_eligible(label: &str) -> bool {
+    matches!(
+        label,
+        "representation.discrete.categorical"
+            | "representation.boolean.binary"
+            | "representation.boolean.initials"
+            | "representation.boolean.terms"
+    )
+}
+
 /// Collapsed character-class signature: runs of upper/lower/digit collapse to
 /// `U`/`l`/`d`; other characters (space, punctuation) are kept literally.
 /// `"US" -> "U"`, `"active" -> "l"`, `"conv_5" -> "l_d"`, `"San Jose" -> "Ul Ul"`.

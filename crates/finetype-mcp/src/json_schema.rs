@@ -34,6 +34,7 @@
 //! extensions. Stats are observed-from-the-input numbers, not part of
 //! the type contract, and live outside the verbosity contract above.
 
+use finetype_core::enum_domain::{detect_enum_domain, label_is_enum_keyword_eligible, EnumConfig};
 use finetype_core::{Definition, Taxonomy};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -192,10 +193,33 @@ fn attach_stats(
         }
     }
 
-    if enum_threshold > 0 && cardinality <= enum_threshold {
-        let mut enum_vals: Vec<&str> = unique.into_iter().collect();
+    // Conservative standard `enum` keyword (a CLOSED validation constraint):
+    // categorical/boolean only, to avoid enum_overfit (card 0014). Shared gate so
+    // the CLI json-schema and MCP emit the SAME keyword (was cardinality-only — an
+    // enum_overfit hazard; spec 2026-06-17-enum-domain-emission).
+    if enum_threshold > 0
+        && cardinality <= enum_threshold
+        && label_is_enum_keyword_eligible(col.label)
+    {
+        let mut enum_vals: Vec<&str> = unique.iter().copied().collect();
         enum_vals.sort();
         prop.insert("enum".into(), json!(enum_vals));
+    }
+
+    // x-finetype-enum: the OPEN observed domain for any non-denylisted bounded
+    // column (choice 0102). Descriptive — validators ignore `x-finetype-*`, so the
+    // round-trip is unaffected. Same shared policy as the CLI profile output.
+    if let Some(ed) = detect_enum_domain(col.label, col.values, &EnumConfig::default()) {
+        prop.insert(
+            "x-finetype-enum".into(),
+            json!({
+                "open": ed.open,
+                "distinct": ed.distinct,
+                "rows": ed.rows,
+                "cohesion": (ed.cohesion * 1000.0).round() / 1000.0,
+                "domain": ed.domain,
+            }),
+        );
     }
 }
 
