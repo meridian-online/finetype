@@ -18,8 +18,12 @@ acceptance_criteria:
     top-K distinct values WITH their counts (the repetition structure). 172/239
     resolve to clean stats today; record the ~28% that don't (file/column-name
     mismatch) as a coverage limit, do not silently drop them.
+    DONE (2026-06-17, scripts/build_boundary_worklist.py): 239 columns, 0
+    unresolved (the GROUP BY value-count path resolves all, vs 172 for the stats
+    path). Worklist (cardinality + top value-counts per column) is a local,
+    gitignored artifact (raw values; public repo).
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-01
   description: |
@@ -33,8 +37,18 @@ acceptance_criteria:
     low-cardinality on BOTH sides and decided by SEMANTICS. That is exactly why a
     human/LLM (not a cardinality gate) is the instrument. Record panel agreement,
     a control-confirm rate, and the contested residue.
+    DONE (2026-06-17): 3 blind subagent panels, each labelled all 239 from
+    cardinality+value-counts (no current gold). 217/239 unanimous, 6 contested.
+    CONFIRM rate (majority == current gold) 204/233 = 0.88 — sound integrity,
+    matches the 2026-06-16 control. 29 proposed changes, BALANCED in direction
+    (8 toward categorical, 11 away, 10 other) — cleaning, not inflating. 2 are a
+    taxonomy gap (geography.location.neighborhood, not a current label) — record,
+    do not apply. ac-03 PREVIEW (dry-run, non-destructive): applying 27 changes to
+    a gold COPY moves the headline 731->728 (0.789->0.785, within noise) — so the
+    model's boundary errors are REAL, not gold artifacts; gold cleanup does not
+    unlock accuracy. AWAITING author sign-off before ac-02 mutates gold.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-02
   description: |

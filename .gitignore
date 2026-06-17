@@ -306,3 +306,4 @@ output/**/sample_pass/
 output/**/*.files.txt
 output/**/sample_pass_hier/
 output/**/*.nohup
+output/cardinality-readjudication/
