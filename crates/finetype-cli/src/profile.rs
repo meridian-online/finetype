@@ -2,6 +2,7 @@
 
 use super::*;
 use finetype_cli::enum_emission::collect_unique_values_if_categorical;
+use finetype_core::enum_domain::{detect_enum_domain, EnumConfig, EnumDomain};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_profile(
@@ -228,6 +229,11 @@ pub(crate) fn cmd_profile(
             validation_vetoed: bool,
             validation_advisory_low: bool,
             vetoed_type: Option<String>,
+            // x-finetype-enum: the column's OBSERVED open bounded domain
+            // (spec 2026-06-17-enum-domain-emission, choice 0102). Descriptive —
+            // emitted as an extension, NOT the validation-enforced `enum` keyword,
+            // which stays conservative via `unique_values`.
+            enum_domain: Option<EnumDomain>,
         }
 
         /// Per-column validation + quality data.
@@ -298,6 +304,7 @@ pub(crate) fn cmd_profile(
                             validation_vetoed: false,
                             validation_advisory_low: false,
                             vetoed_type: None,
+                            enum_domain: None,
                         },
                     ));
                 } else {
@@ -354,6 +361,7 @@ pub(crate) fn cmd_profile(
                     };
                 let unique_values =
                     collect_unique_values_if_categorical(&final_label, &values, enum_threshold);
+                let enum_domain = detect_enum_domain(&final_label, &values, &EnumConfig::default());
                 all_entries.push((
                     idx,
                     ColProfile {
@@ -376,6 +384,7 @@ pub(crate) fn cmd_profile(
                         validation_vetoed: vetoed,
                         validation_advisory_low: advisory_low,
                         vetoed_type,
+                        enum_domain,
                     },
                 ));
             }
@@ -411,6 +420,7 @@ pub(crate) fn cmd_profile(
                         validation_vetoed: false,
                         validation_advisory_low: false,
                         vetoed_type: None,
+                        enum_domain: None,
                     });
                     continue;
                 }
@@ -461,6 +471,8 @@ pub(crate) fn cmd_profile(
 
                 let unique_values =
                     collect_unique_values_if_categorical(&final_label, col_values, enum_threshold);
+                let enum_domain =
+                    detect_enum_domain(&final_label, col_values, &EnumConfig::default());
                 profiles.push(ColProfile {
                     name,
                     label: final_label,
@@ -481,6 +493,7 @@ pub(crate) fn cmd_profile(
                     validation_vetoed: vetoed,
                     validation_advisory_low: advisory_low,
                     vetoed_type,
+                    enum_domain,
                 });
             }
         } // end else (per-column path)
@@ -644,6 +657,21 @@ pub(crate) fn cmd_profile(
                             if let Some(ref uv) = p.unique_values {
                                 obj.insert("unique_values".to_string(), json!(uv));
                             }
+                        }
+                        // x-finetype-enum: the observed OPEN bounded domain, for
+                        // any non-denylisted column (choice 0102). Descriptive
+                        // metadata — distinct from the validation `enum` keyword.
+                        if let Some(ref ed) = p.enum_domain {
+                            obj.insert(
+                                "x-finetype-enum".to_string(),
+                                json!({
+                                    "open": ed.open,
+                                    "distinct": ed.distinct,
+                                    "rows": ed.rows,
+                                    "cohesion": (ed.cohesion * 1000.0).round() / 1000.0,
+                                    "domain": ed.domain,
+                                }),
+                            );
                         }
                         if false {
                             // validate removed (AC-10)
