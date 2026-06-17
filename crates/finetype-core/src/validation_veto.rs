@@ -147,9 +147,12 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
         return None;
     }
 
-    // vocab-shape: a small vocabulary, genuinely repeated.
+    // vocab-shape: a small vocabulary, genuinely repeated. Enum reframe (choice 0102 /
+    // spec 2026-06-17-enum-accuracy-reframe): `categorical` is retired as an emitted
+    // label — a bounded vocabulary with no semantic type is the honest text residual
+    // `word`; its bounded-ness is surfaced separately as the x-finetype-enum property.
     if n >= 4 && (2..=12).contains(&distinct.len()) && distinct_ratio <= 0.6 {
-        return Some("representation.discrete.categorical");
+        return Some("representation.text.word");
     }
 
     None
@@ -283,9 +286,10 @@ identity.person.gender_code:
     #[test]
     fn fallback_vocab_shape_on_small_repeating_vocabulary() {
         let vocab = opts(&["comment", "story", "comment", "comment", "story", "comment"]);
+        // Enum reframe (0102): small bounded vocab -> text residual `word`, not categorical.
         assert_eq!(
             veto_shape_fallback(&vocab),
-            Some("representation.discrete.categorical")
+            Some("representation.text.word")
         );
     }
 

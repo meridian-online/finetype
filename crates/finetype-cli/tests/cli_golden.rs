@@ -302,7 +302,7 @@ fn golden_profile_ecommerce_orders() {
         "shipping_postal_code",
         "geography.address.postal_code",
     );
-    assert_column_type(&cols, "status", "representation.discrete.categorical");
+    assert_column_type(&cols, "status", "representation.text.word");
     assert_column_type(&cols, "is_gift", "representation.boolean.terms");
     assert_column_type(&cols, "tracking_url", "technology.internet.url");
     // v16: phone correctly classified as phone_number (v14 misclassified as ssn)
@@ -327,7 +327,7 @@ fn golden_profile_titanic() {
     assert_column_type(&cols, "Survived", "representation.boolean.binary");
     assert_column_type(&cols, "Sex", "identity.person.gender");
     assert_column_type(&cols, "Fare", "finance.currency.amount");
-    assert_column_type(&cols, "Embarked", "representation.discrete.categorical");
+    assert_column_type(&cols, "Embarked", "representation.text.word");
 
     // Cabin should NOT be ICD10 — this was the showstopper bug
     assert_column_domain(&cols, "Cabin", "representation.");
@@ -370,7 +370,7 @@ fn golden_profile_people_directory() {
 
     // Representation
     assert_column_type(&cols, "company", "representation.text.entity_name");
-    assert_column_type(&cols, "job_title", "representation.discrete.categorical");
+    assert_column_type(&cols, "job_title", "representation.text.word");
     assert_column_type(&cols, "salary", "finance.currency.amount");
 
     // Broad types

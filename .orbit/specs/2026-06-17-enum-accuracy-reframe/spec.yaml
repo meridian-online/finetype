@@ -81,6 +81,20 @@ acceptance_criteria:
     (x-finetype-enum, already shipped 0.6.33) carries bounded-ness instead. GATE: reframed
     gold no-regression AND corpus-honest gate (blocking, H05) — this RELOCATES mass off
     categorical, exactly the relocation the gate exists to police, so it must run.
+    CODE DONE (2026-06-17), GATE PENDING: implemented as ONE output-boundary remap
+    `categorical -> representation.text.word` in finalize_is_generic (column/mod.rs, the
+    chokepoint every classify path calls; RHH-disableable `enum_reframe_residual`) PLUS the
+    CLI-layer leak fixed at source — veto_shape_fallback (validation_veto.rs) now returns
+    text.word, not categorical (it runs in resolve_veto_outcome AFTER the model finalize, so
+    the chokepoint alone missed it: 2/931 leaked until fixed). The internal Sharpen rules
+    (R32, header/feature/value sharpen, fusion cardinality gate) still COMPUTE categorical so
+    the gate still prevents over-emission; only the survivor is remapped. Deeper rule deletion
+    deferred to a gated simplification. VERIFIED: 0 categorical emitted corpus-wide on the gold
+    set; reframed gold 0.800 (no regression, was 0.797); legacy gold recovered 0.743->0.796
+    (model now emits word matching migrated truth — phantom dip gone, coherent under both
+    scorers); cargo test green (cli_golden status/Embarked/job_title -> word, veto fallback
+    test -> word). REMAINING: the BLOCKING corpus-honest gate (candidate pass on the 33,250-file
+    ac-01 stratified sample vs the v19 gated oracle) — must run GO before the next binary release.
   gate: true
   checked: false
 - id: ac-04

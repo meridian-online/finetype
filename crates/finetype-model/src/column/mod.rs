@@ -912,6 +912,25 @@ impl ColumnClassifier {
     /// Called before returning from classification methods to ensure the field is always
     /// computed on the final (post-hint, post-demotion) label.
     fn finalize_is_generic(&self, result: &mut ColumnResult) {
+        // Enum reframe (choice 0102 / spec 2026-06-17-enum-accuracy-reframe): retire
+        // `representation.discrete.categorical` as an EMITTED label. It is a
+        // representation property (bounded enum domain), surfaced separately as
+        // x-finetype-enum, not a competing semantic leaf — and as a flat-softmax
+        // residual it is the v23-explosion attractor (memory categorical-is-a-residual-
+        // category). The Sharpen rules still compute it internally — crucially the
+        // fusion cardinality gate (CATEGORICAL_LABEL above) still demotes over-emitted
+        // categorical to a specific type BEFORE this point — so we remap only the
+        // surviving residual to the honest text residual `word`. Single output-boundary
+        // chokepoint (every classify path calls finalize_is_generic). RHH-disableable
+        // for A/B and instant revert; the deeper rule deletion is a gated follow-up.
+        if result.label == CATEGORICAL_LABEL && !rhh::is_disabled("enum_reframe_residual") {
+            result.label = "representation.text.word".to_string();
+            result.disambiguation_applied = true;
+            result.disambiguation_rule = Some(match result.disambiguation_rule.take() {
+                Some(r) => format!("enum_reframe_residual<-{r}"),
+                None => "enum_reframe_residual".to_string(),
+            });
+        }
         result.is_generic = is_generic_prediction(
             &result.label,
             &result.disambiguation_rule,
