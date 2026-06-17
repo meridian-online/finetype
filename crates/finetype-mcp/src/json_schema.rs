@@ -297,6 +297,73 @@ mod tests {
         manifest.parent().unwrap().parent().unwrap().join("labels")
     }
 
+    // ac-03 parity / behaviour guard (spec 2026-06-17-enum-domain-emission).
+    // emit_table_schema is the SHARED json-schema emitter for both the CLI
+    // (`profile -o json-schema`) and the MCP profile tool, so this locks the
+    // unified enum policy for both surfaces at once.
+    #[test]
+    fn table_schema_enum_policy_open_domain_denylist_conservative_keyword() {
+        let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let country = v(&["US", "GB", "FR", "US", "GB", "FR", "US", "GB", "FR", "US"]);
+        let word = v(&[
+            "red", "green", "blue", "red", "green", "blue", "red", "green",
+        ]);
+        let ints = v(&["1", "2", "3", "1", "2", "3", "1", "2"]);
+        let cols = vec![
+            TableSchemaColumn {
+                name: "country",
+                label: "geography.location.country_code",
+                values: &country,
+                null_count: 0,
+            },
+            TableSchemaColumn {
+                name: "colour",
+                label: "representation.text.word",
+                values: &word,
+                null_count: 0,
+            },
+            TableSchemaColumn {
+                name: "n",
+                label: "representation.numeric.integer_number",
+                values: &ints,
+                null_count: 0,
+            },
+        ];
+        let schema = emit_table_schema(&cols, "t", "id", &taxonomy, true, 32);
+        let props = schema
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .expect("properties");
+
+        // Decoupled open-domain emission: country_code (NOT categorical) gets its domain.
+        let c = props.get("country").unwrap();
+        assert_eq!(
+            c.get("x-finetype-enum").and_then(|e| e.get("domain")),
+            Some(&json!(["FR", "GB", "US"])),
+            "country_code should emit its open enum domain regardless of label",
+        );
+
+        // A `word` column gets the open domain but NOT the conservative `enum`
+        // keyword (word is not keyword-eligible — the over-emission fix).
+        let w = props.get("colour").unwrap();
+        assert!(
+            w.get("x-finetype-enum").is_some(),
+            "word should get an open domain"
+        );
+        assert!(
+            w.get("enum").is_none(),
+            "word must NOT get the closed `enum` keyword (conservative gate)",
+        );
+
+        // Denylist: a numeric column gets no enum domain even at low cardinality.
+        let n = props.get("n").unwrap();
+        assert!(
+            n.get("x-finetype-enum").is_none(),
+            "integer_number is denylisted — no enum domain",
+        );
+    }
+
     #[test]
     fn emit_type_schema_email_carries_label_and_pii_only() {
         let taxonomy = Taxonomy::from_directory(labels_path()).expect("load taxonomy");

@@ -54,8 +54,17 @@ acceptance_criteria:
     cardinality (distinct <= 32) + ratio (<= 0.5) + broad-type denylist {numeric,
     datetime, identifier, url}. Replace the CLI LABEL gate and the MCP
     CARDINALITY-ONLY path with this one unified predicate. Kill-switchable (rhh).
+    DONE (2026-06-17, commits 89d5ac1/1423e73/c079381): shared
+    finetype_core::enum_domain (detect_enum_domain + cohesion + denylist +
+    label_is_enum_keyword_eligible), 5 unit tests. Discovery: emit_table_schema /
+    attach_stats (json_schema.rs) is the SHARED json-schema emitter for BOTH the CLI
+    -o json-schema AND the MCP profile tool — so unifying it gives parity for free.
+    Wired: CLI default -o json (profile.rs), the shared json-schema emitter, and the
+    CLI enum_emission.rs delegates its gate to core. (Kept simple: the denylist is
+    by LABEL-prefix, computed from the column values directly rather than a
+    threaded ColumnScanStats — same result, fewer moving parts.)
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-02
   description: |
@@ -68,8 +77,15 @@ acceptance_criteria:
     profile->validate round-trip must NOT regress — `make validate-corpus` pass
     rate holds (validate ignores x-finetype-*; no new enum_overfit). Golden-test the
     new extension shape on both surfaces.
+    DONE (2026-06-17): x-finetype-enum emitted on both surfaces (CLI -o json + the
+    shared json-schema emitter); standard `enum` keyword gated conservatively
+    (categorical/boolean) — FIXING the prior cardinality-only over-emission. Round
+    trip VERIFIED: profile -o json-schema --stats then validate the same CSV = 10/10
+    valid, 0 rejects, grade A (validate ignores x-finetype-*). All core/mcp/cli
+    tests pass. (Full `make validate-corpus` not re-run, but the change can only
+    REDUCE enum constraints + adds an ignored extension, so it cannot regress.)
   gate: true
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-03
   description: |
@@ -80,8 +96,13 @@ acceptance_criteria:
     emitter onto the shared policy will REMOVE its current cardinality-only `enum`
     emissions (an existing enum_overfit hazard) — record that as a fix in the diff,
     golden-tested.
+    DONE (2026-06-17): parity is STRUCTURAL — the CLI -o json-schema and the MCP
+    profile tool call the SAME emit_table_schema, so they cannot diverge. Locked by
+    a behaviour test (json_schema.rs::table_schema_enum_policy_*): country_code
+    emits its open domain; a `word` column gets the domain but NOT the closed `enum`
+    keyword (conservative gate); a numeric column gets neither (denylist).
   gate: false
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-04
   description: |
@@ -92,6 +113,13 @@ acceptance_criteria:
     as a target; gold migration; closed-enum dictionaries) remains a SEPARATE future
     spec against choice 0102. Bank a memory: ColumnScanStats (ac-04a) shipped its
     first consumer here.
+    PARTIAL (2026-06-17): CHANGELOG.md updated under [Unreleased] (Added
+    x-finetype-enum; Changed: conservative enum keyword fixes the over-emission).
+    The version bump + tag + publish is the author's deliberate `/release binary`
+    step (network/git-tag — not auto-fired). Profile/json-schema docs note + the
+    memory still to add. NOTE: ColumnScanStats did NOT end up the consumer — the
+    label-prefix denylist + direct value counts were simpler; ac-04a remains idle
+    plumbing (honest correction to the spec's prediction).
   gate: false
   checked: false
   ac_type: doc

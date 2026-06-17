@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Enum-domain emission** (choice 0102, patch increment — spec
+  `2026-06-17-enum-domain-emission`). `profile` now reports each column's observed
+  bounded value domain as a descriptive `x-finetype-enum` extension
+  (`{ open, domain, distinct, rows, cohesion }`), **decoupled from the semantic
+  label**: a `country_code` column emits its domain `[FR, GB, US]` just as a
+  categorical column does — enum-ness is a representation property, not a competing
+  type. Detected from full-column cardinality (`distinct <= 32`,
+  `distinct/rows <= 0.5`) with a denylist (numeric / coordinate / datetime /
+  identifier / url); a character-shape **cohesion** score rides along as an analyst
+  signal. The CLI (`profile`, `-o json` and `-o json-schema --stats`) and the MCP
+  `profile` tool share one policy (`finetype_core::enum_domain`).
+
+### Changed
+
+- The validation-enforced JSON-Schema **`enum` keyword stays conservative**
+  (categorical/boolean labels only). This **fixes** a prior cardinality-only
+  over-emission in the json-schema / MCP path that could freeze an open domain into
+  a closed constraint (`enum_overfit`, card 0014). The open domain now lives in the
+  descriptive `x-finetype-enum` extension, which validators ignore — so the
+  `profile -> validate` round-trip is unaffected.
+
 ## [0.6.32] - 2026-06-16
 
 Ingestion and interface release: `profile` now reads CSV **and Parquet** through
