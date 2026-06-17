@@ -1,0 +1,77 @@
+id: 2026-06-17-cardinality-boundary-readjudication
+goal: Re-adjudicate the ~239 categorical-boundary gold columns with TRUE full-column cardinality shown to the adjudicator (the repetition signal absent from gold's original 8-25-value labelling), so ground truth at the categorical-vs-specific boundary reflects real structure — then re-measure whether the model's boundary errors are real or gold-label artifacts.
+cards:
+- 0019-human-verified-gold-corpus
+status: open
+labels:
+- gold
+- readjudication
+- cardinality
+acceptance_criteria:
+- id: ac-00
+  description: |
+    BUILD THE BOUNDARY WORKLIST. The ~239 columns whose current gold label is
+    `representation.discrete.categorical` OR a type the model confuses with it
+    (city, region, iata_code, country_code, word, entity_name, plain_text,
+    ordinal). For each, compute via DuckDB the TRUE full-column signal the original
+    labelling never had: distinct count, row count, cardinality ratio, and the
+    top-K distinct values WITH their counts (the repetition structure). 172/239
+    resolve to clean stats today; record the ~28% that don't (file/column-name
+    mismatch) as a coverage limit, do not silently drop them.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-01
+  description: |
+    RE-ADJUDICATE via the 2026-06-16 mixed-panel method (LLM panels blind + author
+    adversarial, the procedure that set today's 0.800), but with TRUE CARDINALITY +
+    distinct-value-counts shown as a labelled input alongside header and values.
+    The adjudication question is specifically: is this a BOUNDED ENUM (categorical)
+    or an OPEN specific type? Cardinality is necessary-not-sufficient — it cleanly
+    separates categorical from entity_name (0.04 vs 0.99) / iata (0.89) but NOT
+    from country_code (0.039 vs 0.044) / city (0.18) / region (0.49), which are
+    low-cardinality on BOTH sides and decided by SEMANTICS. That is exactly why a
+    human/LLM (not a cardinality gate) is the instrument. Record panel agreement,
+    a control-confirm rate, and the contested residue.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-02
+  description: |
+    APPLY confirmed changes to eval/gold/gold_corpus.tsv — append-only fact model,
+    provenance string records the prior label + `cardinality-readjudication` tier
+    (the single canonical file; git + provenance is the history). Re-run
+    `make leakage-guard` (membership unchanged; the firewall must still hold).
+    Record the label-change count AND direction (toward vs away from categorical) —
+    the 2026-06-16 precedent was 33 changes / +7 headline, i.e. re-adjudication
+    CLEANS rather than inflates; a large swing toward categorical would itself be a
+    signal worth pausing on.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    RE-MEASURE on the cleaned gold (scripts/score_gold_anchor.py, same 8-value
+    harness — this re-adjudication does NOT change the eval regime, only the
+    labels). Report how categorical / city / region / country_code per-type
+    precision & recall and the headline move. The DELIVERABLE is the answer to the
+    load-bearing question: are the model's categorical-boundary errors REAL (gold
+    confirmed after seeing cardinality) or ARTIFACTS (gold flips toward the model)?
+    Either outcome is valuable — it tells us whether the dominant error mass is a
+    model problem worth a fix or a measurement problem now resolved. Honest prior:
+    expect mostly confirmation + a handful of corrections, not a headline jump.
+  gate: false
+  checked: false
+  ac_type: observation
+- id: ac-04
+  description: |
+    DECISION + HANDOFF. Record the verdict: how much of the categorical-boundary
+    error survived re-adjudication (real model error) vs was gold noise. IF a
+    substantial real residue remains, scope the model-side fix as a SEPARATE spec —
+    and note it needs SEMANTIC features (header/sibling/value), NOT a cardinality
+    gate, because cardinality cannot separate the dominant cat-vs-country/city/region
+    pairs (proven in ac-01). Update CLAUDE.md sprint state + bank a memory. Do NOT
+    bundle a model change into this gold-quality spec.
+  gate: false
+  checked: false
+  ac_type: doc
