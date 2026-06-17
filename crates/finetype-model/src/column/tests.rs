@@ -6202,7 +6202,13 @@ fn vals(xs: &[&str]) -> Vec<String> {
 fn username_veto_fires_on_login_handles() {
     // Corpus `author` shape: single-token handles, no internal whitespace.
     let handles = vals(&[
-        "tptacek", "patio11", "rms", "jacquesm", "petercooper", "dfens", "schof",
+        "tptacek",
+        "patio11",
+        "rms",
+        "jacquesm",
+        "petercooper",
+        "dfens",
+        "schof",
     ]);
     assert!(is_username_handle_shaped(&handles));
 }

@@ -251,8 +251,7 @@ fn is_username_handle_shaped(values: &[String]) -> bool {
         if v.chars().any(char::is_whitespace) {
             with_space += 1;
         } else if v.chars().any(|c| c.is_ascii_alphabetic())
-            && v
-                .chars()
+            && v.chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
         {
             handle_charset += 1;
