@@ -3,7 +3,7 @@ goal: Drop representation.discrete.categorical as a competing classification tar
 cards:
 - 0020-honest-production-typing
 - 0002-semantic-type-detection
-status: open
+status: closed
 labels:
 - enum
 - eval-reframe
@@ -118,6 +118,10 @@ acceptance_criteria:
     (native JSON-Schema `enum` for ISO/currency closed domains + out-of-domain validation)
     are a SEPARATE follow-up spec, not folded here. This AC records the sequencing decision;
     it does not run the retrain.
+    DONE (2026-06-17): retrain follow-up filed as spec 2026-06-17-post-reframe-retrain under
+    card 0020 (the north-star hypothesis to test). Closed-enum dictionaries remain a separate
+    future spec. Sequencing recorded in card 0020 goal + memory representative-baseline-is-068.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
+closed_at: 2026-06-17T11:10:43.957113Z

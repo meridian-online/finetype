@@ -1,0 +1,9 @@
+id: 2026-06-17-post-reframe-retrain
+goal: 'Test card 0020''s north-star hypothesis: with the categorical residual attractor removed (enum reframe shipped), an additive hard-negative retrain rebalances cleanly (no categorical explosion) and lifts the representative + gold headline with no destination-drift NO-GO on the corpus-honest gate.'
+cards:
+- 0020-honest-production-typing
+status: open
+labels:
+- retrain
+- north-star
+acceptance_criteria: []
