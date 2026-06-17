@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.33] - 2026-06-17
+
+Enum-domain emission: `profile` now reports each column's observed bounded value
+domain, and the JSON-Schema `enum` keyword is hardened against `enum_overfit`.
+
 ### Added
 
 - **Enum-domain emission** (choice 0102, patch increment — spec
