@@ -323,3 +323,7 @@ output/isbn-checksum-guard/
 output/isbn-veto/
 output/securities-checksum-guard/
 output/url-veto/
+
+# Representative-baseline study (this session) — regenerable dumps + local finding;
+# durable record is memory representative-baseline-is-068 + card 0020 + the spec.
+output/representative-baseline/
