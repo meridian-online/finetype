@@ -21,7 +21,7 @@ acceptance_criteria:
     the limit: the 448-row manifest is curated/small; the identity hit-count is single
     digits, so this measures the curated gap, not production breadth.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-01
   description: |
