@@ -84,13 +84,36 @@ how cleanly the predicate separates designed enums from accidental low cardinali
 and from cohesive-but-open types (city/entity). Ship the loosest setting that
 keeps enum precision high. No threshold is hand-picked.
 
-### Output (additive, non-breaking)
+### Output / JSON Schema evolution (settled — the load-bearing routing)
 
-Extend the existing `enum_emission` path. Minimum: populate `unique_values` (→
-JSON-Schema `enum`) for the broadened eligible set. Preferred: a small `enum`
-block — `{ open: true, domain: [...], distinct, rows, cohesion_score }` — emitted
-alongside the semantic type, so the analyst gets meaning AND domain. Existing
-consumers that ignore the new field are unaffected (patch-safe).
+The standard JSON Schema `enum` keyword is a CLOSED VALIDATION CONSTRAINT — a
+validator REJECTS any value outside the set. Emitting an OPEN, observed domain
+there re-introduces `enum_overfit` and breaks the profile→validate round-trip
+(the exact failure card 0014 guards: "don't freeze a value list real data will
+violate"). So open/closed maps directly onto extension/keyword:
+
+- **Open enum domain (the patch) → a DESCRIPTIVE `x-finetype-*` extension** —
+  `x-finetype-enum: { open: true, domain: [...], distinct, rows, cohesion }`.
+  Validators ignore `x-finetype-*`, so the round-trip stays intact and the analyst
+  still gets the discovered domain. This is the patch's primary output.
+- **Standard `enum` keyword → stays CONSERVATIVE**, reserved for genuinely-closed
+  enums (the deferred 0.7.0 closed-dictionary work). The patch does NOT broaden
+  what lands in the validation-enforced `enum` keyword.
+
+The existing fields (`x-finetype-cardinality`, `x-finetype-domain`) are reused
+where they fit; the new `x-finetype-enum` block carries open/domain/cohesion.
+
+### MCP shadows CLI — one shared policy, not two (settled, author)
+
+The two emitters currently DIVERGE: the CLI (`enum_emission.rs`) gates `enum` by
+LABEL + cardinality; the MCP/extension (`json_schema.rs:195`) emits the standard
+`enum` keyword on CARDINALITY ALONE (already an `enum_overfit` hazard). The MCP is
+**not a separate feature set — it must shadow the CLI.** The patch consolidates the
+enum-emission policy into ONE shared module that BOTH surfaces call, and a parity
+guard asserts identical output (precedent: the MCP tool-surface parity guard,
+choice 0101). Reconciling the MCP emitter onto the conservative-`enum` +
+`x-finetype-enum`-extension policy is part of the patch (it removes existing MCP
+enum_overfit emissions — a fix, golden-tested).
 
 ### Decisions surfaced
 
