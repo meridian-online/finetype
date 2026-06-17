@@ -35,6 +35,25 @@ Examples:
       --predictions ../output/gold-eval-anchor/predictions_v19.tsv \\
       --model-name v19-models-default \\
       --out-dir ../output/gold-eval-anchor
+
+LOAD-BEARING PROPERTIES (read before building analysis on top of this harness):
+
+  1. SAMPLE CONSISTENCY. `predict` feeds the model the SMALL per-column sample
+     stored in `sample_values_truncated` (a handful of representative values,
+     ~8), NOT the full column. Crucially, the gold labels were ADJUDICATED from
+     those same samples (the fixture's sense_context / ydf_context). So the eval
+     is internally consistent: the model is scored on the same evidence the
+     labeller saw. Do NOT "improve" predict by reading full columns from disk —
+     that feeds the model more than ground truth was based on, and accuracy drops
+     against gold (measured 2026-06-17: 0.785 -> 0.707). It is not understatement;
+     it is consistency. A full-column-statistic study CANNOT be run on this
+     harness for the same reason (predictions and any disk-read stats come from
+     different value sets). See memory `full-column-stat-sharpen-is-redundant`.
+
+  2. SEP is "│" (U+2502 BOX DRAWINGS LIGHT VERTICAL), not a control char. When
+     parsing `sample_values_truncated` anywhere, import this SEP — do not retype a
+     guess (splitting on the wrong byte silently collapses every sample to one
+     value, which reads as a fake "n=1" degeneracy).
 """
 from __future__ import annotations
 
