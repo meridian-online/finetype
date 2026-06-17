@@ -40,7 +40,7 @@ jobs:
             archive: zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - run: rustup show # installs toolchain from rust-toolchain.toml
       - run: rustup target add ${{ matrix.target }}
@@ -107,7 +107,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -153,7 +153,7 @@ jobs:
           echo "x86_64_linux=$(awk '{print $1}' finetype-${TAG}-x86_64-unknown-linux-gnu.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew-tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: meridian-online/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -219,7 +219,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Dispatch to install.meridian.online
         run: |
