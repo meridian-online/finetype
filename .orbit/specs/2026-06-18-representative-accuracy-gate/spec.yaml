@@ -3,7 +3,7 @@ goal: 'Freeze the panel-adjudicated uniform-random representative sample into a 
 cards:
 - 0020-honest-production-typing
 - 0019-human-verified-gold-corpus
-status: open
+status: closed
 labels:
 - eval-infrastructure
 - representative-baseline
@@ -80,7 +80,7 @@ acceptance_criteria:
     DELIVERABLE: the documented promotion order with the representative band placed, its advisory
     role and CI caveat stated, so the scoreboard is self-describing for the next promoter.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-04
   description: |
@@ -99,5 +99,6 @@ acceptance_criteria:
     signal. STATE what is measured vs assumed (a clean divergence may simply not exist yet among
     today's candidates; do not manufacture one).
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
+closed_at: 2026-06-18T10:13:15.14564Z

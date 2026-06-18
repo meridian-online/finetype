@@ -23,6 +23,8 @@ After the v0.6.17 release we decoupled CI from the `models/default` symlink (see
 
 Steps 2 and 3 may ship in the same PR. Step 1 must precede step 2 (or step 2 can be deferred if the promotion is purely a runtime change).
 
+**Quality gates before any of this.** A candidate clears the promotion-order scoreboard *before* the flip (CLAUDE.md "Promotion order"): gold-anchor → drift proxy → gold + rare-type scoreboard → **representative accuracy (advisory)** → corpus-honest gate (**blocking**). The representative band (`eval/repr/representative_corpus.tsv`, scored `score_gold_anchor.py … --reframe`) is reported alongside gold and flags an advisory drop on the candidate-vs-v19 delta; it never blocks on its own. Only gold + the corpus-honest relocation gate block. See the spec `2026-06-18-representative-accuracy-gate`.
+
 A non-blocking drift check (`.github/scripts/check-ci-model-drift.sh`) warns in CI when `FINETYPE_CI_MODEL` and `models/default` disagree — legitimate during promotion PRs, but visible so divergence isn't silent for weeks.
 
 See also: `DEVELOPMENT.md` for the three model-name env vars (`FINETYPE_CI_MODEL`, `FINETYPE_MODEL`, `FINETYPE_MODEL_DIR`) — each read by exactly one consumer.
