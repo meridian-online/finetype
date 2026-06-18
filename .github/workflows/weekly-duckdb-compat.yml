@@ -1,0 +1,104 @@
+name: Weekly DuckDB compatibility
+
+# Early-warning canary: build the finetype extension against the LATEST DuckDB
+# stable (resolved dynamically) and against DuckDB main, every Monday. A red run
+# means a DuckDB version that users will soon be forced onto (via the
+# community-extensions registry rebuild) breaks our build — caught here on our
+# own schedule instead of as a published-build 404.
+#
+# Kept SEPARATE from MainDistributionPipeline.yml so a compat failure is a
+# SIGNAL, never a gate: it does not block releases or PR merges.
+#
+# Faithful mirror of the real build (MainDistributionPipeline.yml): same
+# reusable workflow @ref, ci_tools_version, extra_toolchains and exclude_archs —
+# ONLY duckdb_version varies. So a red here is "the new DuckDB broke our shipped
+# build recipe", not a build-infra mismatch.
+#
+# Note on the @ref: GitHub does not allow expressions in a reusable-workflow
+# `uses:` ref, so it is pinned to the same v1.5.3 ci-tools as production (and the
+# extension-ci-tools repo has no tag tracking every DuckDB patch — e.g. v1.5.4
+# has no workflow). The moving target is the `duckdb_version` INPUT, which does
+# accept an expression.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'      # Mondays 06:00 UTC
+  workflow_dispatch:          # run on demand (also keeps the cron from being auto-disabled)
+
+concurrency:
+  group: weekly-duckdb-compat
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-stable:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.latest.outputs.tag }}
+    steps:
+      - id: latest
+        run: |
+          tag=$(curl -fsSL https://api.github.com/repos/duckdb/duckdb/releases/latest | jq -r .tag_name)
+          if [ -z "$tag" ] || [ "$tag" = "null" ]; then
+            echo "::error::could not resolve latest DuckDB stable tag"; exit 1
+          fi
+          echo "Latest DuckDB stable: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  # Build against the latest RELEASED DuckDB — the version users get next.
+  build-stable:
+    needs: resolve-stable
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    with:
+      duckdb_version: ${{ needs.resolve-stable.outputs.tag }}
+      ci_tools_version: v1.5.3
+      extension_name: finetype
+      extra_toolchains: 'rust;python3'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+
+  # Build against DuckDB main — earliest warning of an upstream API change.
+  # Optional/noisier than build-stable; drop this job if main churn is annoying.
+  build-main:
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.5.3
+    with:
+      duckdb_version: main
+      ci_tools_version: v1.5.3
+      extension_name: finetype
+      extra_toolchains: 'rust;python3'
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_amd64_musl;linux_arm64_musl;windows_arm64;windows_amd64_mingw'
+
+  # File a tracking issue on failure so it survives past the owner's email.
+  notify:
+    needs: [resolve-stable, build-stable, build-main]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'duckdb-compat';
+            // Ensure the label exists (create-if-missing) so issue creation can't 404 on it.
+            try {
+              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label });
+            } catch (e) {
+              await github.rest.issues.createLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label, color: 'fbca04' });
+            }
+            const stable = ${{ toJSON(needs.resolve-stable.outputs.tag) }};
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Weekly DuckDB compat build failed — stable ${stable} (run ${context.runId})`,
+              body: [
+                `The scheduled build against the latest DuckDB stable (\`${stable}\`) and/or \`main\` failed.`,
+                ``,
+                `This is the early-warning canary — it does NOT block releases or merges. Fix on your own schedule before the community-extensions registry rebuilds finetype against this DuckDB.`,
+                ``,
+                `Run: ${run}`,
+              ].join('\n'),
+              labels: [label],
+            });
