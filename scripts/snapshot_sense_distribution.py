@@ -106,21 +106,19 @@ def main() -> int:
         csvdir.mkdir()
         schemadir.mkdir()
 
+        # Profile source parquets DIRECTLY (choice 0100: `profile` reads parquet
+        # via the duckdb CLI). The former parquet->CSV->reprofile round-trip broke
+        # post-0100: the strict duckdb CSV reader (ignore_errors=false) aborts the
+        # whole batch on one text-heavy converted CSV (embedded newlines/quotes),
+        # capturing only the first file. Direct parquet batch mode is tolerant —
+        # it skips an unreadable file and continues (measured: 995/1000, exit 0).
         idx_paths = []
         convert_err = 0
-        for i, f in enumerate(files):
+        for f in files:
             if not os.path.isfile(f):
                 convert_err += 1
                 continue
-            csvp = csvdir / f"{i:05d}.csv"
-            c = run(["duckdb", "-c",
-                     f"COPY (SELECT * FROM read_parquet('{os.path.realpath(f)}') "
-                     f"LIMIT {args.rows}) TO '{csvp.as_posix()}' "
-                     f"(HEADER, FORMAT CSV);"])
-            if c.returncode != 0 or not csvp.is_file():
-                convert_err += 1
-                continue
-            idx_paths.append(str(csvp))
+            idx_paths.append(os.path.realpath(f))
 
         listfile = Path(work) / "list.txt"
         listfile.write_text("\n".join(idx_paths) + "\n")
