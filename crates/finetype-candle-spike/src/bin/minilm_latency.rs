@@ -25,7 +25,20 @@ fn main() -> Result<()> {
         .nth(1)
         .unwrap_or_else(|| "output/fine-tuned-encoder-discovery/probe_data.tsv".to_string());
 
-    let device = Device::Cpu;
+    // DEVICE=metal (default when built --features metal) uses the M1 GPU; DEVICE=cpu forces CPU.
+    let want_cpu = std::env::var("DEVICE").as_deref() == Ok("cpu");
+    #[cfg(feature = "metal")]
+    let device = if want_cpu {
+        Device::Cpu
+    } else {
+        Device::new_metal(0)?
+    };
+    #[cfg(not(feature = "metal"))]
+    let device = {
+        let _ = want_cpu;
+        Device::Cpu
+    };
+    eprintln!("device: {device:?}");
     let config: Config =
         serde_json::from_reader(File::open(format!("{snap}/config.json")).context("config.json")?)?;
     let mut tokenizer =

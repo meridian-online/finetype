@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[features]
+# Apple Silicon GPU backend for the MiniLM latency probe (ac-00.5).
+metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+
 [dependencies]
 # Candle ML framework — pin half to resolve known rand/half trait conflict
 candle-core = "0.8"
