@@ -59,8 +59,13 @@ class LoadIdentitiesTests(unittest.TestCase):
         full = load_gold_identities()
         self.assertGreater(len(full), len(anchor_only),
                            "gold-corpus candidate fixtures not folded in")
+        # `bogus` loads a missing explicit path, so it is exactly the folded-in
+        # corpus fixtures. Loading everything is the union of the anchor and the
+        # corpus fixtures — this holds even when a fixture coincidentally shares a
+        # column identity with the anchor (e.g. the uniform-random representative
+        # draw can land on a gold column), which a strict `full - anchor` would miss.
         bogus = load_gold_identities(REPO / "no" / "such.tsv")
-        self.assertEqual(bogus, full - anchor_only)
+        self.assertEqual(full, anchor_only | bogus)
 
 
 class IsGoldColumnTests(unittest.TestCase):

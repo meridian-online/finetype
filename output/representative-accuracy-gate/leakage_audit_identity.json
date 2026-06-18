@@ -1,0 +1,8 @@
+{
+  "n_gold": 1531,
+  "n_training_with_identity": 0,
+  "n_overlap": 0,
+  "overlap": [],
+  "gold_path": "eval/repr/representative_corpus.tsv",
+  "distilled_path": "/Users/hugh/github/meridian-online/finetype/output/distillation-v3/sherlock_distilled.csv.gz"
+}

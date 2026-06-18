@@ -35,6 +35,10 @@ DEFAULT_GOLD = REPO / "eval" / "gold" / "gold_eval_anchor.tsv"
 GOLD_CORPUS_FIXTURES = (
     REPO / "eval" / "gold" / "gold_corpus_candidates.tsv",
     REPO / "eval" / "gold" / "gold_corpus_candidates_external.tsv",
+    # Representative-data eval fixture (spec 2026-06-18-representative-accuracy-gate
+    # ac-01): the uniform-random production sample is an eval instrument, so its
+    # columns are excluded from training on the same firewall as gold.
+    REPO / "eval" / "repr" / "representative_corpus.tsv",
 )
 
 Identity = tuple[str, str]  # (file_content_sha256, column_name)
