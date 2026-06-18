@@ -1,0 +1,88 @@
+id: 2026-06-18-ceiling-and-rules-discovery
+goal: 'Determine the architecture lever(s) that move the gold/representative ceiling above ~0.80 AND let us delete Sharpen rules — adjudicating the proven-but-structural full-column-statistics layer against the stranded-but-semantic sibling/header layer, and naming what is irreducible without an LLM. Discovery only: no model/rule ship.'
+cards:
+- 0020-honest-production-typing
+- 0002-semantic-type-detection
+labels:
+- discovery
+- architecture
+status: open
+acceptance_criteria:
+- id: ac-00
+  description: |
+    PARTITION THE REMAINING HEADROOM BY ERROR MASS (observation, BLOCKING). From the
+    latest gold + representative error taxonomy (memories representative-baseline-is-068,
+    cardinality-boundary-error-is-real), split the residual misses into:
+    (a) STRUCTURAL — separable by full-column statistics the per-VALUE model is blind to:
+        categorical vs alphanumeric_id / entity_name, integer_number vs increment, binary,
+        coordinate-pair (memory column-stats-separate-residual-gaps: AUC 0.985 / 0.972).
+    (b) SEMANTIC — needs meaning, NOT shape/stats: categorical vs country_code/city/region,
+        full_name vs place/org/person, numeric_code-as-role.
+    Quantify each mass on gold (column counts) so the prize for each lever is sized, not
+    assumed. DELIVERABLE: the two-bucket headroom table + the honest split (how much of the
+    gap to ~0.90 is structural-and-winnable vs semantic-and-hard vs irreducible label noise).
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-01
+  description: |
+    COLUMN-STATISTICS LAYER — feasibility + rule-consolidation (observation+doc, the PROVEN
+    lever). Reproduce the 2026-06-16 probe (scripts/probe_column_stats.py) on the CURRENT
+    gold: confirm full-column cardinality ratio / increment signature / binary domain
+    separate the STRUCTURAL masses. Design it as ONE first-class layer — full-column exact
+    stats via a single DuckDB aggregate pass (FREE; likely a SPEED win as a decisive stat
+    short-circuits the neural pass), feeding value-based disambiguation (decisions 0048/0096).
+    KEY: enumerate which EXISTING ad-hoc cardinality rules it SUBSUMES (veto_shape_fallback,
+    text_vocab_override R32, fusion_cardinality_gate column/mod.rs:~2115 — all compute
+    cardinality over the 100-row SAMPLE today) so the layer is a NET RULE REDUCTION, not an
+    addition. STATE the limit: it must clear the corpus-honest gate (relocation) like any
+    rule; increment gold support is thin (n=1).
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-02
+  description: |
+    SEMANTIC-SIGNAL HEADROOM — clear-eyed, confronts the stranded layer (observation,
+    BLOCKING). The user's instinct is a SEMANTIC advance; the evidence says the semantic
+    learned layers are stranded/dead (memories sibling-context-is-the-stranded-architecture-
+    layer, hierarchical-head-falsified, b3-value-expert-fusion-dead-end). Resolve it with
+    measurement, not opinion:
+    (a) ABLATION: does the sibling-context attention block (crates/finetype-model/src/
+        sibling_context.rs, ~397k params, loaded at inference) change ANY v19 prediction?
+        Is it trained for the 250-class model or only the dead 6-class Sense? (memory says
+        the 250-class integration spec 2026-03-24 closed 0/7 — never finished).
+    (b) HEADROOM: if FINISHED (FTMB v3 table-grouped + frozen-sibling training), what is the
+        realistic gold gain on the SEMANTIC mass from ac-00 — vs the hierarchical-head
+        result (gold -3.3pp, falsified) as the prior.
+    (c) VERDICT: finish sibling-context (with a numeric/scoped target where it is motivated —
+        coordinate pairs), OR declare the SEMANTIC mass irreducible by any value/shape/sibling
+        model and route it to an LLM-in-the-loop / taxonomy / human tier. Name which.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-03
+  description: |
+    RULE-DELETION SCOREBOARD (doc). Cross-reference the RHH roadmap (diagnostics/
+    rhh_classification.tsv — model-gap vs model-covered families) AND the deterministic
+    Sharpen rules (username veto, veto_shape_fallback, text_vocab_override, the 0096
+    residual-precedence rules) against the ac-01/ac-02 levers: for each lever, list exactly
+    which rules it would let us DELETE and which become redundant. Produce the "fewer rules"
+    target list as a measurable scoreboard (count of rules retired), so the semantic-advance
+    goal has a concrete rule-reduction deliverable, not a vibe.
+  gate: false
+  checked: false
+  ac_type: doc
+- id: ac-04
+  description: |
+    SYNTHESIS + RECOMMENDATION (doc, BLOCKING). One artefact: the lever (or sequenced two)
+    that best moves the ceiling AND shrinks the rule pile, with the evidence. Must answer:
+    (1) what STRUCTURAL headroom the column-statistics layer wins and which rules it retires;
+    (2) whether the SEMANTIC mass has any model-side lever left or is LLM/human/taxonomy
+    territory; (3) the honest ceiling — how far above ~0.80 is reachable, and how much of the
+    remainder is irreducible label ambiguity (cardinality-boundary-error-is-real). End with
+    a single recommended next spec (build the column-stats layer / finish sibling-context /
+    accept the ceiling + shift to product), framed so the author picks the bet with eyes open.
+    No code or model ships from THIS spec — it produces the decision, not the change.
+  gate: true
+  checked: false
+  ac_type: doc
