@@ -1,0 +1,245 @@
+text	true_family	model_pred_family	model_correct
+header: country_code | values: US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US	country_code	country_code	1
+header: CountryCode | values: AT, CZ, DE, DE, EE, EE, ES, FI	country_code	country_code	1
+header: NPPES_PROVIDER_COUNTRY | values: US, US, US, US, US, US, US	country_code	country_code	1
+header: NPPES_PROVIDER_COUNTRY | values: US, US, US, US, US, US, US	country_code	country_code	1
+header: countryCode | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: Country | values: US, US, US, US, US, US, US	country_code	country_code	1
+header: country | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: Country | values: AO, AL, AE, AR, AM, AS, AU, AT	country_code	country_code	1
+header: country | values: BZ, DO, TR, VE, GR, PE, MX, FO	country_code	country_code	1
+header: countryCode | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: countryCode | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_code | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: Country | values: GF, RU, US, MU, US, US, JP, NU	country_code	country_code	1
+header: country | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: country_id | values: US, US, US, US	country_code	country_code	1
+header: country_id | values: US, US, US, US	country_code	country_code	1
+header: country_id | values: AZ, BR, CN, RO, AR, US, TR, ID	country_code	country_code	1
+header: country_code | values: AD, AE, AF, AG, AI, AL, AM, AO	country_code	country_code	1
+header: country | values: AD, AE, AF, AG, AI, AL, AM, AN	country_code	country_code	1
+header: venue_localized_country_name | values: USA, USA, USA, USA, USA, USA	country	full_name	0
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: exchange | values: GER, GER, GER, GER	RESIDUAL	RESIDUAL	1
+header: filename | values: d:\Develop\AutoChess-Simulator\.editorconfig, d:\Develop\AutoChess-Simulator\.eslintignore, d:\Develop\AutoChess-Simulator\.eslintrc.js, d:\Develop\AutoChess-Simulator\.postcssrc.js, d:\Develop\AutoChess-Simulator\README.md, d:\Develop\AutoChess-Simulator\build\build.js, d:\Develop\AutoChess-Simulator\build\check-versions.js, d:\Develop\AutoChess-Simulator\build\dev-client.js	RESIDUAL	RESIDUAL	1
+header: country_code_filter | values: MT, MT, MT, MT, MT, MT, MT, MT	country_code	country_code	1
+header: CountryCode | values: US, US, US, US	country_code	country_code	1
+header: countryCode | values: AU, AU, AU, AU, AU, AU, AU, AU	country_code	country_code	1
+header: exchange_country | values: HK, HK, HK, HK, HK, HK, HK, HK	country_code	country_code	1
+header: country_id:id | values: us, us, us, us, us, us, us, us	country_code	country_code	1
+header: country_id:id | values: au, au, au, au, au, au, au, au	country_code	locale_code	0
+header: country_id:id | values: us, us, us, us, us, us, us, us	country_code	country_code	1
+header: venue_country | values: ar, us, us, us, us, ar	country_code	locale_code	0
+header: marketplace | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: REC_DIR | values: ro, ro, ro, ro, ro, ro, ro, ro	RESIDUAL	RESIDUAL	1
+header: PA | values: PA, PA, PA, PA	RESIDUAL	country_code	0
+header: name | values: aranzebia spawned, aranzebia killed, reset aranzebia, aranzebia spawned, aranzebia killed, reset aranzebia, exit spawned, exit spawned	RESIDUAL	city	0
+header: name | values: Namibia, cinerea, pomonae, ponderosa	RESIDUAL	city	0
+header: EstadoDoc | values: Si, Si, Si, Si, Si, Si, Si, Si	RESIDUAL	region	0
+header: groupingname | values: Grouping-1, Grouping-2, Grouping-3, Grouping-3, Grouping-2	RESIDUAL	region	0
+header: name | values: Trochodium, ajrekarii, ipomoeae, sampathense	RESIDUAL	RESIDUAL	1
+header: Unnamed: 4 | values: apache-2.0, other, mit, mit, mit, lgpl-2.1	RESIDUAL	RESIDUAL	1
+"header: Description | values: The length of the statement  ""                sb.AppendFormat("", The length of the statement  ""            Assert.Fail(""Action is, The length of the statement  ""                "", The length of the statement  ""            const string text = @"", The length of the statement  ""                @"", The length of the statement  ""            new ServiceMessagePars, The length of the statement  ""            new ServiceMessagePars, The length of the statement  ""            new ServiceMessagePars"	RESIDUAL	RESIDUAL	1
+header: Shortname | values: OECD, Levels, Level 1, Level 2, Level 3, Level 4, Level 5, Competencies	RESIDUAL	RESIDUAL	1
+header: Title | values: Functional Pattern Matching in JavaScript , Adobe AIR Vs Microsoft Silverlight: It’s All About Numbers, Thoughts on Startups, Building a green PC	RESIDUAL	entity_name	0
+header: ObjectName | values: Browser, Username, Username, Password, Password, Login, Charlie Shen	RESIDUAL	RESIDUAL	1
+header: LayerName | values: conv_1, conv_1, relu_1, maxpool_1, conv_2, conv_2, relu_2, maxpool_2	RESIDUAL	RESIDUAL	1
+header: name | values: purchase.requisition, purchase.requisition.line, purchase.requisition manager, purchase.requisition.line manager, purchase.requisition, purchase.requisition.line	RESIDUAL	RESIDUAL	1
+header: variable description (or question text) | values: index of this account within the Twitter Politicians Dataset, Twitter account id, Twitter account id in string format, Twitter username or handle that appears after the @ (e.g., potus, Name indicated in Twitter API field 'name' (e.g., President Bide, Offline name of the account holder (e.g., Joseph R. Biden, Jr.), What type of entity does this account represent? If a politician, Have we as a team confirmed that this account belongs to a polit	RESIDUAL	RESIDUAL	1
+header: name | values: Goroka Airport, Madang Airport, Mount Hagen Kagamuga Airport, Nadzab Airport, Port Moresby Jacksons International Airport, Wewak International Airport, Narsarsuaq Airport, Godthaab / Nuuk Airport	entity_name	city	0
+header: status | values: reviewed, reviewed, reviewed, reviewed, reviewed, reviewed, reviewed, reviewed	RESIDUAL	version	0
+header: title | values: Slim by Design: Mindless Eating Solutions for Everyday Life, Trollflöjten [videorecording] = The magic flute / Janus Films ; [presented by] Carmen F. Zollo ; [écrit et réalisé par Ingmar Bergman] ; Sveriges Radio AB., Great Expectations, A dangerous friend / Ward Just., Bridge School benefit [sound recording]., The kingdom on the waves / taken from accounts by his [Octavian Nothing's] own hand and other sundry sources ; collected by M.T. Anderson of Boston., How to bake a book / Ella Burfoot., We have tornadoes / Linda Crotta Brennan.	RESIDUAL	comma_separated	0
+header: permit_status | values: ISSUED, ISSUED, ISSUED, ISSUED, ISSUED, ISSUED, ISSUED, ISSUED	RESIDUAL	http_method	0
+header: permit_type | values: EW, EQ, FO, DM, EW, FO, NB, EW	RESIDUAL	country_code	0
+header: work_type | values: OT, EQ, MH, OT, OT, SP, OT, OT	RESIDUAL	RESIDUAL	1
+header: filing_status | values: INITIAL, RENEWAL, RENEWAL, INITIAL, INITIAL, RENEWAL, RENEWAL, RENEWAL	RESIDUAL	http_method	0
+header: street_name | values: BAY 34 ST, BEACH 215 STREET, RICHMOND TERRACE, CHISHOLM ST, PENN PLAZA, WEST SERVICE ROAD, WEST SERVICE ROAD, PENNYFIELD CAMP	RESIDUAL	full_name	0
+header: leave_status_as_of_june_30 | values: ACTIVE, ON LEAVE, ACTIVE, ACTIVE, ACTIVE, CEASED, ACTIVE, ACTIVE	RESIDUAL	http_method	0
+header: type | values: heliport, small_airport, small_airport, small_airport, small_airport, small_airport, small_airport, small_airport	RESIDUAL	RESIDUAL	1
+header: name | values: Total RF Heliport, Aero B Ranch Airport, Lowell Field, Epps Airpark, Katmai Lodge Airport, Fulton Airport, Cordes Airport, Goldstone (GTS) Airport	entity_name	entity_name	1
+header: primary_type | values: BATTERY, SEX OFFENSE, BATTERY, BURGLARY, ROBBERY, BURGLARY, MOTOR VEHICLE THEFT, BATTERY	RESIDUAL	last_name	0
+header: city | values: Larkspur, Oakland, Daly City, Daly City, Sacramento, So San Francisco, San Francisco, San Francisco	city	city	1
+header: property_type | values: F, F, S, D, S, S, S, F	RESIDUAL	RESIDUAL	1
+header: street | values: EAGLE WAY, PASTON ROAD, WOLTERTON ROAD, ST ANDREWS LANE, CHURCH LANE, OLLEY CRESCENT, ALICE BATT ROAD, MOSSIE WALK	RESIDUAL	street_address	0
+header: exchangeTimezoneShortName | values: EDT, EDT, EDT, EDT	RESIDUAL	iata_code	0
+header: exchangeTimezoneShortName | values: CEST, CEST, CEST, CEST	RESIDUAL	unknown	0
+header: exchangeTimezoneShortName | values: EDT, EDT, EDT, EDT	RESIDUAL	iata_code	0
+header: exchangeTimezoneShortName | values: EDT, EDT, EDT, EDT	RESIDUAL	iata_code	0
+header: exchangeTimezoneShortName | values: EDT, EDT, EDT, EDT	RESIDUAL	iata_code	0
+header: April 9, 2021 9:32 PM UTC | values: (Reuters) - Citigroup Inc said on Friday it recorded an addition, Citigroup Inc (C.N) said on Friday it recorded an additional $39, NEW YORK (Reuters Breakingviews) - On Wall Street, Revlon means , Nov 12 (Reuters) - Revlon Inc said on Thursday that enough bondh, (Reuters) - Citigroup Inc is dropping claims against one of the , (Reuters) - Citigroup Inc filed a third lawsuit on Friday in its, (Reuters) - Citigroup Inc is suing HPS Investment Partners and S, Aug 18 (Reuters) - Citigroup asked a U.S. judge on Tuesday to fr	RESIDUAL	RESIDUAL	1
+header: April 9, 2021 9:32 PM UTC | values: (Reuters) - Citigroup Inc said on Friday it recorded an addition, Citigroup Inc (C.N) said on Friday it recorded an additional $39, NEW YORK (Reuters Breakingviews) - On Wall Street, Revlon means , Nov 12 (Reuters) - Revlon Inc said on Thursday that enough bondh, (Reuters) - Citigroup Inc is dropping claims against one of the , (Reuters) - Citigroup Inc filed a third lawsuit on Friday in its, (Reuters) - Citigroup Inc is suing HPS Investment Partners and S, Aug 18 (Reuters) - Citigroup asked a U.S. judge on Tuesday to fr	RESIDUAL	RESIDUAL	1
+header: template_name | values: projects/PROJECT_ID/locations/us/tagTemplates/glossary_term_spec, projects/PROJECT_ID/locations/us/tagTemplates/semantic_education	RESIDUAL	unknown	0
+header: guardian_relation | values: Father, Father, Father, Father, Father, Father, Father, Father	RESIDUAL	RESIDUAL	1
+header: longName | values: CYIOS Corporation, CYIOS Corporation, CYIOS Corporation, CYIOS Corporation	entity_name	entity_name	1
+header: longName | values: Global Net Lease, Inc., Global Net Lease, Inc., Global Net Lease, Inc., Global Net Lease, Inc.	entity_name	entity_name	1
+header: longName | values: HTG Molecular Diagnostics, Inc., HTG Molecular Diagnostics, Inc., HTG Molecular Diagnostics, Inc., HTG Molecular Diagnostics, Inc.	entity_name	entity_name	1
+header: longName | values: Julius Bär Gruppe AG, Julius Bär Gruppe AG, Julius Bär Gruppe AG, Julius Bär Gruppe AG	entity_name	full_name	0
+header: T:StockSharp.Poloniex.PoloniexMessageAdapter/summary | values: M:StockSharp.Poloniex.PoloniexMessageAdapter., M:StockSharp.Poloniex.PoloniexMessageAdapter., M:StockSharp.Poloniex.PoloniexMessageAdapter.OnSendInMessage(Sto, P:StockSharp.Poloniex.PoloniexMessageAdapter.AllTimeFrames/summa, P:StockSharp.Poloniex.PoloniexMessageAdapter.Key/summary, P:StockSharp.Poloniex.PoloniexMessageAdapter.Secret/summary, P:StockSharp.Poloniex.PoloniexMessageAdapter.BalanceCheckInterva, M:StockSharp.Poloniex.PoloniexMessageAdapter.Save(Ecng.Serializa	RESIDUAL	s3_uri	0
+header: longName | values: Edgewater Bancorp, Inc., Edgewater Bancorp, Inc., Edgewater Bancorp, Inc., Edgewater Bancorp, Inc.	entity_name	entity_name	1
+header: TEAM_CITY | values: Orlando, Orlando, Orlando, Orlando, Orlando, Orlando, Orlando, Orlando	city	city	1
+header: TEAM_CITY | values: Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia	city	city	1
+header: TEAM_CITY | values: Washington, Washington, Washington, Washington, Washington, Washington, Washington, Washington	city	city	1
+header: TEAM_CITY | values: Phoenix, Phoenix, Phoenix, Phoenix, Phoenix, Phoenix, Phoenix, Phoenix	city	city	1
+header: TEAM_CITY | values: Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia, Philadelphia	city	city	1
+header: city | values: Eschborn, Eschborn, Eschborn, Eschborn	city	city	1
+header: CITY | values:  Denton,  Vernon,  Wheeler,  Livingston,  Hallettsville,  Baytown,  Fredericksburg,  Carrizo Springs	city	city	1
+header: City | values: ROSEVILLE, ROSEVILLE, ROSEVILLE, ROSEVILLE, ROSEVILLE, ROSEVILLE	city	city	1
+header: city | values: Toronto, Toronto, Toronto, Toronto	city	city	1
+header: city | values: Houston, Houston, Houston, Houston	city	city	1
+header: Provider City | values: LAS VEGAS, LAS VEGAS, NORTH LAS VEGAS, WINNEMUCCA, RENO, YERINGTON, BOULDER CITY, LOVELOCK	city	city	1
+header: venue_city | values: San Jose, Bethesda, Bethesda, Global, Bethesda, Bethesda	city	city	1
+header: Provider City | values: CHANDLER, SELLS, TUCSON, SURPRISE, SUN CITY WEST, TUCSON, TUCSON, WINSLOW	city	city	1
+header: Provider City | values: WIBAUX, GREAT FALLS, EUREKA, CROW AGENCY, MISSOULA, COLUMBUS, GLASGOW, BILLINGS	city	city	1
+header: Provider City | values: ST ALBANS, BRATTLEBORO, GLOVER, BURLINGTON, SHELBURNE, BENNINGTON, BRATTLEBORO, BARRE	city	city	1
+header: Provider City | values: ANSTED, SUMMERSVILLE, CLARKSBURG, SAINT ALBANS, WHEELING, MOUNDSVILLE, CHARLESTON, FORT ASHBY	city	city	1
+header: _city | values: Reading, Sudbury, Sudbury, Vancouver, Reading, Sudbury	city	city	1
+header: town_map_darkelf_t00 | values: town_map_darkelf_t00, town_map_dwarf_t00, town_map_dwarf_t00, town_map_dwarf_t00, town_map_elf_t00, town_map_elf_t00, town_map_elf_t00, town_map_talking_t00	RESIDUAL	region	0
+header: Activecity StringType | values: guangzhou, wuhan, changsha, zhuzhou, wuhan, wuhan, changsha, changsha	city	city	1
+header: DropOffCity | values: Sydney, Melbourne, Brisbane, Sydney, Sydney, Brisbane, Melbourne, Sydney	city	city	1
+header: Region | values: Bulawayo, Harare, Manicaland, Mashonaland Central, Mashonaland East, Mashonaland West, Midlands, Masvingo	region	region	1
+header: name | values: Azuay, Bolivar, Cañar, Carchi, Cotopaxi, Chimborazo, El Oro, Esmeraldas	region	city	0
+header: Source Type | values: LOCAL, LOCAL, LOCAL, LOCAL, LOCAL, LOCAL, LOCAL, LOCAL	RESIDUAL	city	0
+header: interaction_type | values: RightGate, RightGate, PickedUp, RightGate, LeftGate, LeftGate, LeftGate, LeftGate	RESIDUAL	city	0
+header: folder_owner_addrcity | values: Buda, Austin, Georgetown, PFLUGERVILLE, Manchaca, Georgetown, Round Rock, Round Rock	city	city	1
+header: interaction_type | values: LeftGate, LeftGate, RightGate, PickedUp, LeftGate, LeftGate, RightGate, RightGate	RESIDUAL	city	0
+header: country_id | values: Argentina, Argentina, Argentina, Argentina, Argentina, Argentina, Argentina, Argentina	country	country	1
+header: country_name_filter | values: Ireland, Ireland, Ireland, Ireland, Ireland, Ireland, Ireland, Ireland	country	country	1
+header: primaryCountry.alpha3Code | values: FRA, FRA, FRA, FRA, FRA, FRA, FRA, FRA	country_code	country_code	1
+header: country_name_filter | values: Luxembourg, Luxembourg, Luxembourg, Luxembourg, Luxembourg, Luxembourg, Luxembourg, Luxembourg	country	country	1
+header: country | values: Canada, Canada, Canada, Canada	country	country	1
+header: country | values: Brazil, Brazil, Brazil, Brazil, Brazil, Brazil, Brazil, Brazil	country	country	1
+header: country_name_filter | values: Cyprus, Cyprus, Cyprus, Cyprus, Cyprus, Cyprus, Cyprus, Cyprus	country	region	0
+header: toCountry | values: Malta, Malta, Malta, Malta, Malta, Malta	country	country	1
+header: country | values: Germany, Germany, Germany, Germany	country	country	1
+header: Country Code | values: ABW, AFG, AGO, ALB, AND, ARB, ARE, ARG	country_code	country_code	1
+header: ActiveCountry StringType | values: Chinese, Chinese, Chinese, Chinese, Chinese, Chinese, Chinese, Chinese	RESIDUAL	country	0
+header: id | values: AU, AT, AZ, UM, AX, AL, DZ, AS	country_code	country_code	1
+header: id | values: AF, ZA, AL, DE, AD, AO, AI, AQ	country_code	country_code	1
+header: id | values: ET, AZ, AM, AW, ER, ES, AU, EE	country_code	country_code	1
+header: id | values: GN, GW, YE, TR, TM, MV, YT, MT	country_code	unknown	0
+header: region | values: US, US, US, US	country_code	country_code	1
+header: region | values: US, US, US, US	country_code	country_code	1
+header: TEAM_ABBREVIATION | values: BOS, BOS, BOS, BOS, BOS, BOS, BOS, BOS	RESIDUAL	iata_code	0
+header: region | values: US, US, US, US	country_code	country_code	1
+header: id | values: IS, ET, AZ, AM, AW, ER, ES, AU	country_code	country_code	1
+header: region | values: US, US, US, US	country_code	country_code	1
+header: region | values: US, US, US, US	country_code	country_code	1
+header: Type | values: LTE, LTE, LTE, NR, LTE, LTE	RESIDUAL	country_code	0
+header: label | values: I, I, I, I, O, L, I, I	RESIDUAL	RESIDUAL	1
+header: Explanation_more | values: Example: Give an example if you have experienced geo-blocking, f, ●       Netflix and its current situation whereby it faces very , It is simply unacceptable that getting a digital single market i,  It is simply unacceptable that getting a digital single market 	RESIDUAL	RESIDUAL	1
+header: country | values: United States, United States, United States, United States	country	country	1
+header: state | values: Static, Static, Static, Static, Static, Dynamic, Static, Static	RESIDUAL	state	0
+header: state | values: Static, Static, Static, Static, Dynamic, Dynamic, Static, Static	RESIDUAL	state	0
+header: state | values: Static, Static, Static, Static, Dynamic, Dynamic, Static, Static	RESIDUAL	state	0
+header: region | values: South West, South East, South West, East, North West, North West, North West, Yorkshire and The Humber	region	region	1
+header: PROVINCE | values: Mat North, Mat South, Masvingo, Midlands , Mash Central, Mash East, Mash West, Manicaland	region	state	0
+header: County | values: BIG HORN, County, POLK, LOUDOUN, AMHERST, CHESHIRE, AROOSTOOK, ARLINGTON	region	region	1
+header: County | values: POWDER RIVER, SCOTTS BLUFF, County, BLECKLEY, MULTNOMAH, DODGE, YELLOWSTONE, YELLOWSTONE	region	region	1
+header: REGIONE | values: LOMBARDIA, LOMBARDIA, LOMBARDIA, LOMBARDIA, LOMBARDIA, LOMBARDIA, LOMBARDIA, LOMBARDIA	region	region	1
+header: County | values: CARROLL, FULTON, MUSCOGEE, STEWART, STEWART, WEBSTER, TALBOT, LUMPKIN	region	region	1
+header: County | values: ST. JOSEPH, County, MCDONALD, NEWTON, ST. JOSEPH, SAGINAW, ST. JOSEPH, ELKHART	region	region	1
+header: County | values: County, LUBBOCK, BENTON, KENT, County, St. Lucie, Dawson, GARZA	region	region	1
+header: region | values: US, US, US, US	country_code	country_code	1
+header: region | values: US, US, US, US	country_code	country_code	1
+header: Type | values: Strings, Date, Date, Date, Date, Date, Date, Date	RESIDUAL	RESIDUAL	1
+header: Type | values: comment, comment, comment, comment, comment, comment, comment, comment	RESIDUAL	RESIDUAL	1
+header: Type | values: comment, comment, comment, comment, story, comment, comment, comment	RESIDUAL	RESIDUAL	1
+header: Type | values: comment, comment, comment, comment, comment, story, comment, comment	RESIDUAL	RESIDUAL	1
+header: Type | values: comment, comment, comment, story, comment, comment, comment, comment	RESIDUAL	RESIDUAL	1
+header: Class | values: GraphItem, GraphItem<T>, Edge<T>, Edge, Edge, Vertex<T>, Vertex, Vertex	RESIDUAL	ordinal	0
+header: finc_class_facet | values: unassigned, Mathematik, Mathematik, Mathematik, Mathematik, Mathematik, Mathematik, Mathematik	RESIDUAL	ordinal	0
+header: Class | values: WorkerRole, PublisherProcessorAdapter, Topics, Topics, Commands, Commands, Subscriptions, Events	RESIDUAL	ordinal	0
+header: Status | values: passed, passed, passed, passed, passed, passed	RESIDUAL	unknown	0
+header: cell_type | values: K562, K562, K562, K562, K562, K562, K562, K562	RESIDUAL	alphanumeric_id	0
+header: Class | values: TestRecord, FixedSampleRecord, FixedSampleRecordSortable, TestRecord, TestRecord	RESIDUAL	ordinal	0
+header: type_tax_use | values: sale, sale, sale, sale, sale, sale, sale, purchase	RESIDUAL	RESIDUAL	1
+header: dividend_type | values: payout, growth, payout, growth, payout, growth, growth, payout	RESIDUAL	RESIDUAL	1
+header: call_type | values: Foul: Personal, Foul: Shooting, Foul: Loose Ball, Violation: Lane, Foul: Offensive, Turnover: Traveling, Foul: Shooting, Foul: Offensive	RESIDUAL	entity_name	0
+header: Code | values: electronicSubmission, electronicAuction, written, inPerson	RESIDUAL	RESIDUAL	1
+header: exchange | values: PNK, PNK, PNK, PNK	RESIDUAL	RESIDUAL	1
+header: food_category | values: Menüler, Menüler, Menüler, Menüler, Menüler, Kahvaltılıklar, Tostlar, Tostlar	RESIDUAL	city	0
+header: Status | values: Fix Released, Fix Released, Fix Released, Fix Released, Fix Released, Fix Released, Fix Released, Fix Released	RESIDUAL	entity_name	0
+header: category | values: Payload delivery, Payload delivery, Payload delivery, Payload delivery, Payload delivery, Network activity, Network activity, External analysis	RESIDUAL	entity_name	0
+header: group | values: h, f, b, h, f, a, b, c	RESIDUAL	RESIDUAL	1
+header: Class | values: HelloJob, Program	RESIDUAL	ordinal	0
+header: TEAM_ABBREVIATION | values: POR, POR, POR, POR, POR, POR, POR, POR	RESIDUAL	smiles	0
+header: TEAM_ABBREVIATION | values: OKC, OKC, OKC, OKC, OKC, OKC, OKC, OKC	RESIDUAL	smiles	0
+header: TEAM_ABBREVIATION | values: HOU, HOU, HOU, HOU, HOU, HOU, HOU, HOU	RESIDUAL	smiles	0
+header: source_id | values: views, twitter	RESIDUAL	unknown	0
+header: link | values: vds21a-cactus.pdf, vds21a-graph.pdf, vds21a-lodestar.pdf, vds21a-natto.pdf	RESIDUAL	url	0
+header: link_description | values: View Right Track: Metro North's listing in the Google Play store, View the website for this app.  Find information about features , Like Right Track on facebook to get the latest news and updates., Homepage for Metro North Railroad.  Get the latest news, updates, This is the mobile version of the Metro North website.  This web, Full schedule search provided by Metro North.  Includes transfer, View a list of transportation services that connect with Metro N, Homepage for the Metropolitan Transportation Authority.  Get inf	RESIDUAL	url	0
+header: signature_source_url | values: label, background, signature source url	RESIDUAL	url	0
+header: URL rewritten | values: music-ipods, accessories-ipod, laptops	RESIDUAL	url	0
+header: URL rewritten | values: music-ipods, accessories-ipod, laptops	RESIDUAL	url	0
+header: city | values: Goroka, Madang, Mount Hagen, Nadzab, Port Moresby, Wewak, Narssarssuaq, Godthaab	city	city	1
+header: municipality | values: Bensalem, Leoti, Anchor Point, Harvest, King Salmon, Alex, Cordes, Barstow	city	city	1
+header: town_city | values: BRENTWOOD, NORWICH, NORWICH, KING'S LYNN, NEWARK, WITNEY, WITNEY, WITNEY	city	city	1
+header: country | values: Papua New Guinea, Papua New Guinea, Papua New Guinea, Papua New Guinea, Papua New Guinea, Papua New Guinea, Greenland, Greenland	country	country	1
+header: iso_country | values: US, US, US, US, US, US, US, US	country_code	country_code	1
+header: iso_region | values: US-PA, US-KS, US-AK, US-AL, US-AK, US-OK, US-AZ, US-CA	region	state_code	0
+header: district | values: BRENTWOOD, NORTH NORFOLK, NORTH NORFOLK, KING'S LYNN AND WEST NORFOLK, NEWARK AND SHERWOOD, WEST OXFORDSHIRE, WEST OXFORDSHIRE, WEST OXFORDSHIRE	region	region	1
+header: gis_nta_name | values: Bensonhurst East, Breezy Point-Belle Harbor-Rockaway Park-Broad Channel, West New Brighton-New Brighton-St. George, Crotona Park East, Midtown-Midtown South, New Springville-Bloomfield-Travis, New Springville-Bloomfield-Travis, Schuylerville-Throgs Neck-Edgewater Park	RESIDUAL	full_name	0
+header: county | values: ESSEX, NORFOLK, NORFOLK, NORFOLK, NOTTINGHAMSHIRE, OXFORDSHIRE, OXFORDSHIRE, OXFORDSHIRE	region	region	1
+header: type | values: airport, airport, airport, airport, airport, airport, airport, airport	RESIDUAL	RESIDUAL	1
+header: job_type | values: A2, NB, NB, DM, A2, NB, NB, A2	RESIDUAL	alphanumeric_id	0
+header: agency_name | values: ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS, ADMIN FOR CHILDREN'S SVCS	RESIDUAL	full_name	0
+header: continent | values: NA, NA, NA, NA, NA, NA, NA, NA	RESIDUAL	unknown	0
+header: location_description | values: SCHOOL - PUBLIC BUILDING, APARTMENT, APARTMENT, APARTMENT, STREET, RESIDENCE, STREET, STREET	RESIDUAL	RESIDUAL	1
+header: naic_code_description | values: Food Services, Food Services, Construction, Manufacturing, Food Services, Construction, Food Services, Accommodations	RESIDUAL	entity_name	0
+header: dst | values: U, U, U, U, U, U, E, E	RESIDUAL	RESIDUAL	1
+header: magType | values: md, mb, ml, mb, mb, mwr, ml, mb	RESIDUAL	RESIDUAL	1
+header: net | values: pr, us, us, us, us, us, us, us	RESIDUAL	region	0
+header: materialtype | values: EBOOK, VIDEODISC, EBOOK, BOOK, SOUNDDISC, BOOK, BOOK, BOOK	RESIDUAL	cpt	0
+header: usageclass | values: Digital, Physical, Digital, Physical, Physical, Physical, Physical, Physical	RESIDUAL	ordinal	0
+header: checkouttype | values: OverDrive, Horizon, OverDrive, Horizon, Horizon, Horizon, Horizon, Horizon	RESIDUAL	region	0
+header: pay_basis | values: per Annum, per Annum, per Annum, per Annum, per Annum, per Annum, per Annum, per Annum	RESIDUAL	entity_name	0
+header: duration | values: L, L, F, F, F, F, F, L	RESIDUAL	RESIDUAL	1
+header: iata_code | values: UTK, OCA, CSE, CUS, JCY, WLR, NUP, PTC	iata_code	iata_code	1
+header: iata | values: GKA, MAG, HGU, LAE, POM, WWK, UAK, GOH	iata_code	iata_code	1
+header: place | values: 31 km NW of Rincón, Puerto Rico, South Sandwich Islands region, 25 km SSW of Atoka, New Mexico, 28 km NE of San Martín, Argentina, 35 km NNW of Valparaíso, Chile, 30 km NNW of Valparaíso, Chile, 142 km SSE of Atka, Alaska, 47 km NW of Valparaíso, Chile	RESIDUAL	full_address	0
+header: creator | values: Brian Wansink, Charles Dickens, Just, Ward S., Anderson, M. T., Burfoot, Ella, Brennan, Linda Crotta, Stetz-Waters, Karelia., Annie Proulx	full_name	full_name	1
+header: block | values: 007XX N PULASKI RD, 054XX W MELROSE ST, 008XX E BOWEN AVE, 105XX S WABASH AVE, 004XX W 69TH ST, 008XX E 88TH ST, 082XX S PAXTON AVE, 039XX W MADISON ST	RESIDUAL	eu_vat	0
+header: borough | values: BROOKLYN, QUEENS, STATEN ISLAND, BRONX, MANHATTAN, STATEN ISLAND, STATEN ISLAND, BRONX	region	region	1
+header: work_location_borough | values: BRONX, MANHATTAN, QUEENS, BROOKLYN, RICHMOND, MANHATTAN, RICHMOND, BROOKLYN	region	region	1
+header: title_description | values: CHILD PROTECTIVE SPECIALIST, CHILD AND FAMILY SPECIALIST, CHILD PROTECTIVE SPECIALIST, CHILD PROTECTIVE SPECIALIST, CHILD PROTECTIVE SPECIALIST, CHILD AND FAMILY SPECIALIST, CHILD PROTECTIVE SPECIALIST, YOUTH DEVELOPMENT SPECIALIST	RESIDUAL	entity_name	0
+header: publisher | values: HarperCollins Publishers Inc., Criterion Collection,, Penguin Group (USA), Inc., Houghton Mifflin Co.,, Reprise,, Candlewick Press,, Sourcebooks Jabberwocky,, Cherry Lake Publishing,	entity_name	entity_name	1
+header: neighborhoods_analysis_boundaries | values: South of Market, Marina, Lone Mountain/USF, Visitacion Valley, Financial District/South Beach, Financial District/South Beach, Financial District/South Beach, Financial District/South Beach	RESIDUAL	region	0
+header: Demo URL | values: COMPETN/doom/nmare/n4m1-035.zip, COMPETN/plutonia/speed/pl27-051.zip, COMPETN/doom2/coop/movies/30cn3519.zip, COMPETN/doom2/coop/movies/30cn3519.zip, COMPETN/doom2/max/lv19-509.zip	RESIDUAL	url	0

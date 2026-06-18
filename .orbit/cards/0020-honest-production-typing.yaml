@@ -27,6 +27,7 @@ specs:
 - .orbit/specs/2026-06-18-ceiling-and-rules-discovery/spec.yaml
 - .orbit/specs/2026-06-18-representative-accuracy-gate/spec.yaml
 - .orbit/specs/2026-06-18-calibrated-confidence-abstention/spec.yaml
+- .orbit/specs/2026-06-18-fine-tuned-encoder-discovery/spec.yaml
 relations:
 - card: 0002-semantic-type-detection
   type: depends-on

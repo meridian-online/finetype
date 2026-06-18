@@ -3,7 +3,7 @@ goal: 'Determine whether replacing FineType''s static Model2Vec encoder with a s
 cards:
 - 0002-semantic-type-detection
 - 0020-honest-production-typing
-status: open
+status: closed
 labels:
 - discovery
 - architecture
@@ -27,7 +27,7 @@ acceptance_criteria:
         memory `confidence-quality-band-shipped`). DELIVERABLE: prize (cols + max lift) +
         measured current latency + the budget ceiling + which regime the bet must hit.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-01
   description: |
@@ -42,7 +42,7 @@ acceptance_criteria:
     pure SPEED. If NO candidate clears even low-band-only, that is a speed NO-GO feeding ac-04 —
     record it and continue the accuracy probe anyway (the signal is worth knowing).
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-02
   description: |
@@ -61,7 +61,7 @@ acceptance_criteria:
     does NOT separate these boundaries materially better than Model2Vec, the lever is dead and the
     semantic ceiling is the model's permanent limit — say so.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-03
   description: |
@@ -78,7 +78,7 @@ acceptance_criteria:
     require (not merely "fine-tune") + the gates it must clear (drift proxy → gold → representative
     → corpus-honest, all shipped this session).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-04
   description: |
@@ -94,5 +94,6 @@ acceptance_criteria:
     follow-up probe, or NO-GO (accept the ceiling). Framed so the author picks with eyes open. No
     model ships from THIS spec — it produces the decision, not the change.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-18T12:29:07.001414Z
