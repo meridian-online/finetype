@@ -76,11 +76,14 @@ few values in the ISO country list → residual, even though `PA` alone is valid
 
 - **GeoNames is the clean lever for country / country_code / city** — near-perfect recall and
   RESIDUAL precision up to 0.94. No heuristic noise; authoritative labels.
-- **`region` is the gap**: the `admin1CodesASCII` *name* list (4,322) doesn't match real
-  region-column values (states/provinces/codes), so it mislabelled most mined region columns
-  as residual and starved the positive class. Region needs broader vocab — admin1 + the
-  ISO-3166-2 subdivision codes (`iso_3166-2` column is in `iso3166.csv`) + US/national state
-  codes — or fall back to the header heuristic / LLM for region.
+- **`region` is the gap (diagnosed):** admin1 covers only **12/90** gold region values. Gold
+  "region" is a **multi-admin-level catch-all** — admin1 states (Harare, Azuay) but mostly
+  admin2 **counties** (BIG HORN, POLK, County columns), UK districts, NYC **boroughs**
+  (Brooklyn, Queens), and ISO-3166-2 codes (US-PA, US-KS). admin1CodesASCII (admin1 only)
+  can't match them. Region needs **admin1 + admin2** (`admin2Codes.txt` from the full GeoNames
+  dump at `~/datasets/geonames`) **+ ISO-3166-2 subdivision codes** — a real vocab-assembly
+  task, not a quick fix. (It also surfaces a gold-label question: is a US county "region"? —
+  taxonomy territory, separate.)
 - Overall stays ~0.82 because the geo gains offset the region loss; fixing region vocab should
   push past it.
 
