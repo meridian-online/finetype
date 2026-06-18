@@ -23,9 +23,27 @@ candle-transformers may not support → integration risk, slower anyway.
 | static potion-32M | 120 MB | 0.754 | 0.05 ms | — | ✓ (static) |
 | static potion-8M | 30 MB | 0.750 | 0.05 ms | — | ✓ (static) |
 | gte-small | 67 MB | 0.717 | — | — | ✓ |
+| ModernBERT-embed-base | 149 MB | 0.778 | — | — | ✓ candle has `modernbert.rs`; 39ms CPU (torch), 5× slower |
+| mdbr-leaf-ir (MongoDB) | 23 MB | 0.774 | — | — | ✓ BERT; IR-tuned, Apache-2.0 |
 
 (CV numbers are an internally-consistent ranking — no StandardScaler — so lower than the scaled
 0.893 baseline; the +6.5pp gap is the signal.)
+
+### Follow-up: mdbr-leaf-ir and ModernBERT (author-flagged) — both lose to gte-tiny
+
+- **mdbr-leaf-ir** (MongoDB, 23M, Apache-2.0, #1 BEIR ≤100M, candle-runnable): separability
+  **0.774** — below gte-tiny (0.872) and MiniLM (0.807). Strong *retrieval* pedigree doesn't
+  transfer to our classification task (the IR-vs-classification caveat, confirmed).
+- **ModernBERT-embed-base** (149M, modern arch, candle HAS `modernbert.rs`): separability
+  **0.778** AND **~5× slower on CPU** (39 ms vs gte-tiny 7.4 ms, torch). Disqualified on both
+  axes — its flash-attention/8k-context efficiency is a GPU/long-context win, irrelevant to our
+  short-input CPU case. Only comes at 149M (no tiny variant), 6× gte-tiny.
+
+**Sweep complete (8 candidates): gte-tiny wins on separability AND is among the fastest/smallest.**
+The repeated lesson — bigger general-retrieval/modern models do NOT separate our specific
+short-input type boundaries better; tiny + task-fit beats them. Caveat: zero-shot probe; a
+fine-tune *could* shift the ranking, but ModernBERT's 5× CPU cost is disqualifying regardless,
+and gte-tiny leads zero-shot by a clear margin. **gte-tiny remains the build's lead encoder.**
 
 ## Findings
 
