@@ -59,3 +59,25 @@ scale — caught cheaply by the gate before the full build; the low-band-only de
 no confidence) would relocate far less, so the next move is a fair confidence-gated re-run plus a
 residual-rebalanced retrain, not a promotion.
 </content>
+
+---
+
+## CORRECTION (2026-06-19, author challenge "is it the training data?")
+
+It's substantially the **training data + a noisy baseline**, not a clean encoder failure.
+Sampling the demotions showed:
+1. **v19's own contested predictions are frequently wrong** — `Namespace → code` called `city`/
+   `entity_name`, `[20000,10000,15]` arrays called `full_name`. The encoder demoting these to
+   `word` is *correct*, but the gated-YDF oracle (wrong ~42% on contested ground) scores the fix
+   as `oracle_fp` — so the 52k "contradicted" count is **inflated by the encoder fixing v19 errors**.
+2. **Training-label noise**: `entity_name` training came from the shipped model's noisy calls, and
+   `RESIDUAL` from distilled `word/categorical` that overlaps entity semantically — so the encoder
+   never learned a clean entity-vs-word split and collapses both into `word` (17k entity→word).
+3. Residual over-representation (44%) compounds it; the encoder's `word` is genuinely too crude
+   (it also demotes real cities like Trieste, business `seller_name`, drug names).
+
+**Refined verdict:** the encoder bet is **not condemned** by this run. The fix is the *data*:
+clean `entity_name` from Wikidata/dbpedia + the entity datasets (not the model's calls), keep
+`entity_name` and `word` distinct, rebalance residual — then re-test low-band-only (which also
+shrinks the noisy-baseline inflation). The "encoder over-emits residual" framing above over-stated
+a fixable training-data problem.
