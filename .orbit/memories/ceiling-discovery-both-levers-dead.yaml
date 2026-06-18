@@ -1,0 +1,16 @@
+key: ceiling-discovery-both-levers-dead
+body: |-
+  Ceiling-and-rules discovery (spec 2026-06-18, cards 0020/0002) CLOSED: both candidate architecture levers are dead/stranded; ~0.80 gold is the practical ceiling for this architecture; the next pillar-moving bet is PRODUCT not model. Substrate: output/ceiling-and-rules-discovery/FINDING.md (reproducible: predictions_v19.tsv + _nosibling.tsv, reframe scoring).
+
+  v19 reframe baseline RE-RUN CLEAN: 739/927=0.797. 192 misses partition: 46 STRUCTURAL (24%, cardinality/increment/binary-shape) / 49 SEMANTIC (26%, geography 31 + person 7 + iata 6 + currency 5) / 97 IRREDUCIBLE-OTHER (51%, veto->unknown 37 + gross collisions/rare 48 + datetime-subtype 8 + load-fail 4).
+
+  ac-01 COLUMN-STATS LEVER = SHIPS NOTHING (re-confirmed, not re-opened): the spec FRAMING called it 'the PROVEN lever' but 3 memories post-dating the probe already killed it — [[decisive-stat-skip-is-no-go]] (skip form, all 4 predicates <0.98) + [[full-column-stat-sharpen-is-redundant]] (recall-rule form, alnum breaks 18 url for 2; categorical full-col redundant w/ sample). AUC=discriminator-with-second-opinion ceiling, NOT blind-assertion threshold. Rule CONSOLIDATION does NOT net out: full-column card >= sample card, so a unified pass BROADENS text_vocab_override the known-bad way; increment_substance_veto ALREADY full-column; fusion_cardinality_gate dead on v19 (fusion-only path). ColumnScanStats already deleted. Probe reproduction blocked (raw gittables files not on disk) AND moot.
+
+  ac-02 SIBLING-CONTEXT ablation (NEW measurement): models/sibling-context (6-class, 397k, val0.780, NEVER trained for 250-class) IS loaded locally via hardcoded wire_sibling_context path. Ablation (move dir aside, re-predict, diff): changes 26/927 gold preds, NET +4 (6 better/2 worse/18 lateral) = noise. So NOT inert (corrects the 'v19 runs zero cross-column context' memory for the LOCAL binary) BUT the quoted 0.797 includes +0.4pp from this UNSHIPPED module — shipped-v19 (no dir) = 0.793. Headroom-if-finished prior is poor: [[hierarchical-head-falsified]] -3.3pp; arch-challenge +14-18% was EXTERNAL benchmarks. VERDICT: semantic mass irreducible by value/shape/sibling model; only scoped exception = sibling-for-geography (~31 col ceiling, realisation far lower, negative prior).
+
+  ac-03 RULE-DELETION: levers retire 0 rules. Lever-independent deletable NOW = ~12 dead header-hint families (10 no-hit + 2 model-covered, diagnostics/rhh_classification.tsv) via card-0019-scenario-5 no-regression gold run. All value/shape vetoes STAY (precision floor).
+
+  ac-04 RECOMMENDATION: accept ceiling, DRIVE card 0020 honest production typing (confidence/unknown surfacing, representative-baseline tracking). NOTE: card 0020's hypothesis-2 (remove categorical attractor via reframe THEN additive retrain has clean space) is now LEANING FALSIFIED — identity-fortification retrain (2026-06-18, AFTER reframe shipped) STILL NO-GO'd by broadening full_name = 7th-direction confirmation additive text/semantic retrains regress. Reinforces [[cardinality-boundary-error-is-real]], [[representative-baseline-is-068]], [[identity-retrain-broadened-fullname-no-go]].
+timestamp: 2026-06-18T09:21:45.754067Z
+labels:
+- topology

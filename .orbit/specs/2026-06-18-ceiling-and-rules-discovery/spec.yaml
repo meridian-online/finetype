@@ -3,10 +3,10 @@ goal: 'Determine the architecture lever(s) that move the gold/representative cei
 cards:
 - 0020-honest-production-typing
 - 0002-semantic-type-detection
+status: closed
 labels:
 - discovery
 - architecture
-status: open
 acceptance_criteria:
 - id: ac-00
   description: |
@@ -22,7 +22,7 @@ acceptance_criteria:
     assumed. DELIVERABLE: the two-bucket headroom table + the honest split (how much of the
     gap to ~0.90 is structural-and-winnable vs semantic-and-hard vs irreducible label noise).
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-01
   description: |
@@ -38,7 +38,7 @@ acceptance_criteria:
     addition. STATE the limit: it must clear the corpus-honest gate (relocation) like any
     rule; increment gold support is thin (n=1).
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-02
   description: |
@@ -58,7 +58,7 @@ acceptance_criteria:
         coordinate pairs), OR declare the SEMANTIC mass irreducible by any value/shape/sibling
         model and route it to an LLM-in-the-loop / taxonomy / human tier. Name which.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-03
   description: |
@@ -70,7 +70,7 @@ acceptance_criteria:
     target list as a measurable scoreboard (count of rules retired), so the semantic-advance
     goal has a concrete rule-reduction deliverable, not a vibe.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-04
   description: |
@@ -84,5 +84,6 @@ acceptance_criteria:
     accept the ceiling + shift to product), framed so the author picks the bet with eyes open.
     No code or model ships from THIS spec — it produces the decision, not the change.
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
+closed_at: 2026-06-18T09:21:21.073274Z

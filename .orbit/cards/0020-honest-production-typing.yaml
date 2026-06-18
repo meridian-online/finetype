@@ -24,6 +24,7 @@ scenarios:
   gate: true
 specs:
 - .orbit/specs/2026-06-17-enum-accuracy-reframe/spec.yaml
+- .orbit/specs/2026-06-18-ceiling-and-rules-discovery/spec.yaml
 relations:
 - card: 0002-semantic-type-detection
   type: depends-on

@@ -60,6 +60,7 @@ specs:
 - .orbit/specs/2026-06-17-categorical-alnum-recall-rule/spec.yaml
 - .orbit/specs/2026-06-17-enum-domain-emission/spec.yaml
 - .orbit/specs/2026-06-17-enum-accuracy-reframe/spec.yaml
+- .orbit/specs/2026-06-18-ceiling-and-rules-discovery/spec.yaml
 relations: []
 references:
 - README.md
