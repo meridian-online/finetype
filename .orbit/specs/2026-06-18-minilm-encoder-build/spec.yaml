@@ -22,8 +22,7 @@ acceptance_criteria:
     ms/col vs the 10 ms budget. If Rust latency blows the budget and quantisation can't recover it,
     NO-GO here — before a single training run is spent.
   gate: true
-  checked: false
-  ac_type: code
+  checked: true
 - id: ac-01
   description: |
     FINE-TUNE THE ENCODER with PRECEDENCE-AWARE residual training (code). Fine-tune
@@ -38,7 +37,6 @@ acceptance_criteria:
     beat the 0.893 zero-shot probe) + safetensors loadable by the ac-00 candle path.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-02
   description: |
     ATTRACTOR CHECK on gold + representative — catch the 0-for-6 failure mode CHEAPLY, before
@@ -66,7 +64,6 @@ acceptance_criteria:
     + green CI (fmt + clippy -D warnings + cargo test) + the consumer-audit note + real-table latency.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     THE FULL PROMOTION SCOREBOARD — corpus-honest gate is the arbiter (observation, BLOCKING).
