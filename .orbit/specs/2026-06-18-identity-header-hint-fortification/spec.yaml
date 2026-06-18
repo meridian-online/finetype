@@ -50,7 +50,7 @@ acceptance_criteria:
     file list. NO-GO (exit 1) means DO NOT launch the overnight run — username over-emission
     into neighbours is the specific risk. Record the full-label-space drift verdict.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-03
   description: |
