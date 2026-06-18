@@ -81,6 +81,8 @@ def main():
         rows.append({
             "sha": s, "column": c, "true": t, "pred": col.get("type", ""),
             "confidence": col.get("confidence", 0.0),
+            "quality_band": col.get("quality_band", ""),
+            "runner_up": col.get("runner_up", ""),
             "rule": col.get("disambiguation_rule") or "",
             "vetoed": col.get("validation_vetoed", False),
             "correct": int(rf(col.get("type", "")) == rf(t)),
@@ -90,7 +92,8 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=["sha", "column", "true", "pred",
-                                           "confidence", "rule", "vetoed", "correct"],
+                                           "confidence", "quality_band", "runner_up",
+                                           "rule", "vetoed", "correct"],
                            delimiter="\t")
         w.writeheader()
         w.writerows(rows)

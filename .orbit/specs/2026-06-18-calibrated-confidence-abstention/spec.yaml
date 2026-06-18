@@ -2,7 +2,7 @@ id: 2026-06-18-calibrated-confidence-abstention
 goal: Make FineType's per-column confidence an honest, calibrated data-quality signal — measure whether the shipped confidence tracks correctness, then (if viable) surface a calibrated confidence + honest abstention so an analyst can trust high-confidence types and scrutinise low-confidence ones, instead of receiving a bare guess with a heuristic number. Measure-first; ship only what calibration supports.
 cards:
 - 0020-honest-production-typing
-status: open
+status: closed
 labels:
 - honest-typing
 - confidence-calibration
@@ -56,7 +56,7 @@ acceptance_criteria:
     load-bearing edit is unaudited. DELIVERABLE: the implemented surfacing + green CI (fmt +
     clippy -D warnings + cargo test) + the consumer audit note.
   gate: false
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     PROVE IT HELPS THE ANALYST (observation, BLOCKING). The feature is only honest if
@@ -68,5 +68,6 @@ acceptance_criteria:
     the verdict on whether the surfaced signal is trustworthy. STATE what is measured vs assumed;
     if the separation is weak, say the feature is cosmetic and recommend against shipping it on.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
+closed_at: 2026-06-18T10:51:31.350053Z

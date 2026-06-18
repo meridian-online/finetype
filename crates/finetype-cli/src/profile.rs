@@ -4,6 +4,41 @@ use super::*;
 use finetype_cli::enum_emission::collect_unique_values_if_categorical;
 use finetype_core::enum_domain::{detect_enum_domain, EnumConfig, EnumDomain};
 
+// Honest confidence signal (spec 2026-06-18-calibrated-confidence-abstention).
+// The shipped confidence ranks correctness but is not calibrated (over-confident
+// in the high bins), so we surface a quality BAND over the ranking rather than the
+// raw number. Thresholds are the data-driven knees from the gold+representative
+// reliability curve (output/calibrated-confidence/ac00_reliability_finding.md):
+// below 0.70 accuracy drops to ~coin-flip on representative data; >=0.85 is the
+// trust band. Below the LOW threshold the runner-up type is surfaced so a shaky
+// column reads "probably X, maybe Y" instead of a bare guess.
+const QUALITY_HIGH_THRESHOLD: f32 = 0.85;
+const QUALITY_LOW_THRESHOLD: f32 = 0.70;
+
+fn quality_band_label(confidence: f32) -> &'static str {
+    if confidence >= QUALITY_HIGH_THRESHOLD {
+        "high"
+    } else if confidence >= QUALITY_LOW_THRESHOLD {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+/// The second-best vote, surfaced only on the `low` band (and only when it
+/// differs from the emitted label). `vote_distribution` is empty on rule/veto
+/// paths, which sit above the low threshold anyway, so this is `None` there.
+fn low_band_runner_up(label: &str, confidence: f32, votes: &[(String, f32)]) -> Option<String> {
+    if confidence >= QUALITY_LOW_THRESHOLD {
+        return None;
+    }
+    votes
+        .iter()
+        .map(|(l, _)| l)
+        .find(|l| l.as_str() != label)
+        .cloned()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_profile(
     file: Option<PathBuf>,
@@ -234,6 +269,12 @@ pub(crate) fn cmd_profile(
             // emitted as an extension, NOT the validation-enforced `enum` keyword,
             // which stays conservative via `unique_values`.
             enum_domain: Option<EnumDomain>,
+            // Honest confidence signal (spec 2026-06-18-calibrated-confidence-abstention):
+            // a quality band (high/medium/low) over the existing confidence, plus the
+            // runner-up type on the `low` band. Purely additive — the predicted label
+            // and raw confidence are unchanged.
+            quality_band: &'static str,
+            runner_up: Option<String>,
         }
 
         /// Per-column validation + quality data.
@@ -287,6 +328,8 @@ pub(crate) fn cmd_profile(
                         ColProfile {
                             name,
                             label: "unknown".to_string(),
+                            quality_band: "low",
+                            runner_up: None,
                             confidence: 0.0,
                             samples_used: 0,
                             non_null_count: 0,
@@ -362,11 +405,16 @@ pub(crate) fn cmd_profile(
                 let unique_values =
                     collect_unique_values_if_categorical(&final_label, &values, enum_threshold);
                 let enum_domain = detect_enum_domain(&final_label, &values, &EnumConfig::default());
+                let quality_band = quality_band_label(result.confidence);
+                let runner_up =
+                    low_band_runner_up(&final_label, result.confidence, &result.vote_distribution);
                 all_entries.push((
                     idx,
                     ColProfile {
                         name,
                         label: final_label,
+                        quality_band,
+                        runner_up,
                         confidence: result.confidence,
                         samples_used: result.samples_used,
                         non_null_count: values.len(),
@@ -403,6 +451,8 @@ pub(crate) fn cmd_profile(
                     profiles.push(ColProfile {
                         name,
                         label: "unknown".to_string(),
+                        quality_band: "low",
+                        runner_up: None,
                         confidence: 0.0,
                         samples_used: 0,
                         non_null_count: 0,
@@ -473,9 +523,14 @@ pub(crate) fn cmd_profile(
                     collect_unique_values_if_categorical(&final_label, col_values, enum_threshold);
                 let enum_domain =
                     detect_enum_domain(&final_label, col_values, &EnumConfig::default());
+                let quality_band = quality_band_label(result.confidence);
+                let runner_up =
+                    low_band_runner_up(&final_label, result.confidence, &result.vote_distribution);
                 profiles.push(ColProfile {
                     name,
                     label: final_label,
+                    quality_band,
+                    runner_up,
                     confidence: result.confidence,
                     samples_used: result.samples_used,
                     non_null_count: col_values.len(),
@@ -563,8 +618,18 @@ pub(crate) fn cmd_profile(
                     } else {
                         String::new()
                     };
+                    // Honest confidence band: call out medium/low only — `high` is
+                    // the default expectation, so an unmarked row reads as trusted.
+                    let band_str = match p.quality_band {
+                        "low" => match &p.runner_up {
+                            Some(ru) => format!(" ⚑ low (maybe {ru})"),
+                            None => " ⚑ low".to_string(),
+                        },
+                        "medium" => " ~ medium".to_string(),
+                        _ => String::new(),
+                    };
                     println!(
-                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}",
+                        "  {:<25} {:<38} {:>8} {:>6}{}{}{}{}{}",
                         p.name,
                         p.label,
                         broad,
@@ -572,7 +637,8 @@ pub(crate) fn cmd_profile(
                         quality_str,
                         disambig,
                         locale_str,
-                        veto_str
+                        veto_str,
+                        band_str
                     );
                     // Show top 3 invalid samples inline (plain output, validate mode)
                     if false {
@@ -613,6 +679,10 @@ pub(crate) fn cmd_profile(
                         obj.insert("column".to_string(), json!(p.name));
                         obj.insert("type".to_string(), json!(p.label));
                         obj.insert("confidence".to_string(), json!(p.confidence));
+                        obj.insert("quality_band".to_string(), json!(p.quality_band));
+                        if let Some(ru) = &p.runner_up {
+                            obj.insert("runner_up".to_string(), json!(ru));
+                        }
                         let resolved_broad =
                             resolve_broad_type_display(p.broad_type.as_deref(), &p.unique_values);
                         obj.insert("broad_type".to_string(), json!(resolved_broad));
@@ -755,13 +825,15 @@ pub(crate) fn cmd_profile(
                 }
             }
             OutputFormat::Csv => {
-                println!("column,type,confidence,broad_type,format_string,transform,is_generic,samples_used,non_null,null,disambiguation,locale");
+                println!("column,type,confidence,quality_band,runner_up,broad_type,format_string,transform,is_generic,samples_used,non_null,null,disambiguation,locale");
                 for p in &profiles {
                     println!(
-                        "\"{}\",\"{}\",{:.4},\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\",\"{}\"",
+                        "\"{}\",\"{}\",{:.4},\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{},{},{},\"{}\",\"{}\"",
                         p.name,
                         p.label,
                         p.confidence,
+                        p.quality_band,
+                        p.runner_up.as_deref().unwrap_or(""),
                         p.broad_type.as_deref().unwrap_or(""),
                         p.format_string.as_deref().unwrap_or(""),
                         p.transform.as_deref().unwrap_or(""),
@@ -785,8 +857,8 @@ pub(crate) fn cmd_profile(
                     println!("| Column | Type | Broad Type | Confidence | Valid Rate | Quality |");
                     println!("|--------|------|-----------|----------:|-----------:|--------:|");
                 } else {
-                    println!("| Column | Type | Broad Type | Confidence |");
-                    println!("|--------|------|-----------|----------:|");
+                    println!("| Column | Type | Broad Type | Confidence | Quality |");
+                    println!("|--------|------|-----------|----------:|---------|");
                 }
                 for p in &profiles {
                     let conf_str = if p.non_null_count > 0 {
@@ -810,7 +882,14 @@ pub(crate) fn cmd_profile(
                             p.name, p.label, broad, conf_str, valid_str, score_str
                         );
                     } else {
-                        println!("| {} | `{}` | {} | {} |", p.name, p.label, broad, conf_str);
+                        let band_cell = match (p.quality_band, &p.runner_up) {
+                            ("low", Some(ru)) => format!("low (maybe `{ru}`)"),
+                            (band, _) => band.to_string(),
+                        };
+                        println!(
+                            "| {} | `{}` | {} | {} | {} |",
+                            p.name, p.label, broad, conf_str, band_cell
+                        );
                     }
                 }
                 let typed_cols = profiles.iter().filter(|p| p.label != "unknown").count();

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Honest confidence signal in `profile` output** (spec
+  `2026-06-18-calibrated-confidence-abstention`, card 0020). Each column now carries
+  a `quality_band` (`high` ≥ 0.85 / `medium` / `low` < 0.70) over the existing
+  confidence, plus a `runner_up` type on the `low` band — so a shaky column reads
+  "probably X, maybe Y" instead of a bare guess. Purely additive: the predicted label
+  and raw confidence are unchanged. Thresholds are the data-driven knees from the
+  gold + representative reliability curve; on representative data `high`-band columns
+  are ~0.82 accurate vs ~0.54 for `low`. The shipped confidence ranks correctness but
+  is not calibrated, so the band reads the ranking, not the raw number.
+
 ## [0.6.34] - 2026-06-17
 
 Enum reframe: `representation.discrete.categorical` is retired as an emitted label.
