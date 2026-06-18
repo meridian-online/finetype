@@ -2,3 +2,4 @@
 *.parquet
 *.pt
 encoder_train.tsv
+encoder_train_region.tsv
