@@ -1,0 +1,14 @@
+key: encoder-upgrade-is-the-live-model-lever
+body: |-
+  ENCODER UPGRADE is the live model-side lever (discovery 2026-06-18-fine-tuned-encoder-discovery CLOSED, GO to build+gate — the FIRST model-side GO after 0-for-6 retrains). Substrate: output/fine-tuned-encoder-discovery/ (probe.py, probe_extended.py, probe_data.tsv, ac00/ac03_ac04 docs; ML env in gitignored .venv via uv).
+
+  THESIS (corrects the dead-end framing): every failed model bet this year left the ENCODER static — additive retrains fed the same Model2Vec-static trunk more data; hierarchical head ([[hierarchical-head-falsified]]) reshaped the output; sibling-context ([[sibling-context-is-the-stranded-architecture-layer]]) added cross-column signal. NONE replaced the static encoder, which is where the discovery said the interference lives. The encoder is the untouched lever.
+
+  EVIDENCE (zero-shot linear-probe 5fold acc on 244 contested semantic cols — the PA->country_code / Si->region over-emission mass): contextual all-MiniLM-L6-v2 0.893 = bge-small 0.893, Qwen2.5-0.5B decoder 0.901, vs static Model2Vec/potion 0.803 vs SHIPPED MODEL 0.684. Contextual encoder beats static +9pp and the shipped model +21pp -> the semantic signal the model lacks IS present in a richer encoder. KEY: the 0.5B DECODER LLM barely beats the small ENCODER (+0.8pp) for 10x latency -> the boundaries are embedding-separable, NO decoder/LLM-in-the-loop needed; a small encoder is the right tool.
+
+  LATENCY (ac-01, CPU single-col): MiniLM-L6 6.7ms CLEARS the <=10ms low-band ceiling; bge-small 11.4ms / Qwen 69ms interactive-only. Current engine 0.9ms/col. REGIME: low-band-only escalation gated by the shipped quality_band<0.70 ([[confidence-quality-band-shipped]]) — every-column off the table (~12-18h corpus). Prize: up to +9pp gold/+12pp repr (ORACLE ceiling, realistic far less).
+
+  CAVEATS (do not over-read): 0.893 is a separability CEILING for a discriminator-with-second-opinion (CV-trained on the same families), NOT a shippable number ([[column-stats-separate-residual-gaps]], [[decisive-stat-skip-is-no-go]] lesson). The residual-attractor (0096, [[categorical-is-a-residual-category]]) is partly TRAINING-DYNAMICS not just encoding, so a build needs precedence-aware training (class-balance/abstain outcome) NOT just fine-tune. 6 retrains died at the gates; this is a GO to BUILD-AND-GATE, the corpus-honest relocation gate remains arbiter. NEXT SPEC: build finetype-minilm-encoder (fine-tune all-MiniLM-L6-v2 + precedence-aware residual + quality_band-gated low-band escalation + full promotion scoreboard).
+timestamp: 2026-06-18T12:29:51.82443Z
+labels:
+- topology
