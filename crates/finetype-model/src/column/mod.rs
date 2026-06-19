@@ -2334,6 +2334,7 @@ impl ColumnClassifier {
             // Deterministic datetime sub-format read (value-based, over-emission-safe;
             // runs before header hints so a delimited timestamp is read from values).
             self.datetime_format_refinement(&mut result, &sample);
+            self.structured_string_refinement(&mut result, &sample);
             self.sharpen_and_guard(&mut result, header, &sample, values);
 
             // Step 5b: Username recovery veto — value-based, runs AFTER header hints
@@ -2426,6 +2427,7 @@ impl ColumnClassifier {
             // Deterministic datetime sub-format read (value-based, over-emission-safe;
             // runs before header hints so a delimited timestamp is read from values).
             self.datetime_format_refinement(&mut result, &sample);
+            self.structured_string_refinement(&mut result, &sample);
             self.sharpen_and_guard(&mut result, header, &sample, values);
 
             // Step 5b: Username recovery veto — value-based, runs AFTER header hints
@@ -2532,6 +2534,7 @@ impl ColumnClassifier {
             // Deterministic datetime sub-format read (value-based, over-emission-safe;
             // runs before header hints so a delimited timestamp is read from values).
             self.datetime_format_refinement(&mut result, &sample);
+            self.structured_string_refinement(&mut result, &sample);
             self.sharpen_and_guard(&mut result, header, &sample, values);
 
             // Step 5b: Username recovery veto — value-based, runs AFTER header hints
@@ -3051,6 +3054,76 @@ impl ColumnClassifier {
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some("datetime_format_refinement".to_string());
         result.detected_locale = None;
+    }
+
+    /// `structured_string_refinement` (default ON). Three value-determinable types mined
+    /// from the `plain_text` residual (spec 2026-06-19-plain-text-type-discovery):
+    /// `technology.filesystem.windows_path`, `technology.internet.message_id`,
+    /// `technology.code.qualified_name`. Each has a precise validator (qualified_name:
+    /// zero prose false positives across the 447k-column corpus). The shipped 240-dim Sense
+    /// model cannot predict them, so — exactly like `datetime_format_refinement` — they are
+    /// recovered deterministically in the Sharpen layer, gated so they cannot relocate
+    /// non-matching columns. CORROBORATION gate: fire only where the model gave up
+    /// (`plain_text`/`word`/`unknown` — the discovery mined these types from exactly there),
+    /// never overriding a confident foreign prediction (`hostname`/`url`/`email`).
+    /// VETO-CONSISTENCY gate: assert a leaf only if ≥90% of the column's values pass that
+    /// leaf's OWN taxonomy validator (`label_validates_sample`, the same validator the
+    /// downstream veto uses — a single source of truth). Value-based (decision 0048);
+    /// RHH-disableable.
+    fn structured_string_refinement(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("structured_string_refinement") {
+            return;
+        }
+        let tax = match self.taxonomy.as_ref() {
+            Some(t) => t,
+            None => return,
+        };
+        // Per-type corroboration gate (the labels the model produces for columns of this
+        // shape when it can't name them). `windows_path` and `message_id` have UNAMBIGUOUS
+        // validators (drive-letter/UNC backslash; angle-bracket `<…@…>`) that nothing else
+        // passes, so they may fire on the path/locator and email mispredictions too — the
+        // veto-consistency gate (`label_validates_sample`, ≥90%) is the real guard. But
+        // `qualified_name` (dotted reverse-DNS) STRUCTURALLY overlaps `hostname` / `url`, so
+        // it fires on the residual labels ONLY, never overriding a confident locator. The
+        // three patterns are mutually exclusive, so at most one validates a given column.
+        const RESIDUAL: &[&str] = &[
+            "representation.text.plain_text",
+            "representation.text.word",
+            "unknown",
+        ];
+        let readers: [(&str, &[&str]); 3] = [
+            (
+                "technology.filesystem.windows_path",
+                &[
+                    "representation.text.plain_text",
+                    "representation.text.word",
+                    "unknown",
+                    "technology.internet.url",
+                    "technology.internet.urn",
+                ],
+            ),
+            (
+                "technology.internet.message_id",
+                &[
+                    "representation.text.plain_text",
+                    "representation.text.word",
+                    "unknown",
+                    "identity.person.email",
+                ],
+            ),
+            ("technology.code.qualified_name", RESIDUAL),
+        ];
+        for (leaf, fire_on) in readers {
+            if fire_on.contains(&result.label.as_str()) && label_validates_sample(tax, leaf, sample)
+            {
+                result.label = leaf.to_string();
+                result.confidence = result.confidence.max(0.99);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some("structured_string_refinement".to_string());
+                result.detected_locale = None;
+                return;
+            }
+        }
     }
 
     /// `binary_vocab_veto` (default ON). `representation.boolean.binary` requires

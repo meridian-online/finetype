@@ -6339,6 +6339,113 @@ datetime.timestamp.sql_standard:
     );
 }
 
+// ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──
+
+#[test]
+fn test_structured_string_refinement() {
+    let yaml = r#"
+technology.filesystem.windows_path:
+  title: Windows Path
+  designation: universal
+  tier: [VARCHAR, filesystem]
+  release_priority: 3
+  samples: ["C:\\x"]
+  validation:
+    type: string
+    pattern: '^([A-Za-z]:\\|\\\\)[^\r\n]*$'
+technology.internet.message_id:
+  title: Message ID
+  designation: universal
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  samples: ["<a@b>"]
+  validation:
+    type: string
+    pattern: '^<[^<>@\s]+@[^<>@\s]+>$'
+technology.code.qualified_name:
+  title: Qualified Name
+  designation: universal
+  tier: [VARCHAR, code]
+  release_priority: 3
+  samples: ["a.b.c"]
+  validation:
+    type: string
+    pattern: '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2,}$'
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    let mk = |label: &str| ColumnResult {
+        label: label.to_string(),
+        confidence: 0.3,
+        vote_distribution: vec![],
+        disambiguation_applied: false,
+        disambiguation_rule: None,
+        samples_used: 3,
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+    let run = |cc: &ColumnClassifier, label: &str, vals: &[&str]| {
+        let mut r = mk(label);
+        let s: Vec<String> = vals.iter().map(|v| v.to_string()).collect();
+        cc.structured_string_refinement(&mut r, &s);
+        r.label
+    };
+
+    // Fires from the residual labels.
+    assert_eq!(
+        run(
+            &cc,
+            "representation.text.plain_text",
+            &[r"C:\a\b.sys", r"D:\x\y.cs"]
+        ),
+        "technology.filesystem.windows_path"
+    );
+    assert_eq!(
+        run(
+            &cc,
+            "representation.text.plain_text",
+            &["<a.b@thyme>", "<c.d@thyme>"]
+        ),
+        "technology.internet.message_id"
+    );
+    assert_eq!(
+        run(&cc, "representation.text.word", &["com.a.B", "org.c.D"]),
+        "technology.code.qualified_name"
+    );
+    // windows_path also recovers from a path/locator misprediction (unambiguous validator).
+    assert_eq!(
+        run(
+            &cc,
+            "technology.internet.urn",
+            &[r"C:\a\b.sys", r"D:\x\y.cs"]
+        ),
+        "technology.filesystem.windows_path"
+    );
+    // qualified_name must NOT eat a confident hostname (structural overlap).
+    assert_eq!(
+        run(
+            &cc,
+            "technology.internet.hostname",
+            &["www.bbc.co.uk", "api.github.com"]
+        ),
+        "technology.internet.hostname"
+    );
+    // Prose is left alone (no validator passes).
+    assert_eq!(
+        run(
+            &cc,
+            "representation.text.plain_text",
+            &["a sentence here", "more prose now"]
+        ),
+        "representation.text.plain_text"
+    );
+}
+
 #[test]
 fn test_datetime_refinement_blocked_when_taxonomy_rejects() {
     // The taxonomy's iso_8601_milliseconds requires a trailing `Z`. A zoneless

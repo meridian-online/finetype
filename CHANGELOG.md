@@ -19,8 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   ships a generator (100% taxonomy-check alignment) and a precision-validated validator
   (qualified_name: 0 prose false positives; windows_path: 1.1%). Rejected candidates
   (numeric ranges, quantity+unit, identifier soup) cleared volume but were panel-flagged
-  "mixed" — unwriteable as a precise validation. The three are taxonomy/validation-live now;
-  the Sense model predicts them after the next retrain.
+  "mixed" — unwriteable as a precise validation. All three emit **live** at `profile` time via
+  a deterministic gated reader (`structured_string_refinement`, below) — no retrain required.
+
+- **`structured_string_refinement` reader** — covers the three plain_text-discovery types
+  deterministically in the Sharpen layer, mirroring the datetime reader. Because they are
+  value-determinable (precise validators) and the 240-dim Sense model cannot predict them, a
+  gated reader recovers them: a **corroboration gate** fires only where the model gave up
+  (`plain_text`/`word`/`unknown`, plus the unambiguous `windows_path`/`message_id` validators
+  also recover path/email mispredictions), and a **veto-consistency gate** asserts a leaf only
+  if ≥90% of values pass that leaf's own validator. `qualified_name` is residual-only (it
+  structurally overlaps `hostname`/`url`), verified not to eat a confident hostname. Smoke- and
+  unit-tested; structurally cannot relocate non-matching columns. RHH-disableable.
 
 - **Two zoneless ISO-8601 datetime leaves** (spec
   `2026-06-19-zoneless-iso-datetime-leaves`, card 0002). `datetime.timestamp.iso_seconds`
