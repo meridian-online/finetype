@@ -56,3 +56,19 @@ is the largest single drain). NOT ship-ready as-is.
    widen past the 8 contested families. Re-run this corpus check; target word ratio ~1.0.
 4. Persist v19 sense_confidence on the corpus (infra) -> definitive TWO-SIDED corpus gate.
 5. Rust/candle integration, confidence-gated, B07 audit, green CI, swap.
+
+## Clean-slate decider probes (2026-06-19) — full label space
+
+**Full-label linear probe (fullprobe.py):** raw gte-tiny + linear head reproduces v19 at
+0.716 across 218 labels (structural 0.73, semantic 0.65). Conservative FLOOR (raw+linear;
+v19-as-truth penalises gte-tiny on the contested residual types where it is actually better).
+The one real structural gap is cardinality/sequence identifiers (alphanumeric_id 0.42,
+increment 0.43) — a column-aggregate signal a text encoder cannot see; full-column stats fixes it.
+
+**Char-CNN decider (charprobe.py):** cheap hand-crafted char/stats features lift alphanumeric_id
+only +0.05 (0.42->0.47). Char-shape is NOT the bottleneck — cardinality is, and a char-CNN reads
+values not column aggregates, so it is blind to the one gap it might justify. => RETIRE char-CNN.
+
+**Verdict:** clean slate = parsers + gte-tiny + full-column stats head. Three components, each
+earning its place; char-CNN / Model2Vec / header branches / v19 all retired. See choice 0103 +
+spec 2026-06-19-gte-tiny-clean-slate-build.

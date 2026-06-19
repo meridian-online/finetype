@@ -1,0 +1,138 @@
+id: '0103'
+title: 'Clean-slate Sense architecture: parsers + gte-tiny backbone + stats head (retire the v19 multi-branch)'
+status: proposed
+date_created: 2026-06-19
+date_modified: 2026-06-19
+body: |
+  # 0103. Clean-slate Sense architecture: deterministic parsers + a gte-tiny backbone + a full-column stats head — retiring the v19 five-branch multi-branch model
+
+  ## Context and Problem Statement
+
+  The Sense stage is a five-branch multi-branch model (char-CNN + Model2Vec embed
+  + column-stats + header + validation), a flat softmax over the type label space
+  (shipped: sherlock-v19-relu-s42). It has a hard ceiling: **six consecutive
+  additive retrains failed** (v22/v23/v24/v27x2/latdec) by relocating untargeted
+  neighbours at corpus scale (destination drift). The root cause is structural —
+  a flat softmax fed by one shared trunk where look-alike types collide; any
+  gradient that sharpens a type drags its neighbours (memory
+  `categorical-is-a-residual-category`, choice 0096). The repeated cure has been
+  to remove malformed *labels* (enum out via 0102, residual out via 0096) rather
+  than improve the *model*.
+
+  The 2026-06-18/19 encoder discovery established that the **representation** is
+  the bottleneck: gte-tiny separates the contested boundaries at **0.87 vs the
+  v19 trunk's 0.68**. The first attempt to use it (type-routed, re-decide all
+  contested) scored gold +1.6 / representative −5.8 (NO-GO) — but that was the
+  worst regime. This session proved the representation is genuinely strong enough
+  to *lead*, not merely assist (see Evidence).
+
+  The question this choice settles: do we keep v19 as a frozen floor and bolt
+  gte-tiny on as an escalation head, or rebuild the Sense stage clean-slate with
+  gte-tiny as the backbone? The frozen-floor option is safe but caps us at
+  "v19 + patches" forever. Author direction (2026-06-19): a frozen v19 is a
+  ceiling; gte-tiny opens a clean slate; large blast radius is acceptable, a
+  ceiling is not.
+
+  ## Decision Drivers
+
+  - Break the additive-retrain ceiling permanently, not patch around it.
+  - Use the strongest available representation (gte-tiny, +19pp separability over
+    the v19 trunk) as the backbone, not a bolt-on.
+  - Simplify: every component must earn its place by a signal the others cannot
+    provide. Retire components whose signal is subsumed.
+  - Accept a large but *measured* blast radius — the blocking truth gates
+    (gold + representative) and the corpus relocation check remain the arbiter.
+
+  ## Considered Options
+
+  ### Option A — v19 frozen floor + gte-tiny confidence-gated escalation
+  Keep v19 untouched; gte-tiny overrides only where v19 is uncertain AND gte-tiny
+  is confident. PROVEN improve-or-hold (gold +1.1, repr flat). Collapse-proof.
+  But it inherits v19's entire structure and ceiling — gte-tiny only ever patches
+  the edges. "v19 + patches" forever. Safe, capped.
+
+  ### Option B — Clean-slate three-component Sense (CHOSEN)
+  Rebuild the Sense stage as three components, each owning the signal it is best
+  at, with NO v19 multi-branch:
+
+  ```
+  column ─▶ deterministic parsers (datetime, coords, numeric formats, code
+            readers — the 4-for-4 value-based pattern) ─────────────────▶ type
+         ─▶ gte-tiny full-label classifier (fine-tuned; semantic + general) ▶ type
+         ─▶ full-column stats head (cardinality / sequence → the identifier
+            types: alphanumeric_id, increment, numeric_code) ────────────▶ type
+  ```
+
+  Retires: the v19 multi-branch, the char-CNN branch, the Model2Vec embed branch,
+  the header branch. Composition by precedence (parsers deterministic-first;
+  stats head owns the cardinality/sequence types; gte-tiny owns the rest).
+
+  ## Decision Outcome (proposed)
+
+  Adopt **Option B**. gte-tiny is the learned backbone; deterministic parsers
+  handle parseable structure; a full-column stats head handles the cardinality/
+  sequence identifier types. v19, char-CNN, Model2Vec, and the header branch are
+  retired. The frozen-floor escalation (Option A) remains a validated FALLBACK we
+  can ship if the clean slate fails a blocking gate — but the target is the clean
+  slate.
+
+  ## Why each surviving component, and why each retirement (Evidence, this session)
+
+  - **gte-tiny backbone.** Separability 0.87 vs v19 trunk 0.68. Witness quality on
+    gold disagreements: **165 right / 4 wrong (98%)** vs the char-CNN value-expert
+    that killed the 2026-06-08 deferral at 3.6%. A confidence-gated escalation
+    using it is improve-or-hold (gold 0.798→0.809, repr 0.691 flat;
+    `output/gte-tiny-gated-escalation/RESULT.md`).
+  - **Deterministic parsers.** The value-based reader pattern is 4-for-4 shipped
+    (postal-veto, veto-shape-fallback, R32, datetime reader; gold 610→745) and
+    structurally cannot relocate (corroboration + veto-consistency gates).
+  - **Full-column stats head.** The one structural gap gte-tiny cannot close is
+    cardinality/sequence identifiers (alphanumeric_id 0.42, increment 0.43 on the
+    full-label linear probe). This is a column-aggregate signal a text encoder
+    cannot see. `ColumnScanStats` already computes it.
+  - **Retire char-CNN.** Cheap hand-crafted char-shape features lift
+    alphanumeric_id by only +0.05 — char-shape is not the bottleneck; cardinality
+    is, and a char-CNN reads values not column aggregates, so it is blind to the
+    one gap it might have justified. Its semantic load is carried better by
+    gte-tiny. No residual char-level-but-not-semantic-not-statistical signal
+    remains (`output/gte-tiny-gated-escalation/` probes).
+  - **Retire Model2Vec embed + header branches.** Subsumed by gte-tiny (a single
+    stronger text representation of header+values).
+
+  ## Consequences
+
+  - A full-label gte-tiny fine-tune becomes the training job (a 22M-param encoder,
+    NOT the 9-hour FTMB multi-branch pipeline; plausibly overnight on this Mac for
+    scale, minutes on a cloud GPU). v19 is never retrained.
+  - The promotion gates are unchanged and remain the arbiter: gold + representative
+    (blocking, improve-or-hold), corpus relocation check, on human truth — the
+    instruments that told the truth (0.811) when curated probes and the YDF oracle
+    misled.
+  - A persisted `sense_confidence` corpus pass is the genuinely long-running
+    inference step (for the corpus relocation gate); it is inference, not training.
+  - The Sense stage shrinks from five neural branches to one encoder + one small
+    stats head + deterministic parsers. The DuckDB/MCP/CLI surfaces are unchanged
+    (Sense is internal).
+  - Risk: the full-label fine-tuned gte-tiny must MATCH v19 on the structural/easy
+    label space (where v19 is strong) AND beat it on semantics. The linear probe
+    (raw + linear, a conservative floor) reproduces v19 at 0.72; a fine-tuned head
+    will be higher, but the GO is the fine-tuned model scored on GOLD, not the
+    probe. If it fails a blocking gate, Option A (escalation) is the validated
+    fallback.
+
+  ## Open Questions
+
+  - Stats-head form: a tiny learned head over ColumnScanStats, or deterministic
+    cardinality/sequence rules feeding precedence? (The identifier types may be
+    rule-shaped, per 0096.)
+  - Precedence/composition order between the three components on conflict.
+  - Does gte-tiny need full fine-tune or partial-unfreeze (v3 recipe: top-2 layers,
+    discriminative LR enc 2e-6/head 1e-3) at the full label space?
+
+  ## Substrate
+  `output/gte-tiny-gated-escalation/` (RESULT.md, two_sided_gate.py,
+  corpus_overemit_check.py); `output/fine-tuned-encoder-discovery/`
+  (gte_tiny_v2.pt, probes, the slim-plan history); memories
+  `gte-tiny-is-the-way-through`, `gte-tiny-corpus-overemit`,
+  `new-type-addition-strategy`. Builds on choice 0096 (residual precedence),
+  choice 0102 (categorical→enum, realized v0.6.36).
