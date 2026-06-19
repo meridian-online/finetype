@@ -1,0 +1,105 @@
+id: 2026-06-20-gte-tiny-embed-branch-swap
+goal: |
+  Beat v19 by replacing the multi-branch model's weakest branch — the static
+  512-dim Model2Vec value-aggregation embed branch — with a fine-tuned gte-tiny
+  embedding (384-dim), KEEPING every other branch (char, stats, header,
+  validation) and the 50/50 distilled/synthetic recipe, then retraining.
+
+  ## Why this is the bet worth building (not another prototype)
+  Four Python prototypes regressed because they stripped v19's structural branches
+  (gold composed 0.646-0.770 vs v19 0.798). But the failure was always the missing
+  structure, never the embed: gte-tiny separates the contested boundaries at 0.87
+  vs Model2Vec's 0.80. v19 trains on the SAME distilled data and scores 0.798 —
+  because it has the full multi-branch. So the faithful test is: v19's exact
+  architecture, one branch upgraded. The prototypes proved this can only be tested
+  in the real multi-branch; this spec builds it.
+
+  ## The sequencing that de-risks it
+  Training reads PRECOMPUTED features (prepare_multibranch_data.py writes a feature
+  binary; the in-Rust Model2Vec is only used at inference). So we train + score
+  offline on precomputed gte-tiny embeddings and get the accuracy GO/NO-GO BEFORE
+  paying for the expensive candle gte-tiny inference integration. If it doesn't
+  beat v19 offline, we never build the inference path.
+
+  Risk acknowledged: this is a FULL multi-branch retrain (flat-softmax destination
+  drift, 0-for-6) — but with a materially stronger embed and clean data, and it
+  clears the same blocking gates (gold + representative + corpus relocation). The
+  validated narrow escalation (+1.1/flat) remains the fallback if this NO-GOs.
+
+  Foundation pinned: choice 0103, tag v19-train-state, HF backup verified.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- architecture
+- gte-tiny
+- multi-branch
+- embed-branch
+acceptance_criteria:
+- id: ac-00
+  description: |
+    B07 CONSUMER-GRAPH AUDIT of the embed branch before any load-bearing edit
+    (H03). Enumerate every consumer of EMBED_DIM / the embed feature slot /
+    extract_embedding_aggregation / Model2VecResources across prepare_multibranch_
+    data.py (feature binary format), finetype-train (training read), finetype-model
+    multi_branch (embed_branch BranchWeights, config embed_dim), and column/mod.rs
+    (inference). DELIVERABLE: the consumer list + the exact edit set per surface.
+    CLOSED 2026-06-20: ac00_audit.md. KEY: Model2Vec serves BOTH embed(values,512)
+    AND header(header,128) — first build swaps embed only (header stays Model2Vec).
+    Feature binary is format-versioned (FTMB v2/v3/v4) → add V5 with embed_dim=384,
+    old models still load. Embed branch can use FROZEN gte-tiny (no separate
+    fine-tune). Edit set + de-risk sequence (ac-01→ac-03 offline gate → only-if-GO
+    ac-04 candle) in the audit.
+  ac_type: doc
+  gate: true
+  checked: true
+- id: ac-01
+  description: |
+    DATA PIPELINE — gte-tiny embed features. In prepare_multibranch_data.py replace
+    the 512-dim Model2Vec value-aggregation embed slot with a 384-dim fine-tuned
+    gte-tiny value embedding (EMBED_DIM 512->384); training mix stays 50/50
+    distilled/synthetic (the distilled data is the clean semantic source; choice
+    0103). Write the feature binary in the new dim. DELIVERABLE: feature binary with
+    gte-tiny embed slot, format-versioned so the Rust reader can distinguish it.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-02
+  description: |
+    MODEL + TRAIN — set embed_dim 512->384 in MultiBranchConfig + the Rust embed
+    branch input; retrain the full multi-branch on the gte-tiny-embed feature binary
+    (overnight, the FTMB pipeline). Char/stats/header/validation branches unchanged.
+    DELIVERABLE: trained model + held-out val_acc, all branches intact.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-03
+  description: |
+    OFFLINE ACCURACY GATE (blocking, the GO/NO-GO BEFORE candle). Precompute gte-tiny
+    embed features for the gold + representative columns, run the trained model
+    (precomputed-feature path), score vs v19 (gold 0.798 / repr 0.691). REQUIRE
+    improve-or-hold on both. This is the decision point: GO -> build inference;
+    NO-GO -> fall back to the narrow escalation, inference path never built.
+  ac_type: observation
+  gate: true
+  checked: false
+- id: ac-04
+  description: |
+    CANDLE INFERENCE (only if ac-03 GO) — run fine-tuned gte-tiny in the binary for
+    the embed branch (replacing extract_embedding_aggregation / Model2VecResources),
+    candle, embedded weights, latency within budget (candle spike: gte-tiny viable
+    ~10ms/col). B07 re-audit, green CI. DELIVERABLE: integrated binary, parity with
+    the offline scores, latency measured.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-05
+  description: |
+    CORPUS RELOCATION GATE + SWAP — corpus over-emission/relocation check on the new
+    model's predictions (the H05 blocking relocation detector), then swap
+    models/default, retire the Model2Vec embed branch + its resources. Update count
+    surfaces, CLAUDE.md, CHANGELOG, version bump. DELIVERABLE: shipped or documented
+    fallback to the escalation.
+  ac_type: observation
+  gate: true
+  checked: false
