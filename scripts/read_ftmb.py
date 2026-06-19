@@ -35,7 +35,7 @@ def read_header(f):
         sys.exit(1)
 
     (version,) = struct.unpack("<I", f.read(4))
-    if version not in (1, 2, 3, 4):
+    if version not in (1, 2, 3, 4, 5):
         print(f"ERROR: Unknown version: {version}", file=sys.stderr)
         sys.exit(1)
 

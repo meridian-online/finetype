@@ -679,6 +679,15 @@ const FTMB_VERSION_V4: u32 = 4;
 /// v4: v3 header (28 bytes) + 2 valid_dim = 30.
 pub const FTMB_HEADER_SIZE_V4: usize = 30;
 
+/// Format version for the gte-tiny embed-branch swap (v5).
+///
+/// Byte-identical to v4 (same 30-byte header, same per-record layout) — the only
+/// distinction is the version field and a smaller `embed_dim` (384 for gte-tiny vs
+/// 512 for Model2Vec). The reader is dim-agnostic, so v5 reads through the v4 path;
+/// the version marker exists so inference can tell a gte-tiny embed binary apart from
+/// a Model2Vec one. Spec 2026-06-20-gte-tiny-embed-branch-swap, ac-01.
+const FTMB_VERSION_V5: u32 = 5;
+
 /// A single training record with label and feature vectors.
 #[derive(Debug, Clone)]
 pub struct TrainingRecord {
@@ -827,9 +836,9 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     }
 
     let version = u32::from_le_bytes(header[4..8].try_into().unwrap());
-    if version != 1 && version != 2 && version != 3 && version != 4 {
+    if version != 1 && version != 2 && version != 3 && version != 4 && version != FTMB_VERSION_V5 {
         bail!(
-            "Unsupported FTMB version: {} (expected 1, 2, 3, or 4)",
+            "Unsupported FTMB version: {} (expected 1, 2, 3, 4, or 5)",
             version
         );
     }
@@ -897,9 +906,9 @@ pub fn read_training_data(
         bail!("Invalid FTMB magic");
     }
     let version = u32::from_le_bytes(header_buf[4..8].try_into().unwrap());
-    if version != 1 && version != 2 && version != 3 && version != 4 {
+    if version != 1 && version != 2 && version != 3 && version != 4 && version != FTMB_VERSION_V5 {
         bail!(
-            "Unsupported FTMB version: {} (expected 1, 2, 3, or 4)",
+            "Unsupported FTMB version: {} (expected 1, 2, 3, 4, or 5)",
             version
         );
     }

@@ -1,0 +1,4 @@
+key: gte-embed-build-taxonomy-244
+body: 'Any multi-branch FTMB rebuild as of 2026-06-20 must use VALID_DIM=244 and n_classes=244, NOT v19''s 240. The taxonomy grew to 244 defs (v0.6.36: +3 plain_text types, +2 zoneless ISO datetime leaves, -1 categorical retired) after v19 last trained. ''finetype extract-features --validation'' now emits 244 validation dims; the hardcoded VALID_DIM=240 in scripts/prepare_multibranch_data.py is STALE and will reject every column (244!=240 dim check) -> empty/crashed build. scripts/build_ftmb_v5_gte.py probes the live dim from the binary and patches it. The Rust trainer auto-derives n_classes from the taxonomy (saw ''244 classes''), but the model-config valid_dim must be 244 to match the data''s validation branch. Confound for the gte-embed-swap ac-03 comparison: v19 is 240-class, the gte rebuild is 244-class -> not a pure embed-only delta.'
+timestamp: 2026-06-19T22:45:57.86821Z
+labels: []
