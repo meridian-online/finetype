@@ -1,0 +1,79 @@
+id: 2026-06-19-plain-text-type-discovery
+goal: |
+  Find the real, nameable types hiding inside representation.text.plain_text
+  (FineType's 447,422-column residual bucket), rank candidates by how common
+  they are (distinct-dataset breadth) times how confidently a blind expert
+  panel can name them, and build only those clearing a volume bar.
+
+  ## Outcome
+
+  Three types clear the bar and are built (definitions + generators authored
+  and precision-validated), staged for the next taxonomy-expansion retrain:
+
+  | type | distinct datasets | panel conf | score |
+  |---|---|---|---|
+  | representation.file.windows_path   | 7,651 | 0.97 | 7,421 |
+  | technology.internet.message_id     | 3,032 | 0.95 | 2,880 |
+  | technology.code.qualified_name     | 1,677 | 0.79 | 1,325 |
+
+  Five candidates were rejected and why matters as much as the wins:
+  numeric_range / quantity+unit / snake-token-soup each cleared the volume
+  bar on raw count but all three blind panellists independently flagged them
+  "mixed" — not a single type, so unwriteable as a precise validation.
+  unix/url-path and pos_tagged were clean-and-nameable but fell below the
+  >=1,000-distinct-dataset volume bar.
+
+  ## Why staged, not live
+
+  The label space is locked at 240 across the taxonomy, the
+  label_category_map, and the trained model's valid_dim; precise_audit
+  enforces taxonomy ~ model within +/-1. A new type becomes predictable only
+  after a retrain (240 -> 243) through the full promotion gate stack. This
+  spec hands that retrain three pre-validated targets.
+
+  Substrate: discovery_report.md (headline + method),
+  staged_definitions.yaml (3 blocks + count-bump checklist),
+  staged_generators.rs.txt (3 generator arms, alignment-verified).
+cards:
+- 0001-type-taxonomy
+status: open
+labels:
+- taxonomy
+- discovery
+- plain-text
+acceptance_criteria:
+- id: ac-01
+  description: |
+    Mine plain_text for hidden types and rank by distinct-dataset breadth x
+    blind-panel nameability. CLOSED 2026-06-19: 8 candidate families
+    surfaced via structural-shape clustering of corpus_pass/columns.parquet;
+    breadth measured as distinct dataset signatures (strips replication —
+    snake_token 28,291 cols -> 1,709 datasets; pos_tagged 6,965 -> 74);
+    3 independent blind panellists named relabelled clusters from values
+    alone. Ranking table in discovery_report.md.
+  ac_type: doc
+  gate: false
+  checked: true
+- id: ac-02
+  description: |
+    Build (definitions + generators) the types clearing the >=1,000
+    distinct-dataset volume bar AND a clean (non-mixed) panel verdict.
+    CLOSED 2026-06-19: windows_path / message_id / qualified_name authored
+    in staged_definitions.yaml + staged_generators.rs.txt. Precision
+    validated on full 447k: win 7,913 match / 87 (1.1%) prose FPs; qual
+    6,478 match / 0 prose FPs; msg unambiguous angle-bracket grammar.
+    Generator outputs verified to pass their validation patterns.
+  ac_type: doc
+  gate: false
+  checked: true
+- id: ac-03
+  description: |
+    Activate the three types via a taxonomy-expansion retrain: apply the
+    staged definitions + generators (240 -> 243), bump the count constants,
+    extend label_category_map, run `finetype taxonomy check` (100%
+    alignment), train, and clear the promotion gate stack (gold-anchor ->
+    drift proxy -> gold corpus -> corpus-honest) before any models/default
+    swap. DEFERRED — retrain-gated, next session.
+  ac_type: observation
+  gate: false
+  checked: false
