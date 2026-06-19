@@ -3,3 +3,6 @@
 *.pt
 encoder_train.tsv
 encoder_train_region.tsv
+encoder_train_v2.tsv
+routed_*.tsv
+region_pool.tsv
