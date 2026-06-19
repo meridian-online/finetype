@@ -90,6 +90,8 @@ const TEMPORAL_LABELS: &[&str] = &[
     "datetime.timestamp.iso_8601_milliseconds",
     "datetime.timestamp.iso_8601_offset",
     "datetime.timestamp.iso_microseconds",
+    "datetime.timestamp.iso_milliseconds",
+    "datetime.timestamp.iso_seconds",
     "datetime.timestamp.iso_space_zulu",
     "datetime.timestamp.mdy_12h",
     "datetime.timestamp.mdy_24h",
@@ -444,14 +446,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_242() {
+    fn test_total_is_244() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 242, "Map should contain exactly 242 types");
+        assert_eq!(map.len(), 244, "Map should contain exactly 244 types");
     }
 
     #[test]
     fn test_category_counts() {
-        assert_eq!(TEMPORAL_LABELS.len(), 84, "temporal should have 84 types");
+        assert_eq!(TEMPORAL_LABELS.len(), 86, "temporal should have 86 types");
         assert_eq!(NUMERIC_LABELS.len(), 23, "numeric should have 23 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
@@ -547,8 +549,8 @@ mod tests {
         let temporal = map.eligible_labels(BroadCategory::Temporal);
         assert_eq!(
             temporal.len(),
-            84,
-            "temporal eligible should be 84 (no overlaps)"
+            86,
+            "temporal eligible should be 86 (no overlaps)"
         );
 
         let geographic = map.eligible_labels(BroadCategory::Geographic);

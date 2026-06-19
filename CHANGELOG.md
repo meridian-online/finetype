@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   "mixed" — unwriteable as a precise validation. The three are taxonomy/validation-live now;
   the Sense model predicts them after the next retrain.
 
+- **Two zoneless ISO-8601 datetime leaves** (spec
+  `2026-06-19-zoneless-iso-datetime-leaves`, card 0002). `datetime.timestamp.iso_seconds`
+  (`2013-06-04T01:02:03`) and `datetime.timestamp.iso_milliseconds` (`…:03.123`) — the
+  zoneless siblings of `iso_8601` / `iso_8601_milliseconds`, mirroring the existing
+  `iso_microseconds`. Add-not-broaden: the zoned leaves keep their Z-required patterns so
+  round-trip `validate` transforms stay correct; the deterministic datetime detector now
+  requires a trailing Z on the zoned leaves and routes zoneless values to the new siblings.
+  Live at `profile` time today via the `datetime_format_refinement` Sharpen rule — values
+  that previously matched no datetime leaf (the veto declined them against the Z-required
+  patterns) now name and round-trip correctly. Gold/representative/corpus gates deferred to
+  the corpus run.
+
 ### Changed
 
 - **`representation.discrete.categorical` retired as a taxonomy leaf** (choice 0102).

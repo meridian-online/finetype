@@ -334,6 +334,68 @@ datetime.timestamp.iso_microseconds:
   references: null
   notes: "v1 name: datetime.datetime. Distinct from iso_8601_microseconds (has no trailing Z)."
 
+datetime.timestamp.iso_seconds:
+  title: ISO Datetime, second precision (no timezone)
+  description: >
+    ISO 8601-like format with second precision and no timezone indicator
+    (e.g. 2013-06-04T01:02:03). Common in database exports and log files.
+    The zoneless sibling of iso_8601 (which requires a trailing Z).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y-%m-%dT%H:%M:%S"
+  transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$"
+    minLength: 19
+    maxLength: 19
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "2013-06-04T01:02:03"
+    - "2024-01-15T10:30:00"
+  references: null
+  notes: >
+    New in v0.6.36 (spec 2026-06-19-zoneless-iso-datetime-leaves). Zoneless
+    second-precision sibling of iso_8601, mirroring iso_microseconds. Add-not-
+    broaden: the zoned leaves keep their Z-required patterns so round-trip
+    transforms stay correct. Distinct from epoch.unix_seconds (numeric epoch,
+    not an ISO string).
+
+datetime.timestamp.iso_milliseconds:
+  title: ISO Datetime with Milliseconds (no timezone)
+  description: >
+    ISO 8601-like format with millisecond precision but no timezone
+    indicator (e.g. 2013-06-04T01:02:03.123). Common in database exports
+    and log files. The zoneless sibling of iso_8601_milliseconds.
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: TIMESTAMP
+  format_string: "%Y-%m-%dT%H:%M:%S.%g"
+  transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%g')"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}$"
+    minLength: 23
+    maxLength: 23
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 3
+  aliases: []
+  samples:
+    - "2013-06-04T01:02:03.123"
+    - "2024-01-15T10:30:00.500"
+  references: null
+  notes: >
+    New in v0.6.36 (spec 2026-06-19-zoneless-iso-datetime-leaves). Zoneless
+    millisecond sibling of iso_8601_milliseconds, mirroring iso_microseconds.
+    Distinct from iso_8601_milliseconds (has the trailing Z).
+
 datetime.timestamp.rfc_2822_ordinal:
   title: RFC 2822 with Ordinal Indicators
   description: >

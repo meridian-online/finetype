@@ -81,6 +81,8 @@ datetime.timestamp.iso_8601_millis_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\
 datetime.timestamp.iso_8601_milliseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$	true
 datetime.timestamp.iso_8601_offset	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{1,2}:\d{2}$	true
 datetime.timestamp.iso_microseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$	true
+datetime.timestamp.iso_milliseconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$	true
+datetime.timestamp.iso_seconds	false	^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$	true
 datetime.timestamp.iso_space_zulu	false	^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$	true
 datetime.timestamp.mdy_12h	false	^\d{2}/\d{2}/\d{4} \d{2}:\d{2} [AP]M$	true
 datetime.timestamp.mdy_24h	false	^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$	true

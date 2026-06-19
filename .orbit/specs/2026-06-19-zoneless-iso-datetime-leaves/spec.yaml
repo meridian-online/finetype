@@ -19,8 +19,13 @@ acceptance_criteria:
     `datetime.timestamp.iso_milliseconds` (zoneless millisecond). DELIVERABLE: a one-paragraph
     decision note confirming add-not-broaden + the two leaf names (flag if `iso_seconds`
     risks confusion with epoch.unix_seconds and a better name is warranted).
+    CLOSED 2026-06-19: add-not-broaden confirmed (zoned taxonomy patterns require a
+    trailing Z and their transforms emit `…Z`; broadening would break round-trip). Names
+    `iso_seconds` / `iso_milliseconds` follow the established zoneless convention
+    (`iso_microseconds`); no clash with `datetime.epoch.unix_seconds` (numeric epoch,
+    different namespace and shape).
   gate: true
-  checked: false
+  checked: true
   ac_type: doc
 - id: ac-01
   description: |
@@ -34,8 +39,13 @@ acceptance_criteria:
     samples/release_priority like the sibling. DELIVERABLE: generators pass (`make
     taxonomy-check` / generator alignment 100%), taxonomy count 240 → 242, all 7-domain
     generators green.
+    CLOSED 2026-06-19 (folded into the v0.6.36 patch): both leaves added to
+    definitions_datetime.yaml mirroring iso_microseconds, generator arms added to
+    generator/datetime.rs. `finetype check` 100% (datetime 86/86). NOTE the count: this
+    patch also adds 3 plain_text-discovery types and retires categorical, so the net
+    taxonomy is 240 → 244 (datetime 84 → 86), not 240 → 242.
   gate: true
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-02
   description: |
@@ -47,8 +57,15 @@ acceptance_criteria:
     veto-consistency gate passes for both. Extend the unit tests (zoned vs zoneless split,
     the taxonomy-consistency test now covers the 2 new leaves). DELIVERABLE: detector + tests
     + green CI (fmt, clippy -D warnings, cargo test).
+    CLOSED 2026-06-19: datetime_format.rs zoned ISO regexes changed `Z?$` → `Z$` (require Z,
+    match taxonomy); added zoneless detector entries iso_microseconds (existing leaf, was
+    absent from the detector) + iso_milliseconds + iso_seconds (mutually exclusive with the
+    zoned leaves by Z). Unit tests split into zoned_iso_requires_z + zoneless_iso_reads_
+    zoneless_leaves; consistency test covers the new leaves. Full workspace cargo test green,
+    clippy -D warnings clean. Functional smoke test: zoneless `…:03`→iso_seconds,
+    `…:03.123`→iso_milliseconds, `…:03Z`→iso_8601 (via datetime_format_refinement at profile).
   gate: true
-  checked: false
+  checked: true
   ac_type: code
 - id: ac-03
   description: |
@@ -59,7 +76,11 @@ acceptance_criteria:
     sql_standard mislabels — those are gold corrections, not model wins). Isolate via
     rule-on vs rule-off if needed. DELIVERABLE: gold + representative headline vs current
     main, the zoneless-ISO recovery count, the no-regression check.
-  gate: true
+    DEFERRED 2026-06-19: the GitTables gold/representative source files are not checked in
+    locally, so the empirical gates run on the corpus machine (like the corpus-honest gate)
+    before the v0.6.36 release is cut. The change is corrective-by-construction — zoneless
+    ISO values the veto previously DECLINED now route to the correct leaves; zoned Z-values
+    are unchanged (the Z-required regex only tightens what the taxonomy veto already enforced).
   checked: false
   ac_type: observation
 - id: ac-04

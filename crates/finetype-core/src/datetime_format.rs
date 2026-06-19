@@ -137,22 +137,46 @@ fn formats() -> &'static [Format] {
                 &format!(r"^{ymd_t}[+-]\d{{2}}:?\d{{2}}$"),
                 chk_ymd_hms,
             ),
+            // Zoned ISO leaves REQUIRE a trailing Z (match the taxonomy
+            // patterns, whose transforms emit `…%fZ`). Zoneless values fall
+            // through to the iso_seconds/_milliseconds/_microseconds siblings
+            // below — spec 2026-06-19-zoneless-iso-datetime-leaves.
             f(
                 "datetime.timestamp.iso_8601_microseconds",
                 true,
-                &format!(r"^{ymd_t}\.\d{{6}}Z?$"),
+                &format!(r"^{ymd_t}\.\d{{6}}Z$"),
                 chk_ymd_hms,
             ),
             f(
                 "datetime.timestamp.iso_8601_milliseconds",
                 true,
-                &format!(r"^{ymd_t}\.\d{{3}}Z?$"),
+                &format!(r"^{ymd_t}\.\d{{3}}Z$"),
                 chk_ymd_hms,
             ),
             f(
                 "datetime.timestamp.iso_8601",
                 true,
-                &format!(r"^{ymd_t}Z?$"),
+                &format!(r"^{ymd_t}Z$"),
+                chk_ymd_hms,
+            ),
+            // Zoneless ISO siblings (no trailing Z, mutually exclusive with the
+            // zoned leaves above by the absence of Z).
+            f(
+                "datetime.timestamp.iso_microseconds",
+                true,
+                &format!(r"^{ymd_t}\.\d{{6}}$"),
+                chk_ymd_hms,
+            ),
+            f(
+                "datetime.timestamp.iso_milliseconds",
+                true,
+                &format!(r"^{ymd_t}\.\d{{3}}$"),
+                chk_ymd_hms,
+            ),
+            f(
+                "datetime.timestamp.iso_seconds",
+                true,
+                &format!(r"^{ymd_t}$"),
                 chk_ymd_hms,
             ),
             // ── SQL / space-separated ──
@@ -410,15 +434,37 @@ mod tests {
     }
 
     #[test]
-    fn millis_beats_plain_iso_no_overlap() {
-        // A millisecond value matches ONLY the millis format, never plain iso_8601.
+    fn zoneless_iso_reads_zoneless_leaves() {
+        // No trailing Z → the zoneless siblings, by precision. spec
+        // 2026-06-19-zoneless-iso-datetime-leaves.
+        assert_eq!(
+            leaf(&["2020-01-03T14:22:09", "2021-06-01T00:00:00"]),
+            Some("datetime.timestamp.iso_seconds")
+        );
         assert_eq!(
             leaf(&["2020-01-03T14:22:09.123", "2021-06-01T00:00:00.000"]),
+            Some("datetime.timestamp.iso_milliseconds")
+        );
+        assert_eq!(
+            leaf(&["2020-01-03T14:22:09.123456"]),
+            Some("datetime.timestamp.iso_microseconds")
+        );
+    }
+
+    #[test]
+    fn zoned_iso_requires_z() {
+        // A trailing Z → the zoned leaves (mutually exclusive with zoneless).
+        assert_eq!(
+            leaf(&["2020-01-03T14:22:09Z", "2021-06-01T00:00:00Z"]),
+            Some("datetime.timestamp.iso_8601")
+        );
+        assert_eq!(
+            leaf(&["2020-01-03T14:22:09.123Z"]),
             Some("datetime.timestamp.iso_8601_milliseconds")
         );
         assert_eq!(
-            leaf(&["2020-01-03T14:22:09", "2021-06-01T00:00:00"]),
-            Some("datetime.timestamp.iso_8601")
+            leaf(&["2020-01-03T14:22:09.123456Z"]),
+            Some("datetime.timestamp.iso_8601_microseconds")
         );
     }
 
@@ -427,10 +473,6 @@ mod tests {
         assert_eq!(
             leaf(&["2020-01-03T14:22:09+02:00"]),
             Some("datetime.timestamp.iso_8601_offset")
-        );
-        assert_eq!(
-            leaf(&["2020-01-03T14:22:09.123456"]),
-            Some("datetime.timestamp.iso_8601_microseconds")
         );
         assert_eq!(
             leaf(&["2020-01-03T14:22:09.123456+0200"]),

@@ -32,6 +32,17 @@ impl Generator {
                 let micros = self.rng.gen_range(0..1000000);
                 Ok(format!("{}.{:06}Z", dt.format("%Y-%m-%dT%H:%M:%S"), micros))
             }
+            // Zoneless ISO siblings (no trailing Z) — spec
+            // 2026-06-19-zoneless-iso-datetime-leaves.
+            ("timestamp", "iso_seconds") => Ok(self
+                .random_datetime()
+                .format("%Y-%m-%dT%H:%M:%S")
+                .to_string()),
+            ("timestamp", "iso_milliseconds") => {
+                let dt = self.random_datetime();
+                let millis = self.rng.gen_range(0..1000);
+                Ok(format!("{}.{:03}", dt.format("%Y-%m-%dT%H:%M:%S"), millis))
+            }
             ("timestamp", "iso_8601_offset") => {
                 let dt = self.random_datetime();
                 let offset_h = self.rng.gen_range(-12i32..=12);
