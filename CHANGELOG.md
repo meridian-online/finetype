@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.35] - 2026-06-19
+
 ### Added
 
 - **Honest confidence signal in `profile` output** (spec
@@ -17,7 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and raw confidence are unchanged. Thresholds are the data-driven knees from the
   gold + representative reliability curve; on representative data `high`-band columns
   are ~0.82 accurate vs ~0.54 for `low`. The shipped confidence ranks correctness but
-  is not calibrated, so the band reads the ranking, not the raw number.
+  is not calibrated, so the band reads the ranking, not the raw number. Trust the
+  `high`/`low` bands; the `medium` tier is statistically indistinct.
+- **Username recovery rule** (spec `2026-06-17-full-name-username-veto`). High-cardinality
+  login-handle columns the model called `full_name` (a distinct handle per row) are
+  recovered as `identity.person.username` — a value-based rule, with a cardinality guard
+  so low-cardinality repeating vocabularies (exchange codes, drug names) are left alone.
 
 ## [0.6.34] - 2026-06-17
 
