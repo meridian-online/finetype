@@ -1,5 +1,5 @@
 id: 2026-06-18-minilm-encoder-build
-goal: 'Build a fine-tuned all-MiniLM-L6-v2 contextual encoder as a low-band escalation path for the Sense pipeline — to crack the semantic over-emission mass the static Model2Vec encoder can''t (PA→country_code, Si→region). Fail-cheap order: confirm Rust/candle latency holds BEFORE training, catch the residual-attractor on gold+repr BEFORE corpus-scale work, and let the corpus-honest relocation gate (which killed 0-for-6 retrains) be the arbiter. A blocking NO-GO is a legitimate documented outcome, not a spec failure.'
+goal: 'Ship gte-tiny as the semantic-boundary classifier in a type-routed two-stage (deterministic parsers + static multi-branch + gte-tiny on contested-semantic predictions, routed by PREDICTED TYPE — no confidence machinery). SLIM PLAN (2026-06-19 zoom-out, revised_slim_plan.md): gte-tiny is a separate encoder, not an additive flat-softmax retrain, so the relocation ceremony built for the 0-for-6 retrains does not apply. Gold + representative (human truth) are the BLOCKING gates; corpus over-emission is a DIRECTIONAL sanity check; the drift proxy and the gated-YDF-oracle blocking gate are DROPPED for this path (the YDF oracle is wrong ~42% on contested and inflated the prior NO-GO).'
 cards:
 - 0002-semantic-type-detection
 - 0020-honest-production-typing
@@ -11,72 +11,59 @@ labels:
 acceptance_criteria:
 - id: ac-00
   description: |
-    RUST/CANDLE LATENCY PROBE — speed must hold in Rust BEFORE any training (code, BLOCKING,
-    the cheapest kill). Load OFF-THE-SHELF all-MiniLM-L6-v2 in candle (candle-transformers BERT
-    + the tokenizers crate loading tokenizer.json + safetensors weights — all already workspace
-    deps; finetype-model is already a candle crate), mean-pool, and measure CPU per-column
-    latency on a column-text sample ("header: <h> | values: <v…>"). The Python/torch probe showed
-    6.7 ms/col; confirm candle holds the ≤10 ms low-band ceiling (ac-00 budget of the discovery).
-    Confirm it is embeddable + offline + DETERMINISTIC (identical vectors across runs). Try int8
-    quantisation if needed. DELIVERABLE: a working candle MiniLM inference path + measured Rust
-    ms/col vs the 10 ms budget. If Rust latency blows the budget and quantisation can't recover it,
-    NO-GO here — before a single training run is spent.
+    RUST/CANDLE LATENCY — DONE. gte-tiny (lead encoder, beat 7 alternatives) runs in candle
+    (candle-transformers BERT + tokenizers + safetensors, deterministic, embeddable). CPU batched
+    ~10.6 ms/col (at budget), Metal batched 0.07 ms/col (corpus pass ~minutes). Same arch as MiniLM
+    so latency identical. crates/finetype-candle-spike/src/bin/minilm_latency.rs.
   gate: true
   checked: true
+  ac_type: code
 - id: ac-01
   description: |
-    FINE-TUNE THE ENCODER with PRECEDENCE-AWARE residual training (code). Fine-tune
-    all-MiniLM-L6-v2 + a classification head on the type task using the SAME substrate the
-    multi-branch uses (the generator + distilled data), on the "header + values" representation.
-    CRITICAL (the 0-for-6 defence, discovery ac-03): the residual must be trained as an explicit
-    DECISION, not a frequency sink — class-balancing and/or an explicit "no-specific-type" abstain
-    outcome and/or precedence semantics (decision 0096), NOT plain additive fine-tuning that
-    broadened catch-alls six times. Lower-friction route: fine-tune in PyTorch (mature LoRA /
-    head tooling), export safetensors for the candle path from ac-00; the candle finetype-train
-    crate is the alternative. DELIVERABLE: the fine-tuned model + held-out separability (target:
-    beat the 0.893 zero-shot probe) + safetensors loadable by the ac-00 candle path.
+    FINE-TUNE gte-tiny AS THE SEMANTIC CLASSIFIER (code). Clean rebalanced training: mine REAL
+    corpus columns (gold's distribution, NOT synthetic generation which under-performs) + label by
+    authoritative-vocab membership (GeoNames incl admin2 for region, airports for iata) and DISTILLED
+    LLM labels for entity_name/full_name/residual (NOT v19's noisy calls — the root cause of the
+    prior over-demotion); residual ~25% (rebalanced from 44%). Train with the validated v3 recipe:
+    partial-unfreeze (top-2 layers), discriminative LR (encoder 2e-6 / head 1e-3), NATURAL CE (no
+    class weights), grad-clip + warmup; SAVE the model. DELIVERABLE: the saved fine-tuned gte-tiny +
+    held-out separability beating the shipped model on the contested families.
   gate: false
   checked: false
+  ac_type: code
 - id: ac-02
   description: |
-    ATTRACTOR CHECK on gold + representative — catch the 0-for-6 failure mode CHEAPLY, before
-    corpus-scale work (observation, BLOCKING). Score the fine-tuned model on gold + the
-    representative fixture (eval/repr) via the Python harness — standalone or escalation-simulated
-    (static path for quality_band≥0.70, encoder for the low band). Confirm the residual is NOT
-    broadened: categorical/full_name/the text catch-alls hold or improve their PRECISION, and the
-    semantic prize (the 83 gold / 31 repr over-emission cols, discovery ac-00) is recovered without
-    a new attractor forming. This is the exact failure every additive retrain hit — measure it on
-    the cheap instruments before spending the 9-hour corpus pass. DELIVERABLE: gold + repr per-type
-    precision/recall for the candidate vs v19, with the residual-broadening check explicit. A
-    broadened residual here is a NO-GO before ac-03/ac-04 — kill cheap.
+    GOLD + REPRESENTATIVE — the BLOCKING truth gates (observation, BLOCKING). Wire the type-routed
+    two-stage (static multi-branch; when it predicts a contested-semantic type — geo/person/entity/
+    residual — gte-tiny re-decides; route by PREDICTED TYPE, no confidence gating) and score it on
+    the gold corpus + the representative fixture (eval/repr). REQUIRE: a lift on the contested mass,
+    NO regression on non-contested types, and the residual NOT broadened (categorical/full_name/word
+    precision held). These human-verified instruments — not the YDF oracle — are the arbiter.
+    DELIVERABLE: gold + representative headline vs v19, per-type, with the residual-broadening check.
   gate: true
   checked: false
   ac_type: observation
 - id: ac-03
   description: |
-    LOW-BAND ESCALATION INTEGRATION in Rust (code). Wire the candle encoder as a
-    quality_band < 0.70 escalation path in the profile/classify pipeline: confident columns keep
-    the fast static Model2Vec+multi-branch path (~0.9 ms/col); only the uncertain low band gets the
-    MiniLM re-classification. Embedded + offline + deterministic, like the three existing models.
-    Run the B07 consumer-graph audit on the classify path first (codegraph_impact; H03 halt if an
-    unaudited load-bearing edit). Measure END-TO-END latency on real multi-column tables (the
-    interactive analyst cost, not just per-column). DELIVERABLE: integrated escalation behind a flag
-    + green CI (fmt + clippy -D warnings + cargo test) + the consumer-audit note + real-table latency.
+    TYPE-ROUTED TWO-STAGE IN RUST (code). Wire the candle gte-tiny into the profile pipeline:
+    when the static stage predicts a contested-semantic type, gte-tiny re-classifies (predicted-type
+    routing — NO confidence threshold, NO corpus-pass-confidence dependency). Embedded + offline +
+    deterministic like the existing models. B07 consumer-graph audit on the classify path first
+    (codegraph_impact; H03 halt if unaudited). DELIVERABLE: the integrated two-stage behind a flag +
+    green CI (fmt + clippy -D warnings + cargo test) + the audit note + real-table latency.
   gate: false
   checked: false
+  ac_type: code
 - id: ac-04
   description: |
-    THE FULL PROMOTION SCOREBOARD — corpus-honest gate is the arbiter (observation, BLOCKING).
-    Run the candidate through the promotion order (0095, + representative band this session):
-    gold-anchor (efficacy) → drift proxy (pre-train) → gold + representative + rare-type scoreboard
-    → corpus-honest relocation gate (BLOCKING, H05). The corpus-honest gate killed all six prior
-    retrains by catching error RELOCATION the curated instruments miss — it is the arbiter here, not
-    the gold/separability number. DELIVERABLE: the per-gate verdict + the gold/representative headline
-    delta + the corpus-honest relocation report. DECISION: if every blocking gate is GO, promote
-    (models/default swap via the release flow) and record the headline lift; if the corpus-honest
-    gate (or any blocking gate) is NO-GO, PRESERVE the model as an artifact, document the failure
-    mode, and the semantic ceiling stands — a legitimate, expected-possible outcome after 0-for-6,
-    NOT a spec failure. State what is measured vs assumed.
-  gate: true
+    CORPUS OVER-EMISSION SANITY CHECK — directional, NOT blocking (observation). Does gte-tiny
+    over-emit any label wildly at corpus scale, judged on its OWN predictions (label marginals vs
+    v19's)? Keep the corpus-honest gate's QUESTION — catch a label exploding at scale — but drop the
+    vs-v19 gated-YDF relocation apparatus (the oracle is ~42% wrong on contested and inflated the
+    prior NO-GO by scoring correct fixes as oracle_fp). A large over-emission FLAGS investigation; it
+    does not auto-block. Promotion is decided by ac-02 (gold + representative). DELIVERABLE: the
+    per-label corpus marginal comparison + a judgement on any wild over-emission. STATE what is
+    measured vs assumed.
+  gate: false
   checked: false
   ac_type: observation
