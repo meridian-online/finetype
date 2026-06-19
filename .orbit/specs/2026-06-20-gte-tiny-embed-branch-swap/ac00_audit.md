@@ -43,3 +43,21 @@ ac-01 (data) → ac-02 (model dim + train) → **ac-03 offline accuracy gate (GO
 only if GO: ac-04 (candle inference) → ac-05 (corpus gate + swap). Training reads precomputed
 features, so ac-01→ac-03 never touch inference; the expensive candle path is built only after
 the model is proven to beat v19 offline.
+
+## ac-01 implementation finding (2026-06-20) — careful build, not a quick edit
+
+Features come from the Rust `finetype extract-features --json` (subprocess per column,
+threaded), NOT Python. And the v4 `.ftmb` is **table-grouped** (sibling-context) with a
+**fifth validation branch** — `write_ftmb_v4(path, table_groups, valid_dim)`, not flat
+records. So a correct V5 builder must reproduce: table grouping + validation branch +
+threaded char/stats extraction + **batched** gte-tiny (torch/MPS can't run per-thread).
+
+SAFE DESIGN (no edits to the 3265-line load-bearing file): a separate `build_ftmb_v5_gte.py`
+that imports `blend_columns` + `extract_features` from prepare_multibranch_data.py, runs the
+threaded char/stats extraction, batch-computes frozen gte-tiny embed(values,384)+header(384),
+and writes V5 mirroring write_ftmb_v4's table-group layout. Injection point confirmed:
+`_extract_and_validate` (has col_values + header).
+
+MUST smoke-test: write a tiny V5, read it back through the Rust train-data reader, confirm
+dims/round-trip BEFORE launching the full embedding job + overnight retrain. A misaligned
+binary does not crash — it silently wastes the retrain. Do NOT rush unattended.
