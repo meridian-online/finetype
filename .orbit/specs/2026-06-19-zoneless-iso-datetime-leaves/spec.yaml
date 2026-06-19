@@ -1,0 +1,76 @@
+id: 2026-06-19-zoneless-iso-datetime-leaves
+goal: Add the two missing zoneless ISO-8601 datetime leaves (second + millisecond precision) following the existing iso_microseconds zoneless-sibling convention, so the engine can name and round-trip 2013-06-04T01:02:03 and ...:03.123 — values that currently match NO datetime leaf because the zoned iso_8601/iso_8601_milliseconds patterns force a trailing Z, so the deterministic datetime parser correctly declines them and they fall to a wrong sub-leaf or unknown.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- datetime
+- taxonomy
+acceptance_criteria:
+- id: ac-00
+  description: |
+    DESIGN — ADD leaves, do NOT broaden patterns (settled by investigation, doc). The
+    taxonomy already separates zoneless from zoned: iso_microseconds (pattern …\.\d{6}$,
+    transform %Y-%m-%dT%H:%M:%S.%f) vs iso_8601_microseconds (…\.\d{6}Z$, transform …%fZ).
+    The transforms DIFFER, so making the trailing Z optional on the zoned leaves would break
+    round-trip materialisation (the `validate` command's strptime). Therefore ADD the two
+    missing zoneless siblings mirroring iso_microseconds. Naming follows the precision-suffix
+    convention: `datetime.timestamp.iso_seconds` (zoneless second precision) and
+    `datetime.timestamp.iso_milliseconds` (zoneless millisecond). DELIVERABLE: a one-paragraph
+    decision note confirming add-not-broaden + the two leaf names (flag if `iso_seconds`
+    risks confusion with epoch.unix_seconds and a better name is warranted).
+  gate: true
+  checked: false
+  ac_type: doc
+- id: ac-01
+  description: |
+    TAXONOMY — add the two leaves to labels/definitions_datetime.yaml (config). Mirror
+    iso_microseconds exactly except the fractional width + format:
+    - iso_seconds:       pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$, format
+      %Y-%m-%dT%H:%M:%S, transform strptime({col}, '%Y-%m-%dT%H:%M:%S').
+    - iso_milliseconds:  pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$, format
+      %Y-%m-%dT%H:%M:%S.%g, transform strptime({col}, '%Y-%m-%dT%H:%M:%S.%g').
+    Include title/description/designation: universal/locales/broad_type: TIMESTAMP/tier/
+    samples/release_priority like the sibling. DELIVERABLE: generators pass (`make
+    taxonomy-check` / generator alignment 100%), taxonomy count 240 → 242, all 7-domain
+    generators green.
+  gate: true
+  checked: false
+  ac_type: config
+- id: ac-02
+  description: |
+    DETECTOR — align the deterministic datetime detector to the corrected taxonomy (code).
+    finetype_core::datetime_format currently uses Z-optional ISO regexes (looser than the
+    zoned taxonomy). Split them: the zoned iso_8601/iso_8601_milliseconds formats REQUIRE Z
+    (match the taxonomy), and ADD iso_seconds/iso_milliseconds zoneless formats. After this,
+    a zoneless value reads as the new leaf, a Z value reads as the zoned leaf, and the
+    veto-consistency gate passes for both. Extend the unit tests (zoned vs zoneless split,
+    the taxonomy-consistency test now covers the 2 new leaves). DELIVERABLE: detector + tests
+    + green CI (fmt, clippy -D warnings, cargo test).
+  gate: true
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    GOLD + REPRESENTATIVE — blocking truth gates (observation). Score the change. REQUIRE:
+    no regression on gold or representative, and the datetime parser now RECOVERS zoneless
+    ISO columns (the gold `data_as_of`/`dba_start_date`-shaped columns the veto-consistency
+    gate currently declines should now land on iso_milliseconds; note gold may relabel some
+    sql_standard mislabels — those are gold corrections, not model wins). Isolate via
+    rule-on vs rule-off if needed. DELIVERABLE: gold + representative headline vs current
+    main, the zoneless-ISO recovery count, the no-regression check.
+  gate: true
+  checked: false
+  ac_type: observation
+- id: ac-04
+  description: |
+    CORPUS — directional, non-blocking (observation). At corpus scale the ~615 zoneless
+    sec/ms ISO columns (measured: 0.01% of 6M) should move onto the two new leaves (today
+    mislabelled iso_microseconds 361 / iso_8601_offset 122 / iso_8601 96 / …). Confirm via
+    per-leaf marginal that the new leaves absorb that mass and nothing else over-emits.
+    DELIVERABLE: per-leaf datetime marginal before/after + a judgement. STATE measured vs
+    assumed. NOTE: the win is SMALL by volume (~615 cols); the value is correctness +
+    round-trip, not headline accuracy.
+  gate: false
+  checked: false
+  ac_type: observation
