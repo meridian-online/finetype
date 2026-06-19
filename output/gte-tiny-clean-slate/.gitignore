@@ -1,3 +1,6 @@
 cs_train.tsv
-gte_tiny_fulllabel.pt
-train.log
+gte_tiny_fulllabel*.pt
+train*.log
+kb_clean.tsv
+clean_v2.tsv
+cs_train_clean.tsv
