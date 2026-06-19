@@ -36,6 +36,9 @@ cpu = ["finetype-model/cpu"]
 cuda = ["finetype-model/cuda", "train", "finetype-train/cuda"]
 metal = ["finetype-model/metal", "train", "finetype-train/metal"]
 embed-models = []
+# Dev/eval-only: expose finetype-model's RHH runtime toggle so a single binary can
+# A/B a Sharpen rule on/off via RHH_DISABLE_HINTS. Never in the default (shipped) build.
+rhh-instrumentation = ["finetype-model/rhh-instrumentation"]
 # Opt-in trainer for CPU-host training (`cargo run --features train -- \
 # train-multi-branch ...`). Gates the `train-multi-branch` subcommand; `cuda`
 # and `metal` enable it transitively.

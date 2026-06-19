@@ -1,0 +1,65 @@
+id: 2026-06-19-deterministic-datetime-parser
+goal: 'Replace the model''s unreliable guess between near-identical datetime sub-formats with a deterministic value-based detector: a delimited datetime string deterministically resolves to exactly one taxonomy leaf, so test the sample against an ordered specificity list of datetime formats (with value-range disambiguation for shared-pattern leaves) and assign the leaf the values actually parse as. Over-emission-safe by construction: delimited formats assert unconditionally (they cannot be anything but datetime); bare-integer formats (epoch/compact/year) assert ONLY when the model already predicted datetime, since a bare integer is genuinely epoch-or-id-or-phone.'
+cards:
+- 0002-semantic-type-detection
+status: closed
+labels:
+- datetime
+- deterministic
+- precision
+acceptance_criteria:
+- id: ac-01
+  description: |
+    DETERMINISTIC DATETIME FORMAT DETECTOR in finetype-core (code). A value-based
+    function detect_datetime_format(samples) -> Option<leaf> that tests the non-null
+    sample against an ORDERED specificity list of datetime formats (most-specific first,
+    so iso_8601_milliseconds wins over iso_8601 on a fractional value) and returns the
+    leaf that >= a high fraction (>=0.95) of values parse as. Shared-pattern leaves are
+    disambiguated by VALUE-RANGE checks, not regex alone: \d{2}/\d{2}/\d{4} resolves
+    mdy vs dmy by which field exceeds 12 (undecidable -> no override); \d{8} resolves
+    compact_ymd/dmy/mdy by which split yields a valid year+month+day. Reuses the
+    taxonomy's compiled validators (validate_value_for_label) for the regex tier. Cover
+    the real corpus/gold distribution first (delimited iso/sql/slash/dot dates+timestamps,
+    epoch, year) — the rare obscure leaves (jp_era, julian, chinese) stay model+veto.
+    DELIVERABLE: the detector + unit tests over the gold datetime formats incl. the
+    overlap/disambiguation cases and the negative controls (a bare id is NOT an epoch).
+  gate: false
+  checked: true
+- id: ac-02
+  description: |
+    WIRE AS A VALUE-BASED SHARPEN RULE (code), over-emission-safe by construction.
+    A datetime_format_refinement method on ColumnClassifier: run the detector on the
+    sample; if it returns a DELIMITED-format leaf, assign it (it cannot be anything but
+    datetime — assert unconditionally); if it returns a BARE-INTEGER leaf (epoch/compact/
+    year), assign ONLY when the model already predicted a datetime.* leaf (corroboration
+    gate — a bare 10-digit integer is genuinely epoch-or-id-or-phone). RHH-disableable
+    (datetime_format_refinement); records disambiguation_rule. B07 consumer-graph audit
+    on the classify path first (codegraph_impact; H03 halt if unaudited). DELIVERABLE:
+    the integrated rule + green CI (fmt + clippy -D warnings + cargo test) + audit note.
+  gate: true
+  checked: true
+- id: ac-03
+  description: |
+    GOLD + REPRESENTATIVE — the BLOCKING truth gates (observation, BLOCKING). Score the
+    rule on the gold corpus + representative fixture. REQUIRE: a lift (or hold) on the
+    141 datetime gold rows' exact-leaf accuracy (v19 = 127/141 = 0.901), and ZERO
+    regression on non-datetime types (the corroboration gate must not pull any bare
+    integer into epoch/year that the model did not already call datetime). DELIVERABLE:
+    gold + representative headline vs v19, the datetime sub-leaf delta, and the
+    non-datetime no-regression check.
+  gate: true
+  checked: true
+  ac_type: observation
+- id: ac-04
+  description: |
+    CORPUS OVER-EMISSION SANITY CHECK — directional, not blocking (observation). At
+    corpus scale, does the rule pull any non-datetime mass INTO datetime, or explode a
+    datetime sub-leaf marginal vs v19? Run the rule over the stratified sample and compare
+    per-label datetime marginals to v19. A delimited-format assertion is provably safe; the
+    check exists to confirm the corroboration gate holds for the bare-integer path. A wild
+    over-emission FLAGS investigation; promotion is decided by ac-03. DELIVERABLE: the
+    per-label datetime marginal comparison + a judgement. STATE what is measured vs assumed.
+  gate: false
+  checked: true
+  ac_type: observation
+closed_at: 2026-06-19T04:19:29.273375Z

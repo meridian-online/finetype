@@ -387,6 +387,28 @@ fn is_generic_prediction(
 /// over-emits increment (gold precision 0.056). Returns `Some(true)` for a genuine
 /// increment, `Some(false)` for a plain integer column wearing the label, and
 /// `None` when there are too few integers to judge (caller leaves the label alone).
+/// Does the sample pass `leaf`'s taxonomy validator at a high rate? Used by
+/// `datetime_format_refinement` to assert only leaves the downstream validation veto
+/// (threshold 0.5) will accept — the 0.9 bar here sits comfortably above it, so a
+/// confirmed assertion is never re-vetoed, and an under-bar column keeps the model's label.
+fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
+    let mut checked = 0usize;
+    let mut passed = 0usize;
+    for v in sample {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        if let Ok(res) = finetype_core::validator::validate_value_for_label(t, leaf, tax) {
+            checked += 1;
+            if res.is_valid {
+                passed += 1;
+            }
+        }
+    }
+    checked > 0 && (passed as f64) / (checked as f64) >= 0.9
+}
+
 fn values_form_increment(values: &[String]) -> Option<bool> {
     let n_nonempty = values.iter().filter(|v| !v.trim().is_empty()).count();
     let ints: Vec<i64> = values
@@ -2309,6 +2331,9 @@ impl ColumnClassifier {
                 result.disambiguation_rule = Some(rule_name);
             }
 
+            // Deterministic datetime sub-format read (value-based, over-emission-safe;
+            // runs before header hints so a delimited timestamp is read from values).
+            self.datetime_format_refinement(&mut result, &sample);
             self.sharpen_and_guard(&mut result, header, &sample, values);
 
             // Step 5b: Username recovery veto — value-based, runs AFTER header hints
@@ -2398,6 +2423,9 @@ impl ColumnClassifier {
             }
 
             // Step 5: Header hints (Model2Vec semantic matching)
+            // Deterministic datetime sub-format read (value-based, over-emission-safe;
+            // runs before header hints so a delimited timestamp is read from values).
+            self.datetime_format_refinement(&mut result, &sample);
             self.sharpen_and_guard(&mut result, header, &sample, values);
 
             // Step 5b: Username recovery veto — value-based, runs AFTER header hints
@@ -2501,6 +2529,9 @@ impl ColumnClassifier {
             }
 
             // Step 5: Header hints (Model2Vec semantic matching)
+            // Deterministic datetime sub-format read (value-based, over-emission-safe;
+            // runs before header hints so a delimited timestamp is read from values).
+            self.datetime_format_refinement(&mut result, &sample);
             self.sharpen_and_guard(&mut result, header, &sample, values);
 
             // Step 5b: Username recovery veto — value-based, runs AFTER header hints
@@ -2966,6 +2997,60 @@ impl ColumnClassifier {
         if let Some(taxonomy) = self.taxonomy.as_ref() {
             result.detected_locale = detect_locale_from_validation(values, &result.label, taxonomy);
         }
+    }
+
+    /// `datetime_format_refinement` (default ON). Deterministic datetime sub-format
+    /// detection (spec 2026-06-19-deterministic-datetime-parser). A delimited datetime
+    /// string (`2020-01-03 14:22:09`, ISO, offset, slash/dot YMD, …) resolves to exactly
+    /// ONE taxonomy leaf by its shape and field ranges — there is nothing to learn, yet
+    /// the flat-softmax Sense model routinely guesses the wrong sub-leaf (iso_8601 vs
+    /// `…_milliseconds` vs `sql_standard`) or the validation veto demotes a real timestamp
+    /// to `unknown`. Read the format deterministically (finetype_core::datetime_format)
+    /// and assert it. Over-emission-safe by construction: a DELIMITED reading is
+    /// unmistakably datetime, so it is asserted unconditionally (it recovers a timestamp
+    /// the model mislabelled `alphanumeric_id`/`unknown` and fixes the sub-leaf); a
+    /// BARE-INTEGER reading (epoch seconds/millis/…, a 4-digit year) is asserted ONLY when
+    /// the model already predicted a `datetime.*` leaf, because a bare 10-digit integer is
+    /// genuinely epoch-or-id-or-phone and grabbing it would relocate non-datetime mass.
+    /// Value-based (decision 0048); RHH-disableable.
+    fn datetime_format_refinement(&self, result: &mut ColumnResult, sample: &[String]) {
+        if rhh::is_disabled("datetime_format_refinement") {
+            return;
+        }
+        let detected = match finetype_core::datetime_format::detect_datetime_format(sample) {
+            Some(d) => d,
+            None => return,
+        };
+        // Corroboration gate: a bare integer is only datetime when the model agrees.
+        if !detected.delimited && !result.label.starts_with("datetime.") {
+            return;
+        }
+        // Already the exact leaf — leave the disambiguation metadata untouched.
+        if result.label == detected.leaf {
+            return;
+        }
+        // Veto-consistency gate: assert a leaf ONLY if the column's values actually pass
+        // that leaf's OWN taxonomy validator. The detector uses format-family regexes that
+        // are intentionally looser than some strict taxonomy patterns (e.g. the taxonomy
+        // requires a trailing `Z` on iso_8601_milliseconds, so a zoneless `…:09.123` reads
+        // as millis here but fails that leaf's schema). Without this gate we would assert a
+        // leaf the downstream validation veto (profile.rs) then HARD-REJECTS into
+        // `unknown`/`alphanumeric_id` — strictly worse than the model's datetime guess.
+        // Gating on the same validator the veto uses keeps the two a single source of truth.
+        match self.taxonomy.as_ref() {
+            Some(tax) if label_validates_sample(tax, detected.leaf, sample) => {}
+            _ => return,
+        }
+        result.label = detected.leaf.to_string();
+        // A delimited datetime read is deterministic and certain; reflect that in the
+        // confidence (feeds the quality band). A corroborated bare-integer read keeps the
+        // model's confidence — the model, not the shape, decided it was temporal.
+        if detected.delimited {
+            result.confidence = result.confidence.max(0.99);
+        }
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some("datetime_format_refinement".to_string());
+        result.detected_locale = None;
     }
 
     /// `binary_vocab_veto` (default ON). `representation.boolean.binary` requires

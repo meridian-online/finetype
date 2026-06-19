@@ -6292,3 +6292,95 @@ fn username_veto_still_fires_on_high_cardinality_handles() {
     ]);
     assert!(is_username_handle_shaped(&handles));
 }
+
+// ── datetime_format_refinement (spec 2026-06-19-deterministic-datetime-parser) ──
+
+#[test]
+fn test_datetime_refinement_fires_when_taxonomy_accepts() {
+    // sql_standard values + a taxonomy that accepts them → the rule recovers a real
+    // timestamp the model called `unknown`.
+    let yaml = r#"
+datetime.timestamp.sql_standard:
+  title: SQL Standard
+  designation: universal
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 5
+  samples: ["2020-01-03 14:22:09"]
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    let mut r = ColumnResult {
+        label: "unknown".to_string(),
+        confidence: 0.3,
+        vote_distribution: vec![],
+        disambiguation_applied: false,
+        disambiguation_rule: None,
+        samples_used: 2,
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+    let sample = vec![
+        "2001-09-17 00:00:00".to_string(),
+        "2011-08-30 00:00:00".to_string(),
+    ];
+    cc.datetime_format_refinement(&mut r, &sample);
+    assert_eq!(r.label, "datetime.timestamp.sql_standard");
+    assert_eq!(
+        r.disambiguation_rule.as_deref(),
+        Some("datetime_format_refinement")
+    );
+}
+
+#[test]
+fn test_datetime_refinement_blocked_when_taxonomy_rejects() {
+    // The taxonomy's iso_8601_milliseconds requires a trailing `Z`. A zoneless
+    // `…:03.123` reads as millis in the detector but FAILS that leaf's schema, so the
+    // veto-consistency gate must refuse to assert it (else the downstream veto would
+    // hard-reject our label into unknown/alphanumeric_id — strictly worse).
+    let yaml = r#"
+datetime.timestamp.iso_8601_milliseconds:
+  title: ISO 8601 ms
+  designation: universal
+  tier: [TIMESTAMP, timestamp]
+  release_priority: 5
+  samples: ["2020-01-03T14:22:09.123Z"]
+  validation:
+    type: string
+    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc = ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new(
+        "representation.identifier.alphanumeric_id",
+    )));
+    cc.set_taxonomy(tax);
+
+    let mut r = ColumnResult {
+        label: "representation.identifier.alphanumeric_id".to_string(),
+        confidence: 0.5,
+        vote_distribution: vec![],
+        disambiguation_applied: false,
+        disambiguation_rule: None,
+        samples_used: 2,
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+    let sample = vec![
+        "2013-06-04T01:02:03.123".to_string(),
+        "2018-01-01T05:30:00.000".to_string(),
+    ];
+    cc.datetime_format_refinement(&mut r, &sample);
+    assert_eq!(
+        r.label, "representation.identifier.alphanumeric_id",
+        "zoneless iso-millis must not be asserted — taxonomy rejects that leaf"
+    );
+}

@@ -9,6 +9,7 @@
 
 pub mod checker;
 pub mod checksum;
+pub mod datetime_format;
 pub mod enum_domain;
 pub mod generator;
 pub mod infer;

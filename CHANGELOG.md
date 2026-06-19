@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Deterministic datetime sub-format reader** (spec
+  `2026-06-19-deterministic-datetime-parser`). A delimited datetime string resolves to
+  exactly one taxonomy leaf by its shape and field ranges, so a value-based Sharpen rule
+  (`datetime_format_refinement`) now reads the format deterministically instead of trusting
+  the model's guess between near-identical sub-formats (iso_8601 vs `…_milliseconds` vs
+  `sql_standard` vs rfc_3339). It recovers timestamps the model dropped to `unknown` and
+  fixes sub-leaves. Over-emission-safe by construction: bare integers (epoch/year) are only
+  read as datetime when the model already agrees, and a format is only asserted when the
+  column passes that leaf's own taxonomy validator — so the rule cannot relocate
+  non-datetime columns into datetime (corpus A/B over 2,000 columns: zero relocation, zero
+  over-emission). Gold +1, representative held; RHH-disableable.
+
 ## [0.6.35] - 2026-06-19
 
 ### Added

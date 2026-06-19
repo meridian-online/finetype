@@ -1,0 +1,34 @@
+ac-04 done
+
+=== ac-04 over-emission A/B (n=2000) ===
+columns the rule changed: 0
+  INTO datetime (non-dt -> dt): 0
+  OUT of datetime (dt -> non-dt): 0
+  datetime SUB-LEAF shift: 0
+
+--- per-datetime-leaf marginal (off -> on) ---
+    11 ->   11  (+0)  datetime.component.year
+     2 ->    2  (+0)  datetime.date.abbreviated_month
+     8 ->    8  (+0)  datetime.date.iso
+     5 ->    5  (+0)  datetime.date.jp_era_long
+     1 ->    1  (+0)  datetime.date.korean_ymd
+     1 ->    1  (+0)  datetime.date.long_full_month
+     6 ->    6  (+0)  datetime.date.mdy_slash
+     1 ->    1  (+0)  datetime.date.short_dmy
+     6 ->    6  (+0)  datetime.epoch.unix_seconds
+     1 ->    1  (+0)  datetime.offset.iana
+     2 ->    2  (+0)  datetime.period.quarter
+    15 ->   15  (+0)  datetime.time.hm_24h
+     1 ->    1  (+0)  datetime.time.hms_24h
+     1 ->    1  (+0)  datetime.timestamp.dot_ymd_24h
+     4 ->    4  (+0)  datetime.timestamp.iso_8601
+     3 ->    3  (+0)  datetime.timestamp.iso_8601_compact
+     3 ->    3  (+0)  datetime.timestamp.iso_8601_milliseconds
+     2 ->    2  (+0)  datetime.timestamp.mdy_12h
+     1 ->    1  (+0)  datetime.timestamp.mdy_24h
+     1 ->    1  (+0)  datetime.timestamp.rfc_3339
+    11 ->   11  (+0)  datetime.timestamp.sql_standard
+
+--- INTO-datetime transitions (verify these are GENUINE timestamps) ---
+
+--- OUT-of-datetime transitions (rule should rarely remove datetime) ---
