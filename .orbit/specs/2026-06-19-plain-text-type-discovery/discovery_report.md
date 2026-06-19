@@ -71,16 +71,23 @@ test that separates "is this type" from "is not":
   CamelCase / non-TLD final segment, a Sharpen-precedence call for the
   retrain, not the validator.
 
-## What we don't know yet
+## What shipped, and what's next
 
-These three are *built* (definitions + generators authored and precision-
-validated) but not yet *live*. FineType's label space is deliberately locked
-at 240 in lockstep across three places — the taxonomy, the hand-maintained
-category map, and the trained model's output dimension (the test suite
-enforces taxonomy ≈ model within ±1). A new type only becomes predictable
-after a retrain lifts 240→243 and clears the full promotion gate stack
-(gold-anchor → drift proxy → gold corpus → corpus-honest). That retrain is
-the next step; this spec hands it three precise, pre-validated targets.
+**Update (v0.6.36 patch):** all three are now built **live** into the
+taxonomy (242 definitions, 100% generator alignment, full test suite green).
+All three landed in the **technology** domain (author's call):
+`technology.filesystem.windows_path`, `technology.internet.message_id`,
+`technology.code.qualified_name`. In the same patch,
+`representation.discrete.categorical` was retired as a leaf (choice 0102 —
+it's now the orthogonal enum-domain property), so the net is 240 − 1 + 3 =
+**242**, not 243.
+
+One thing they can't do yet: be *predicted*. The shipped Sense model is
+240-dim and untrained on these three, so `validate` recognises them today
+but `profile` won't emit them until the next retrain clears the promotion
+gate stack (gold-anchor → drift proxy → gold corpus → corpus-honest). That
+retrain is the one remaining step; this spec hands it three precise,
+pre-validated targets.
 
 **One line for a stakeholder:** about 8% of FineType's "plain text" columns
 are really file paths, email Message-IDs, or code identifiers — three types

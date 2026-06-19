@@ -707,6 +707,65 @@ impl Generator {
                 Ok(gens[self.rng.gen_range(0..gens.len())].to_string())
             }
 
+            // ── filesystem ───────────────────────────────────────────────
+            ("filesystem", "windows_path") => {
+                let drives = ["C", "D", "E", "c", "d"];
+                let drive = drives[self.rng.gen_range(0..drives.len())];
+                let depth = self.rng.gen_range(2..6);
+                let mut segs: Vec<String> = (0..depth).map(|_| self.random_word()).collect();
+                // final segment is often a filename with extension
+                if self.rng.gen_bool(0.6) {
+                    let exts = ["cs", "dll", "sys", "txt", "xml", "json", "exe", "config"];
+                    let ext = exts[self.rng.gen_range(0..exts.len())];
+                    let last = segs.len() - 1;
+                    segs[last] = format!("{}.{}", segs[last], ext);
+                }
+                if self.rng.gen_bool(0.15) {
+                    // UNC share root
+                    Ok(format!("\\\\{}\\{}", self.random_word(), segs.join("\\")))
+                } else {
+                    // drive-letter root
+                    Ok(format!("{}:\\{}", drive, segs.join("\\")))
+                }
+            }
+
+            // ── email Message-ID ─────────────────────────────────────────
+            ("internet", "message_id") => {
+                let domains = [
+                    "mail.gmail.com",
+                    "thyme",
+                    "server.example.org",
+                    "mx.corp.net",
+                    "smtp.local",
+                ];
+                let domain = domains[self.rng.gen_range(0..domains.len())];
+                if self.rng.gen_bool(0.5) {
+                    let left_num: u64 = self.rng.gen_range(100_000..99_999_999);
+                    let ts: u64 = self.rng.gen_range(1_000_000_000_000..1_999_999_999_999);
+                    Ok(format!("<{}.{}.JavaMail.user@{}>", left_num, ts, domain))
+                } else {
+                    Ok(format!("<{}@{}>", self.gen_hex_string(16), domain))
+                }
+            }
+
+            // ── dotted qualified name (reverse-DNS FQN) ──────────────────
+            ("code", "qualified_name") => {
+                let tlds = ["com", "org", "io", "net"];
+                let tld = tlds[self.rng.gen_range(0..tlds.len())];
+                let depth = self.rng.gen_range(2..5);
+                let mids: Vec<String> = (0..depth).map(|_| self.random_word()).collect();
+                // leaf is often a CamelCase class name
+                let leaf_word = self.random_word();
+                let leaf = {
+                    let mut ch = leaf_word.chars();
+                    match ch.next() {
+                        Some(f) => f.to_uppercase().collect::<String>() + ch.as_str(),
+                        None => leaf_word.clone(),
+                    }
+                };
+                Ok(format!("{}.{}.{}", tld, mids.join("."), leaf))
+            }
+
             _ => Err(GeneratorError::NotImplemented(format!(
                 "technology.{}.{}",
                 category, type_name

@@ -247,10 +247,13 @@ const FORMAT_LABELS: &[&str] = &[
     "technology.code.doi",
     "technology.code.imei",
     "technology.code.locale_code",
+    "technology.code.qualified_name",
     // technology.cryptographic (structured tokens)
     "technology.cryptographic.jwt",
     // technology.development (structured references)
     "technology.development.docker_ref",
+    // technology.filesystem (structured paths)
+    "technology.filesystem.windows_path",
     // technology.identifier (structured IDs with embedded metadata)
     "technology.identifier.snowflake_id",
     "technology.identifier.tsid",
@@ -263,6 +266,7 @@ const FORMAT_LABELS: &[&str] = &[
     "technology.internet.ip_v4_with_port",
     "technology.internet.ip_v6",
     "technology.internet.mac_address",
+    "technology.internet.message_id",
     "technology.internet.url",
     "technology.internet.urn",
     "technology.internet.user_agent",
@@ -276,8 +280,8 @@ const TEXT_LABELS: &[&str] = &[
     "representation.boolean.binary",
     "representation.boolean.initials",
     "representation.boolean.terms",
-    // representation.discrete.*
-    "representation.discrete.categorical",
+    // representation.discrete.* (categorical retired — choice 0102, now an
+    // orthogonal enum-domain property, not a competing leaf)
     "representation.discrete.ordinal",
     // representation.file (categorical — limited value sets)
     "representation.file.excel_format",
@@ -440,9 +444,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_total_is_240() {
+    fn test_total_is_242() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 240, "Map should contain exactly 240 types");
+        assert_eq!(map.len(), 242, "Map should contain exactly 242 types");
     }
 
     #[test]
@@ -455,8 +459,8 @@ mod tests {
             "geographic should have 25 types"
         );
         assert_eq!(ENTITY_LABELS.len(), 8, "entity should have 8 types");
-        assert_eq!(FORMAT_LABELS.len(), 79, "format should have 79 types");
-        assert_eq!(TEXT_LABELS.len(), 21, "text should have 21 types");
+        assert_eq!(FORMAT_LABELS.len(), 82, "format should have 82 types");
+        assert_eq!(TEXT_LABELS.len(), 20, "text should have 20 types");
     }
 
     #[test]
@@ -563,14 +567,14 @@ mod tests {
         assert_eq!(entity.len(), 12, "entity eligible should be 8+4=12");
 
         let format = map.eligible_labels(BroadCategory::Format);
-        // 79 primary + 2 incoming (postal_code, calling_code)
-        assert_eq!(format.len(), 81, "format eligible should be 79+2=81");
+        // 82 primary + 2 incoming (postal_code, calling_code)
+        assert_eq!(format.len(), 84, "format eligible should be 82+2=84");
 
         let text = map.eligible_labels(BroadCategory::Text);
         assert_eq!(
             text.len(),
-            21,
-            "text eligible should be 21 (no incoming overlaps)"
+            20,
+            "text eligible should be 20 (no incoming overlaps)"
         );
     }
 

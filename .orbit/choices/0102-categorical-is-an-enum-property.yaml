@@ -1,9 +1,18 @@
 id: '0102'
 title: 'Categorical is a representation property (enum domain), not a competing semantic leaf'
-status: proposed
+status: accepted
 date_created: 2026-06-17
-date_modified: 2026-06-17
+date_modified: 2026-06-19
 body: |
+  > **Realized v0.6.36 (2026-06-19):** the categorical leaf is removed from
+  > the taxonomy and label_category_map (240 → 242 alongside three new
+  > plain_text-discovery types). This was the last vestige; the reframe's
+  > substance (gold migration, eval `--reframe`, internal sentinel → `word`
+  > remap at finalize, enum-domain emission) had already shipped
+  > incrementally, so the leaf removal landed as a patch with zero runtime
+  > behaviour change. Open questions below (residual choice, two-part eval
+  > scoring, closed-enum dictionaries) remain follow-on work.
+
   # 0102. Categorical is a representation property (enum domain), not a competing semantic leaf
 
   ## Context and Problem Statement

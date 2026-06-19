@@ -897,40 +897,12 @@ representation.scientific.smiles:
 # requires column-level cardinality analysis.
 # ═════════════════════════════════════════════════════════════════════
 
-representation.discrete.categorical:
-  title: "Categorical Value"
-  description: >
-    Discrete string value from a small, unordered set (e.g., "male"/"female",
-    "S"/"C"/"Q", "red"/"blue"/"green", "active"/"inactive").
-    Typical cardinality: 2-20 unique values. Transforms to ENUM when cardinality
-    is below --enum-threshold (default 50), otherwise VARCHAR.
-    Column-level identification relies on low cardinality detection.
-  designation: universal
-  locales: [UNIVERSAL]
-  broad_type: ENUM
-  format_string: null
-  transform: "CAST({col} AS VARCHAR)"
-  transform_ext: null
-  decompose: null
-  validation:
-    type: string
-    minLength: 1
-    maxLength: 50
-  tier: [VARCHAR, discrete]
-  release_priority: 3
-  aliases: [category, enum, factor, level]
-  samples:
-    - "active"
-    - "male"
-    - "S"
-    - "red"
-    - "pending"
-    - "Type A"
-  references: null
-  notes: >
-    Covers low-cardinality string columns common in tabular data.
-    Single-value model learns common categorical vocabulary; column-mode
-    disambiguation resolves ambiguous cases via cardinality analysis.
+# representation.discrete.categorical RETIRED (choice 0102, v0.6.36): categorical
+# is an orthogonal enum-domain property (x-finetype-enum), not a competing semantic
+# leaf. The reframe shipped incrementally — gold migrated, eval --reframe collapses
+# the residual, the model remaps the internal categorical sentinel to word at
+# finalize. This patch removes the last vestige: the taxonomy leaf. The internal
+# CATEGORICAL_LABEL sentinel + fusion cardinality gate remain (never surfaced).
 
 representation.discrete.ordinal:
   title: "Ordinal Value"

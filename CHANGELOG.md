@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Three types mined from the `plain_text` residual** (spec
+  `2026-06-19-plain-text-type-discovery`, card 0001). `representation.text.plain_text` is
+  FineType's largest bucket (447k corpus columns); mining it by structural shape and ranking
+  candidates by distinct-dataset breadth × blind-panel nameability surfaced three precise,
+  high-volume types now added to the taxonomy: `technology.filesystem.windows_path`
+  (7,651 datasets, panel 0.97), `technology.internet.message_id` (RFC 2822, 3,032 datasets,
+  0.95), and `technology.code.qualified_name` (reverse-DNS FQN, 1,677 datasets, 0.79). Each
+  ships a generator (100% taxonomy-check alignment) and a precision-validated validator
+  (qualified_name: 0 prose false positives; windows_path: 1.1%). Rejected candidates
+  (numeric ranges, quantity+unit, identifier soup) cleared volume but were panel-flagged
+  "mixed" — unwriteable as a precise validation. The three are taxonomy/validation-live now;
+  the Sense model predicts them after the next retrain.
+
+### Changed
+
+- **`representation.discrete.categorical` retired as a taxonomy leaf** (choice 0102).
+  Categorical is now exclusively the orthogonal enum-domain property (`x-finetype-enum`),
+  not a competing semantic label. The reframe shipped incrementally over prior releases
+  (gold migrated, eval `--reframe` residual, the model's internal categorical sentinel
+  remapped to `representation.text.word` at finalize, enum-domain emission); this release
+  removes the last vestige — the taxonomy leaf and its category-map entry. Runtime
+  predictions are unchanged (the internal sentinel + fusion cardinality gate remain).
+  Net taxonomy: 240 → 242 (−1 categorical, +3 plain_text-discovery types).
+
 - **Deterministic datetime sub-format reader** (spec
   `2026-06-19-deterministic-datetime-parser`). A delimited datetime string resolves to
   exactly one taxonomy leaf by its shape and field ranges, so a value-based Sharpen rule

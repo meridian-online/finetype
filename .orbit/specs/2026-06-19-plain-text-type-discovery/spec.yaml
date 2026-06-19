@@ -68,12 +68,25 @@ acceptance_criteria:
   checked: true
 - id: ac-03
   description: |
-    Activate the three types via a taxonomy-expansion retrain: apply the
-    staged definitions + generators (240 -> 243), bump the count constants,
-    extend label_category_map, run `finetype taxonomy check` (100%
-    alignment), train, and clear the promotion gate stack (gold-anchor ->
-    drift proxy -> gold corpus -> corpus-honest) before any models/default
-    swap. DEFERRED — retrain-gated, next session.
+    Build the three types LIVE into the taxonomy. CLOSED 2026-06-19 (v0.6.36
+    patch): definitions appended to labels/definitions_technology.yaml (all 3
+    placed in the technology domain per author — filesystem.windows_path,
+    internet.message_id, code.qualified_name), generators added to
+    generator/technology.rs, label_category_map extended (sorted, FORMAT
+    category). `representation.discrete.categorical` retired as a leaf
+    (choice 0102) in the same change, netting 240 -> 242. `finetype check`
+    100% (242/242), full workspace `cargo test` green, clippy clean. Count
+    constants + CLAUDE.md + CHANGELOG updated to 242.
+  ac_type: code
+  gate: false
+  checked: true
+- id: ac-04
+  description: |
+    Teach the Sense model to PREDICT the three new types via a retrain
+    (model is 240-dim; the types are taxonomy/validation-live but not yet
+    predicted). Clear the promotion gate stack (gold-anchor -> drift proxy ->
+    gold corpus -> corpus-honest) before any models/default swap. DEFERRED —
+    retrain-gated, next session.
   ac_type: observation
   gate: false
   checked: false

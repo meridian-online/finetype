@@ -870,3 +870,104 @@ technology.internet.data_uri:
     Media type is optional (defaults to text/plain;charset=US-ASCII).
     Base64 encoding is indicated by ;base64 before the comma.
 
+technology.filesystem.windows_path:
+  title: "Windows File Path"
+  description: >
+    An absolute Microsoft Windows filesystem path: a drive letter and colon
+    (C:\, D:\) or a UNC share root (\\server\share) followed by
+    backslash-separated segments. Distinct from URLs (no scheme) and POSIX
+    paths (forward-slash rooted).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    drive: "REGEXP_EXTRACT({col}, '^([A-Za-z]:)')"
+    filename: "REGEXP_EXTRACT({col}, '([^\\\\]+)$')"
+  validation:
+    type: string
+    pattern: '^([A-Za-z]:\\|\\\\)[^\r\n]*$'
+    minLength: 3
+  tier: [VARCHAR, filesystem]
+  release_priority: 3
+  aliases: [path, filepath, directory]
+  samples:
+    - "C:\\Windows\\System32\\drivers\\WdfLdr.sys"
+    - "D:\\research\\repos\\project\\src\\Main.cs"
+    - "\\\\server\\share\\reports\\q3.xlsx"
+  references: null
+  notes: >
+    New in v0.6.36 (spec 2026-06-19-plain-text-type-discovery). Highest
+    volume x nameability type hiding behind representation.text.plain_text:
+    7,651 distinct corpus datasets, blind-panel confidence 0.97 (unanimous).
+    Pattern fires on <1.2% of multi-word prose. POSIX-path sibling deferred
+    (below volume bar + URL-route ambiguity).
+
+technology.internet.message_id:
+  title: "Email Message-ID"
+  description: >
+    RFC 2822 Message-ID header — a globally-unique identifier for an email
+    message: an angle-bracketed left@right token (<unique@domain>).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    local: "REGEXP_EXTRACT({col}, '^<([^@]+)@')"
+    domain: "REGEXP_EXTRACT({col}, '@([^>]+)>$')"
+  validation:
+    type: string
+    pattern: '^<[^<>@\s]+@[^<>@\s]+>$'
+  tier: [VARCHAR, internet]
+  release_priority: 3
+  aliases: [messageid, msgid]
+  samples:
+    - "<30365805.1075860998985.JavaMail.evans@thyme>"
+    - "<CAF2a3b9c@mail.gmail.com>"
+    - "<199911abc@server.example.org>"
+  references: null
+  notes: >
+    New in v0.6.36 (spec 2026-06-19-plain-text-type-discovery). 3,032
+    distinct corpus datasets, blind-panel confidence 0.95 (unanimous).
+    Angle-bracket + @ grammar is unambiguous. Corpus sample is Enron-heavy
+    (single provenance) but the RFC 2822 type is universal. Sits beside
+    url / urn / mac_address as an internet protocol identifier.
+
+technology.code.qualified_name:
+  title: "Qualified Name"
+  description: >
+    A dotted, reverse-DNS-style fully-qualified identifier: three or more
+    dot-separated identifier segments naming a namespaced code symbol
+    (Java/.NET package or class, config key, module path).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  format_string: null
+  transform: "CAST({col} AS VARCHAR)"
+  transform_ext: null
+  decompose:
+    root: "REGEXP_EXTRACT({col}, '^([A-Za-z_][A-Za-z0-9_]*)')"
+    leaf: "REGEXP_EXTRACT({col}, '([A-Za-z0-9_]+)$')"
+  validation:
+    type: string
+    pattern: '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2,}$'
+  tier: [VARCHAR, code]
+  release_priority: 3
+  aliases: [fqn, classname, namespace]
+  samples:
+    - "com.google.javascript.jscomp.Compiler"
+    - "org.apache.commons.math.fraction.Fraction"
+    - "Avalonia.UnitTests.Controls.ContentControl"
+  references: null
+  notes: >
+    New in v0.6.36 (spec 2026-06-19-plain-text-type-discovery). 1,677
+    distinct corpus datasets, blind-panel confidence 0.79 (unanimous
+    "java/dotted FQN"). Pattern fires on ZERO multi-word prose. Boundary
+    caveat: structurally overlaps technology.internet.hostname (www.x.com);
+    the disambiguating signal is a CamelCase / non-TLD leaf segment — a
+    Sharpen-precedence decision for the retrain, not the validator.
+
