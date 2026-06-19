@@ -8,7 +8,7 @@ from transformers import AutoTokenizer, AutoModel, get_linear_schedule_with_warm
 
 MODEL="TaylorAI/gte-tiny"
 OUT="output/gte-tiny-clean-slate/gte_tiny_fulllabel.pt"
-EPOCHS=4; BS=64
+EPOCHS=12; BS=64
 
 def load(p):
     r=list(csv.DictReader(open(p),delimiter="\t")); return [x["text"] for x in r],[x["label"] for x in r]
@@ -36,5 +36,6 @@ for e in range(EPOCHS):
         tot+=loss.item();nb+=1
         if b % 25600==0: print(f"  e{e+1} {b}/{len(idx)} loss={loss.item():.3f}", flush=True)
     torch.save({"enc":enc.state_dict(),"head":head.state_dict(),"labels":labels}, OUT)
+    if e+1 in (6,12): torch.save({"enc":enc.state_dict(),"head":head.state_dict(),"labels":labels}, OUT.replace(".pt",f"_e{e+1}.pt"))
     print(f"epoch {e+1}/{EPOCHS} done ({time.time()-t0:.0f}s) avg_loss={tot/nb:.3f} -> saved {OUT}", flush=True)
 print("DONE", flush=True)
