@@ -65,7 +65,8 @@ GTE_DIM = 384  # gte-tiny hidden size (per-value); asserted against the loaded m
 # ++ min ++ max), each 128-dim -> 512. We mirror that aggregation exactly on gte's
 # 384-dim per-value vectors -> 4 x 384 = 1536. This keeps the swap a true
 # one-variable change (encoder only) instead of silently downgrading aggregation.
-EMBED_AGG_DIM = 4 * GTE_DIM  # 1536
+EMBED_AGG_DIM_PER = 4 * GTE_DIM  # 1536 per encoder
+EMBED_AGG_DIM = EMBED_AGG_DIM_PER  # total; set to 2x in two-view mode (main/install)
 VALUE_CAP = 32  # values encoded per column before aggregation (the stats are stable)
 
 # v19's exact recipe (scripts/overnight_v19_paired.sh, Step 1).
@@ -87,72 +88,77 @@ V19_ARGS = [
     "--seed", "42",
 ]
 
-# ── gte embed (lazy-loaded, thread-safe). Frozen base, or a fine-tuned checkpoint ──
-_GTE = {}
-_ENCODER_CKPT = None  # set by main() to a .pt with {base_model, enc state_dict}
+# ── gte embed (lazy-loaded, thread-safe). One encoder, or two for two-view ──
+_ENCODERS = []            # loaded encoder stack [{tok, enc, torch}, ...], concat order
+_ENCODER_CKPT = None      # single-view: fine-tuned encoder .pt {base_model, enc}
+_TWO_VIEW_FT_CKPT = None  # two-view: frozen GTE_MODEL ++ this fine-tuned encoder
 
 
-def _load_gte():
-    """Load tokenizer + encoder once. Returns (tok, enc, torch, dim).
-
-    Frozen base (GTE_MODEL) by default, or the fine-tuned value-encoder checkpoint
-    when --encoder-checkpoint is given. Either way the encoder is used frozen here;
+def _load_encoders():
+    """Load the encoder stack once. Single-view: [frozen base] or [fine-tuned ckpt].
+    Two-view: [frozen GTE_MODEL, fine-tuned ckpt] — their embeds are concatenated, so
+    the multi-branch sees a format-preserving view AND a semantic view and learns to
+    weight each per type (spec 2026-06-20, ac-03 two-view bet). Each encoder is frozen;
     the multi-branch learns the embed MLP on top."""
-    if "enc" in _GTE:
-        return _GTE["tok"], _GTE["enc"], _GTE["torch"], _GTE["dim"]
+    if _ENCODERS:
+        return _ENCODERS
     import torch
     from transformers import AutoModel, AutoTokenizer
-    # One intra-op thread per forward: the ThreadPoolExecutor runs ~8 gte forwards
-    # concurrently, so per-forward parallelism would oversubscribe cores. Each worker
-    # gets one core; aggregate throughput scales with workers instead of serializing.
+    # One intra-op thread per forward: ~8 forwards run concurrently across the
+    # ThreadPoolExecutor; per-forward parallelism would oversubscribe cores.
     torch.set_num_threads(1)
-    if _ENCODER_CKPT:
-        ckpt = torch.load(_ENCODER_CKPT, map_location="cpu", weights_only=False)
-        base = ckpt["base_model"]
+
+    def _load(base=None, ckpt=None):
+        if ckpt:
+            c = torch.load(ckpt, map_location="cpu", weights_only=False)
+            base = c["base_model"]
+            enc = AutoModel.from_pretrained(base)
+            enc.load_state_dict(c["enc"])
+            tag = f"fine-tuned {ckpt} (base {base})"
+        else:
+            enc = AutoModel.from_pretrained(base)
+            tag = f"frozen {base}"
         tok = AutoTokenizer.from_pretrained(base)
-        enc = AutoModel.from_pretrained(base)
-        enc.load_state_dict(ckpt["enc"])
         enc = enc.to("cpu").eval()
-        print(f"[build] fine-tuned encoder: {_ENCODER_CKPT} (base {base})")
+        assert enc.config.hidden_size == GTE_DIM, \
+            f"encoder hidden_size {enc.config.hidden_size} != {GTE_DIM}"
+        print(f"[build] encoder view {len(_ENCODERS)}: {tag}")
+        return {"tok": tok, "enc": enc, "torch": torch}
+
+    if _TWO_VIEW_FT_CKPT:
+        _ENCODERS.append(_load(base=GTE_MODEL))          # view 0: format-preserving
+        _ENCODERS.append(_load(ckpt=_TWO_VIEW_FT_CKPT))  # view 1: semantic
+    elif _ENCODER_CKPT:
+        _ENCODERS.append(_load(ckpt=_ENCODER_CKPT))
     else:
-        tok = AutoTokenizer.from_pretrained(GTE_MODEL)
-        enc = AutoModel.from_pretrained(GTE_MODEL).to("cpu").eval()
-    dim = enc.config.hidden_size
-    assert dim == GTE_DIM, f"encoder hidden_size {dim} != expected {GTE_DIM}"
-    _GTE.update(tok=tok, enc=enc, torch=torch, dim=dim)
-    return tok, enc, torch, dim
+        _ENCODERS.append(_load(base=GTE_MODEL))
+    return _ENCODERS
+
+
+def _embed_one(ed, texts):
+    """4-stat L2-normed column embedding for ONE encoder -> EMBED_AGG_DIM_PER floats.
+    Per-value: mean-pool tokens (masked) -> L2-normalise (GTE's canonical cosine space,
+    also bounds features to [-1, 1]). Column: mean ++ var ++ min ++ max."""
+    tok, enc, torch = ed["tok"], ed["enc"], ed["torch"]
+    with torch.no_grad():
+        e = tok(texts, padding=True, truncation=True, max_length=64, return_tensors="pt")
+        out = enc(**e).last_hidden_state            # (n, seq, dim)
+        mask = e["attention_mask"].unsqueeze(-1).float()
+        pv = (out * mask).sum(1) / mask.sum(1).clamp(min=1)  # (n, dim)
+        pv = pv / pv.norm(dim=1, keepdim=True).clamp(min=1e-12)
+        return torch.cat([pv.mean(0), pv.var(0, unbiased=False),
+                          pv.min(0).values, pv.max(0).values]).tolist()
 
 
 def gte_embed(values):
-    """Frozen gte-tiny column embedding. Encode each value (mean-pool tokens, masked)
-    to a 384-dim vector, then aggregate the column with Model2Vec's 4 statistics:
-    mean ++ variance(population) ++ min ++ max -> EMBED_AGG_DIM (1536) floats. The
-    encoder runs once per value; the 4 stats are a single cheap pass over the result.
-
-    Lock-free: gte-tiny's forward is a stateless eval-mode pass (LayerNorm, no running
-    buffers, no_grad), so concurrent inference on the shared model from the
-    ThreadPoolExecutor workers is safe."""
-    tok, enc, torch, _ = _load_gte()
+    """Column embed = per-encoder 4-stat L2-normed aggregate, concatenated:
+    EMBED_AGG_DIM_PER (1536) single-view, or 2x (3072) two-view (frozen ++ fine-tuned).
+    Lock-free: stateless eval forward, safe across the ThreadPoolExecutor workers."""
+    encs = _load_encoders()
     texts = [str(v) for v in values[:VALUE_CAP] if v is not None and str(v).strip()]
     if not texts:
         return [0.0] * EMBED_AGG_DIM
-    with torch.no_grad():
-        e = tok(texts, padding=True, truncation=True, max_length=64,
-                return_tensors="pt")
-        out = enc(**e).last_hidden_state            # (n, seq, dim)
-        mask = e["attention_mask"].unsqueeze(-1).float()
-        per_value = (out * mask).sum(1) / mask.sum(1).clamp(min=1)  # (n, dim)
-        # L2-normalise each value embedding: GTE is trained for cosine similarity,
-        # so unit-sphere vectors are its canonical space. This also bounds every
-        # aggregated feature to [-1, 1] (no raw [-3, 3] scales into the MLP) — the
-        # job input-LayerNorm would do, but train/inference-consistent and with no
-        # model change.
-        per_value = per_value / per_value.norm(dim=1, keepdim=True).clamp(min=1e-12)
-        mean = per_value.mean(0)                     # (dim,)
-        var = per_value.var(0, unbiased=False)       # population variance; 0 if n==1
-        mn = per_value.min(0).values
-        mx = per_value.max(0).values
-        return torch.cat([mean, var, mn, mx]).tolist()  # (4*dim,)
+    return [x for ed in encs for x in _embed_one(ed, texts)]
 
 
 # ── Monkeypatch: swap the embed slot, keep everything else ──────────────────
@@ -174,8 +180,8 @@ def _probe_valid_dim(finetype_bin="./target/release/finetype"):
 def install_patches():
     """Patch prepare_multibranch_data in place: EMBED_DIM->384, VALID_DIM->live,
     embed slot->gte, write v5 marker. Idempotent."""
-    _load_gte()
-    P.EMBED_DIM = EMBED_AGG_DIM        # dim checks + header pack + per-record pack (1536)
+    _load_encoders()
+    P.EMBED_DIM = EMBED_AGG_DIM        # dim checks + header pack + per-record pack
     live_valid = _probe_valid_dim()
     if live_valid != P.VALID_DIM:
         print(f"[build] VALID_DIM {P.VALID_DIM} (stale) -> {live_valid} (live taxonomy)")
@@ -271,7 +277,8 @@ def smoke_gte():
     assert any(abs(x) > 1e-9 for x in var_block), "variance block all-zero"
     zeros = gte_embed([])
     assert len(zeros) == EMBED_AGG_DIM and all(x == 0.0 for x in zeros)
-    print(f"[smoke-gte] OK (dim {EMBED_AGG_DIM}=4x{GTE_DIM}, variance live, empty -> zeros)")
+    print(f"[smoke-gte] OK (dim {EMBED_AGG_DIM}, {EMBED_AGG_DIM // EMBED_AGG_DIM_PER} view(s) x "
+          f"4x{GTE_DIM}, variance live, empty -> zeros)")
 
 
 def main():
@@ -280,15 +287,20 @@ def main():
     ap.add_argument("--output", default="output/multibranch-training/v5-gte-blend.ftmb")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--encoder-checkpoint", default=None,
-                    help="fine-tuned encoder .pt ({base_model, enc}); default frozen base")
+                    help="single-view fine-tuned encoder .pt ({base_model, enc}); default frozen base")
+    ap.add_argument("--two-view-ft", default=None,
+                    help="two-view: embed = frozen GTE_MODEL ++ this fine-tuned encoder (3072-dim)")
     ap.add_argument("--smoke", metavar="PATH",
                     help="write a tiny v5 + verify header, then exit")
     ap.add_argument("--smoke-gte", action="store_true",
                     help="check gte embed dimension, then exit")
     args = ap.parse_args()
 
-    global _ENCODER_CKPT
+    global _ENCODER_CKPT, _TWO_VIEW_FT_CKPT, EMBED_AGG_DIM
     _ENCODER_CKPT = args.encoder_checkpoint
+    if args.two_view_ft:
+        _TWO_VIEW_FT_CKPT = args.two_view_ft
+        EMBED_AGG_DIM = 2 * EMBED_AGG_DIM_PER  # frozen ++ fine-tuned
 
     if args.smoke:
         smoke_write(args.smoke)
@@ -302,7 +314,9 @@ def main():
     argv = ["prepare_multibranch_data.py"] + V19_ARGS + [
         "--output", args.output, "--workers", str(args.workers),
     ]
-    print(f"[build] gte-tiny embed swap; EMBED_DIM={P.EMBED_DIM} VERSION={P.VERSION_V4}")
+    mode = ("two-view frozen++ft" if _TWO_VIEW_FT_CKPT
+            else "ft" if _ENCODER_CKPT else "frozen")
+    print(f"[build] gte embed swap [{mode}]; EMBED_DIM={P.EMBED_DIM} VERSION={P.VERSION_V4}")
     print(f"[build] argv: {' '.join(argv[1:])}")
     sys.argv = argv
     P.main()

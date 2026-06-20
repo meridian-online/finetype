@@ -40,10 +40,15 @@ def main():
     ap.add_argument("--columns", required=True, help="corpus parquet with sample_values_truncated")
     ap.add_argument("--binary", default="./target/release/finetype")
     ap.add_argument("--encoder-checkpoint", default=None)
+    ap.add_argument("--two-view-ft", default=None,
+                    help="two-view: frozen GTE_MODEL ++ this fine-tuned encoder (3072)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
     B._ENCODER_CKPT = a.encoder_checkpoint
+    if a.two_view_ft:
+        B._TWO_VIEW_FT_CKPT = a.two_view_ft
+        B.EMBED_AGG_DIM = 2 * B.EMBED_AGG_DIM_PER
     B.install_patches()  # patches P.extract_features (gte 1536), EMBED_DIM, VALID_DIM, write_ftmb_v4->v5
     print(f"[gold-ftmb] EMBED_DIM={P.EMBED_DIM} VALID_DIM={P.VALID_DIM} VERSION={P.VERSION_V4} "
           f"encoder={'ft:'+a.encoder_checkpoint if a.encoder_checkpoint else 'frozen-base'}")
