@@ -39,6 +39,7 @@ fn main() -> Result<()> {
     let mut data: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
     let mut use_sibling = true;
+    let mut zero_embed = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -47,6 +48,10 @@ fn main() -> Result<()> {
             "--data" => data = args.next().map(PathBuf::from),
             "--out" => out = args.next().map(PathBuf::from),
             "--no-sibling" => use_sibling = false,
+            // Ablation: replace the embed branch input with zeros before the forward,
+            // so the model decides on char/stats/header/validation only. If format
+            // types recover vs the un-ablated run, the embed was overriding them.
+            "--zero-embed" => zero_embed = true,
             other => bail!("unknown arg: {other}"),
         }
     }
@@ -146,6 +151,7 @@ fn main() -> Result<()> {
         let end = (gi + GROUP_CHUNK).min(n_groups);
         let chunk: Vec<usize> = (gi..end).collect();
         let (c, e, s, h, v, _labels) = ds.batch_groups(&chunk, sibling.as_ref(), &device)?;
+        let e = if zero_embed { e.zeros_like()? } else { e };
         let logits = model.forward(&c, &e, &s, h.as_ref(), v.as_ref(), false)?;
         let probs = softmax(&logits, D::Minus1)?;
         let pred_idx: Vec<u32> = logits.argmax(D::Minus1)?.to_vec1()?;
