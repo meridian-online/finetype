@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Build an FTMB **v5** feature binary: v19's exact multi-branch recipe with the
-512-dim Model2Vec value-aggregation embed slot replaced by a frozen 384-dim
-gte-tiny value embedding. Every other branch (char, stats, header=Model2Vec,
-validation) and the whole data recipe are v19's, untouched.
+512-dim Model2Vec value-aggregation embed slot replaced by a frozen gte-tiny value
+embedding under Model2Vec's SAME aggregation — 4 statistics (mean ++ variance ++ min
+++ max) over gte's 384-dim per-value vectors = 1536-dim. Every other branch (char,
+stats, header=Model2Vec, validation) and the whole data recipe are v19's, untouched.
+
+The aggregation is matched on purpose: Model2Vec encodes each value to 128-dim then
+keeps mean/var/min/max (4x128=512). A bare-mean gte slot would silently DOWNGRADE
+the aggregation (dropping variance — the within-column-spread signal that separates
+categorical from free-text), confounding the encoder upgrade. Matching it makes the
+swap a true one-variable change: encoder only.
 
 Spec: 2026-06-20-gte-tiny-embed-branch-swap, ac-01.
 Audit: .orbit/specs/2026-06-20-gte-tiny-embed-branch-swap/ac00_audit.md
@@ -16,8 +23,8 @@ Reimplementing ~150 lines of that risks silent drift from v19. So this script do
 NOT reimplement it: it imports prepare_multibranch_data and runs its `main()`
 verbatim with v19's exact argv, monkeypatching only three things:
 
-  1. EMBED_DIM            512 -> 384   (gte-tiny native hidden size)
-  2. extract_features     embed slot   -> frozen gte-tiny mean-pooled value embedding
+  1. EMBED_DIM            512 -> 1536  (gte 384-dim x 4 aggregation statistics)
+  2. extract_features     embed slot   -> frozen gte-tiny + 4-stat column aggregation
   3. VERSION_V4 marker    4 -> 5       (so the Rust reader tags it gte-tiny, not Model2Vec)
 
 The v4 writer, table-group layout, validation branch, and threaded char/stats
@@ -53,8 +60,13 @@ if _SCRIPTS_DIR not in sys.path:
 import prepare_multibranch_data as P  # noqa: E402
 
 GTE_MODEL = "TaylorAI/gte-tiny"
-GTE_DIM = 384  # gte-tiny hidden size; asserted against the loaded model below
-VALUE_CAP = 32  # values mean-pooled per column for the embed (the mean is stable)
+GTE_DIM = 384  # gte-tiny hidden size (per-value); asserted against the loaded model
+# Model2Vec's embed branch aggregates a column with 4 statistics (mean ++ variance
+# ++ min ++ max), each 128-dim -> 512. We mirror that aggregation exactly on gte's
+# 384-dim per-value vectors -> 4 x 384 = 1536. This keeps the swap a true
+# one-variable change (encoder only) instead of silently downgrading aggregation.
+EMBED_AGG_DIM = 4 * GTE_DIM  # 1536
+VALUE_CAP = 32  # values encoded per column before aggregation (the stats are stable)
 
 # v19's exact recipe (scripts/overnight_v19_paired.sh, Step 1).
 V19_ARGS = [
@@ -98,22 +110,29 @@ def _load_gte():
 
 
 def gte_embed(values):
-    """Frozen gte-tiny column embedding: per-value mean-pool over tokens, then
-    mean-pool across values -> GTE_DIM floats. Lock-free: gte-tiny's forward is a
-    stateless eval-mode pass (LayerNorm, no running buffers, no_grad), so concurrent
-    inference on the shared model from the ThreadPoolExecutor workers is safe."""
-    tok, enc, torch, dim = _load_gte()
+    """Frozen gte-tiny column embedding. Encode each value (mean-pool tokens, masked)
+    to a 384-dim vector, then aggregate the column with Model2Vec's 4 statistics:
+    mean ++ variance(population) ++ min ++ max -> EMBED_AGG_DIM (1536) floats. The
+    encoder runs once per value; the 4 stats are a single cheap pass over the result.
+
+    Lock-free: gte-tiny's forward is a stateless eval-mode pass (LayerNorm, no running
+    buffers, no_grad), so concurrent inference on the shared model from the
+    ThreadPoolExecutor workers is safe."""
+    tok, enc, torch, _ = _load_gte()
     texts = [str(v) for v in values[:VALUE_CAP] if v is not None and str(v).strip()]
     if not texts:
-        return [0.0] * dim
+        return [0.0] * EMBED_AGG_DIM
     with torch.no_grad():
         e = tok(texts, padding=True, truncation=True, max_length=64,
                 return_tensors="pt")
         out = enc(**e).last_hidden_state            # (n, seq, dim)
         mask = e["attention_mask"].unsqueeze(-1).float()
         per_value = (out * mask).sum(1) / mask.sum(1).clamp(min=1)  # (n, dim)
-        col = per_value.mean(0)                      # (dim,)
-        return col.tolist()
+        mean = per_value.mean(0)                     # (dim,)
+        var = per_value.var(0, unbiased=False)       # population variance; 0 if n==1
+        mn = per_value.min(0).values
+        mx = per_value.max(0).values
+        return torch.cat([mean, var, mn, mx]).tolist()  # (4*dim,)
 
 
 # ── Monkeypatch: swap the embed slot, keep everything else ──────────────────
@@ -135,8 +154,8 @@ def _probe_valid_dim(finetype_bin="./target/release/finetype"):
 def install_patches():
     """Patch prepare_multibranch_data in place: EMBED_DIM->384, VALID_DIM->live,
     embed slot->gte, write v5 marker. Idempotent."""
-    _, _, _, dim = _load_gte()
-    P.EMBED_DIM = dim                 # dim checks + header pack + per-record pack
+    _load_gte()
+    P.EMBED_DIM = EMBED_AGG_DIM        # dim checks + header pack + per-record pack (1536)
     live_valid = _probe_valid_dim()
     if live_valid != P.VALID_DIM:
         print(f"[build] VALID_DIM {P.VALID_DIM} (stale) -> {live_valid} (live taxonomy)")
@@ -174,9 +193,9 @@ def smoke_write(path):
     """Write a tiny v5 with synthetic features so the Rust train-data reader can
     round-trip it. Proves the binary format + version marker independently of the
     (slow) gte + data path."""
-    P.EMBED_DIM = GTE_DIM
+    P.EMBED_DIM = EMBED_AGG_DIM
     P.VERSION_V4 = 5
-    cd, ed, sd, hd, vd = P.CHAR_DIM, GTE_DIM, P.STATS_DIM, P.HEADER_DIM, P.VALID_DIM
+    cd, ed, sd, hd, vd = P.CHAR_DIM, EMBED_AGG_DIM, P.STATS_DIM, P.HEADER_DIM, P.VALID_DIM
 
     def feat(n, base):
         return [float((base + i) % 7) * 0.01 for i in range(n)]
@@ -217,19 +236,22 @@ def _verify_header(path):
           f"header={header_dim} valid={valid_dim}")
     assert magic == b"FTMB", magic
     assert version == 5, version
-    assert embed_dim == GTE_DIM, embed_dim
+    assert embed_dim == EMBED_AGG_DIM, embed_dim
     assert valid_dim == P.VALID_DIM, valid_dim
-    print("[smoke] header OK (version 5, embed 384, valid 240)")
+    print(f"[smoke] header OK (version 5, embed {EMBED_AGG_DIM}, valid {valid_dim})")
 
 
 # ── Smoke 2: gte embed dimension ────────────────────────────────────────────
 def smoke_gte():
     vec = gte_embed(["alice@example.com", "bob@test.org", "carol@mail.net"])
     print(f"[smoke-gte] embed len={len(vec)} sample={vec[:4]}")
-    assert len(vec) == GTE_DIM, len(vec)
+    assert len(vec) == EMBED_AGG_DIM, len(vec)
+    # variance block (slots dim..2*dim) must be non-zero for >1 distinct value
+    var_block = vec[GTE_DIM:2 * GTE_DIM]
+    assert any(abs(x) > 1e-9 for x in var_block), "variance block all-zero"
     zeros = gte_embed([])
-    assert len(zeros) == GTE_DIM and all(x == 0.0 for x in zeros)
-    print("[smoke-gte] OK (dim 384, empty -> zeros)")
+    assert len(zeros) == EMBED_AGG_DIM and all(x == 0.0 for x in zeros)
+    print(f"[smoke-gte] OK (dim {EMBED_AGG_DIM}=4x{GTE_DIM}, variance live, empty -> zeros)")
 
 
 def main():

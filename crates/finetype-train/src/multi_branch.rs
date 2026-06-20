@@ -682,8 +682,9 @@ pub const FTMB_HEADER_SIZE_V4: usize = 30;
 /// Format version for the gte-tiny embed-branch swap (v5).
 ///
 /// Byte-identical to v4 (same 30-byte header, same per-record layout) — the only
-/// distinction is the version field and a smaller `embed_dim` (384 for gte-tiny vs
-/// 512 for Model2Vec). The reader is dim-agnostic, so v5 reads through the v4 path;
+/// distinction is the version field and a different `embed_dim` (gte-tiny 384-dim
+/// per value under a 4-stat aggregation = 1536, vs Model2Vec 128-dim x 4 = 512).
+/// The reader is dim-agnostic, so v5 reads through the v4 path;
 /// the version marker exists so inference can tell a gte-tiny embed binary apart from
 /// a Model2Vec one. Spec 2026-06-20-gte-tiny-embed-branch-swap, ac-01.
 const FTMB_VERSION_V5: u32 = 5;
