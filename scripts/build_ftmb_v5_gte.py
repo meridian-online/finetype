@@ -128,6 +128,12 @@ def gte_embed(values):
         out = enc(**e).last_hidden_state            # (n, seq, dim)
         mask = e["attention_mask"].unsqueeze(-1).float()
         per_value = (out * mask).sum(1) / mask.sum(1).clamp(min=1)  # (n, dim)
+        # L2-normalise each value embedding: GTE is trained for cosine similarity,
+        # so unit-sphere vectors are its canonical space. This also bounds every
+        # aggregated feature to [-1, 1] (no raw [-3, 3] scales into the MLP) — the
+        # job input-LayerNorm would do, but train/inference-consistent and with no
+        # model change.
+        per_value = per_value / per_value.norm(dim=1, keepdim=True).clamp(min=1e-12)
         mean = per_value.mean(0)                     # (dim,)
         var = per_value.var(0, unbiased=False)       # population variance; 0 if n==1
         mn = per_value.min(0).values
