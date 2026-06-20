@@ -87,12 +87,17 @@ V19_ARGS = [
     "--seed", "42",
 ]
 
-# ── Frozen gte-tiny embed (lazy-loaded, thread-safe) ────────────────────────
+# ── gte embed (lazy-loaded, thread-safe). Frozen base, or a fine-tuned checkpoint ──
 _GTE = {}
+_ENCODER_CKPT = None  # set by main() to a .pt with {base_model, enc state_dict}
 
 
 def _load_gte():
-    """Load tokenizer + frozen encoder once. Returns (tok, enc, torch, dim)."""
+    """Load tokenizer + encoder once. Returns (tok, enc, torch, dim).
+
+    Frozen base (GTE_MODEL) by default, or the fine-tuned value-encoder checkpoint
+    when --encoder-checkpoint is given. Either way the encoder is used frozen here;
+    the multi-branch learns the embed MLP on top."""
     if "enc" in _GTE:
         return _GTE["tok"], _GTE["enc"], _GTE["torch"], _GTE["dim"]
     import torch
@@ -101,10 +106,19 @@ def _load_gte():
     # concurrently, so per-forward parallelism would oversubscribe cores. Each worker
     # gets one core; aggregate throughput scales with workers instead of serializing.
     torch.set_num_threads(1)
-    tok = AutoTokenizer.from_pretrained(GTE_MODEL)
-    enc = AutoModel.from_pretrained(GTE_MODEL).to("cpu").eval()
+    if _ENCODER_CKPT:
+        ckpt = torch.load(_ENCODER_CKPT, map_location="cpu", weights_only=False)
+        base = ckpt["base_model"]
+        tok = AutoTokenizer.from_pretrained(base)
+        enc = AutoModel.from_pretrained(base)
+        enc.load_state_dict(ckpt["enc"])
+        enc = enc.to("cpu").eval()
+        print(f"[build] fine-tuned encoder: {_ENCODER_CKPT} (base {base})")
+    else:
+        tok = AutoTokenizer.from_pretrained(GTE_MODEL)
+        enc = AutoModel.from_pretrained(GTE_MODEL).to("cpu").eval()
     dim = enc.config.hidden_size
-    assert dim == GTE_DIM, f"gte-tiny hidden_size {dim} != expected {GTE_DIM}"
+    assert dim == GTE_DIM, f"encoder hidden_size {dim} != expected {GTE_DIM}"
     _GTE.update(tok=tok, enc=enc, torch=torch, dim=dim)
     return tok, enc, torch, dim
 
@@ -265,11 +279,16 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--output", default="output/multibranch-training/v5-gte-blend.ftmb")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--encoder-checkpoint", default=None,
+                    help="fine-tuned encoder .pt ({base_model, enc}); default frozen base")
     ap.add_argument("--smoke", metavar="PATH",
                     help="write a tiny v5 + verify header, then exit")
     ap.add_argument("--smoke-gte", action="store_true",
                     help="check gte embed dimension, then exit")
     args = ap.parse_args()
+
+    global _ENCODER_CKPT
+    _ENCODER_CKPT = args.encoder_checkpoint
 
     if args.smoke:
         smoke_write(args.smoke)
