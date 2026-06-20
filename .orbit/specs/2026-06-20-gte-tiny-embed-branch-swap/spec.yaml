@@ -61,9 +61,15 @@ acceptance_criteria:
     distilled/synthetic (the distilled data is the clean semantic source; choice
     0103). Write the feature binary in the new dim. DELIVERABLE: feature binary with
     gte-tiny embed slot, format-versioned so the Rust reader can distinguish it.
+    CLOSED 2026-06-20: output/multibranch-training/v5-gte-blend.ftmb (131,831 cols,
+    16,788 groups, embed=384 gte-tiny, valid=244 live taxonomy, 0 errors, full parse
+    0 trailing bytes, min label 57 >=50). FTMB v5 reader live (multi_branch.rs,
+    read_ftmb.py). Builder scripts/build_ftmb_v5_gte.py runs v19's exact recipe by
+    monkeypatch (embed slot only). Smoke-validated via 1-epoch Rust train. Result:
+    output/gte-tiny-embed-swap/ac01_result.md. Commit 320fe4c.
   ac_type: code
   gate: true
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     MODEL + TRAIN — set embed_dim 512->384 in MultiBranchConfig + the Rust embed
