@@ -40,7 +40,7 @@ Sense quality comes straight back.
 
 ## The movable baseline (for ac-02 fresh-vs-fresh)
 
-**`models/repro-baseline-relu-s44`** — Sense **0.521**, composed **0.769**. Chosen as the
+**`models/m2v-244-s44`** — Sense **0.521**, composed **0.769**. Chosen as the
 baseline because ac-02 compares *representation* quality (Sense), and s44 has the best Sense
 while tying s43 on composed (0.769 vs 0.770). Every bigger-static candidate (potion-8M/32M) is
 measured against **this**, not the frozen v19.
@@ -54,4 +54,4 @@ deliberate place to re-examine the Sharpen layer.
 
 ac-02: swap potion-4M → 8M → 32M as the embed branch (the gte `build_ftmb_v5_gte.py` patch is
 the template per ac-00), retrain, measure Sense-only gold **and per-column latency** vs
-`repro-baseline-relu-s44`. Require a candidate that beats the baseline's Sense at ≤~3× latency.
+`m2v-244-s44`. Require a candidate that beats the baseline's Sense at ≤~3× latency.
