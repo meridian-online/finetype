@@ -20,7 +20,7 @@
 //! Output TSV: join_key<TAB>predicted_label<TAB>confidence
 
 use anyhow::{bail, Context, Result};
-use candle_core::{DType, Device, D};
+use candle_core::{DType, Device, Tensor, D};
 use candle_nn::ops::softmax;
 use candle_nn::VarBuilder;
 use finetype_train::multi_branch::{
@@ -40,6 +40,8 @@ fn main() -> Result<()> {
     let mut out: Option<PathBuf> = None;
     let mut use_sibling = true;
     let mut zero_embed = false;
+    let mut logit_adjust = 0.0f64; // tau; subtract tau*log(prior) from logits before argmax
+    let mut priors_path: Option<PathBuf> = None;
 
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -52,6 +54,13 @@ fn main() -> Result<()> {
             // so the model decides on char/stats/header/validation only. If format
             // types recover vs the un-ablated run, the embed was overriding them.
             "--zero-embed" => zero_embed = true,
+            // Post-hoc logit adjustment: logit_c -= tau * log(prior_c). Down-weights
+            // frequent classes (the decimal_number / entity_name attractors) at
+            // inference only — no retrain. --priors is a "label<TAB>train_count" TSV.
+            "--logit-adjust" => {
+                logit_adjust = args.next().context("--logit-adjust needs tau")?.parse()?
+            }
+            "--priors" => priors_path = args.next().map(PathBuf::from),
             other => bail!("unknown arg: {other}"),
         }
     }
@@ -76,6 +85,33 @@ fn main() -> Result<()> {
         config.embed_dim,
         config.valid_dim
     );
+
+    // ── Logit-adjustment vector: tau * log(prior_c), aligned to model_labels ──
+    let adjust: Option<Tensor> = if logit_adjust != 0.0 {
+        let path = priors_path.context("--logit-adjust requires --priors")?;
+        let mut counts: HashMap<String, f64> = HashMap::new();
+        for line in std::fs::read_to_string(&path)?.lines() {
+            if let Some((lab, cnt)) = line.split_once('\t') {
+                counts.insert(lab.to_string(), cnt.trim().parse().unwrap_or(0.0));
+            }
+        }
+        let total: f64 = counts.values().sum::<f64>().max(1.0);
+        let floor = 1.0 / total; // unseen classes get a tiny prior, not -inf
+        let adj: Vec<f32> = model_labels
+            .iter()
+            .map(|l| {
+                let p = (counts.get(l).copied().unwrap_or(0.0) / total).max(floor);
+                (logit_adjust * p.ln()) as f32
+            })
+            .collect();
+        eprintln!(
+            "logit-adjust: tau={logit_adjust} over {} priors",
+            counts.len()
+        );
+        Some(Tensor::from_vec(adj, model_labels.len(), &device)?)
+    } else {
+        None
+    };
 
     // ── Model weights ──────────────────────────────────────────────────
     let weights = model_dir.join("model.safetensors");
@@ -153,6 +189,10 @@ fn main() -> Result<()> {
         let (c, e, s, h, v, _labels) = ds.batch_groups(&chunk, sibling.as_ref(), &device)?;
         let e = if zero_embed { e.zeros_like()? } else { e };
         let logits = model.forward(&c, &e, &s, h.as_ref(), v.as_ref(), false)?;
+        let logits = match &adjust {
+            Some(adj) => logits.broadcast_sub(adj)?, // logit_c -= tau*log(prior_c)
+            None => logits,
+        };
         let probs = softmax(&logits, D::Minus1)?;
         let pred_idx: Vec<u32> = logits.argmax(D::Minus1)?.to_vec1()?;
         let conf: Vec<f32> = probs.max(D::Minus1)?.to_vec1()?;
