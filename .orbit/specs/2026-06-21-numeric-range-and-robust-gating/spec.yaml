@@ -1,5 +1,10 @@
 id: 2026-06-21-numeric-range-and-robust-gating
 goal: |
+  SUPERSEDED 2026-06-21 by spec 2026-06-21-column-distribution-features — its ac-00/ac-01
+  investigation (Sharpen cannot recover; range-as-embed no better than gte; logit-adjust
+  slides the decimal boundary 1:1) traced the root cause to the ABSENT column-distribution
+  features. The representation/gating framing below is retained as the investigation record.
+
   Close the two gaps the two-view overnight exposed — numeric-range types and seed-
   fragile gating — and lock in a STATIC-BY-DESIGN path so inference speed never
   becomes the blocker (and the expensive candle-gte-in-binary is never needed).

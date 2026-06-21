@@ -1,0 +1,135 @@
+id: 2026-06-21-column-distribution-features
+goal: |
+  Give the multi-branch model the column-level DISTRIBUTION features it is currently
+  blind to — cardinality, sequentiality, numeric value/range — so it can LEARN the
+  residual-attractor and numeric-range distinctions that today live entirely in the
+  Sharpen rule layer. Test whether the recurring numeric/residual problem family is a
+  FEATURE-POVERTY problem (one missing feature category) rather than the inherent
+  flat-softmax limitation decision 0096 concluded.
+
+  ## The root cause (grounded in code, 2026-06-21)
+  The deterministic feature set is per-value CHARACTER SHAPE — 37 features (length,
+  digit_count, ratios, sign, decimal_places; features.rs) — and the column "stats"
+  branch is just mean/var/min/max OF THOSE SHAPE FEATURES (extract_features.rs:74). It
+  never parses the numeric value, and column/mod.rs:2266 states it outright: "the value
+  head cannot see column cardinality." So the model is blind to how values are
+  DISTRIBUTED across a column. Every recurring confusion is a RULE compensating for this
+  one gap:
+    - categorical vs free-text/entity   -> cardinality        (-> the categorical cardinality gate)
+    - alphanumeric_id / username        -> near-unique         (-> distinct-fraction guard >= 0.9)
+    - increment / serial                -> contiguous sequence (-> the contiguity check)
+    - latitude/longitude/year vs decimal-> numeric range       (-> the coordinate plausibility gate)
+  This is why the gte-embed campaign never fixed coordinates: the gap is not the semantic
+  embed, it is the absent distribution features. The logit-adjust sweep proved no global
+  knob substitutes (it slides the decimal boundary 1:1, +26 coords = -26 true decimals);
+  the prior ac-01 probe proved range-as-embed-competitor is the wrong placement (0.85, no
+  better than gte). The right move is to give the COLUMN feature set the distribution
+  signal it lacks.
+
+  ## The 0096 reframe (a hypothesis to test, not a reversal)
+  Decision 0096 concluded residual-precedence (categorical/id/decimal "no tighter type
+  fits") cannot be trained into a flat softmax — from six results. But all six used a
+  feature set that, by its own comment, cannot see cardinality. So "cannot be trained"
+  may be "cannot be trained from features that OMIT the signal that DEFINES the residual
+  classes." This spec is the controlled test: give the model cardinality/sequence/range
+  and measure whether it now LEARNS the residual distinctions. If yes, a pile of rules
+  (cardinality gate, username guard, increment check, coord plausibility) becomes
+  redundant — a structural simplification (decision 0038), not one coordinate patch.
+
+  ## Pillar defence
+  Precision Principle + Pillar 4. The residual/numeric boundaries are where "is this
+  type" vs "is not" is decided; giving the model the distribution signal is the path to
+  learned precision and fewer hand-rules.
+
+  ## Risk
+  A feature-contract change has wide blast radius (FEATURE_DIM / the stats branch / the
+  FTMB format / the YDF value pipeline) -> B07 audit gates ac-00. Flat-softmax
+  destination-drift risk on the retrain -> the blocking gates (gold + corpus-relocation
+  H05) hold. Fallback: the existing rules and the narrow escalation stay if the model
+  does not learn the distinctions. Substrate: prior spec 2026-06-21-numeric-range-and-
+  robust-gating (ac-00 Sharpen-recovery check, ac-01 informative-negative + the logit-
+  adjust sweep); memories decimal-number-is-a-residual-attractor, categorical-is-a-
+  residual-category; scripts/numeric_range_features.py + probe_range_features.py.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- architecture
+- feature-set
+- column-distribution
+- cardinality
+- numeric-range
+- residual-precedence
+acceptance_criteria:
+- id: ac-00
+  description: |
+    B07 CONSUMER-GRAPH AUDIT of the feature contract before any load-bearing edit (H03).
+    Enumerate every consumer of FEATURE_DIM / FEATURE_NAMES (features.rs), the column
+    stats branch (mean/var/min/max), the FTMB stats slot + its dim in the writers/reader,
+    value_feature_row / value_feature_dim (the YDF value pipeline, spec 2026-06-04), and
+    extract-features. DELIVERABLE: consumer list + the exact edit set per surface + a
+    format plan for the widened column feature slot (FTMB version bump or new slot;
+    old models still load). KEY QUESTION: do the new features extend the COLUMN stats
+    branch (column-level, where cardinality/range must live) or a new dedicated branch?
+  ac_type: doc
+  gate: true
+  checked: false
+- id: ac-01
+  description: |
+    COLUMN-DISTRIBUTION FEATURE SET. Add the column-level signals the model is blind to,
+    as first-class column features (NOT an embed competitor — that was the prior ac-01's
+    error):
+      - cardinality: distinct ratio, distinct count, top-value frequency, value entropy
+      - sequentiality: monotonic fraction, contiguous-integer-run ratio, sortedness
+      - numeric value & range: parse to number -> min/max/mean/std/percentiles, sign
+        fraction, magnitude (signed-log), bounded-ness
+      - length consistency: std of length, fixed-width fraction, leading-zero fraction
+    DELIVERABLE: the column-distribution extractor + its format-versioned FTMB slot.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-02
+  description: |
+    SEPARATION PROBE (cheap pre-train gate). Does adding distribution features lift the
+    separability of the recurring confusions vs the current feature set — coord-vs-decimal,
+    categorical-vs-free-text, id-vs-categorical, increment-vs-integer? 5-fold CV classifier
+    on stats+distribution vs stats-alone (reuse probe_range_features.py shape). REQUIRE a
+    material lift on >=2 of these confusions; else the features do not carry the signal and
+    the retrain is not worth running.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-03
+  description: |
+    RETRAIN + LEARNED-DISTINCTION TEST (the core hypothesis). Retrain the multi-branch with
+    the distribution features; score standalone gold (predict_multibranch). REQUIRE the
+    model now LEARNS the distinctions it needed rules for: coordinates recovered WITHOUT the
+    1:1 decimal loss the logit-adjust sweep showed (latitude up, true-decimal recall held),
+    and the categorical/id cardinality confusions improved. >=2/3 seeds beat the floor by
+    >CI. GO -> ac-04; NO-GO -> the distribution features did not transfer; rules stay.
+  ac_type: observation
+  gate: true
+  checked: false
+- id: ac-04
+  description: |
+    RULE-SIMPLIFICATION AUDIT + 0096 VERDICT (the payoff). With the model seeing
+    distribution, test which rule-layer gates become redundant — the categorical
+    cardinality gate, username distinct-fraction guard, increment contiguity check,
+    coordinate plausibility gate. Turn each off and confirm accuracy holds (the model
+    subsumes it). DELIVERABLE: the list of rules the model now learns + the verdict on the
+    0096 hypothesis (can residual-precedence be learned once the features carry cardinality).
+    Each rule removal gate-shipped + ledgered with a kill switch.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-05
+  description: |
+    COMPOSED GATE + CORPUS RELOCATION + SWAP. The features are deterministic/static, so the
+    model runs the normal Sense->Sharpen pipeline — the composed gold number is free (no
+    candle build). Score composed gold vs v19 0.798 and representative vs 0.691; run the
+    corpus-relocation gate (H05, blocking). REQUIRE improve-or-hold on the blocking gates.
+    GO -> swap models/default, version bump, CHANGELOG, count surfaces; NO-GO -> documented
+    fallback to the escalation (the new features may still ship as substrate).
+  ac_type: observation
+  gate: true
+  checked: false
