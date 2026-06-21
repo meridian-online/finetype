@@ -82,9 +82,20 @@ acceptance_criteria:
     semantic encoder. DELIVERABLE: the range-feature extractor + its format-versioned
     FTMB slot, with a held-out probe showing it separates latitude / longitude / year /
     postcode where both gte views collapse them.
+    CLOSED 2026-06-21 — INFORMATIVE NEGATIVE, premise refuted. The probe (5-fold CV,
+    223 gold cols) shows range features (coord-vs-decimal 0.841) are NOT better than the
+    gte embed (0.852) — gte already separates coordinate from decimal at 0.85, so the
+    embed is NOT the bottleneck. The real gap is the decimal_number RESIDUAL-ATTRACTOR
+    (decision 0096): the model over-predicts decimal_number 1.8x, swallowing 34 lat + 38
+    lon. Rule-shaped, not representational. REDIRECT: attack the attractor via
+    logit_adjust_tau (built-in, zero inference cost) and/or a value-distribution
+    decimal->coordinate promotion gate. Substrate kept (scripts/numeric_range_features.py,
+    probe_range_features.py). Memo: ac01_finding.md; memory decimal-number-is-a-residual-
+    attractor. THE SPEC'S REPRESENTATION FRAMING (ac-01/02/03) NEEDS RE-CENTRING ON THE
+    ATTRACTOR — pending author review.
   ac_type: code
   gate: true
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     ROBUST GATING (the other half of the two-view problem). Replace the soft-MLP view
