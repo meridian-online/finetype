@@ -2316,6 +2316,18 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
+        // Honest-gate composition (FINETYPE_INJECT_LABEL): override the Sense label
+        // with an externally-supplied one (another model's prediction), then run the
+        // REAL Sharpen stack on it — lets us compose any model's predictions without
+        // that model being in the binary. Diagnostic only; empty/unset = no-op.
+        if !self.skip_sharpen {
+            if let Ok(inj) = std::env::var("FINETYPE_INJECT_LABEL") {
+                if !inj.is_empty() {
+                    result.label = inj;
+                    result.confidence = 1.0;
+                }
+            }
+        }
         // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set).
         if !self.skip_sharpen {
             feature_sharpen(&mut result, &column_features);
@@ -2406,6 +2418,18 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
+        // Honest-gate composition (FINETYPE_INJECT_LABEL): override the Sense label
+        // with an externally-supplied one (another model's prediction), then run the
+        // REAL Sharpen stack on it — lets us compose any model's predictions without
+        // that model being in the binary. Diagnostic only; empty/unset = no-op.
+        if !self.skip_sharpen {
+            if let Ok(inj) = std::env::var("FINETYPE_INJECT_LABEL") {
+                if !inj.is_empty() {
+                    result.label = inj;
+                    result.confidence = 1.0;
+                }
+            }
+        }
         // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
         if !self.skip_sharpen {
             // Step 3: Feature-based Sharpen rules (F1-F6)
@@ -2513,6 +2537,18 @@ impl ColumnClassifier {
             column_features: Some(column_features.clone()),
         };
 
+        // Honest-gate composition (FINETYPE_INJECT_LABEL): override the Sense label
+        // with an externally-supplied one (another model's prediction), then run the
+        // REAL Sharpen stack on it — lets us compose any model's predictions without
+        // that model being in the binary. Diagnostic only; empty/unset = no-op.
+        if !self.skip_sharpen {
+            if let Ok(inj) = std::env::var("FINETYPE_INJECT_LABEL") {
+                if !inj.is_empty() {
+                    result.label = inj;
+                    result.confidence = 1.0;
+                }
+            }
+        }
         // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set)
         if !self.skip_sharpen {
             // Step 3: Feature-based Sharpen rules (F1-F6)
