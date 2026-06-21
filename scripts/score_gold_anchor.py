@@ -74,7 +74,8 @@ def load_gold(path: Path) -> list[dict]:
         return list(csv.DictReader(fh, delimiter="\t"))
 
 
-def _profile_column(binary: Path, column_name: str, values: list[str]) -> str:
+def _profile_column(binary: Path, column_name: str, values: list[str],
+                    raw_model: bool = False) -> str:
     """Run the REAL Sense pipeline: reconstruct a single-column CSV and profile
     it (`finetype profile -f csv -o json-schema`), returning x-finetype-label.
 
@@ -92,12 +93,10 @@ def _profile_column(binary: Path, column_name: str, values: list[str]) -> str:
             w.writerow([column_name])
             for v in values:
                 w.writerow([v])
-        proc = subprocess.run(
-            [str(binary), "profile", "-f", str(csv_path), "-o", "json-schema"],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        cmd = [str(binary), "profile", "-f", str(csv_path), "-o", "json-schema"]
+        if raw_model:
+            cmd.append("--raw-model")  # Sense only, no Sharpen — for honest Sense-vs-Sense
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if proc.returncode != 0:
             raise RuntimeError(f"profile failed: {proc.stderr.strip()[-200:]}")
         schema = json.loads(proc.stdout)
@@ -293,7 +292,8 @@ def cmd_predict(args: argparse.Namespace) -> int:
                 n_err += 1
                 continue
             try:
-                label = _profile_column(args.binary, r["column_name"], vals)
+                label = _profile_column(args.binary, r["column_name"], vals,
+                                        raw_model=getattr(args, "raw_model", False))
             except Exception as e:  # noqa: BLE001
                 print(f"  row {i}: {e}", file=sys.stderr)
                 n_err += 1
@@ -485,6 +485,8 @@ def main() -> int:
     b.set_defaults(func=cmd_build_gold)
 
     p = sub.add_parser("predict")
+    p.add_argument("--raw-model", action="store_true",
+                   help="Sense only (no Sharpen) — for honest Sense-vs-Sense comparison")
     p.add_argument("--gold", required=True, type=Path)
     p.add_argument("--columns", required=True, type=Path)
     p.add_argument("--binary", required=True, type=Path)
