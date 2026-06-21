@@ -1,12 +1,14 @@
 //! Column-level statistical features (Sherlock-inspired).
 //!
 //! Computes aggregate statistics over an entire column of string values.
-//! Complements the per-value `features.rs` (36-dim) with 27 column-level dimensions:
+//! Complements the per-value `features.rs` with 44 column-level dimensions:
 //!
 //! - **Entropy & Cardinality** (4 dims): Shannon entropy, uniqueness, count, emptiness
 //! - **Value Length Statistics** (8 dims): mean, variance, min, max, median, skewness, kurtosis, sum
 //! - **Character Composition** (10 dims): digit/alpha/special cell fractions, count stats, word counts
 //! - **Structural** (5 dims): word count std, case pattern fractions
+//! - **Column-distribution** (17 dims): parsed value range (signed-log percentiles, sign,
+//!   bounded-90/180), precision (decimal_places), sequentiality (monotonic, contiguous-run)
 //!
 //! All features are deterministic: same input always produces the same output.
 //! Pure computation -- no ML dependencies, no file I/O.
