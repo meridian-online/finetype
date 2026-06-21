@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/overnight_repro_baseline.sh — spec 2026-06-21 ac-01
+# scripts/overnight_m2v_244.sh — spec 2026-06-21 ac-01
 #
 # The REPRODUCIBLE Model2Vec baseline. 3-seed retrain at v19's EXACT recipe
 # (potion-4M embed, 27 column stats, format v4, the v19_paired data blend) but
@@ -21,17 +21,17 @@
 #           --verify reports EOF only as a WARNING, so we fail on it explicitly).
 #
 # Usage:
-#   ./scripts/overnight_repro_baseline.sh                 # full: build data + train 3 seeds + score
-#   ./scripts/overnight_repro_baseline.sh --skip-data     # reuse existing FTMB
-#   ./scripts/overnight_repro_baseline.sh --score-only    # skip build+train, just score existing models
-#   ./scripts/overnight_repro_baseline.sh --dry-run
-#   ./scripts/overnight_repro_baseline.sh --epochs N
+#   ./scripts/overnight_m2v_244.sh                 # full: build data + train 3 seeds + score
+#   ./scripts/overnight_m2v_244.sh --skip-data     # reuse existing FTMB
+#   ./scripts/overnight_m2v_244.sh --score-only    # skip build+train, just score existing models
+#   ./scripts/overnight_m2v_244.sh --dry-run
+#   ./scripts/overnight_m2v_244.sh --epochs N
 #
 # Output:
-#   output/multibranch-training/repro-baseline.ftmb       — training data (FTMB v4, 27 stats, 244 valid)
-#   models/repro-baseline-relu-s{42,43,44}/               — the 3 seed models
+#   output/multibranch-training/m2v-244.ftmb       — training data (FTMB v4, 27 stats, 244 valid)
+#   models/m2v-244-s{42,43,44}/               — the 3 seed models
 #   output/embed-frontier/ac01_result.md                  — the deliverable: per-seed Sense + composed
-#   results/overnight-repro-baseline.log
+#   results/overnight-m2v-244.log
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -41,10 +41,10 @@ cd "$PROJECT_DIR"
 PY="eval/gittables/.venv/bin/python"           # full scientific stack (numpy/duckdb/pyarrow)
 BIN="./target/release/finetype"
 LOG_DIR="results"; mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/overnight-repro-baseline.log"
+LOG_FILE="$LOG_DIR/overnight-m2v-244.log"
 
-CONFIG="models/repro-baseline-config.json"
-FTMB_FILE="output/multibranch-training/repro-baseline.ftmb"
+CONFIG="models/m2v-244-config.json"
+FTMB_FILE="output/multibranch-training/m2v-244.ftmb"
 DISTILLED_FILE="output/distillation-v3/sherlock_distilled.csv.gz"
 HF_DATASET="meridian-online/sherlock-annotated"
 GOLD="eval/gold/gold_corpus.tsv"
@@ -94,7 +94,7 @@ done
 echo "[Pre-flight] Config n_classes/valid_dim == $LIVE_TAXONOMY — OK"
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    echo "[DRY RUN] Would build $FTMB_FILE then train ${#SEEDS[@]} seeds -> models/repro-baseline-relu-s*"
+    echo "[DRY RUN] Would build $FTMB_FILE then train ${#SEEDS[@]} seeds -> models/m2v-244-s*"
     exit 0
 fi
 
@@ -198,7 +198,7 @@ fi
 # ── Step 2: Train 3 ReLU seeds ────────────────────────────────────────
 if [[ "$SCORE_ONLY" != "true" ]]; then
     for seed in "${SEEDS[@]}"; do
-        name="repro-baseline-relu-s${seed}"
+        name="m2v-244-s${seed}"
         MODEL_DIR="models/$name"
         if [[ -f "$MODEL_DIR/model.safetensors" ]]; then
             echo "[Train] $name exists — skipping"; continue
@@ -276,8 +276,8 @@ echo "| model | Sense (raw) | composed |"
 echo "|---|---|---|"
 eval_model "models/sherlock-v19-relu-s42" "v19-relu-s42 (reference)"
 for seed in "${SEEDS[@]}"; do
-    md="models/repro-baseline-relu-s${seed}"
-    [[ -f "$md/model.safetensors" ]] && eval_model "$md" "repro-s${seed}" || echo "repro-s${seed} | MISSING | MISSING"
+    md="models/m2v-244-s${seed}"
+    [[ -f "$md/model.safetensors" ]] && eval_model "$md" "m2v-244-s${seed}" || echo "m2v-244-s${seed} | MISSING | MISSING"
 done
 echo
 echo "Verdict: best-of-3 composed within v19's CI (~0.793) => reproducible movable baseline."
