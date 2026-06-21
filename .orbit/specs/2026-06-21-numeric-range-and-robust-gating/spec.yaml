@@ -64,9 +64,15 @@ acceptance_criteria:
     column, whether a Sharpen rule fires. DECISION: if composition recovers the bulk,
     the numeric-range view (ac-01) drops to secondary and the spec narrows to gating
     robustness (ac-02) + the static path (ac-03); else ac-01 proceeds at full weight.
+    CLOSED 2026-06-21: NO — composition does NOT heal it. Two-view predicts the 28
+    missed latitudes as decimal_number; both coordinate Sharpen rules gate on
+    result_label==latitude||longitude (they demote/disambiguate DOWNSTREAM of a coord
+    prediction, never promote decimal->coord — value range is used only to REJECT false
+    coords, by design). DECISION: ac-01 (range features) is PRIMARY. Memo:
+    ac00_sharpen_recovery_check.md.
   ac_type: code
   gate: true
-  checked: false
+  checked: true
 - id: ac-01
   description: |
     NUMERIC-RANGE REPRESENTATION (weight set by ac-00). Build the format view as
