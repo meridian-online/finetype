@@ -18,6 +18,11 @@
 set -eo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 
+# Models are fully cached. Force OFFLINE so model2vec's load never makes a network call —
+# a flaky HF check hung the first 8M run (main thread blocked on a lock, socket CLOSE_WAIT).
+# PYTHONUNBUFFERED so the builder's progress prints are visible through the tee pipe.
+export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 PYTHONUNBUFFERED=1
+
 PY="eval/gittables/.venv/bin/python"
 BIN="./target/release/finetype"
 PM="./target/release/predict_multibranch"
