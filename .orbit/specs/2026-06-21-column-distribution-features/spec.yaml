@@ -111,9 +111,11 @@ acceptance_criteria:
     on stats+distribution vs stats-alone (reuse probe_range_features.py shape). REQUIRE a
     material lift on >=2 of these confusions; else the features do not carry the signal and
     the retrain is not worth running.
+    CLOSED 2026-06-21 GO: stats-27+coldist lifts coord-vs-decimal 0.690->0.780 (+0.089) and
+    multi-class +0.07 (probe_coldist.py, 414 gold cols). Two confusions clear the bar.
   ac_type: code
   gate: true
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     RETRAIN + LEARNED-DISTINCTION TEST (the core hypothesis). Retrain the multi-branch with
