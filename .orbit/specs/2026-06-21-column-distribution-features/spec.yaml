@@ -71,20 +71,31 @@ acceptance_criteria:
     format plan for the widened column feature slot (FTMB version bump or new slot;
     old models still load). KEY QUESTION: do the new features extend the COLUMN stats
     branch (column-level, where cardinality/range must live) or a new dedicated branch?
+    CLOSED 2026-06-21 (ac00_audit.md). PREMISE CORRECTED: cardinality is ALREADY present
+    (extract_column_stats / COLUMN_STATS_DIM=27 has col_entropy + frac_unique; the
+    mod.rs:2266 "cannot see cardinality" is the separate value/fusion head, not the Sense
+    multi-branch). Genuinely ABSENT: numeric value/range, column-level precision,
+    sequentiality. EDIT: extend extract_column_stats — the UNIFIED Rust path (same fn at
+    training-feature extraction AND inference -> NO train/inference skew, NO candle, FTMB
+    reader dim-agnostic so NO format bump; per-value FEATURE_DIM/YDF UNTOUCHED). Blast
+    radius: one Rust fn + COLUMN_STATS_DIM + STATS_DIM(py) + config stats_dim + retrain.
+    ac-01 drops cardinality; ac-03/04 narrow to range/increment (0096 holds for
+    categorical/id since cardinality was always present).
   ac_type: doc
   gate: true
-  checked: false
+  checked: true
 - id: ac-01
   description: |
-    COLUMN-DISTRIBUTION FEATURE SET. Add the column-level signals the model is blind to,
-    as first-class column features (NOT an embed competitor — that was the prior ac-01's
-    error):
-      - cardinality: distinct ratio, distinct count, top-value frequency, value entropy
-      - sequentiality: monotonic fraction, contiguous-integer-run ratio, sortedness
+    COLUMN-DISTRIBUTION FEATURE SET. EXTEND extract_column_stats (ac-00) with the column-
+    level signals it is genuinely missing (cardinality/entropy already present — do NOT
+    re-add). NOT an embed competitor (the prior ac-01's error):
       - numeric value & range: parse to number -> min/max/mean/std/percentiles, sign
-        fraction, magnitude (signed-log), bounded-ness
-      - length consistency: std of length, fixed-width fraction, leading-zero fraction
-    DELIVERABLE: the column-distribution extractor + its format-versioned FTMB slot.
+        fraction, signed-log magnitude, bounded-ness  [coordinates/year/unix/port/amount]
+      - column-level precision: aggregate decimal_places (mean/max) — absent from the 27
+      - sequentiality: monotonic fraction, contiguous-integer-run ratio, sortedness  [increment]
+      - length consistency: fixed-width fraction, leading-zero fraction  [codes/postcodes]
+    DELIVERABLE: the extended extract_column_stats (COLUMN_STATS_DIM 27->N, dim-agnostic FTMB
+    reader, STATS_DIM/config updated) + COLUMN_STATS_NAMES.
   ac_type: code
   gate: true
   checked: false
@@ -102,23 +113,25 @@ acceptance_criteria:
 - id: ac-03
   description: |
     RETRAIN + LEARNED-DISTINCTION TEST (the core hypothesis). Retrain the multi-branch with
-    the distribution features; score standalone gold (predict_multibranch). REQUIRE the
-    model now LEARNS the distinctions it needed rules for: coordinates recovered WITHOUT the
-    1:1 decimal loss the logit-adjust sweep showed (latitude up, true-decimal recall held),
-    and the categorical/id cardinality confusions improved. >=2/3 seeds beat the floor by
-    >CI. GO -> ac-04; NO-GO -> the distribution features did not transfer; rules stay.
+    the extended stats; score standalone gold (predict_multibranch). REQUIRE the model now
+    LEARNS the RANGE/SEQUENCE distinctions it needed rules for: coordinates recovered WITHOUT
+    the 1:1 decimal loss the logit-adjust sweep showed (latitude up, true-decimal recall
+    held), and increment/serial vs integer improved. (Categorical/id are NOT in scope —
+    cardinality was always present.) >=2/3 seeds beat the floor by >CI. GO -> ac-04; NO-GO ->
+    the features did not transfer; rules stay.
   ac_type: observation
   gate: true
   checked: false
 - id: ac-04
   description: |
-    RULE-SIMPLIFICATION AUDIT + 0096 VERDICT (the payoff). With the model seeing
-    distribution, test which rule-layer gates become redundant — the categorical
-    cardinality gate, username distinct-fraction guard, increment contiguity check,
-    coordinate plausibility gate. Turn each off and confirm accuracy holds (the model
-    subsumes it). DELIVERABLE: the list of rules the model now learns + the verdict on the
-    0096 hypothesis (can residual-precedence be learned once the features carry cardinality).
-    Each rule removal gate-shipped + ledgered with a kill switch.
+    RULE-SIMPLIFICATION AUDIT + 0096 VERDICT (the payoff). With the model now seeing
+    range/sequence, test which RANGE/SEQUENCE rule-gates become redundant — the increment
+    contiguity check and the coordinate plausibility gate (NOT the cardinality gates, which
+    the model already had cardinality for). Turn each off and confirm accuracy holds (the
+    model subsumes it). DELIVERABLE: the list of rules the model now learns + the refined
+    0096 verdict (residual-precedence learnability is bounded by feature coverage: range/
+    sequence were absent and may now be learnable; cardinality was present and 0096 still
+    holds for categorical/id). Each rule removal gate-shipped + ledgered with a kill switch.
   ac_type: code
   gate: true
   checked: false
