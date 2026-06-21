@@ -93,7 +93,7 @@ from eval_leakage import (  # noqa: E402  # pyright: ignore[reportMissingImports
 
 CHAR_DIM = 960
 EMBED_DIM = 512
-STATS_DIM = 44
+STATS_DIM = 27
 HEADER_DIM = 128
 VALID_DIM = 244
 MAGIC = b"FTMB"
