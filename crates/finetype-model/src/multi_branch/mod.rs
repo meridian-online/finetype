@@ -347,8 +347,12 @@ impl MultiBranchClassifier {
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
         let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
-        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(
+            &stats_feats[..self.config.stats_dim],
+            (1, self.config.stats_dim),
+            &device,
+        )
+        .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
 
         // Extract header embedding if the model has a header branch
         let header_t = if self.header_branch.is_some() {
@@ -456,8 +460,12 @@ impl MultiBranchClassifier {
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
         let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
-        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(
+            &stats_feats[..self.config.stats_dim],
+            (1, self.config.stats_dim),
+            &device,
+        )
+        .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
 
         // Use the pre-enriched header embedding (reshaped to [1, D])
         let header_t = if self.header_branch.is_some() {
@@ -689,8 +697,12 @@ impl MultiBranchClassifier {
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
         let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
-        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(
+            &stats_feats[..self.config.stats_dim],
+            (1, self.config.stats_dim),
+            &device,
+        )
+        .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
 
         let header_t = if self.header_branch.is_some() {
             let header_embed = if !header.is_empty() {
@@ -799,8 +811,12 @@ impl MultiBranchClassifier {
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
         let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
-        let stats_t = Tensor::from_slice(&stats_feats, (1, COLUMN_STATS_DIM), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
+        let stats_t = Tensor::from_slice(
+            &stats_feats[..self.config.stats_dim],
+            (1, self.config.stats_dim),
+            &device,
+        )
+        .map_err(|e| InferenceError::InvalidPath(format!("stats tensor: {e}")))?;
 
         let header_t = if self.header_branch.is_some() {
             let header_embed = if !header.is_empty() {

@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 
 /// Total number of column-level statistical features.
-pub const COLUMN_STATS_DIM: usize = 27;
+pub const COLUMN_STATS_DIM: usize = 44;
 
 /// Human-readable names for each feature index.
 pub const COLUMN_STATS_NAMES: [&str; COLUMN_STATS_DIM] = [
@@ -49,6 +49,25 @@ pub const COLUMN_STATS_NAMES: [&str; COLUMN_STATS_DIM] = [
     "frac_all_upper",    // 24
     "frac_all_lower",    // 25
     "frac_mixed_case",   // 26
+    // Column-distribution (spec 2026-06-21-column-distribution-features): parsed value
+    // range, precision, sequentiality — the signals the shape-only stats above lack.
+    "frac_numeric_parsed",  // 27
+    "value_slog_min",       // 28
+    "value_slog_median",    // 29
+    "value_slog_max",       // 30
+    "abs_log_min",          // 31
+    "abs_log_max",          // 32
+    "frac_negative",        // 33
+    "frac_integer_valued",  // 34
+    "value_slog_spread",    // 35
+    "frac_bounded_90",      // 36
+    "frac_bounded_180",     // 37
+    "mean_decimal_places",  // 38
+    "max_decimal_places",   // 39
+    "frac_high_precision",  // 40
+    "monotonic_fraction",   // 41
+    "contiguous_run_ratio", // 42
+    "is_sorted",            // 43
 ];
 
 /// Extract column-level statistical features from a set of values.
@@ -229,6 +248,76 @@ pub fn extract_column_stats(values: &[&str]) -> Option<[f32; COLUMN_STATS_DIM]> 
     f[24] = all_upper as f32 / n_ne_f as f32; // frac_all_upper
     f[25] = all_lower as f32 / n_ne_f as f32; // frac_all_lower
     f[26] = mixed_case as f32 / n_ne_f as f32; // frac_mixed_case
+
+    // ─── Column-distribution: parsed value / range / precision / sequentiality ──────
+    // The shape stats above never parse the value (length_min/max are STRING length);
+    // these give the model magnitude/range, precision, and monotonicity. Computed in
+    // this one fn so training-feature extraction and inference share the definition.
+    let nums: Vec<f64> = non_empty
+        .iter()
+        .filter_map(|v| v.parse::<f64>().ok())
+        .collect();
+    f[27] = nums.len() as f32 / n_ne_f as f32; // frac_numeric_parsed
+    if !nums.is_empty() {
+        let slog = |x: f64| ((x.abs() + 1.0).log10()).copysign(x);
+        let cmp = |a: &f64, b: &f64| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal);
+        let nn = nums.len() as f32;
+        let mut sorted = nums.clone();
+        sorted.sort_by(cmp);
+        f[28] = slog(sorted[0]) as f32; // value_slog_min
+        f[29] = slog(sorted[sorted.len() / 2]) as f32; // value_slog_median
+        f[30] = slog(sorted[sorted.len() - 1]) as f32; // value_slog_max
+        let mut absn: Vec<f64> = nums.iter().map(|x| x.abs()).collect();
+        absn.sort_by(cmp);
+        f[31] = (absn[0] + 1.0).log10() as f32; // abs_log_min
+        f[32] = (absn[absn.len() - 1] + 1.0).log10() as f32; // abs_log_max
+        f[33] = nums.iter().filter(|&&x| x < 0.0).count() as f32 / nn; // frac_negative
+        f[34] = nums.iter().filter(|&&x| x == x.trunc()).count() as f32 / nn; // frac_integer_valued
+        let m: f64 = nums.iter().map(|&x| slog(x)).sum::<f64>() / nums.len() as f64;
+        f[35] = (nums.iter().map(|&x| (slog(x) - m).powi(2)).sum::<f64>() / nums.len() as f64)
+            .sqrt() as f32; // value_slog_spread
+        f[36] = nums.iter().filter(|&&x| x.abs() <= 90.0).count() as f32 / nn; // frac_bounded_90
+        f[37] = nums.iter().filter(|&&x| x.abs() <= 180.0).count() as f32 / nn; // frac_bounded_180
+    }
+    // precision (decimal places per value)
+    let dps: Vec<usize> = non_empty
+        .iter()
+        .map(|v| match v.split_once('.') {
+            Some((_, frac)) if !frac.is_empty() && frac.bytes().all(|b| b.is_ascii_digit()) => {
+                frac.len()
+            }
+            _ => 0,
+        })
+        .collect();
+    f[38] = dps.iter().sum::<usize>() as f32 / n_ne_f as f32; // mean_decimal_places
+    f[39] = *dps.iter().max().unwrap_or(&0) as f32; // max_decimal_places
+    f[40] = dps.iter().filter(|&&d| d >= 4).count() as f32 / n_ne_f as f32; // frac_high_precision
+                                                                            // sequentiality
+    if nums.len() >= 2 {
+        let asc = nums.windows(2).filter(|w| w[1] >= w[0]).count() as f64 / (nums.len() - 1) as f64;
+        f[41] = asc.max(1.0 - asc) as f32; // monotonic_fraction
+        let ints: Vec<i64> = nums
+            .iter()
+            .filter(|&&x| x == x.trunc() && x.abs() < 1e18)
+            .map(|&x| x as i64)
+            .collect();
+        if ints.len() >= 2 {
+            let mn = *ints.iter().min().unwrap();
+            let mx = *ints.iter().max().unwrap();
+            let span = (mx - mn + 1) as f64;
+            let distinct = ints.iter().collect::<std::collections::HashSet<_>>().len() as f64;
+            f[42] = if span > 0.0 {
+                (distinct / span) as f32
+            } else {
+                0.0
+            }; // contiguous_run_ratio
+        }
+        f[43] = if nums.windows(2).all(|w| w[1] >= w[0]) {
+            1.0
+        } else {
+            0.0
+        }; // is_sorted
+    }
 
     Some(f)
 }
