@@ -321,6 +321,15 @@ pub fn extract_column_stats(values: &[&str]) -> Option<[f32; COLUMN_STATS_DIM]> 
         }; // is_sorted
     }
 
+    // Clamp non-finite to 0: a value like "inf"/"NaN"/1e999 parses to f64 inf/NaN and
+    // propagates through the range features; serde_json serialises non-finite f32 as
+    // `null`, which breaks any downstream consumer (e.g. the FTMB writer's struct.pack).
+    for x in f.iter_mut() {
+        if !x.is_finite() {
+            *x = 0.0;
+        }
+    }
+
     Some(f)
 }
 
