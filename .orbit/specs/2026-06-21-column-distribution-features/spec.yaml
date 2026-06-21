@@ -96,9 +96,13 @@ acceptance_criteria:
       - length consistency: fixed-width fraction, leading-zero fraction  [codes/postcodes]
     DELIVERABLE: the extended extract_column_stats (COLUMN_STATS_DIM 27->N, dim-agnostic FTMB
     reader, STATS_DIM/config updated) + COLUMN_STATS_NAMES.
+    CLOSED 2026-06-21: extract_column_stats 27->44 (parsed range/precision/sequentiality
+    appended; 27 unchanged). Backward-compat: inference slices stats[..config.stats_dim] ->
+    v19 byte-identical (verified: still types lat->latitude). extract-features emits 44;
+    STATS_DIM/cdist-config updated; FTMB reader dim-agnostic (no format bump); clippy clean.
   ac_type: code
   gate: true
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     SEPARATION PROBE (cheap pre-train gate). Does adding distribution features lift the
