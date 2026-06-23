@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.36] - 2026-06-24
+
+### Changed
+
+- **Default Sense model: `sherlock-v19-relu-s42` → `m2v8m-s43` (potion-8M dual-encoder) —
+  v19 retired.** The new default is **reproducible** (`scripts/overnight_potion.sh`) and
+  **244-label** (tracks the live taxonomy; v19 was 240-label and could not predict the new
+  leaves, stranding taxonomy growth). Gold composed 0.794 ties v19's 0.797 within CI;
+  Sense 0.522 > 0.502; latency ~free (static encoders). The swap was gated by **gold parity
+  plus a gold-adjudicated relocation review** (choice 0104), not a corpus-honest GO — that
+  gate is structurally unpassable by any model retrain (it measures deviation from v19).
+  Known residual: short-code / `user_agent` over-emission (gold-invisible corpus-scale
+  warts) deferred to a follow-up retrain with better negatives.
+
+### Fixed
+
+- **`currency_code` validator → ISO-4217 membership** (was `^[A-Z]{3}$`, which accepted any
+  three uppercase letters — UDP, TCP, EDT, team/airport codes). Per the Precision Principle,
+  a validation that confirms most random input is not a validation; this lets the validation
+  veto suppress non-currency 3-letter codes. Real currencies (incl. lowercase) unaffected.
+- **Validation type-key fallback** — when a model config omits `type_index_keys` but has a
+  trained validation branch, the index order is derived from the live taxonomy instead of
+  silently feeding the branch zeros (which made such a model mis-predict). Config-pinned
+  keys still take precedence.
+
 ### Added
+
+- **Dual-encoder native inference.** `MultiBranchClassifier` can load a second Model2Vec
+  encoder for the value-aggregation branch (model config `value_embed_model`), so a model
+  can use potion-8M (256-dim) for values while potion-4M (128-dim) drives the header branch
+  and the semantic/entity/sense classifiers. The value encoder is co-located in the model
+  dir (`value_model2vec/`), embedded in release binaries (build.rs `MB_VALUE_*`), and
+  fetched by `download-model.sh`. Single-encoder models (v19, m2v-244) are unaffected.
 
 - **Three types mined from the `plain_text` residual** (spec
   `2026-06-19-plain-text-type-discovery`, card 0001). `representation.text.plain_text` is
