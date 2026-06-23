@@ -1,0 +1,90 @@
+id: '0104'
+title: 'Corpus-honest gate is a gold-adjudicated relocation review for model swaps, not a blocking GO'
+status: accepted
+date_created: 2026-06-24
+date_modified: 2026-06-24
+body: |
+  # 0104. The corpus-honest gate's role for MODEL SWAPS: a gold-adjudicated relocation review, not a blocking GO requirement
+
+  ## Context and Problem Statement
+
+  The corpus-honest gate (spec 2026-06-07, H05 BLOCKING) was adopted as the
+  blocking promotion gate. Empirically, across every recorded run, it has a
+  **0% pass rate for model retrains**: every GO verdict (21) is a RULE change on
+  v19 (postal-veto, country-code-corrob, isbn-checksum-guard, coord-guard,
+  state-code, amount-veto, veto-fallback, …); every MODEL retrain is NO-GO
+  without exception (v22, v23, latdec×3, mfg-coords×3, fusion-v26/v27, m2v-244,
+  potion-8M×2).
+
+  This is **structural, not a property of the candidates**. The gate's oracle is
+  v19's gated-YDF (`output/ydf-validation-gate/v19_gated.parquet`); it measures
+  *deviation from v19*. A retrain moves 12–25% of all columns relative to v19
+  (latdec 12.0%, v22 21.3%, v23 24.7%), so the over-emit/collapse bands trip by
+  construction. A rule change is a small targeted delta and stays in-band. And the
+  oracle itself — gated-YDF — is, by the project's own instrument audit
+  (`output/gold-corpus/instrument_audit.md`), wrong in 42% of its assertions on
+  contested ground and "must not adjudicate per-column correctness in any gate or
+  metric without a gold cross-check."
+
+  Consequence: requiring a corpus-gate GO to retire v19 is **permanent v19
+  lock-in**. This — not candidate quality — is why no reproducible default has
+  ever shipped, even when a candidate ties v19 on the gold corpus (potion-8M:
+  native composed 0.794 vs v19 0.797).
+
+  ## Decision
+
+  Split the gate's role by change type:
+
+  - **Rule / Sharpen changes** (binary + existing `models/default`): the corpus
+    gate stays a **BLOCKING GO** requirement, unchanged. It is a proven, correctly
+    calibrated regression detector for small targeted deltas (H05 intact here).
+
+  - **Model swaps** (replacing the Sense model): the corpus gate is a
+    **relocation FINDER**, not a blocking GO. Its NO-GO triggers are the input to
+    a mandatory **gold-adjudicated relocation review**: each trigger is judged with
+    the GOLD corpus (the trustworthy referee), not gated-YDF. A trigger blocks the
+    swap only when gold confirms it is a genuine regression (candidate worse than
+    v19 on those columns). Triggers where gold shows the candidate is
+    neutral-or-better are benign v19-deviation and do NOT block.
+
+  The model-swap promotion bar becomes: **gold parity-or-better** (blocking) +
+  **representative accuracy** (advisory) + **gold-adjudicated relocation review with
+  no gold-confirmed regression** (blocking) + **rare-type scoreboard clean**.
+
+  ## Decision Drivers
+
+  - A blocking gate that no candidate of its target class can pass is not a gate,
+    it is a lock. The instrument was mis-applied: built/validated for rule deltas,
+    used as a model-swap gate.
+  - The project already mandates a gold cross-check before gated-YDF adjudicates
+    (instrument audit). This decision operationalises that for the swap case.
+  - There is precedent for recalibrating this gate when it false-alarms: the
+    0.6.29 composition-aware over_emit band flipped a real false-alarm NO-GO
+    (text-vocab) to GO.
+
+  ## Evidence (potion-8M, 2026-06-24)
+
+  Gold-adjudication of potion-8M's 14 gate triggers:
+  - **Benign / candidate-better:** numeric_code (v19 over-emits onto integer `id`
+    columns; potion correctly declines — 88% of the "lost" support is `id`-headed),
+    si_number (`33.65k`/`59.7M` ARE SI-suffixed), username (Author handles).
+  - **Genuine regressions, must fix before swap:** currency_code (validator
+    `^[A-Z]{3}$` passes UDP/TCP/EDT — tightened to ISO-4217), user_agent (prose →
+    user_agent; not veto-eligible, needs a value-shape Sharpen rule).
+  - isbn collapse worth a gold check; compact_ymd minor.
+
+  ## Consequences
+
+  - Good: the reproducible-default roadmap is unblocked; v19 can be retired by a
+    gold-equal candidate with gold-clean relocations.
+  - Good: H05 is preserved where it works (rule changes).
+  - Neutral: the relocation review is manual-ish per swap (gold-adjudicate each
+    trigger). Acceptable — swaps are rare.
+  - Risk: gold is curated/small; a relocation that gold can't see could slip. Mitigated
+    by the representative band + rare-type scoreboard + post-swap soak.
+
+  ## Supersedes / amends
+
+  Amends the H05 blocking role from spec 2026-06-07-corpus-honest-quality-gate for
+  the MODEL-SWAP case only. Rule-change gating is unchanged. See memory
+  `corpus-gate-is-structurally-anti-model-swap` and the dual-encoder spec ledger §8.

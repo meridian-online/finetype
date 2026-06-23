@@ -250,3 +250,23 @@ benign: numeric_code (potion more correct), si_number, username. Fix the genuine
 user_agent, currency_code. Ship on gold-parity (0.794 ≈ 0.797) + representative +
 gold-cleared relocations. Precedent: the 0.6.29 composition-aware band recalibrated the
 gate when it false-alarmed (text-vocab NO-GO→GO).
+
+## 9. Toward the swap: choice 0104 + value-guards (2026-06-24)
+
+- **Choice 0104 recorded:** corpus gate = gold-adjudicated relocation review for MODEL
+  swaps (blocking only on gold-confirmed regressions); stays a blocking GO for rule changes.
+- **currency_code validator → ISO-4217 enum** (was `^[A-Z]{3}$`, the Precision-Principle
+  anti-pattern). Gold-safe: v19 holds 0.797, potion-8M holds 0.794. Suppresses the
+  currency_code over-emission on UDP/TCP/EDT; real currencies (incl. lowercase) keep the type.
+- **Whack-a-mole tell:** with currency_code vetoed, UDP/TCP flip to `iata_code` (the next
+  3-letter attractor). Confirms the corpus over-emission is the model over-asserting on short
+  codes generally — rule-vetoes shift it, don't solve it. Reinforces 0104 (ship on
+  gold-adjudication, not a clean gate) and the spec's ">4 rules → fix the data" guidance.
+- **user_agent** (prose → user_agent): NOT veto-eligible (absent from veto_safe.txt), so it
+  needs a dedicated value-shape Sharpen rule, OR — given the whack-a-mole — it's better
+  addressed by the retrain. On gold it's not a confirmed regression (potion ties v19), so under
+  0104 it is not strictly ship-blocking; it is a product-quality wart.
+
+**Remaining to ship potion-8M:** decide user_agent (rule vs accept-as-documented vs retrain),
+gold-adjudicate the remaining triggers, then the deliberate release (package → HF → swap →
+version → CHANGELOG → CLAUDE.md). The release is a reviewed action, not auto-fired.
