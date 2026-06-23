@@ -78,6 +78,15 @@ pub struct MultiBranchClassifier {
     /// Validation feature extractor (built from config.type_index_keys).
     /// None when the model has no validation branch (v11 and earlier).
     validation_extractor: Option<crate::validation_features::ValidationFeatureExtractor>,
+    /// Fallback validation extractor derived from the live taxonomy at first use,
+    /// for models whose config is missing `type_index_keys` but DO have a trained
+    /// validation branch. Without this, the branch is silently fed zeros — a model
+    /// trained on real validation pass-rates then mis-predicts (see the potion-8M
+    /// config bug). Lazily built because the taxonomy is only available at classify
+    /// time. `Some(None)` means derivation was attempted but the taxonomy dim did
+    /// not match `valid_dim` (branch correctly left zeroed).
+    derived_validation_extractor:
+        std::sync::OnceLock<Option<crate::validation_features::ValidationFeatureExtractor>>,
 }
 
 impl MultiBranchClassifier {
@@ -297,6 +306,7 @@ impl MultiBranchClassifier {
             model2vec,
             value_model2vec,
             validation_extractor,
+            derived_validation_extractor: std::sync::OnceLock::new(),
         })
     }
 
@@ -583,24 +593,70 @@ impl MultiBranchClassifier {
         Ok((label, *max_prob))
     }
 
+    /// Resolve the validation extractor for this column.
+    ///
+    /// Precedence: the config-pinned extractor (`type_index_keys`) if present —
+    /// that decouples inference from taxonomy version and is the intended path.
+    /// Otherwise, if the model HAS a trained validation branch but the config is
+    /// missing `type_index_keys`, derive the extractor from the live taxonomy
+    /// (cached on first use). This prevents the branch from being silently fed
+    /// zeros — a model trained on real validation pass-rates then mis-predicts.
+    /// The derived order matches training, which built its features the same way
+    /// (`ValidationFeatureExtractor::new`), as long as the taxonomy ordering is
+    /// unchanged; guarded by a `valid_dim` match so a mismatched taxonomy leaves
+    /// the branch zeroed rather than scrambled.
+    fn resolve_validation_extractor(
+        &self,
+        taxonomy: Option<&Taxonomy>,
+    ) -> Option<&crate::validation_features::ValidationFeatureExtractor> {
+        if let Some(ext) = &self.validation_extractor {
+            return Some(ext);
+        }
+        // No pinned keys. Only derive when a trained validation branch exists.
+        self.validation_branch.as_ref()?;
+        let tax = taxonomy?;
+        self.derived_validation_extractor
+            .get_or_init(|| {
+                let ext = crate::validation_features::ValidationFeatureExtractor::new(tax);
+                if ext.dim() == self.config.valid_dim {
+                    tracing::warn!(
+                        "config.type_index_keys missing; deriving validation order from live \
+                         taxonomy ({} types). Persist type_index_keys in the model config to pin it.",
+                        ext.dim()
+                    );
+                    Some(ext)
+                } else {
+                    tracing::warn!(
+                        "config.type_index_keys missing and live taxonomy dim {} != valid_dim {}; \
+                         validation branch left zeroed.",
+                        ext.dim(),
+                        self.config.valid_dim
+                    );
+                    None
+                }
+            })
+            .as_ref()
+    }
+
     /// Compute validation features as a tensor, if the model has a validation branch.
     ///
-    /// Returns `Some(Tensor)` of shape `[1, valid_dim]` when the model has a
-    /// validation extractor and a taxonomy is provided. Returns `None` otherwise
-    /// (v11 models or when taxonomy is unavailable — forward_trunk fills zeros).
+    /// Returns `Some(Tensor)` of shape `[1, valid_dim]` when a validation extractor
+    /// resolves (config-pinned or taxonomy-derived) and a taxonomy is provided.
+    /// Returns `None` otherwise (v11 models or when taxonomy is unavailable —
+    /// forward_trunk fills zeros).
     fn compute_validation_tensor(
         &self,
         value_refs: &[&str],
         taxonomy: Option<&Taxonomy>,
         device: &Device,
     ) -> Result<Option<Tensor>, InferenceError> {
-        let extractor = match (&self.validation_extractor, taxonomy) {
+        let (extractor, tax) = match (self.resolve_validation_extractor(taxonomy), taxonomy) {
             (Some(ext), Some(tax)) => (ext, tax),
             _ => return Ok(None),
         };
 
-        let feats = extractor.0.extract(value_refs, extractor.1);
-        let t = Tensor::from_slice(&feats, (1, extractor.0.dim()), device)
+        let feats = extractor.extract(value_refs, tax);
+        let t = Tensor::from_slice(&feats, (1, extractor.dim()), device)
             .map_err(|e| InferenceError::InvalidPath(format!("validation tensor: {e}")))?;
         Ok(Some(t))
     }

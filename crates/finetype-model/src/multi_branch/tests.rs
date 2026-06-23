@@ -32,6 +32,40 @@ fn test_config_deserialization() {
 }
 
 #[test]
+fn test_config_validation_branch_without_type_index_keys() {
+    // A config with a trained validation branch but NO type_index_keys (the
+    // potion-8M training-pipeline bug). It must deserialise with an enabled
+    // validation branch and EMPTY type_index_keys — the precondition for the
+    // taxonomy-derived fallback in resolve_validation_extractor (without which
+    // the branch is silently fed zeros and the model mis-predicts).
+    let json = r#"{
+            "char_dim": 960,
+            "embed_dim": 1024,
+            "stats_dim": 27,
+            "header_dim": 128,
+            "char_hidden": [450, 450],
+            "embed_hidden": [300, 300],
+            "stats_hidden": [192, 96],
+            "header_hidden": [192, 96],
+            "valid_dim": 244,
+            "valid_hidden": [192, 128],
+            "merge_hidden": [750, 750],
+            "n_classes": 244,
+            "dropout": 0.35,
+            "head_type": "Flat",
+            "activation": "ReLU",
+            "use_layer_norm": false
+        }"#;
+    let config: MultiBranchConfig = serde_json::from_str(json).unwrap();
+    assert!(config.has_validation_branch());
+    assert_eq!(config.valid_dim, 244);
+    assert!(
+        config.type_index_keys.is_empty(),
+        "missing type_index_keys must default to empty so the taxonomy-derived fallback fires"
+    );
+}
+
+#[test]
 fn test_config_deserialization_with_header() {
     let json = r#"{
             "char_dim": 960,
