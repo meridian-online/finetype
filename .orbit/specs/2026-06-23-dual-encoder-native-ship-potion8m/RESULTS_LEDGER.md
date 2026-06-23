@@ -160,3 +160,39 @@ Targets, in impact order:
 
 **Not pursued:** ac-03 rule stack (14 triggers ≫ 4-rule cap); code-16M native re-run
 (offline 0.781 < potion-8M, and it shares the same data drift — would NO-GO too).
+
+## 6. Rule co-adaptation to v19 — quantified (2026-06-24)
+
+**The wall to beating v19 composed is the v19-tuned Sharpen layer, not the embeddings.**
+
+Raw→composed transition grid on gold (reframe, n=927; raw = pure model argmax,
+no veto/Sharpen):
+
+| model | raw acc | composed | FIX | BREAK | net lift |
+|---|---|---|---|---|---|
+| v19 | 0.471 | 0.797 | 335 | 33 | **+302** |
+| potion-8M | 0.520 | 0.794 | 295 | 41 | **+254** |
+
+potion-8M's *raw* model is more accurate (0.520 vs 0.471, ~+45 cols), but the
+deterministic layer gives v19 **48 more columns of net lift** — which cancels the raw
+lead, yielding the composed tie (~3-col gap). The rules convert v19's errors better.
+
+**Per-rule attribution of the gap (gold; small-sample, directional):**
+- *Rules that recover v19 but not potion-8M:* `veto_fallback:id` (5), `veto:hash` (5).
+- *Rules that BREAK potion-8M (right→wrong) but not v19:* `header_hint_cross_domain`
+  (link_id/state, 6), `veto:alphanumeric_id` (3), + singletons. 14 cols total.
+
+So the co-adaptation is **real but localized to a handful of rules**, not broad. The
+header-hint and alphanumeric_id-veto rules misfire on potion-8M's (different, correct)
+raw predictions and turn them wrong.
+
+**Implication / path to BEAT v19:** potion-8M's raw Sense already wins; re-fitting the
+~dozen co-adapted rules to its error distribution (fix the header-hint/alnum-veto
+misfires, port what veto_fallback:id+hash do for v19) would push composed past v19's
+0.798 — a tractable rule edit, not an architecture rebuild. This is separate from the
+SHIP blocker (corpus over-emissions: user_agent/currency_code generators).
+
+**Architecture note:** the embed aggregation is a *shared* ceiling (v19 aggregates
+identically; gte-tiny clean-slate pools too). Per-value cross-attention (orig Sense,
+sense.rs) is the only untested representation path — but given the co-adaptation
+finding, re-fitting rules is the cheaper first lever to actually beat v19.
