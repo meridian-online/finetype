@@ -1,0 +1,121 @@
+id: 2026-06-23-dual-encoder-native-ship-potion8m
+goal: |
+  Ship **potion-8M** as the reproducible, 244-label default Sense model that finally retires
+  v19 — via **dual-encoder native inference** (the binary loads potion-4M for the header/
+  classifier paths AND potion-8M for the value-aggregation branch), gated by the BLOCKING
+  corpus-honest gate plus principled value-rule fixes for whatever relocations it surfaces.
+
+  ## Why now — what the 2026-06-21 spec established (read those memories first)
+  - **v19 is a dead-end as the reference**: 240-label (can't predict the live 244 taxonomy's new
+    leaves) AND unreproducible. Every experiment gated against it stalls the roadmap. The default
+    MUST become reproducible + full-taxonomy. (CLAUDE.md architectural direction; [[fresh-retrain-penalty-was-44-stats]])
+  - **The embed frontier is closed** (ac-02, [[static-embed-frontier-topped-out]]): static Sense is
+    capped ~0.52; composed is RULE-bound, not embed-bound. No embedding beats v19 composed. So this
+    is NOT an accuracy bet — it is a **reproducibility + full-taxonomy** bet at composed parity.
+  - **potion-8M is the chosen candidate** ([[potion8m-beats-code16m-pick]]): gold composed 0.794
+    (ties v19 0.793) > code-16M 0.776; directional relocation slightly favors it; code-16M's
+    format-teacher bet failed. Sense 0.522 > v19 0.502, latency ~free (static).
+  - **m2v-244 (potion-4M) is NOT shippable** ([[m2v244-corpus-nogo-gold-reproducible-not-corpus-faithful]]):
+    gold-reproducible but a corpus-honest NO-GO (numeric_code collapse 59k->238, isbn/npi collapse,
+    si_number/file_size over-emit). Gold-reproducible != corpus-faithful — the fresh-retrain pipeline
+    drifted from v19's corpus behaviour in ways only the corpus gate sees.
+  - **There is NO faithful offline gate** ([[offline-gate-needs-composed-not-raw-sense]]): the
+    validation veto lives only in the native `finetype profile` pipeline. predict_multibranch is raw
+    pre-veto Sense (0 unknowns); FINETYPE_INJECT_LABEL composes Sharpen but NOT the veto (0 unknowns
+    vs native's 13%). So testing potion-8M faithfully REQUIRES native inference = the dual-encoder
+    work = the same work needed to ship. Testing and shipping have converged.
+
+  ## The bet
+  potion-8M trained with a 1024-dim potion-8M value embed + a 128-dim potion-4M header embed (the
+  builder only swapped the value branch). The binary loads ONE shared model2vec. So native potion-8M
+  needs the binary to load TWO model2vec resources — potion-4M (header + semantic/entity/sense
+  classifiers) and potion-8M (value-aggregation) — plus EMBED_DIM/EMBED_AGG_DIM handling for the
+  1024-dim value agg. Once native, potion-8M is gated like any candidate; relocations are fixed with
+  principled value-based rules (decision 0048/0096), and the bundle ships if it clears the blocking
+  corpus-honest gate at composed parity with v19.
+
+  ## Pillar defence
+  Pillars 1 + 4: a reproducible, full-taxonomy default is the prerequisite for ALL future Sense work
+  (the v19 dead-end is the binding constraint). The Precision Principle: rule fixes must be genuine
+  value-based type semantics that transfer across models, not per-model patches.
+
+  ## Risk / halt conditions
+  - Native potion-8M gold composed must reproduce the offline 0.794 (within tolerance). If native
+    composition diverges, STOP and diagnose before gating (the native path differs from offline).
+  - If clearing the corpus-honest gate needs a large stack of vetoes (fragility, against 0038), STOP:
+    that signals the data/recipe drift should be fixed (so the fresh model is corpus-clean by
+    construction) rather than papered over with rules. Threshold to revisit: > ~4 new rules.
+  - Dual-encoder touches the load-bearing every-profile-call inference path: B07 audit + H02 verify
+    are mandatory; no rushed merge.
+cards:
+- 0002-semantic-type-detection
+status: open
+labels:
+- architecture
+- embed-branch
+- model2vec
+- ship
+- dual-encoder
+acceptance_criteria:
+- id: ac-00
+  description: |
+    B07 AUDIT + DUAL-ENCODER DESIGN. Enumerate every consumer of `models/model2vec` and the
+    EMBED_DIM/EMBED_AGG_DIM consts: the value-aggregation branch (extract_embedding_aggregation,
+    main.rs:1464), the header branch (128-dim header embed, shares the same resource), and the
+    semantic/entity/sense classifiers (model2vec_shared). Decide the mechanism: a SECOND
+    Model2VecResources for the value branch selected by a model-config field (e.g. value_embed_model),
+    keeping potion-4M for header+classifiers; and how EMBED_DIM 128->256 / EMBED_AGG_DIM 512->1024 is
+    handled (config-driven vs const — must not break the 128-dim header or the other classifiers).
+    DELIVERABLE: the consumer graph + the edit set + the config-schema change + the dim-handling
+    decision. Use codegraph (codegraph_impact/codegraph_callers) per CLAUDE.md.
+  ac_type: doc
+  gate: true
+  checked: false
+- id: ac-01
+  description: |
+    IMPLEMENT DUAL-ENCODER NATIVE INFERENCE. Per ac-00's design: the binary loads potion-4M (header +
+    semantic/entity/sense) AND potion-8M (value-aggregation, 1024-dim agg); the value-embed model is
+    config-selected so v19/m2v-244 (single potion-4M) still load unchanged. Place the potion-8M
+    artifact; set potion-8M's config value_embed_model + embed_dim 1024. VERIFY: `FINETYPE_MODEL=
+    models/m2v8m-s44 finetype profile` runs natively; native gold composed reproduces the offline
+    0.794 within tolerance AND native Sense ~= 0.522 (else HALT + diagnose); the header branch and
+    the other classifiers are unaffected (v19 still profiles identically). Tests + B07 + `clippy -D
+    warnings` + `cargo test` green.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-02
+  description: |
+    NATIVE CORPUS-HONEST GATE on potion-8M — the real, faithful GO/NO-GO vs v19 (replaces the invalid
+    offline gate). Run `gittables_corpus_pass` natively (FINETYPE_MODEL=potion-8M) over the ac-01
+    stratified sample, then `corpus_honest_gate.py` vs the stable v19_gated oracle (categorical->word
+    remap). DELIVERABLE: the verdict + the trigger list, classified shared-collapse vs over-emit. This
+    is BLOCKING (H05). Expectation from the directional offline read: numeric_code/isbn/npi collapse +
+    some over-emits; the rules in ac-03 must clear the blocking ones.
+  ac_type: observation
+  gate: true
+  checked: false
+- id: ac-03
+  description: |
+    PRINCIPLED RULE FIXES for the gate's blocking triggers, then re-gate to GO. Start with the
+    leading-zero numeric_code promotion rule (banked task t-0000a86b: integer_number -> numeric_code
+    when leading-zero ratio >= 0.5 AND fixed-width all-digit; the biggest shared collapse, helps every
+    model incl v19). Add value-based rules (0048/0096) for remaining blocking triggers — each with a
+    kill switch + deterministic-layer ledger entry + both-sides evidence. Re-run the native
+    corpus-honest gate until GO AND composed improve-or-hold vs v19 on gold + rare-type scoreboard.
+    HALT if > ~4 new rules are needed (fragility -> fix data drift instead). DELIVERABLE: the rules +
+    composed-hold evidence + the GO verdict.
+  ac_type: code
+  gate: true
+  checked: false
+- id: ac-04
+  description: |
+    SHIP. If native potion-8M + rules clears the corpus-honest gate (GO) AND composed holds vs v19 on
+    gold (+ representative advisory) AND the rare-type scoreboard is clean: package (skill `package`),
+    upload to HuggingFace, swap `models/default` -> potion-8M, version bump, CHANGELOG, update count
+    surfaces + a latency note, and update CLAUDE.md (v19 retired -> potion-8M is the shipped default).
+    This is the swap that retires v19 and unblocks the roadmap. Else: documented fallback (stay on v19;
+    the next bet is fixing the fresh-retrain data drift so a reproducible model is corpus-clean).
+  ac_type: observation
+  gate: true
+  checked: false
