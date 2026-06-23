@@ -96,12 +96,14 @@ def main():
 
     preds = {tag: [] for tag, _ in encoders}   # (file_path, column_name, label)
     done = 0
+    # One pool for the whole run — created INSIDE the loop respawns 8 workers per batch
+    # and deadlocked the feed on the first large batch. Hoisted out: workers stay warm.
+    ex = ProcessPoolExecutor(max_workers=a.jobs)
     for start in range(0, len(table_items), a.batch_tables):
         batch = table_items[start:start + a.batch_tables]
         # Parallel base-feature extraction (process pool → real parallelism on json.loads).
         flat = [(fp, cn, vals) for fp, cols in batch for cn, vals in cols]
-        with ProcessPoolExecutor(max_workers=a.jobs) as ex:
-            results = list(ex.map(_extract_one, flat, chunksize=64))
+        results = list(ex.map(_extract_one, flat, chunksize=64))
 
         # Per potion, assemble a table-grouped sub-FTMB and predict.
         by_table = defaultdict(list)
@@ -139,6 +141,7 @@ def main():
                         preds[tag].append((fp, cn, p[1]))
         done += len(batch)
         print(f"[offline-gate] {done}/{len(table_items)} tables done")
+    ex.shutdown()
 
     for tag, _ in encoders:
         rows = preds[tag]

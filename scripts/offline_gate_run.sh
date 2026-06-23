@@ -21,7 +21,7 @@ echo "── Build both candidates' predictions (shared extract pass) — $(date
 "$PY" scripts/offline_corpus_gate.py --source "$SRC" \
   --potion minishlab/potion-base-8M:m2v8m \
   --potion minishlab/potion-code-16M:m2v-code16m \
-  --out-dir "$OUT" --jobs 8
+  --out-dir "$OUT" --jobs 8 --batch-tables 500
 
 for tag in m2v8m m2v-code16m; do
   echo ""; echo "── Corpus-honest gate: $tag — $(date) ──"
