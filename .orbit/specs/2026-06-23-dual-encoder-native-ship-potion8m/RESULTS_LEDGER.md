@@ -82,10 +82,28 @@ far past the ~4-rule cap → per spec, fix the data drift, don't paper over.
 | identity.person.last_name | 2.0× | |
 | + docker_ref, coordinates, alphanumeric_id, version, username, currency_code, country | 1.4–2× | |
 
-**Root cause:** fresh-retrain data/recipe drift — the SAME signature as m2v-244
-(numeric_code/isbn/si_number). m2v-244's config HAD type_index_keys, so its NO-GO
-was real, not this bug — confirming the drift is in the data blend, inherited by
-potion-8M. Gold-reproducible ≠ corpus-faithful.
+**Root cause (investigated 2026-06-24 — NOT worse data):** v19 and potion-8M train on
+the *identical* recipe — `build_ftmb_v5_potion` literally reuses a constant named
+`V19_ARGS` (same `distillation-v3` corpus, same `data/label_remap.json`, same
+1200/0.7/600 blend, same hard-negatives, format v4). The human distilled corpus is
+Sherlock-78 (`artist`, `city`, `name`…); the collapsed taxonomy types come from
+**synthetic generation** (`finetype generate`, `--synthetic-columns 1200`).
+
+The numeric_code collapse is a **synthetic-generator flaw, not drift**: 92% of generated
+`numeric_code` values are plain all-digit integers (`356`, `7130`, `580`) — only 8% carry
+the leading-zero signal that defines the type. They are indistinguishable from
+`integer_number`. A fresh flat softmax cannot carve out a class whose examples are 92%
+identical to a larger neighbour, so it collapses numeric_code → integer_number. This is
+decision 0096 (residual/attractor types are rule-shaped, not trainable into flat softmax).
+v19 emitting numeric_code (59k, only ~12% oracle-confirmed) is the *anomaly* — a quirk of
+its specific unreproducible historical weights, and imprecise at that.
+
+**Implication:** the fix for numeric_code is the deterministic leading-zero RULE
+(t-0000a86b), not better data — and it helps v19 too. The other triggers (user_agent 7.2×
+over-emit, isbn collapse, si_number over-emit) likely have the same generator-quality
+root cause and need the same audit. So "fix the data drift" is more precisely **"audit the
+synthetic generators + add value-based rules for the attractor types,"** NOT "v19 had better
+data" (it didn't — it's the same data).
 
 ## 4. Bugs found & fixed this spec
 
