@@ -270,3 +270,14 @@ gate when it false-alarmed (text-vocab NO-GO→GO).
 **Remaining to ship potion-8M:** decide user_agent (rule vs accept-as-documented vs retrain),
 gold-adjudicate the remaining triggers, then the deliberate release (package → HF → swap →
 version → CHANGELOG → CLAUDE.md). The release is a reviewed action, not auto-fired.
+
+## 10. SHIPPED — v0.6.36 (2026-06-24)
+
+potion-8M (m2v8m-s43) is the default, **v19 retired**. ac-04 dual-encoder distribution
+built + verified: build.rs embeds the value encoder, from_bytes loads it (embedded binary
+runs with no disk models), download-model.sh fetches it. HF upload (5 files) verified; CI
+green on main (Linux build + download + drift check); binary release v0.6.36 — all 5
+platforms green (incl. Windows MSVC + macOS), GitHub release + Homebrew + install site
+updated. Gated by gold parity (0.794 ≈ 0.797) + gold-adjudicated relocation review (choice
+0104), currency_code ISO-4217 fix, type-key fallback. Residual short-code/user_agent
+over-emission → follow-up retrain (t-000133e418).

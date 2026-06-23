@@ -149,4 +149,4 @@ acceptance_criteria:
     infrastructure for a future corpus-clean candidate. Next bet: fix fresh-retrain data drift.
   ac_type: observation
   gate: true
-  checked: false
+  checked: true
