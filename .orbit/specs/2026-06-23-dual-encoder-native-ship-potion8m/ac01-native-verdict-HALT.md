@@ -1,3 +1,12 @@
+> **SUPERSEDED 2026-06-23 — this HALT was a FALSE ALARM.** The −11pp was a
+> training-pipeline config bug (missing `type_index_keys` zeroed the validation
+> branch at native inference), not a model regression. Fixed in commit fb44b26.
+> Corrected verdict: potion-8M native composed best-of-3 = 0.794, ties v19 0.797.
+> See **ac01-native-verdict.md**. The veto/data-drift reasoning below is WRONG;
+> kept only for the audit trail.
+
+---
+
 # ac-01 — Dual-encoder native: implemented and verified. potion-8M HALTS at the native gate.
 
 **Date:** 2026-06-23 · spec 2026-06-23-dual-encoder-native-ship-potion8m

@@ -51,25 +51,24 @@ cards:
 - 0002-semantic-type-detection
 status: open
 resolution: |
-  HALT at ac-01 (2026-06-23). The dual-encoder native path was built and verified
-  byte-faithful (value features match offline potion_embed to 7+ sig figs; matrix ==
-  HF potion-base-8M; encode == model2vec cos 1.0000) — ac-00 + ac-01 implementation
-  DELIVERED and KEPT. But the native gold gate FAILED its halt: faithful native
-  composed best-of-3 = 0.690 vs v19 native 0.797 (−11pp). The offline 0.794 "tie"
-  was an artifact of compose_predictions skipping the validation veto. potion-8M
-  over-asserts into types its values fail to validate (fresh-retrain data drift,
-  same root cause as the m2v-244 corpus NO-GO). ac-02/03/04 NOT pursued: corpus gate
-  would be NO-GO; the gap is far past the ~4-rule cap. Fallback taken: STAY ON v19.
-  Real next bet = fix the fresh-retrain data/recipe drift (a NEW spec), then reuse
-  the proven dual-encoder if a bigger value encoder is still wanted. See
-  ac01-native-verdict-HALT.md + memory potion8m-native-halt-veto-exposes-drift.
+  ac-00 + ac-01 DONE (2026-06-23). Dual-encoder native inference built and verified
+  byte-faithful (value features == offline potion_embed; matrix == HF potion-base-8M;
+  encode == model2vec cos 1.0000). The native gold gate initially looked like a −11pp
+  HALT, but that was a FALSE ALARM from a training-pipeline config bug: potion configs
+  were missing type_index_keys, so native silently zeroed the validation branch while
+  the model was trained on real validation features. Fixed (commit fb44b26: derive the
+  key order from the live taxonomy when absent). CORRECTED result: native gold composed
+  best-of-3 = 0.794, TIES v19 0.797 (within CI), reproducing the offline number.
+  potion-8M is a live candidate. NEXT: ac-02 native corpus-honest gate (the real
+  blocking GO/NO-GO). The m2v-244 corpus NO-GO is now suspect (same bug) and must be
+  re-checked before its drift conclusion stands. See ac01-native-verdict.md + memory
+  potion8m-native-halt-veto-exposes-drift (corrected).
 labels:
 - architecture
 - embed-branch
 - model2vec
 - ship
 - dual-encoder
-- halt
 acceptance_criteria:
 - id: ac-00
   description: |
@@ -97,10 +96,10 @@ acceptance_criteria:
     0.794 within tolerance AND native Sense ~= 0.522 (else HALT + diagnose); the header branch and
     the other classifiers are unaffected (v19 still profiles identically). Tests + B07 + `clippy -D
     warnings` + `cargo test` green.
-    DONE (implementation) + HALT (verification): dual-encoder built, value features byte-faithful
-    to offline; v19 profiles identically (None path). But native gold composed = 0.690 best-of-3
-    (NOT 0.794) vs v19 0.797 — HALT fired. See ac01-native-verdict-HALT.md. Implementation KEPT;
-    potion-8M not shippable.
+    DONE: dual-encoder built; value features byte-faithful to offline; v19 profiles identically.
+    Native gold composed best-of-3 = 0.794, TIES v19 0.797 (within CI). The initial −11pp HALT was a
+    config bug (missing type_index_keys zeroed the validation branch), fixed in fb44b26. See
+    ac01-native-verdict.md.
   ac_type: code
   gate: true
   checked: true
@@ -112,8 +111,9 @@ acceptance_criteria:
     remap). DELIVERABLE: the verdict + the trigger list, classified shared-collapse vs over-emit. This
     is BLOCKING (H05). Expectation from the directional offline read: numeric_code/isbn/npi collapse +
     some over-emits; the rules in ac-03 must clear the blocking ones.
-    NOT PURSUED (HALT at ac-01): would be NO-GO (m2v-244 same recipe already is; potion-8M shows
-    the same drift on native gold). No corpus pass spent.
+    ACTIVE — this is now the real next step (the ac-01 HALT was a false alarm). Run on the FIXED
+    potion-8M config. The m2v-244 NO-GO that suggested "would be NO-GO" is itself suspect (same
+    type_index_keys bug) and must be re-checked.
   ac_type: observation
   gate: true
   checked: false
@@ -127,9 +127,9 @@ acceptance_criteria:
     corpus-honest gate until GO AND composed improve-or-hold vs v19 on gold + rare-type scoreboard.
     HALT if > ~4 new rules are needed (fragility -> fix data drift instead). DELIVERABLE: the rules +
     composed-hold evidence + the GO verdict.
-    NOT PURSUED (HALT at ac-01): an 11pp gold gap from systematic over-assertion is far past the
-    ~4-rule cap; spec says fix the data drift instead. The leading-zero numeric_code rule (t-0000a86b)
-    remains a banked, model-agnostic improvement for a future data-drift spec.
+    PENDING ac-02. The 11pp "gap" was a config bug, not over-assertion; rule needs reassessed once
+    the corpus gate runs on the fixed model. The leading-zero numeric_code rule (t-0000a86b) remains a
+    banked, model-agnostic improvement regardless.
   ac_type: code
   gate: true
   checked: false
@@ -141,8 +141,8 @@ acceptance_criteria:
     surfaces + a latency note, and update CLAUDE.md (v19 retired -> potion-8M is the shipped default).
     This is the swap that retires v19 and unblocks the roadmap. Else: documented fallback (stay on v19;
     the next bet is fixing the fresh-retrain data drift so a reproducible model is corpus-clean).
-    FALLBACK TAKEN (HALT at ac-01): STAY ON v19. potion-8M not shipped. The dual-encoder is kept as
-    proven infrastructure for a future corpus-clean value-encoder candidate.
+    PENDING ac-02. potion-8M ties v19 on gold and is a live ship candidate; the corpus-honest gate
+    decides GO/NO-GO. Dual-encoder is built and proven.
   ac_type: observation
   gate: true
   checked: false
