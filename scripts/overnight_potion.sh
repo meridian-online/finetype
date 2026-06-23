@@ -105,6 +105,25 @@ PYGATE
     "$BIN" train-multi-branch --data "$FTMB" --output "$OUT" --model-config "$CONFIG" \
       --epochs "$EPOCHS" --batch-size 32 --lr 0.0001 --weight-decay 0.0001 --dropout 0.35 \
       --seed "$S" --head flat --patience 15
+
+    # Post-train: inject type_index_keys (label-order contract for the validation
+    # branch at inference). WITHOUT this the native classifier feeds the validation
+    # branch zeros and mis-predicts — the bug that made potion-8M look like an 11pp
+    # gold regression. Mirrors overnight_m2v_244.sh. (finetype now also derives this
+    # from the live taxonomy as a fallback, but persisting pins the order.)
+    SAVED_CONFIG="$OUT/config.json"
+    if [[ -f "$SAVED_CONFIG" ]] && ! grep -q '"type_index_keys"' "$SAVED_CONFIG"; then
+      TYPE_KEYS=$(echo '["test"]' | "$BIN" extract-features --json --header "test" --validation 2>/dev/null | \
+        "$PY" -c "import json,sys; print(json.dumps(json.load(sys.stdin)['type_index_keys']))" 2>/dev/null)
+      if [[ -n "$TYPE_KEYS" && "$TYPE_KEYS" != "null" ]]; then
+        "$PY" -c "
+import json
+c=json.load(open('$SAVED_CONFIG')); c['type_index_keys']=json.loads('''$TYPE_KEYS''')
+json.dump(c,open('$SAVED_CONFIG','w'),indent=2); open('$SAVED_CONFIG','a').write('\n')
+print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')
+"
+      fi
+    fi
   done
 fi
 
