@@ -105,6 +105,33 @@ root cause and need the same audit. So "fix the data drift" is more precisely **
 synthetic generators + add value-based rules for the attractor types,"** NOT "v19 had better
 data" (it didn't — it's the same data).
 
+### Re-reading the NO-GO triggers by trust level (2026-06-24)
+
+Prompted by "numeric codes have partial leading-zero coverage" — investigating the real
+population flipped the headline trigger:
+
+- **numeric_code collapse is largely an ORACLE ARTIFACT, not a regression.** Of the 5,342
+  oracle-"confirmed" numeric_code cols, **0% have any leading zero and 88% are headed `id`**
+  (sequential integers like 2038329, 2038328…). v19 was OVER-emitting numeric_code onto
+  integer ID columns; potion-8M correctly declines. The gate's "collapse" counts that as a
+  loss because the referee is gated-YDF, which CLAUDE.md says is 42%-wrong on contested
+  ground and must not adjudicate without a gold cross-check (numeric_code's validator passes
+  any digit string → rubber-stamps the over-emission). The leading-zero rule wouldn't fire
+  here (0% leading zeros) and shouldn't (they're IDs). **Discount numeric_code.**
+- **The NO-GO survives on the OVER-EMIT side.** 11 over-emit/oracle_fp triggers (oracle-AWARE,
+  the trustworthy band) — potion-8M over-asserts `user_agent` 7.2×, `username` 3.4×,
+  `currency_code` 3.2×, `version` 2.9×, `si_number` 2.5×, etc. These are CREATED false
+  positives, still ≫4, and a real defect. So the problem is **over-emission of synthetic
+  types**, not "lost numeric_code."
+- `isbn` collapse (1,733) is more credible than numeric_code (real checksum validator) —
+  worth a gold check. `compact_ymd` (611) minor.
+
+**Refined fix direction:** the real defect is the fresh retrain **over-emitting** a cluster
+of synthetic types (user_agent/username/currency_code/version/si_number). That points at the
+synthetic *generators* for those types (too-broad examples → over-prediction), not a
+numeric_code recovery problem. Audit those generators first; numeric_code is a separate,
+precision-safe rule (t-0000a86b) for the genuine leading-zero/header-driven codes.
+
 ## 4. Bugs found & fixed this spec
 
 | bug | symptom | fix (commit) |
