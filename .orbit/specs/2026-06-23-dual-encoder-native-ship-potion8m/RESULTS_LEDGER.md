@@ -196,3 +196,33 @@ SHIP blocker (corpus over-emissions: user_agent/currency_code generators).
 identically; gte-tiny clean-slate pools too). Per-value cross-attention (orig Sense,
 sense.rs) is the only untested representation path — but given the co-adaptation
 finding, re-fitting rules is the cheaper first lever to actually beat v19.
+
+## 7. Rule re-fit traced to mechanism — it's gold-only, doesn't ship (2026-06-24)
+
+Traced the 14 potion-8M gold breaks to their exact rule: **every one is a deprecated
+hardcoded header hint (or veto) overriding a CORRECT value-based model prediction**:
+- `link_id`/`episode_url_id` → forced to `url` (values are `msg…`/`BV1…` IDs)
+- `state` → forced to `geography.state` (values are `"Static"`, a status field)
+- `BenchmarkName`/`coord_id` → alphanumeric_id *vetoed* to unknown (they ARE alnum IDs)
+
+This is decision 0042 biting: hints override on column *name*, ignoring *values*. And it
+penalises strong models more — potion-8M's raw is right more often (0.520 vs 0.471), so the
+blind override clobbers correct answers more often. Real co-adaptation, confirmed at column
+level. The principled fix (gate header hints by value-consistency / model confidence) aligns
+with 0042/0048 and removes a structural penalty on any strong model.
+
+**BUT — two findings cap its value:**
+1. **Gold-only & within noise.** Recovers ~14 cols / 927 ≈ +1.5pp (potion 0.794 → ~0.81),
+   inside the ±3pp gold CI. Confirms the thesis; not a significant "beat v19."
+2. **Does NOT unblock shipping.** The corpus over-emissions (the actual blocking gate) are
+   **raw-model, not header-hint**: profiling shows `currency_code`→UDP/TCP/EDT and
+   `user_agent`→prose fire with "(no rule — raw model)". Those are the model over-asserting
+   (3-letter attractor; free-text→UA), fixable only by RETRAIN (generator/negative changes),
+   not by the rule layer. The header-hint fix touches none of them.
+
+**Conclusion:** the rule re-fit confirmed the co-adaptation but is the wrong lever for
+shipping. The ship blocker is raw-model over-emission → the real next step is a retrain with
+fixed synthetic generators / hard-negatives for the over-emitted types. The header-hint
+value-consistency guard remains a worthwhile *standalone* cleanup (0042-aligned, un-penalises
+strong models) but it's gold-only and load-bearing on v19, so it should be its own gold-gated
+change, not bundled with the ship push.
