@@ -28,6 +28,7 @@ ENVSUBST_VARS  := '$$EXTENSION_PATH $$EVAL_OUTPUT $$SOTAB_DIR $$SOTAB_SPLIT'
 setup:
 	@if command -v rustup >/dev/null 2>&1; then \
 		rustup update stable; \
+		rustup component add rustfmt clippy; \
 	elif command -v brew >/dev/null 2>&1; then \
 		brew upgrade rust 2>/dev/null || true; \
 	fi

@@ -1,3 +1,9 @@
 [toolchain]
 channel = "1.94.1"
-components = ["rustfmt", "clippy"]
+# minimal profile: the toolchain auto-install triggered by `cargo build` pulls
+# only rustc/cargo/rust-std — NOT clippy/rustfmt. This keeps the DuckDB
+# community-extensions Windows build from hitting a rustup clippy-component
+# conflict (the runner image ships a cargo-clippy.exe that collides with the
+# component install). Lint tooling is added explicitly where it is run:
+# CI fmt/clippy jobs (.github/workflows/ci.yml) and local dev (`make setup`).
+profile = "minimal"

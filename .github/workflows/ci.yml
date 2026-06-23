@@ -35,7 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: rustup show # installs toolchain + components from rust-toolchain.toml
+      - run: rustup show # installs the minimal toolchain from rust-toolchain.toml
+      - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check
 
   machete:
@@ -54,6 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: rustup show
+      - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
       - name: Download model from HuggingFace
         run: .github/scripts/download-model.sh
