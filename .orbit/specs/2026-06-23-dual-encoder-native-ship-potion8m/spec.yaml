@@ -59,10 +59,15 @@ resolution: |
   the model was trained on real validation features. Fixed (commit fb44b26: derive the
   key order from the live taxonomy when absent). CORRECTED result: native gold composed
   best-of-3 = 0.794, TIES v19 0.797 (within CI), reproducing the offline number.
-  potion-8M is a live candidate. NEXT: ac-02 native corpus-honest gate (the real
-  blocking GO/NO-GO). The m2v-244 corpus NO-GO is now suspect (same bug) and must be
-  re-checked before its drift conclusion stands. See ac01-native-verdict.md + memory
-  potion8m-native-halt-veto-exposes-drift (corrected).
+  potion-8M is a live candidate on gold. ac-02 corpus-honest gate (faithful, correct
+  binary + working validation branch + categorical→word remap): **NO-GO, 14 triggers**
+  — numeric_code collapse (7,014 confirmed→0), isbn collapse, user_agent 7.2× over-emit,
+  si_number/compact_dmy/etc. Far past the ~4-rule cap → per spec, fix the DATA DRIFT, not
+  rules. Same signature as m2v-244 (whose config HAD the keys → its NO-GO was real, not
+  this bug; the drift is in the shared data blend). FINAL: potion-8M ties v19 on gold but
+  is corpus-honest NO-GO; **STAY ON v19**. Dual-encoder kept as proven infrastructure.
+  Real next bet = fix fresh-retrain data drift (task t-000133e418, premise now validated).
+  See RESULTS_LEDGER.md + ac01-native-verdict.md + memory potion8m-native-halt-veto-exposes-drift.
 labels:
 - architecture
 - embed-branch
@@ -111,12 +116,12 @@ acceptance_criteria:
     remap). DELIVERABLE: the verdict + the trigger list, classified shared-collapse vs over-emit. This
     is BLOCKING (H05). Expectation from the directional offline read: numeric_code/isbn/npi collapse +
     some over-emits; the rules in ac-03 must clear the blocking ones.
-    ACTIVE — this is now the real next step (the ac-01 HALT was a false alarm). Run on the FIXED
-    potion-8M config. The m2v-244 NO-GO that suggested "would be NO-GO" is itself suspect (same
-    type_index_keys bug) and must be re-checked.
+    DONE — NO-GO (faithful). 14 triggers post categorical→word remap: numeric_code collapse
+    (7,014 confirmed→0), isbn collapse, user_agent 7.2× over-emit, si_number/compact_dmy/last_name/
+    country/etc. Same signature as m2v-244 (real drift, not the config bug). See RESULTS_LEDGER.md.
   ac_type: observation
   gate: true
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     PRINCIPLED RULE FIXES for the gate's blocking triggers, then re-gate to GO. Start with the
@@ -127,9 +132,8 @@ acceptance_criteria:
     corpus-honest gate until GO AND composed improve-or-hold vs v19 on gold + rare-type scoreboard.
     HALT if > ~4 new rules are needed (fragility -> fix data drift instead). DELIVERABLE: the rules +
     composed-hold evidence + the GO verdict.
-    PENDING ac-02. The 11pp "gap" was a config bug, not over-assertion; rule needs reassessed once
-    the corpus gate runs on the fixed model. The leading-zero numeric_code rule (t-0000a86b) remains a
-    banked, model-agnostic improvement regardless.
+    NOT VIABLE — 14 triggers ≫ ~4-rule cap → per spec, fix the data drift, not rules. The leading-zero
+    numeric_code rule (t-0000a86b) is still independently worthwhile (biggest single collapse, helps v19).
   ac_type: code
   gate: true
   checked: false
@@ -141,8 +145,8 @@ acceptance_criteria:
     surfaces + a latency note, and update CLAUDE.md (v19 retired -> potion-8M is the shipped default).
     This is the swap that retires v19 and unblocks the roadmap. Else: documented fallback (stay on v19;
     the next bet is fixing the fresh-retrain data drift so a reproducible model is corpus-clean).
-    PENDING ac-02. potion-8M ties v19 on gold and is a live ship candidate; the corpus-honest gate
-    decides GO/NO-GO. Dual-encoder is built and proven.
+    FALLBACK TAKEN — STAY ON v19. potion-8M corpus-honest NO-GO. Dual-encoder kept as proven
+    infrastructure for a future corpus-clean candidate. Next bet: fix fresh-retrain data drift.
   ac_type: observation
   gate: true
   checked: false

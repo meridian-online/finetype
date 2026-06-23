@@ -5,7 +5,7 @@ profile` pipeline) unless marked offline. Raw predictions + per-type reports liv
 under `output/dual-encoder-native/` (gitignored, regenerable); this file is the
 tracked synthesis. Update it each time a gate runs.
 
-Last updated: 2026-06-23 (corpus-honest gate in progress).
+Last updated: 2026-06-23 (corpus-honest gate DONE — NO-GO).
 
 ## 1. Headline scoreboard — gold corpus (reframe, n≈927)
 
@@ -54,8 +54,38 @@ true positives), a recall problem, not a precision one.
 | gold-anchor / gold accuracy | efficacy + headline | DONE | potion-8M 0.794 ties v19 0.797 ✓ |
 | destination-drift (Sense dist vs v19) | advisory pre/post | DONE | 1 label over band: `technology.internet.user_agent` (advisory) |
 | representative accuracy | advisory | not yet run | — |
-| **corpus-honest gate (H05)** | **BLOCKING GO/NO-GO** | **RUNNING** | pending (33,250-file native pass) |
-| rare-type scoreboard | headline support | not yet run | — |
+| **corpus-honest gate (H05)** | **BLOCKING GO/NO-GO** | **DONE** | **NO-GO** — 14 real triggers (post categorical→word remap); 33,250 files, 7.6% err |
+| rare-type scoreboard | headline support | not run (NO-GO upstream) | — |
+
+### Corpus-honest gate — the faithful verdict (2026-06-23)
+
+**NO-GO.** Gold tie did NOT translate to corpus-clean. Run with the correct binary
+(post bd206f1) + working validation branch (post fb44b26) + categorical→word remap.
+This is the REAL verdict (the earlier config-bug run was an artifact). 14 triggers,
+far past the ~4-rule cap → per spec, fix the data drift, don't paper over.
+
+**Collapses (potion-8M loses v19-confirmed support):**
+
+| label | v19 marginal | cand marginal | confirmed v19→cand | meaning |
+|---|---|---|---|---|
+| representation.identifier.numeric_code | 59,157 | 463 | **7,014 → 0** | leading-zero codes collapse to integer_number (+327k) — the big one |
+| identity.commerce.isbn | 8,024 | 787 | 1,949 → 216 | isbn collapse |
+| datetime.date.compact_ymd | 1,987 | 943 | 1,408 → 797 | partial collapse |
+
+**Over-emits onto oracle-refuted columns (oracle_fp / over_emit):**
+
+| label | ratio (cand/v19) | note |
+|---|---|---|
+| technology.internet.user_agent | 7.2× | biggest over-emit (21k→151k) |
+| datetime.date.compact_dmy | 4.9× | also collapses sibling compact_ymd |
+| representation.numeric.si_number | 2.5× | shared with m2v-244 |
+| identity.person.last_name | 2.0× | |
+| + docker_ref, coordinates, alphanumeric_id, version, username, currency_code, country | 1.4–2× | |
+
+**Root cause:** fresh-retrain data/recipe drift — the SAME signature as m2v-244
+(numeric_code/isbn/si_number). m2v-244's config HAD type_index_keys, so its NO-GO
+was real, not this bug — confirming the drift is in the data blend, inherited by
+potion-8M. Gold-reproducible ≠ corpus-faithful.
 
 ## 4. Bugs found & fixed this spec
 
@@ -64,15 +94,24 @@ true positives), a recall problem, not a precision one.
 | potion training omitted `type_index_keys` | native zeroed validation branch → potion-8M looked −11pp | runtime taxonomy-derived fallback (fb44b26) + potion script persists keys (c2cda72) |
 | eval_rule.sh corpus pass used PATH `finetype` (stale 0.6.25) | corpus pass 100%-errored | pass `--finetype-bin "$BIN"` (bd206f1) |
 
-## 5. Open / next
+## 5. Conclusion & next
 
-- **Corpus-honest gate verdict** (running) — the blocking decision. If GO → potion-8M
-  can retire v19. If NO-GO → trigger list drives value-based rule fixes (ac-03), capped
-  at ~4 rules.
-- **Re-run code-16M native** with the fix (its 0.663 is invalid; offline 0.781 < potion-8M
-  so likely not the pick regardless).
-- **m2v-244 status:** its config HAS `type_index_keys`, so its earlier corpus NO-GO was
-  NOT this bug — likely a real potion-4M corpus regression. Not re-opened unless potion-8M
-  also NO-GOs (shared data blend).
-- **If we want to beat (not tie) v19:** target the §2 regressions — datetime epochs and
-  geography region/country recall.
+**potion-8M is NOT shippable: ties v19 on gold (0.794) but a corpus-honest NO-GO
+(14 triggers). v19 stays the default.** The dual-encoder works and is kept as proven
+infrastructure. This is the faithful conclusion — the blocking gate did its job.
+
+**The real bet (revived, now validated): fix the fresh-retrain data/recipe drift.**
+Task t-000133e418 — its premise is confirmed (real drift, not the config bug).
+Targets, in impact order:
+1. **numeric_code leading-zero collapse** (7,014 confirmed lost → integer). Banked rule
+   t-0000a86b (integer→numeric_code when leading-zero ratio ≥0.5 + fixed-width all-digit)
+   — model-agnostic, helps v19 too. Highest-value single fix.
+2. **user_agent over-emit 7.2×** — the largest over-assertion; diagnose why fresh retrains
+   over-predict it.
+3. **isbn / si_number** collapse+over-emit — shared with m2v-244, data-blend issue.
+4. The drift is in the **data recipe**, not the encoder — so a corpus-clean fresh model
+   is the prerequisite, after which the dual-encoder (if a bigger value encoder is still
+   wanted) is ready.
+
+**Not pursued:** ac-03 rule stack (14 triggers ≫ 4-rule cap); code-16M native re-run
+(offline 0.781 < potion-8M, and it shares the same data drift — would NO-GO too).
