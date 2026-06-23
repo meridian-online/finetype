@@ -167,8 +167,13 @@ echo ""; echo "── Candidate corpus pass (33k stratified sample) ──"
 rm -rf "$OUT/sample_pass"
 # shellcheck disable=SC1091
 source eval/gittables/.venv/bin/activate   # pyarrow/duckdb live here, not in system python3
+# --finetype-bin is REQUIRED: without it the corpus pass workers fall back to the
+# PATH `finetype` (often a stale installed release), not the freshly-built $BIN the
+# gold/drift steps use — a silent binary skew that 100%-errors the pass when the
+# installed binary's CSV reader is incompatible with the current duckdb CLI.
 FINETYPE_MODEL="$MODEL" python3 scripts/gittables_corpus_pass.py \
     --corpus-index "$SAMPLE_FILES" \
+    --finetype-bin "$BIN" \
     --execute --jobs 8 --out-dir "$OUT/sample_pass" || echo "  corpus pass failed"
 
 # ── 4. Corpus-honest gate (H05, BLOCKING — this is the verdict) ──────────────
