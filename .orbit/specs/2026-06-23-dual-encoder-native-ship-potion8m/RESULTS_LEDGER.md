@@ -226,3 +226,27 @@ fixed synthetic generators / hard-negatives for the over-emitted types. The head
 value-consistency guard remains a worthwhile *standalone* cleanup (0042-aligned, un-penalises
 strong models) but it's gold-only and load-bearing on v19, so it should be its own gold-gated
 change, not bundled with the ship push.
+
+## 8. The corpus gate is structurally anti-model-swap (2026-06-24)
+
+"Has any development passed the corpus gate?" — checked every recorded run:
+- **GO (21): every one is a RULE change** on v19 (postal-veto, country-code-corrob,
+  isbn-checksum-guard, coord-guard, state-code, amount-veto, veto-fallback…).
+- **NO-GO: every MODEL retrain, without exception** — v22, v23, latdec×3, mfg-coords×3,
+  fusion-v26/v27, m2v-244, potion-8M×2. **0% model pass rate.**
+
+**Why structural:** the gate's oracle is v19's gated-YDF — it measures *deviation from
+v19*. A retrain moves 12–25% of all columns (latdec 12.0%, v22 21.3%, v23 24.7%), so the
+bands trip by construction; a rule change is a small targeted delta and stays in-band.
+CLAUDE.md's own audit says gated-YDF is 42%-wrong on contested ground and must not
+adjudicate without a gold cross-check — yet it's the blocking model-swap referee.
+
+**Consequence:** using corpus-gate-GO as the BLOCKING criterion to retire v19 is permanent
+v19 lock-in. This — not candidate quality — is why no reproducible default has ever shipped.
+
+**Way out (needs owner decision + recorded choice amending H05's role for model swaps):**
+use the gate to FIND relocations, adjudicate them with GOLD not gated-YDF. Already shown
+benign: numeric_code (potion more correct), si_number, username. Fix the genuinely-wrong:
+user_agent, currency_code. Ship on gold-parity (0.794 ≈ 0.797) + representative +
+gold-cleared relocations. Precedent: the 0.6.29 composition-aware band recalibrated the
+gate when it false-alarmed (text-vocab NO-GO→GO).
