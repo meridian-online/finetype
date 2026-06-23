@@ -12,7 +12,7 @@ env:
   # CI's authoritative model name. Read only by .github/scripts/download-model.sh.
   # Propagates to every matrix leg automatically via workflow-level env.
   # See specs/2026-04-20-ci-decouple-default-symlink/spec.yaml.
-  FINETYPE_CI_MODEL: sherlock-v19-relu-s42
+  FINETYPE_CI_MODEL: m2v8m-s43
 
 jobs:
   build:
