@@ -64,6 +64,13 @@ pub struct MultiBranchConfig {
     /// after training get zero pass rates, types removed are ignored.
     #[serde(default)]
     pub type_index_keys: Vec<String>,
+    /// Optional path to a SECOND Model2Vec encoder used ONLY for the value-
+    /// aggregation branch (dual-encoder, e.g. potion-8M). Resolved relative to
+    /// the model dir first, then as a workspace/absolute path. When absent, the
+    /// value branch shares the header encoder (potion-4M) — backward compatible
+    /// with v19 and every single-encoder model.
+    #[serde(default)]
+    pub value_embed_model: Option<String>,
 }
 
 impl MultiBranchConfig {

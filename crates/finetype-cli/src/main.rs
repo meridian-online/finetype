@@ -2140,11 +2140,15 @@ fn load_multi_branch_classifier(model: &PathBuf) -> Result<finetype_model::Multi
                         "Multi-branch model requires Model2Vec resources but none found"
                     )
                 })?;
+                // Release-embedded single-encoder path: no separate value encoder
+                // (dual-encoder potion-8M ships via the disk/HF path; ac-04 extends
+                // this to embed the value encoder too).
                 return finetype_model::MultiBranchClassifier::from_bytes(
                     embedded::MB_CONFIG,
                     embedded::MB_LABELS,
                     embedded::MB_WEIGHTS,
                     m2v,
+                    None,
                 )
                 .map_err(Into::into);
             }

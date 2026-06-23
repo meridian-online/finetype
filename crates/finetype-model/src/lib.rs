@@ -36,7 +36,9 @@ pub use column::{
     aggregate_features, ColumnClassifier, ColumnConfig, ColumnFeatures, ColumnResult,
 };
 pub use column_stats::{extract_column_stats, COLUMN_STATS_DIM, COLUMN_STATS_NAMES};
-pub use embedding_aggregation::{extract_embedding_aggregation, EMBED_AGG_DIM, EMBED_DIM};
+pub use embedding_aggregation::{
+    extract_embedding_aggregation, extract_embedding_aggregation_dyn, EMBED_AGG_DIM, EMBED_DIM,
+};
 pub use entity::EntityClassifier;
 pub use features::{extract_features, FEATURE_DIM, FEATURE_NAMES};
 pub use fusion::{compute_fusion_row, FusionClassifier, FusionHead};

@@ -25,7 +25,7 @@
 use crate::char_cnn::HierarchicalHead;
 use crate::char_distribution::{extract_char_distribution, CHAR_DIST_DIM};
 use crate::column_stats::{extract_column_stats, COLUMN_STATS_DIM};
-use crate::embedding_aggregation::{extract_embedding_aggregation, EMBED_AGG_DIM};
+use crate::embedding_aggregation::extract_embedding_aggregation_dyn;
 use crate::inference::InferenceError;
 use crate::model2vec_shared::Model2VecResources;
 use candle_core::{DType, Device, Module, Tensor};
@@ -68,8 +68,13 @@ pub struct MultiBranchClassifier {
     config: MultiBranchConfig,
     /// Index → label mapping (sorted by index).
     labels: Vec<String>,
-    /// Model2Vec resources for embedding extraction.
+    /// Model2Vec resources for header encoding (and the value branch when no
+    /// separate value encoder is configured).
     model2vec: Model2VecResources,
+    /// Optional SECOND Model2Vec encoder for the value-aggregation branch only
+    /// (dual-encoder, e.g. potion-8M). `None` for single-encoder models — the
+    /// value branch then shares `model2vec`. Selected by `config.value_embed_model`.
+    value_model2vec: Option<Model2VecResources>,
     /// Validation feature extractor (built from config.type_index_keys).
     /// None when the model has no validation branch (v11 and earlier).
     validation_extractor: Option<crate::validation_features::ValidationFeatureExtractor>,
@@ -103,10 +108,15 @@ impl MultiBranchClassifier {
             InferenceError::InvalidPath(format!("Failed to read model.safetensors: {e}"))
         })?;
 
-        // Load Model2Vec resources
+        // Load Model2Vec resources (header + classifiers; potion-4M)
         let m2v = Self::load_model2vec(dir)?;
 
-        Self::from_bytes(&config_bytes, &label_bytes, &model_bytes, m2v)
+        // Optional second encoder for the value branch (dual-encoder, e.g. potion-8M).
+        // Read the field straight from config.json so resolution can be relative to
+        // the model dir before from_bytes (which has no dir).
+        let value_m2v = Self::load_value_model2vec(dir, &config_bytes)?;
+
+        Self::from_bytes(&config_bytes, &label_bytes, &model_bytes, m2v, value_m2v)
     }
 
     /// Construct a MultiBranchClassifier from raw byte slices.
@@ -118,6 +128,7 @@ impl MultiBranchClassifier {
         label_bytes: &[u8],
         model_bytes: &[u8],
         model2vec: Model2VecResources,
+        value_model2vec: Option<Model2VecResources>,
     ) -> Result<Self, InferenceError> {
         let config: MultiBranchConfig = serde_json::from_slice(config_bytes).map_err(|e| {
             InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
@@ -284,6 +295,7 @@ impl MultiBranchClassifier {
             config,
             labels,
             model2vec,
+            value_model2vec,
             validation_extractor,
         })
     }
@@ -307,6 +319,43 @@ impl MultiBranchClassifier {
             "Model2Vec resources not found. Checked: model_dir/model2vec/, models/model2vec/"
                 .into(),
         ))
+    }
+
+    /// Load the optional value-branch Model2Vec encoder named by
+    /// `config.value_embed_model`. Resolves the path relative to `model_dir`
+    /// first, then as a workspace/absolute path. Returns `None` when the field
+    /// is absent (single-encoder models). Errors only when the field is set but
+    /// the artifact cannot be found/loaded.
+    fn load_value_model2vec(
+        model_dir: &Path,
+        config_bytes: &[u8],
+    ) -> Result<Option<Model2VecResources>, InferenceError> {
+        let config: MultiBranchConfig = serde_json::from_slice(config_bytes).map_err(|e| {
+            InferenceError::InvalidPath(format!("Failed to parse config.json: {e}"))
+        })?;
+        let Some(rel) = config.value_embed_model.as_deref() else {
+            return Ok(None);
+        };
+
+        let local = model_dir.join(rel);
+        let dir = if local.join("model.safetensors").exists() {
+            local
+        } else {
+            std::path::PathBuf::from(rel)
+        };
+        if !dir.join("model.safetensors").exists() {
+            return Err(InferenceError::InvalidPath(format!(
+                "value_embed_model '{rel}' not found (checked {}/{rel} and {rel})",
+                model_dir.display()
+            )));
+        }
+        Ok(Some(Model2VecResources::load(&dir)?))
+    }
+
+    /// The encoder used for the value-aggregation branch: the dedicated value
+    /// encoder when configured (dual-encoder), otherwise the shared `model2vec`.
+    fn value_resources(&self) -> &Model2VecResources {
+        self.value_model2vec.as_ref().unwrap_or(&self.model2vec)
     }
 
     /// Classify a column of values, returning (label, confidence).
@@ -337,15 +386,15 @@ impl MultiBranchClassifier {
 
         // Extract features
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
-            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
+            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         // Forward pass through trunk
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
@@ -451,14 +500,14 @@ impl MultiBranchClassifier {
 
         // Extract features (same as classify_column)
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
-            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
+            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
@@ -688,14 +737,14 @@ impl MultiBranchClassifier {
         let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
-            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
+            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
@@ -802,14 +851,14 @@ impl MultiBranchClassifier {
         let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation(&value_refs, &self.model2vec)
-            .unwrap_or([0.0f32; EMBED_AGG_DIM]);
+        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
+            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, EMBED_AGG_DIM), &device)
+        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],

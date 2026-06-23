@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use serde::Deserialize;
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "eval-mapping", about = "Convert schema_mapping.yaml to CSV")]
@@ -126,8 +126,8 @@ fn main() -> Result<()> {
 /// and every gt_label in the eval manifest has at least one mapping entry.
 fn validate_mapping(
     mapping: &SchemaMapping,
-    labels_dir: &PathBuf,
-    manifest_path: &PathBuf,
+    labels_dir: &Path,
+    manifest_path: &Path,
 ) -> Result<Vec<String>> {
     let mut errors = Vec::new();
 
@@ -206,7 +206,7 @@ fn validate_mapping(
 
 /// Parse taxonomy labels from YAML definition files.
 /// Each top-level key (e.g., `identity.person.email:`) is a type label.
-fn load_taxonomy_labels(labels_dir: &PathBuf) -> Result<BTreeSet<String>> {
+fn load_taxonomy_labels(labels_dir: &Path) -> Result<BTreeSet<String>> {
     let mut labels = BTreeSet::new();
     let pattern = labels_dir.join("definitions_*.yaml");
     let pattern_str = pattern.to_string_lossy();

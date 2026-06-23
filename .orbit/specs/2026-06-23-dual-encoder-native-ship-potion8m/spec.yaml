@@ -50,12 +50,26 @@ goal: |
 cards:
 - 0002-semantic-type-detection
 status: open
+resolution: |
+  HALT at ac-01 (2026-06-23). The dual-encoder native path was built and verified
+  byte-faithful (value features match offline potion_embed to 7+ sig figs; matrix ==
+  HF potion-base-8M; encode == model2vec cos 1.0000) — ac-00 + ac-01 implementation
+  DELIVERED and KEPT. But the native gold gate FAILED its halt: faithful native
+  composed best-of-3 = 0.690 vs v19 native 0.797 (−11pp). The offline 0.794 "tie"
+  was an artifact of compose_predictions skipping the validation veto. potion-8M
+  over-asserts into types its values fail to validate (fresh-retrain data drift,
+  same root cause as the m2v-244 corpus NO-GO). ac-02/03/04 NOT pursued: corpus gate
+  would be NO-GO; the gap is far past the ~4-rule cap. Fallback taken: STAY ON v19.
+  Real next bet = fix the fresh-retrain data/recipe drift (a NEW spec), then reuse
+  the proven dual-encoder if a bigger value encoder is still wanted. See
+  ac01-native-verdict-HALT.md + memory potion8m-native-halt-veto-exposes-drift.
 labels:
 - architecture
 - embed-branch
 - model2vec
 - ship
 - dual-encoder
+- halt
 acceptance_criteria:
 - id: ac-00
   description: |
@@ -68,9 +82,11 @@ acceptance_criteria:
     handled (config-driven vs const — must not break the 128-dim header or the other classifiers).
     DELIVERABLE: the consumer graph + the edit set + the config-schema change + the dim-handling
     decision. Use codegraph (codegraph_impact/codegraph_callers) per CLAUDE.md.
+    DONE: ac00-dual-encoder-design.md (consumer graph, edit set, config field
+    value_embed_model, dim-handling via extract_embedding_aggregation_dyn + config.embed_dim).
   ac_type: doc
   gate: true
-  checked: false
+  checked: true
 - id: ac-01
   description: |
     IMPLEMENT DUAL-ENCODER NATIVE INFERENCE. Per ac-00's design: the binary loads potion-4M (header +
@@ -81,9 +97,13 @@ acceptance_criteria:
     0.794 within tolerance AND native Sense ~= 0.522 (else HALT + diagnose); the header branch and
     the other classifiers are unaffected (v19 still profiles identically). Tests + B07 + `clippy -D
     warnings` + `cargo test` green.
+    DONE (implementation) + HALT (verification): dual-encoder built, value features byte-faithful
+    to offline; v19 profiles identically (None path). But native gold composed = 0.690 best-of-3
+    (NOT 0.794) vs v19 0.797 — HALT fired. See ac01-native-verdict-HALT.md. Implementation KEPT;
+    potion-8M not shippable.
   ac_type: code
   gate: true
-  checked: false
+  checked: true
 - id: ac-02
   description: |
     NATIVE CORPUS-HONEST GATE on potion-8M — the real, faithful GO/NO-GO vs v19 (replaces the invalid
@@ -92,6 +112,8 @@ acceptance_criteria:
     remap). DELIVERABLE: the verdict + the trigger list, classified shared-collapse vs over-emit. This
     is BLOCKING (H05). Expectation from the directional offline read: numeric_code/isbn/npi collapse +
     some over-emits; the rules in ac-03 must clear the blocking ones.
+    NOT PURSUED (HALT at ac-01): would be NO-GO (m2v-244 same recipe already is; potion-8M shows
+    the same drift on native gold). No corpus pass spent.
   ac_type: observation
   gate: true
   checked: false
@@ -105,6 +127,9 @@ acceptance_criteria:
     corpus-honest gate until GO AND composed improve-or-hold vs v19 on gold + rare-type scoreboard.
     HALT if > ~4 new rules are needed (fragility -> fix data drift instead). DELIVERABLE: the rules +
     composed-hold evidence + the GO verdict.
+    NOT PURSUED (HALT at ac-01): an 11pp gold gap from systematic over-assertion is far past the
+    ~4-rule cap; spec says fix the data drift instead. The leading-zero numeric_code rule (t-0000a86b)
+    remains a banked, model-agnostic improvement for a future data-drift spec.
   ac_type: code
   gate: true
   checked: false
@@ -116,6 +141,8 @@ acceptance_criteria:
     surfaces + a latency note, and update CLAUDE.md (v19 retired -> potion-8M is the shipped default).
     This is the swap that retires v19 and unblocks the roadmap. Else: documented fallback (stay on v19;
     the next bet is fixing the fresh-retrain data drift so a reproducible model is corpus-clean).
+    FALLBACK TAKEN (HALT at ac-01): STAY ON v19. potion-8M not shipped. The dual-encoder is kept as
+    proven infrastructure for a future corpus-clean value-encoder candidate.
   ac_type: observation
   gate: true
   checked: false

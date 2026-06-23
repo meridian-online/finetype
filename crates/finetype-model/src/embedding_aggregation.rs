@@ -94,6 +94,81 @@ pub fn extract_embedding_aggregation(
     Some(result)
 }
 
+/// Dynamic value-aggregation: returns `4 × embed_dim` floats (mean‖var‖min‖max),
+/// sized to the encoder's actual width. Handles any Model2Vec encoder
+/// (128-dim → 512, 256-dim potion-8M → 1024) for the dual-encoder value branch.
+///
+/// Same statistics and L2-normalised mean-pool contract as
+/// [`extract_embedding_aggregation`], but not pinned to the 128-dim const path —
+/// the fixed-size version silently truncates wider encoders to `EMBED_DIM`.
+///
+/// Returns `None` if no values produce valid (non-zero) embeddings.
+pub fn extract_embedding_aggregation_dyn(
+    values: &[&str],
+    resources: &Model2VecResources,
+) -> Option<Vec<f32>> {
+    if values.is_empty() {
+        return None;
+    }
+
+    let batch = resources.encode_batch(values).ok()?;
+    let embed_dim = resources.embed_dim().ok()?;
+
+    let mut valid_rows: Vec<Vec<f32>> = Vec::with_capacity(values.len());
+    for i in 0..values.len() {
+        let row: Vec<f32> = batch.get(i).ok()?.to_vec1().ok()?;
+        let norm_sq: f32 = row.iter().map(|v| v * v).sum();
+        if norm_sq > 1e-16 {
+            valid_rows.push(row);
+        }
+    }
+
+    if valid_rows.is_empty() {
+        return None;
+    }
+
+    let n = valid_rows.len() as f32;
+
+    let mut mean = vec![0.0f32; embed_dim];
+    let mut min = vec![f32::INFINITY; embed_dim];
+    let mut max = vec![f32::NEG_INFINITY; embed_dim];
+
+    for row in &valid_rows {
+        for d in 0..embed_dim {
+            mean[d] += row[d];
+            if row[d] < min[d] {
+                min[d] = row[d];
+            }
+            if row[d] > max[d] {
+                max[d] = row[d];
+            }
+        }
+    }
+    for v in mean.iter_mut() {
+        *v /= n;
+    }
+
+    let mut variance = vec![0.0f32; embed_dim];
+    for row in &valid_rows {
+        for d in 0..embed_dim {
+            let diff = row[d] - mean[d];
+            variance[d] += diff * diff;
+        }
+    }
+    for v in variance.iter_mut() {
+        *v /= n;
+    }
+
+    // Concatenate: mean ++ variance ++ min ++ max → [4 × embed_dim]
+    let mut result = Vec::with_capacity(4 * embed_dim);
+    result.extend_from_slice(&mean);
+    result.extend_from_slice(&variance);
+    result.extend_from_slice(&min);
+    result.extend_from_slice(&max);
+
+    Some(result)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -133,6 +208,56 @@ mod tests {
             return 0.0;
         }
         dot / (norm_a * norm_b)
+    }
+
+    /// Resolve workspace root → an arbitrary models/<name> dir.
+    fn models_subdir(name: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("models")
+            .join(name)
+    }
+
+    // ── Dual-encoder: dynamic aggregation ──────────────────────────────────
+
+    /// The dynamic aggregation must agree exactly with the fixed-size 128-dim
+    /// version on the shared potion-4M encoder (the `None`/single-encoder path
+    /// must be bit-identical to today).
+    #[test]
+    fn test_dyn_matches_const_on_128dim() {
+        let resources = match load_resources_or_skip() {
+            Some(r) => r,
+            None => return,
+        };
+        let values = &["user@example.com", "42", "London, UK", "true", "USD"];
+
+        let fixed = extract_embedding_aggregation(values, &resources).unwrap();
+        let dynv = extract_embedding_aggregation_dyn(values, &resources).unwrap();
+
+        assert_eq!(dynv.len(), EMBED_AGG_DIM, "128-dim → 512");
+        for (i, (a, b)) in fixed.iter().zip(dynv.iter()).enumerate() {
+            assert!((a - b).abs() < 1e-6, "mismatch at {i}: {a} vs {b}");
+        }
+    }
+
+    /// On the staged 256-dim potion-8M encoder the dynamic aggregation must
+    /// produce 1024 features (the value branch of the dual-encoder).
+    #[test]
+    fn test_dyn_1024_on_potion8m() {
+        let dir = models_subdir("m2v8m");
+        if !dir.join("model.safetensors").exists() {
+            eprintln!("Skipping: models/m2v8m not staged");
+            return;
+        }
+        let resources = Model2VecResources::load(&dir).unwrap();
+        assert_eq!(resources.embed_dim().unwrap(), 256);
+
+        let values = &["user@example.com", "42", "London, UK", "true", "USD"];
+        let agg = extract_embedding_aggregation_dyn(values, &resources).unwrap();
+        assert_eq!(agg.len(), 1024, "256-dim → 1024");
     }
 
     // ── Test 1: output dimensions ──────────────────────────────────────────
