@@ -22,7 +22,7 @@ import argparse
 import subprocess
 import sys
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import pyarrow as pa
@@ -42,6 +42,15 @@ def probe_valid_dim():
                          input='["x"]', capture_output=True, text=True, check=True)
     import json
     return len(json.loads(out.stdout.strip())["validation"])
+
+
+def _extract_one(item):
+    """Module-level (picklable for ProcessPoolExecutor): base features for one column.
+    Each worker process json-decodes independently — its own GIL — so this is the real
+    8x parallelism the threaded version couldn't get (json.loads is GIL-bound)."""
+    fp, cn, vals = item
+    f = P.extract_features(BIN, vals, header=cn, include_validation=True)
+    return (fp, cn, vals, f)
 
 
 def potion_4stat(model, texts):
@@ -89,16 +98,10 @@ def main():
     done = 0
     for start in range(0, len(table_items), a.batch_tables):
         batch = table_items[start:start + a.batch_tables]
-        # Parallel base-feature extraction for every column in the batch.
+        # Parallel base-feature extraction (process pool → real parallelism on json.loads).
         flat = [(fp, cn, vals) for fp, cols in batch for cn, vals in cols]
-
-        def base(item):
-            fp, cn, vals = item
-            f = P.extract_features(BIN, vals, header=cn, include_validation=True)
-            return (fp, cn, vals, f)
-
-        with ThreadPoolExecutor(max_workers=a.jobs) as ex:
-            results = list(ex.map(base, flat))
+        with ProcessPoolExecutor(max_workers=a.jobs) as ex:
+            results = list(ex.map(_extract_one, flat, chunksize=64))
 
         # Per potion, assemble a table-grouped sub-FTMB and predict.
         by_table = defaultdict(list)
