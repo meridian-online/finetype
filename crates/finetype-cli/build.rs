@@ -402,6 +402,33 @@ fn generate_embedded_models(models_base: &Path, labels_base: &Path) {
         code.push_str("\npub const EMBEDDED_MODEL_TYPE: &str = \"flat\";\n");
     }
 
+    // Dual-encoder: embed the value-branch encoder (e.g. potion-8M) when the default
+    // model co-locates one at <model_dir>/value_model2vec/ (config.value_embed_model).
+    // The header branch + semantic/entity/sense classifiers keep the shared model2vec
+    // (M2V_*); this is the SECOND encoder the value-aggregation branch needs. Absent
+    // for single-encoder models (v19, m2v-244) → false stubs, from_bytes passes None.
+    let value_m2v = model_dir.join("value_model2vec");
+    if value_m2v.join("model.safetensors").exists() {
+        println!("cargo:rerun-if-changed={}", value_m2v.display());
+        let vtok = portable_path(&value_m2v.join("tokenizer.json"));
+        let vmodel = portable_path(&value_m2v.join("model.safetensors"));
+        code.push_str("\npub const HAS_MB_VALUE_M2V: bool = true;\n");
+        code.push_str(&format!(
+            "pub const MB_VALUE_TOKENIZER: &[u8] = include_bytes!(\"{vtok}\");\n"
+        ));
+        code.push_str(&format!(
+            "pub const MB_VALUE_MODEL: &[u8] = include_bytes!(\"{vmodel}\");\n"
+        ));
+        println!(
+            "cargo:warning=Embedding dual-encoder value model2vec from {}",
+            value_m2v.display()
+        );
+    } else {
+        code.push_str("\npub const HAS_MB_VALUE_M2V: bool = false;\n");
+        code.push_str("pub const MB_VALUE_TOKENIZER: &[u8] = &[];\n");
+        code.push_str("pub const MB_VALUE_MODEL: &[u8] = &[];\n");
+    }
+
     // Embed taxonomy YAML files
     let mut yaml_paths: Vec<_> = fs::read_dir(labels_base)
         .expect("Failed to read labels directory")

@@ -2140,15 +2140,29 @@ fn load_multi_branch_classifier(model: &PathBuf) -> Result<finetype_model::Multi
                         "Multi-branch model requires Model2Vec resources but none found"
                     )
                 })?;
-                // Release-embedded single-encoder path: no separate value encoder
-                // (dual-encoder potion-8M ships via the disk/HF path; ac-04 extends
-                // this to embed the value encoder too).
+                // Dual-encoder: load the embedded value-branch encoder (potion-8M)
+                // when present, so a released binary with no disk models drives the
+                // value-aggregation branch correctly. Single-encoder models embed
+                // HAS_MB_VALUE_M2V=false → None (value branch shares m2v).
+                let value_m2v = if embedded::HAS_MB_VALUE_M2V {
+                    Some(
+                        finetype_model::Model2VecResources::from_bytes(
+                            embedded::MB_VALUE_TOKENIZER,
+                            embedded::MB_VALUE_MODEL,
+                        )
+                        .map_err(|e| {
+                            anyhow::anyhow!("Failed to load embedded value encoder: {e}")
+                        })?,
+                    )
+                } else {
+                    None
+                };
                 return finetype_model::MultiBranchClassifier::from_bytes(
                     embedded::MB_CONFIG,
                     embedded::MB_LABELS,
                     embedded::MB_WEIGHTS,
                     m2v,
-                    None,
+                    value_m2v,
                 )
                 .map_err(Into::into);
             }

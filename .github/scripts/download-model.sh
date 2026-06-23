@@ -55,6 +55,21 @@ else
     echo "  Downloading ${file}..."
     curl -sfLO --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${REPO}/${MODEL_DIR}/${file}"
   done
+  # Dual-encoder: if config.json declares a co-located value-branch encoder
+  # (value_embed_model, e.g. potion-8M for the value-aggregation branch), fetch
+  # its files too. Header + semantic/entity/sense classifiers use the shared
+  # model2vec; the value branch needs this second encoder, so without it the model
+  # fails to load. Single-encoder models have no value_embed_model → skip.
+  VEM=$(sed -n 's/.*"value_embed_model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' config.json 2>/dev/null | head -1)
+  if [ -n "${VEM}" ]; then
+    echo "  Dual-encoder — downloading value encoder ${VEM}/..."
+    mkdir -p "${VEM}"
+    for vf in model.safetensors tokenizer.json; do
+      echo "  Downloading ${VEM}/${vf}..."
+      curl -sfL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused \
+        "${REPO}/${MODEL_DIR}/${VEM}/${vf}" -o "${VEM}/${vf}"
+    done
+  fi
   cd ../..
 fi
 
