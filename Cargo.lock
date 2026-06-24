@@ -1650,7 +1650,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "sha2",
  "tempfile",
  "tokio",
  "tracing-subscriber",
@@ -1705,13 +1704,16 @@ name = "finetype-mcp"
 version = "0.6.36"
 dependencies = [
  "anyhow",
+ "chrono",
  "csv",
  "finetype-core",
  "finetype-model",
+ "jsonschema",
  "rmcp",
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
 ]
 

@@ -18,3 +18,12 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 csv = { workspace = true }
+sha2 = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+# Conformance test (spec 2026-06-24 ac-04): validate emitted datapackage
+# descriptors against the vendored profile, using the embedded taxonomy so the
+# type/format come from the real authoritative map.
+finetype-core = { workspace = true, features = ["embedded-taxonomy"] }
+jsonschema = { workspace = true }

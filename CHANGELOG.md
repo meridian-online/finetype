@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Frictionless Data Package output: `finetype profile -f <file> -o datapackage`** (choice 0105,
+  spec `2026-06-24-frictionless-datapackage-profile-output`). Emits a conformant Frictionless
+  v2.0 **Data Package** descriptor — one Data Resource (`name`/`path`/`format`/`mediatype`/
+  `encoding`/`bytes`/`sha256` hash) wrapping a Table Schema whose field `type`/`format` come from
+  a new **authoritative per-leaf `frictionless:` map** added to all 244 taxonomy definitions (the
+  canonical 244→16 fold FineType owns for the Meridian family — dovetail and arcform consume it
+  rather than re-deriving it). Constraints come from the type's validation; FineType richness
+  rides as `x-finetype-*` custom properties (`label`/`confidence`/`pii`/`locale`/`enum-domain`).
+  `$schema` pins the v2.0 profile (vendored at `vendor/frictionless/`); emitted descriptors are
+  conformance-tested against it. Mirrored on the MCP `profile` tool (`format: "datapackage"`).
+  Additive — the `json-schema` output is unchanged; the executable DuckDB `transform` is
+  deliberately omitted (a Data Package *describes*, it does not *execute*).
+- **`finetype_core::frictionless_for(label)`** (feature `embedded-taxonomy`) — the accessor that
+  exposes the label→Frictionless `{type, format}` map to in-workspace crate consumers without a
+  `labels/` dir at runtime. The taxonomy `check` gate now fails on any leaf missing a valid
+  `frictionless:` block.
+
 ## [0.6.36] - 2026-06-24
 
 ### Changed

@@ -22,7 +22,7 @@ finetype profile -f <FILE> [OPTIONS]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-f, --file <FILE>` | *required* | Input CSV file |
-| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema` |
+| `-o, --output <FORMAT>` | `plain` | Output format: `plain`, `json`, `csv`, `markdown`, `arrow`, `json-schema`, `datapackage` |
 | `--sample-size <N>` | `100` | Max values to sample per column |
 | `--delimiter <CHAR>` | auto-detect | CSV delimiter character |
 | `--no-header-hint` | — | Disable column name header hints |
@@ -61,6 +61,33 @@ Both surfaces emit only `x-finetype-label` + `x-finetype-pii` on each
 schema property (verbosity contract from PR #51 / card 0006). The
 older `--pretty` flag is gone — `taxonomy -o json-schema` and
 `profile -o json-schema` both pretty-print unconditionally.
+
+---
+
+### Frictionless Data Package export — `profile -o datapackage`
+
+**`profile -f FILE -o datapackage`** (choice 0105) emits a conformant
+Frictionless **Data Package** descriptor — the interoperable family
+standard alongside `json-schema`:
+
+```bash
+finetype profile -f data.csv -o datapackage > datapackage.json
+```
+
+Shape: one Data Resource (`name`/`path`/`format`/`mediatype`/`encoding`/
+`bytes`/`sha256` hash + `$schema` pinned to the v2.0 profile) wrapping a
+Table Schema. Each field is `{name, type, format?, constraints?}` where
+`type`/`format` come from the authoritative per-leaf `frictionless:` map in
+the taxonomy (the 244→16 fold FineType owns; e.g. `identity.person.email` →
+`string`/`email`, a `dd/mm/yyyy` date → `date`/`"%d/%m/%Y"`). FineType
+richness rides as `x-finetype-*` custom properties (`label`, `confidence`,
+`pii`, `locale`, `enum-domain`) — strip them and a valid plain Data Package
+remains. Available on the MCP `profile` tool too (`format: "datapackage"`).
+
+The DuckDB `transform` is deliberately **not** in the descriptor: a Data
+Package *describes*, it does not *execute* (recover the cast from the label
+via the bundled taxonomy). Descriptors validate against the vendored v2.0
+profile (`vendor/frictionless/`; conformance test in `finetype-mcp`).
 
 The MCP `schema` tool's type-key branch is retained for v0.6.19; the
 v0.6.20 audit will mirror the CLI fold (MADR 0070).

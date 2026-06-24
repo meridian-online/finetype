@@ -64,7 +64,7 @@ acceptance_criteria:
     matches the PR #51 verbosity contract). A descriptor stripped of all `x-` keys is a
     valid plain Data Package.
   gate: false
-  checked: false
+  checked: true
 - id: ac-04
   description: |
     CONFORMANCE — vendor the Frictionless v2 Data Package profile JSON Schema under
@@ -75,7 +75,7 @@ acceptance_criteria:
     test asserts the descriptor round-trips: parse it back and confirm every field's
     type/format matches ac-01's map for that column's label.
   gate: true
-  checked: false
+  checked: true
 - id: ac-05
   description: |
     DOCS + SURFACE PARITY — document `-o datapackage` in docs/DEVELOPMENT.md and the
@@ -83,5 +83,5 @@ acceptance_criteria:
     stay at parity (choice 0101). The existing `json-schema` output is unchanged
     (additive). CHANGELOG entry references choice 0105.
   gate: false
-  checked: false
+  checked: true
   ac_type: doc

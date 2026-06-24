@@ -1,5 +1,6 @@
 //! `profile` tool — profile all columns in a CSV/JSON file.
 
+use crate::datapackage;
 use crate::json_schema;
 use crate::FineTypeServer;
 use rmcp::model::{CallToolResult, Content, ErrorData};
@@ -21,6 +22,9 @@ pub enum ProfileFormat {
     /// Table-level JSON Schema document (Draft 2020-12). Replaces the
     /// `path`/`data` branch of the legacy `schema` tool.
     JsonSchema,
+    /// Frictionless Data Package descriptor (choice 0105) — the interoperable
+    /// family-standard envelope; mirrors the CLI's `-o datapackage`.
+    Datapackage,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -37,7 +41,7 @@ pub struct ProfileRequest {
     /// to `json-schema` to receive a table-level JSON Schema document
     /// suitable for direct input to `validate`.
     #[schemars(
-        description = "Output format: \"json\" (default, profile object per column) or \"json-schema\" (table-level JSON Schema)"
+        description = "Output format: \"json\" (default, profile object per column), \"json-schema\" (table-level JSON Schema), or \"datapackage\" (Frictionless Data Package descriptor)"
     )]
     #[serde(default)]
     pub format: ProfileFormat,
@@ -200,6 +204,65 @@ pub async fn handle(
             row_count
         );
         return Ok(super::success_with_summary(&schema, &md));
+    }
+
+    // ── datapackage branch ───────────────────────────────────────────────
+    // Routes through the same `emit_datapackage` helper as the CLI's
+    // `profile -o datapackage` so output is identical across surfaces
+    // (modulo the `created` timestamp). Locale enrichment is CLI-only, so
+    // `x-finetype-locale` is omitted here.
+    if request.format == ProfileFormat::Datapackage {
+        let taxonomy = server.taxonomy();
+
+        let mut labels: Vec<String> = Vec::with_capacity(headers.len());
+        let mut confidences: Vec<Option<f32>> = Vec::with_capacity(headers.len());
+        for (col_idx, header) in headers.iter().enumerate() {
+            let values = &columns[col_idx];
+            if values.is_empty() {
+                labels.push("unknown".to_string());
+                confidences.push(None);
+                continue;
+            }
+            let result = classifier
+                .classify_column_with_header(values, header)
+                .map_err(|e| {
+                    ErrorData::internal_error(format!("Classification error: {e}"), None)
+                })?;
+            confidences.push(Some(result.confidence));
+            labels.push(result.label);
+        }
+
+        let cols: Vec<datapackage::DatapackageColumn<'_>> = headers
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+                datapackage::DatapackageColumn {
+                    name,
+                    label: &labels[i],
+                    values,
+                    confidence: confidences[i],
+                    locale: None,
+                }
+            })
+            .collect();
+
+        let resource = match &request.path {
+            Some(p) => {
+                datapackage::ResourceMeta::for_path(std::path::Path::new(p), csv_data.as_bytes())
+            }
+            None => datapackage::ResourceMeta::for_inline(csv_data.as_bytes()),
+        };
+
+        let descriptor =
+            datapackage::emit_datapackage(&cols, &resource, taxonomy, request.enum_threshold);
+        let md = format!(
+            "## Data Package\n\n**{}** ({} columns, {} rows)\n",
+            resource.name,
+            headers.len(),
+            row_count
+        );
+        return Ok(super::success_with_summary(&descriptor, &md));
     }
 
     // ── default json branch — unchanged from prior behaviour ─────────────

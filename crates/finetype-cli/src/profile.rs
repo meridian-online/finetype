@@ -1015,21 +1015,24 @@ pub(crate) fn cmd_profile(
                     )
                 })?;
 
-                let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
+                let cols: Vec<datapackage::DatapackageColumn<'_>> = profiles
                     .iter()
                     .enumerate()
                     .map(|(i, p)| {
                         let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
-                        json_schema::TableSchemaColumn {
+                        datapackage::DatapackageColumn {
                             name: &p.name,
                             label: &p.label,
                             values,
-                            null_count: p.null_count,
+                            confidence: Some(p.confidence),
+                            locale: p.detected_locale.as_deref(),
                         }
                     })
                     .collect();
 
-                let resource = resource_meta(file)?;
+                let content = std::fs::read(file)
+                    .map_err(|e| anyhow::anyhow!("could not read {:?} for hashing: {}", file, e))?;
+                let resource = datapackage::ResourceMeta::for_path(file, &content);
                 let descriptor =
                     datapackage::emit_datapackage(&cols, &resource, taxonomy, enum_threshold);
                 writeln!(writer, "{}", serde_json::to_string_pretty(&descriptor)?)?;
@@ -1040,74 +1043,4 @@ pub(crate) fn cmd_profile(
     } // end per-file loop
 
     Ok(())
-}
-
-/// Compute the Frictionless Data Resource metadata for a profiled file
-/// (choice 0105, ac-02): name/path/format/mediatype/encoding/bytes/hash/created.
-/// The file is read once more to size + hash it; profiling read it via DuckDB,
-/// which does not expose the raw bytes.
-fn resource_meta(file: &std::path::Path) -> Result<datapackage::ResourceMeta> {
-    use sha2::{Digest, Sha256};
-
-    let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
-    let path = file
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("data")
-        .to_string();
-    let ext = file
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-
-    // (format token, mediatype, is-text). Text formats carry `encoding`.
-    let (format, mediatype, text) = match ext.as_str() {
-        "csv" | "" => ("csv".to_string(), "text/csv", true),
-        "tsv" => ("tsv".to_string(), "text/tab-separated-values", true),
-        "parquet" => (
-            "parquet".to_string(),
-            "application/vnd.apache.parquet",
-            false,
-        ),
-        "ndjson" | "jsonl" => ("ndjson".to_string(), "application/x-ndjson", true),
-        "json" => ("json".to_string(), "application/json", true),
-        other => (other.to_string(), "application/octet-stream", false),
-    };
-
-    let content = std::fs::read(file)
-        .map_err(|e| anyhow::anyhow!("could not read {:?} for hashing: {}", file, e))?;
-    let hash = format!("sha256:{:x}", Sha256::digest(&content));
-
-    Ok(datapackage::ResourceMeta {
-        name: slugify(stem),
-        path,
-        format,
-        mediatype: mediatype.to_string(),
-        encoding: text.then(|| "utf-8".to_string()),
-        bytes: content.len() as u64,
-        hash,
-        created: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-    })
-}
-
-/// Slug a file stem into a Frictionless-legal resource/package name:
-/// lowercase, keeping only `[a-z0-9._-]`, other chars → `-`.
-fn slugify(s: &str) -> String {
-    let slug: String = s
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
-                c.to_ascii_lowercase()
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    let trimmed = slug.trim_matches('-');
-    if trimmed.is_empty() {
-        "resource".to_string()
-    } else {
-        trimmed.to_string()
-    }
 }
