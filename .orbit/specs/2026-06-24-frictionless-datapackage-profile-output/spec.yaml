@@ -35,7 +35,7 @@ acceptance_criteria:
     container.json→object|array. Deferred-as-string with a note: anything whose richer
     semantics have no Frictionless home (the lossless carrier is x-finetype-label).
   gate: true
-  checked: false
+  checked: true
   ac_type: config
 - id: ac-02
   description: |
@@ -52,7 +52,6 @@ acceptance_criteria:
     Follow dovetail-core/src/datapackage.rs struct shape where it eases family consistency.
   gate: true
   checked: false
-  ac_type: code
 - id: ac-03
   description: |
     CUSTOM PROPERTIES — FineType richness rides as `x-finetype-*` per-field custom
@@ -66,7 +65,6 @@ acceptance_criteria:
     valid plain Data Package.
   gate: false
   checked: false
-  ac_type: code
 - id: ac-04
   description: |
     CONFORMANCE — vendor the Frictionless v2 Data Package profile JSON Schema under
@@ -78,7 +76,6 @@ acceptance_criteria:
     type/format matches ac-01's map for that column's label.
   gate: true
   checked: false
-  ac_type: code
 - id: ac-05
   description: |
     DOCS + SURFACE PARITY — document `-o datapackage` in docs/DEVELOPMENT.md and the
@@ -88,4 +85,3 @@ acceptance_criteria:
   gate: false
   checked: false
   ac_type: doc
-memories_considered: []

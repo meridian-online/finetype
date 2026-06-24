@@ -49,6 +49,8 @@ container.object.json:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: JSON
+  frictionless:
+    type: object
   format_string: null
   transform: "PARSE_JSON({col})"
   transform_ext: null
@@ -91,6 +93,8 @@ container.object.json_array:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: JSON
+  frictionless:
+    type: array
   format_string: null
   transform: "PARSE_JSON({col})"
   transform_ext: null
@@ -125,6 +129,8 @@ container.object.xml:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "XMLPARSE(DOCUMENT {col})"
@@ -156,6 +162,8 @@ container.object.html:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "REGEXP_REPLACE({col}, '<[^>]+>', '', 'g')"
   transform_ext: null
@@ -199,6 +207,8 @@ container.object.yaml:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -235,6 +245,8 @@ container.object.csv:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -273,6 +285,8 @@ container.array.comma_separated:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: list
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -304,6 +318,8 @@ container.array.pipe_separated:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -333,6 +349,8 @@ container.array.semicolon_separated:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -362,6 +380,8 @@ container.array.whitespace_separated:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -395,6 +415,8 @@ container.key_value.query_string:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null

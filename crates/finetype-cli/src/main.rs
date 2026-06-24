@@ -3150,6 +3150,30 @@ fn cmd_check(
         }
     }
 
+    // Frictionless mapping gate (choice 0105, spec 2026-06-24 ac-01): every
+    // definition must carry a valid {type, format} block, else `check` fails.
+    let mut fx_failures: Vec<String> = Vec::new();
+    for (key, def) in taxonomy.definitions() {
+        match &def.frictionless {
+            None => fx_failures.push(format!("{key}: missing `frictionless` block")),
+            Some(fr) => {
+                if let Err(e) = fr.validate() {
+                    fx_failures.push(format!("{key}: {e}"));
+                }
+            }
+        }
+    }
+    if !fx_failures.is_empty() {
+        eprintln!(
+            "\nFrictionless mapping check FAILED ({} definition(s)):",
+            fx_failures.len()
+        );
+        for f in &fx_failures {
+            eprintln!("  - {f}");
+        }
+        std::process::exit(1);
+    }
+
     // Exit non-zero if checks failed
     if !report.all_passed() {
         std::process::exit(1);

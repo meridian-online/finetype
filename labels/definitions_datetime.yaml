@@ -31,6 +31,9 @@ datetime.timestamp.iso_8601:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M:%SZ"
   format_string: "%Y-%m-%dT%H:%M:%SZ"
   format_string_alt: "%Y-%m-%dT%H:%M:%S.%gZ"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%SZ')"
@@ -63,6 +66,9 @@ datetime.timestamp.iso_8601_compact:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y%m%dT%H%M%S"
   format_string: "%Y%m%dT%H%M%S"
   transform: "strptime({col}, '%Y%m%dT%H%M%S')"
   transform_ext: null
@@ -91,6 +97,9 @@ datetime.timestamp.iso_8601_microseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M:%S.%fZ"
   format_string: "%Y-%m-%dT%H:%M:%S.%fZ"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%fZ')"
   transform_ext: null
@@ -119,6 +128,9 @@ datetime.timestamp.iso_8601_offset:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M:%S%z"
   format_string: "%Y-%m-%dT%H:%M:%S%z"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S%z')"
   transform_ext: null
@@ -148,6 +160,9 @@ datetime.timestamp.rfc_2822:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%a, %d %b %Y %H:%M:%S %z"
   format_string: "%a, %d %b %Y %H:%M:%S %z"
   transform: "strptime({col}, '%a, %d %b %Y %H:%M:%S %z')"
   transform_ext: null
@@ -177,6 +192,9 @@ datetime.timestamp.rfc_3339:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M:%S%z"
   format_string: "%Y-%m-%d %H:%M:%S%z"
   format_string_alt: "%Y-%m-%d %H:%M:%SZ"
   transform: "strptime({col}, '%Y-%m-%d %H:%M:%S%z')"
@@ -212,6 +230,9 @@ datetime.timestamp.sql_standard:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M:%S"
   format_string: "%Y-%m-%d %H:%M:%S"
   transform: "strptime({col}, '%Y-%m-%d %H:%M:%S')"
   transform_ext: null
@@ -240,6 +261,9 @@ datetime.timestamp.mdy_12h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%m/%d/%Y %I:%M %p"
   format_string: "%m/%d/%Y %I:%M %p"
   transform: "strptime({col}, '%m/%d/%Y %I:%M %p')"
   transform_ext: null
@@ -266,6 +290,9 @@ datetime.timestamp.mdy_24h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%m/%d/%Y %H:%M:%S"
   format_string: "%m/%d/%Y %H:%M:%S"
   transform: "strptime({col}, '%m/%d/%Y %H:%M:%S')"
   transform_ext: null
@@ -290,6 +317,9 @@ datetime.timestamp.dmy_hm:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%d/%m/%Y %H:%M"
   format_string: "%d/%m/%Y %H:%M"
   transform: "strptime({col}, '%d/%m/%Y %H:%M')"
   transform_ext: null
@@ -316,6 +346,9 @@ datetime.timestamp.iso_microseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M:%S.%f"
   format_string: "%Y-%m-%dT%H:%M:%S.%f"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%f')"
   transform_ext: null
@@ -343,6 +376,9 @@ datetime.timestamp.iso_seconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M:%S"
   format_string: "%Y-%m-%dT%H:%M:%S"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S')"
   transform_ext: null
@@ -375,6 +411,9 @@ datetime.timestamp.iso_milliseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: "%Y-%m-%dT%H:%M:%S.%g"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%g')"
   transform_ext: null
@@ -405,6 +444,9 @@ datetime.timestamp.rfc_2822_ordinal:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: null
   transform: "strptime(regexp_replace({col}, '(\\d+)(?:st|nd|rd|th)', '\\1'), '%d %b %Y %H:%M:%S %z')"
   transform_ext: null
@@ -442,6 +484,9 @@ datetime.date.iso:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y-%m-%d"
   format_string: "%Y-%m-%d"
   transform: "strptime({col}, '%Y-%m-%d')::DATE"
   transform_ext: null
@@ -472,6 +517,9 @@ datetime.date.mdy_slash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%m/%d/%Y"
   format_string: "%m/%d/%Y"
   transform: "strptime({col}, '%m/%d/%Y')::DATE"
   transform_ext: null
@@ -499,6 +547,9 @@ datetime.date.dmy_slash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d/%m/%Y"
   format_string: "%d/%m/%Y"
   transform: "strptime({col}, '%d/%m/%Y')::DATE"
   transform_ext: null
@@ -528,6 +579,9 @@ datetime.date.dmy_dot:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d.%m.%Y"
   format_string: "%d.%m.%Y"
   transform: "strptime({col}, '%d.%m.%Y')::DATE"
   transform_ext: null
@@ -554,6 +608,9 @@ datetime.date.short_dmy:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d-%m-%y"
   format_string: "%d-%m-%y"
   transform: "strptime({col}, '%d-%m-%y')::DATE"
   transform_ext: null
@@ -582,6 +639,9 @@ datetime.date.short_mdy:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%m-%d-%y"
   format_string: "%m-%d-%y"
   transform: "strptime({col}, '%m-%d-%y')::DATE"
   transform_ext: null
@@ -609,6 +669,9 @@ datetime.date.short_ymd:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%y-%m-%d"
   format_string: "%y-%m-%d"
   transform: "strptime({col}, '%y-%m-%d')::DATE"
   transform_ext: null
@@ -635,6 +698,9 @@ datetime.date.compact_ymd:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y%m%d"
   format_string: "%Y%m%d"
   transform: "strptime({col}, '%Y%m%d')::DATE"
   transform_ext: null
@@ -660,6 +726,9 @@ datetime.date.compact_dmy:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d%m%Y"
   format_string: "%d%m%Y"
   transform: "strptime({col}, '%d%m%Y')::DATE"
   transform_ext: null
@@ -687,6 +756,9 @@ datetime.date.compact_mdy:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%m%d%Y"
   format_string: "%m%d%Y"
   transform: "strptime({col}, '%m%d%Y')::DATE"
   transform_ext: null
@@ -730,6 +802,9 @@ datetime.date.abbreviated_month:
     - JA
     - ZH
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%b %d, %Y"
   format_string: "%b %d, %Y"
   transform: "strptime({col}, '%b %d, %Y')::DATE"
   transform_ext: null
@@ -768,6 +843,9 @@ datetime.date.long_full_month:
     - CS
     - RU
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%B %d, %Y"
   format_string: "%B %d, %Y"
   transform: "strptime({col}, '%B %d, %Y')::DATE"
   transform_ext: null
@@ -799,6 +877,9 @@ datetime.date.weekday_abbreviated_month:
     - IT
     - PT
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%A, %b %d, %Y"
   format_string: "%A, %b %d, %Y"
   transform: "strptime({col}, '%A, %b %d, %Y')::DATE"
   transform_ext: null
@@ -829,6 +910,9 @@ datetime.date.weekday_full_month:
     - IT
     - PT
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%A, %B %d, %Y"
   format_string: "%A, %B %d, %Y"
   transform: "strptime({col}, '%A, %B %d, %Y')::DATE"
   transform_ext: null
@@ -853,6 +937,9 @@ datetime.date.ordinal:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y-%j"
   format_string: "%Y-%j"
   transform: "strptime({col}, '%Y-%j')::DATE"
   transform_ext: null
@@ -882,6 +969,8 @@ datetime.date.julian:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: string
   format_string: null
   transform: "strptime(concat('20', {col}), '%Y-%j')::DATE"
   transform_ext: null
@@ -912,6 +1001,9 @@ datetime.date.iso_week:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%G-W%V"
   format_string: "%G-W%V"
   transform: "strptime({col} || '-1', '%G-W%V-%u')::DATE"
   transform_ext: null
@@ -946,6 +1038,9 @@ datetime.time.iso:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIME
+  frictionless:
+    type: time
+    format: "%H:%M:%S.%f"
   format_string: "%H:%M:%S.%f"
   transform: "strptime({col}, '%H:%M:%S.%f')::TIME"
   transform_ext: null
@@ -972,6 +1067,9 @@ datetime.time.hms_24h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIME
+  frictionless:
+    type: time
+    format: "%H:%M:%S"
   format_string: "%H:%M:%S"
   transform: "strptime({col}, '%H:%M:%S')::TIME"
   transform_ext: null
@@ -999,6 +1097,9 @@ datetime.time.hm_24h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIME
+  frictionless:
+    type: time
+    format: "%H:%M"
   format_string: "%H:%M"
   transform: "strptime({col}, '%H:%M')::TIME"
   transform_ext: null
@@ -1026,6 +1127,9 @@ datetime.time.hms_12h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIME
+  frictionless:
+    type: time
+    format: "%I:%M:%S %p"
   format_string: "%I:%M:%S %p"
   transform: "strptime({col}, '%I:%M:%S %p')::TIME"
   transform_ext: null
@@ -1053,6 +1157,9 @@ datetime.time.hm_12h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIME
+  frictionless:
+    type: time
+    format: "%I:%M %p"
   format_string: "%I:%M %p"
   transform: "strptime({col}, '%I:%M %p')::TIME"
   transform_ext: null
@@ -1086,6 +1193,8 @@ datetime.epoch.unix_seconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: integer
   format_string: null
   transform: "to_timestamp({col}::BIGINT)"
   transform_ext: null
@@ -1118,6 +1227,8 @@ datetime.epoch.unix_milliseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: integer
   format_string: null
   transform: "to_timestamp({col}::BIGINT / 1000)"
   transform_ext: null
@@ -1146,6 +1257,8 @@ datetime.epoch.unix_microseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: integer
   format_string: null
   transform: "to_timestamp({col}::BIGINT / 1000000)"
   transform_ext: null
@@ -1179,6 +1292,8 @@ datetime.offset.iana:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "{col}"
   transform_ext: null
@@ -1211,6 +1326,8 @@ datetime.offset.utc:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "{col}"
   transform_ext: null
@@ -1243,6 +1360,8 @@ datetime.duration.iso_8601:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: INTERVAL
+  frictionless:
+    type: duration
   format_string: null
   transform: >
     CAST(
@@ -1294,6 +1413,8 @@ datetime.component.year:
   designation: broad_numbers
   locales: [UNIVERSAL]
   broad_type: SMALLINT
+  frictionless:
+    type: year
   format_string: null
   transform: "{col}::SMALLINT"
   transform_ext: null
@@ -1347,6 +1468,8 @@ datetime.component.day_of_week:
     - TR
     - UK
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "{col}"
   transform_ext: null
@@ -1500,6 +1623,8 @@ datetime.component.month_name:
     - TR
     - UK
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "{col}"
   transform_ext: null
@@ -1626,6 +1751,8 @@ datetime.component.periodicity:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "{col}"
   transform_ext: null
@@ -1670,6 +1797,9 @@ datetime.timestamp.sql_microseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M:%S.%f"
   format_string: "%Y-%m-%d %H:%M:%S.%f"
   transform: "strptime({col}, '%Y-%m-%d %H:%M:%S.%f')"
   transform_ext: null
@@ -1699,6 +1829,9 @@ datetime.timestamp.sql_milliseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: "%Y-%m-%d %H:%M:%S.%g"
   transform: "strptime({col}, '%Y-%m-%d %H:%M:%S.%g')"
   transform_ext: null
@@ -1728,6 +1861,9 @@ datetime.timestamp.iso_8601_milliseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: "%Y-%m-%dT%H:%M:%S.%gZ"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%gZ')"
   transform_ext: null
@@ -1760,6 +1896,9 @@ datetime.timestamp.iso_8601_millis_offset:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: "%Y-%m-%dT%H:%M:%S.%g%z"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%g%z')"
   transform_ext: null
@@ -1789,6 +1928,9 @@ datetime.timestamp.iso_8601_micros_offset:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%dT%H:%M:%S.%f%z"
   format_string: "%Y-%m-%dT%H:%M:%S.%f%z"
   transform: "strptime({col}, '%Y-%m-%dT%H:%M:%S.%f%z')"
   transform_ext: null
@@ -1821,6 +1963,9 @@ datetime.timestamp.clf:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%d/%b/%Y:%H:%M:%S %z"
   format_string: "%d/%b/%Y:%H:%M:%S %z"
   format_string_alt: "[%d/%b/%Y:%H:%M:%S %z]"
   transform: "strptime({col}, '%d/%b/%Y:%H:%M:%S %z')"
@@ -1854,6 +1999,9 @@ datetime.timestamp.syslog_bsd:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: "%b %-d %H:%M:%S"
   transform: "strptime(CAST(YEAR(CURRENT_DATE) AS VARCHAR) || ' ' || {col}, '%Y %b %-d %H:%M:%S')"
   transform_ext: null
@@ -1886,6 +2034,9 @@ datetime.timestamp.sql_microseconds_offset:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M:%S.%f%z"
   format_string: "%Y-%m-%d %H:%M:%S.%f%z"
   transform: "strptime({col}, '%Y-%m-%d %H:%M:%S.%f%z')"
   transform_ext: null
@@ -1915,6 +2066,9 @@ datetime.timestamp.pg_short_offset:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMPTZ
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M:%S.%f%z"
   format_string: "%Y-%m-%d %H:%M:%S.%f%z"
   transform: "strptime({col} || ':00', '%Y-%m-%d %H:%M:%S.%f%z')"
   transform_ext: null
@@ -1945,6 +2099,9 @@ datetime.timestamp.dot_dmy_24h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%d.%m.%Y %H:%M:%S"
   format_string: "%d.%m.%Y %H:%M:%S"
   transform: "strptime({col}, '%d.%m.%Y %H:%M:%S')"
   transform_ext: null
@@ -1974,6 +2131,9 @@ datetime.timestamp.slash_ymd_24h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y/%m/%d %H:%M:%S"
   format_string: "%Y/%m/%d %H:%M:%S"
   transform: "strptime({col}, '%Y/%m/%d %H:%M:%S')"
   transform_ext: null
@@ -2003,6 +2163,9 @@ datetime.timestamp.ctime:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "any"
   format_string: "%a %b %-d %H:%M:%S %Y"
   transform: "strptime({col}, '%a %b %-d %H:%M:%S %Y')"
   transform_ext: null
@@ -2033,6 +2196,8 @@ datetime.timestamp.epoch_nanoseconds:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: integer
   format_string: null
   transform: "make_timestamp_ns({col}::BIGINT)"
   transform_ext: null
@@ -2066,6 +2231,9 @@ datetime.timestamp.iso_space_zulu:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y-%m-%d %H:%M:%SZ"
   format_string: "%Y-%m-%d %H:%M:%SZ"
   transform: "strptime({col}, '%Y-%m-%d %H:%M:%SZ')"
   transform_ext: null
@@ -2095,6 +2263,9 @@ datetime.timestamp.dot_ymd_24h:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: TIMESTAMP
+  frictionless:
+    type: datetime
+    format: "%Y.%m.%d %H:%M:%S"
   format_string: "%Y.%m.%d %H:%M:%S"
   transform: "strptime({col}, '%Y.%m.%d %H:%M:%S')"
   transform_ext: null
@@ -2135,6 +2306,9 @@ datetime.date.ymd_slash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y/%m/%d"
   format_string: "%Y/%m/%d"
   transform: "strptime({col}, '%Y/%m/%d')::DATE"
   transform_ext: null
@@ -2163,6 +2337,9 @@ datetime.date.ymd_dot:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y.%m.%d"
   format_string: "%Y.%m.%d"
   transform: "strptime({col}, '%Y.%m.%d')::DATE"
   transform_ext: null
@@ -2192,6 +2369,9 @@ datetime.date.dmy_dash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d-%m-%Y"
   format_string: "%d-%m-%Y"
   transform: "strptime({col}, '%d-%m-%Y')::DATE"
   transform_ext: null
@@ -2221,6 +2401,9 @@ datetime.date.mdy_dash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%m-%d-%Y"
   format_string: "%m-%d-%Y"
   transform: "strptime({col}, '%m-%d-%Y')::DATE"
   transform_ext: null
@@ -2251,6 +2434,9 @@ datetime.date.dmy_space_abbrev:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d %b %Y"
   format_string: "%d %b %Y"
   transform: "strptime({col}, '%d %b %Y')::DATE"
   transform_ext: null
@@ -2279,6 +2465,9 @@ datetime.date.dmy_space_full:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d %B %Y"
   format_string: "%d %B %Y"
   transform: "strptime({col}, '%d %B %Y')::DATE"
   transform_ext: null
@@ -2308,6 +2497,9 @@ datetime.date.abbrev_month_no_comma:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%b %d %Y"
   format_string: "%b %d %Y"
   transform: "strptime({col}, '%b %d %Y')::DATE"
   transform_ext: null
@@ -2337,6 +2529,9 @@ datetime.date.full_month_no_comma:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%B %d %Y"
   format_string: "%B %d %Y"
   transform: "strptime({col}, '%B %d %Y')::DATE"
   transform_ext: null
@@ -2366,6 +2561,9 @@ datetime.date.dmy_dash_abbrev:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d-%b-%Y"
   format_string: "%d-%b-%Y"
   transform: "strptime({col}, '%d-%b-%Y')::DATE"
   transform_ext: null
@@ -2396,6 +2594,9 @@ datetime.date.dmy_dash_abbrev_short:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d-%b-%y"
   format_string: "%d-%b-%y"
   transform: "strptime({col}, '%d-%b-%y')::DATE"
   transform_ext: null
@@ -2424,6 +2625,9 @@ datetime.date.mdy_short_slash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%m/%d/%y"
   format_string: "%m/%d/%y"
   transform: "strptime({col}, '%m/%d/%y')::DATE"
   transform_ext: null
@@ -2453,6 +2657,9 @@ datetime.date.dmy_short_slash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d/%m/%y"
   format_string: "%d/%m/%y"
   transform: "strptime({col}, '%d/%m/%y')::DATE"
   transform_ext: null
@@ -2482,6 +2689,9 @@ datetime.date.dmy_short_dot:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%d.%m.%y"
   format_string: "%d.%m.%y"
   transform: "strptime({col}, '%d.%m.%y')::DATE"
   transform_ext: null
@@ -2511,6 +2721,8 @@ datetime.date.year_month:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: yearmonth
   format_string: "%Y-%m"
   transform: "strptime({col} || '-01', '%Y-%m-%d')::DATE"
   transform_ext: null
@@ -2543,6 +2755,9 @@ datetime.date.compact_ym:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%Y%m"
   format_string: "%Y%m"
   transform: "strptime({col} || '01', '%Y%m%d')::DATE"
   transform_ext: null
@@ -2574,6 +2789,9 @@ datetime.date.month_year_full:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%B %Y"
   format_string: "%B %Y"
   transform: "strptime('01 ' || {col}, '%d %B %Y')::DATE"
   transform_ext: null
@@ -2602,6 +2820,9 @@ datetime.date.month_year_abbrev:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%b %Y"
   format_string: "%b %Y"
   transform: "strptime('01 ' || {col}, '%d %b %Y')::DATE"
   transform_ext: null
@@ -2631,6 +2852,9 @@ datetime.date.month_year_slash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%m/%Y"
   format_string: "%m/%Y"
   transform: "CASE WHEN LENGTH({col}) = 5 THEN strptime('01/' || SUBSTRING({col}, 1, 2) || '/20' || SUBSTRING({col}, 4, 2), '%d/%m/%Y')::DATE ELSE strptime('01/' || {col}, '%d/%m/%Y')::DATE END"
   transform_ext: null
@@ -2665,6 +2889,9 @@ datetime.date.weekday_dmy_full:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: date
+    format: "%A, %d %B %Y"
   format_string: "%A, %d %B %Y"
   transform: "strptime({col}, '%A, %d %B %Y')::DATE"
   transform_ext: null
@@ -2694,6 +2921,8 @@ datetime.date.chinese_ymd:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: string
   format_string: null
   transform: "strptime(regexp_replace(regexp_replace(regexp_replace({col}, '\u5E74', '-'), '\u6708', '-'), '\u65E5', ''), '%Y-%-m-%-d')::DATE"
   transform_ext: null
@@ -2721,6 +2950,8 @@ datetime.date.korean_ymd:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: string
   format_string: null
   transform: "strptime(regexp_replace(regexp_replace(regexp_replace({col}, '\uB144 ', '-'), '\uC6D4 ', '-'), '\uC77C', ''), '%Y-%-m-%-d')::DATE"
   transform_ext: null
@@ -2751,6 +2982,8 @@ datetime.date.jp_era_short:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: string
   format_string: null
   transform: >
     CASE
@@ -2792,6 +3025,8 @@ datetime.date.jp_era_long:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: string
   format_string: null
   transform: >
     CASE
@@ -2838,6 +3073,8 @@ datetime.period.quarter:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DATE
+  frictionless:
+    type: string
   format_string: null
   transform: "make_date(CAST(regexp_extract({col}, '(\\d{4})', 1) AS INT), (CAST(regexp_extract({col}, 'Q([1-4])', 1) AS INT) - 1) * 3 + 1, 1)"
   transform_ext: null
@@ -2870,6 +3107,8 @@ datetime.period.fiscal_year:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST(regexp_extract({col}, 'FY(\\d{2,4})', 1) AS VARCHAR)"
   transform_ext: null

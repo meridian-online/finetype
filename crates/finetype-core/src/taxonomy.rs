@@ -190,6 +190,85 @@ fn is_rejected_body(body: &str) -> bool {
     false
 }
 
+/// Authoritative mapping from a FineType label to a Frictionless Table Schema
+/// field type (choice 0105). FineType owns this fold — the 244-type taxonomy
+/// collapses to the ~16 Frictionless v2 types, and downstream Meridian projects
+/// (dovetail, arcform) read this map rather than re-deriving it heuristically.
+///
+/// The richer FineType semantics that this lossy fold drops are preserved on the
+/// wire as the `x-finetype-label` custom property; this struct carries only the
+/// standard-core `type`/`format` pair.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Frictionless {
+    /// Frictionless v2 field type (one of [`FRICTIONLESS_TYPES`]).
+    #[serde(rename = "type")]
+    pub ftype: String,
+    /// Type-legal `format` variant, or `None` when only `default` applies.
+    /// For the temporal types this carries FineType's exact (portable) strptime
+    /// pattern, or the literal `any` for heuristic-parse leaves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+}
+
+/// The Frictionless v2 field-type vocabulary (Table Schema spec).
+pub const FRICTIONLESS_TYPES: &[&str] = &[
+    "string",
+    "number",
+    "integer",
+    "boolean",
+    "object",
+    "array",
+    "list",
+    "date",
+    "time",
+    "datetime",
+    "year",
+    "yearmonth",
+    "duration",
+    "geopoint",
+    "geojson",
+    "any",
+];
+
+/// Named (non-`default`) `format` values legal for the `string` type.
+const STRING_FORMATS: &[&str] = &["default", "email", "uri", "binary", "uuid"];
+
+impl Frictionless {
+    /// Validate that `type` is in the v2 vocabulary and `format` is legal for it.
+    ///
+    /// Returns `Err(reason)` describing the first problem. Used by the taxonomy
+    /// `check` gate (spec 2026-06-24, ac-01) so a malformed or missing mapping
+    /// fails CI rather than silently emitting a non-conformant descriptor.
+    pub fn validate(&self) -> Result<(), String> {
+        if !FRICTIONLESS_TYPES.contains(&self.ftype.as_str()) {
+            return Err(format!(
+                "type `{}` is not a Frictionless v2 type",
+                self.ftype
+            ));
+        }
+        let Some(fmt) = self.format.as_deref() else {
+            return Ok(()); // omitted format == `default`, always legal
+        };
+        let ok = match self.ftype.as_str() {
+            // Temporal types accept `default`, `any`, or any strptime pattern.
+            "date" | "time" | "datetime" => !fmt.is_empty(),
+            "string" => STRING_FORMATS.contains(&fmt),
+            "geopoint" => matches!(fmt, "default" | "array" | "object"),
+            "geojson" => matches!(fmt, "default" | "topojson"),
+            // All remaining types define only `default`.
+            _ => fmt == "default",
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(format!(
+                "format `{}` is not legal for Frictionless type `{}`",
+                fmt, self.ftype
+            ))
+        }
+    }
+}
+
 /// A single label definition in the taxonomy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Definition {
@@ -205,6 +284,11 @@ pub struct Definition {
     pub locales: Vec<String>,
     /// Target DuckDB type
     pub broad_type: Option<String>,
+    /// Authoritative Frictionless Table Schema `{type, format}` mapping for this
+    /// label (choice 0105). Required on every leaf; the taxonomy `check` gate
+    /// fails if it is absent or invalid (spec 2026-06-24, ac-01).
+    #[serde(default)]
+    pub frictionless: Option<Frictionless>,
     /// DuckDB strptime format string (null if not strptime-based)
     pub format_string: Option<String>,
     /// Alternative format string for type variants (e.g., ISO 8601 with fractional seconds)
@@ -1384,6 +1468,75 @@ representation.discrete.categorical:
             // In CI/release builds, labels/ may not exist — skip gracefully
             eprintln!("Skipping full taxonomy test (labels/ not found)");
         }
+    }
+
+    #[test]
+    fn test_frictionless_validate_accepts_and_rejects() {
+        // Legal cases.
+        for (ty, fmt) in [
+            ("string", None),
+            ("string", Some("email")),
+            ("string", Some("uri")),
+            ("string", Some("uuid")),
+            ("date", Some("%d/%m/%Y")), // strptime pattern
+            ("datetime", Some("any")),
+            ("geopoint", Some("array")),
+            ("integer", None),
+        ] {
+            let f = Frictionless {
+                ftype: ty.into(),
+                format: fmt.map(String::from),
+            };
+            assert!(f.validate().is_ok(), "{ty}/{fmt:?} should be legal");
+        }
+        // Illegal cases.
+        for (ty, fmt) in [
+            ("strng", None),                // typo'd type
+            ("integer", Some("email")),     // format illegal for integer
+            ("string", Some("pattern")),    // non-string-format
+            ("geopoint", Some("topojson")), // wrong geo format
+        ] {
+            let f = Frictionless {
+                ftype: ty.into(),
+                format: fmt.map(String::from),
+            };
+            assert!(f.validate().is_err(), "{ty}/{fmt:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn test_every_definition_has_valid_frictionless() {
+        // The hard gate lives in the `check` CLI command (run in CI from the
+        // repo root); this mirrors it for `cargo test`. Try both the crate-dir
+        // and workspace-root locations of labels/.
+        let taxonomy = ["labels", "../../labels"]
+            .iter()
+            .find_map(|p| Taxonomy::from_directory(p).ok());
+        let Some(taxonomy) = taxonomy else {
+            eprintln!("Skipping frictionless gate test (labels/ not found)");
+            return;
+        };
+        let mut failures = Vec::new();
+        for (key, def) in taxonomy.definitions() {
+            match &def.frictionless {
+                None => failures.push(format!("{key}: missing frictionless block")),
+                Some(fr) => {
+                    if let Err(e) = fr.validate() {
+                        failures.push(format!("{key}: {e}"));
+                    }
+                }
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} definition(s) with invalid frictionless mapping:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+        eprintln!(
+            "All {} definitions carry a valid frictionless mapping",
+            taxonomy.len()
+        );
     }
 
     // ── Locale validator cache tests ────────────────────────────────────

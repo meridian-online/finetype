@@ -36,6 +36,8 @@ technology.internet.ip_v4:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "CAST({col} AS INET)"
@@ -64,6 +66,8 @@ technology.internet.ip_v4_with_port:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -93,6 +97,8 @@ technology.internet.ip_v6:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "CAST({col} AS INET)"
@@ -120,6 +126,8 @@ technology.internet.mac_address:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -147,6 +155,9 @@ technology.internet.url:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
+    format: "uri"
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -181,6 +192,8 @@ technology.internet.hostname:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -212,6 +225,8 @@ technology.internet.top_level_domain:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -245,6 +260,8 @@ technology.internet.user_agent:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -276,6 +293,8 @@ technology.internet.http_method:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -332,6 +351,8 @@ technology.cryptographic.hash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -361,6 +382,8 @@ technology.cryptographic.token_urlsafe:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -397,6 +420,8 @@ technology.code.imei:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -429,6 +454,8 @@ technology.code.doi:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -461,6 +488,8 @@ technology.code.locale_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -494,6 +523,8 @@ technology.development.version:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -528,6 +559,8 @@ technology.development.calver:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -559,6 +592,8 @@ technology.development.docker_ref:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -599,6 +634,8 @@ technology.identifier.ulid:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "TRY_CAST({col} AS ULID)"
@@ -628,6 +665,8 @@ technology.identifier.tsid:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "tsid_to_timestamp({col})"
@@ -656,6 +695,8 @@ technology.identifier.snowflake_id:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BIGINT
+  frictionless:
+    type: integer
   format_string: null
   transform: "epoch_ms(({col}::BIGINT >> 22) + 1288834974657)"
   transform_ext: null
@@ -692,6 +733,8 @@ technology.cloud.aws_arn:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -725,6 +768,8 @@ technology.cloud.s3_uri:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -755,6 +800,8 @@ technology.cryptographic.jwt:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -786,6 +833,8 @@ technology.internet.cidr:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "CAST({col} AS INET)"
@@ -817,6 +866,9 @@ technology.internet.urn:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
+    format: "uri"
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -848,6 +900,9 @@ technology.internet.data_uri:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
+    format: "uri"
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -880,6 +935,8 @@ technology.filesystem.windows_path:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -913,6 +970,8 @@ technology.internet.message_id:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -946,6 +1005,8 @@ technology.code.qualified_name:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null

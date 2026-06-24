@@ -33,7 +33,8 @@ pub use table_validator::{
     TableValidatorError,
 };
 pub use taxonomy::{
-    DdlInfo, Definition, Designation, Label, Taxonomy, TierGraph, TierGraphSummary, Validation,
+    DdlInfo, Definition, Designation, Frictionless, Label, Taxonomy, TierGraph, TierGraphSummary,
+    Validation, FRICTIONLESS_TYPES,
 };
 pub use tokenizer::Tokenizer;
 pub use validation_veto::{

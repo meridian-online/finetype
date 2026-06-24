@@ -34,6 +34,8 @@ geography.location.country:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -64,6 +66,8 @@ geography.location.country_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -345,6 +349,8 @@ geography.location.state_code:
   designation: locale_specific
   locales: [EN_US, EN_CA, EN_AU]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -464,6 +470,8 @@ geography.location.continent:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -499,6 +507,8 @@ geography.location.region:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -530,6 +540,8 @@ geography.location.city:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, PT_BR, RU, JA, ZH, KO, AR, HI, TR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -566,6 +578,8 @@ geography.address.full_address:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -602,6 +616,8 @@ geography.address.street_name:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -631,6 +647,8 @@ geography.address.street_suffix:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -697,6 +715,8 @@ geography.address.postal_code:
     LU, MT
   ]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1084,6 +1104,8 @@ geography.format.wkt:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "ST_GeomFromText({col})"
@@ -1119,6 +1141,8 @@ geography.index.h3:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: "h3_cell_to_lat(h3_string_to_h3({col}))"
@@ -1154,6 +1178,8 @@ geography.coordinate.latitude:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -1187,6 +1213,8 @@ geography.coordinate.longitude:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -1219,6 +1247,8 @@ geography.coordinate.coordinates:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: POINT
+  frictionless:
+    type: geopoint
   format_string: null
   transform: "STRUCT_PACK(lat := CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), lon := CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
   transform_ext: "ST_Point(CAST(SPLIT_PART({col}, ',', 1) AS DOUBLE), CAST(SPLIT_PART({col}, ',', 2) AS DOUBLE))"
@@ -1252,6 +1282,8 @@ geography.coordinate.geohash:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1284,6 +1316,8 @@ geography.coordinate.plus_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1313,6 +1347,8 @@ geography.coordinate.dms:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1347,6 +1383,8 @@ geography.coordinate.mgrs:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1383,6 +1421,8 @@ geography.transportation.iata_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -1414,6 +1454,8 @@ geography.transportation.icao_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -1445,6 +1487,8 @@ geography.transportation.iso6346:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1476,6 +1520,8 @@ geography.transportation.hs_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1506,6 +1552,8 @@ geography.transportation.unlocode:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -1543,6 +1591,8 @@ geography.contact.calling_code:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA, PT_BR, ES_MX, HI, ES_AR, ES_CL, ES_CO, ES_PE, SE, NO, DK, FI, CZ, HU, RO, GR, TR, IL, TH, MY, SG, PH, ID, TW, NZ, NG, PT, AT, CH, BE, IE]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null

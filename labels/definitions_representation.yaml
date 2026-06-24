@@ -33,6 +33,8 @@ representation.numeric.integer_number:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BIGINT
+  frictionless:
+    type: integer
   format_string: null
   transform: "CAST({col} AS BIGINT)"
   transform_ext: null
@@ -62,6 +64,8 @@ representation.numeric.decimal_number:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -110,6 +114,8 @@ representation.numeric.decimal_number_comma:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: "CAST(REPLACE(REPLACE({col}, '.', ''), ',', '.') AS DOUBLE)"
   transform_ext: null
@@ -148,6 +154,8 @@ representation.numeric.scientific_notation:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: "CAST({col} AS DOUBLE)"
   transform_ext: null
@@ -178,6 +186,8 @@ representation.numeric.percentage:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: "CAST(REGEXP_EXTRACT({col}, '^(-?[0-9]+(\\.[0-9]+)?)') AS DOUBLE)"
   transform_ext: null
@@ -213,6 +223,8 @@ representation.numeric.si_number:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: >
     CASE
@@ -260,6 +272,8 @@ representation.text.plain_text:
   designation: broad_characters
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -290,6 +304,8 @@ representation.text.word:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "LOWER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -320,6 +336,8 @@ representation.format.color_hex:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -351,6 +369,8 @@ representation.format.color_rgb:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -383,6 +403,8 @@ representation.format.color_hsl:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -417,6 +439,8 @@ representation.text.emoji:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -447,6 +471,8 @@ representation.text.entity_name:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -489,6 +515,8 @@ representation.file.extension:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "LOWER(REGEXP_REPLACE({col}, '^\\.*', ''))"
   transform_ext: null
@@ -520,6 +548,8 @@ representation.file.mime_type:
   designation: broad_characters
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "LOWER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -553,6 +583,8 @@ representation.file.file_size:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BIGINT
+  frictionless:
+    type: integer
   format_string: null
   transform: >
     CASE
@@ -594,6 +626,8 @@ representation.file.excel_format:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -633,6 +667,8 @@ representation.scientific.dna_sequence:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -664,6 +700,8 @@ representation.scientific.rna_sequence:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -694,6 +732,8 @@ representation.scientific.protein_sequence:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -725,6 +765,8 @@ representation.scientific.measurement_unit:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "LOWER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -789,6 +831,8 @@ representation.scientific.cas_number:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -826,6 +870,8 @@ representation.scientific.inchi:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -861,6 +907,8 @@ representation.scientific.smiles:
   designation: broad_characters
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -915,6 +963,8 @@ representation.discrete.ordinal:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -966,6 +1016,8 @@ representation.boolean.binary:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BOOLEAN
+  frictionless:
+    type: boolean
   format_string: null
   transform: "CAST({col} AS BOOLEAN)"
   transform_ext: null
@@ -994,6 +1046,8 @@ representation.boolean.initials:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BOOLEAN
+  frictionless:
+    type: boolean
   format_string: null
   transform: "CAST({col} AS BOOLEAN)"
   transform_ext: null
@@ -1028,6 +1082,8 @@ representation.boolean.terms:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: BOOLEAN
+  frictionless:
+    type: boolean
   format_string: null
   transform: "CAST({col} AS BOOLEAN)"
   transform_ext: null
@@ -1072,6 +1128,9 @@ representation.identifier.uuid:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: UUID
+  frictionless:
+    type: string
+    format: "uuid"
   format_string: null
   transform: "CAST({col} AS UUID)"
   transform_ext: null
@@ -1104,6 +1163,8 @@ representation.identifier.alphanumeric_id:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1141,6 +1202,8 @@ representation.identifier.increment:
   designation: broad_numbers
   locales: [UNIVERSAL]
   broad_type: BIGINT
+  frictionless:
+    type: integer
   format_string: null
   transform: "CAST({col} AS BIGINT)"
   transform_ext: null
@@ -1174,6 +1237,8 @@ representation.identifier.numeric_code:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null

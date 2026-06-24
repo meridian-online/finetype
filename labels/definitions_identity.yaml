@@ -36,6 +36,8 @@ identity.person.full_name:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -73,6 +75,8 @@ identity.person.first_name:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -105,6 +109,8 @@ identity.person.last_name:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -137,6 +143,9 @@ identity.person.email:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
+    format: "email"
   format_string: null
   transform: "LOWER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -170,6 +179,8 @@ identity.person.phone_number:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU, JA, ZH, KO, AR, ZA, PT_BR, ES_MX, HI, ES_AR, ES_CL, ES_CO, ES_PE, SE, NO, DK, FI, CZ, HU, RO, GR, TR, IL, TH, MY, SG, PH, ID, TW, NZ, NG, PT, AT, CH, BE, IE]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -452,6 +463,8 @@ identity.person.email_display:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -486,6 +499,8 @@ identity.person.phone_e164:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -522,6 +537,8 @@ identity.person.username:
   designation: locale_specific
   locales: [EN, EN_AU, EN_GB, EN_CA, EN_US, DE, FR, ES, IT, NL, PL, RU]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "LOWER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -553,6 +570,8 @@ identity.person.password:
   designation: broad_characters
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -585,6 +604,8 @@ identity.person.gender:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -624,6 +645,8 @@ identity.person.gender_code:
   designation: broad_words
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST(UPPER({col}) AS VARCHAR)"
   transform_ext: null
@@ -669,6 +692,8 @@ identity.person.blood_type:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "UPPER(CAST({col} AS VARCHAR))"
   transform_ext: null
@@ -699,6 +724,8 @@ identity.person.height:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: >
     CASE
@@ -736,6 +763,8 @@ identity.person.weight:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: DOUBLE
+  frictionless:
+    type: number
   format_string: null
   transform: >
     CASE
@@ -800,6 +829,8 @@ identity.commerce.ean:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -828,6 +859,8 @@ identity.commerce.isbn:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -860,6 +893,8 @@ identity.commerce.issn:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -887,6 +922,8 @@ identity.commerce.upc:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -918,6 +955,8 @@ identity.commerce.isrc:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -959,6 +998,8 @@ identity.medical.npi:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -991,6 +1032,8 @@ identity.medical.dea_number:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1023,6 +1066,8 @@ identity.medical.ndc:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1053,6 +1098,8 @@ identity.medical.icd10:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1084,6 +1131,8 @@ identity.medical.loinc:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1114,6 +1163,8 @@ identity.medical.cpt:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1145,6 +1196,8 @@ identity.medical.hcpcs:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1182,6 +1235,8 @@ identity.government.vin:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1213,6 +1268,8 @@ identity.government.eu_vat:
   designation: locale_specific
   locales: [DE, FR, ES, IT, NL, PL, AT, BE, IE, SE, DK, FI, CZ, HU, RO, GR, PT]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1245,6 +1302,8 @@ identity.government.ssn:
   designation: locale_specific
   locales: [EN_US]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1279,6 +1338,8 @@ identity.government.ein:
   designation: locale_specific
   locales: [EN_US]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1310,6 +1371,8 @@ identity.government.pan_india:
   designation: locale_specific
   locales: [EN_IN, HI]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1342,6 +1405,8 @@ identity.government.abn:
   designation: locale_specific
   locales: [EN_AU]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
@@ -1382,6 +1447,8 @@ identity.academic.orcid:
   designation: universal
   locales: [UNIVERSAL]
   broad_type: VARCHAR
+  frictionless:
+    type: string
   format_string: null
   transform: "CAST({col} AS VARCHAR)"
   transform_ext: null
