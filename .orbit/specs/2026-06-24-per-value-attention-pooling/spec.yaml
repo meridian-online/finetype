@@ -37,7 +37,7 @@ acceptance_criteria:
     branch (mean/var/min/max retained as auxiliary concat per the pinned
     design). Trains end-to-end on the new FTMB; config fields added.
   gate: false
-  checked: false
+  checked: true
 - id: ac-3
   description: |
     Rust inference mirrors the trained pool: new value_attention.rs (modelled

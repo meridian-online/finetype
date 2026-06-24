@@ -443,6 +443,12 @@ enum Commands {
         /// Path to model config JSON (optional; uses built-in defaults if omitted)
         #[arg(long)]
         model_config: Option<PathBuf>,
+
+        /// Value-encoder model2vec directory (required when the model config has a
+        /// `value_attention` block — choice 0106). Encodes the FTMB v6 value
+        /// strings into per-value embeddings for the attention pool.
+        #[arg(long)]
+        value_encoder: Option<PathBuf>,
     },
 
     /// Autonomous type-inference triangulator (bead finetype-7zi).
@@ -772,6 +778,7 @@ fn main() -> Result<()> {
             val_split,
             no_tui,
             model_config,
+            value_encoder,
         } => cmd_train_multi_branch(
             data,
             output,
@@ -788,6 +795,7 @@ fn main() -> Result<()> {
             val_split,
             no_tui,
             model_config,
+            value_encoder,
         ),
 
         Commands::ExtractFeatures {
@@ -945,7 +953,9 @@ fn cmd_train_multi_branch(
     val_split: f32,
     no_tui: bool,
     model_config: Option<PathBuf>,
+    value_encoder: Option<PathBuf>,
 ) -> Result<()> {
+    use finetype_model::model2vec_shared::Model2VecResources;
     use finetype_train::multi_branch::{
         read_training_data, train_multi_branch, HeadType, MultiBranchConfig, MultiBranchDataset,
         MultiBranchTrainConfig,
@@ -1155,6 +1165,34 @@ fn cmd_train_multi_branch(
                 ..Default::default()
             }
         };
+
+    // Cross-value attention (choice 0106): encode the FTMB v6 value strings into
+    // per-value embeddings, once, with the value encoder. Done after model_config so
+    // we know whether attention is enabled.
+    let (train_data, val_data) = if let Some(va) = model_config.value_attention.clone() {
+        let enc_dir = value_encoder.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "model config has a `value_attention` block but --value-encoder was not given"
+            )
+        })?;
+        let enc = Model2VecResources::load(enc_dir).map_err(|e| {
+            anyhow::anyhow!("failed to load value encoder {}: {e}", enc_dir.display())
+        })?;
+        eprintln!(
+            "Value attention: encoding up to {} values/col with {} ({}d) for {} train + {} val records",
+            va.n_values,
+            enc_dir.display(),
+            va.value_embed_dim,
+            train_records.len(),
+            val_records.len(),
+        );
+        (
+            train_data.with_value_attention(&train_records, &va, &enc)?,
+            val_data.with_value_attention(&val_records, &va, &enc)?,
+        )
+    } else {
+        (train_data, val_data)
+    };
 
     let train_config = MultiBranchTrainConfig {
         output_dir: output.clone(),

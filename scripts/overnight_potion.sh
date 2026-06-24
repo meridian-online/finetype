@@ -40,6 +40,9 @@ SEEDS=(42 43 44)
 # Per-value attention (choice 0106): when > 0, the builder stores up to this many
 # raw value strings per record and writes FTMB v6 instead of v5. 0 = off.
 STORE_VALUES="${STORE_VALUES:-0}"
+# Local model2vec dir the trainer uses to encode the v6 value strings into per-value
+# embeddings (must match the value-branch encoder; potion-8M is staged at models/m2v8m).
+VALUE_ENCODER="${VALUE_ENCODER:-models/m2v8m}"
 
 # baseline (ac-01): m2v-244-s44 native Sense 0.521 / composed 0.769
 BASE_SENSE="0.521"; BASE_COMPOSED="0.769"
@@ -119,9 +122,10 @@ PYGATE
     OUT="models/${TAG}-s${S}"
     [[ -f "$OUT/model.safetensors" ]] && { echo "skip $OUT (exists)"; continue; }
     echo "[train] seed $S -> $OUT  ($(date))"
+    VE_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && VE_ARG=(--value-encoder "$VALUE_ENCODER")
     "$BIN" train-multi-branch --data "$FTMB" --output "$OUT" --model-config "$CONFIG" \
       --epochs "$EPOCHS" --batch-size 32 --lr 0.0001 --weight-decay 0.0001 --dropout 0.35 \
-      --seed "$S" --head flat --patience 15
+      --seed "$S" --head flat --patience 15 "${VE_ARG[@]}"
 
     # Post-train: inject type_index_keys (label-order contract for the validation
     # branch at inference). WITHOUT this the native classifier feeds the validation

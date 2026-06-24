@@ -29,6 +29,8 @@ use candle_nn::{
     batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder, VarMap,
 };
 use finetype_model::char_cnn::{HierarchicalHead, HierarchyMap};
+use finetype_model::model2vec_shared::Model2VecResources;
+use finetype_model::value_attention::{ValueAttentionConfig, ValueAttentionPool};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -104,6 +106,12 @@ pub struct MultiBranchConfig {
     /// When false (default): only header branch gets input LayerNorm, merge uses BatchNorm.
     #[serde(default)]
     pub use_layer_norm: bool,
+    /// Cross-value attention pool for the value branch (choice 0106). When set, the
+    /// embed branch input is `embed_dim` (mean/var/min/max blender) ‖ pool output,
+    /// and the per-value embeds are encoded in-trainer from the FTMB v6 strings.
+    /// None (default) = the legacy fixed-pool value branch.
+    #[serde(default)]
+    pub value_attention: Option<ValueAttentionConfig>,
 }
 
 impl Default for MultiBranchConfig {
@@ -125,6 +133,7 @@ impl Default for MultiBranchConfig {
             head_type: HeadType::Flat,
             activation: Activation::ReLU,
             use_layer_norm: false,
+            value_attention: None,
         }
     }
 }
@@ -138,6 +147,23 @@ impl MultiBranchConfig {
     /// Whether the validation branch is enabled (valid_dim > 0 with valid hidden dims).
     pub fn has_validation_branch(&self) -> bool {
         self.valid_dim > 0 && self.valid_hidden[0] > 0 && self.valid_hidden[1] > 0
+    }
+
+    /// Actual input dimension of the embed branch. Without value attention this is
+    /// `embed_dim` (the blender). With it, the blender (when `keep_blender_concat`)
+    /// is concatenated with the pool output before the branch.
+    pub fn embed_branch_input_dim(&self) -> usize {
+        match &self.value_attention {
+            Some(va) => {
+                let blender = if va.keep_blender_concat {
+                    self.embed_dim
+                } else {
+                    0
+                };
+                blender + va.output_dim()
+            }
+            None => self.embed_dim,
+        }
     }
 
     /// Compute the merged dimension (sum of final branch hidden sizes).
@@ -286,6 +312,9 @@ pub struct MultiBranchModel {
     stats_branch: BranchWeights,
     header_branch: Option<BranchWeights>,
     valid_branch: Option<BranchWeights>,
+    /// Cross-value attention pool feeding the embed branch (choice 0106). None for
+    /// the legacy fixed-pool value branch.
+    value_attention: Option<ValueAttentionPool>,
     merge_norm: MergeNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
@@ -305,6 +334,7 @@ impl MultiBranchModel {
             stats_branch,
             header_branch,
             valid_branch,
+            value_attention,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -318,6 +348,7 @@ impl MultiBranchModel {
             stats_branch,
             header_branch,
             valid_branch,
+            value_attention,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -341,6 +372,7 @@ impl MultiBranchModel {
             stats_branch,
             header_branch,
             valid_branch,
+            value_attention,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -358,6 +390,7 @@ impl MultiBranchModel {
             stats_branch,
             header_branch,
             valid_branch,
+            value_attention,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -384,6 +417,7 @@ impl MultiBranchModel {
         BranchWeights,
         Option<BranchWeights>,
         Option<BranchWeights>,
+        Option<ValueAttentionPool>,
         MergeNorm,
         Linear,
         Linear,
@@ -411,8 +445,19 @@ impl MultiBranchModel {
         };
 
         let char_branch = build_branch(config.char_dim, config.char_hidden, "char")?;
-        let embed_branch = build_branch(config.embed_dim, config.embed_hidden, "embed")?;
+        // Embed branch input widens to blender ‖ pool when value attention is on.
+        let embed_branch = build_branch(
+            config.embed_branch_input_dim(),
+            config.embed_hidden,
+            "embed",
+        )?;
         let stats_branch = build_branch(config.stats_dim, config.stats_hidden, "stats")?;
+
+        // Cross-value attention pool (choice 0106). Lives under "value_attn".
+        let value_attention = match &config.value_attention {
+            Some(va) => Some(ValueAttentionPool::new(va, vb.pp("value_attn"))?),
+            None => None,
+        };
 
         let header_branch = if config.has_header_branch() {
             // Header branch always gets input LayerNorm (stabilises raw Model2Vec embeddings).
@@ -470,10 +515,53 @@ impl MultiBranchModel {
             stats_branch,
             header_branch,
             valid_branch,
+            value_attention,
             merge_norm,
             merge_linear1,
             merge_linear2,
         ))
+    }
+
+    /// Whether this model uses cross-value attention pooling (choice 0106).
+    pub fn has_value_attention(&self) -> bool {
+        self.value_attention.is_some()
+    }
+
+    /// Build the embed-branch input from the blender features (mean/var/min/max,
+    /// `[B, embed_dim]`) and the per-value embeds.
+    ///
+    /// - No value attention: returns the blender unchanged.
+    /// - With it: runs the pool over `value_embeds [B, N, D]` (masked by
+    ///   `value_mask [B, N]`) and returns `blender ‖ pool` (or just `pool` when
+    ///   `keep_blender_concat` is false). The result is what `forward`/`forward_trunk`
+    ///   expect as `embed_feats` — the branch was built at this widened input dim.
+    pub fn embed_input(
+        &self,
+        blender: &Tensor,
+        value_embeds: Option<&Tensor>,
+        value_mask: Option<&Tensor>,
+        train: bool,
+    ) -> candle_core::Result<Tensor> {
+        let Some(pool) = &self.value_attention else {
+            return Ok(blender.clone());
+        };
+        let (embeds, mask) = value_embeds.zip(value_mask).ok_or_else(|| {
+            candle_core::Error::Msg(
+                "value-attention model requires value_embeds + value_mask".into(),
+            )
+        })?;
+        let pooled = pool.forward(embeds, mask, train)?;
+        let keep = self
+            .config
+            .value_attention
+            .as_ref()
+            .map(|v| v.keep_blender_concat)
+            .unwrap_or(false);
+        if keep {
+            Tensor::cat(&[blender, &pooled], 1)
+        } else {
+            Ok(pooled)
+        }
     }
 
     /// Forward pass through the trunk only (branches → merge → hidden).
@@ -481,6 +569,8 @@ impl MultiBranchModel {
     /// Returns the hidden representation `[B, merge_hidden[1]]` before the classification head.
     /// `header_feats` is optional — pass `None` for old 3-branch models.
     /// `valid_feats` is optional — pass `None` when no validation branch.
+    /// When the model has value attention, `embed_feats` must already be the
+    /// widened `blender ‖ pool` tensor from [`Self::embed_input`].
     pub fn forward_trunk(
         &self,
         char_feats: &Tensor,
@@ -1848,6 +1938,16 @@ pub struct MultiBranchDataset {
     pub valid_dim: usize,
     /// Table groups from v3 data. Empty for v1/v2 data (single group with all records).
     pub table_groups: Vec<TableGroup>,
+    /// Per-value embeddings for cross-value attention (choice 0106), flat
+    /// `[N * n_values * value_embed_dim]`. Empty when value attention is off.
+    pub value_embeds: Vec<f32>,
+    /// Validity mask aligned with `value_embeds`, flat `[N * n_values]` (1.0 valid,
+    /// 0.0 pad). Empty when value attention is off.
+    pub value_mask: Vec<f32>,
+    /// Values attended over per column (sequence length). 0 = no value attention.
+    pub n_values: usize,
+    /// Per-value embedding width. 0 = no value attention.
+    pub value_embed_dim: usize,
 }
 
 impl MultiBranchDataset {
@@ -1954,7 +2054,106 @@ impl MultiBranchDataset {
             header_dim,
             valid_dim,
             table_groups: groups,
+            value_embeds: Vec::new(),
+            value_mask: Vec::new(),
+            n_values: 0,
+            value_embed_dim: 0,
         })
+    }
+
+    /// Encode each record's FTMB v6 value strings into per-value embeddings for the
+    /// cross-value attention pool (choice 0106). Call after construction when the
+    /// model config has `value_attention`. Values are encoded once here (not per
+    /// epoch) with the value encoder, padded/truncated to `n_values`, and a validity
+    /// mask is recorded. `records` MUST be the same slice (same order) used to build
+    /// this dataset, so encoded rows align with the flat feature arrays.
+    pub fn with_value_attention(
+        mut self,
+        records: &[TrainingRecord],
+        cfg: &ValueAttentionConfig,
+        encoder: &Model2VecResources,
+    ) -> Result<Self> {
+        let n_values = cfg.n_values;
+        let d = cfg.value_embed_dim;
+        let enc_dim = encoder.embed_dim()?;
+        if enc_dim != d {
+            bail!("value encoder dim {enc_dim} != config value_embed_dim {d}");
+        }
+        if records.len() != self.n_samples {
+            bail!(
+                "with_value_attention: {} records != dataset n_samples {}",
+                records.len(),
+                self.n_samples
+            );
+        }
+
+        let mut value_embeds = vec![0.0f32; self.n_samples * n_values * d];
+        let mut value_mask = vec![0.0f32; self.n_samples * n_values];
+
+        for (ri, record) in records.iter().enumerate() {
+            let take = record.values.len().min(n_values);
+            if take == 0 {
+                continue; // empty column → all-pad row (pooled to zeros)
+            }
+            let refs: Vec<&str> = record.values[..take].iter().map(|s| s.as_str()).collect();
+            let batch = encoder.encode_batch(&refs)?; // [take, d]
+            for j in 0..take {
+                let row: Vec<f32> = batch.get(j)?.to_vec1()?;
+                let base = (ri * n_values + j) * d;
+                value_embeds[base..base + d].copy_from_slice(&row[..d]);
+                value_mask[ri * n_values + j] = 1.0;
+            }
+        }
+
+        self.value_embeds = value_embeds;
+        self.value_mask = value_mask;
+        self.n_values = n_values;
+        self.value_embed_dim = d;
+        Ok(self)
+    }
+
+    /// Whether per-value embeddings have been encoded for attention pooling.
+    pub fn has_value_attention(&self) -> bool {
+        self.n_values > 0 && self.value_embed_dim > 0
+    }
+
+    /// Expand a list of group indices into the flat record-index order that
+    /// [`Self::batch_groups`] produces (concatenated `group.record_indices`).
+    /// Used to align the value batch with the group batch.
+    pub fn expand_group_indices(&self, group_indices: &[usize]) -> Vec<usize> {
+        let mut out = Vec::new();
+        for &gi in group_indices {
+            out.extend_from_slice(&self.table_groups[gi].record_indices);
+        }
+        out
+    }
+
+    /// Gather the per-value embeds + mask for `record_indices` into batch tensors:
+    /// `([bs, n_values, value_embed_dim], [bs, n_values])`. None when value
+    /// attention is off. `record_indices` are flat record indices (use
+    /// [`Self::expand_group_indices`] for the group path).
+    pub fn value_batch(
+        &self,
+        record_indices: &[usize],
+        device: &Device,
+    ) -> candle_core::Result<Option<(Tensor, Tensor)>> {
+        if !self.has_value_attention() {
+            return Ok(None);
+        }
+        let bs = record_indices.len();
+        let n = self.n_values;
+        let d = self.value_embed_dim;
+        let mut embeds = Vec::with_capacity(bs * n * d);
+        let mut mask = Vec::with_capacity(bs * n);
+        for &i in record_indices {
+            let e_start = i * n * d;
+            embeds.extend_from_slice(&self.value_embeds[e_start..e_start + n * d]);
+            let m_start = i * n;
+            mask.extend_from_slice(&self.value_mask[m_start..m_start + n]);
+        }
+        let embeds_t = Tensor::new(embeds.as_slice(), device)?.reshape((bs, n, d))?;
+        let mask_t = Tensor::new(mask.as_slice(), device)?.reshape((bs, n))?;
+        Ok(Some((embeds_t, mask_t)))
     }
 
     /// Number of samples.
@@ -2614,6 +2813,13 @@ pub fn train_multi_branch(
 
         // Training loop
         for batch_num in 0..total_batches {
+            // Flat record-index list for this batch — aligns the value batch with
+            // either the group expansion or the flat indices.
+            let record_idx_list: Vec<usize> = if use_group_batching {
+                train_data.expand_group_indices(&group_batches[batch_num])
+            } else {
+                flat_batches[batch_num].clone()
+            };
             let (char_t, embed_t, stats_t, header_t, valid_t, labels_t) = if use_group_batching {
                 train_data.batch_groups(&group_batches[batch_num], frozen_ref, &device)?
             } else {
@@ -2621,12 +2827,22 @@ pub fn train_multi_branch(
             };
             let bs = labels_t.dim(0)?;
 
+            // Per-value embeds for the attention pool (None when off). The embed
+            // branch input is blender ‖ pool — computed train/eval separately so the
+            // pool's dropout matches the rest of the forward.
+            let value_bt = train_data.value_batch(&record_idx_list, &device)?;
+            let (ve, vm) = match &value_bt {
+                Some((e, m)) => (Some(e), Some(m)),
+                None => (None, None),
+            };
+            let embed_train = model.embed_input(&embed_t, ve, vm, true)?;
+
             let loss = if is_hierarchical {
                 let hier = model.hierarchical_head().unwrap();
                 let hierarchy = hier.hierarchy();
                 let (domain_logits, cat_logits, leaf_logits) = model.forward_levels(
                     &char_t,
-                    &embed_t,
+                    &embed_train,
                     &stats_t,
                     header_t.as_ref(),
                     valid_t.as_ref(),
@@ -2643,7 +2859,7 @@ pub fn train_multi_branch(
             } else {
                 let logits = model.forward(
                     &char_t,
-                    &embed_t,
+                    &embed_train,
                     &stats_t,
                     header_t.as_ref(),
                     valid_t.as_ref(),
@@ -2676,9 +2892,10 @@ pub fn train_multi_branch(
             train_loss_sum += loss_val as f64 * bs as f64;
 
             // Accuracy via forward (product probabilities for hier, logits for flat)
+            let embed_eval = model.embed_input(&embed_t, ve, vm, false)?;
             let output = model.forward(
                 &char_t,
-                &embed_t,
+                &embed_eval,
                 &stats_t,
                 header_t.as_ref(),
                 valid_t.as_ref(),
@@ -2710,6 +2927,14 @@ pub fn train_multi_branch(
                 let (char_t, embed_t, stats_t, header_t, valid_t, labels_t) =
                     val_data.batch(batch_idx, &device)?;
                 let bs = batch_idx.len();
+
+                // Validation is eval-only — one embed input (blender ‖ pool) suffices.
+                let value_bt = val_data.value_batch(batch_idx, &device)?;
+                let (ve, vm) = match &value_bt {
+                    Some((e, m)) => (Some(e), Some(m)),
+                    None => (None, None),
+                };
+                let embed_t = model.embed_input(&embed_t, ve, vm, false)?;
 
                 let loss_val = if is_hierarchical {
                     let hier = model.hierarchical_head().unwrap();
@@ -2905,6 +3130,133 @@ mod tests {
         MultiBranchConfig::default()
     }
 
+    /// End-to-end: a value-attention model encodes real value strings, widens the
+    /// embed branch to blender ‖ pool, and a full forward+backward step updates the
+    /// pool's parameters. Skips when the shared model2vec encoder is absent.
+    #[test]
+    fn test_value_attention_end_to_end() {
+        let enc_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("models")
+            .join("model2vec");
+        if !enc_dir.join("model.safetensors").exists() {
+            eprintln!("skip test_value_attention_end_to_end: models/model2vec absent");
+            return;
+        }
+        let enc = Model2VecResources::load(&enc_dir).unwrap();
+        let d = enc.embed_dim().unwrap();
+
+        let va = ValueAttentionConfig {
+            value_embed_dim: d,
+            n_values: 8,
+            n_heads: 4,
+            self_attn_layers: 1,
+            ffn_hidden: 64,
+            pool_slots: 2,
+            dropout: 0.0,
+            keep_blender_concat: true,
+        };
+        let blender = 16usize;
+        let config = MultiBranchConfig {
+            char_dim: 12,
+            embed_dim: blender,
+            stats_dim: 6,
+            header_dim: 0,
+            char_hidden: [16, 8],
+            embed_hidden: [16, 8],
+            stats_hidden: [8, 4],
+            header_hidden: [0, 0],
+            valid_dim: 0,
+            valid_hidden: [0, 0],
+            merge_hidden: [16, 16],
+            n_classes: 3,
+            dropout: 0.0,
+            head_type: HeadType::Flat,
+            activation: Activation::ReLU,
+            use_layer_norm: false,
+            value_attention: Some(va.clone()),
+        };
+
+        let label_names = ["a.b.c0", "a.b.c1", "a.b.c2"];
+        let value_sets = [
+            vec!["alice@example.com", "bob@example.com"],
+            vec!["2024-01-15", "2023-06-30", "2022-12-01"],
+            vec!["London", "Paris"],
+        ];
+        let records: Vec<TrainingRecord> = (0..6)
+            .map(|i| {
+                let c = i % 3;
+                TrainingRecord {
+                    label: label_names[c].to_string(),
+                    char_features: vec![c as f32 * 0.1; 12],
+                    embed_features: vec![c as f32 * 0.2; blender],
+                    stats_features: vec![c as f32 * 0.3; 6],
+                    header_features: vec![],
+                    validation_features: vec![],
+                    values: value_sets[c].iter().map(|s| s.to_string()).collect(),
+                }
+            })
+            .collect();
+        let mut label_to_idx = std::collections::HashMap::new();
+        for (i, n) in label_names.iter().enumerate() {
+            label_to_idx.insert(n.to_string(), i as u32);
+        }
+
+        let ds = MultiBranchDataset::from_records(&records, &label_to_idx, 12, blender, 6, 0)
+            .unwrap()
+            .with_value_attention(&records, &va, &enc)
+            .unwrap();
+        assert!(ds.has_value_attention());
+
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let model = MultiBranchModel::new(&config, vb).unwrap();
+        assert!(model.has_value_attention());
+
+        let indices: Vec<usize> = (0..records.len()).collect();
+        let (char_t, embed_t, stats_t, _h, _v, labels_t) = ds.batch(&indices, &device).unwrap();
+        let (ve, vm) = ds.value_batch(&indices, &device).unwrap().unwrap();
+        let embed_in = model
+            .embed_input(&embed_t, Some(&ve), Some(&vm), true)
+            .unwrap();
+        assert_eq!(embed_in.dim(1).unwrap(), blender + va.output_dim());
+
+        // Snapshot params, run one optimiser step, confirm they moved.
+        let vars = varmap.all_vars();
+        let before: Vec<Vec<f32>> = vars
+            .iter()
+            .map(|v| v.flatten_all().unwrap().to_vec1::<f32>().unwrap())
+            .collect();
+
+        let adamw_params = candle_nn::ParamsAdamW {
+            lr: 0.01,
+            ..Default::default()
+        };
+        let mut opt = candle_nn::AdamW::new(varmap.all_vars(), adamw_params).unwrap();
+        let logits = model
+            .forward(&char_t, &embed_in, &stats_t, None, None, true)
+            .unwrap();
+        assert_eq!(logits.dims(), &[6, 3]);
+        let loss = candle_nn::loss::cross_entropy(&logits, &labels_t).unwrap();
+        assert!(loss.to_scalar::<f32>().unwrap().is_finite());
+        let grads = loss.backward().unwrap();
+        opt.step(&grads).unwrap();
+
+        let changed = vars
+            .iter()
+            .zip(before.iter())
+            .filter(|(v, b)| &v.flatten_all().unwrap().to_vec1::<f32>().unwrap() != *b)
+            .count();
+        assert!(
+            changed > 0,
+            "no parameters updated by the value-attention step"
+        );
+    }
+
     #[test]
     fn test_logit_adjust_prior_upweights_rare_classes() {
         // labels: class 0 appears 8x, class 1 4x, class 2 1x (the rare one).
@@ -3065,6 +3417,7 @@ mod tests {
             head_type: HeadType::Flat,
             activation: Activation::ReLU,
             use_layer_norm: false,
+            value_attention: None,
         };
 
         let tmp = tempfile::NamedTempFile::new().unwrap();
