@@ -1,8 +1,12 @@
 id: '0105'
 title: Frictionless Data Package is FineType's interoperable description format; FineType owns the canonical label→Frictionless type map
-status: proposed
+status: accepted
 date_created: 2026-06-24
 date_modified: 2026-06-24
+# Emit side SHIPPED via spec 2026-06-24-frictionless-datapackage-profile-output
+# (closed): the authoritative map, `profile -o datapackage` (CLI + MCP),
+# `frictionless_for` accessor, and the vendored v2.0 profile. The deferred
+# `validate`-reads-Frictionless round-trip remains open (see card 0005 task).
 body: |
   # 0105. Frictionless Data Package as FineType's interoperable output, and FineType as the family's authoritative type-mapping source
 
