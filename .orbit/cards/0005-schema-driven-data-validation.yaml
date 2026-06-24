@@ -41,6 +41,7 @@ specs:
 - .orbit/specs/2026-04-22-duckdb-extension-ergonomics/spec.yaml
 - .orbit/specs/2026-04-27-cli-pipeline-reshape/
 - .orbit/specs/2026-04-28-validate-absorbs-load/spec.yaml
+- .orbit/specs/2026-06-24-frictionless-datapackage-profile-output/spec.yaml
 relations: []
 references:
 - README.md

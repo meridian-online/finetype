@@ -57,6 +57,7 @@ specs:
 - .orbit/specs/2026-06-16-duckdb-csv-ingestion-spike/spec.yaml
 - .orbit/specs/2026-06-16-duckdb-shellout-ingestion/spec.yaml
 - .orbit/specs/2026-06-17-enum-domain-emission/spec.yaml
+- .orbit/specs/2026-06-24-frictionless-datapackage-profile-output/spec.yaml
 relations: []
 references:
 - .orbit/specs/2026-04-28-validate-precision-corpus/interview.md
