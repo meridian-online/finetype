@@ -16,9 +16,9 @@ acceptance_criteria:
     pool query (learned vs header-derived), attention shape (layers/heads/
     width), n_values carried + padding/masking, keep-or-drop the mean/var/
     min/max concat. One config committed (models/<tag>-attn-config.json).
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
 - id: ac-1
   description: |
     FTMB carries the ~50 sampled value strings per column so per-value
@@ -27,7 +27,6 @@ acceptance_criteria:
     read_ftmb.py, the dims gate in overnight_potion.sh, and the record
     struct in finetype-train/src/data.rs. Round-trips: a built FTMB
     re-reads identical strings.
-  ac_type: code
   gate: false
   checked: false
 - id: ac-2
@@ -37,7 +36,6 @@ acceptance_criteria:
     vectors followed by a learned/header-query pool, feeding the value
     branch (mean/var/min/max retained as auxiliary concat per the pinned
     design). Trains end-to-end on the new FTMB; config fields added.
-  ac_type: code
   gate: false
   checked: false
 - id: ac-3
@@ -47,7 +45,6 @@ acceptance_criteria:
     matrix path, not extract_embedding_aggregation_dyn on the value branch),
     branch.rs, config.rs. Native finetype predictions match the trainer's
     predict_multibranch on the gold FTMB within tolerance (parity check).
-  ac_type: code
   gate: false
   checked: false
 - id: ac-4
@@ -57,9 +54,9 @@ acceptance_criteria:
     (0.502 / 0.793). Drift-proxy pre-check run; representative band (advisory)
     reported. DELIVERABLE: best-of-3 Sense delta and composed delta, and the
     explicit read on whether the Sense lift passed through to composed.
-  ac_type: observation
   gate: false
   checked: false
+  ac_type: observation
 - id: ac-5
   description: |
     PROMOTION GATE (choice 0104, unchanged): a swap to models/default requires
@@ -67,15 +64,15 @@ acceptance_criteria:
     corpus-honest gate (blocking). No swap unless gold holds and the relocation
     review passes. A Sense-only win that ties composed is a documented
     no-swap outcome, not a failure.
-  ac_type: observation
   gate: true
   checked: false
+  ac_type: observation
 - id: ac-6
   description: |
     Findings memo (output/per-value-attention/RESULT.md): what cross-value
     attention bought on Sense, whether it tied or beat composed, native
     latency confirmed vs the shipped potion-8M, and the GO/NO-GO call on
     whether to proceed to the separate rule-layer bet (the composed cap).
-  ac_type: doc
   gate: false
   checked: false
+  ac_type: doc
