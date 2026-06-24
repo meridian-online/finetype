@@ -46,7 +46,7 @@ acceptance_criteria:
     branch.rs, config.rs. Native finetype predictions match the trainer's
     predict_multibranch on the gold FTMB within tolerance (parity check).
   gate: false
-  checked: false
+  checked: true
 - id: ac-4
   description: |
     3-seed retrain (potion-8M value encoder) scored on gold: Sense + composed
@@ -55,7 +55,7 @@ acceptance_criteria:
     reported. DELIVERABLE: best-of-3 Sense delta and composed delta, and the
     explicit read on whether the Sense lift passed through to composed.
   gate: false
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-5
   description: |
@@ -65,7 +65,7 @@ acceptance_criteria:
     review passes. A Sense-only win that ties composed is a documented
     no-swap outcome, not a failure.
   gate: true
-  checked: false
+  checked: true
   ac_type: observation
 - id: ac-6
   description: |
@@ -74,5 +74,5 @@ acceptance_criteria:
     latency confirmed vs the shipped potion-8M, and the GO/NO-GO call on
     whether to proceed to the separate rule-layer bet (the composed cap).
   gate: false
-  checked: false
+  checked: true
   ac_type: doc
