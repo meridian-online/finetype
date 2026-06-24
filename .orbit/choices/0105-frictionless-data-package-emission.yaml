@@ -1,0 +1,108 @@
+id: '0105'
+title: Frictionless Data Package is FineType's interoperable description format; FineType owns the canonical label→Frictionless type map
+status: proposed
+date_created: 2026-06-24
+date_modified: 2026-06-24
+body: |
+  # 0105. Frictionless Data Package as FineType's interoperable output, and FineType as the family's authoritative type-mapping source
+
+  ## Context and Problem Statement
+
+  Two sibling Meridian projects have committed to the Frictionless Data Package
+  standard for *describing* data: dovetail (choice 0002, **accepted + shipped** —
+  `datapackage.json` from `survey`/`relate`, `foreignKeys` for relationships) and
+  arcform (decision 0017, **accepted**, a pipeline ships a `datapackage.json`
+  describing its outputs; the boundary is load-bearing — a Data Package
+  *describes*, it does not *execute*). FAIR data (Findable, Accessible,
+  Interoperable, Reusable) is the shared why: one interoperable, JSON-Schema-
+  validated envelope instead of three bespoke ones.
+
+  FineType is the **upstream** of that family. It already infers richer types than
+  Frictionless can express, and dovetail already *consumes a FineType label* — its
+  resource fields carry `x-dovetailSemanticType` (a FineType label) and map it to a
+  coarse Frictionless `type` with a string-prefix heuristic (`frictionless_type()`
+  in `dovetail-core/src/datapackage.rs`). Arcform hand-writes the mapping in its
+  example descriptor. So the family is **guessing at a fold FineType owns the
+  authority for** (244 semantic types → ~16 Frictionless types).
+
+  Meanwhile FineType's own external description format is JSON Schema (draft
+  2020-12) via `profile -o json-schema`: keyed by `properties`, DuckDB type names
+  buried in `broad_type`, the rich type in `x-finetype-label`. It is ~90% of a
+  Table Schema in the wrong dialect, and there is no `datapackage.json` resource
+  wrapper at all.
+
+  ## Considered Options
+
+  - **Do nothing.** Keep emitting JSON Schema; let dovetail/arcform keep guessing
+    the type fold. Cheap, but strands FineType outside the family standard and
+    leaves the authoritative mapping un-owned and re-derived lossily downstream.
+  - **Replace the JSON-Schema output with Table Schema.** One description format,
+    but breaks existing JSON-Schema consumers and conflates a clean additive win
+    with a migration.
+  - **Adopt Frictionless additively, and own the type map.** Add a Data Package
+    output alongside the existing JSON-Schema output; make the
+    label→Frictionless `type`/`format` mapping an authoritative, hand-curated
+    block in the taxonomy YAML (not an emitter heuristic); teach `validate` to
+    read a Frictionless descriptor so the round-trip with dovetail/arcform closes.
+
+  ## Decision Outcome
+
+  Chosen option: **adopt Frictionless additively, and own the type map**, because
+  FineType is the one project in the family with the authority to define the
+  canonical fold, and emitting the standard envelope makes it the type source the
+  rest of Meridian validates against rather than guesses at.
+
+  Concretely:
+
+  - **`profile` gains a `datapackage` output** (`-o datapackage`): one Data Resource
+    (`name`, `path`, `format`, `mediatype`, `encoding`, `bytes`, `hash` as
+    `sha256:…`, `created` — all already computable in `profile_io.rs`) embedding a
+    Table Schema (`fields[]` with `name`, `type`, `format`, `constraints`).
+    `$schema` pins the **2.0** profile, aligning with arcform (dovetail is on 1.0;
+    the family should converge on 2.0).
+  - **The label→Frictionless map is authoritative in the taxonomy.** Each of the
+    244 `Definition`s in `labels/definitions_*.yaml` gains a curated
+    `frictionless: {type, format}` block — a hand-verified fold, not a prefix
+    heuristic. This is the Precision Principle applied to interoperability, and it
+    is the family value-add: dovetail can retire its `frictionless_type()` guess
+    and import the map. Several mappings are precision *gains* because Frictionless
+    has native string formats FineType currently flattens to `pattern` (email→
+    `string`/`email`, url→`string`/`uri`, uuid→`string`/`uuid`); the datetime
+    domain folds to `date`/`time`/`datetime`/`year`/`yearmonth`/`duration`.
+  - **FineType richness rides as `x-finetype-*` custom properties** (the dovetail
+    pattern — never fork the spec): `x-finetype-label` (lossless 3-level type),
+    `x-finetype-locale`, `x-finetype-confidence`, `x-finetype-pii`,
+    `x-finetype-enum-domain` (the *open* observed domain, kept distinct from the
+    constraining `enum`). Consumers that ignore extensions see standard core.
+  - **`validate` accepts a Table Schema / `datapackage.json` as input schema**, not
+    only JSON Schema, mapping `type`/`format`/`constraints` back through the same
+    registry. This closes the round-trip: FineType emits → dovetail/arcform extend
+    with `foreignKeys` + provenance → FineType validates data against it.
+
+  ### Scope boundaries (load-bearing)
+
+  - **Additive, never a replacement.** The existing `json-schema` output stays.
+  - **The DuckDB `transform` is NOT in the descriptor.** A Data Package *describes*,
+    it does not *execute* — the boundary arcform drew (decision 0017). The transform
+    is recoverable from the label via the bundled taxonomy; this matches FineType's
+    existing PR #51 verbosity contract.
+  - **No locale/confidence/PII fields invented in the core spec** — they ride as
+    `x-finetype-*` so conformance holds.
+
+  ### Consequences
+
+  - Good, because FineType joins the family standard and becomes the authoritative
+    label→Frictionless type source — dovetail/arcform stop guessing the fold.
+  - Good, because the round-trip (`validate` reads Frictionless) makes the standard
+    a real interoperability loop, not just an emit-side gesture.
+  - Good, because several mappings *gain* precision via native Frictionless string
+    formats currently flattened to regex patterns.
+  - Bad, because the 244→16 fold is lossy; `x-finetype-label` is the lossless
+    carrier downstream consumers must read to recover full semantics.
+  - Neutral, because single-column `geopoint` (Frictionless wants `"lon,lat"` in one
+    column; FineType detects latitude/longitude as separate columns) and
+    multi-pattern `validation_by_locale` (Table Schema allows one `constraints.pattern`)
+    are honest narrowings deferred out of the first cut.
+references:
+- dovetail choice 0002 (Frictionless Data Package as the canonical manifest)
+- arcform decision 0017 (Frictionless Data Package as meridian's data-description standard)

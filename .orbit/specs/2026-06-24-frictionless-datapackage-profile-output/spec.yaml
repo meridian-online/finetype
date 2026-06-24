@@ -1,0 +1,91 @@
+id: 2026-06-24-frictionless-datapackage-profile-output
+goal: |
+  First cut of choice 0105: `profile` emits a conformant Frictionless **Data Package**
+  (`-o datapackage`) describing the profiled file — a Data Resource wrapping a Table Schema
+  whose `type`/`format` come from a NEW authoritative `frictionless:` mapping block on each
+  taxonomy definition. FineType becomes the family's canonical label→Frictionless type source
+  (dovetail/arcform stop guessing the fold). Additive: the existing `json-schema` output is
+  untouched. `validate`-reads-Frictionless and the standalone registry publish are deferred to
+  follow-up specs.
+cards:
+- 0005-schema-driven-data-validation
+- 0014-profile-validate-precision
+status: open
+labels:
+- interoperability
+- frictionless
+- output-format
+- taxonomy
+acceptance_criteria:
+- id: ac-01
+  description: |
+    AUTHORITATIVE TYPE MAP — every one of the 244 taxonomy definitions in
+    labels/definitions_*.yaml gains a curated `frictionless: {type, format}` block,
+    hand-verified per leaf (NOT a prefix heuristic in the emitter). `type` is one of
+    the Frictionless v2 enum: string, number, integer, boolean, object, array, list,
+    date, time, datetime, year, yearmonth, duration, geopoint, geojson, any. `format`
+    is the type-legal variant (e.g. string→default|email|uri|uuid|binary; date/time/
+    datetime→default|<pattern>|any) or omitted when only `default` applies. The map is
+    surfaced through the `Definition` struct (finetype-core/src/taxonomy.rs) and a
+    generator/taxonomy `check` rule fails if any definition lacks a valid block or
+    names a non-enum type/format. Precision wins to capture explicitly:
+    identity.person.email→string/email, technology.internet.url→string/uri,
+    representation.identifier.uuid→string/uuid; datetime.* folds to
+    date|time|datetime|year|yearmonth|duration; representation.boolean→boolean;
+    container.json→object|array. Deferred-as-string with a note: anything whose richer
+    semantics have no Frictionless home (the lossless carrier is x-finetype-label).
+  gate: true
+  checked: false
+  ac_type: config
+- id: ac-02
+  description: |
+    DATA PACKAGE EMITTER — `profile -f <file> -o datapackage` writes a single
+    Data Package descriptor: one Data Resource with `name` (derived from filename),
+    `path`, `format` (csv|parquet|json|ndjson), `mediatype`, `encoding`, `bytes`,
+    `hash` ("sha256:<hex>"), `created`, plus `$schema` pinned to
+    https://datapackage.org/profiles/2.0/datapackage.json. The resource embeds a Table
+    Schema: `fields[]` ordered as in the source, each `{name, type, format?,
+    constraints?}` where type/format come from ac-01's map keyed on the inferred label,
+    and `constraints` carries `pattern`/`minLength`/`maxLength`/`minimum`/`maximum` from
+    the type's validation and `enum` ONLY from a CLOSED enum_domain. Reuse the resource-
+    metadata already computed in crates/finetype-cli/src/profile_io.rs; do not recompute.
+    Follow dovetail-core/src/datapackage.rs struct shape where it eases family consistency.
+  gate: true
+  checked: false
+  ac_type: code
+- id: ac-03
+  description: |
+    CUSTOM PROPERTIES — FineType richness rides as `x-finetype-*` per-field custom
+    properties (never fork the core spec): `x-finetype-label` (3-level lossless type),
+    `x-finetype-confidence`, `x-finetype-pii` (only when true), `x-finetype-locale`
+    (only when a locale was detected), `x-finetype-enum-domain` (the OPEN observed
+    domain object — distinct from the constraining `enum`; only when present). The
+    DuckDB `transform`, `broad_type`, and `format_string` are NOT emitted (descriptive-
+    not-executable boundary; recoverable from the label via the bundled taxonomy —
+    matches the PR #51 verbosity contract). A descriptor stripped of all `x-` keys is a
+    valid plain Data Package.
+  gate: false
+  checked: false
+  ac_type: code
+- id: ac-04
+  description: |
+    CONFORMANCE — vendor the Frictionless v2 Data Package profile JSON Schema under
+    vendor/frictionless/ and add a test that validates a `-o datapackage` descriptor
+    (from a real fixture covering string-format, datetime, numeric, boolean, and
+    categorical-enum columns) against it, INCLUDING the x-finetype-* extensions (they
+    must not break conformance). Mirror dovetail-core/tests/conformance.rs. A second
+    test asserts the descriptor round-trips: parse it back and confirm every field's
+    type/format matches ac-01's map for that column's label.
+  gate: true
+  checked: false
+  ac_type: code
+- id: ac-05
+  description: |
+    DOCS + SURFACE PARITY — document `-o datapackage` in docs/DEVELOPMENT.md and the
+    finetype-cli skill; add it to the MCP `profile` tool's output-format enum so CLI/MCP
+    stay at parity (choice 0101). The existing `json-schema` output is unchanged
+    (additive). CHANGELOG entry references choice 0105.
+  gate: false
+  checked: false
+  ac_type: doc
+memories_considered: []
