@@ -33,12 +33,16 @@ def main():
     ap.add_argument("--potion", default="minishlab/potion-base-8M")
     ap.add_argument("--two-view", default=None)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--store-values", type=int, default=0, metavar="N",
+                    help="store up to N raw value strings per gold column and write "
+                         "FTMB v6 (per-value attention scoring, choice 0106). 0 = off (v5).")
     a = ap.parse_args()
 
     B._POTIONS = [a.potion] + ([a.two_view] if a.two_view else [])
     B.install_patches()  # patches P.extract_features (potion embed), EMBED_DIM, VALID_DIM, v5
-    print(f"[gold-ftmb] EMBED_DIM={P.EMBED_DIM} VALID_DIM={P.VALID_DIM} VERSION={P.VERSION_V4} "
-          f"potion={' ++ '.join(B._POTIONS)}")
+    out_ver = "v6" if a.store_values > 0 else f"v{P.VERSION_V4}"
+    print(f"[gold-ftmb] EMBED_DIM={P.EMBED_DIM} VALID_DIM={P.VALID_DIM} VERSION={out_ver} "
+          f"store_values={a.store_values} potion={' ++ '.join(B._POTIONS)}")
 
     gold = load_gold(Path(a.gold))
     wanted = {(r["file_content_sha256"], r["column_name"]) for r in gold}
@@ -79,9 +83,16 @@ def main():
             "char": feats["char"], "embed": feats["embed"], "stats": feats["stats"],
             "header": feats["header_features"], "validation": feats["validation"],
         }
+        if a.store_values > 0:
+            # Same non-empty filter + cap as the training builder, so the pool sees
+            # the rows it trained on (choice 0106).
+            rec["values"] = [str(v) for v in vals if str(v).strip()][:a.store_values]
         groups.append({"sibling_headers": [r["column_name"]], "records": [rec]})
 
-    P.write_ftmb_v4(a.out, groups)  # -> v5 (patched)
+    if a.store_values > 0:
+        P.write_ftmb_v6(a.out, groups, valid_dim=P.VALID_DIM, n_values_cap=a.store_values)
+    else:
+        P.write_ftmb_v4(a.out, groups)  # -> v5 (patched)
     print(f"[gold-ftmb] wrote {len(groups)} records -> {a.out} "
           f"({n_novals} no-values, {n_featfail} feature-fail)")
 

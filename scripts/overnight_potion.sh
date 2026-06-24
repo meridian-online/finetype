@@ -36,6 +36,8 @@ TAG="m2v8m"
 EPOCHS=100
 SCORE_ONLY=false
 SEEDS=(42 43 44)
+# Override seeds via env for a fast 1-seed pilot, e.g. OVERRIDE_SEEDS="42".
+[[ -n "${OVERRIDE_SEEDS:-}" ]] && read -ra SEEDS <<< "$OVERRIDE_SEEDS"
 
 # Per-value attention (choice 0106): when > 0, the builder stores up to this many
 # raw value strings per record and writes FTMB v6 instead of v5. 0 = off.
@@ -149,9 +151,10 @@ print(f'Injected {len(c[\"type_index_keys\"])} type_index_keys')
 fi
 
 echo "--- STEP 3: build gold FTMB (potion embed) ---"
+SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
 if [[ ! -f "$GOLDFTMB" ]]; then
   "$PY" scripts/build_gold_ftmb_potion.py --gold "$GOLD" --columns "$COLS" --binary "$BIN" \
-    --potion "$POTION" "${TV_ARG[@]}" --out "$GOLDFTMB"
+    --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --out "$GOLDFTMB"
 fi
 
 echo "--- STEP 4: score each seed (Sense + composed) ---"
@@ -175,7 +178,8 @@ for S in "${SEEDS[@]}"; do
   [[ -f "$OUT/model.safetensors" ]] || { echo "| s$S | MISSING | MISSING |"; continue; }
   raw="/tmp/${TAG}_s${S}_raw.tsv"; sense="output/embed-frontier/preds/${TAG}-s${S}_sense.tsv"
   comp="output/embed-frontier/preds/${TAG}-s${S}_composed.tsv"
-  "$PM" --model "$OUT" --data "$GOLDFTMB" --out "$raw"
+  PM_VE=(); [[ "$STORE_VALUES" -gt 0 ]] && PM_VE=(--value-encoder "$VALUE_ENCODER")
+  "$PM" --model "$OUT" --data "$GOLDFTMB" --out "$raw" "${PM_VE[@]}"
   { echo -e "file_content_sha256\tcolumn_name\tpredicted_label\tconfidence";
     tail -n +2 "$raw" | awk -F'\t' '{split($1,a,"\037"); print a[1]"\t"a[2]"\t"$2"\t"$3}'; } > "$sense"
   "$PY" scripts/compose_predictions.py --preds "$sense" --out "$comp" >/dev/null 2>&1 || cp "$sense" "$comp"
