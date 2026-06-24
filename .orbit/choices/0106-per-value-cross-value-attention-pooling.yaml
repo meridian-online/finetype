@@ -1,0 +1,144 @@
+id: '0106'
+title: 'Per-value cross-value attention pooling over static potion (latency-respecting Sense lift; alternative to 0103 gte-tiny backbone)'
+status: proposed
+date_created: 2026-06-24
+date_modified: 2026-06-24
+body: |
+  # 0106. Per-value cross-value attention pooling over the static potion value branch — the latency-respecting alternative to a gte-tiny backbone (0103)
+
+  ## Context and Problem Statement
+
+  The value-aggregation branch of the multi-branch Sense model never sees an
+  individual value. In `embedding_aggregation.rs`, the ~50 sampled values are
+  encoded with the static potion value encoder (potion-8M, 256-dim under the
+  shipped dual-encoder, choice 0104) and then collapsed by a **fixed pool** —
+  per-dimension mean, variance, min, max → one 1024-dim vector — *before* any
+  learned layer touches them. The pool is order-invariant and gives every value
+  equal weight; per-value identity, salience, and cross-value structure are
+  destroyed at feature-extraction time. That fixed pool is the value-side
+  ceiling.
+
+  The embed-frontier spec (`2026-06-21-reproducible-baseline-and-static-embeddings`
+  ac-02) established that **encoder size is not the lever**: under this fixed
+  pool, static potion is flat — 4M 0.521, 8M 0.522, code-16M 0.524, 32M and
+  two-view fusion all ~0.52 Sense (`output/embed-frontier/ac02_FINAL_verdict.md`).
+  A genuine contextual transformer (gte) reached 0.571 Sense — but only by paying
+  a per-value BERT forward at ~100x latency, and even that **only tied v19 on
+  composed** because composed is rule-bound. Choice 0103 proposed adopting a
+  gte-tiny backbone clean-slate; author direction (2026-06-24) **rejects that on
+  the still-serious inference-latency priority** and constrains the encoder to the
+  static Model2Vec/potion family.
+
+  Every experiment to date held the **pooling fixed**. Per-value attention is the
+  one untested axis on the value side: replace the mean/var/min/max blender with a
+  learned pool over the per-value embeddings. Crucially, a cheap form of
+  contextuality is available *without* a contextual encoder — let the column's ~50
+  static value-vectors attend to **each other** (cross-value self-attention) before
+  pooling. Each value's representation becomes informed by the rest of the column,
+  which the blender throws away — and the cost is one small transformer over 50
+  precomputed vectors run **once per column** (microseconds on CPU), not a
+  per-value forward. The mechanism already exists in-repo: `sense.rs` runs
+  header-as-query cross-attention over per-value potion embeddings (the original
+  Sense classifier, superseded by the blender-based multi-branch model), and
+  `sibling_context.rs` is the self-attention transformer pattern (over headers).
+
+  ## Decision Drivers
+
+  - Break the fixed-pool ceiling — the one untested axis on the value side.
+  - Preserve the shipped potion model's "latency ~free" property (the reason
+    gte-tiny was rejected). Cost must stay one cheap pass per column, not a
+    per-value forward.
+  - Reuse existing Candle attention infra (`sense.rs` cross-attention,
+    `sibling_context.rs` self-attention) rather than inventing one.
+  - One-variable change: pooling only. Encoder, stats, validation, header, and
+    char branches unchanged so attribution is clean against the gates.
+  - Honest about the rule-bound composed ceiling: prove the Sense lift first
+    before betting on any rule-layer rework.
+
+  ## Considered Options
+
+  ### Option A — single learned/header-query attention pool (reweight only)
+  One learned (or header-derived) query attends over the ~50 value embeddings →
+  weighted pool. Strictly more expressive than the blender (it can downweight
+  junk/null-like values and focus on the discriminative ones) but values never see
+  each other — no cross-value context. Cheapest; the minimal proof of the axis.
+
+  ### Option B — cross-value self-attention then attention pool (CHOSEN)
+  A 1–2 layer self-attention transformer lets the column's value-vectors attend to
+  each other, then a learned/header query pools them. Adds cross-value
+  contextuality — the cheap stand-in for gte's contextual lift — at near-zero
+  latency (one pass over 50 precomputed vectors per column). Keep mean/var/min/max
+  as an auxiliary concat (free signal, collapse-proof floor). Reuses the
+  `sibling_context.rs` transformer pattern.
+
+  ### Option C — gte-tiny contextual backbone (choice 0103) — REJECTED here
+  A real contextual encoder buys the strongest Sense (0.571) but at the per-value
+  forward latency the author has ruled out. Retained as 0103; this choice is the
+  latency-respecting alternative on the same problem.
+
+  ## Decision Outcome (proposed)
+
+  Adopt **Option B**, built on the shipped potion-8M value encoder. Carry the ~50
+  sampled value **strings** in the FTMB (encode in-trainer — Model2Vec is a static
+  lookup, cheap) instead of the pre-aggregated 1024-dim vector, so per-value
+  structure survives to training. Add a cross-value attention-pool module to the
+  value branch in `finetype-train`; mirror it in Rust inference
+  (`multi_branch/mod.rs` + a new `value_attention.rs` modelled on `sense.rs`),
+  replacing the `extract_embedding_aggregation_dyn` call on the value branch while
+  keeping the blender output as an auxiliary concat. 3-seed retrain, gated on the
+  unchanged promotion order (choice 0104: gold parity + gold-adjudicated
+  relocation review for the model swap; drift-proxy pre-check; corpus-honest gate
+  blocking). Option A is the validated fallback if B fails to beat A on Sense.
+
+  ## Honest scope (load-bearing)
+
+  - **Sense first, not composed.** Cross-value attention over *static* vectors adds
+    cross-value context but not within-value context, so its realistic Sense
+    ceiling sits **between** potion's 0.52 and gte's 0.571. And **composed is
+    rule-bound** — gte's +7pp Sense tied v19 on the shipped number. So a Sense win
+    may again tie composed. The first spec proves the Sense lift and measures
+    whether it passes through; rule-layer rework is a *separate, later* bet gated
+    on that evidence, never bundled in (one-variable discipline; the rule layer is
+    where six additive retrains and the residual-precedence results were burned —
+    choice 0096, memory `categorical-is-a-residual-category`).
+  - **Latency must be confirmed natively at ship**, not assumed. The cost argument
+    (one cheap pass per column) is sound on paper; the project's discipline is to
+    confirm with a native `finetype profile` timing before promotion.
+
+  ## Consequences
+
+  - FTMB format version bump (string-carry): `build_ftmb_v5_potion.py`,
+    `prepare_multibranch_data.py`, `read_ftmb.py`, the dims gate in
+    `overnight_potion.sh`, and the record struct in `finetype-train/src/data.rs`.
+  - New attention-pool module in `finetype-train/src/multi_branch.rs` + config
+    fields (n_value_tokens, attn_dim, n_heads, attn_layers, pool query type).
+  - Rust inference mirror: `value_attention.rs` (new), edits to
+    `multi_branch/mod.rs`, `branch.rs`, `config.rs`. Native predictions must match
+    the trainer within tolerance (the type_index_keys-style parity discipline).
+  - DuckDB/MCP/CLI surfaces unchanged — Sense is internal.
+  - Promotion gates unchanged (choice 0104). The corpus-honest gate stays a
+    blocking relocation review for the swap.
+
+  ## Open Questions
+
+  - Pool query: a learned query, or derived from the header embedding (the
+    `sense.rs` design)? Header-query ties value salience to the column name.
+  - Attention shape: layers (1 vs 2), heads, attn width (project 256→128?).
+  - How many values to carry/attend over (50? full 100?), and padding/masking for
+    short columns.
+  - Keep the mean/var/min/max concat, or let attention fully replace it?
+  - Encoder: potion-8M primary; potion-32M a cheap A/B *once the harness exists*
+    (flat under fixed pooling, untested under attention). potion-multilingual-128M
+    only if multilingual/geography names are first confirmed a real gold gap.
+
+  ## Substrate
+
+  `output/embed-frontier/ac02_FINAL_verdict.md` (static-cap + gte evidence);
+  `crates/finetype-model/src/embedding_aggregation.rs` (the blender being
+  replaced); `crates/finetype-model/src/sense.rs` (header-query cross-attention,
+  the in-repo prior art); `crates/finetype-model/src/sibling_context.rs`
+  (self-attention pattern). Alternative to choice 0103 (gte-tiny backbone, rejected
+  on latency here); keeps the dual-encoder shipped under choice 0104; gated by
+  0104's relocation-review role for model swaps. Builds on 0096 (rule-layer is the
+  composed cap) and the dual-encoder ship (spec
+  `2026-06-23-dual-encoder-native-ship-potion8m`).
