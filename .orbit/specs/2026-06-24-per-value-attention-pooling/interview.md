@@ -76,10 +76,14 @@ codepath, not a reconciliation of two.
 
 ### D6 — Config + tag
 `models/m2v8m-attn-244-config.json` (committed this session), based on
-`m2v8m-244-config.json` with a `value_attention` block and `embed_dim` widened to
-2048 (the concatenated value-branch input). potion-8M stays the value encoder
-(`value_embed_model` unchanged). Tag `m2v8m-attn`; 3 seeds (42/43/44) per the
-overnight recipe. potion-32M is a cheap A/B *after* the harness exists, not now.
+`m2v8m-244-config.json` with a `value_attention` block. `embed_dim` stays **1024**
+— it is the FTMB blender width (potion-8M 4-stat), which the reader validates
+against. The embed-branch *input* (2048 = blender 1024 ‖ PMA 1024) is **derived by
+the model** as `embed_dim + value_attention.output_dim()` when `keep_blender_concat`
+is set, NOT stored in `embed_dim` (that would desync the FTMB read). potion-8M stays
+the value encoder (`value_embed_model` unchanged). Tag `m2v8m-attn`; 3 seeds
+(42/43/44) per the overnight recipe. potion-32M is a cheap A/B *after* the harness
+exists, not now.
 
 ## Open question deferred to implementation (not blocking ac-0)
 - PMA seed slot count k: pinned to 4 for v1 (4·256=1024 matches the blender half,
