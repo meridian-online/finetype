@@ -100,6 +100,12 @@ MAGIC = b"FTMB"
 VERSION_V2 = 2
 VERSION_V3 = 3
 VERSION_V4 = 4
+VERSION_V6 = 6  # v4 layout + per-record raw value strings (per-value attention, choice 0106)
+
+# When > 0, the v4 pipeline stores up to this many raw value strings per record
+# and writes FTMB v6 instead of v4. 0 = off (byte-identical v4/v5 output). Set by
+# build_ftmb_v6_potion.py / the --store-values build flag.
+STORE_VALUES_CAP = 0
 
 # Column-level types that may cause negative transfer (same as prepare_spike_data.py)
 COLUMN_LEVEL_TYPES = {
@@ -2177,6 +2183,63 @@ def write_ftmb_v4(path, table_groups, valid_dim=VALID_DIM):
                 f.write(struct.pack(f"<{valid_dim}f", *rec["validation"]))
 
 
+def write_ftmb_v6(path, table_groups, valid_dim=VALID_DIM, n_values_cap=50):
+    """Write a .ftmb v6 binary file: v4 layout plus a per-record block of raw
+    value strings (per-value attention, choice 0106).
+
+    Identical to write_ftmb_v4 (same 30-byte header, same per-record feature
+    layout) except the version field is 6 and, after each record's validation
+    features, a values block is appended:
+        2B  n_values (u16) — min(len(rec["values"]), n_values_cap)
+        For each value: 2B val_len (u16) + val_bytes (UTF-8)
+    Records missing "values" store zero values (forward-compatible).
+    """
+    n_records = sum(len(g["records"]) for g in table_groups)
+    n_groups = len(table_groups)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(MAGIC)
+        f.write(struct.pack("<I", VERSION_V6))
+        f.write(struct.pack("<Q", n_records))
+        f.write(struct.pack("<HHHH", CHAR_DIM, EMBED_DIM, STATS_DIM, HEADER_DIM))
+        f.write(struct.pack("<HH", n_groups, 0))  # n_groups + reserved
+        f.write(struct.pack("<H", valid_dim))
+
+        for group in table_groups:
+            sibling_headers = group["sibling_headers"]
+            records = group["records"]
+
+            f.write(struct.pack("<HH", len(records), len(sibling_headers)))
+
+            for hdr in sibling_headers:
+                hdr_bytes = hdr.encode("utf-8")
+                f.write(struct.pack("<H", len(hdr_bytes)))
+                f.write(hdr_bytes)
+
+            for rec in records:
+                label_bytes = rec["label"].encode("utf-8")
+                f.write(struct.pack("<H", len(label_bytes)))
+                f.write(label_bytes)
+                f.write(struct.pack("<H", rec["column_index"]))
+                f.write(struct.pack(f"<{CHAR_DIM}f", *rec["char"]))
+                f.write(struct.pack(f"<{EMBED_DIM}f", *rec["embed"]))
+                f.write(struct.pack(f"<{STATS_DIM}f", *rec["stats"]))
+                f.write(struct.pack(f"<{HEADER_DIM}f", *rec["header"]))
+                f.write(struct.pack(f"<{valid_dim}f", *rec["validation"]))
+
+                # v6: per-record raw value strings, capped
+                vals = rec.get("values", [])[:n_values_cap]
+                f.write(struct.pack("<H", len(vals)))
+                for v in vals:
+                    vb = str(v).encode("utf-8")
+                    if len(vb) > 0xFFFF:  # truncate at a char boundary
+                        vb = str(v)[:0xFFFF].encode("utf-8")[:0xFFFF]
+                        vb = vb.decode("utf-8", "ignore").encode("utf-8")
+                    f.write(struct.pack("<H", len(vb)))
+                    f.write(vb)
+
+
 def read_ftmb(path):
     """Read a .ftmb binary file (v1, v2, or v3).
 
@@ -2508,12 +2571,14 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
         for c_idx in range(len(table)):
             if (g_idx, c_idx) in results_map:
                 header, result = results_map[(g_idx, c_idx)]
+                # table[c_idx] = (label, values, header); carry raw values for v6
+                col_vals = table[c_idx][1] if STORE_VALUES_CAP > 0 else None
                 if include_validation:
                     label, char_f, embed_f, stats_f, header_f, valid_f = result
-                    group_columns.append((label, header, char_f, embed_f, stats_f, header_f, valid_f))
+                    group_columns.append((label, header, char_f, embed_f, stats_f, header_f, valid_f, col_vals))
                 else:
                     label, char_f, embed_f, stats_f, header_f = result
-                    group_columns.append((label, header, char_f, embed_f, stats_f, header_f, None))
+                    group_columns.append((label, header, char_f, embed_f, stats_f, header_f, None, col_vals))
 
         if len(group_columns) < 2:
             # Skip groups with fewer than 2 successful columns
@@ -2524,7 +2589,7 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
 
         # Build records with column_index pointing into sibling_headers
         records = []
-        for col_idx, (label, header, char_f, embed_f, stats_f, header_f, valid_f) in enumerate(group_columns):
+        for col_idx, (label, header, char_f, embed_f, stats_f, header_f, valid_f, col_vals) in enumerate(group_columns):
             rec = {
                 "label": label,
                 "column_index": col_idx,
@@ -2535,6 +2600,9 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
             }
             if include_validation:
                 rec["validation"] = valid_f
+            if STORE_VALUES_CAP > 0:
+                rec["values"] = [str(v) for v in (col_vals or [])
+                                 if v is not None and str(v).strip()][:STORE_VALUES_CAP]
             records.append(rec)
 
         v3_groups.append({
@@ -2547,7 +2615,10 @@ def _run_v3_pipeline(synthetic, ordered_distilled, finetype_bin, output_path,
     _n_sibling_headers = sum(len(g["sibling_headers"]) for g in v3_groups)
     print(f"n_sibling_headers: {_n_sibling_headers}")
     print(f"\nWriting {total_records} records in {len(v3_groups)} groups to {output_path}...")
-    if include_validation:
+    if include_validation and STORE_VALUES_CAP > 0:
+        print(f"  format v6: storing up to {STORE_VALUES_CAP} raw values/record")
+        write_ftmb_v6(output_path, v3_groups, valid_dim=VALID_DIM, n_values_cap=STORE_VALUES_CAP)
+    elif include_validation:
         write_ftmb_v4(output_path, v3_groups)
     else:
         write_ftmb_v3(output_path, v3_groups)

@@ -689,8 +689,21 @@ pub const FTMB_HEADER_SIZE_V4: usize = 30;
 /// a Model2Vec one. Spec 2026-06-20-gte-tiny-embed-branch-swap, ac-01.
 const FTMB_VERSION_V5: u32 = 5;
 
+/// Format version for the per-value attention build (v6).
+///
+/// v4/v5 layout (same 30-byte header, same per-record feature layout) PLUS a
+/// per-record values block appended after the validation features:
+///   2B  n_values (u16)
+///   for each value: 2B len (u16) + UTF-8 bytes
+/// The raw sampled value strings let the value branch encode per-value
+/// embeddings in-trainer for cross-value attention pooling (choice 0106).
+/// v6 is grouped-only (implies version >= 3). Readers below v6 must not read a
+/// v6 file (the trailing values block would desync the record stream); the
+/// version gate enforces that.
+const FTMB_VERSION_V6: u32 = 6;
+
 /// A single training record with label and feature vectors.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TrainingRecord {
     /// Type label (e.g., "identity.person.email").
     pub label: String,
@@ -704,6 +717,10 @@ pub struct TrainingRecord {
     pub header_features: Vec<f32>,
     /// Validation pass-rate features (one per taxonomy type). Empty for v1/v2/v3 data.
     pub validation_features: Vec<f32>,
+    /// Raw sampled value strings for the column (FTMB v6+, capped at `n_values`).
+    /// Empty for v1–v5 data. Carried so the value branch can encode per-value
+    /// embeddings in-trainer for cross-value attention pooling (choice 0106).
+    pub values: Vec<String>,
 }
 
 /// A group of training records from the same table, with sibling header names.
@@ -837,9 +854,15 @@ pub fn read_training_header(path: &Path) -> Result<FtmbHeader> {
     }
 
     let version = u32::from_le_bytes(header[4..8].try_into().unwrap());
-    if version != 1 && version != 2 && version != 3 && version != 4 && version != FTMB_VERSION_V5 {
+    if version != 1
+        && version != 2
+        && version != 3
+        && version != 4
+        && version != FTMB_VERSION_V5
+        && version != FTMB_VERSION_V6
+    {
         bail!(
-            "Unsupported FTMB version: {} (expected 1, 2, 3, 4, or 5)",
+            "Unsupported FTMB version: {} (expected 1, 2, 3, 4, 5, or 6)",
             version
         );
     }
@@ -907,9 +930,15 @@ pub fn read_training_data(
         bail!("Invalid FTMB magic");
     }
     let version = u32::from_le_bytes(header_buf[4..8].try_into().unwrap());
-    if version != 1 && version != 2 && version != 3 && version != 4 && version != FTMB_VERSION_V5 {
+    if version != 1
+        && version != 2
+        && version != 3
+        && version != 4
+        && version != FTMB_VERSION_V5
+        && version != FTMB_VERSION_V6
+    {
         bail!(
-            "Unsupported FTMB version: {} (expected 1, 2, 3, 4, or 5)",
+            "Unsupported FTMB version: {} (expected 1, 2, 3, 4, 5, or 6)",
             version
         );
     }
@@ -1031,6 +1060,24 @@ pub fn read_training_data(
                     Vec::new()
                 };
 
+                // v6: read the per-record raw value strings; otherwise empty
+                let values = if version >= FTMB_VERSION_V6 {
+                    let mut n_values_buf = [0u8; 2];
+                    file.read_exact(&mut n_values_buf)?;
+                    let n_values = u16::from_le_bytes(n_values_buf) as usize;
+                    let mut vals = Vec::with_capacity(n_values);
+                    for _ in 0..n_values {
+                        file.read_exact(&mut label_len_buf)?;
+                        let val_len = u16::from_le_bytes(label_len_buf) as usize;
+                        let mut val_buf = vec![0u8; val_len];
+                        file.read_exact(&mut val_buf)?;
+                        vals.push(String::from_utf8(val_buf).context("Invalid UTF-8 in value")?);
+                    }
+                    vals
+                } else {
+                    Vec::new()
+                };
+
                 group_indices.push(record_offset);
                 records.push(TrainingRecord {
                     label,
@@ -1039,6 +1086,7 @@ pub fn read_training_data(
                     stats_features,
                     header_features,
                     validation_features,
+                    values,
                 });
                 record_offset += 1;
             }
@@ -1105,6 +1153,7 @@ pub fn read_training_data(
                 stats_features,
                 header_features,
                 validation_features,
+                values: Vec::new(),
             });
         }
 
@@ -1374,6 +1423,154 @@ pub fn write_training_data_v4(
             }
             for &v in &record.validation_features {
                 file.write_all(&v.to_le_bytes())?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Write training records to an FTMB v6 binary file: v4 layout plus a per-record
+/// block of raw value strings (capped at `n_values`) for per-value attention
+/// pooling (choice 0106). Header is byte-identical to v4 (30 bytes) except the
+/// version field; the values block is appended after each record's validation
+/// features. A record's `values` are truncated to `n_values` at write time.
+#[allow(clippy::too_many_arguments)]
+pub fn write_training_data_v6(
+    path: &Path,
+    records: &[TrainingRecord],
+    table_groups: &[TableGroup],
+    char_dim: u16,
+    embed_dim: u16,
+    stats_dim: u16,
+    header_dim: u16,
+    valid_dim: u16,
+    n_values: u16,
+) -> Result<()> {
+    let mut file = std::fs::File::create(path)
+        .with_context(|| format!("Failed to create training data file: {}", path.display()))?;
+
+    let total_records: usize = table_groups.iter().map(|g| g.record_indices.len()).sum();
+    if total_records != records.len() {
+        bail!(
+            "Table groups reference {} records but {} were provided",
+            total_records,
+            records.len()
+        );
+    }
+
+    // Write v6 header (30 bytes — identical to v4 except the version field)
+    file.write_all(FTMB_MAGIC)?;
+    file.write_all(&FTMB_VERSION_V6.to_le_bytes())?;
+    file.write_all(&(records.len() as u64).to_le_bytes())?;
+    file.write_all(&char_dim.to_le_bytes())?;
+    file.write_all(&embed_dim.to_le_bytes())?;
+    file.write_all(&stats_dim.to_le_bytes())?;
+    file.write_all(&header_dim.to_le_bytes())?;
+    file.write_all(&(table_groups.len() as u16).to_le_bytes())?;
+    file.write_all(&[0u8; 2])?; // reserved
+    file.write_all(&valid_dim.to_le_bytes())?;
+
+    for group in table_groups {
+        file.write_all(&(group.record_indices.len() as u16).to_le_bytes())?;
+        file.write_all(&(group.sibling_headers.len() as u16).to_le_bytes())?;
+
+        for header_name in &group.sibling_headers {
+            let header_bytes = header_name.as_bytes();
+            if header_bytes.len() > u16::MAX as usize {
+                bail!(
+                    "Sibling header too long ({} bytes): {}",
+                    header_bytes.len(),
+                    header_name
+                );
+            }
+            file.write_all(&(header_bytes.len() as u16).to_le_bytes())?;
+            file.write_all(header_bytes)?;
+        }
+
+        for (col_idx, &record_idx) in group.record_indices.iter().enumerate() {
+            let record = &records[record_idx];
+
+            let label_bytes = record.label.as_bytes();
+            if label_bytes.len() > u16::MAX as usize {
+                bail!(
+                    "Label too long ({} bytes): {}",
+                    label_bytes.len(),
+                    record.label
+                );
+            }
+            file.write_all(&(label_bytes.len() as u16).to_le_bytes())?;
+            file.write_all(label_bytes)?;
+
+            file.write_all(&(col_idx as u16).to_le_bytes())?;
+
+            // Feature dimension checks (identical contract to v4)
+            for (name, got, want) in [
+                (
+                    "char_features",
+                    record.char_features.len(),
+                    char_dim as usize,
+                ),
+                (
+                    "embed_features",
+                    record.embed_features.len(),
+                    embed_dim as usize,
+                ),
+                (
+                    "stats_features",
+                    record.stats_features.len(),
+                    stats_dim as usize,
+                ),
+                (
+                    "header_features",
+                    record.header_features.len(),
+                    header_dim as usize,
+                ),
+                (
+                    "validation_features",
+                    record.validation_features.len(),
+                    valid_dim as usize,
+                ),
+            ] {
+                if got != want {
+                    bail!("{name} length {got} != expected {want}");
+                }
+            }
+
+            for &v in &record.char_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.embed_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.stats_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.header_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+            for &v in &record.validation_features {
+                file.write_all(&v.to_le_bytes())?;
+            }
+
+            // v6: per-record value strings (truncated to n_values)
+            let n = (record.values.len()).min(n_values as usize);
+            file.write_all(&(n as u16).to_le_bytes())?;
+            for val in record.values.iter().take(n) {
+                // Truncate pathological >64KiB values at a char boundary so the
+                // stored bytes stay valid UTF-8 (cell values are tiny in practice).
+                let val: &str = if val.len() > u16::MAX as usize {
+                    let mut cut = u16::MAX as usize;
+                    while cut > 0 && !val.is_char_boundary(cut) {
+                        cut -= 1;
+                    }
+                    &val[..cut]
+                } else {
+                    val
+                };
+                let vb = val.as_bytes();
+                file.write_all(&(vb.len() as u16).to_le_bytes())?;
+                file.write_all(vb)?;
             }
         }
     }
@@ -3107,6 +3304,7 @@ mod tests {
                 stats_features: (0..27).map(|j| (i * 27 + j) as f32 * 0.1).collect(),
                 header_features: (0..128).map(|j| (i * 128 + j) as f32 * 0.003).collect(),
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -3225,6 +3423,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -3259,6 +3458,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 27],
                 header_features: vec![i as f32 * 4.0; 128],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -3315,6 +3515,7 @@ mod tests {
                     .map(|j| if j % 3 == class_idx { 0.5 + bias } else { 0.05 })
                     .collect(),
                 validation_features: Vec::new(),
+                values: Vec::new(),
             });
         }
 
@@ -3580,6 +3781,7 @@ mod tests {
                     })
                     .collect(),
                 validation_features: Vec::new(),
+                values: Vec::new(),
             });
         }
 
@@ -3649,6 +3851,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -3762,6 +3965,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -3853,6 +4057,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -3925,6 +4130,7 @@ mod tests {
                     stats_features: vec![i as f32 * 3.0; 4],
                     header_features: vec![i as f32 * 4.0; 5],
                     validation_features,
+                    values: Vec::new(),
                 }
             })
             .collect();
@@ -3991,6 +4197,89 @@ mod tests {
     }
 
     #[test]
+    fn test_ftmb_v6_roundtrip_values() {
+        // v6 carries raw per-record value strings (choice 0106). Write records
+        // with known values (varying lengths, unicode, empties, and one column
+        // that exceeds the n_values cap), read back, assert the strings are
+        // identical after the cap truncation — and that features still match.
+        let valid_dim: usize = 12;
+        let n_values: u16 = 4;
+
+        // Distinct value lists per record, including unicode and an over-cap one.
+        let value_sets: Vec<Vec<String>> = vec![
+            vec!["user@x.com".into(), "bob@y.org".into()],
+            vec!["£42.50".into(), "naïve".into(), "日本語".into(), "x".into()],
+            vec![], // empty column → zero values stored
+            vec![
+                "a".into(),
+                "b".into(),
+                "c".into(),
+                "d".into(),
+                "e".into(),
+                "f".into(),
+            ], // > cap(4)
+        ];
+
+        let records: Vec<TrainingRecord> = (0..4)
+            .map(|i| TrainingRecord {
+                label: format!("test.type.t_{i}"),
+                char_features: vec![i as f32; 8],
+                embed_features: vec![i as f32 * 2.0; 6],
+                stats_features: vec![i as f32 * 3.0; 4],
+                header_features: vec![i as f32 * 4.0; 5],
+                validation_features: vec![if i % 2 == 0 { 0.0 } else { 1.0 }; valid_dim],
+                values: value_sets[i].clone(),
+            })
+            .collect();
+
+        let groups = vec![TableGroup {
+            record_indices: vec![0, 1, 2, 3],
+            sibling_headers: vec!["a".into(), "b".into(), "c".into(), "d".into()],
+        }];
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        write_training_data_v6(
+            tmp.path(),
+            &records,
+            &groups,
+            8,
+            6,
+            4,
+            5,
+            valid_dim as u16,
+            n_values,
+        )
+        .unwrap();
+
+        // Raw header: version field must be 6, 30-byte header.
+        let raw = std::fs::read(tmp.path()).unwrap();
+        assert_eq!(&raw[0..4], b"FTMB");
+        assert_eq!(u32::from_le_bytes([raw[4], raw[5], raw[6], raw[7]]), 6);
+
+        let (header, loaded, _groups) = read_training_data(tmp.path()).unwrap();
+        assert_eq!(header.version, 6);
+        assert_eq!(loaded.len(), 4);
+
+        for (i, (orig, read)) in records.iter().zip(loaded.iter()).enumerate() {
+            // Features unchanged by the v6 extension.
+            assert_eq!(orig.char_features, read.char_features);
+            assert_eq!(orig.validation_features, read.validation_features);
+            // Values round-trip identically, after the n_values cap.
+            let expected: Vec<String> = orig
+                .values
+                .iter()
+                .take(n_values as usize)
+                .cloned()
+                .collect();
+            assert_eq!(read.values, expected, "values mismatch for record {i}");
+        }
+        // Record 1 keeps full unicode; record 3 was capped to 4.
+        assert_eq!(loaded[1].values, vec!["£42.50", "naïve", "日本語", "x"]);
+        assert_eq!(loaded[2].values, Vec::<String>::new());
+        assert_eq!(loaded[3].values, vec!["a", "b", "c", "d"]);
+    }
+
+    #[test]
     fn test_ftmb_v4_header_is_30_bytes() {
         // Verify that v4 header is exactly 30 bytes as specified in ac-03.
         assert_eq!(FTMB_HEADER_SIZE_V4, 30);
@@ -4002,6 +4291,7 @@ mod tests {
             stats_features: vec![3.0; 2],
             header_features: vec![4.0; 5],
             validation_features: vec![0.5; 10],
+            values: Vec::new(),
         }];
         let groups = vec![TableGroup {
             record_indices: vec![0],
@@ -4097,6 +4387,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -4132,6 +4423,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: Vec::new(),
+                values: Vec::new(),
             })
             .collect();
 
@@ -4280,6 +4572,7 @@ mod tests {
                 stats_features: vec![i as f32 * 3.0; 4],
                 header_features: vec![i as f32 * 4.0; 5],
                 validation_features: (0..valid_dim).map(|j| (i + j) as f32 * 0.1).collect(),
+                values: Vec::new(),
             })
             .collect();
 

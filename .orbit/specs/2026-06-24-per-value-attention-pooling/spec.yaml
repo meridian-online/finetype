@@ -28,7 +28,7 @@ acceptance_criteria:
     struct in finetype-train/src/data.rs. Round-trips: a built FTMB
     re-reads identical strings.
   gate: false
-  checked: false
+  checked: true
 - id: ac-2
   description: |
     Cross-value attention-pool module lands in finetype-train/src/

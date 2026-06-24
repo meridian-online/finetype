@@ -35,7 +35,7 @@ def read_header(f):
         sys.exit(1)
 
     (version,) = struct.unpack("<I", f.read(4))
-    if version not in (1, 2, 3, 4, 5):
+    if version not in (1, 2, 3, 4, 5, 6):
         print(f"ERROR: Unknown version: {version}", file=sys.stderr)
         sys.exit(1)
 
@@ -81,12 +81,13 @@ def read_record(f, char_dim, embed_dim, stats_dim, header_dim):
     return label, char_feat, embed_feat, stats_feat
 
 
-def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim, valid_dim=0):
-    """Read a single v3/v4 table group.
+def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim, valid_dim=0, version=3):
+    """Read a single v3/v4/v6 table group.
 
     Returns: (sibling_headers, records) where records is a list of
-    (label, column_index, char_feat, embed_feat, stats_feat, header_feat[, valid_feat]).
-    v4 records include valid_feat. Returns None at EOF.
+    (label, column_index, char_feat, embed_feat, stats_feat, header_feat[, valid_feat[, values]]).
+    v4 records include valid_feat; v6 records additionally append `values`
+    (a list of raw value strings). Returns None at EOF.
     """
     data = f.read(4)
     if len(data) < 4:
@@ -108,11 +109,25 @@ def read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim, valid_dim=0):
         embed_feat = list(struct.unpack(f"<{embed_dim}f", f.read(embed_dim * 4)))
         stats_feat = list(struct.unpack(f"<{stats_dim}f", f.read(stats_dim * 4)))
         header_feat = list(struct.unpack(f"<{header_dim}f", f.read(header_dim * 4)))
+        valid_feat = None
         if valid_dim > 0:
             valid_feat = list(struct.unpack(f"<{valid_dim}f", f.read(valid_dim * 4)))
-            records.append((label, column_index, char_feat, embed_feat, stats_feat, header_feat, valid_feat))
-        else:
-            records.append((label, column_index, char_feat, embed_feat, stats_feat, header_feat))
+
+        # v6: per-record raw value strings
+        values = None
+        if version >= 6:
+            (n_values,) = struct.unpack("<H", f.read(2))
+            values = []
+            for _ in range(n_values):
+                (val_len,) = struct.unpack("<H", f.read(2))
+                values.append(f.read(val_len).decode("utf-8"))
+
+        rec = [label, column_index, char_feat, embed_feat, stats_feat, header_feat]
+        if valid_feat is not None:
+            rec.append(valid_feat)
+        if values is not None:
+            rec.append(values)
+        records.append(tuple(rec))
 
     return sibling_headers, records
 
@@ -196,7 +211,8 @@ def main():
             record_idx = 0
 
             for g_idx in range(n_groups):
-                result = read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim, valid_dim)
+                result = read_v3_group(f, char_dim, embed_dim, stats_dim, header_dim,
+                                       valid_dim, version)
                 if result is None:
                     print(f"WARNING: EOF at group {g_idx} (expected {n_groups})")
                     break
@@ -207,9 +223,11 @@ def main():
                 for rec in records:
                     # v3: (label, col_idx, char, embed, stats, header)
                     # v4: (label, col_idx, char, embed, stats, header, valid)
+                    # v6: ... + values (list of raw strings) as the final element
                     label = rec[0]
                     column_index = rec[1]
-                    feats = list(rec[2:])  # all feature vectors
+                    feats = list(rec[2:])  # feature vectors (+ values tail for v6)
+                    values = feats.pop() if version >= 6 else None
 
                     type_counts[label] += 1
 
@@ -220,6 +238,9 @@ def main():
                                     print(f"  ISSUE: record {record_idx} ({label}) has NaN/Inf in {name}")
                                     issues += 1
                                     break
+                        if version >= 6 and any(not isinstance(v, str) for v in values):
+                            print(f"  ISSUE: record {record_idx} ({label}) has non-str value")
+                            issues += 1
 
                     if filter_type and label != filter_type:
                         record_idx += 1
@@ -232,6 +253,9 @@ def main():
                         print(f"  siblings: [{siblings_str}]")
                         for (name, _dim), feat in zip(branch_names, feats):
                             print(f"  {name:7s}: {feat_summary(feat)}")
+                        if version >= 6:
+                            preview = ", ".join(f'"{v}"' for v in values[:5])
+                            print(f"  values : n={len(values)} [{preview}{', ...' if len(values) > 5 else ''}]")
                         shown += 1
 
                     record_idx += 1

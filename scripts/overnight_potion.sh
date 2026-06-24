@@ -37,6 +37,10 @@ EPOCHS=100
 SCORE_ONLY=false
 SEEDS=(42 43 44)
 
+# Per-value attention (choice 0106): when > 0, the builder stores up to this many
+# raw value strings per record and writes FTMB v6 instead of v5. 0 = off.
+STORE_VALUES="${STORE_VALUES:-0}"
+
 # baseline (ac-01): m2v-244-s44 native Sense 0.521 / composed 0.769
 BASE_SENSE="0.521"; BASE_COMPOSED="0.769"
 
@@ -77,15 +81,17 @@ for f in "$CONFIG" "$GOLD" "$COLS"; do [[ -e "$f" ]] || { echo "FAIL: missing $f
 
 if [[ "$SCORE_ONLY" != "true" ]]; then
   echo "--- STEP 1: build training FTMB (potion embed, full width) ---"
+  SV_ARG=(); [[ "$STORE_VALUES" -gt 0 ]] && SV_ARG=(--store-values "$STORE_VALUES")
+  [[ "$STORE_VALUES" -gt 0 ]] && echo "  per-value attention: storing $STORE_VALUES values/record (FTMB v6)"
   if [[ ! -f "$FTMB" ]]; then
-    "$PY" scripts/build_ftmb_v5_potion.py --potion "$POTION" "${TV_ARG[@]}" --output "$FTMB" --workers 8
+    "$PY" scripts/build_ftmb_v5_potion.py --potion "$POTION" "${TV_ARG[@]}" "${SV_ARG[@]}" --output "$FTMB" --workers 8
   fi
   # GATE: dims + truncation. A misaligned binary doesn't crash training — it wastes the night.
   VERIFY_OUT=$("$PY" scripts/read_ftmb.py "$FTMB" --stats --verify 2>&1) || { echo "$VERIFY_OUT"; echo "FAIL: read_ftmb verify"; exit 1; }
   echo "$VERIFY_OUT" | grep -q "WARNING: EOF" && { echo "FAIL: FTMB truncated (EOF)"; exit 1; }
-  "$PY" - "$FTMB" "$EXPECT_EMBED" <<'PYGATE'
+  "$PY" - "$FTMB" "$EXPECT_EMBED" "$STORE_VALUES" <<'PYGATE'
 import struct, sys
-path, expect = sys.argv[1], int(sys.argv[2])
+path, expect, store_values = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 with open(path, "rb") as f:
     assert f.read(4) == b"FTMB"
     ver, = struct.unpack("<I", f.read(4)); n, = struct.unpack("<Q", f.read(8))
@@ -94,6 +100,17 @@ print(f"[gate] v{ver} records={n} char={cd} embed={ed} stats={sd} header={hd} va
 assert ed == expect, f"FAIL embed={ed} != config {expect} (truncation?)"
 assert sd == 27, f"FAIL stats={sd} != 27"
 assert vd == 244, f"FAIL valid={vd} != 244"
+# per-value attention (choice 0106): a v6 build MUST report stored values, else
+# the night trains a value-attention model on empty value lists.
+if store_values > 0:
+    assert ver == 6, f"FAIL version={ver} != 6 (STORE_VALUES={store_values} but not v6)"
+    import subprocess
+    out = subprocess.run([sys.executable, "scripts/read_ftmb.py", path, "--records", "20"],
+                         capture_output=True, text=True).stdout
+    n_with = sum(1 for ln in out.splitlines()
+                 if ln.lstrip().startswith("values :") and "n=0 " not in ln)
+    assert n_with > 0, "FAIL v6 build stored zero values on all sampled records"
+    print(f"[gate] v6 values OK ({n_with}/20 sampled records carry values)")
 print("[gate] dims OK")
 PYGATE
 

@@ -175,6 +175,45 @@ def smoke_embed():
     print(f"[smoke-embed] OK dim={EMBED_AGG_DIM}, nonzero={nonzero}, empty->zeros")
 
 
+def smoke_v6(path, cap=4):
+    """Round-trip proof for FTMB v6 (per-value attention, choice 0106): write a
+    tiny v6 with known value strings (unicode + an over-cap column), read back
+    via read_ftmb, assert the strings are identical after the cap. Pure format
+    test — independent of the potion encoder, the finetype binary, and real data."""
+    P.STORE_VALUES_CAP = cap
+    cd, ed, sd, hd, vd = P.CHAR_DIM, P.EMBED_DIM, P.STATS_DIM, P.HEADER_DIM, P.VALID_DIM
+
+    def feat(n, base):
+        return [float((base + i) % 7) * 0.01 for i in range(n)]
+
+    value_sets = [
+        ["jane@x.com", "bob@y.org"],
+        ["£42.50", "naïve", "日本語", "x"],
+        [],
+        ["a", "b", "c", "d", "e", "f"],  # > cap
+    ]
+    recs = []
+    for c in range(4):
+        recs.append({"label": "identity.person.email", "column_index": c,
+                     "char": feat(cd, c), "embed": feat(ed, c), "stats": feat(sd, c),
+                     "header": feat(hd, c), "validation": feat(vd, c),
+                     "values": value_sets[c]})
+    groups = [{"sibling_headers": [f"col_{c}" for c in range(4)], "records": recs}]
+    P.write_ftmb_v6(path, groups, valid_dim=vd, n_values_cap=cap)
+
+    # Read back with read_ftmb's reader and assert exact string round-trip.
+    import read_ftmb as R
+    with open(path, "rb") as f:
+        ver, n_records, c_d, e_d, s_d, h_d, n_groups, v_d = R.read_header(f)
+        assert ver == 6, ver
+        sib, records = R.read_v3_group(f, c_d, e_d, s_d, h_d, v_d, ver)
+    got = [rec[-1] for rec in records]  # values is the last tuple element for v6
+    expect = [vs[:cap] for vs in value_sets]
+    assert got == expect, f"value round-trip mismatch:\n got={got}\n exp={expect}"
+    print(f"[smoke-v6] OK version=6 cap={cap}; values round-trip exactly "
+          f"(unicode + over-cap truncation): {got}")
+
+
 V19_ARGS = [
     "--distilled", "output/distillation-v3/sherlock_distilled.csv.gz",
     "--finetype", "./target/release/finetype",
@@ -206,6 +245,11 @@ def main():
     ap.add_argument("--smoke", metavar="PATH", help="write a tiny v5 + verify, then exit")
     ap.add_argument("--smoke-embed", action="store_true",
                     help="check potion embed dim + empty->zeros, then exit")
+    ap.add_argument("--smoke-v6", metavar="PATH",
+                    help="write a tiny v6 + round-trip its value strings, then exit")
+    ap.add_argument("--store-values", type=int, default=0, metavar="N",
+                    help="store up to N raw value strings per record and write FTMB v6 "
+                         "(per-value attention, choice 0106). 0 = off (v5).")
     args = ap.parse_args()
 
     global _POTIONS
@@ -217,13 +261,20 @@ def main():
     if args.smoke_embed:
         smoke_embed()
         return
+    if args.smoke_v6:
+        smoke_v6(args.smoke_v6)
+        return
 
     install_patches()
+    if args.store_values > 0:
+        P.STORE_VALUES_CAP = args.store_values
     argv = ["prepare_multibranch_data.py"] + V19_ARGS + [
         "--output", args.output, "--workers", str(args.workers)]
     mode = " ++ ".join(_POTIONS)
+    out_ver = "v6" if args.store_values > 0 else f"v{P.VERSION_V4}"
     print(f"[build] potion embed swap [{mode}]; EMBED_DIM={P.EMBED_DIM} "
-          f"VALID_DIM={P.VALID_DIM} VERSION={P.VERSION_V4}")
+          f"VALID_DIM={P.VALID_DIM} VERSION={out_ver} "
+          f"store_values={P.STORE_VALUES_CAP}")
     sys.argv = argv
     P.main()
 
