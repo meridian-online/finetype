@@ -342,6 +342,37 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // manual: `cargo test -p finetype-model value_attention bench_latency -- --ignored --nocapture`
+    fn bench_latency_cpu_batch1() {
+        // Per-column inference cost of the pool forward at batch=1 (the shipped
+        // CPU path). Decision-relevant: is cross-value attention "latency ~free"?
+        let cfg = ValueAttentionConfig::default(); // n_values 50, 256-d, 1 layer, 4 slots
+        let dev = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &dev);
+        let pool = ValueAttentionPool::new(&cfg, vb).unwrap();
+        let x = Tensor::randn(0f32, 1.0, (1, cfg.n_values, cfg.value_embed_dim), &dev).unwrap();
+        let mask = Tensor::ones((1, cfg.n_values), DType::F32, &dev).unwrap();
+        // warmup
+        for _ in 0..10 {
+            let _ = pool.forward(&x, &mask, false).unwrap();
+        }
+        let n = 200;
+        let t = std::time::Instant::now();
+        for _ in 0..n {
+            let o = pool.forward(&x, &mask, false).unwrap();
+            let _ = o.sum_all().unwrap().to_scalar::<f32>().unwrap(); // force eval
+        }
+        let per = t.elapsed().as_secs_f64() * 1000.0 / n as f64;
+        // Release CPU batch=1 measured ~2.3 ms/column (choice 0106 latency probe);
+        // debug is ~25x that, so always run with --release.
+        println!(
+            "POOL forward CPU batch=1 [1,{},{}]: {per:.3} ms/column",
+            cfg.n_values, cfg.value_embed_dim
+        );
+    }
+
+    #[test]
     fn test_single_valid_value() {
         // A column with one real value (rest padded) must produce a finite pool.
         let cfg = ValueAttentionConfig {
