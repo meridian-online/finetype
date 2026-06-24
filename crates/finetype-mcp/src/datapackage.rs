@@ -404,6 +404,21 @@ datetime.date.dmy_slash:
     }
 
     #[test]
+    fn for_path_emits_relative_basename() {
+        // v2.0 rejects an absolute resource.path (also ../, ~, scheme). The
+        // emitter must reduce an absolute source path to the descriptor-relative
+        // basename. (Found downstream: dovetail emitted the absolute path and
+        // every fixture failed 2.0 conformance.)
+        let m = ResourceMeta::for_path(std::path::Path::new("/abs/dir/data.csv"), b"x");
+        assert_eq!(m.path, "data.csv");
+        assert!(!m.path.starts_with('/'));
+        assert!(!m.path.contains(".."));
+        assert!(!m.path.contains(':'));
+        assert_eq!(m.name, "data");
+        assert_eq!(m.format, "csv");
+    }
+
+    #[test]
     fn omits_encoding_when_none() {
         let tax = test_taxonomy();
         let mut m = meta();

@@ -32,6 +32,13 @@ directly. No drift, no subset to maintain.
   v2 type FineType emits — including `list`, `geopoint`, `year`, `yearmonth`,
   `duration` — passes. The type *vocabulary* is enforced by FineType's own
   `Frictionless::validate` (a stricter gate than the profile), not by this schema.
+- **`resource.path` MUST be relative** to the descriptor's directory — an absolute
+  path (`/…`), `../`, `~`, or a `file:`/URL scheme is **rejected** by 2.0 (it was
+  lenient under 1.0). Emit the basename when the descriptor is co-located with its
+  data. FineType's emitter does this via `file_name()`; a downstream consumer
+  (dovetail) hit this emitting the absolute source path. A closed `enum` constraint
+  must also be type-consistent — observed-string enums only belong on `string`
+  fields, not `boolean` (the field `oneOf` rejects the mismatch).
 
 ## Consumers
 
