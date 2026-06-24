@@ -3,6 +3,7 @@
 use super::*;
 use finetype_cli::enum_emission::collect_unique_values_if_categorical;
 use finetype_core::enum_domain::{detect_enum_domain, EnumConfig, EnumDomain};
+use finetype_mcp::datapackage;
 
 // Honest confidence signal (spec 2026-06-18-calibrated-confidence-abstention).
 // The shipped confidence ranks correctness but is not calibrated (over-confident
@@ -79,22 +80,22 @@ pub(crate) fn cmd_profile(
         return Err(anyhow::anyhow!("no input paths to profile"));
     }
     let batch_ext = match output {
-        OutputFormat::Json | OutputFormat::JsonSchema => "json",
+        OutputFormat::Json | OutputFormat::JsonSchema | OutputFormat::Datapackage => "json",
         OutputFormat::Csv => "csv",
         OutputFormat::Plain => "txt",
         OutputFormat::Markdown => "md",
         OutputFormat::Arrow => "arrow",
     };
     if batch_mode {
-        // Batch mode currently routes only the json-schema output through
+        // Batch mode routes the json-schema and datapackage outputs through
         // the per-file writer. The other format branches still use
         // `println!` to stdout, which would interleave outputs and ignore
         // --out-dir. Refuse early until they're converted.
-        if !matches!(output, OutputFormat::JsonSchema) {
+        if !matches!(output, OutputFormat::JsonSchema | OutputFormat::Datapackage) {
             let mut cmd = <Cli as clap::CommandFactory>::command();
             let err = cmd.error(
                 clap::error::ErrorKind::ArgumentConflict,
-                "--files currently requires -o json-schema (other formats not yet wired through the per-file writer)",
+                "--files currently requires -o json-schema or -o datapackage (other formats not yet wired through the per-file writer)",
             );
             err.exit();
         }
@@ -1002,10 +1003,111 @@ pub(crate) fn cmd_profile(
 
                 writeln!(writer, "{}", serde_json::to_string_pretty(&schema)?)?;
             }
+            OutputFormat::Datapackage => {
+                // ac-02: Frictionless Data Package descriptor (choice 0105).
+                // Same taxonomy enrichment + borrowed-column shape as the
+                // json-schema branch; type/format come from the authoritative
+                // `frictionless` map keyed on each column's label.
+                let taxonomy = enrichment_taxonomy.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "datapackage output requires the bundled taxonomy at `labels/`; \
+                     run from the FineType source tree or ship with embedded taxonomy."
+                    )
+                })?;
+
+                let cols: Vec<json_schema::TableSchemaColumn<'_>> = profiles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| {
+                        let values: &[String] = columns.get(i).map(|v| v.as_slice()).unwrap_or(&[]);
+                        json_schema::TableSchemaColumn {
+                            name: &p.name,
+                            label: &p.label,
+                            values,
+                            null_count: p.null_count,
+                        }
+                    })
+                    .collect();
+
+                let resource = resource_meta(file)?;
+                let descriptor =
+                    datapackage::emit_datapackage(&cols, &resource, taxonomy, enum_threshold);
+                writeln!(writer, "{}", serde_json::to_string_pretty(&descriptor)?)?;
+            }
         }
 
         writer.flush()?;
     } // end per-file loop
 
     Ok(())
+}
+
+/// Compute the Frictionless Data Resource metadata for a profiled file
+/// (choice 0105, ac-02): name/path/format/mediatype/encoding/bytes/hash/created.
+/// The file is read once more to size + hash it; profiling read it via DuckDB,
+/// which does not expose the raw bytes.
+fn resource_meta(file: &std::path::Path) -> Result<datapackage::ResourceMeta> {
+    use sha2::{Digest, Sha256};
+
+    let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
+    let path = file
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("data")
+        .to_string();
+    let ext = file
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    // (format token, mediatype, is-text). Text formats carry `encoding`.
+    let (format, mediatype, text) = match ext.as_str() {
+        "csv" | "" => ("csv".to_string(), "text/csv", true),
+        "tsv" => ("tsv".to_string(), "text/tab-separated-values", true),
+        "parquet" => (
+            "parquet".to_string(),
+            "application/vnd.apache.parquet",
+            false,
+        ),
+        "ndjson" | "jsonl" => ("ndjson".to_string(), "application/x-ndjson", true),
+        "json" => ("json".to_string(), "application/json", true),
+        other => (other.to_string(), "application/octet-stream", false),
+    };
+
+    let content = std::fs::read(file)
+        .map_err(|e| anyhow::anyhow!("could not read {:?} for hashing: {}", file, e))?;
+    let hash = format!("sha256:{:x}", Sha256::digest(&content));
+
+    Ok(datapackage::ResourceMeta {
+        name: slugify(stem),
+        path,
+        format,
+        mediatype: mediatype.to_string(),
+        encoding: text.then(|| "utf-8".to_string()),
+        bytes: content.len() as u64,
+        hash,
+        created: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+    })
+}
+
+/// Slug a file stem into a Frictionless-legal resource/package name:
+/// lowercase, keeping only `[a-z0-9._-]`, other chars → `-`.
+fn slugify(s: &str) -> String {
+    let slug: String = s
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = slug.trim_matches('-');
+    if trimmed.is_empty() {
+        "resource".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }

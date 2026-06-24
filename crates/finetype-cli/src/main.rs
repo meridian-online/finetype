@@ -545,6 +545,10 @@ enum OutputFormat {
     /// enum) and the `x-finetype-null-rate` / `x-finetype-cardinality`
     /// extensions.
     JsonSchema,
+    /// Frictionless Data Package descriptor (choice 0105) — one Data Resource
+    /// wrapping a Table Schema whose `type`/`format` come from the authoritative
+    /// taxonomy map. `profile` only; the interoperable family-standard envelope.
+    Datapackage,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -1637,10 +1641,13 @@ fn cmd_infer(
         };
 
         match output {
+            // datapackage is a profile-only table format; for single-value
+            // `infer` it degrades to plain output.
             OutputFormat::Plain
             | OutputFormat::Markdown
             | OutputFormat::Arrow
-            | OutputFormat::JsonSchema => {
+            | OutputFormat::JsonSchema
+            | OutputFormat::Datapackage => {
                 if show_value && show_confidence {
                     println!("{}\t{}\t{:.4}", text, display_label, result.confidence);
                 } else if show_value {
@@ -1745,10 +1752,13 @@ fn cmd_infer(
         };
 
         match output {
+            // datapackage is a profile-only table format; for single-value
+            // `infer` it degrades to plain output.
             OutputFormat::Plain
             | OutputFormat::Markdown
             | OutputFormat::Arrow
-            | OutputFormat::JsonSchema => {
+            | OutputFormat::JsonSchema
+            | OutputFormat::Datapackage => {
                 println!("{}", result.label);
                 if show_confidence {
                     println!(
@@ -2869,7 +2879,10 @@ fn cmd_taxonomy(
     }
 
     match output {
-        OutputFormat::Plain | OutputFormat::Markdown | OutputFormat::Arrow => {
+        OutputFormat::Plain
+        | OutputFormat::Markdown
+        | OutputFormat::Arrow
+        | OutputFormat::Datapackage => {
             println!("Domains: {:?}", taxonomy.domains());
             println!("Total labels: {}", taxonomy.len());
             if let Some(dom) = &domain {
@@ -3074,7 +3087,8 @@ fn cmd_check(
         OutputFormat::Plain
         | OutputFormat::Markdown
         | OutputFormat::Arrow
-        | OutputFormat::JsonSchema => {
+        | OutputFormat::JsonSchema
+        | OutputFormat::Datapackage => {
             print!("{}", format_report(&report, verbose));
         }
         OutputFormat::Json => {
@@ -3435,7 +3449,8 @@ fn cmd_eval(
         | OutputFormat::Csv
         | OutputFormat::Markdown
         | OutputFormat::Arrow
-        | OutputFormat::JsonSchema => {
+        | OutputFormat::JsonSchema
+        | OutputFormat::Datapackage => {
             println!("FineType Model Evaluation");
             println!("{}", "=".repeat(60));
             println!();

@@ -63,6 +63,7 @@ tracing-subscriber = { workspace = true }
 rand = { workspace = true }
 uuid = { workspace = true }
 tempfile = { workspace = true }
+sha2 = { workspace = true }
 
 [build-dependencies]
 ureq = { version = "2.9", features = ["tls"] }

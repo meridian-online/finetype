@@ -18,6 +18,7 @@
 //! server.serve_stdio().await?;
 //! ```
 
+pub mod datapackage;
 pub mod json_schema;
 pub mod resources;
 pub mod tools;

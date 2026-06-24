@@ -51,7 +51,7 @@ acceptance_criteria:
     metadata already computed in crates/finetype-cli/src/profile_io.rs; do not recompute.
     Follow dovetail-core/src/datapackage.rs struct shape where it eases family consistency.
   gate: true
-  checked: false
+  checked: true
 - id: ac-03
   description: |
     CUSTOM PROPERTIES — FineType richness rides as `x-finetype-*` per-field custom

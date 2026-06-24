@@ -472,7 +472,8 @@ pub(crate) fn cmd_validate_table(
         | OutputFormat::Arrow
         | OutputFormat::Csv
         | OutputFormat::Markdown
-        | OutputFormat::JsonSchema => {
+        | OutputFormat::JsonSchema
+        | OutputFormat::Datapackage => {
             println!("Validation Report");
             println!("{}", "═".repeat(60));
             println!("  Input:        {}", file.display());
