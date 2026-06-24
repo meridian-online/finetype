@@ -25,5 +25,13 @@ regex = { workspace = true }
 thiserror = { workspace = true }
 indexmap = { workspace = true }
 
+[features]
+# Embed the taxonomy YAMLs at compile time so crate consumers can read the
+# authoritative Frictionless type map (choice 0105) without a labels/ dir at
+# runtime. Workspace-only: it `include_str!`s the sibling `labels/` directory, so
+# it is for in-workspace path-dependency consumers (e.g. dovetail), NOT for the
+# crates.io-published light core, which builds with this feature off.
+embedded-taxonomy = []
+
 [dev-dependencies]
 pretty_assertions = "1.4"

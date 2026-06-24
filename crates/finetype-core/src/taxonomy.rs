@@ -986,6 +986,60 @@ impl std::fmt::Display for TierGraphSummary {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EMBEDDED TAXONOMY ACCESSOR (feature `embedded-taxonomy`)
+//
+// Exposes the compile-time-embedded taxonomy so in-workspace crate consumers
+// (dovetail) can read the authoritative Frictionless type map (choice 0105)
+// without a labels/ dir at runtime and without re-embedding the YAMLs. Gated so
+// the crates.io-published light core (default features) never references the
+// sibling labels/ directory.
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "embedded-taxonomy")]
+mod embedded_labels {
+    /// The seven domain definition files, embedded at compile time. Paths are
+    /// relative to this source file (`crates/finetype-core/src/`); the workspace
+    /// `labels/` dir sits three levels up.
+    pub const YAMLS: &[&str] = &[
+        include_str!("../../../labels/definitions_container.yaml"),
+        include_str!("../../../labels/definitions_datetime.yaml"),
+        include_str!("../../../labels/definitions_finance.yaml"),
+        include_str!("../../../labels/definitions_geography.yaml"),
+        include_str!("../../../labels/definitions_identity.yaml"),
+        include_str!("../../../labels/definitions_representation.yaml"),
+        include_str!("../../../labels/definitions_technology.yaml"),
+    ];
+}
+
+#[cfg(feature = "embedded-taxonomy")]
+impl Taxonomy {
+    /// Load the taxonomy embedded at compile time — no `labels/` directory
+    /// needed at runtime. Available under the `embedded-taxonomy` feature.
+    pub fn embedded() -> Result<Self, TaxonomyError> {
+        Self::from_yamls(embedded_labels::YAMLS)
+    }
+}
+
+/// Look up the authoritative Frictionless `{type, format}` mapping for a FineType
+/// label (choice 0105), using the compile-time-embedded taxonomy. A `.LOCALE`
+/// suffix on a 4-level label is stripped before lookup. Returns `None` for an
+/// unknown label (e.g. a shape-heuristic detection with no taxonomy entry).
+///
+/// The embedded taxonomy is parsed once and cached. Available under the
+/// `embedded-taxonomy` feature; this is the seam dovetail consumes to retire its
+/// own `frictionless_type()` heuristic.
+#[cfg(feature = "embedded-taxonomy")]
+pub fn frictionless_for(label: &str) -> Option<Frictionless> {
+    use std::sync::OnceLock;
+    static TAXONOMY: OnceLock<Taxonomy> = OnceLock::new();
+    let taxonomy =
+        TAXONOMY.get_or_init(|| Taxonomy::embedded().expect("embedded taxonomy must parse"));
+    // Keys are 3-level (domain.category.type); drop any locale 4th segment.
+    let key: String = label.split('.').take(3).collect::<Vec<_>>().join(".");
+    taxonomy.get(&key).and_then(|d| d.frictionless.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1468,6 +1522,30 @@ representation.discrete.categorical:
             // In CI/release builds, labels/ may not exist — skip gracefully
             eprintln!("Skipping full taxonomy test (labels/ not found)");
         }
+    }
+
+    #[cfg(feature = "embedded-taxonomy")]
+    #[test]
+    fn test_embedded_taxonomy_and_frictionless_for() {
+        // Embedded taxonomy loads all 244 definitions without a labels/ dir.
+        let tax = Taxonomy::embedded().expect("embedded taxonomy parses");
+        assert_eq!(tax.len(), 244, "expected 244 embedded definitions");
+
+        // The accessor returns the authoritative map for known labels…
+        let email = super::frictionless_for("identity.person.email").unwrap();
+        assert_eq!(email.ftype, "string");
+        assert_eq!(email.format.as_deref(), Some("email"));
+
+        let date = super::frictionless_for("datetime.date.dmy_slash").unwrap();
+        assert_eq!(date.ftype, "date");
+        assert_eq!(date.format.as_deref(), Some("%d/%m/%Y"));
+
+        // …strips a locale 4th segment…
+        let with_locale = super::frictionless_for("identity.person.email.EN_US").unwrap();
+        assert_eq!(with_locale.ftype, "string");
+
+        // …and returns None for an unknown label.
+        assert!(super::frictionless_for("not.a.label").is_none());
     }
 
     #[test]

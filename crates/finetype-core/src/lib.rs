@@ -36,6 +36,8 @@ pub use taxonomy::{
     DdlInfo, Definition, Designation, Frictionless, Label, Taxonomy, TierGraph, TierGraphSummary,
     Validation, FRICTIONLESS_TYPES,
 };
+#[cfg(feature = "embedded-taxonomy")]
+pub use taxonomy::frictionless_for;
 pub use tokenizer::Tokenizer;
 pub use validation_veto::{
     audited_safe_labels, evaluate_validation_veto, veto_shape_fallback, ValidationVeto,
