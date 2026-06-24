@@ -23,6 +23,7 @@ use anyhow::{bail, Context, Result};
 use candle_core::{DType, Device, Tensor, D};
 use candle_nn::ops::softmax;
 use candle_nn::VarBuilder;
+use finetype_model::model2vec_shared::Model2VecResources;
 use finetype_train::multi_branch::{
     read_training_data, FrozenSiblingContext, MultiBranchConfig, MultiBranchDataset,
     MultiBranchModel,
@@ -42,6 +43,7 @@ fn main() -> Result<()> {
     let mut zero_embed = false;
     let mut logit_adjust = 0.0f64; // tau; subtract tau*log(prior) from logits before argmax
     let mut priors_path: Option<PathBuf> = None;
+    let mut value_encoder: Option<PathBuf> = None;
 
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -49,6 +51,9 @@ fn main() -> Result<()> {
             "--model" => model_dir = args.next().map(PathBuf::from),
             "--data" => data = args.next().map(PathBuf::from),
             "--out" => out = args.next().map(PathBuf::from),
+            // Value-encoder dir for the per-value attention pool (choice 0106) — the
+            // model's config has a value_attention block and the FTMB is v6.
+            "--value-encoder" => value_encoder = args.next().map(PathBuf::from),
             "--no-sibling" => use_sibling = false,
             // Ablation: replace the embed branch input with zeros before the forward,
             // so the model decides on char/stats/header/validation only. If format
@@ -174,6 +179,25 @@ fn main() -> Result<()> {
         Some(table_groups),
     )?;
 
+    // Value attention (choice 0106): encode the FTMB v6 value strings once with the
+    // value encoder so the forward below matches the native classifier exactly.
+    let ds = if let Some(va) = config.value_attention.clone() {
+        let enc_dir = value_encoder
+            .as_ref()
+            .context("model config has value_attention but --value-encoder not given")?;
+        let enc = Model2VecResources::load(enc_dir)
+            .with_context(|| format!("load value encoder {}", enc_dir.display()))?;
+        eprintln!(
+            "value attention: encoding up to {} values/col with {} ({}d)",
+            va.n_values,
+            enc_dir.display(),
+            va.value_embed_dim
+        );
+        ds.with_value_attention(&records, &va, &enc)?
+    } else {
+        ds
+    };
+
     // ── Predict, group-chunk at a time ─────────────────────────────────
     let f = std::fs::File::create(&out).context("create out")?;
     let mut w = BufWriter::new(f);
@@ -187,6 +211,19 @@ fn main() -> Result<()> {
         let end = (gi + GROUP_CHUNK).min(n_groups);
         let chunk: Vec<usize> = (gi..end).collect();
         let (c, e, s, h, v, _labels) = ds.batch_groups(&chunk, sibling.as_ref(), &device)?;
+        // Widen the embed input to blender ‖ pool when value attention is on, using
+        // the same group→record expansion batch_groups produced.
+        let e = if ds.has_value_attention() {
+            let idxs = ds.expand_group_indices(&chunk);
+            let vbt = ds.value_batch(&idxs, &device)?;
+            let (ve, vm) = match &vbt {
+                Some((a, b)) => (Some(a), Some(b)),
+                None => (None, None),
+            };
+            model.embed_input(&e, ve, vm, false)?
+        } else {
+            e
+        };
         let e = if zero_embed { e.zeros_like()? } else { e };
         let logits = model.forward(&c, &e, &s, h.as_ref(), v.as_ref(), false)?;
         let logits = match &adjust {

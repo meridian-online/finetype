@@ -301,6 +301,47 @@ mod tests {
     }
 
     #[test]
+    fn test_save_load_roundtrip() {
+        // The pool's weights must serialise on the training side and deserialise on
+        // the inference side under the SAME VarBuilder prefix (choice 0106 D5). Build
+        // with random weights, save, reload from safetensors, and confirm identical
+        // output — the train-save → infer-load contract ac-3 depends on.
+        let cfg = ValueAttentionConfig {
+            n_values: 6,
+            ..Default::default()
+        };
+        let dev = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &dev);
+        let pool1 = ValueAttentionPool::new(&cfg, vb.pp("value_attn")).unwrap();
+
+        let path = std::env::temp_dir().join(format!("va_pool_{}.safetensors", std::process::id()));
+        varmap.save(&path).unwrap();
+
+        let vb2 =
+            unsafe { VarBuilder::from_mmaped_safetensors(&[&path], DType::F32, &dev).unwrap() };
+        let pool2 = ValueAttentionPool::new(&cfg, vb2.pp("value_attn")).unwrap();
+
+        let (b, n, d) = (2usize, cfg.n_values, cfg.value_embed_dim);
+        let x = Tensor::randn(0f32, 1.0, (b, n, d), &dev).unwrap();
+        let mask = Tensor::ones((b, n), DType::F32, &dev).unwrap();
+        let o1 = pool1.forward(&x, &mask, false).unwrap();
+        let o2 = pool2.forward(&x, &mask, false).unwrap();
+        let maxd = (o1 - o2)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .max(D::Minus1)
+            .unwrap()
+            .max(D::Minus1)
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        std::fs::remove_file(&path).ok();
+        assert!(maxd < 1e-6, "reloaded pool diverged: max diff {maxd}");
+    }
+
+    #[test]
     fn test_single_valid_value() {
         // A column with one real value (rest padded) must produce a finite pool.
         let cfg = ValueAttentionConfig {

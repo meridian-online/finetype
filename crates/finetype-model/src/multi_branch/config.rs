@@ -71,6 +71,12 @@ pub struct MultiBranchConfig {
     /// with v19 and every single-encoder model.
     #[serde(default)]
     pub value_embed_model: Option<String>,
+    /// Cross-value attention pool for the value branch (choice 0106). When set, the
+    /// embed branch input is the mean/var/min/max blender ‖ pool output, and the
+    /// per-value embeds are encoded once from the column values. None (default) =
+    /// the legacy fixed-pool value branch.
+    #[serde(default)]
+    pub value_attention: Option<crate::value_attention::ValueAttentionConfig>,
 }
 
 impl MultiBranchConfig {
@@ -82,6 +88,23 @@ impl MultiBranchConfig {
     /// Whether the validation branch is enabled (valid_dim > 0 with valid hidden dims).
     pub fn has_validation_branch(&self) -> bool {
         self.valid_dim > 0 && self.valid_hidden[0] > 0 && self.valid_hidden[1] > 0
+    }
+
+    /// Actual input dimension of the embed branch. Without value attention this is
+    /// `embed_dim` (the blender). With it, the blender (when `keep_blender_concat`)
+    /// is concatenated with the pool output before the branch.
+    pub fn embed_branch_input_dim(&self) -> usize {
+        match &self.value_attention {
+            Some(va) => {
+                let blender = if va.keep_blender_concat {
+                    self.embed_dim
+                } else {
+                    0
+                };
+                blender + va.output_dim()
+            }
+            None => self.embed_dim,
+        }
     }
 
     /// Total dimension of the merged trunk input (sum of all branch hidden[1] dims).

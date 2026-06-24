@@ -169,6 +169,68 @@ pub fn extract_embedding_aggregation_dyn(
     Some(result)
 }
 
+/// Same mean/var/min/max aggregation as [`extract_embedding_aggregation_dyn`],
+/// but over an ALREADY-ENCODED batch `[n_rows, embed_dim]`.
+///
+/// Lets a caller encode the value matrix ONCE and derive both the blender and the
+/// per-value attention pool input from it (choice 0106) — avoiding a second potion
+/// encode of the same values at inference. Skips zero-norm rows exactly as the
+/// `_dyn` path does, so the blender value is bit-identical to today's. Returns
+/// `None` when no row has non-zero norm.
+pub fn extract_embedding_aggregation_from_batch(
+    batch: &candle_core::Tensor,
+    n_rows: usize,
+    embed_dim: usize,
+) -> Option<Vec<f32>> {
+    let mut valid_rows: Vec<Vec<f32>> = Vec::with_capacity(n_rows);
+    for i in 0..n_rows {
+        let row: Vec<f32> = batch.get(i).ok()?.to_vec1().ok()?;
+        let norm_sq: f32 = row.iter().map(|v| v * v).sum();
+        if norm_sq > 1e-16 {
+            valid_rows.push(row);
+        }
+    }
+    if valid_rows.is_empty() {
+        return None;
+    }
+
+    let n = valid_rows.len() as f32;
+    let mut mean = vec![0.0f32; embed_dim];
+    let mut min = vec![f32::INFINITY; embed_dim];
+    let mut max = vec![f32::NEG_INFINITY; embed_dim];
+    for row in &valid_rows {
+        for d in 0..embed_dim {
+            mean[d] += row[d];
+            if row[d] < min[d] {
+                min[d] = row[d];
+            }
+            if row[d] > max[d] {
+                max[d] = row[d];
+            }
+        }
+    }
+    for v in mean.iter_mut() {
+        *v /= n;
+    }
+    let mut variance = vec![0.0f32; embed_dim];
+    for row in &valid_rows {
+        for d in 0..embed_dim {
+            let diff = row[d] - mean[d];
+            variance[d] += diff * diff;
+        }
+    }
+    for v in variance.iter_mut() {
+        *v /= n;
+    }
+
+    let mut result = Vec::with_capacity(4 * embed_dim);
+    result.extend_from_slice(&mean);
+    result.extend_from_slice(&variance);
+    result.extend_from_slice(&min);
+    result.extend_from_slice(&max);
+    Some(result)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════

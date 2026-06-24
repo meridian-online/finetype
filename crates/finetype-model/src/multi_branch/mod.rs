@@ -25,9 +25,12 @@
 use crate::char_cnn::HierarchicalHead;
 use crate::char_distribution::{extract_char_distribution, CHAR_DIST_DIM};
 use crate::column_stats::{extract_column_stats, COLUMN_STATS_DIM};
-use crate::embedding_aggregation::extract_embedding_aggregation_dyn;
+use crate::embedding_aggregation::{
+    extract_embedding_aggregation_dyn, extract_embedding_aggregation_from_batch,
+};
 use crate::inference::InferenceError;
 use crate::model2vec_shared::Model2VecResources;
+use crate::value_attention::ValueAttentionPool;
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{batch_norm, linear, BatchNorm, BatchNormConfig, Linear, ModuleT, VarBuilder};
 use finetype_core::Taxonomy;
@@ -61,6 +64,9 @@ pub struct MultiBranchClassifier {
     stats_branch: BranchWeights,
     header_branch: Option<BranchWeights>,
     validation_branch: Option<BranchWeights>,
+    /// Cross-value attention pool feeding the embed branch (choice 0106). None for
+    /// the legacy fixed-pool value branch. Same module + weight names as training.
+    value_attention: Option<ValueAttentionPool>,
     merge_norm: MergeNorm,
     merge_linear1: Linear,
     merge_linear2: Linear,
@@ -180,8 +186,23 @@ impl MultiBranchClassifier {
             };
 
         let char_branch = build_branch(config.char_dim, config.char_hidden, "char")?;
-        let embed_branch = build_branch(config.embed_dim, config.embed_hidden, "embed")?;
+        // Embed branch input widens to blender ‖ pool when value attention is on.
+        let embed_branch = build_branch(
+            config.embed_branch_input_dim(),
+            config.embed_hidden,
+            "embed",
+        )?;
         let stats_branch = build_branch(config.stats_dim, config.stats_hidden, "stats")?;
+
+        // Cross-value attention pool (choice 0106). Same module + weight prefix
+        // ("value_attn") training saved — loads straight from the safetensors.
+        let value_attention = match &config.value_attention {
+            Some(va) => Some(
+                ValueAttentionPool::new(va, vb.pp("value_attn"))
+                    .map_err(|e| InferenceError::InvalidPath(format!("value_attn: {e}")))?,
+            ),
+            None => None,
+        };
 
         // Load header branch if config enables it and weights exist in safetensors
         // Header always gets input LayerNorm (stabilises raw Model2Vec embeddings).
@@ -297,6 +318,7 @@ impl MultiBranchClassifier {
             stats_branch,
             header_branch,
             validation_branch,
+            value_attention,
             merge_norm,
             merge_linear1,
             merge_linear2,
@@ -368,6 +390,80 @@ impl MultiBranchClassifier {
         self.value_model2vec.as_ref().unwrap_or(&self.model2vec)
     }
 
+    /// Build the embed-branch input tensor `[1, embed_branch_input_dim]` for a column.
+    ///
+    /// Without value attention: the mean/var/min/max blender `[1, embed_dim]`
+    /// (unchanged behaviour). With it: encodes the column's values with the value
+    /// encoder ONCE and derives BOTH the blender and the per-value attention pool
+    /// input from that single encode — the attention path never re-encodes (the
+    /// inference-latency rule, choice 0106). Values are filtered to non-empty and
+    /// capped at `n_values`, matching the FTMB v6 write-time filter so the pool sees
+    /// the same rows it was trained on.
+    fn embed_input_tensor(
+        &self,
+        value_refs: &[&str],
+        device: &Device,
+    ) -> Result<Tensor, InferenceError> {
+        let resources = self.value_resources();
+        let (Some(pool), Some(va)) = (&self.value_attention, self.config.value_attention.as_ref())
+        else {
+            // Legacy fixed-pool path — single encode inside `_dyn`, unchanged.
+            let blender = extract_embedding_aggregation_dyn(value_refs, resources)
+                .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
+            return Tensor::from_slice(&blender, (1, self.config.embed_dim), device)
+                .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")));
+        };
+
+        let d = va.value_embed_dim;
+        let n_values = va.n_values;
+        let width = self.config.embed_branch_input_dim();
+
+        let filtered: Vec<&str> = value_refs
+            .iter()
+            .copied()
+            .filter(|s| !s.trim().is_empty())
+            .take(n_values)
+            .collect();
+        if filtered.is_empty() {
+            return Tensor::zeros((1, width), DType::F32, device)
+                .map_err(|e| InferenceError::InvalidPath(format!("embed zeros: {e}")));
+        }
+
+        // One encode; the pool input AND the blender both derive from `batch`.
+        let batch = resources
+            .encode_batch(&filtered)
+            .map_err(|e| InferenceError::InvalidPath(format!("value encode: {e}")))?;
+
+        let mut embeds = vec![0.0f32; n_values * d];
+        let mut mask = vec![0.0f32; n_values];
+        for j in 0..filtered.len() {
+            let row: Vec<f32> = batch
+                .get(j)
+                .and_then(|t| t.to_vec1())
+                .map_err(|e| InferenceError::InvalidPath(format!("value row: {e}")))?;
+            embeds[j * d..(j + 1) * d].copy_from_slice(&row[..d]);
+            mask[j] = 1.0;
+        }
+        let embeds_t = Tensor::from_slice(&embeds, (1, n_values, d), device)
+            .map_err(|e| InferenceError::InvalidPath(format!("value embeds: {e}")))?;
+        let mask_t = Tensor::from_slice(&mask, (1, n_values), device)
+            .map_err(|e| InferenceError::InvalidPath(format!("value mask: {e}")))?;
+        let pooled = pool
+            .forward(&embeds_t, &mask_t, false)
+            .map_err(|e| InferenceError::InvalidPath(format!("value pool: {e}")))?;
+
+        if va.keep_blender_concat {
+            let blender = extract_embedding_aggregation_from_batch(&batch, filtered.len(), d)
+                .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
+            let blender_t = Tensor::from_slice(&blender, (1, self.config.embed_dim), device)
+                .map_err(|e| InferenceError::InvalidPath(format!("blender tensor: {e}")))?;
+            Tensor::cat(&[&blender_t, &pooled], 1)
+                .map_err(|e| InferenceError::InvalidPath(format!("embed cat: {e}")))
+        } else {
+            Ok(pooled)
+        }
+    }
+
     /// Classify a column of values, returning (label, confidence).
     ///
     /// Extracts branch features from the values, runs the MLP forward pass,
@@ -396,16 +492,14 @@ impl MultiBranchClassifier {
 
         // Extract features
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
-            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
+        // embed branch input (blender ‖ pool) is built below from a single encode.
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         // Forward pass through trunk
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let embed_t = self.embed_input_tensor(&value_refs, &device)?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
             (1, self.config.stats_dim),
@@ -510,15 +604,13 @@ impl MultiBranchClassifier {
 
         // Extract features (same as classify_column)
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
-            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
+        // embed branch input (blender ‖ pool) is built below from a single encode.
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let embed_t = self.embed_input_tensor(&value_refs, &device)?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
             (1, self.config.stats_dim),
@@ -793,15 +885,13 @@ impl MultiBranchClassifier {
         let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
-            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
+        // embed branch input (blender ‖ pool) is built below from a single encode.
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let embed_t = self.embed_input_tensor(&value_refs, &device)?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
             (1, self.config.stats_dim),
@@ -907,15 +997,13 @@ impl MultiBranchClassifier {
         let value_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
 
         let char_feats = extract_char_distribution(&value_refs).unwrap_or([0.0f32; CHAR_DIST_DIM]);
-        let embed_feats = extract_embedding_aggregation_dyn(&value_refs, self.value_resources())
-            .unwrap_or_else(|| vec![0.0f32; self.config.embed_dim]);
+        // embed branch input (blender ‖ pool) is built below from a single encode.
         let stats_feats = extract_column_stats(&value_refs).unwrap_or([0.0f32; COLUMN_STATS_DIM]);
 
         let device = Device::Cpu;
         let char_t = Tensor::from_slice(&char_feats, (1, CHAR_DIST_DIM), &device)
             .map_err(|e| InferenceError::InvalidPath(format!("char tensor: {e}")))?;
-        let embed_t = Tensor::from_slice(&embed_feats, (1, self.config.embed_dim), &device)
-            .map_err(|e| InferenceError::InvalidPath(format!("embed tensor: {e}")))?;
+        let embed_t = self.embed_input_tensor(&value_refs, &device)?;
         let stats_t = Tensor::from_slice(
             &stats_feats[..self.config.stats_dim],
             (1, self.config.stats_dim),
