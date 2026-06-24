@@ -10,7 +10,7 @@ goal: |
 cards:
 - 0005-schema-driven-data-validation
 - 0014-profile-validate-precision
-status: open
+status: closed
 labels:
 - interoperability
 - frictionless
@@ -85,3 +85,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-24T04:15:18.592552Z
