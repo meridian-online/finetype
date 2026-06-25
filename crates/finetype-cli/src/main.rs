@@ -9,10 +9,9 @@ use finetype_cli::transform_projection::{
 };
 use finetype_core::{format_report, Checker, Generator, Label, Taxonomy};
 use finetype_mcp::json_schema;
-use finetype_model::Classifier;
 use serde_json::json;
 use std::io::{self, BufRead, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -20,6 +19,12 @@ use tracing_subscriber::EnvFilter;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "embed-models")]
+// The generated module still defines the char-cnn / tiered / semantic-hint /
+// entity embeds, which became unused when the value-level ModelTypes and their
+// loaders were removed (choice 0107 stage 2b). The multi-branch model only reads
+// MB_* / M2V_MODEL / M2V_TOKENIZER. Trimming the build.rs generators for the dead
+// embeds is a behaviour-neutral follow-up; allow dead_code until then.
+#[allow(dead_code)]
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded_models.rs"));
 }
@@ -70,22 +75,14 @@ enum Commands {
         #[arg(short, long)]
         value: bool,
 
-        /// Model type: multi-branch (default), char-cnn, or tiered (legacy).
-        /// Multi-branch uses a single column-level forward pass + Sharpen post-processing.
-        #[arg(long, default_value = "multi-branch")]
-        model_type: ModelType,
-
-        /// Inference mode: row (per-value) or column (distribution-based disambiguation)
-        #[arg(long, default_value = "row")]
+        /// Inference mode: column (distribution-based disambiguation, default) or
+        /// row. The shipped model is column-level, so row mode is unsupported.
+        #[arg(long, default_value = "column")]
         mode: InferenceMode,
 
         /// Sample size for column mode (default 100)
         #[arg(long, default_value = "100")]
         sample_size: usize,
-
-        /// Print throughput statistics to stderr after inference
-        #[arg(long)]
-        bench: bool,
 
         /// Column name for header hint (used with --mode column)
         #[arg(long)]
@@ -141,52 +138,6 @@ enum Commands {
         /// Generate 4-level labels with locale suffixes (domain.category.type.LOCALE)
         #[arg(long)]
         localized: bool,
-    },
-
-    /// Train a model
-    #[command(hide = true)]
-    Train {
-        /// Training data file (NDJSON)
-        #[arg(short, long)]
-        data: PathBuf,
-
-        /// Taxonomy file or directory
-        #[arg(short, long, default_value = "labels")]
-        taxonomy: PathBuf,
-
-        /// Output directory for model
-        #[arg(short, long, default_value = "models/default")]
-        output: PathBuf,
-
-        /// Number of epochs
-        #[arg(short, long, default_value = "5")]
-        epochs: usize,
-
-        /// Batch size
-        #[arg(short, long, default_value = "32")]
-        batch_size: usize,
-
-        /// Device (cpu, cuda, metal)
-        #[arg(long, default_value = "cpu")]
-        device: String,
-
-        /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "multi-branch")]
-        model_type: ModelType,
-
-        /// Random seed for deterministic training reproducibility
-        #[arg(long)]
-        seed: Option<u64>,
-
-        /// Enable feature-augmented training. Extracts deterministic
-        /// features per sample and passes them alongside character encodings.
-        #[arg(long)]
-        use_features: bool,
-
-        /// Enable hierarchical classification head. Uses tree softmax
-        /// (7 domains → 43 categories → 250 leaf types) instead of flat 250-class softmax.
-        #[arg(long)]
-        hierarchical: bool,
     },
 
     /// Show taxonomy information (optionally filtered to a single type or glob)
@@ -337,10 +288,6 @@ enum Commands {
         #[arg(long)]
         no_header_hint: bool,
 
-        /// Model type (char-cnn, tiered, transformer)
-        #[arg(long, default_value = "multi-branch")]
-        model_type: ModelType,
-
         /// Cardinality threshold for ENUM columns (0 = disable ENUM, show VARCHAR).
         /// A column with at most this many distinct values is typed as an ENUM;
         /// above it, VARCHAR. Default 32 — tuned to reduce over-eager ENUM
@@ -470,29 +417,6 @@ enum Commands {
         validation: bool,
     },
 
-    /// Evaluate model accuracy on a test set
-    #[command(hide = true)]
-    Eval {
-        /// Test data file (NDJSON with "text" and "classification" fields)
-        #[arg(short, long)]
-        data: PathBuf,
-
-        /// Taxonomy file or directory
-        #[arg(short, long, default_value = "labels")]
-        taxonomy: PathBuf,
-
-        /// Model type (transformer, char_cnn)
-        #[arg(long, default_value = "multi-branch")]
-        model_type: ModelType,
-
-        /// Number of top confusions to show
-        #[arg(long, default_value = "20")]
-        top_confusions: usize,
-
-        /// Output format (plain, json)
-        #[arg(short, long, default_value = "plain")]
-        output: OutputFormat,
-    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
@@ -512,14 +436,6 @@ enum OutputFormat {
     /// wrapping a Table Schema whose `type`/`format` come from the authoritative
     /// taxonomy map. `profile` only; the interoperable family-standard envelope.
     Datapackage,
-}
-
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
-enum ModelType {
-    Transformer,
-    CharCnn,
-    Tiered,
-    MultiBranch,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -561,10 +477,8 @@ fn main() -> Result<()> {
             output,
             confidence,
             value,
-            model_type,
             mode,
             sample_size,
-            bench,
             header,
             batch,
             explain,
@@ -575,10 +489,8 @@ fn main() -> Result<()> {
             output,
             confidence,
             value,
-            model_type,
             mode,
             sample_size,
-            bench,
             header,
             batch,
             explain,
@@ -594,29 +506,6 @@ fn main() -> Result<()> {
             localized,
         } => cmd_generate(samples, priority, output, taxonomy, seed, localized),
 
-        Commands::Train {
-            data,
-            taxonomy,
-            output,
-            epochs,
-            batch_size,
-            device,
-            model_type,
-            seed,
-            use_features,
-            hierarchical,
-        } => cmd_train(
-            data,
-            taxonomy,
-            output,
-            epochs,
-            batch_size,
-            device,
-            model_type,
-            seed,
-            use_features,
-            hierarchical,
-        ),
 
         Commands::Taxonomy {
             type_key,
@@ -661,7 +550,6 @@ fn main() -> Result<()> {
             sample_size,
             delimiter,
             no_header_hint,
-            model_type,
             enum_threshold,
             stats,
             verbose,
@@ -696,7 +584,6 @@ fn main() -> Result<()> {
                 sample_size,
                 delimiter,
                 no_header_hint,
-                model_type,
                 enum_threshold,
                 stats,
                 verbose,
@@ -704,14 +591,6 @@ fn main() -> Result<()> {
                 no_validation_veto,
             )
         }
-
-        Commands::Eval {
-            data,
-            taxonomy,
-            model_type,
-            top_confusions,
-            output,
-        } => cmd_eval(data, taxonomy, model_type, top_confusions, output),
 
         Commands::Mcp => cmd_mcp(),
 
@@ -808,42 +687,15 @@ fn cmd_mcp() -> Result<()> {
         ..Default::default()
     };
 
-    // Build column classifier — prefer multi-branch, fall back to CharCNN
+    // Build the multi-branch column classifier (the shipped model).
     let model_path = PathBuf::from("models/default");
-    let mut column_classifier = if let Ok(mb) = load_multi_branch_classifier(&model_path) {
-        eprintln!(
-            "Loaded multi-branch classifier ({} classes)",
-            mb.n_classes()
-        );
-        let mut cc = ColumnClassifier::with_multi_branch(mb, config);
-        wire_model2vec_and_siblings(&mut cc);
-        cc
-    } else {
-        eprintln!("No multi-branch model found, falling back to CharCNN");
-        let char_classifier = load_char_classifier(&model_path)?;
-        if let Some(semantic) = load_semantic_hint() {
-            eprintln!("Loaded semantic hint classifier (Model2Vec)");
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(
-                Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
-                config,
-                semantic,
-            );
-            if let Some(entity) = entity {
-                eprintln!("Loaded entity classifier (full_name demotion gate)");
-                cc.set_entity_classifier(entity);
-            }
-            wire_sibling_context(&mut cc);
-            cc
-        } else {
-            let mut cc = ColumnClassifier::new(
-                Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
-                config,
-            );
-            wire_sibling_context(&mut cc);
-            cc
-        }
-    };
+    let mb = load_multi_branch_classifier(&model_path)?;
+    eprintln!(
+        "Loaded multi-branch classifier ({} classes)",
+        mb.n_classes()
+    );
+    let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
+    wire_model2vec_and_siblings(&mut column_classifier);
 
     // Load taxonomy for validation-based disambiguation
     let taxonomy_path = PathBuf::from("labels");
@@ -1334,17 +1186,14 @@ fn cmd_infer(
     output: OutputFormat,
     show_confidence: bool,
     show_value: bool,
-    model_type: ModelType,
     mode: InferenceMode,
     sample_size: usize,
-    bench: bool,
     header: Option<String>,
     batch: bool,
     explain: bool,
     taxonomy: PathBuf,
 ) -> Result<()> {
-    use finetype_model::{ClassificationResult, ColumnClassifier, ColumnConfig};
-    use std::time::Instant;
+    use finetype_model::{ColumnClassifier, ColumnConfig};
 
     // --explain: diagnostic cascade over an NDJSON stream. Subsumes the
     // historical `infer-type` subcommand; lives on `infer` to keep the
@@ -1363,7 +1212,7 @@ fn cmd_infer(
         if !matches!(mode, InferenceMode::Column) {
             anyhow::bail!("--batch requires --mode column");
         }
-        return cmd_infer_batch(model, model_type, sample_size);
+        return cmd_infer_batch(model, sample_size);
     }
 
     // Collect inputs
@@ -1388,105 +1237,6 @@ fn cmd_infer(
     if inputs.is_empty() {
         eprintln!("No input provided");
         return Ok(());
-    }
-
-    let total_values = inputs.len();
-    let t_start = Instant::now();
-
-    // Load taxonomy for value-mode enrichment (locale detection, broad_type)
-    let taxonomy_path = std::path::PathBuf::from("labels");
-    let taxonomy = load_taxonomy(&taxonomy_path).ok().map(|mut t| {
-        t.compile_locale_validators();
-        t
-    });
-
-    /// Detect locale for a single value by testing it against all locale validators.
-    /// Unlike `detect_locale_from_validation` (column mode, pass-rate ranking),
-    /// this returns the first locale whose validator passes for a single value.
-    fn detect_single_value_locale(value: &str, label: &str, taxonomy: &Taxonomy) -> Option<String> {
-        let locale_validators = taxonomy.get_locale_validators(label)?;
-        for (locale, validator) in locale_validators {
-            if validator.validate(value).is_valid {
-                return Some(locale.clone());
-            }
-        }
-        None
-    }
-
-    // Helper to output result
-    fn output_result(
-        text: &str,
-        result: &ClassificationResult,
-        output: OutputFormat,
-        show_value: bool,
-        show_confidence: bool,
-        taxonomy: Option<&Taxonomy>,
-    ) {
-        // Detect locale for suffix and JSON enrichment
-        let locale = taxonomy.and_then(|tax| detect_single_value_locale(text, &result.label, tax));
-
-        // Build display label: append .LOCALE suffix when detected
-        let display_label = if let Some(ref loc) = locale {
-            format!("{}.{}", result.label, loc)
-        } else {
-            result.label.clone()
-        };
-
-        match output {
-            // datapackage is a profile-only table format; for single-value
-            // `infer` it degrades to plain output.
-            OutputFormat::Plain
-            | OutputFormat::Markdown
-            | OutputFormat::Arrow
-            | OutputFormat::JsonSchema
-            | OutputFormat::Datapackage => {
-                if show_value && show_confidence {
-                    println!("{}\t{}\t{:.4}", text, display_label, result.confidence);
-                } else if show_value {
-                    println!("{}\t{}", text, display_label);
-                } else if show_confidence {
-                    println!("{}\t{:.4}", display_label, result.confidence);
-                } else {
-                    println!("{}", display_label);
-                }
-            }
-            OutputFormat::Json => {
-                let mut obj = serde_json::Map::new();
-                obj.insert("label".to_string(), json!(result.label));
-                if show_value {
-                    obj.insert("input".to_string(), json!(text));
-                }
-                if show_confidence {
-                    obj.insert("confidence".to_string(), json!(result.confidence));
-                }
-                // Enrich with taxonomy fields when available
-                if let Some(tax) = taxonomy {
-                    if let Some(def) = tax.get(&result.label) {
-                        if let Some(ref bt) = def.broad_type {
-                            obj.insert("broad_type".to_string(), json!(bt));
-                        }
-                    }
-                }
-                if let Some(ref loc) = locale {
-                    obj.insert("locale".to_string(), json!(loc));
-                }
-                println!("{}", serde_json::Value::Object(obj));
-            }
-            OutputFormat::Csv => {
-                if show_value && show_confidence {
-                    println!(
-                        "\"{}\",\"{}\",{:.4}",
-                        text, display_label, result.confidence
-                    );
-                } else if show_value {
-                    println!("\"{}\",\"{}\"", text, display_label);
-                } else if show_confidence {
-                    println!("\"{}\",{:.4}", display_label, result.confidence);
-                } else {
-                    println!("\"{}\"", display_label);
-                }
-            }
-        }
     }
 
     // Column mode: treat all inputs as one column, return single prediction
@@ -1536,29 +1286,8 @@ fn cmd_infer(
                 sample_size,
                 ..Default::default()
             };
-            let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-                let mb = load_multi_branch_classifier(&model)?;
-                ColumnClassifier::with_multi_branch(mb, config)
-            } else {
-                let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
-                    ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-                    ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-                    ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-                    ModelType::MultiBranch => unreachable!(),
-                };
-                let semantic_hint = load_semantic_hint();
-                if let Some(semantic) = semantic_hint {
-                    // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-                    let entity = load_entity_classifier(&semantic);
-                    let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-                    if let Some(entity) = entity {
-                        cc.set_entity_classifier(entity);
-                    }
-                    cc
-                } else {
-                    ColumnClassifier::new(classifier, config)
-                }
-            };
+            let mb = load_multi_branch_classifier(&model)?;
+            let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
 
             // Validation-based attractor demotion (Rule 14) needs the taxonomy.
             if let Some(taxonomy) = col_taxonomy {
@@ -1647,138 +1376,12 @@ fn cmd_infer(
         return Ok(());
     }
 
-    // Row mode: classify each value independently
-    if matches!(model_type, ModelType::MultiBranch) {
-        anyhow::bail!(
-            "Multi-branch models are column-level only. Use --mode column or `finetype profile` instead."
-        );
-    }
-    match model_type {
-        ModelType::Transformer => {
-            let classifier = Classifier::load(&model)?;
-            let batch_size = 32;
-            for chunk in inputs.chunks(batch_size) {
-                let batch_texts: Vec<String> = chunk.to_vec();
-                let results = classifier.classify_batch(&batch_texts)?;
-                for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(
-                        text,
-                        result,
-                        output,
-                        show_value,
-                        show_confidence,
-                        taxonomy.as_ref(),
-                    );
-                }
-            }
-        }
-        ModelType::CharCnn => {
-            let classifier = load_char_classifier(&model)?;
-            let batch_size = 128;
-            for chunk in inputs.chunks(batch_size) {
-                let batch_texts: Vec<String> = chunk.to_vec();
-                let results = classifier.classify_batch(&batch_texts)?;
-                for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(
-                        text,
-                        result,
-                        output,
-                        show_value,
-                        show_confidence,
-                        taxonomy.as_ref(),
-                    );
-                }
-            }
-        }
-        ModelType::Tiered => {
-            let classifier = load_tiered_classifier(&model)?;
-            let batch_size = 128;
-            if bench {
-                // Use timed variant for tier-level breakdown
-                let mut total_timing = finetype_model::TierTiming {
-                    encode_ms: 0.0,
-                    tier0_ms: 0.0,
-                    tier1_ms: 0.0,
-                    tier1_models: 0,
-                    tier2_ms: 0.0,
-                    tier2_models: 0,
-                    total_ms: 0.0,
-                };
-                for chunk in inputs.chunks(batch_size) {
-                    let batch_texts: Vec<String> = chunk.to_vec();
-                    let (results, timing) = classifier.classify_batch_timed(&batch_texts)?;
-                    total_timing.encode_ms += timing.encode_ms;
-                    total_timing.tier0_ms += timing.tier0_ms;
-                    total_timing.tier1_ms += timing.tier1_ms;
-                    total_timing.tier1_models = total_timing.tier1_models.max(timing.tier1_models);
-                    total_timing.tier2_ms += timing.tier2_ms;
-                    total_timing.tier2_models = total_timing.tier2_models.max(timing.tier2_models);
-                    total_timing.total_ms += timing.total_ms;
-                    for (text, result) in chunk.iter().zip(results.iter()) {
-                        output_result(
-                            text,
-                            result,
-                            output,
-                            show_value,
-                            show_confidence,
-                            taxonomy.as_ref(),
-                        );
-                    }
-                }
-                let elapsed = t_start.elapsed();
-                let secs = elapsed.as_secs_f64();
-                let vps = total_values as f64 / secs;
-                eprintln!(
-                    "[bench] model=Tiered  values={}  elapsed={:.3}s  throughput={:.0} val/sec",
-                    total_values, secs, vps
-                );
-                eprintln!(
-                    "[bench] breakdown: encode={:.1}ms  T0={:.1}ms  T1={:.1}ms ({} models)  T2={:.1}ms ({} models)",
-                    total_timing.encode_ms, total_timing.tier0_ms,
-                    total_timing.tier1_ms, total_timing.tier1_models,
-                    total_timing.tier2_ms, total_timing.tier2_models
-                );
-                let inference_ms =
-                    total_timing.tier0_ms + total_timing.tier1_ms + total_timing.tier2_ms;
-                if inference_ms > 0.0 {
-                    eprintln!(
-                        "[bench] tier share: T0={:.1}%  T1={:.1}%  T2={:.1}%",
-                        total_timing.tier0_ms / inference_ms * 100.0,
-                        total_timing.tier1_ms / inference_ms * 100.0,
-                        total_timing.tier2_ms / inference_ms * 100.0
-                    );
-                }
-                return Ok(());
-            }
-            for chunk in inputs.chunks(batch_size) {
-                let batch_texts: Vec<String> = chunk.to_vec();
-                let results = classifier.classify_batch(&batch_texts)?;
-                for (text, result) in chunk.iter().zip(results.iter()) {
-                    output_result(
-                        text,
-                        result,
-                        output,
-                        show_value,
-                        show_confidence,
-                        taxonomy.as_ref(),
-                    );
-                }
-            }
-        }
-        ModelType::MultiBranch => unreachable!("guarded above"),
-    }
-
-    if bench {
-        let elapsed = t_start.elapsed();
-        let secs = elapsed.as_secs_f64();
-        let vps = total_values as f64 / secs;
-        eprintln!(
-            "[bench] model={:?}  values={}  elapsed={:.3}s  throughput={:.0} val/sec",
-            model_type, total_values, secs, vps
-        );
-    }
-
-    Ok(())
+    // Row mode (per-value) required a value-level model. The only shipped
+    // model is the column-level multi-branch model (choice 0107), so row mode
+    // is no longer supported.
+    anyhow::bail!(
+        "Row mode is unsupported: the shipped model is column-level. Use --mode column (the default) or `finetype profile`."
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1795,8 +1398,8 @@ fn cmd_infer(
 ///
 /// Output JSONL format:
 ///   {"label": "identity.person.email", "confidence": 0.95, ...}
-fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+fn cmd_infer_batch(model: PathBuf, sample_size: usize) -> Result<()> {
+    use finetype_model::{ColumnClassifier, ColumnConfig};
     use std::time::Instant;
 
     let t_start = Instant::now();
@@ -1806,37 +1409,12 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
         ..Default::default()
     };
 
-    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = load_multi_branch_classifier(&model)?;
-        eprintln!(
-            "Loaded multi-branch classifier ({} classes)",
-            mb.n_classes()
-        );
-        ColumnClassifier::with_multi_branch(mb, config)
-    } else {
-        // Load value-level classifier
-        let classifier: Box<dyn ValueClassifier> = match model_type {
-            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch => unreachable!(),
-        };
-
-        // Wire up semantic hint (Model2Vec) — same as profile command
-        if let Some(semantic) = load_semantic_hint() {
-            eprintln!("Loaded semantic hint classifier (Model2Vec)");
-            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-            if let Some(entity) = entity {
-                eprintln!("Loaded entity classifier (full_name demotion gate)");
-                cc.set_entity_classifier(entity);
-            }
-            cc
-        } else {
-            ColumnClassifier::new(classifier, config)
-        }
-    };
+    let mb = load_multi_branch_classifier(&model)?;
+    eprintln!(
+        "Loaded multi-branch classifier ({} classes)",
+        mb.n_classes()
+    );
+    let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
 
     // Load taxonomy for validation-based attractor demotion (Rule 14)
     let taxonomy_path = std::path::PathBuf::from("labels");
@@ -2006,150 +1584,6 @@ fn load_multi_branch_classifier(model: &PathBuf) -> Result<finetype_model::Multi
     }
 }
 
-/// Load a CharClassifier: try the model directory first, then fall back to
-/// the embedded model if the path doesn't exist (release binaries).
-///
-/// Automatically loads validation patterns from the taxonomy to enable
-/// pattern-gated post-processing.
-fn load_char_classifier(model: &PathBuf) -> Result<finetype_model::CharClassifier> {
-    let mut classifier = if model.exists() {
-        finetype_model::CharClassifier::load(model)?
-    } else {
-        #[cfg(feature = "embed-models")]
-        {
-            finetype_model::CharClassifier::from_bytes(
-                embedded::FLAT_WEIGHTS,
-                embedded::FLAT_LABELS,
-                embedded::FLAT_CONFIG,
-            )?
-        }
-        #[cfg(not(feature = "embed-models"))]
-        {
-            anyhow::bail!(
-                "Model directory {:?} not found. Build with `embed-models` feature for standalone use.",
-                model
-            )
-        }
-    };
-
-    // Load validation patterns from taxonomy for pattern-gated post-processing.
-    // This validates model predictions against taxonomy regex patterns and falls
-    // back to next-best predictions on mismatch (e.g., "C85" ≠ iata_code pattern).
-    let taxonomy_path = PathBuf::from("labels");
-    if let Ok(taxonomy) = load_taxonomy(&taxonomy_path) {
-        let patterns = finetype_model::extract_validation_patterns(&taxonomy);
-        if !patterns.is_empty() {
-            classifier.set_validation_patterns(patterns);
-        }
-    }
-
-    Ok(classifier)
-}
-
-/// Load a TieredClassifier: try the model directory first, then fall back to
-/// the embedded tiered model if the path doesn't exist (release binaries).
-fn load_tiered_classifier(model: &PathBuf) -> Result<finetype_model::TieredClassifier> {
-    if model.exists() && model.join("tier_graph.json").exists() {
-        Ok(finetype_model::TieredClassifier::load(model)?)
-    } else {
-        #[cfg(feature = "embed-models")]
-        {
-            if embedded::EMBEDDED_MODEL_TYPE == "tiered" {
-                Ok(finetype_model::TieredClassifier::from_embedded(
-                    embedded::TIER_GRAPH,
-                    embedded::get_tiered_model_data,
-                )?)
-            } else {
-                anyhow::bail!(
-                    "Tiered model not found at {:?} and embedded model is flat. \
-                     Use --model-type char-cnn or provide a tiered model path.",
-                    model
-                )
-            }
-        }
-        #[cfg(not(feature = "embed-models"))]
-        {
-            anyhow::bail!(
-                "Model directory {:?} not found. Build with `embed-models` feature for standalone use.",
-                model
-            )
-        }
-    }
-}
-
-/// Load the semantic hint classifier for column name classification.
-///
-/// Resolution order:
-///  1. models/model2vec directory on disk (development)
-///  2. Embedded Model2Vec bytes (release binaries)
-///  3. None — falls back to hardcoded header_hint()
-fn load_semantic_hint() -> Option<finetype_model::SemanticHintClassifier> {
-    // Try disk-based model first (development workflow)
-    let model_dir = std::path::PathBuf::from("models/model2vec");
-    if model_dir.join("model.safetensors").exists() {
-        return finetype_model::SemanticHintClassifier::load(&model_dir)
-            .map_err(|e| eprintln!("Warning: Failed to load Model2Vec from disk: {e}"))
-            .ok();
-    }
-
-    // Try embedded model bytes (release binary)
-    #[cfg(feature = "embed-models")]
-    {
-        if embedded::HAS_MODEL2VEC {
-            return finetype_model::SemanticHintClassifier::from_bytes(
-                embedded::M2V_TOKENIZER,
-                embedded::M2V_MODEL,
-                embedded::M2V_TYPE_EMBEDDINGS,
-                embedded::M2V_LABEL_INDEX,
-            )
-            .map_err(|e| eprintln!("Warning: Failed to load embedded Model2Vec: {e}"))
-            .ok();
-        }
-    }
-
-    None
-}
-
-/// Load the entity classifier for full_name demotion.
-///
-/// Requires a loaded SemanticHintClassifier to share the Model2Vec tokenizer
-/// and embeddings. Resolution order:
-///  1. models/entity-classifier directory on disk (development)
-///  2. Embedded entity classifier bytes (release binaries)
-///  3. None — entity demotion disabled
-fn load_entity_classifier(
-    semantic: &finetype_model::SemanticHintClassifier,
-) -> Option<finetype_model::EntityClassifier> {
-    // Try disk-based model first (development workflow)
-    let model_dir = std::path::PathBuf::from("models/entity-classifier");
-    if model_dir.join("model.safetensors").exists() {
-        return finetype_model::EntityClassifier::load(
-            &model_dir,
-            semantic.tokenizer().clone(),
-            semantic.embeddings().clone(),
-        )
-        .map_err(|e| eprintln!("Warning: Failed to load entity classifier from disk: {e}"))
-        .ok();
-    }
-
-    // Try embedded model bytes (release binary)
-    #[cfg(feature = "embed-models")]
-    {
-        if embedded::HAS_ENTITY_CLASSIFIER {
-            return finetype_model::EntityClassifier::from_bytes(
-                embedded::ENTITY_MODEL,
-                embedded::ENTITY_CONFIG,
-                semantic.tokenizer().clone(),
-                semantic.embeddings().clone(),
-            )
-            .map_err(|e| eprintln!("Warning: Failed to load embedded entity classifier: {e}"))
-            .ok();
-        }
-    }
-
-    None
-}
-
 /// Load shared Model2Vec resources (tokenizer + embeddings).
 ///
 /// Resolution order:
@@ -2283,234 +1717,6 @@ fn cmd_generate(
 
     eprintln!("Saved to {:?}", output);
     Ok(())
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TRAIN — Train a classification model
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[allow(clippy::too_many_arguments)]
-fn cmd_train(
-    data: PathBuf,
-    taxonomy_path: PathBuf,
-    output: PathBuf,
-    epochs: usize,
-    batch_size: usize,
-    _device: String,
-    model_type: ModelType,
-    seed: Option<u64>,
-    use_features: bool,
-    hierarchical: bool,
-) -> Result<()> {
-    use finetype_core::Sample;
-    use std::io::BufRead;
-
-    eprintln!("Loading taxonomy from {:?}", taxonomy_path);
-    let taxonomy = load_taxonomy(&taxonomy_path)?;
-    eprintln!("Loaded {} label definitions", taxonomy.len());
-
-    eprintln!("Loading training data from {:?}", data);
-    let file = std::fs::File::open(&data)?;
-    let reader = std::io::BufReader::new(file);
-
-    let mut samples = Vec::new();
-    for line in reader.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-        let record: serde_json::Value = serde_json::from_str(&line)?;
-        let text = record["text"].as_str().unwrap_or("").to_string();
-        let label = record["classification"].as_str().unwrap_or("").to_string();
-        samples.push(Sample { text, label });
-    }
-    eprintln!("Loaded {} training samples", samples.len());
-
-    // Snapshot: if output directory already contains model files, back it up
-    let snapshot_path = snapshot_model_dir(&output)?;
-
-    match model_type {
-        ModelType::Transformer => {
-            use finetype_model::{Trainer, TrainingConfig};
-
-            let config = TrainingConfig {
-                batch_size,
-                epochs,
-                learning_rate: 1e-4,
-                max_seq_length: 128,
-                warmup_steps: 100,
-                weight_decay: 0.01,
-            };
-
-            eprintln!("Training Transformer model");
-            eprintln!("Training config: {:?}", config);
-
-            let trainer = Trainer::new(config);
-            trainer.train(&taxonomy, &samples, &output)?;
-        }
-        ModelType::CharCnn => {
-            use finetype_model::{CharTrainer, CharTrainingConfig};
-
-            let config = CharTrainingConfig {
-                batch_size,
-                epochs,
-                learning_rate: 1e-3,
-                max_seq_length: 128,
-                embed_dim: 32,
-                num_filters: 64,
-                hidden_dim: 128,
-                weight_decay: 1e-4,
-                shuffle: true,
-                seed,
-                use_features,
-                use_hierarchical: hierarchical,
-            };
-
-            eprintln!("Training CharCNN model");
-            eprintln!("Training config: {:?}", config);
-
-            let trainer = CharTrainer::new(config);
-            trainer.train(&taxonomy, &samples, &output)?;
-        }
-        ModelType::Tiered => {
-            use finetype_model::{TieredTrainer, TieredTrainingConfig};
-
-            let config = TieredTrainingConfig {
-                batch_size,
-                epochs,
-                learning_rate: 1e-3,
-                max_seq_length: 128,
-                embed_dim: 32,
-                num_filters: 64,
-                hidden_dim: 128,
-                weight_decay: 1e-4,
-                tier2_min_types: 1,
-                seed,
-            };
-
-            eprintln!("Training Tiered models (Tier 0 -> Tier 1 -> Tier 2)");
-            eprintln!("Training config: {:?}", config);
-
-            let trainer = TieredTrainer::new(config);
-            let report = trainer.train_all(&taxonomy, &samples, &output)?;
-            eprintln!("{}", report);
-        }
-        ModelType::MultiBranch => {
-            anyhow::bail!(
-                "Multi-branch training uses `finetype train-multi-branch`, not `finetype train`."
-            );
-        }
-    }
-
-    // Write training manifest
-    TrainingManifest {
-        output: &output,
-        data_file: &data,
-        epochs,
-        batch_size,
-        seed,
-        model_type: &model_type,
-        n_classes: taxonomy.len(),
-        n_samples: samples.len(),
-        snapshot_path: snapshot_path.as_deref(),
-    }
-    .write()?;
-
-    eprintln!("Training complete! Model saved to {:?}", output);
-    Ok(())
-}
-
-/// Snapshot an existing model directory before overwriting.
-///
-/// If the output directory exists and contains model files (model.safetensors
-/// or tier_graph.json), copies it to `{output}.snapshot.{ISO-timestamp}`.
-/// Returns the snapshot path if a snapshot was taken, or None.
-fn snapshot_model_dir(output: &Path) -> Result<Option<PathBuf>> {
-    if !output.exists() {
-        return Ok(None);
-    }
-
-    // Check for model files that indicate a trained model lives here
-    let has_model = output.join("model.safetensors").exists()
-        || output.join("tier_graph.json").exists()
-        || output.join("tier0").join("model.safetensors").exists();
-
-    if !has_model {
-        return Ok(None);
-    }
-
-    let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
-    let dir_name = output
-        .file_name()
-        .map(|n: &std::ffi::OsStr| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "model".to_string());
-    let snapshot_name = format!("{}.snapshot.{}", dir_name, timestamp);
-    let snapshot_path = output
-        .parent()
-        .unwrap_or(Path::new("."))
-        .join(&snapshot_name);
-
-    eprintln!("Snapshot: backing up {:?} -> {:?}", output, snapshot_path);
-    copy_dir_recursive(output, &snapshot_path)?;
-    eprintln!("Snapshot complete: {:?}", snapshot_path);
-
-    Ok(Some(snapshot_path))
-}
-
-/// Recursively copy a directory.
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
-            std::fs::copy(&src_path, &dst_path)?;
-        }
-    }
-    Ok(())
-}
-
-/// Training provenance metadata written alongside model artifacts.
-struct TrainingManifest<'a> {
-    output: &'a Path,
-    data_file: &'a Path,
-    epochs: usize,
-    batch_size: usize,
-    seed: Option<u64>,
-    model_type: &'a ModelType,
-    n_classes: usize,
-    n_samples: usize,
-    snapshot_path: Option<&'a Path>,
-}
-
-impl TrainingManifest<'_> {
-    /// Write manifest.json to the model output directory.
-    fn write(&self) -> Result<()> {
-        let manifest = serde_json::json!({
-            "data_file": self.data_file.to_string_lossy(),
-            "epochs": self.epochs,
-            "batch_size": self.batch_size,
-            "seed": self.seed,
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-            "model_type": format!("{:?}", self.model_type).to_lowercase(),
-            "n_classes": self.n_classes,
-            "n_samples": self.n_samples,
-            "parent_snapshot": self.snapshot_path.map(|p: &Path| p.to_string_lossy().to_string()),
-        });
-
-        let manifest_str = serde_json::to_string_pretty(&manifest)?;
-        std::fs::create_dir_all(self.output)?;
-        std::fs::write(self.output.join("manifest.json"), manifest_str)?;
-        eprintln!(
-            "Training manifest written to {:?}",
-            self.output.join("manifest.json")
-        );
-
-        Ok(())
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3006,316 +2212,6 @@ fn load_schema_or_exit(schema_path: &PathBuf) -> serde_json::Value {
     }
 
     schema
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// EVAL — Evaluate model accuracy on a test set
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn cmd_eval(
-    data: PathBuf,
-    _taxonomy_path: PathBuf,
-    model_type: ModelType,
-    top_confusions: usize,
-    output: OutputFormat,
-) -> Result<()> {
-    use finetype_model::{CharClassifier, ClassificationResult};
-    use std::collections::HashMap;
-
-    let model = resolve_model_path();
-
-    eprintln!("Loading test data from {:?}", data);
-    let file = std::fs::File::open(&data)?;
-    let reader = std::io::BufReader::new(file);
-
-    let mut test_samples: Vec<(String, String)> = Vec::new();
-    for line in reader.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-        let record: serde_json::Value = serde_json::from_str(&line)?;
-        let text = record["text"].as_str().unwrap_or("").to_string();
-        let label = record["classification"].as_str().unwrap_or("").to_string();
-        test_samples.push((text, label));
-    }
-    eprintln!("Loaded {} test samples", test_samples.len());
-
-    // Run inference
-    eprintln!("Loading model from {:?}", model);
-    let mut predictions: Vec<ClassificationResult> = Vec::new();
-
-    match model_type {
-        ModelType::CharCnn => {
-            let classifier = CharClassifier::load(&model)?;
-            eprintln!("Running inference...");
-
-            // Batch inference for efficiency
-            let batch_size = 128;
-            let texts: Vec<String> = test_samples.iter().map(|(t, _)| t.clone()).collect();
-            for chunk in texts.chunks(batch_size) {
-                let batch_results = classifier.classify_batch(chunk)?;
-                predictions.extend(batch_results);
-            }
-        }
-        ModelType::Transformer => {
-            let classifier = Classifier::load(&model)?;
-            eprintln!("Running inference...");
-
-            let batch_size = 32;
-            let texts: Vec<String> = test_samples.iter().map(|(t, _)| t.clone()).collect();
-            for chunk in texts.chunks(batch_size) {
-                let batch_results = classifier.classify_batch(chunk)?;
-                predictions.extend(batch_results);
-            }
-        }
-        ModelType::Tiered => {
-            let classifier = load_tiered_classifier(&model)?;
-            eprintln!("Running tiered inference...");
-
-            let batch_size = 128;
-            let texts: Vec<String> = test_samples.iter().map(|(t, _)| t.clone()).collect();
-            for chunk in texts.chunks(batch_size) {
-                let batch_results = classifier.classify_batch(chunk)?;
-                predictions.extend(batch_results);
-            }
-        }
-        ModelType::MultiBranch => {
-            anyhow::bail!(
-                "Multi-branch models are column-level only and cannot be evaluated with value-level test data."
-            );
-        }
-    }
-
-    eprintln!("Computing metrics...");
-
-    // Compute metrics
-    let mut correct = 0usize;
-    let mut top3_correct = 0usize;
-    let total = test_samples.len();
-
-    // Per-class counts: true_positives, false_positives, false_negatives
-    let mut tp: HashMap<String, usize> = HashMap::new();
-    let mut fp: HashMap<String, usize> = HashMap::new();
-    let mut fn_: HashMap<String, usize> = HashMap::new();
-
-    // Confusion pairs: (actual, predicted) -> count
-    let mut confusion: HashMap<(String, String), usize> = HashMap::new();
-
-    // Confidence distribution
-    let mut confidence_correct: Vec<f32> = Vec::new();
-    let mut confidence_wrong: Vec<f32> = Vec::new();
-
-    for (i, ((_text, actual), pred)) in test_samples.iter().zip(predictions.iter()).enumerate() {
-        let predicted = &pred.label;
-
-        if predicted == actual {
-            correct += 1;
-            confidence_correct.push(pred.confidence);
-            *tp.entry(actual.clone()).or_default() += 1;
-        } else {
-            confidence_wrong.push(pred.confidence);
-            *fp.entry(predicted.clone()).or_default() += 1;
-            *fn_.entry(actual.clone()).or_default() += 1;
-            *confusion
-                .entry((actual.clone(), predicted.clone()))
-                .or_default() += 1;
-        }
-
-        // Top-3 accuracy
-        let mut scores = pred.all_scores.clone();
-        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        let top3_labels: Vec<&str> = scores.iter().take(3).map(|(l, _)| l.as_str()).collect();
-        if top3_labels.contains(&actual.as_str()) {
-            top3_correct += 1;
-        }
-
-        // Progress
-        if (i + 1) % 1000 == 0 {
-            eprint!("\r  Processed {}/{}...", i + 1, total);
-        }
-    }
-    eprintln!();
-
-    let accuracy = correct as f64 / total as f64;
-    let top3_accuracy = top3_correct as f64 / total as f64;
-
-    let avg_confidence_correct = if confidence_correct.is_empty() {
-        0.0
-    } else {
-        confidence_correct.iter().sum::<f32>() / confidence_correct.len() as f32
-    };
-    let avg_confidence_wrong = if confidence_wrong.is_empty() {
-        0.0
-    } else {
-        confidence_wrong.iter().sum::<f32>() / confidence_wrong.len() as f32
-    };
-
-    // Collect all classes
-    let mut all_classes: Vec<String> = tp
-        .keys()
-        .chain(fp.keys())
-        .chain(fn_.keys())
-        .cloned()
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-    all_classes.sort();
-
-    // Sort confusions by count
-    let mut confusion_vec: Vec<((String, String), usize)> = confusion.into_iter().collect();
-    confusion_vec.sort_by_key(|b| std::cmp::Reverse(b.1));
-
-    match output {
-        OutputFormat::Plain
-        | OutputFormat::Csv
-        | OutputFormat::Markdown
-        | OutputFormat::Arrow
-        | OutputFormat::JsonSchema
-        | OutputFormat::Datapackage => {
-            println!("FineType Model Evaluation");
-            println!("{}", "=".repeat(60));
-            println!();
-            println!("OVERALL");
-            println!("  Samples:        {}", total);
-            println!(
-                "  Accuracy:       {:.2}% ({}/{})",
-                accuracy * 100.0,
-                correct,
-                total
-            );
-            println!(
-                "  Top-3 Accuracy: {:.2}% ({}/{})",
-                top3_accuracy * 100.0,
-                top3_correct,
-                total
-            );
-            println!(
-                "  Avg confidence (correct):   {:.4}",
-                avg_confidence_correct
-            );
-            println!("  Avg confidence (incorrect): {:.4}", avg_confidence_wrong);
-            println!();
-
-            // Per-class metrics
-            println!("PER-CLASS METRICS");
-            println!(
-                "  {:50} {:>6} {:>6} {:>6} {:>8}",
-                "class", "prec", "rec", "f1", "support"
-            );
-            println!("  {}", "-".repeat(80));
-
-            let mut macro_precision = 0.0f64;
-            let mut macro_recall = 0.0f64;
-            let mut macro_f1 = 0.0f64;
-            let mut n_classes = 0;
-
-            for class in &all_classes {
-                let t = *tp.get(class).unwrap_or(&0) as f64;
-                let f_p = *fp.get(class).unwrap_or(&0) as f64;
-                let f_n = *fn_.get(class).unwrap_or(&0) as f64;
-
-                let precision = if t + f_p > 0.0 { t / (t + f_p) } else { 0.0 };
-                let recall = if t + f_n > 0.0 { t / (t + f_n) } else { 0.0 };
-                let f1 = if precision + recall > 0.0 {
-                    2.0 * precision * recall / (precision + recall)
-                } else {
-                    0.0
-                };
-                let support = (t + f_n) as usize;
-
-                if support > 0 {
-                    println!(
-                        "  {:50} {:>5.1}% {:>5.1}% {:>5.1}% {:>8}",
-                        class,
-                        precision * 100.0,
-                        recall * 100.0,
-                        f1 * 100.0,
-                        support,
-                    );
-                    macro_precision += precision;
-                    macro_recall += recall;
-                    macro_f1 += f1;
-                    n_classes += 1;
-                }
-            }
-
-            if n_classes > 0 {
-                println!("  {}", "-".repeat(80));
-                println!(
-                    "  {:50} {:>5.1}% {:>5.1}% {:>5.1}% {:>8}",
-                    "macro avg",
-                    (macro_precision / n_classes as f64) * 100.0,
-                    (macro_recall / n_classes as f64) * 100.0,
-                    (macro_f1 / n_classes as f64) * 100.0,
-                    total,
-                );
-            }
-
-            // Top confusions
-            if !confusion_vec.is_empty() {
-                println!();
-                println!("TOP CONFUSIONS (actual -> predicted)");
-                for ((actual, predicted), count) in confusion_vec.iter().take(top_confusions) {
-                    println!("  {:>4}x  {} -> {}", count, actual, predicted);
-                }
-            }
-        }
-        OutputFormat::Json => {
-            let per_class: Vec<serde_json::Value> = all_classes
-                .iter()
-                .filter_map(|class| {
-                    let t = *tp.get(class).unwrap_or(&0) as f64;
-                    let f_p = *fp.get(class).unwrap_or(&0) as f64;
-                    let f_n = *fn_.get(class).unwrap_or(&0) as f64;
-                    let support = (t + f_n) as usize;
-                    if support == 0 {
-                        return None;
-                    }
-                    let precision = if t + f_p > 0.0 { t / (t + f_p) } else { 0.0 };
-                    let recall = if t + f_n > 0.0 { t / (t + f_n) } else { 0.0 };
-                    let f1 = if precision + recall > 0.0 {
-                        2.0 * precision * recall / (precision + recall)
-                    } else {
-                        0.0
-                    };
-                    Some(json!({
-                        "class": class,
-                        "precision": precision,
-                        "recall": recall,
-                        "f1": f1,
-                        "support": support,
-                    }))
-                })
-                .collect();
-
-            let top_conf: Vec<serde_json::Value> = confusion_vec
-                .iter()
-                .take(top_confusions)
-                .map(|((actual, predicted), count)| {
-                    json!({
-                        "actual": actual,
-                        "predicted": predicted,
-                        "count": count,
-                    })
-                })
-                .collect();
-
-            let result = json!({
-                "total_samples": total,
-                "accuracy": accuracy,
-                "top3_accuracy": top3_accuracy,
-                "correct": correct,
-                "avg_confidence_correct": avg_confidence_correct,
-                "avg_confidence_wrong": avg_confidence_wrong,
-                "per_class": per_class,
-                "top_confusions": top_conf,
-            });
-            println!("{}", serde_json::to_string_pretty(&result)?);
-        }
-    }
-
-    Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

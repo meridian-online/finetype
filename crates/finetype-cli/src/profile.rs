@@ -49,14 +49,13 @@ pub(crate) fn cmd_profile(
     sample_size: usize,
     delimiter: Option<char>,
     no_header_hint: bool,
-    model_type: ModelType,
     enum_threshold: usize,
     stats: bool,
     verbose: bool,
     raw_model: bool,
     no_validation_veto: bool,
 ) -> Result<()> {
-    use finetype_model::{ColumnClassifier, ColumnConfig, ValueClassifier};
+    use finetype_model::{ColumnClassifier, ColumnConfig};
     use std::io::Write as _;
 
     // Batch mode (--files) currently writes one output per input to
@@ -112,34 +111,12 @@ pub(crate) fn cmd_profile(
         sample_size,
         ..Default::default()
     };
-    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-        let mb = load_multi_branch_classifier(&model)?;
-        eprintln!(
-            "Loaded multi-branch classifier ({} classes)",
-            mb.n_classes()
-        );
-        ColumnClassifier::with_multi_branch(mb, config)
-    } else {
-        let classifier: Box<dyn ValueClassifier> = match model_type {
-            ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-            ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-            ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch => unreachable!(),
-        };
-        if let Some(semantic) = load_semantic_hint() {
-            eprintln!("Loaded semantic hint classifier (Model2Vec)");
-            // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-            let entity = load_entity_classifier(&semantic);
-            let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-            if let Some(entity) = entity {
-                eprintln!("Loaded entity classifier (full_name demotion gate)");
-                cc.set_entity_classifier(entity);
-            }
-            cc
-        } else {
-            ColumnClassifier::new(classifier, config)
-        }
-    };
+    let mb = load_multi_branch_classifier(&model)?;
+    eprintln!(
+        "Loaded multi-branch classifier ({} classes)",
+        mb.n_classes()
+    );
+    let mut column_classifier = ColumnClassifier::with_multi_branch(mb, config);
 
     // Load taxonomy for validation-based attractor demotion (Rule 14)
     // Pre-compile validators for the hot path
@@ -156,11 +133,8 @@ pub(crate) fn cmd_profile(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Legacy (non-multi-branch) models: no header enrichment.
-    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
-    if column_classifier.has_multi_branch() {
-        wire_model2vec_and_siblings(&mut column_classifier);
-    }
+    // Wire Model2Vec + sibling context for the multi-branch header enrichment.
+    wire_model2vec_and_siblings(&mut column_classifier);
 
     // Diagnostic: skip Sharpen post-processing for ablation studies
     if raw_model {

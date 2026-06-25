@@ -1,5 +1,5 @@
 ---
-description: Kick off a FineType Sense-stage multi-branch retrain (overnight `scripts/overnight_v*_*.sh` pipeline) inside a named tmux session so the author can attach and follow along. Falls back to legacy CharCNN training when the user explicitly asks for it.
+description: Kick off a FineType Sense-stage multi-branch retrain (overnight `scripts/overnight_v*_*.sh` pipeline) inside a named tmux session so the author can attach and follow along.
 when_to_use: User says "train", "retrain", "kick off vNN training", or names an overnight training script. Also use when promoting a planned v-number from spec to running pipeline.
 argument-hint: "[script-path]"
 arguments: script_path
@@ -10,15 +10,11 @@ allowed-tools: Bash, Read
 
 Run from the finetype repo root (`/Users/hugh/github/meridian-online/finetype`).
 
-Two training paths live in this repo:
-
-- **Sense multi-branch (current).** The v0.6.19 default Sense-stage
-  model is multi-branch; every retrain since v19 uses the
-  `scripts/overnight_v*_*.sh` family. Multi-hour, multi-seed, kicked
-  off in a tmux session so the author can attach and follow along.
-- **CharCNN (legacy).** The original Sense implementation. Still in
-  code; rarely retrained. Skip to the *Legacy CharCNN path* section
-  at the bottom if that's what you need.
+The shipped Sense-stage model is **multi-branch**; every retrain uses the
+`scripts/overnight_v*_*.sh` family. Multi-hour, multi-seed, kicked off in a
+tmux session so the author can attach and follow along. (The legacy CharCNN /
+Tiered / Transformer value-level training paths were removed in v0.6.x — choice
+0107; `finetype train` and `finetype eval` no longer exist.)
 
 ## Sense multi-branch — the agent's procedure
 
@@ -107,38 +103,3 @@ will see the same structural sequence every generation.
   name (e.g. `FAIL: dataset_verify`). Don't retry blindly.
 - **Author wants to abort** — `tmux send-keys -t <session> C-c`,
   then let them inspect. The agent doesn't auto-kill.
-
-## Legacy CharCNN path
-
-Only use this when the user explicitly asks for CharCNN; the modern
-Sense pipeline above is the default.
-
-```bash
-./scripts/train.sh --samples 1000 --size small --epochs 10
-./scripts/train.sh --samples 5000 --size large --epochs 15 --seed 42
-```
-
-| Preset | embed_dim | num_filters | hidden_dim |
-|--------|-----------|-------------|------------|
-| small  | 32        | 64          | 128        |
-| medium | 64        | 128         | 256        |
-| large  | 128       | 256         | 512        |
-
-Hardware auto-detect: macOS → Metal, Linux+NVIDIA → CUDA, else CPU.
-Output: `models/char-cnn-vN/` (auto-incremented), log alongside.
-
-All flags:
-```
---samples N         Samples per type (default: 1000)
---size PRESET       small|medium|large (default: small)
---epochs N          Training epochs (default: 10)
---seed N            Random seed (default: 42)
---embed-dim N       Override embedding dimension
---num-filters N     Override CNN filters
---hidden-dim N      Override hidden layer dimension
---model-name NAME   Output dir name (default: auto char-cnn-vN)
---data FILE         Use existing NDJSON (skip generation)
-```
-
-After training: `./scripts/eval.sh --model models/char-cnn-vN`
-and `./scripts/package.sh models/char-cnn-vN`.

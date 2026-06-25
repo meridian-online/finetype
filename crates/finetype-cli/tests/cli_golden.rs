@@ -1056,8 +1056,9 @@ fn infer_explain_without_batch_is_rejected() {
     );
 }
 
-/// `--explain` without `--mode column` is also rejected. Without column
-/// semantics, the cascade can't dispatch correctly.
+/// `--explain` with `--mode row` is rejected. Without column semantics, the
+/// cascade can't dispatch correctly. (Column is the default mode, so the
+/// rejection only fires when row mode is requested explicitly.)
 #[test]
 fn infer_explain_without_column_mode_is_rejected() {
     let out = Command::new("cargo")
@@ -1069,6 +1070,8 @@ fn infer_explain_without_column_mode_is_rejected() {
             "infer",
             "--batch",
             "--explain",
+            "--mode",
+            "row",
         ])
         .current_dir(workspace_root())
         .stdin(Stdio::null())
