@@ -11,6 +11,7 @@ pub mod checker;
 pub mod checksum;
 pub mod datetime_format;
 pub mod enum_domain;
+pub mod fast_path;
 pub mod generator;
 pub mod infer;
 pub mod json_reader;
@@ -23,6 +24,7 @@ pub mod validation_veto;
 pub mod validator;
 
 pub use checker::{format_report, CheckReport, Checker};
+pub use fast_path::deterministic_fast_path;
 pub use generator::{Generator, Sample};
 pub use json_reader::{collect_json, collect_ndjson, JsonPathMap};
 pub use quality::{

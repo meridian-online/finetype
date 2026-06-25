@@ -1737,57 +1737,96 @@ fn cmd_infer(
 
     // Column mode: treat all inputs as one column, return single prediction
     if matches!(mode, InferenceMode::Column) {
-        let config = ColumnConfig {
-            sample_size,
-            ..Default::default()
-        };
-        let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
-            let mb = load_multi_branch_classifier(&model)?;
-            ColumnClassifier::with_multi_branch(mb, config)
-        } else {
-            let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
-                ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
-                ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
-                ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-                ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
-            };
-            let semantic_hint = load_semantic_hint();
-            if let Some(semantic) = semantic_hint {
-                // Load entity classifier (shares Model2Vec tokenizer/embeddings)
-                let entity = load_entity_classifier(&semantic);
-                let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
-                if let Some(entity) = entity {
-                    cc.set_entity_classifier(entity);
-                }
-                cc
-            } else {
-                ColumnClassifier::new(classifier, config)
-            }
-        };
-
-        // Load taxonomy for validation-based attractor demotion (Rule 14)
+        // Taxonomy is needed by BOTH the deterministic fast-path and the full
+        // classifier (validation-based demotion) — load and compile it once.
         let taxonomy_path = std::path::PathBuf::from("labels");
-        if let Ok(mut taxonomy) = load_taxonomy(&taxonomy_path) {
-            taxonomy.compile_validators();
-            taxonomy.compile_locale_validators();
-            column_classifier.set_taxonomy(taxonomy);
+        let mut col_taxonomy = load_taxonomy(&taxonomy_path).ok();
+        if let Some(t) = col_taxonomy.as_mut() {
+            t.compile_validators();
+            t.compile_locale_validators();
         }
 
-        // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models.
-        // `infer` classifies a single column, so sibling-context attention (cross-column) is
-        // never invoked — skip its load (card 0006 single-column fast path).
-        if !column_classifier.has_multi_branch() {
-            wire_sense(&mut column_classifier);
-        }
-        // Multi-branch path: wire Model2Vec for header enrichment, no sibling context.
-        if column_classifier.has_multi_branch() {
-            wire_model2vec_only(&mut column_classifier);
-        }
+        // Deterministic fast-path (card 0006): a structurally-conclusive sample —
+        // email, IPv4/v6, MAC, windows_path, message_id, delimited ISO datetime —
+        // is value-determinable (decision 0048), so the neural model adds nothing.
+        // Resolving it here skips the ~0.08s multi-branch load, the dominant warm
+        // cost of single-shot `infer` (memory infer-latency-breakdown). The leaf
+        // set is conservative by construction, so the answer matches the full
+        // Sense→Sharpen pipeline (finetype_core::fast_path). Engaged only without
+        // an explicit --header (a header can steer the full pipeline; the
+        // value-only case is the one whose agreement we can guarantee) and
+        // kill-switchable via RHH.
+        let fast_leaf =
+            if header.is_none() && !finetype_model::rhh::is_disabled("deterministic_fast_path") {
+                col_taxonomy
+                    .as_ref()
+                    .and_then(|tax| finetype_core::deterministic_fast_path(tax, &inputs))
+            } else {
+                None
+            };
 
-        let result = if let Some(ref hdr) = header {
-            column_classifier.classify_column_with_header(&inputs, hdr)?
+        let result = if let Some(leaf) = fast_leaf {
+            finetype_model::ColumnResult {
+                label: leaf,
+                confidence: 0.99,
+                vote_distribution: Vec::new(),
+                disambiguation_applied: true,
+                disambiguation_rule: Some("deterministic_fast_path".to_string()),
+                samples_used: inputs.len(),
+                detected_locale: None,
+                is_generic: false,
+                column_features: None,
+            }
         } else {
-            column_classifier.classify_column(&inputs)?
+            let config = ColumnConfig {
+                sample_size,
+                ..Default::default()
+            };
+            let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
+                let mb = load_multi_branch_classifier(&model)?;
+                ColumnClassifier::with_multi_branch(mb, config)
+            } else {
+                let classifier: Box<dyn finetype_model::ValueClassifier> = match model_type {
+                    ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
+                    ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
+                    ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
+                    ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
+                };
+                let semantic_hint = load_semantic_hint();
+                if let Some(semantic) = semantic_hint {
+                    // Load entity classifier (shares Model2Vec tokenizer/embeddings)
+                    let entity = load_entity_classifier(&semantic);
+                    let mut cc = ColumnClassifier::with_semantic_hint(classifier, config, semantic);
+                    if let Some(entity) = entity {
+                        cc.set_entity_classifier(entity);
+                    }
+                    cc
+                } else {
+                    ColumnClassifier::new(classifier, config)
+                }
+            };
+
+            // Validation-based attractor demotion (Rule 14) needs the taxonomy.
+            if let Some(taxonomy) = col_taxonomy {
+                column_classifier.set_taxonomy(taxonomy);
+            }
+
+            // Wire up Sense classifier (Sense → Sharpen) for legacy non-multi-branch
+            // models. `infer` classifies a single column, so sibling-context
+            // attention (cross-column) is never invoked — skip its load (card 0006).
+            if !column_classifier.has_multi_branch() {
+                wire_sense(&mut column_classifier);
+            }
+            // Multi-branch path: wire Model2Vec for header enrichment, no siblings.
+            if column_classifier.has_multi_branch() {
+                wire_model2vec_only(&mut column_classifier);
+            }
+
+            if let Some(ref hdr) = header {
+                column_classifier.classify_column_with_header(&inputs, hdr)?
+            } else {
+                column_classifier.classify_column(&inputs)?
+            }
         };
 
         match output {
