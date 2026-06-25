@@ -162,6 +162,49 @@ pub(crate) fn values_look_like_bare_numbers(sample: &[String]) -> (bool, bool) {
     }
     (total >= 3 && bare * 100 >= total * 80, any_decimal)
 }
+/// `(should_demote, any_decimal)` for `utc_offset_bare_number_veto` (spec
+/// 2026-06-25-sharpen-stage-audit ac-1). True when a `datetime.offset.utc` column's
+/// values are bare numbers whose magnitude is implausible for any sane offset
+/// encoding — millisecond-encoded offsets stored as plain large numbers
+/// (`28800000.0` = +08:00 in ms), which gold labels `decimal_number`. The max sane
+/// UTC offset is +14:00 = 50_400 s (= 840 min = 14 h), so any human-readable offset
+/// encoding stays at or below the cap while ms-encoded offsets (≥ 1.8M for a
+/// 30-minute zone) blow past it. Requires a clear majority of bare numbers AND a
+/// clear majority beyond the cap, so a genuine small-integer offset column
+/// (`10`/`-3`/`0`, gold=utc) or colon-form `[+-]HH:MM` is never touched. The
+/// `any_decimal` flag picks the demotion target (decimal vs integer).
+pub(crate) fn values_look_like_oversized_offset(sample: &[String]) -> (bool, bool) {
+    const MAX_OFFSET_SECONDS: f64 = 50_400.0;
+    let (mut total, mut numeric, mut oversized, mut any_decimal) = (0usize, 0usize, 0usize, false);
+    for v in sample.iter().take(16) {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        total += 1;
+        let body = t
+            .strip_prefix('-')
+            .or_else(|| t.strip_prefix('+'))
+            .unwrap_or(t);
+        let is_numeric = !body.is_empty()
+            && body.chars().all(|c| c.is_ascii_digit() || c == '.')
+            && body.matches('.').count() <= 1;
+        if is_numeric {
+            numeric += 1;
+            if body.contains('.') {
+                any_decimal = true;
+            }
+            if t.parse::<f64>()
+                .map(|n| n.abs() > MAX_OFFSET_SECONDS)
+                .unwrap_or(false)
+            {
+                oversized += 1;
+            }
+        }
+    }
+    let fire = total >= 3 && numeric * 100 >= total * 80 && oversized * 100 >= total * 80;
+    (fire, any_decimal)
+}
 /// True when the sample is CLEARLY non-url — the shape guard for the url
 /// header-hint corroboration (spec 2026-06-25-sharpen-stage-audit). Gold counts
 /// three forms as url: scheme (`http://…`), protocol-relative (`//cdn…`), and

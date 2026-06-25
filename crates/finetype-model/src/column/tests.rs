@@ -1383,6 +1383,70 @@ fn url_bare_number_veto_is_default_on() {
 }
 
 #[test]
+fn utc_offset_bare_number_veto_is_default_on() {
+    assert!(!rhh::is_disabled("utc_offset_bare_number_veto"));
+}
+
+#[test]
+fn values_look_like_oversized_offset_fires_on_ms_encoded() {
+    // The spec ac-1 break: 'utc offset' header-hint promotes millisecond-encoded
+    // offsets (28800000.0 = +08:00 in ms) to datetime.offset.utc; gold=decimal.
+    // Magnitude (≫ 50_400 s) is the discriminator; values carry a decimal point.
+    let (fire, any_decimal) = values_look_like_oversized_offset(&[
+        "28800000.0".into(),
+        "-18000000.0".into(),
+        "-14400000.0".into(),
+        "28800000.0".into(),
+    ]);
+    assert!(fire, "ms-encoded offsets must trip the veto");
+    assert!(
+        any_decimal,
+        "decimal-formatted values pick the decimal target"
+    );
+}
+
+#[test]
+fn values_look_like_oversized_offset_spares_genuine_hour_offsets() {
+    // The gold=utc sibling (openflights utc_offset): small signed hour integers.
+    // |v| ≤ 14 stays well under the +14:00 cap, so the veto must NOT fire.
+    let (fire, _) = values_look_like_oversized_offset(&[
+        "10".into(),
+        "-3".into(),
+        "-4".into(),
+        "0".into(),
+        "10".into(),
+    ]);
+    assert!(!fire, "genuine hour-integer offsets must be spared");
+}
+
+#[test]
+fn values_look_like_oversized_offset_spares_colon_form() {
+    // Canonical [+-]HH:MM offsets are not bare numbers (the colon breaks the
+    // all-digit test), so the veto leaves a real UTC-offset column untouched.
+    let (fire, _) = values_look_like_oversized_offset(&[
+        "+08:00".into(),
+        "-05:00".into(),
+        "+00:00".into(),
+        "+05:30".into(),
+    ]);
+    assert!(!fire, "colon-form offsets are not bare numbers");
+}
+
+#[test]
+fn values_look_like_oversized_offset_spares_second_encoded_offsets() {
+    // An offset encoded in SECONDS (+08:00 = 28800 s) stays at or below the
+    // 50_400 s cap, so a plausible second-encoding is not relocated — only the
+    // ms blow-up is.
+    let (fire, _) = values_look_like_oversized_offset(&[
+        "28800".into(),
+        "-18000".into(),
+        "-14400".into(),
+        "0".into(),
+    ]);
+    assert!(!fire, "second-encoded offsets stay under the +14:00 cap");
+}
+
+#[test]
 fn country_code_corroboration_is_default_on() {
     assert!(!rhh::is_disabled("country_code_corroboration"));
 }

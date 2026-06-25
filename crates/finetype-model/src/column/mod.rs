@@ -3083,6 +3083,7 @@ impl ColumnClassifier {
         values: &[String],
     ) {
         self.amount_bare_number_veto(result, header, sample);
+        self.utc_offset_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
         self.checksum_substance_guard(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
@@ -3579,6 +3580,55 @@ impl ColumnClassifier {
                 result.detected_locale =
                     detect_locale_from_validation(sample, &result.label, taxonomy);
             }
+        }
+    }
+
+    /// `utc_offset_bare_number_veto` (default ON). Runs AFTER `apply_header_sharpen`,
+    /// from `apply_post_sharpen_guards`, because the `datetime.offset.utc` over-emission
+    /// is CREATED by the `utc offset`/`gmt offset` header-hint arm (header_sharpen.rs),
+    /// which promotes the model's correct numeric Sense to utc value-blind — a guard
+    /// inside `apply_header_sharpen` cannot reach a label the hint just synthesised
+    /// (the `amount_bare_number_veto` trap).
+    ///
+    /// A genuine UTC offset is `[+-]HH:MM` (colon-structured) or a small signed number
+    /// of hours/minutes/seconds — at most ±14:00, i.e. |v| ≤ 50_400 seconds. The false
+    /// positives are millisecond-encoded offsets stored as plain large numbers
+    /// (`28800000.0` = +08:00 in ms), which gold labels `decimal_number`: an analyst
+    /// reads a column of eight-figure numbers as a decimal measurement, not a
+    /// recognisable UTC offset. So demote utc back to decimal/integer when the values
+    /// are bare numbers whose magnitude is implausible for any sane offset encoding.
+    /// MAGNITUDE — not the validator — is the discriminator: the utc validator
+    /// (`^UTC [+-]\d{2}:\d{2}$`) rejects BOTH the ms over-emits AND a genuine
+    /// hour-integer offset column (`10`/`-3`/`0`, gold=utc) at ~0%, so pass-rate
+    /// carries no separating signal (spec 2026-06-25-sharpen-stage-audit ac-1).
+    /// Demotion only, value-based (decision 0048).
+    fn utc_offset_bare_number_veto(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("utc_offset_bare_number_veto") || result.label != "datetime.offset.utc"
+        {
+            return;
+        }
+        let (fire, any_decimal) = values_look_like_oversized_offset(sample);
+        if !fire {
+            return;
+        }
+        result.label = if any_decimal {
+            "representation.numeric.decimal_number".to_string()
+        } else {
+            "representation.numeric.integer_number".to_string()
+        };
+        result.confidence = result.confidence.min(0.6);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "utc_offset_bare_number_veto:{}",
+            header.to_lowercase()
+        ));
+        if let Some(taxonomy) = self.taxonomy.as_ref() {
+            result.detected_locale = detect_locale_from_validation(sample, &result.label, taxonomy);
         }
     }
 }

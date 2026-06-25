@@ -74,3 +74,41 @@ no-regression holds; corpus-honest gate is the remaining blocking check before a
 need per-label value tests because the universal validators are too imprecise to gate on. The
 header_hint table remains the lever — but the surgical per-arm value-corroboration, not a single
 validator-based guard, is what clears gold.
+
+## Shipped (utc cluster): `utc_offset_bare_number_veto` (+4, 0 regress)
+
+The deferred utc cluster (4 of the 33 breaks) is now closed by a dedicated value-based
+veto, NOT the validator guard (which can't gate — the utc validator rejects ms-integers
+AND genuine hour-integer offsets at ~0%, so pass-rate carries no separating signal).
+
+**MAGNITUDE is the discriminator.** The 4 break columns (gold=decimal) store offsets in
+**milliseconds** — `28800000.0`, `-18000000.0`, `-14400000.0` (tens of millions). The
+`utc offset` header-hint promotes the attention model's correct `decimal` Sense to
+`datetime.offset.utc` value-blind. `utc_offset_bare_number_veto` (in
+`apply_post_sharpen_guards`, where it can see the label the hint synthesised) demotes
+`datetime.offset.utc` → decimal/integer when ≥80% of values are bare numbers AND ≥80%
+exceed the max sane offset (+14:00 = 50_400 s). Demotion only, value-based (0048).
+
+**The note's "gold inconsistency" is DISPROVED.** The task flagged the 5th utc_offset
+(sha `e2695df2e762`, gold=utc) as having "the SAME ms encoding" as the 4 → ac-3. It does
+not: its values are small signed **hour** integers (`10`, `-3`, `-4`, `0`) — a genuine UTC
+offset, gold correctly utc. Magnitude (|v| ≤ 14 ≪ 50_400) separates it cleanly, so the veto
+spares it. **No ac-3 gold change is needed for the utc cluster.**
+
+**Complete gold A/B (no recompose needed).** Only 6 of 931 gold columns ever reach
+composed=`datetime.offset.utc`; the veto's precondition is exactly that label, so checking
+those 6 is the full A/B. Verified live on the release binary (attention Sense injected):
+
+| sha | column | values | gold | old composed | new composed | Δ |
+|---|---|---|---|---|---|---|
+| 1b9ad1b9d168 | utc_offset | ms (−18M…) | decimal | utc | **decimal** | +1 |
+| 2e8097c169f8 | utc_offset | ms (28.8M) | decimal | utc | **decimal** | +1 |
+| 73b732b1c088 | utc_offset | ms | decimal | utc | **decimal** | +1 |
+| a020d7e3865c | utc_offset | ms | decimal | utc | **decimal** | +1 |
+| e2695df2e762 | utc_offset | hours (10,−3) | utc | utc | utc (spared) | 0 |
+| 48e9044292d1 | date | — | sql_standard | iso_milliseconds (not utc) | unchanged | 0 |
+
+**Net on the attention model: +4 columns, zero regressions.** Gold-safe by construction —
+the veto fires only on bare numbers in the millions, which gold never labels utc.
+Corpus-honest gate (H05, blocking) deferred to ac-4's combined promotion, as with the
+year/unix scoped guard.
