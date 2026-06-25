@@ -55,6 +55,21 @@ pub(crate) fn header_corroborates_state(header: &str) -> bool {
         .any(|tok| matches!(tok, "state" | "states" | "province" | "provinces" | "prov"))
 }
 
+/// True if the header names a timezone column — the corroboration guard for the
+/// timezone_abbreviation recovery (spec 2026-06-25-timezone-abbreviation-type).
+/// The abbreviations EST/CST/PST overlap non-tz uses (estimate/cost), so the
+/// recovery requires a tz-ish header. Token-aware: `tz` / `timezone` / `tzname`
+/// match, but `tz` as a substring of an unrelated word does not. The unbroken
+/// `timezone` form also matches `exchangeTimezoneShortName`.
+pub(crate) fn header_corroborates_timezone(header: &str) -> bool {
+    let h = header.to_lowercase();
+    if h.contains("timezone") || h.contains("time zone") {
+        return true;
+    }
+    h.split(|c: char| !c.is_alphanumeric())
+        .any(|tok| matches!(tok, "tz" | "tzname" | "tzabbr" | "zone"))
+}
+
 /// True if the header names an administrative division ABOVE city level — the
 /// disambiguator that separates the value-identical `region`/`city` siblings.
 /// Token-aware so `region`/`county`/`district`/`borough`/`province` match but

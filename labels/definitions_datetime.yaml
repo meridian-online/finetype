@@ -1318,6 +1318,48 @@ datetime.offset.iana:
     is the stable structural invariant. Add an enum only if generated from
     tzdata at build time, never hand-maintained.
 
+datetime.offset.timezone_abbreviation:
+  title: Timezone Abbreviation
+  description: >
+    Short alphabetic timezone abbreviation (EST, EDT, CEST, GMT, UTC, …) — the
+    human-readable shorthand distinct from a full IANA zone name
+    (America/New_York) or an explicit UTC offset (UTC +05:00).
+  designation: universal
+  locales: [UNIVERSAL]
+  broad_type: VARCHAR
+  frictionless:
+    type: string
+  format_string: null
+  transform: "{col}"
+  transform_ext: null
+  decompose: null
+  validation:
+    type: string
+    pattern: "^(UTC|GMT|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AKST|AKDT|HST|HAST|HADT|AST|ADT|NST|NDT|CET|CEST|EET|EEST|WET|WEST|BST|IST|WAT|CAT|EAT|SAST|MSK|GST|PKT|ICT|WIB|SGT|HKT|JST|KST|AEST|AEDT|ACST|ACDT|AWST|NZST|NZDT)$"
+  tier: [VARCHAR, offset]
+  release_priority: 5
+  aliases: [tz_abbrev, timezone_short]
+  samples:
+    - "EST"
+    - "CEST"
+    - "GMT"
+  references: null
+  notes: >
+    Unlike IANA zone names, the common timezone abbreviations are a small,
+    structurally-bounded closed set, so an enum-style pattern is the right
+    validator here (the iana note's anti-enum warning applies to the 500+ IANA
+    zones, not these ~40 abbreviations). The abbreviations EST/CST/PST overlap
+    non-timezone uses (estimate/cost), so the Sharpen recovery
+    (structured_string_refinement) gates on a residual source label + >=90%
+    closed-set match + a timezone-ish header — precision lives in the recovery
+    gating, not a looser pattern. Mined from the word/iana residual (spec
+    2026-06-25-timezone-abbreviation-type): 1,504 distinct corpus datasets.
+    UPPERCASE-ONLY by design: corpus measurement found 1,442/1,444 tz columns
+    uppercase, only 2 lowercase — and case is itself a precision signal
+    ("WET"=Western European Time vs "wet" the word; "EST" vs "estimate"), so
+    case-insensitivity would over-emit far more than the ~2 columns of recall it
+    buys.
+
 datetime.offset.utc:
   title: UTC Offset
   description: >

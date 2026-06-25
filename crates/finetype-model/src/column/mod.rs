@@ -3089,6 +3089,55 @@ impl ColumnClassifier {
         self.increment_substance_veto(result, values);
         self.city_region_header_corroboration(result, header, sample);
         self.country_code_corroboration(result, header, sample);
+        self.timezone_abbreviation_recovery(result, header, sample);
+    }
+
+    /// `timezone_abbreviation_recovery` (default ON). Recovers the
+    /// `datetime.offset.timezone_abbreviation` leaf (spec
+    /// 2026-06-25-timezone-abbreviation-type). The 240-dim model cannot predict
+    /// this mined leaf, and the header-hint machinery routes a `timezone` header
+    /// to `datetime.offset.iana` — but a column of bare abbreviations (EDT/CEST)
+    /// is not an IANA zone name (Region/City). Promote a residual / iana label to
+    /// the abbreviation leaf when the values pass its closed-set validator AND the
+    /// header corroborates a timezone column. The header gate is load-bearing:
+    /// EST/CST/PST overlap estimate/cost, so the abbreviation set alone over-emits
+    /// (corpus: 1,442/1,444 tz columns are uppercase, but a non-tz "EST" status
+    /// column would still match the set — the header is what excludes it).
+    /// Value-based (0048), RHH-disableable. CORROBORATION + veto-consistency gated
+    /// like `structured_string_refinement`.
+    fn timezone_abbreviation_recovery(
+        &self,
+        result: &mut ColumnResult,
+        header: &str,
+        sample: &[String],
+    ) {
+        if rhh::is_disabled("timezone_abbreviation_recovery") {
+            return;
+        }
+        const LEAF: &str = "datetime.offset.timezone_abbreviation";
+        // Precision rests on TWO gates, NOT a source-label allowlist: the header
+        // must name a timezone column AND >=90% of values must pass the closed-set
+        // validator. The model funnels uppercase abbreviations into 3-letter-code
+        // attractors (country_code/iata_code) as readily as into a residual, so an
+        // allowlist misses them — but a genuine country_code/iata column fails the
+        // tz validator (US/LHR are not tz abbreviations) and carries no timezone
+        // header, so neither gate admits it. Only the leaf itself is excluded.
+        if result.label == LEAF || !header_corroborates_timezone(header) {
+            return;
+        }
+        match self.taxonomy.as_ref() {
+            Some(tax) if label_validates_sample(tax, LEAF, sample) => {
+                result.label = LEAF.to_string();
+                result.confidence = result.confidence.max(0.95);
+                result.disambiguation_applied = true;
+                result.disambiguation_rule = Some(format!(
+                    "timezone_abbreviation_recovery:{}",
+                    header.to_lowercase()
+                ));
+                result.detected_locale = None;
+            }
+            _ => {}
+        }
     }
 
     /// `increment_substance_veto` (default ON). The first full-column-statistics

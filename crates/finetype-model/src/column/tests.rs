@@ -3336,6 +3336,20 @@ fn header_hint_value_corroboration_is_default_on() {
 }
 
 #[test]
+fn header_corroborates_timezone_token_aware() {
+    // spec 2026-06-25-timezone-abbreviation-type: the recovery requires a tz-ish
+    // header because EST/CST/PST overlap estimate/cost.
+    assert!(header_corroborates_timezone("exchangeTimezoneShortName"));
+    assert!(header_corroborates_timezone("TZ"));
+    assert!(header_corroborates_timezone("time_zone"));
+    assert!(header_corroborates_timezone("tzname"));
+    // non-timezone headers must NOT corroborate — the precision gate
+    assert!(!header_corroborates_timezone("status"));
+    assert!(!header_corroborates_timezone("estimate_code"));
+    assert!(!header_corroborates_timezone("country"));
+}
+
+#[test]
 fn values_are_clearly_non_url_separates_ids_from_urls() {
     // spec 2026-06-25-sharpen-stage-audit: the url header-hint corroboration uses a
     // value-SHAPE test (not the validator) so it keeps all three url forms gold

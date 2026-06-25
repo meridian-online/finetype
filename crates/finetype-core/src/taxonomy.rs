@@ -1527,9 +1527,9 @@ representation.discrete.categorical:
     #[cfg(feature = "embedded-taxonomy")]
     #[test]
     fn test_embedded_taxonomy_and_frictionless_for() {
-        // Embedded taxonomy loads all 244 definitions without a labels/ dir.
+        // Embedded taxonomy loads all 245 definitions without a labels/ dir.
         let tax = Taxonomy::embedded().expect("embedded taxonomy parses");
-        assert_eq!(tax.len(), 244, "expected 244 embedded definitions");
+        assert_eq!(tax.len(), 245, "expected 245 embedded definitions");
 
         // The accessor returns the authoritative map for known labels…
         let email = super::frictionless_for("identity.person.email").unwrap();

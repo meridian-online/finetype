@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **New type `datetime.offset.timezone_abbreviation`** (EST/EDT/CEST/GMT/UTC/…) mined from the
+  `word`/`iana` residual (spec `2026-06-25-timezone-abbreviation-type`; 1,504 distinct corpus
+  datasets cleared the volume bar). Closed-enum validator, UPPERCASE-only (case discriminates
+  `WET` the zone from `wet` the word). Recovered deterministically at `profile` time via the
+  `timezone_abbreviation_recovery` Sharpen guard (tz-ish header + ≥90% closed-set match) — the
+  240-dim model does not predict it directly; NO retrain. Gold +5 (the 6 affected columns
+  re-adjudicated to the new leaf). Taxonomy 244 → 245.
 - **Frictionless Data Package output: `finetype profile -f <file> -o datapackage`** (choice 0105,
   spec `2026-06-24-frictionless-datapackage-profile-output`). Emits a conformant Frictionless
   v2.0 **Data Package** descriptor — one Data Resource (`name`/`path`/`format`/`mediatype`/

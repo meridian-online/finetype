@@ -68,6 +68,7 @@ const TEMPORAL_LABELS: &[&str] = &[
     "datetime.epoch.unix_milliseconds",
     "datetime.epoch.unix_seconds",
     "datetime.offset.iana",
+    "datetime.offset.timezone_abbreviation",
     "datetime.offset.utc",
     "datetime.period.fiscal_year",
     "datetime.period.quarter",
@@ -448,12 +449,12 @@ mod tests {
     #[test]
     fn test_total_is_244() {
         let map = LabelCategoryMap::new();
-        assert_eq!(map.len(), 244, "Map should contain exactly 244 types");
+        assert_eq!(map.len(), 245, "Map should contain exactly 245 types");
     }
 
     #[test]
     fn test_category_counts() {
-        assert_eq!(TEMPORAL_LABELS.len(), 86, "temporal should have 86 types");
+        assert_eq!(TEMPORAL_LABELS.len(), 87, "temporal should have 87 types");
         assert_eq!(NUMERIC_LABELS.len(), 23, "numeric should have 23 types");
         assert_eq!(
             GEOGRAPHIC_LABELS.len(),
@@ -549,8 +550,8 @@ mod tests {
         let temporal = map.eligible_labels(BroadCategory::Temporal);
         assert_eq!(
             temporal.len(),
-            86,
-            "temporal eligible should be 86 (no overlaps)"
+            87,
+            "temporal eligible should be 87 (no overlaps)"
         );
 
         let geographic = map.eligible_labels(BroadCategory::Geographic);

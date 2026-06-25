@@ -559,6 +559,14 @@ impl Generator {
                 ];
                 Ok(tzs[self.rng.gen_range(0..tzs.len())].to_string())
             }
+            ("offset", "timezone_abbreviation") => {
+                let abbrevs = [
+                    "EST", "EDT", "CST", "CDT", "MST", "MDT", "PST", "PDT", "GMT", "UTC", "CET",
+                    "CEST", "EET", "EEST", "WET", "BST", "IST", "JST", "KST", "AEST", "AEDT",
+                    "NZST", "SAST", "MSK", "ICT", "SGT", "HKT", "AKST", "HST", "AST",
+                ];
+                Ok(abbrevs[self.rng.gen_range(0..abbrevs.len())].to_string())
+            }
 
             // ── duration (1 type) ────────────────────────────────────────
             ("duration", "iso_8601") => {
