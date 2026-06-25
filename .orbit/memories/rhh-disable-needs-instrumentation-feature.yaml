@@ -1,0 +1,5 @@
+key: rhh-disable-needs-instrumentation-feature
+body: RHH_DISABLE_HINTS only takes effect in a binary built with --features rhh-instrumentation. The shipped release binary compiles every rhh::is_disabled(...) to a const false, so RHH_DISABLE_HINTS is SILENTLY IGNORED. To A/B a Sharpen rule on the release binary you cannot toggle it via the env var -- compare against a genuine pre-change baseline (e.g. the committed buckets.tsv composed) or build with the feature. Hit during spec 2026-06-25-sharpen-stage-audit ac-1 (a guard-on vs guard-off compose showed 0 diff until I realised the disable was a no-op).
+timestamp: 2026-06-25T03:42:02.886892Z
+labels:
+- code-investigate
