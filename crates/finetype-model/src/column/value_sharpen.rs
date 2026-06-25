@@ -390,6 +390,11 @@ pub(crate) fn value_sharpen(
     //   - geohash (base32 pattern) onto event ids
     //   - datetime.offset.utc (`^UTC [+-]\d{2}:\d{2}$`) onto plain integers
     //   - technology.internet.url (scheme://… pattern) onto bare ids/codes
+    //   - geography.index.h3 (`^[0-9a-f]{15}$`) onto generic alphanumeric ids —
+    //     h3's sibling geohash was already covered; h3 was the gap (spec
+    //     2026-06-25-sharpen-stage-audit). hipc_gene_… / coord_id-style ids fail
+    //     the 15-char-hex validator ~100%, so the >50% bar fires cleanly while real
+    //     h3 cells (which validate) are untouched.
     // Demote — value-based, gated on the column's own schema-validation fail-rate
     // (>50%, see schema_fail_demotion) — to a representation.* fallback. utc and url
     // are added because their over-emits are schema-contradicted: the offending
@@ -405,6 +410,7 @@ pub(crate) fn value_sharpen(
         || result_label == "geography.coordinate.geohash"
         || result_label == "datetime.offset.utc"
         || result_label == "technology.internet.url"
+        || result_label == "geography.index.h3"
     {
         if let Some(taxonomy) = taxonomy {
             if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
