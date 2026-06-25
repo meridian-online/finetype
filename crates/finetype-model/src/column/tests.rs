@@ -3364,10 +3364,19 @@ fn values_are_clearly_non_url_separates_ids_from_urls() {
         "/partner/y.asp?id=2",
         "/partner/z.asp?id=3"
     ])));
-    // too few values -> inconclusive (a single truncated compose sample must NOT
-    // block a real url column)
-    assert!(!values_are_clearly_non_url(&v(&[
-        "http://howtogetfocused.com/chapters/the-habits"
+    // too few values -> inconclusive: a SINGLE clearly-non-url value still returns
+    // false, so the verdict comes from the count floor alone (a `msg…` id would be
+    // "clearly non-url" with >=3 values — see above — but one truncated compose
+    // sample is not enough evidence to block the hint). Uses a non-url value on
+    // purpose: a url value here would pass for the wrong reason (it's url-shaped),
+    // masking the floor.
+    assert!(!values_are_clearly_non_url(&v(&["msg32812262"])));
+    // and the same id WITH enough values IS clearly non-url — proving it was the
+    // count, not the shape, that spared the single-value case.
+    assert!(values_are_clearly_non_url(&v(&[
+        "msg32812262",
+        "msg32929450",
+        "msg11"
     ])));
 }
 
