@@ -107,29 +107,12 @@ pub(crate) fn cmd_profile(
 
     let model = resolve_model_path();
 
-    // Auto-detect late-fusion from the model directory: a `fusion_manifest.json`
-    // means this is a fusion model, regardless of the --model-type default. This
-    // is what lets `models/default` resolve to a fusion model and route every
-    // `finetype profile` through it without a flag.
-    let model_type = if model.join("fusion_manifest.json").exists() {
-        ModelType::LateFusion
-    } else {
-        model_type
-    };
-
     eprintln!("Loading model from {:?}", model);
     let config = ColumnConfig {
         sample_size,
         ..Default::default()
     };
-    let mut column_classifier = if matches!(model_type, ModelType::LateFusion) {
-        let fusion = load_fusion_classifier(&model)?;
-        eprintln!(
-            "Loaded late-fusion classifier ({} classes)",
-            fusion.labels().len()
-        );
-        ColumnClassifier::with_fusion(fusion, config)
-    } else if matches!(model_type, ModelType::MultiBranch) {
+    let mut column_classifier = if matches!(model_type, ModelType::MultiBranch) {
         let mb = load_multi_branch_classifier(&model)?;
         eprintln!(
             "Loaded multi-branch classifier ({} classes)",
@@ -141,7 +124,7 @@ pub(crate) fn cmd_profile(
             ModelType::CharCnn => Box::new(load_char_classifier(&model)?),
             ModelType::Tiered => Box::new(load_tiered_classifier(&model)?),
             ModelType::Transformer => Box::new(finetype_model::Classifier::load(&model)?),
-            ModelType::MultiBranch | ModelType::LateFusion => unreachable!(),
+            ModelType::MultiBranch => unreachable!(),
         };
         if let Some(semantic) = load_semantic_hint() {
             eprintln!("Loaded semantic hint classifier (Model2Vec)");
@@ -174,9 +157,7 @@ pub(crate) fn cmd_profile(
     }
 
     // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy models only.
-    // Fusion is its own Sense stage and computes View2 with the raw header, so it
-    // wires neither Sense nor sibling-context.
-    if !column_classifier.has_multi_branch() && !column_classifier.has_fusion() {
+    if !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
         wire_sibling_context(&mut column_classifier);
     }

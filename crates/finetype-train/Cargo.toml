@@ -73,10 +73,6 @@ path = "src/bin/train_sibling_context.rs"
 name = "tui-demo"
 path = "src/bin/tui_demo.rs"
 
-[[bin]]
-name = "train-fusion-head"
-path = "src/bin/train_fusion_head.rs"
-
 [lib]
 name = "finetype_train"
 path = "src/lib.rs"

@@ -12,7 +12,6 @@
 
 use crate::entity::EntityClassifier;
 use crate::features::{extract_features, FEATURE_DIM};
-use crate::fusion::FusionClassifier;
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
 use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
@@ -604,12 +603,6 @@ pub struct ColumnClassifier {
     /// ValueClassifier and Sense→Sharpen. The multi-branch model is fundamentally
     /// column-level, not value-level.
     multi_branch: Option<MultiBranchClassifier>,
-    /// Optional late-fusion classifier (B3, spec 2026-06-08). When present it is
-    /// the Sense stage: value-CharCNN + multi-branch views → residual head →
-    /// (label, confidence), bypassing both ValueClassifier and Sense→Sharpen for
-    /// the prediction step. Sharpen post-processing still runs after (unless
-    /// `skip_sharpen`). Takes precedence over `multi_branch` when both are set.
-    fusion: Option<FusionClassifier>,
     /// Diagnostic flag: skip all Sharpen post-processing (feature_sharpen,
     /// value_sharpen, apply_header_sharpen). Returns raw multi-branch model
     /// output. Used for ablation studies — not exposed in public API.
@@ -630,7 +623,6 @@ impl ColumnClassifier {
             model2vec: None,
             label_map: None,
             sibling_context: None,
-            fusion: None,
             multi_branch: None,
         }
     }
@@ -660,7 +652,6 @@ impl ColumnClassifier {
             model2vec: None,
             label_map: None,
             sibling_context: None,
-            fusion: None,
             multi_branch: None,
             skip_sharpen: false,
         }
@@ -757,43 +748,9 @@ impl ColumnClassifier {
             model2vec: None,
             label_map: None,
             sibling_context: None,
-            fusion: None,
             multi_branch: Some(multi_branch),
             skip_sharpen: false,
         }
-    }
-
-    /// Create a column classifier using a late-fusion model (B3, spec 2026-06-08).
-    ///
-    /// Fusion is the Sense stage: it combines a value-CharCNN view and the
-    /// multi-branch column-logit view through a learned residual head to produce
-    /// the (label, confidence). It replaces multi-branch as the primary column
-    /// classifier; Sharpen post-processing still runs after (R1-R21, feature
-    /// rules, header hints) unless `skip_sharpen` is set.
-    ///
-    /// A dummy `ValueClassifier` placeholder is required for the struct field but
-    /// is never called — the fusion code path bypasses it.
-    pub fn with_fusion(fusion: FusionClassifier, config: ColumnConfig) -> Self {
-        let dummy = Box::new(NoopClassifier);
-        Self {
-            classifier: dummy,
-            config,
-            semantic_hint: None,
-            taxonomy: None,
-            entity_classifier: None,
-            sense: None,
-            model2vec: None,
-            label_map: None,
-            sibling_context: None,
-            fusion: Some(fusion),
-            multi_branch: None,
-            skip_sharpen: false,
-        }
-    }
-
-    /// Check whether the late-fusion classifier is active.
-    pub fn has_fusion(&self) -> bool {
-        self.fusion.is_some()
     }
 
     /// Set the skip_sharpen diagnostic flag. When true, the multi-branch pipeline
@@ -817,11 +774,6 @@ impl ColumnClassifier {
     /// 4. Apply disambiguation rules for known ambiguous pairs
     /// 5. Return the final label with confidence
     pub fn classify_column(&self, values: &[String]) -> Result<ColumnResult, InferenceError> {
-        // Late-fusion: delegate to the fusion Sense stage (no header context)
-        if let Some(ref fusion) = self.fusion {
-            return self.classify_fusion(fusion, values, "");
-        }
-
         // Multi-branch: delegate to column-level classifier (no header context)
         if let Some(ref mb) = self.multi_branch {
             return self.classify_multi_branch(mb, values, "");
@@ -1117,17 +1069,6 @@ impl ColumnClassifier {
         &self,
         columns: &[(Vec<String>, String)], // (values, header) per column
     ) -> Result<Vec<ColumnResult>, InferenceError> {
-        // Late-fusion path: View2 (multi-branch logits) is computed with the RAW
-        // header inside the fusion row, matching how the head was trained by the
-        // dump. Sibling-context enrichment is not part of the fusion feature, so
-        // classify per-column with the raw header for exact train/serve parity.
-        if self.has_fusion() {
-            return columns
-                .iter()
-                .map(|(values, header)| self.classify_column_with_header(values, header))
-                .collect();
-        }
-
         // Fast path: no sibling context or no Model2Vec → per-column classification
         if !self.has_sibling_context() || self.model2vec.is_none() {
             return columns
@@ -1193,12 +1134,6 @@ impl ColumnClassifier {
         values: &[String],
         header: &str,
     ) -> Result<ColumnResult, InferenceError> {
-        // Late-fusion pipeline (B3): when fusion is active, it is the Sense
-        // stage. Replaces the (label, confidence) prediction; Sharpen runs after.
-        if let Some(ref fusion) = self.fusion {
-            return self.classify_fusion(fusion, values, header);
-        }
-
         // Multi-branch pipeline: when multi-branch is active, use it directly.
         // Multi-branch is column-level (features → MLP → label), bypassing
         // both ValueClassifier and Sense→Sharpen entirely.
@@ -2241,163 +2176,6 @@ impl ColumnClassifier {
     /// Get a reference to the configuration.
     pub fn config(&self) -> &ColumnConfig {
         &self.config
-    }
-
-    /// Multi-branch classification with Sharpen post-processing (AC-1).
-    ///
-    /// Pipeline: multi-branch forward pass → feature_sharpen (F1-F6) →
-    /// value_sharpen (R1-R19) → header hints → locale detection.
-    ///
-    /// Samples values (same as standard pipeline), then extracts 3-branch
-    /// features (960 char + 512 embed + 27 stats), runs the forward pass,
-    /// and applies the lightweight Sharpen layer before returning.
-    /// Late-fusion Sense stage (B3, spec 2026-06-08).
-    ///
-    /// Mirrors `classify_multi_branch` exactly except the (label, confidence)
-    /// prediction comes from the fusion head (value-CharCNN + multi-branch views
-    /// → residual head) instead of the bare multi-branch forward. The identical
-    /// Sharpen post-processing (feature_sharpen, value_sharpen, header hints,
-    /// locale detection) runs after — fusion replaces only the Sense prediction.
-    fn classify_fusion(
-        &self,
-        fusion: &FusionClassifier,
-        values: &[String],
-        header: &str,
-    ) -> Result<ColumnResult, InferenceError> {
-        if values.is_empty() {
-            return Ok(ColumnResult {
-                label: "unknown".to_string(),
-                confidence: 0.0,
-                vote_distribution: vec![],
-                disambiguation_applied: false,
-                disambiguation_rule: None,
-                samples_used: 0,
-                detected_locale: None,
-                is_generic: false,
-                column_features: None,
-            });
-        }
-
-        // Sample values (same strategy as classify_multi_branch).
-        let sample = if values.len() <= self.config.sample_size {
-            values.to_vec()
-        } else {
-            let step = values.len() as f64 / self.config.sample_size as f64;
-            (0..self.config.sample_size)
-                .map(|i| values[(i as f64 * step) as usize].clone())
-                .collect()
-        };
-        let samples_used = sample.len();
-
-        // Step 1: Fusion Sense prediction (replaces multi-branch's forward).
-        let ranked = fusion.classify_column_ranked(&sample, header, self.taxonomy.as_ref())?;
-        let (mut label, mut confidence) = ranked
-            .first()
-            .cloned()
-            .unwrap_or_else(|| ("unknown".to_string(), 0.0));
-        let mut disambiguation_rule = "late-fusion".to_string();
-
-        // Lever 1 — cardinality gate. The value head cannot see column cardinality,
-        // so it funnels high-cardinality free-text columns (word/entity_name/
-        // plain_text) into `representation.discrete.categorical`. A real enum
-        // repeats a bounded set of values; a free-text column is mostly distinct.
-        // When the top label is categorical but the FULL column is too high-
-        // cardinality to be an enum, demote to the head's best non-categorical
-        // alternative. (Low-cardinality categorical over-emission is recovered by
-        // the head's alpha floor, not here.)
-        if label == CATEGORICAL_LABEL {
-            let mut uniq = std::collections::HashSet::new();
-            let mut total = 0usize;
-            for v in values {
-                let t = v.trim();
-                if !t.is_empty() {
-                    uniq.insert(t);
-                    total += 1;
-                }
-            }
-            let distinct = uniq.len();
-            let frac_unique = if total > 0 {
-                distinct as f32 / total as f32
-            } else {
-                0.0
-            };
-            let too_high_card = distinct > 50 || (frac_unique > 0.7 && distinct > 20);
-            if too_high_card {
-                if let Some((alt_label, alt_conf)) =
-                    ranked.iter().find(|(l, _)| l != CATEGORICAL_LABEL).cloned()
-                {
-                    disambiguation_rule = format!("fusion_cardinality_gate:{distinct}");
-                    label = alt_label;
-                    confidence = alt_conf;
-                }
-            }
-        }
-
-        // Step 2: Deterministic ColumnFeatures (36-dim, no neural inference).
-        let per_value_features: Vec<[f32; FEATURE_DIM]> =
-            sample.iter().map(|v| extract_features(v)).collect();
-        let column_features = aggregate_features(&per_value_features);
-
-        let mut result = ColumnResult {
-            label: label.clone(),
-            confidence,
-            vote_distribution: vec![(label, confidence)],
-            disambiguation_applied: disambiguation_rule != "late-fusion",
-            disambiguation_rule: Some(disambiguation_rule),
-            samples_used,
-            detected_locale: None,
-            is_generic: false,
-            column_features: Some(column_features.clone()),
-        };
-
-        // Honest-gate composition (FINETYPE_INJECT_LABEL): override the Sense label
-        // with an externally-supplied one (another model's prediction), then run the
-        // REAL Sharpen stack on it — lets us compose any model's predictions without
-        // that model being in the binary. Diagnostic only; empty/unset = no-op.
-        if !self.skip_sharpen {
-            if let Ok(inj) = std::env::var("FINETYPE_INJECT_LABEL") {
-                if !inj.is_empty() {
-                    result.label = inj;
-                    result.confidence = 1.0;
-                }
-            }
-        }
-        // Steps 3-5: Sharpen post-processing (skipped when skip_sharpen is set).
-        if !self.skip_sharpen {
-            feature_sharpen(&mut result, &column_features);
-
-            if let Some((resolved_label, rule_name)) = value_sharpen(
-                &sample,
-                &result.label,
-                result.confidence,
-                self.taxonomy.as_ref(),
-            ) {
-                result.label = resolved_label;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule = Some(rule_name);
-            }
-
-            // Deterministic datetime sub-format read (value-based, over-emission-safe;
-            // runs before header hints so a delimited timestamp is read from values).
-            self.datetime_format_refinement(&mut result, &sample);
-            self.structured_string_refinement(&mut result, &sample);
-            self.sharpen_and_guard(&mut result, header, &sample, values);
-
-            // Step 5b: Username recovery veto — value-based, runs AFTER header hints
-            // so a deprecated author->full_name cross-domain hint can't resurrect a
-            // handle column (decision 0048; spec 2026-06-17-full-name-username-veto).
-            self.apply_username_veto(&mut result, &sample);
-        }
-
-        // Step 6: Post-hoc locale detection.
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
-                result.detected_locale = Some(locale);
-            }
-        }
-
-        self.finalize_is_generic(&mut result);
-        Ok(result)
     }
 
     fn classify_multi_branch(
