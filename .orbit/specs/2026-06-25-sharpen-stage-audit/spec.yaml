@@ -29,9 +29,9 @@ acceptance_criteria:
     what weak-Sense failure it was originally compensating for. Also pin HOW composed
     is scored offline (compose_predictions.py vs the native engine) so audit edits
     are measured correctly. The map the rest of the audit works from.
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
 - id: ac-1
   description: |
     SIMPLIFY/REMOVE (Q2): triage the 33 Sense-right -> composed-wrong columns. Each
@@ -42,7 +42,6 @@ acceptance_criteria:
     gold no-regression, corpus-honest gate for any relocation. DELIVERABLE: composed
     recovery on these 33 (up to +3.5pp) measured on the attention model, AND a net
     reduction in rule surface.
-  ac_type: code
   gate: false
   checked: false
 - id: ac-2
@@ -53,7 +52,6 @@ acceptance_criteria:
     (ii) genuinely-hard text residuals (word x36, plain_text x34 - likely a Sense/label
     problem, not a rule), (iii) label issues -> ac-3. Ship value-based rules for the
     (i) slice through the gold + corpus-honest gates.
-  ac_type: code
   gate: false
   checked: false
 - id: ac-3
@@ -64,9 +62,9 @@ acceptance_criteria:
     re-adjudication (mixed-panel per spec 2026-06-16) or in-place gold correction with
     provenance, only where defensible. Separates "model is wrong" from "gold is wrong"
     so ac-1/ac-2 chase real errors.
-  ac_type: doc
   gate: false
   checked: false
+  ac_type: doc
 - id: ac-4
   description: |
     PROMOTION GATE: the combined ship is (attention Sense + cleaned Sharpen). Measure
@@ -75,6 +73,6 @@ acceptance_criteria:
     A composed number > 0.794 + CI is the ceiling-break and the GO to co-promote the
     attention model + Sharpen changes. Below it, ship the rule simplifications that
     hold no-regression and bank the audit.
-  ac_type: observation
   gate: true
   checked: false
+  ac_type: observation
