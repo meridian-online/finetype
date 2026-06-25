@@ -59,6 +59,7 @@ datetime.epoch.unix_microseconds	false	^\d{16}$	true
 datetime.epoch.unix_milliseconds	false	^\d{13}$	true
 datetime.epoch.unix_seconds	false	^\d{10}$	true
 datetime.offset.iana	false	^[A-Z][a-zA-Z]+/[A-Za-z_]+(/[A-Za-z_]+)?$	true
+datetime.offset.timezone_abbreviation	false	^(UTC|GMT|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AKST|AKDT|HST|HAST|HADT|AST|ADT|NST|NDT|CET|CEST|EET|EEST|WET|WEST|BST|IST|WAT|CAT|EAT|SAST|MSK|GST|PKT|ICT|WIB|SGT|HKT|JST|KST|AEST|AEDT|ACST|ACDT|AWST|NZST|NZDT)$	true
 datetime.offset.utc	false	^UTC [+-]\d{2}:\d{2}$	true
 datetime.period.fiscal_year	false	^FY\d{2,4}$	true
 datetime.period.quarter	false	^(Q[1-4]\s?\d{4}|\d{4}[\s-]?Q[1-4])$	true
@@ -114,7 +115,7 @@ finance.currency.amount_multisym	false	^(R\$|HK\$|NT\$|S\$|A\$|C\$|NZ\$|kr|Kč|z
 finance.currency.amount_neg_trailing	false	^[\$€£¥₹]?[0-9]{1,3}(,[0-9]{3})*(\.[0-9]{1,2})?\s?(-|CR|DR)$	true
 finance.currency.amount_nodecimal	false	^[¥₩\p{Sc}]?-?[0-9]{1,3}(,[0-9]{3})*[¥₩\p{Sc}]?$	true
 finance.currency.amount_space	false	^-?[0-9]{1,3}([\s\x{00A0}][0-9]{3})*(,[0-9]{1,2})?\s?[€$£¥₹₩₿\p{Sc}]?$	true
-finance.currency.currency_code	false	^[A-Z]{3}$	true
+finance.currency.currency_code	true		true
 finance.currency.currency_symbol	false	^[\p{Sc}]+$	true
 finance.payment.credit_card_number	false	^[0-9]{13,19}$	true
 finance.rate.basis_points	false	^-?[0-9]+(\.[0-9]+)?\s?(bps|bp)$	true
@@ -240,6 +241,6 @@ technology.internet.ip_v6	false	^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$	true
 technology.internet.mac_address	false	^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$	true
 technology.internet.message_id	false	^<[^<>@\s]+@[^<>@\s]+>$	true
 technology.internet.top_level_domain	false	^(?:[a-z]{2,}|xn--[a-z0-9]+)(?:\.[a-z]{2,})?$	true
-technology.internet.url	false	^(?:(?:https?|ftp|file)://)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\d+)?(?:/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$	true
+technology.internet.url	false	^(?:(?:https?|ftp|file):)?//(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\d+)?(?:/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$	true
 technology.internet.urn	false	^urn:[a-z0-9][a-z0-9\-]{0,31}:.+$	true
 technology.internet.user_agent	false	^(Mozilla/|curl/|python-requests/|Wget/|Go-http-client/|axios/|PostmanRuntime/|kube-probe/|Java/|okhttp/|Apache-HttpClient/|libcurl/|node-fetch/|Dalvik/|CFNetwork/|Lynx/|Links |Scrapy/|Googlebot/|Bingbot/|Slackbot|Twitterbot/|facebookexternalhit/|LinkedInBot/|Prometheus/|Datadog/|Ruby/|Dart/|grpc-|HTTPie/|bot|spider|crawl)	false
