@@ -1,0 +1,127 @@
+id: 2026-06-25-timezone-abbreviation-type
+goal: |
+  Mine the timezone-abbreviation type (EST/EDT/CEST/…) out of the
+  representation.text.word + datetime.offset.iana residual and ship it the proven
+  plain_text-discovery way: a taxonomy leaf with a precise closed-set validator,
+  recovered deterministically in the Sharpen layer (structured_string_refinement
+  playbook), with a small gold migration — NO retrain.
+
+  ## Why this type, and why now (spec 2026-06-25-sharpen-stage-audit follow-up)
+
+  The sharpen-stage audit's both-wrong triage surfaced timezone abbreviations as a
+  clean, value-determinable type hiding in the residual. Breadth + precision
+  measured during scoping (2026-06-25):
+
+  | candidate | distinct datasets | gold cols | verdict |
+  |---|---|---|---|
+  | datetime.offset.timezone_abbreviation | 1,504 | 6 | BUILD — clears the >=1,000 bar |
+  | technology.code xmldoc-ref (T:/M:…)   | 31    | 1 | REJECT — below the volume bar |
+
+  The xmldoc-ref candidate is clean-and-nameable but 30x below the
+  plain-text-discovery volume bar, so it is rejected exactly like unix/url-path and
+  pos_tagged there; its 1 gold column stays plain_text (the honest residual).
+
+  ## Why a Sharpen rule, not a retrain (settled, do-not-reopen)
+
+  A timezone abbreviation is a CLOSED-SET, value-determinable type — a precise enum
+  validator decides it. Per decision 0096 (residual/value-determinable facts are
+  rule-shaped) and the 3 already-shipped plain_text types (windows_path/message_id/
+  qualified_name, recovered via structured_string_refinement while the model stays
+  240-dim), it is recovered in Sharpen, not predicted by the model. Retraining to
+  add one deterministic type worth ~6 gold columns invites the 0-for-6 additive-
+  retrain collateral (catastrophic forgetting, residual-attractor explosions) for
+  zero benefit the rule does not already give free. Folding the leaf into the model
+  is deferred to a future PLANNED retrain, never the trigger for adding it.
+
+  ## Expected outcome
+
+  ~+0.6pp gold (6 cols: 5 exchangeTimezoneShortName word->tz_abbrev + 1 TZ
+  iana->tz_abbrev, the latter a mislabel correction since CST is an abbreviation,
+  not an IANA name). Gold-clean only if the taxonomy add + Sharpen recovery + gold
+  migration land together; the corpus-honest gate is the blocking relocation check.
+  Honest scope: this is the diminishing-returns end of the rule/taxonomy lever the
+  ceiling-discovery work predicted — small but real, low-risk, well-worn playbook.
+cards:
+- 0001-type-taxonomy
+status: open
+labels:
+- taxonomy
+- sharpen
+- residual-mining
+memories_considered:
+- key: categorical-is-a-residual-category
+  disposition: adopted
+  reason: Anchors the no-retrain decision — a closed-set value-determinable type belongs in Sharpen recovery, not a flat-softmax output; retraining for it risks the residual-attractor collateral.
+- key: catastrophic-forgetting-cure-is-train-time
+  disposition: adopted
+  reason: The 0-for-6 additive-retrain history is why this ships as a deterministic rule + taxonomy add rather than a retrain.
+- key: cardinality-boundary-error-is-real
+  disposition: adopted
+  reason: Bounds the ambition honestly — this is the diminishing-returns end of the rule/taxonomy lever (~+0.6pp), not a ceiling break.
+acceptance_criteria:
+- id: ac-0
+  description: |
+    Volume + precision gate (DONE at scoping, 2026-06-25 — recorded here, confirm
+    in the build). Corpus breadth measured over 6.59M corpus_pass columns:
+    timezone-abbreviation = 1,507 cols / 1,504 distinct datasets (clears the
+    plain-text-discovery >=1,000-distinct-dataset bar); xmldoc-ref = 31 datasets
+    (REJECTED, below bar — stays plain_text). The validator is a CLOSED ENUM of the
+    canonical abbreviations (EST EDT CST CDT MST MDT PST PDT AKST AKDT HST AST ADT
+    CET CEST EET EEST WET WEST GMT UTC BST IST JST KST AEST AEDT ACST ACDT AWST NZST
+    NZDT SAST WAT CAT EAT MSK ICT SGT HKT …). PRECISION PRINCIPLE: the abbreviations
+    EST/CST/PST overlap non-tz uses (estimate/cost), so precision is carried by the
+    RECOVERY gating (ac-2: residual-label-only + >=90% closed-set match + header
+    corroboration), not by relaxing the enum. Build only the type that clears both
+    bars (= timezone-abbreviation only).
+  ac_type: doc
+  gate: false
+  checked: false
+- id: ac-1
+  description: |
+    Build the leaf LIVE into the taxonomy: datetime.offset.timezone_abbreviation
+    (sibling of datetime.offset.iana) — definition + closed-enum validation +
+    generator arm in generator/datetime.rs + label_category_map entry (sorted).
+    `finetype check` 100% (count bumps 244 -> 245), full workspace `cargo test`
+    green, clippy clean. Count constants + CLAUDE.md + CHANGELOG updated. The model
+    stays 240-dim and does NOT predict it (recovered in ac-2), exactly like the 3
+    plain_text leaves.
+  ac_type: code
+  gate: false
+  checked: false
+- id: ac-2
+  description: |
+    Recover the type deterministically in Sharpen — extend structured_string_
+    refinement (or a sibling rule) with timezone_abbreviation. CORROBORATION gate:
+    fire only on the residual labels the discovery mined it from (word / plain_text
+    / unknown / datetime.offset.iana when the values are abbreviations not IANA
+    names). VETO-CONSISTENCY gate: assert only if >=90% of values pass the closed-
+    enum validator. Header corroboration (timezone/tz/zone in the header) to blunt
+    the EST=estimate / CST=cost overlap. Value-based (0048), RHH-disableable,
+    ledgered in the deterministic-layer audit. Verify on the 6 gold columns +
+    over-emission-safety on the estimate/cost negatives.
+  ac_type: code
+  gate: false
+  checked: false
+- id: ac-3
+  description: |
+    Gold migration — re-adjudicate the 6 affected gold columns to the new leaf with
+    provenance (choice 0095 evolution policy; mixed-panel per spec 2026-06-16 or
+    author override): 5x exchangeTimezoneShortName (word -> timezone_abbreviation),
+    1x TZ (iana -> timezone_abbreviation, a mislabel correction — CST is an
+    abbreviation, not an IANA zone). Append-only with per-row provenance; leakage
+    unaffected.
+  ac_type: doc
+  gate: false
+  checked: false
+- id: ac-4
+  description: |
+    Promotion gate. Gold no-regression-or-lift (expect ~+0.6pp: the 6 migrated
+    columns flip miss -> correct once recovered) on BOTH the shipped default
+    (m2v8m-s43) and the attention model; corpus-honest gate GO (blocking, H05 — the
+    relocation check on the 1,504-dataset tz population, confirming the recovery
+    does not steal word/categorical columns). NO retrain in this spec. A GO ships
+    the leaf + recovery + gold migration together; a corpus-honest NO-GO tightens
+    the ac-2 gating (header corroboration / closed-set threshold) and re-gates.
+  ac_type: observation
+  gate: true
+  checked: false
