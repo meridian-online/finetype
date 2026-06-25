@@ -19,12 +19,6 @@ use tracing_subscriber::EnvFilter;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "embed-models")]
-// The generated module still defines the char-cnn / tiered / semantic-hint /
-// entity embeds, which became unused when the value-level ModelTypes and their
-// loaders were removed (choice 0107 stage 2b). The multi-branch model only reads
-// MB_* / M2V_MODEL / M2V_TOKENIZER. Trimming the build.rs generators for the dead
-// embeds is a behaviour-neutral follow-up; allow dead_code until then.
-#[allow(dead_code)]
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded_models.rs"));
 }
