@@ -3286,6 +3286,62 @@ geography.address.postal_code:
 }
 
 #[test]
+fn sample_contradicts_label_blocks_year_hint_on_decimals() {
+    // spec 2026-06-25-sharpen-stage-audit ac-1: the deprecated header_hint
+    // "...year" substring promotes a decimal column ("priceEpsCurrentYear",
+    // "CitesPerYear") to datetime.component.year. The values contradict the
+    // year validator, so the corroboration guard must report a contradiction.
+    let yaml = r#"
+datetime.component.year:
+  title: "Year"
+  validation:
+    type: string
+    pattern: "^(19|20)\\d{2}$"
+    minLength: 4
+    maxLength: 4
+  tier: [VARCHAR, component]
+  release_priority: 4
+  samples: ["2021"]
+"#;
+    let mut taxonomy = Taxonomy::from_yaml(yaml).unwrap();
+    taxonomy.compile_validators();
+
+    let decimals: Vec<String> = vec!["3.2205129", "1.0", "2.0", "1.5", "0.0"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    assert!(
+        sample_contradicts_label(&taxonomy, "datetime.component.year", &decimals),
+        "decimals must contradict the year hint"
+    );
+
+    // Genuine 4-digit years corroborate — the guard must NOT block the hint.
+    let years: Vec<String> = vec!["2021", "2020", "2019", "2022", "2018"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    assert!(
+        !sample_contradicts_label(&taxonomy, "datetime.component.year", &years),
+        "real years must corroborate the year hint"
+    );
+
+    // A leaf with no universal validator yields no evidence → never blocks.
+    assert!(
+        !sample_contradicts_label(&taxonomy, "representation.text.word", &decimals),
+        "validator-less leaf must not report a contradiction"
+    );
+
+    // Too few values to judge → no contradiction.
+    let two: Vec<String> = vec!["3.14", "2.71"].into_iter().map(String::from).collect();
+    assert!(!sample_contradicts_label(&taxonomy, "datetime.component.year", &two));
+}
+
+#[test]
+fn header_hint_value_corroboration_is_default_on() {
+    assert!(!rhh::is_disabled("header_hint_value_corroboration"));
+}
+
+#[test]
 fn test_attractor_accepts_real_us_postal_codes() {
     // Real US ZIP codes: match EN_US locale pattern → locale-confirmed, no demotion
     let values: Vec<String> = vec![
