@@ -1,0 +1,122 @@
+id: '0107'
+title: 'Remove the abandoned inference paths (legacy Sense→Sharpen, late-fusion, CharCNN/Tiered/Transformer ModelTypes); keep sibling-context'
+status: accepted
+date_created: 2026-06-25
+date_modified: 2026-06-25
+body: |
+  # 0107. Remove the abandoned inference paths — legacy Sense→Sharpen, late-fusion, and the CharCNN/Tiered/Transformer ModelTypes
+
+  ## Context and Problem Statement
+
+  The shipped default (`models/default` → `m2v8m-s43`) is a **multi-branch** model
+  (choice 0104). Around that one live path the codebase still carries three
+  inference architectures that nothing reachable from the default uses:
+
+  - **Legacy Sense→Sharpen** — `classify_sense_sharpen_inner` (~700 lines) plus its
+    own *inline* header-hint cascade, `set_sense`/`wire_sense`, the `sense` field.
+    Active only when `!multi_branch && !fusion` (`classify_column_with_header`,
+    mod.rs:1211). Its inline cascade is a **divergent duplicate** of
+    `apply_header_sharpen` (the multi-branch copy) — different thresholds — so audit
+    edits land on only one copy. A standing maintenance hazard.
+  - **Late fusion** — `classify_fusion`, `fusion_cardinality_gate`, `with_fusion`,
+    `load_fusion_classifier`, `fusion_manifest.json` auto-detect, the whole
+    `fusion.rs` module (`FusionClassifier`/`FusionHead`/`compute_fusion_row`). The
+    value-fusion Sense replacement was **abandoned** (spec
+    `2026-06-08-late-fusion-sense-classifier`, NO-GO twice). Mutually exclusive with
+    multi-branch (mod.rs:1198 returns before the multi-branch branch).
+  - **CharCNN / Tiered / Transformer ModelTypes** — `ModelType::{CharCnn,Tiered,
+    Transformer}` + `load_char_classifier`/`load_tiered_classifier` + the legacy
+    `classify_column` CharCNN inference path, and the tracked model dirs
+    `models/{char-cnn-v7,tiered-v1}`. Opt-in `--model-type` paths only.
+
+  This reverses the previously settled note "Original Sense implementation remains
+  in code as an alternative." The README declares **Early Release** (breaking
+  changes to taxonomy/CLI/APIs/model formats expected between releases), so the
+  prior plan to *add* download/restore for these legacy model dirs (task
+  t-0001080618) is obviated: **delete the abandoned paths instead.**
+
+  ## Decision Drivers
+
+  - Strength through simplification (decision 0038): less surface, one Sharpen
+    cascade, no divergent duplicate to keep in sync.
+  - Behaviour-neutral on the default — every removal is on a path the default never
+    enters. Gold no-regression is the gate, not a hope.
+  - Early Release license to break opt-in surfaces.
+
+  ## B07 consumer-graph audit (the load-bearing findings)
+
+  Audited 2026-06-25 (codegraph + ripgrep + dispatch read). Dispatch order in
+  `classify_column_with_header` (mod.rs:1191): fusion → multi_branch → has_sense
+  (legacy Sense) → classify_column (legacy CharCNN). The default takes the
+  multi_branch branch only.
+
+  - **Fusion**: zero references from any multi-branch/default code path; mutually
+    exclusive by construction. SAFE to remove in full.
+  - **Legacy Sense**: reachable only via `has_sense()`, which the default never sets
+    (`wire_sense` is gated `if !has_multi_branch() && !has_fusion()`, profile.rs:179).
+    The inline header cascade is confirmed separate code from `apply_header_sharpen`.
+    SAFE to remove.
+  - **CharCNN/Tiered/Transformer**: the `classify_column` legacy path and the
+    `load_char_/load_tiered_` loaders are reachable only via the opt-in ModelType
+    variants. multi-branch (`classify_multi_branch`) does not call them or share a
+    CharCNN helper. SAFE to remove the variants, loaders, legacy path, and the
+    `models/{char-cnn-v7,tiered-v1}` dirs.
+  - **CATEGORICAL sentinel**: the ~13 Sharpen producers that emit
+    `representation.discrete.categorical` are all **multi-branch-live**; the only
+    non-default consumer is `fusion_cardinality_gate`. `enum_reframe_residual`
+    (mod.rs:1083) is reachable on the multi-branch path and is **load-bearing until
+    the producers are rewired** (guard-ablation: enum_reframe −47). So the
+    categorical collapse is behaviour-neutral ONLY if the producers are switched to
+    emit `word` directly first, then `enum_reframe_residual` + the sentinel deleted
+    (categorical→word either way). Do fusion removal BEFORE this. Gold delta MUST be 0.
+
+  ## CARVE-OUT: sibling-context is NOT removed (corrects the task scope)
+
+  The task grouped `models/sibling-context` with the legacy model dirs. The audit
+  **refutes** that: the default multi-branch `profile` path wires sibling-context
+  (`wire_model2vec_and_siblings` → `wire_sibling_context`, profile.rs:185,
+  main.rs:2549), which loads `models/sibling-context/model.safetensors` and drives
+  cross-column header enrichment in `classify_columns_with_context` (mod.rs:1156).
+  Deleting it would **remove cross-column enrichment from default profiling — a
+  behaviour change, not neutral cleanup.** (Single-column `infer` already skips it
+  for latency, card 0006 / commit 91aac37 — that is the only place it is inert.)
+
+  Whether sibling-context earns its place on gold is a *separate accuracy decision*
+  with its own measurement, not part of this behaviour-neutral removal.
+  **sibling-context (code + model dir) stays.** This mirrors the utc-audit lesson:
+  a prior session's task note is a hypothesis to verify, not ground truth.
+
+  ## Decision Outcome
+
+  Remove fusion, legacy Sense→Sharpen, and the CharCNN/Tiered/Transformer ModelTypes
+  + their loaders + legacy `classify_column` path + the `models/{char-cnn-v7,
+  tiered-v1}` dirs. Then collapse the categorical sentinel (producers → `word`,
+  delete `enum_reframe_residual` + `CATEGORICAL_LABEL` + the validation_veto hook).
+  **Keep** sibling-context (code + model dir) and all Sharpen producers.
+
+  Staged, each its own commit, each gated on green CI (clippy -D, cargo test) +
+  cargo machete:
+  1. Fusion removal.
+  2. Legacy Sense + CharCNN/Tiered/Transformer loaders + legacy model dirs.
+  3. Categorical-sentinel collapse — gated on a **no-regression gold run** (card
+     0019 scenario 5), MUST be 0 gold delta.
+
+  `extract_features.rs` is a non-shipped training/dev tool that calls `wire_sense`;
+  it is updated or retired alongside the Sense removal (it is not in the released
+  binary).
+
+  ## Consequences
+
+  - One Sharpen cascade (`apply_header_sharpen`), no divergent inline duplicate.
+  - `finetype.rs`/CLI `--model-type` loses CharCnn/Tiered/Transformer/LateFusion;
+    profile/infer become multi-branch-only (the shipped reality).
+  - `fusion.rs` deleted; `sense.rs` types removed if no remaining consumer.
+  - Gold headline must be unchanged across all three stages (no-regression gate).
+
+  ## Substrate
+
+  Spec `2026-06-25-sharpen-stage-audit` (task t-0000079e). Abandonment of fusion:
+  spec `2026-06-08-late-fusion-sense-classifier`. Default: choice 0104, spec
+  `2026-06-23-dual-encoder-native-ship-potion8m`. Categorical-as-property: choice
+  0102. Guard-ablation finding (enum_reframe −47): 2026-06-25. Simplification gate:
+  card 0019 scenario 5.
