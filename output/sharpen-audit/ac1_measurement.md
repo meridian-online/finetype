@@ -108,7 +108,15 @@ those 6 is the full A/B. Verified live on the release binary (attention Sense in
 | e2695df2e762 | utc_offset | hours (10,−3) | utc | utc | utc (spared) | 0 |
 | 48e9044292d1 | date | — | sql_standard | iso_milliseconds (not utc) | unchanged | 0 |
 
-**Net on the attention model: +4 columns, zero regressions.** Gold-safe by construction —
-the veto fires only on bare numbers in the millions, which gold never labels utc.
-Corpus-honest gate (H05, blocking) deferred to ac-4's combined promotion, as with the
-year/unix scoped guard.
+**Net: +4 columns, zero regressions — on BOTH the attention model AND the SHIPPED default
+(m2v8m-s43).** Unlike the year/unix scoped guard (a no-op on the default because its breaks
+are Sense-right only on attention), this over-emission is created by the `utc offset`
+HEADER hint, which fires regardless of model — so the bug and the fix both land on the
+shipped default. Verified before/after on the default via the rhh-instrumentation toggle
+(`RHH_DISABLE_HINTS=utc_offset_bare_number_veto`): all 4 ms columns were `utc` pre-veto,
+`decimal` post-veto; the gold=utc sibling stays `utc`. So this moves the shipped gold
+headline 745→749/931 (~0.800→0.804), independent of the attention co-ship.
+
+Gold-safe by construction — the veto fires only on bare numbers in the millions, which gold
+never labels utc. Corpus-honest gate (H05, blocking) deferred to ac-4's combined promotion,
+as with the year/unix scoped guard.
