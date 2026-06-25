@@ -987,12 +987,12 @@ fn test_header_hint_names() {
     );
     assert_eq!(header_hint("last_name"), Some("identity.person.last_name"));
     assert_eq!(header_hint("surname"), Some("identity.person.last_name"));
-    // Qualified " name" still works
-    assert_eq!(
-        header_hint("display name"),
-        Some("identity.person.full_name")
-    );
-    assert_eq!(header_hint("user name"), Some("identity.person.full_name"));
+    // spec 2026-06-25-sharpen-stage-audit: the broad `ends_with(" name")` →
+    // full_name arm was retired (net damage — country_name/template_name/
+    // agency_name mis-promoted). Unqualified "* name" headers now carry no hint;
+    // only the first/last/full-qualified arms above remain.
+    assert_eq!(header_hint("display name"), None);
+    assert_eq!(header_hint("user name"), None);
 }
 
 #[test]
@@ -1954,23 +1954,17 @@ fn test_boolean_override_preserves_real_boolean_current_label() {
 // ── New header hint tests ─────────────────────────────────
 
 #[test]
-fn test_header_hint_class_columns() {
-    assert_eq!(
-        header_hint("Pclass"),
-        Some("representation.discrete.ordinal")
-    );
-    assert_eq!(
-        header_hint("class"),
-        Some("representation.discrete.ordinal")
-    );
-    assert_eq!(
-        header_hint("grade"),
-        Some("representation.discrete.ordinal")
-    );
-    assert_eq!(
-        header_hint("rating"),
-        Some("representation.discrete.ordinal")
-    );
+fn class_rank_grade_headers_no_longer_hint_ordinal() {
+    // spec 2026-06-25-sharpen-stage-audit: the class/rank/grade/tier → ordinal
+    // header arms were retired (value-blind, gold-negative on the attention model
+    // — Grade, Region Rank, GlobalRank, TldRank, usageclass were mis-promoted to
+    // ordinal over a correct numeric Sense). These headers now carry no hint; the
+    // model's value-based prediction stands.
+    assert_eq!(header_hint("Pclass"), None);
+    assert_eq!(header_hint("class"), None);
+    assert_eq!(header_hint("grade"), None);
+    assert_eq!(header_hint("rank"), None);
+    assert_eq!(header_hint("tier"), None);
 }
 
 #[test]
@@ -2042,16 +2036,12 @@ fn test_header_hint_fare() {
 }
 
 #[test]
-fn test_header_hint_class_keyword_matching() {
-    // Keyword matching for compound names containing "class"
-    assert_eq!(
-        header_hint("passenger_class"),
-        Some("representation.discrete.ordinal")
-    );
-    assert_eq!(
-        header_hint("ticket_class"),
-        Some("representation.discrete.ordinal")
-    );
+fn compound_class_headers_no_longer_hint_ordinal() {
+    // spec 2026-06-25-sharpen-stage-audit: the substring class/grade/rank/tier →
+    // ordinal arm was retired alongside its exact-match twin. Compound headers
+    // containing "class" no longer hint ordinal.
+    assert_eq!(header_hint("passenger_class"), None);
+    assert_eq!(header_hint("skill_grade"), None);
 }
 
 // ── SI number override tests ─────────────────────────────

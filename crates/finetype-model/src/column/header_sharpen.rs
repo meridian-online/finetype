@@ -334,11 +334,13 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
             | "quantity" => {
                 return Some("representation.numeric.integer_number");
             }
-            // Class / rank / tier columns — ordinal categories
-            "class" | "pclass" | "grade" | "rank" | "level" | "tier" | "rating" | "priority"
-            | "score" => {
-                return Some("representation.discrete.ordinal");
-            }
+            // (retired, spec 2026-06-25-sharpen-stage-audit) Class / rank / tier
+            // → ordinal was a value-blind keyword assertion: gold A/B on the
+            // attention model showed it is pure damage (Grade, Region Rank,
+            // GlobalRank, TldRank, usageclass all mis-promoted to ordinal over a
+            // now-correct numeric Sense). ordinal is a bounded ordered set; a
+            // rank/grade header on continuous or large-spread numbers is not
+            // ordinal. Removed both this exact arm and the substring arm below.
             // Survival / binary outcome columns
             "survived" | "alive" | "deceased" | "dead" | "active" | "enabled" | "disabled"
             | "deleted" | "verified" | "approved" | "flagged" => {
@@ -503,18 +505,12 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
     if !disable_identity && h.contains("name") && (h.contains("full") || h.contains("complete")) {
         return Some("identity.person.full_name");
     }
-    if !disable_identity && h.ends_with(" name") && h != "name" {
-        // Qualified: "display name", "user name", "account name" → full_name
-        // Bare "name" is ambiguous (could be person, city, country, company) — let
-        // Sense + CharCNN decide based on value evidence.
-        // Exclude datetime component names (month_name, day_name) — those are
-        // temporal, not person names.
-        if h.contains("month") || h.contains("day") || h.contains("weekday") {
-            // Let the model decide — these are datetime components
-        } else {
-            return Some("identity.person.full_name");
-        }
-    }
+    // (retired, spec 2026-06-25-sharpen-stage-audit) The broad `ends_with(" name")`
+    // → full_name arm assumed any "* name" header is a person name. Gold A/B on the
+    // attention model showed it is net damage: it mis-promotes country_name,
+    // template_name, agency_name, gis_nta_name (countries, paths, org/place names)
+    // to full_name. The precise first/last/full-name arms above (which require a
+    // first/last/full/given/family/sur qualifier) are kept — they are not value-blind.
     if !disable_geography
         && h.contains("address")
         && !h.contains("email")
@@ -606,11 +602,11 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
     {
         return Some("representation.numeric.integer_number");
     }
-    if !disable_representation
-        && (h.contains("class") || h.contains("grade") || h.contains("rank") || h.contains("tier"))
-    {
-        return Some("representation.discrete.ordinal");
-    }
+    // (retired, spec 2026-06-25-sharpen-stage-audit) substring class/grade/rank/tier
+    // → ordinal — the substring twin of the exact ordinal arm removed above. Gold
+    // A/B: disabling substring_matcher_representation was +3 on the attention model,
+    // driven entirely by these ordinal mis-promotions. The count→integer and
+    // ticket/cabin→alphanumeric_id arms in this family are kept (gold-positive).
     if !disable_representation
         && (h.contains("ticket") || h.contains("cabin") || h.contains("seat") || h.contains("room"))
     {
