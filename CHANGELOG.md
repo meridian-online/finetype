@@ -33,6 +33,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `labels/` dir at runtime. The taxonomy `check` gate now fails on any leaf missing a valid
   `frictionless:` block.
 
+### Changed
+
+- **Retired two value-blind header-hint arms** (spec `2026-06-25-sharpen-stage-audit`): the
+  `class`/`grade`/`rank`/`tier` → `ordinal` arm and the broad `…name` → `full_name` arm. A
+  per-family ablation against the strongest Sense showed both were net damage (they over-rode a
+  now-correct value-based prediction on compound headers). Aligns with decision 0042. Gold +3 on
+  the shipped default, zero regressions; recovers `Grade`/`GlobalRank`/`Region Rank`/
+  `template_name`/`…country_name`.
+
+### Fixed
+
+- **Header hints no longer override a value-contradicted prediction** (`header_hint_value_corroboration`):
+  a `…year`/`epoch` header that promoted a decimal/id column to `year`/`unix_seconds` over the
+  column's own values is now declined when the values fail the hinted type's validator.
+- **URL over-emission on non-URL columns** (spec `2026-06-25-sharpen-stage-audit`): a `link`/`url`
+  header no longer promotes msg-id / prose / flag columns to `url`. The URL validator also now
+  accepts protocol-relative `//host/path` URLs (closes the `//` gap). Gold +5 on the default.
+- **`geography.index.h3` over-emission** on generic alphanumeric id columns — added to the R32
+  schema-fail demotion scope (its sibling `geohash` was already covered).
+
 ## [0.6.36] - 2026-06-24
 
 ### Changed
