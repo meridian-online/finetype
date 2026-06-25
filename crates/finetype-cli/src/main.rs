@@ -1773,14 +1773,15 @@ fn cmd_infer(
             column_classifier.set_taxonomy(taxonomy);
         }
 
-        // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models
+        // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models.
+        // `infer` classifies a single column, so sibling-context attention (cross-column) is
+        // never invoked — skip its load (card 0006 single-column fast path).
         if !column_classifier.has_multi_branch() {
             wire_sense(&mut column_classifier);
-            wire_sibling_context(&mut column_classifier);
         }
-        // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+        // Multi-branch path: wire Model2Vec for header enrichment, no sibling context.
         if column_classifier.has_multi_branch() {
-            wire_model2vec_and_siblings(&mut column_classifier);
+            wire_model2vec_only(&mut column_classifier);
         }
 
         let result = if let Some(ref hdr) = header {
@@ -2064,14 +2065,15 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models
+    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models.
+    // Batch infer classifies one column per JSONL line — never the cross-column context path —
+    // so sibling-context attention is dead weight here (card 0006).
     if !column_classifier.has_multi_branch() {
         wire_sense(&mut column_classifier);
-        wire_sibling_context(&mut column_classifier);
     }
-    // Multi-branch path: wire Model2Vec + sibling context for header enrichment
+    // Multi-branch path: wire Model2Vec for header enrichment, no sibling context.
     if column_classifier.has_multi_branch() {
-        wire_model2vec_and_siblings(&mut column_classifier);
+        wire_model2vec_only(&mut column_classifier);
     }
 
     let load_elapsed = t_start.elapsed();
@@ -2510,6 +2512,20 @@ fn wire_model2vec_and_siblings(cc: &mut finetype_model::ColumnClassifier) {
         eprintln!("Loaded Model2Vec for multi-branch sibling context");
         cc.set_model2vec(m2v);
         wire_sibling_context(cc);
+    }
+}
+
+/// Wire Model2Vec for a multi-branch classifier WITHOUT sibling context.
+///
+/// `infer` classifies one column at a time and never calls the cross-column
+/// `classify_columns_with_context` path, so the sibling-context attention model
+/// (396,800 params) would be loaded from disk only to never be invoked. Skipping
+/// that load is the single-value/single-column infer fast path (card 0006).
+/// `profile`, which has real siblings, still wires both via
+/// `wire_model2vec_and_siblings`.
+fn wire_model2vec_only(cc: &mut finetype_model::ColumnClassifier) {
+    if let Some(m2v) = load_model2vec_resources() {
+        cc.set_model2vec(m2v);
     }
 }
 
