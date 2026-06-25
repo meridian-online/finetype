@@ -2771,13 +2771,28 @@ impl ColumnClassifier {
             "datetime.epoch.unix_seconds",
             "datetime.epoch.unix_milliseconds",
         ];
-        if !rhh::is_disabled("header_hint_value_corroboration")
-            && CORROBORATION_SCOPE.contains(&hinted_type)
-        {
-            if let Some(tax) = self.taxonomy.as_ref() {
-                if sample_contradicts_label(tax, hinted_type, sample) {
-                    return;
-                }
+        if !rhh::is_disabled("header_hint_value_corroboration") {
+            let contradicted = if hinted_type == "technology.internet.url" {
+                // url uses a value-SHAPE test, not its validator: gold treats
+                // root-relative paths (`/partner/x.asp?id=…`) as url, which the
+                // "complete web address" validator rejects — so the validator would
+                // wrongly block a real url column. Decline the `link`/`url` header
+                // promotion only when the values are neither url-shaped (scheme://,
+                // protocol-relative //, or root-relative /) NOR bare numbers. Bare
+                // numbers are left to `url_bare_number_veto` downstream (which
+                // correctly demotes them to integer/decimal), so the guard does not
+                // strip the path that rescues a 0/1 `perm_unlink` column.
+                let (is_bare, _) = values_look_like_bare_numbers(sample);
+                !is_bare && values_are_clearly_non_url(sample)
+            } else if CORROBORATION_SCOPE.contains(&hinted_type) {
+                self.taxonomy
+                    .as_ref()
+                    .is_some_and(|tax| sample_contradicts_label(tax, hinted_type, sample))
+            } else {
+                false
+            };
+            if contradicted {
+                return;
             }
         }
 

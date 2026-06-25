@@ -167,7 +167,7 @@ technology.internet.url:
     path: "REGEXP_EXTRACT({col}, '(?:https?://[^/]+)?(/.*)$')"
   validation:
     type: string
-    pattern: "^(?:(?:https?|ftp|file)://)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\\d+)?(?:/[^?#]*)?(?:\\?[^#]*)?(?:#.*)?$"
+    pattern: "^(?:(?:https?|ftp|file):)?//(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?::\\d+)?(?:/[^?#]*)?(?:\\?[^#]*)?(?:#.*)?$"
   tier: [VARCHAR, internet]
   release_priority: 5
   aliases: [web_url, uri]
@@ -176,6 +176,7 @@ technology.internet.url:
     - "http://www.google.com"
     - "ftp://ftp.example.org/file.txt"
     - "https://example.com:8080/path?query=value#anchor"
+    - "//cdn.example.com/lib.js"
   references: null
   notes: >
     v1 migration: Was internet.url. Includes optional decompose for parsing
@@ -183,6 +184,11 @@ technology.internet.url:
     Phase 0: Merged technology.internet.uri into this type.
     URI had 37% training data overlap with URL (both use http/https schemes).
     Model could not distinguish them (regression analysis).
+    Scheme is optional but `//` is required, so protocol-relative URLs
+    (`//cdn.example.com/lib.js`) validate while bare hostnames and bare ids
+    (`msg32812262`) do not. Closing the `//` gap makes the validator precise
+    enough to gate the url header-hint over-emit (spec
+    2026-06-25-sharpen-stage-audit; task t-00007f4d).
 
 technology.internet.hostname:
   title: "Hostname"

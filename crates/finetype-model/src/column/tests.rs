@@ -3336,6 +3336,42 @@ fn header_hint_value_corroboration_is_default_on() {
 }
 
 #[test]
+fn values_are_clearly_non_url_separates_ids_from_urls() {
+    // spec 2026-06-25-sharpen-stage-audit: the url header-hint corroboration uses a
+    // value-SHAPE test (not the validator) so it keeps all three url forms gold
+    // counts as url, and fires only on positive evidence of non-url-ness.
+    let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    // bare ids / prose / flags -> clearly non-url (block the hint)
+    assert!(values_are_clearly_non_url(&v(&[
+        "msg32812262",
+        "msg32929450",
+        "msg11"
+    ])));
+    assert!(values_are_clearly_non_url(&v(&["Yes", "Yes", "Yes", "No"])));
+    // real urls — all three forms — are NOT clearly non-url (hint may stand)
+    assert!(!values_are_clearly_non_url(&v(&[
+        "http://a.com/x",
+        "https://b.io/y",
+        "http://c.org/z"
+    ])));
+    assert!(!values_are_clearly_non_url(&v(&[
+        "//cdn.a.io/x.js",
+        "//cdn.b.io/y.css",
+        "//c.io/z.js"
+    ])));
+    assert!(!values_are_clearly_non_url(&v(&[
+        "/partner/x.asp?id=1",
+        "/partner/y.asp?id=2",
+        "/partner/z.asp?id=3"
+    ])));
+    // too few values -> inconclusive (a single truncated compose sample must NOT
+    // block a real url column)
+    assert!(!values_are_clearly_non_url(&v(&[
+        "http://howtogetfocused.com/chapters/the-habits"
+    ])));
+}
+
+#[test]
 fn test_attractor_accepts_real_us_postal_codes() {
     // Real US ZIP codes: match EN_US locale pattern → locale-confirmed, no demotion
     let values: Vec<String> = vec![

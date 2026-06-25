@@ -147,6 +147,31 @@ pub(crate) fn values_look_like_bare_numbers(sample: &[String]) -> (bool, bool) {
     }
     (total >= 3 && bare * 100 >= total * 80, any_decimal)
 }
+/// True when the sample is CLEARLY non-url — the shape guard for the url
+/// header-hint corroboration (spec 2026-06-25-sharpen-stage-audit). Gold counts
+/// three forms as url: scheme (`http://…`), protocol-relative (`//cdn…`), and
+/// root-relative paths (`/partner/x.asp?id=…`). The url *validator* rejects the
+/// last two, so a shape test — not the validator — decides whether a `link`/`url`
+/// header may promote a column. A value is url-shaped if it contains `://` or
+/// starts with `/`. Requires POSITIVE evidence to fire: at least 3 non-empty
+/// values and a clear majority that are NOT url-shaped. Too few values is
+/// inconclusive (the offline compose sample can be a single truncated value), so
+/// it returns false and the hint is left to stand — only a genuine column of bare
+/// ids / prose / flags (`msg32812262`, "Yes") trips it.
+pub(crate) fn values_are_clearly_non_url(sample: &[String]) -> bool {
+    let (mut urlish, mut total) = (0usize, 0usize);
+    for v in sample.iter().take(16) {
+        let t = v.trim();
+        if t.is_empty() {
+            continue;
+        }
+        total += 1;
+        if t.contains("://") || t.starts_with('/') {
+            urlish += 1;
+        }
+    }
+    total >= 3 && urlish * 2 < total
+}
 /// True if the sampled values are predominantly numeric — the value-validation
 /// guard for the coordinate veto, so it only fires on genuine numeric columns.
 pub(crate) fn values_look_like_generic_decimals(sample: &[String]) -> bool {
