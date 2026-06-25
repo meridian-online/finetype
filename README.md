@@ -173,13 +173,14 @@ transformation contract.
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 0.80 on the 931-column human-verified gold corpus |
+| Accuracy | 0.81 on the 931-column human-verified gold corpus |
 | Actionability | 99.9% (232,321/232,541 values transformed across 120 types) |
-| Model classes | 240 |
-| Model load time | 66 ms (cold), 25–30 ms (warm) |
-| Single inference | p50=26 ms, p95=41 ms (incl. CLI startup) |
-| Batch throughput | 600–750 values/sec on CPU |
-| Memory footprint | 8.5 MB peak RSS |
+| Model classes | 244 |
+| Profile (model load + classify) | ~150 ms; ~180 MB peak RSS |
+
+The dual-encoder model (potion-8M value branch + potion-4M header branch) is the
+dominant footprint; value-determinable inputs (emails, IPs, ISO datetimes) take a
+deterministic fast path that skips the model load entirely (~50 ms).
 
 ## Known Limitations
 
