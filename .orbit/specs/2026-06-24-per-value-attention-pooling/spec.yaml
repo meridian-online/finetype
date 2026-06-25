@@ -5,7 +5,7 @@ goal: |
   3 seeds, and measure whether the Sense lift passes through to composed —
   Sense-first, with the rule-layer rework explicitly out of scope.
 cards: []
-status: open
+status: closed
 labels:
 - model
 - sense-architecture
@@ -76,3 +76,4 @@ acceptance_criteria:
   gate: false
   checked: true
   ac_type: doc
+closed_at: 2026-06-25T02:12:26.587847Z

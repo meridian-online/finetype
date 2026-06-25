@@ -1,0 +1,80 @@
+id: 2026-06-25-sharpen-stage-audit
+goal: |
+  Push composed past the rule-bound ~0.794 ceiling by auditing the Sharpen stage
+  against the attention model's stronger Sense (spec 2026-06-24-per-value-attention-
+  pooling, memory composed-is-rule-bound). Three retrains proved better representation
+  alone ties composed; the lever is the rule layer. The attention model (m2v8m-attn,
+  Sense 0.561) is the diagnostic substrate AND the eventual co-ship: the recoverable
+  wins exist *because Sense is now right* on those columns. Audit, don't guess —
+  every change value-based (choice 0048), gold no-regression, corpus-honest for
+  relocation.
+
+  Diagnostic baseline (m2v8m-attn-s42 on 931 gold cols): Sharpen RESCUES 250 (Sense
+  wrong -> composed right - it earns its keep), BREAKS 33 (Sense right -> composed
+  wrong - crutch rules overriding now-correct Sense), leaves 159 both-wrong. composed
+  = 0.794. The 33 + the pattern-detectable slice of the 159 are the headroom.
+cards: []
+status: open
+labels:
+- sense-architecture
+- sharpen
+acceptance_criteria:
+- id: ac-0
+  description: |
+    Sharpen rule inventory (doc): enumerate every rule in crates/finetype-model/
+    src/column/ - value_sharpen R12-R32, the vetoes (username, header, increment_
+    substance, binary_vocab, url_bare_number, amount_bare_number, coord, postal),
+    the disambiguate_* overrides (boolean, duration, utc_offset), select_fallback /
+    sharpen_select_fallback - recording for each: what it does, when it fires, and
+    what weak-Sense failure it was originally compensating for. Also pin HOW composed
+    is scored offline (compose_predictions.py vs the native engine) so audit edits
+    are measured correctly. The map the rest of the audit works from.
+  ac_type: doc
+  gate: false
+  checked: false
+- id: ac-1
+  description: |
+    SIMPLIFY/REMOVE (Q2): triage the 33 Sense-right -> composed-wrong columns. Each
+    transition names a suspect rule (integer->increment x6 = increment_substance_veto;
+    decimal->utc x4 = disambiguate_utc_offset_override; decimal/alnum->unknown x7 =
+    validation veto; alnum->url x3; integer/decimal->ordinal x4). For each, confirm the
+    rule overrides correct Sense and tighten or remove the crutch. Value-based (0048),
+    gold no-regression, corpus-honest gate for any relocation. DELIVERABLE: composed
+    recovery on these 33 (up to +3.5pp) measured on the attention model, AND a net
+    reduction in rule surface.
+  ac_type: code
+  gate: false
+  checked: false
+- id: ac-2
+  description: |
+    IMPROVE (Q1): triage the 159 both-wrong columns into (i) pattern-detectable misses
+    a rule should catch (unix_seconds x5, sql_standard x5, top_level_domain x6, url x7,
+    isbn x3, integer x27, alphanumeric_id x17 - diagnose WHY Sharpen doesn't fire),
+    (ii) genuinely-hard text residuals (word x36, plain_text x34 - likely a Sense/label
+    problem, not a rule), (iii) label issues -> ac-3. Ship value-based rules for the
+    (i) slice through the gold + corpus-honest gates.
+  ac_type: code
+  gate: false
+  checked: false
+- id: ac-3
+  description: |
+    LABELS (Q3): review the contestable gold labels the audit surfaces - the
+    word/plain_text/entity_name boundary (~70 both-wrong cols) and integer/increment/
+    ordinal - where the gold label, not the model, may be wrong. Targeted
+    re-adjudication (mixed-panel per spec 2026-06-16) or in-place gold correction with
+    provenance, only where defensible. Separates "model is wrong" from "gold is wrong"
+    so ac-1/ac-2 chase real errors.
+  ac_type: doc
+  gate: false
+  checked: false
+- id: ac-4
+  description: |
+    PROMOTION GATE: the combined ship is (attention Sense + cleaned Sharpen). Measure
+    composed headline vs the 0.794 ceiling on the attention model after the ac-1/ac-2
+    changes; each change clears gold no-regression + corpus-honest (blocking, H05).
+    A composed number > 0.794 + CI is the ceiling-break and the GO to co-promote the
+    attention model + Sharpen changes. Below it, ship the rule simplifications that
+    hold no-regression and bank the audit.
+  ac_type: observation
+  gate: true
+  checked: false
