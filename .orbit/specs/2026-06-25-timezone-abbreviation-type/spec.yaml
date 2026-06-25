@@ -48,16 +48,6 @@ labels:
 - taxonomy
 - sharpen
 - residual-mining
-memories_considered:
-- key: categorical-is-a-residual-category
-  disposition: adopted
-  reason: Anchors the no-retrain decision — a closed-set value-determinable type belongs in Sharpen recovery, not a flat-softmax output; retraining for it risks the residual-attractor collateral.
-- key: catastrophic-forgetting-cure-is-train-time
-  disposition: adopted
-  reason: The 0-for-6 additive-retrain history is why this ships as a deterministic rule + taxonomy add rather than a retrain.
-- key: cardinality-boundary-error-is-real
-  disposition: adopted
-  reason: Bounds the ambition honestly — this is the diminishing-returns end of the rule/taxonomy lever (~+0.6pp), not a ceiling break.
 acceptance_criteria:
 - id: ac-0
   description: |
@@ -73,9 +63,9 @@ acceptance_criteria:
     RECOVERY gating (ac-2: residual-label-only + >=90% closed-set match + header
     corroboration), not by relaxing the enum. Build only the type that clears both
     bars (= timezone-abbreviation only).
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
 - id: ac-1
   description: |
     Build the leaf LIVE into the taxonomy: datetime.offset.timezone_abbreviation
@@ -85,9 +75,8 @@ acceptance_criteria:
     green, clippy clean. Count constants + CLAUDE.md + CHANGELOG updated. The model
     stays 240-dim and does NOT predict it (recovered in ac-2), exactly like the 3
     plain_text leaves.
-  ac_type: code
   gate: false
-  checked: false
+  checked: true
 - id: ac-2
   description: |
     Recover the type deterministically in Sharpen — extend structured_string_
@@ -99,9 +88,8 @@ acceptance_criteria:
     the EST=estimate / CST=cost overlap. Value-based (0048), RHH-disableable,
     ledgered in the deterministic-layer audit. Verify on the 6 gold columns +
     over-emission-safety on the estimate/cost negatives.
-  ac_type: code
   gate: false
-  checked: false
+  checked: true
 - id: ac-3
   description: |
     Gold migration — re-adjudicate the 6 affected gold columns to the new leaf with
@@ -110,9 +98,9 @@ acceptance_criteria:
     1x TZ (iana -> timezone_abbreviation, a mislabel correction — CST is an
     abbreviation, not an IANA zone). Append-only with per-row provenance; leakage
     unaffected.
-  ac_type: doc
   gate: false
-  checked: false
+  checked: true
+  ac_type: doc
 - id: ac-4
   description: |
     Promotion gate. Gold no-regression-or-lift (expect ~+0.6pp: the 6 migrated
@@ -122,6 +110,16 @@ acceptance_criteria:
     does not steal word/categorical columns). NO retrain in this spec. A GO ships
     the leaf + recovery + gold migration together; a corpus-honest NO-GO tightens
     the ac-2 gating (header corroboration / closed-set threshold) and re-gates.
-  ac_type: observation
   gate: true
   checked: false
+  ac_type: observation
+memories_considered:
+- key: categorical-is-a-residual-category
+  disposition: adopted
+  reason: Anchors the no-retrain decision — a closed-set value-determinable type belongs in Sharpen recovery, not a flat-softmax output; retraining for it risks the residual-attractor collateral.
+- key: catastrophic-forgetting-cure-is-train-time
+  disposition: adopted
+  reason: The 0-for-6 additive-retrain history is why this ships as a deterministic rule + taxonomy add rather than a retrain.
+- key: cardinality-boundary-error-is-real
+  disposition: adopted
+  reason: Bounds the ambition honestly — this is the diminishing-returns end of the rule/taxonomy lever (~+0.6pp), not a ceiling break.
