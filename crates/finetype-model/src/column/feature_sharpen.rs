@@ -88,7 +88,7 @@ pub(crate) fn feature_sharpen(result: &mut ColumnResult, column_features: &Colum
         && feat_dot_segments < 1.1
         && feat_alpha_ratio >= 0.8
     {
-        result.label = "representation.discrete.categorical".to_string();
+        result.label = "representation.text.word".to_string();
         result.confidence = result.confidence.max(0.6);
         result.disambiguation_applied = true;
         result.disambiguation_rule = Some(format!(

@@ -328,19 +328,19 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
             }
             // Language — programming or natural language names
             "language" | "lang" | "programming language" | "spoken language" => {
-                return Some("representation.discrete.categorical");
+                return Some("representation.text.word");
             }
             // Sport / athletic discipline
             "sport" | "discipline" | "event type" | "game type" => {
-                return Some("representation.discrete.categorical");
+                return Some("representation.text.word");
             }
             // Species / taxonomy
             "species" | "genus" | "taxon" | "breed" | "variety" => {
-                return Some("representation.discrete.categorical");
+                return Some("representation.text.word");
             }
             // Exchange — financial exchange names
             "exchange" | "stock exchange" | "market" | "bourse" => {
-                return Some("representation.discrete.categorical");
+                return Some("representation.text.word");
             }
             "latitude" | "lat" => {
                 return Some("geography.coordinate.latitude");
@@ -435,7 +435,7 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
             // Occupation / job title — collapsed to categorical
             "occupation" | "job title" | "jobtitle" | "job" | "profession" | "role"
             | "position" => {
-                return Some("representation.discrete.categorical");
+                return Some("representation.text.word");
             }
             // Subcountry / subregion — removed (v15, Option C keyword audit).
             // Model predicts region correctly for subcountry columns; these exact
@@ -443,7 +443,7 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
             // Let the model decide from values.
             // Embarked / boarding columns — categorical
             "embarked" | "boarded" | "departed" | "terminal" | "gate" => {
-                return Some("representation.discrete.categorical");
+                return Some("representation.text.word");
             }
             // Ticket / cabin — alphanumeric identifiers
             "ticket" | "ticket number" | "ticketno" => {

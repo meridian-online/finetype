@@ -444,7 +444,7 @@ pub(crate) fn value_sharpen(
             let d = distinct.len();
             if (2..=12).contains(&d) && (d as f32 / n as f32) <= 0.6 {
                 return Some((
-                    "representation.discrete.categorical".to_string(),
+                    "representation.text.word".to_string(),
                     format!("text_vocab_override:distinct={}/{}", d, n),
                 ));
             }
@@ -504,7 +504,7 @@ pub(crate) fn schema_fail_demotion(
     unique.sort_unstable();
     unique.dedup();
     let fallback = if (1..=20).contains(&unique.len()) {
-        "representation.discrete.categorical"
+        "representation.text.word"
     } else {
         "representation.identifier.alphanumeric_id"
     };
@@ -629,7 +629,7 @@ pub(crate) fn sharpen_attractor_demotion(
         unique.dedup();
         if (1..=20).contains(&unique.len()) {
             return Some((
-                "representation.discrete.categorical".to_string(),
+                "representation.text.word".to_string(),
                 format!("attractor_demotion_cardinality:{}", result_label),
             ));
         }
@@ -654,7 +654,7 @@ pub(crate) fn sharpen_select_fallback(
             "representation.numeric.integer_number".to_string()
         }
     } else if is_text {
-        "representation.discrete.categorical".to_string()
+        "representation.text.word".to_string()
     } else if is_code {
         "representation.alphanumeric.alphanumeric_id".to_string()
     } else {
@@ -1147,7 +1147,7 @@ pub(crate) fn disambiguate_boolean_override(
             };
             if !is_boolean_set {
                 return Some((
-                    "representation.discrete.categorical".to_string(),
+                    "representation.text.word".to_string(),
                     "boolean_override_single_char_categorical".to_string(),
                 ));
             }
@@ -1926,7 +1926,7 @@ pub(crate) fn disambiguate_attractor_demotion(
         unique.dedup();
         if (1..=20).contains(&unique.len()) {
             return Some((
-                "representation.discrete.categorical".to_string(),
+                "representation.text.word".to_string(),
                 format!("attractor_demotion_cardinality:{}", top_label),
             ));
         }
@@ -2034,7 +2034,7 @@ pub(crate) fn select_fallback(
             "representation.numeric.integer_number".to_string()
         }
     } else if is_text {
-        "representation.discrete.categorical".to_string()
+        "representation.text.word".to_string()
     } else if is_code {
         "representation.alphanumeric.alphanumeric_id".to_string()
     } else {

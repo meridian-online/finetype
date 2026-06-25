@@ -209,9 +209,6 @@ const PERSON_NAME_HINTS: &[&str] = &[
     "identity.person.first_name",
 ];
 
-/// The categorical (enum) catch-all label. Used by the fusion cardinality gate.
-const CATEGORICAL_LABEL: &str = "representation.discrete.categorical";
-
 /// Max fraction of a column's values that may contain internal whitespace for it
 /// to be treated as login-handle-shaped (username) rather than person names.
 /// Corpus-grounded (spec 2026-06-17-full-name-username-veto ac-00): `author`
@@ -292,7 +289,6 @@ const HARDCODED_GENERIC_LABELS: &[&str] = &[
     "representation.numeric.integer_number",
     "representation.numeric.decimal_number",
     "representation.identifier.increment",
-    "representation.discrete.categorical",
     "datetime.component.day_of_month",
     // Username/phone are common catch-alls for unrecognized text
     "identity.person.username",
@@ -985,25 +981,12 @@ impl ColumnClassifier {
     /// Called before returning from classification methods to ensure the field is always
     /// computed on the final (post-hint, post-demotion) label.
     fn finalize_is_generic(&self, result: &mut ColumnResult) {
-        // Enum reframe (choice 0102 / spec 2026-06-17-enum-accuracy-reframe): retire
-        // `representation.discrete.categorical` as an EMITTED label. It is a
-        // representation property (bounded enum domain), surfaced separately as
-        // x-finetype-enum, not a competing semantic leaf — and as a flat-softmax
-        // residual it is the v23-explosion attractor (memory categorical-is-a-residual-
-        // category). The Sharpen rules still compute it internally — crucially the
-        // fusion cardinality gate (CATEGORICAL_LABEL above) still demotes over-emitted
-        // categorical to a specific type BEFORE this point — so we remap only the
-        // surviving residual to the honest text residual `word`. Single output-boundary
-        // chokepoint (every classify path calls finalize_is_generic). RHH-disableable
-        // for A/B and instant revert; the deeper rule deletion is a gated follow-up.
-        if result.label == CATEGORICAL_LABEL && !rhh::is_disabled("enum_reframe_residual") {
-            result.label = "representation.text.word".to_string();
-            result.disambiguation_applied = true;
-            result.disambiguation_rule = Some(match result.disambiguation_rule.take() {
-                Some(r) => format!("enum_reframe_residual<-{r}"),
-                None => "enum_reframe_residual".to_string(),
-            });
-        }
+        // `representation.discrete.categorical` was retired as an emitted label
+        // (choice 0102): enum-ness is the orthogonal `x-finetype-enum` domain
+        // property (detected value-side at profile time), not a competing leaf.
+        // The Sharpen producers now emit the honest text residual `word` directly
+        // (choice 0107 stage 3), and the multi-branch model does not predict
+        // categorical — so there is no sentinel left to reframe here.
         result.is_generic = is_generic_prediction(
             &result.label,
             &result.disambiguation_rule,

@@ -147,31 +147,15 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
         return None;
     }
 
-    // vocab-shape: a small vocabulary, genuinely repeated. Enum reframe (choice 0102 /
-    // spec 2026-06-17-enum-accuracy-reframe): `categorical` is retired as an emitted
-    // label — a bounded vocabulary with no semantic type is the honest text residual
-    // `word`; its bounded-ness is surfaced separately as the x-finetype-enum property.
-    // Honours the same RHH kill switch as the finalize-stage remap (read inline — core
-    // has no `rhh` module) so `RHH_DISABLE_HINTS=enum_reframe_residual` reverts the WHOLE
-    // reframe to pre-0102 behaviour (both the finalize remap and this fallback).
+    // vocab-shape: a small vocabulary, genuinely repeated. `categorical` is retired
+    // as an emitted label (choice 0102) — a bounded vocabulary with no semantic type
+    // is the honest text residual `word`; its bounded-ness is surfaced separately as
+    // the x-finetype-enum property.
     if n >= 4 && (2..=12).contains(&distinct.len()) && distinct_ratio <= 0.6 {
-        return Some(if enum_reframe_disabled() {
-            "representation.discrete.categorical"
-        } else {
-            "representation.text.word"
-        });
+        return Some("representation.text.word");
     }
 
     None
-}
-
-/// `true` when `RHH_DISABLE_HINTS` lists `enum_reframe_residual` — reverts the enum
-/// reframe (choice 0102) to pre-0102 categorical emission. Inline twin of
-/// `finetype_model::rhh::is_disabled` (core cannot depend on the model crate).
-fn enum_reframe_disabled() -> bool {
-    std::env::var("RHH_DISABLE_HINTS")
-        .map(|v| v.split(',').any(|s| s.trim() == "enum_reframe_residual"))
-        .unwrap_or(false)
 }
 
 #[cfg(test)]

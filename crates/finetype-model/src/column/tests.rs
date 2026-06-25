@@ -917,7 +917,7 @@ fn test_boolean_override_single_char_categorical() {
     let result = disambiguate_boolean_override(&values, &top_labels);
     assert!(result.is_some());
     let (label, rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert_eq!(rule, "boolean_override_single_char_categorical");
 }
 
@@ -1086,19 +1086,19 @@ fn test_header_hint_categorical() {
     // text types confused with region/country
     assert_eq!(
         header_hint("language"),
-        Some("representation.discrete.categorical")
+        Some("representation.text.word")
     );
     assert_eq!(
         header_hint("sport"),
-        Some("representation.discrete.categorical")
+        Some("representation.text.word")
     );
     assert_eq!(
         header_hint("species"),
-        Some("representation.discrete.categorical")
+        Some("representation.text.word")
     );
     assert_eq!(
         header_hint("exchange"),
-        Some("representation.discrete.categorical")
+        Some("representation.text.word")
     );
 }
 
@@ -1790,7 +1790,7 @@ fn r32_vocab_overrides_word() {
         "R32 should fire on a small repeated vocab"
     );
     let (label, rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert!(rule.starts_with("text_vocab_override:"));
 }
 
@@ -2021,11 +2021,11 @@ fn test_header_hint_ticket_cabin() {
 fn test_header_hint_embarked() {
     assert_eq!(
         header_hint("Embarked"),
-        Some("representation.discrete.categorical")
+        Some("representation.text.word")
     );
     assert_eq!(
         header_hint("terminal"),
-        Some("representation.discrete.categorical")
+        Some("representation.text.word")
     );
 }
 
@@ -2794,7 +2794,7 @@ fn test_attractor_cardinality_demotion() {
         "Should demote first_name with 4 unique values"
     );
     let (label, rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert!(rule.starts_with("attractor_demotion_cardinality:"));
 }
 
@@ -2817,7 +2817,7 @@ fn test_attractor_cardinality_single_value() {
         "Should demote first_name with 1 unique value"
     );
     let (label, rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert!(rule.starts_with("attractor_demotion_cardinality:"));
 }
 
@@ -2886,7 +2886,7 @@ representation.scientific.measurement_unit:
         Some(&taxonomy),
     );
     let (label, rule) = result.expect("network codes should demote off measurement_unit");
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert!(rule.starts_with("schema_fail_demotion:"));
 }
 
@@ -3032,7 +3032,7 @@ datetime.offset.utc:
     let taxonomy = Taxonomy::from_yaml(yaml).unwrap();
     let result = value_sharpen(&values, "datetime.offset.utc", 0.9, Some(&taxonomy));
     let (label, rule) = result.expect("integers should demote off datetime.offset.utc");
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert!(rule.starts_with("schema_fail_demotion:"));
 }
 
@@ -3190,7 +3190,7 @@ fn test_select_fallback_text() {
     ];
 
     let result = select_fallback(&votes, false, true, false, &values);
-    assert_eq!(result, "representation.discrete.categorical");
+    assert_eq!(result, "representation.text.word");
 }
 
 #[test]
@@ -3667,7 +3667,7 @@ fn test_attractor_first_name_cardinality_unchanged() {
         "first_name with 3 unique values should still be demoted (no locale validators)"
     );
     let (label, rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
     assert!(
         rule.starts_with("attractor_demotion_cardinality:"),
         "Should demote via cardinality signal, got: {}",
@@ -4679,12 +4679,12 @@ fn test_header_hint_priority_hardcoded_first() {
     // With hardcoded-first, header_hint should win
     assert_eq!(
         header_hint("job_title"),
-        Some("representation.discrete.categorical"),
+        Some("representation.text.word"),
         "job_title should hint to categorical (hardcoded)"
     );
     assert_eq!(
         header_hint("occupation"),
-        Some("representation.discrete.categorical"),
+        Some("representation.text.word"),
         "occupation should hint to categorical (hardcoded)"
     );
 }
@@ -5778,7 +5778,7 @@ fn test_sharpen_f6_extension_to_categorical_empty_votes() {
     feature_sharpen(&mut result, &cf);
 
     assert_eq!(
-        result.label, "representation.discrete.categorical",
+        result.label, "representation.text.word",
         "F6 should fallback to categorical with single-entry votes"
     );
     assert!(result.disambiguation_applied);
@@ -5832,7 +5832,7 @@ fn test_sharpen_r11_categorical_single_vote() {
         "R11 should fire for low-cardinality categorical values"
     );
     let (label, _rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
 }
 
 // AC-3: value_sharpen — R12 numeric disambiguation with single-entry votes
@@ -5937,7 +5937,7 @@ fn test_sharpen_attractor_text_low_confidence_demotes_to_categorical() {
         "Low confidence text attractor should demote"
     );
     let (label, _rule) = result.unwrap();
-    assert_eq!(label, "representation.discrete.categorical");
+    assert_eq!(label, "representation.text.word");
 }
 
 #[test]
