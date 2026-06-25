@@ -4,7 +4,7 @@
 
 > **Early Release** — FineType is under active development. Expect breaking changes to taxonomy labels, CLI arguments, library APIs, and model formats between releases. Pin to a specific version if stability matters for your use case.
 
-Precision format detection for text data. FineType classifies strings into a rich taxonomy of 250 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
+Precision format detection for text data. FineType classifies strings into a rich taxonomy of 245 semantic types — each type is a **transformation contract** that guarantees a DuckDB cast expression will succeed.
 
 ```
 $ finetype infer -i "192.168.1.1"
@@ -19,7 +19,7 @@ identity.person.email
 
 ## Features
 
-- **240 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
+- **245 semantic types** across 7 domains — dates, times, IPs, emails, UUIDs, financial identifiers, currencies, geospatial formats, medical codes, and more
 - **Transformation contracts** — each type maps to a DuckDB SQL expression that guarantees successful parsing. 99.9% actionability across 120 tested types.
 - **Locale-aware** — validates 65+ locales for postal codes, 46+ for phone numbers, 32+ for month/day names
 - **MCP server** — `finetype mcp` exposes type inference to AI agents via [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -129,25 +129,30 @@ The MCP tool surface mirrors the CLI (one capability surface, enforced by a pari
 
 ### As a Library
 
+The shipped model is the column-level multi-branch classifier paired with a
+Model2Vec header encoder:
+
 ```rust
-use finetype_model::Classifier;
+use finetype_model::{ColumnClassifier, ColumnConfig, Model2VecResources, MultiBranchClassifier};
 
-let classifier = Classifier::load("models/default")?;
-let result = classifier.classify("hello@example.com")?;
+let mb = MultiBranchClassifier::load("models/default")?;
+let mut classifier = ColumnClassifier::with_multi_branch(mb, ColumnConfig::default());
+classifier.set_model2vec(Model2VecResources::load("models/model2vec")?);
 
+let result = classifier.classify_column(&["hello@example.com".to_string()])?;
 println!("{} (confidence: {:.2})", result.label, result.confidence);
 // → identity.person.email (confidence: 0.97)
 ```
 
 ## Taxonomy
 
-FineType recognizes **250 types** across **7 domains**:
+FineType recognizes **245 types** across **7 domains**:
 
 | Domain | Types | Examples |
 |--------|-------|----------|
-| `datetime` | 84 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (32+ locales) |
-| `representation` | 33 | Integers, floats, booleans, numeric codes, hex colors, JSON, CAS numbers, SMILES, InChI |
-| `technology` | 26 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
+| `datetime` | 87 | ISO 8601, RFC 2822, Unix timestamps, CJK dates, Apache CLF, timezones, month/day names (32+ locales) |
+| `representation` | 32 | Integers, floats, booleans, numeric codes, hex colors, JSON, CAS numbers, SMILES, InChI |
+| `technology` | 29 | IPv4/v6, MAC, URLs, UUIDs, ULIDs, DOIs, hashes, JWTs, AWS ARNs, Docker refs, CIDRs, git SHAs |
 | `identity` | 33 | Names, emails, phone numbers (46+ locales), credit cards, SSNs, VINs, medical codes (ICD-10, CPT, LOINC) |
 | `finance` | 28 | IBAN, SWIFT/BIC, ISIN, CUSIP, SEDOL, LEI, FIGI, currency amounts (7 format variants), routing numbers |
 | `geography` | 25 | Lat/lon, countries, cities, postal codes (65+ locales), WKT, GeoJSON, H3, geohash, Plus Codes, MGRS |
@@ -161,18 +166,19 @@ See [`labels/`](labels/) for the complete taxonomy definitions.
 
 ## Performance
 
-| Model | Profile Eval | Actionability | Classes |
-|-------|----------|---------|---------|
-| **Multi-branch→Sharpen** (default) | **81.6% label** (155/190) | **99.9%** | **240** |
-| Sense→Sharpen (legacy) | 98.9% label (188/190) | 99.9% | 240 |
-
-**Profile eval:** 29 real-world datasets, 190 format-detectable columns. **Actionability:** 232,321/232,541 values transformed successfully across 120 types.
+FineType runs a two-stage pipeline: a **semantic** classifier (the multi-branch
+model) predicts a broad type, then a **deterministic** refinement layer
+(value-based rules and vetoes) sharpens it to a leaf type and enforces the
+transformation contract.
 
 | Metric | Value |
 |--------|-------|
-| Model load time | 66 ms (cold), 25-30 ms (warm) |
-| Single inference | p50=26 ms, p95=41 ms (includes CLI startup) |
-| Batch throughput | 600-750 values/sec on CPU |
+| Accuracy | 0.80 on the 931-column human-verified gold corpus |
+| Actionability | 99.9% (232,321/232,541 values transformed across 120 types) |
+| Model classes | 240 |
+| Model load time | 66 ms (cold), 25–30 ms (warm) |
+| Single inference | p50=26 ms, p95=41 ms (incl. CLI startup) |
+| Batch throughput | 600–750 values/sec on CPU |
 | Memory footprint | 8.5 MB peak RSS |
 
 ## Known Limitations
