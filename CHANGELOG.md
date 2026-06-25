@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.37] - 2026-06-25
+
 ### Added
 
 - **New type `datetime.offset.timezone_abbreviation`** (EST/EDT/CEST/GMT/UTC/…) mined from the
