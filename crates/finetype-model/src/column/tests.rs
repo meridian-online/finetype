@@ -3333,7 +3333,11 @@ datetime.component.year:
 
     // Too few values to judge → no contradiction.
     let two: Vec<String> = vec!["3.14", "2.71"].into_iter().map(String::from).collect();
-    assert!(!sample_contradicts_label(&taxonomy, "datetime.component.year", &two));
+    assert!(!sample_contradicts_label(
+        &taxonomy,
+        "datetime.component.year",
+        &two
+    ));
 }
 
 #[test]

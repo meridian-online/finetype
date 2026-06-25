@@ -413,10 +413,20 @@ fn label_validates_sample(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool
 /// universal validator that fewer than half the non-empty values pass. The
 /// reliable-NO direction of the validation asymmetry (memory
 /// `validation-gate-asymmetry`): used only to DECLINE a header-hint override the
-/// values disprove, never to assert a type. Mirrors the profile veto's 0.5
-/// threshold and `country_code_corroboration`'s `get_validator` gate. Returns
-/// false when the leaf has no universal validator (locale-specific or
-/// validator-less types — no evidence either way, so the hint is left to stand).
+/// values disprove, never to assert a type. `country_code_corroboration`'s
+/// `get_validator` gate; returns false when the leaf has no universal validator
+/// (locale-specific or validator-less types — no evidence either way, so the
+/// hint is left to stand).
+///
+/// The bar is NEAR-TOTAL contradiction (≤10% pass), not a simple majority. Some
+/// universal validators are imperfect — they reject genuine members (the `url`
+/// pattern rejects some valid URLs, the `country_code` enum some real codes, the
+/// `utc` offset pattern a real `+05:00`). At a 0.5 bar those imprecise validators
+/// wrongly block a CORRECT hint (gold A/B: href→url, Country Code→country_code,
+/// a real utc_offset all regressed). The genuine over-emits this guard targets —
+/// `year` on decimals, `offset.utc` on millisecond integers, `url` on msg-ids —
+/// pass their hinted validator at ~0%, so the tight bar keeps every recovery
+/// while dropping the imperfect-validator regressions.
 fn sample_contradicts_label(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bool {
     let Some(validator) = tax.get_validator(leaf) else {
         return false;
@@ -430,7 +440,7 @@ fn sample_contradicts_label(tax: &Taxonomy, leaf: &str, sample: &[String]) -> bo
         return false;
     }
     let pass = non_empty.iter().filter(|v| validator.is_valid(v)).count();
-    (pass as f64) / (non_empty.len() as f64) < 0.5
+    (pass as f64) / (non_empty.len() as f64) <= 0.10
 }
 
 fn values_form_increment(values: &[String]) -> Option<bool> {
@@ -2736,18 +2746,34 @@ impl ColumnClassifier {
 
         // Value-corroboration (spec 2026-06-25-sharpen-stage-audit ac-1). The
         // deprecated regex header_hint table (decision 0042) substring-matches
-        // compound headers — "priceEpsCurrentYear"→year, "utc_offset"→offset.utc,
-        // "...link"→url, "epoch_number"→unix_seconds — and overrides a now-correct
-        // value-based Sense label with a type the column's VALUES disprove. The
-        // override then stands wrong or is hard-vetoed to `unknown`. Decline any
-        // override the values outright contradict (the hinted type has a universal
-        // validator the sample fails <50%): the model's value-based label was right.
-        // Reliable-NO direction only — demotion-safe, never asserts. Skips
-        // validator-less / locale-specific hinted types (no evidence). The
-        // `result.label == hinted_type` agreement case already returned above, so
-        // this only ever blocks a genuine override. RHH-disableable. Measured on
-        // gold: recovers year/utc_offset/url/epoch breaks in the ac-1 33.
-        if !rhh::is_disabled("header_hint_value_corroboration") {
+        // compound headers — "priceEpsCurrentYear"/"CitesPerYear"/"(year)"→year,
+        // "epoch_number"→unix_seconds — and overrides a now-correct value-based
+        // Sense label with a type the column's VALUES disprove; the override then
+        // stands wrong or is hard-vetoed to `unknown`. Decline any override whose
+        // hinted type the values outright contradict (its universal validator
+        // passes ≤10%): the model's value-based label was right. Reliable-NO
+        // direction only — demotion-safe, never asserts. The `result.label ==
+        // hinted_type` agreement case already returned above, so this only ever
+        // blocks a genuine override. RHH-disableable.
+        //
+        // SCOPED to labels whose universal validator reliably separates a real
+        // member from an over-emit (gold A/B, attention model): year + epoch.
+        // The broad guard was net +6 but NOT gold-clean — the `url`, `offset.utc`,
+        // `country_code` and `iana` universal validators reject their own genuine
+        // members at ~0% (href→url, a real utc_offset→utc, "Country Code"→
+        // country_code all regressed), so pass-rate cannot tell a true
+        // contradiction from a real member there. Those clusters need per-label
+        // value tests / validator fixes (see output/sharpen-audit/ac1_measurement.md).
+        // Same scoping discipline as R32 (`schema_fail_demotion`): a closed label
+        // set cannot regress unrelated columns.
+        const CORROBORATION_SCOPE: &[&str] = &[
+            "datetime.component.year",
+            "datetime.epoch.unix_seconds",
+            "datetime.epoch.unix_milliseconds",
+        ];
+        if !rhh::is_disabled("header_hint_value_corroboration")
+            && CORROBORATION_SCOPE.contains(&hinted_type)
+        {
             if let Some(tax) = self.taxonomy.as_ref() {
                 if sample_contradicts_label(tax, hinted_type, sample) {
                     return;
