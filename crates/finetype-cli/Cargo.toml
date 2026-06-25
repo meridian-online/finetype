@@ -15,10 +15,6 @@ name = "finetype"
 path = "src/main.rs"
 
 [[bin]]
-name = "extract-features"
-path = "src/bin/extract_features.rs"
-
-[[bin]]
 name = "train-disambiguator"
 path = "src/bin/train_disambiguator.rs"
 

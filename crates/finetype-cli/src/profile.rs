@@ -156,11 +156,7 @@ pub(crate) fn cmd_profile(
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy models only.
-    if !column_classifier.has_multi_branch() {
-        wire_sense(&mut column_classifier);
-        wire_sibling_context(&mut column_classifier);
-    }
+    // Legacy (non-multi-branch) models: no header enrichment.
     // Multi-branch path: wire Model2Vec + sibling context for header enrichment
     if column_classifier.has_multi_branch() {
         wire_model2vec_and_siblings(&mut column_classifier);

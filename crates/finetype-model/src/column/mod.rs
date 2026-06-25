@@ -13,12 +13,10 @@
 use crate::entity::EntityClassifier;
 use crate::features::{extract_features, FEATURE_DIM};
 use crate::inference::{ClassificationResult, InferenceError, ValueClassifier};
-use crate::label_category_map::LabelCategoryMap;
 use crate::model2vec_shared::Model2VecResources;
 use crate::multi_branch::MultiBranchClassifier;
 use crate::rhh;
 use crate::semantic::SemanticHintClassifier;
-use crate::sense::{BroadCategory, EntitySubtype, SenseClassifier};
 use crate::sibling_context::SiblingContextAttention;
 use finetype_core::{Designation, Taxonomy};
 use std::collections::HashMap;
@@ -582,15 +580,8 @@ pub struct ColumnClassifier {
     /// check: if the column is confidently non-person, demotes to entity_name.
     /// Bypassed when Sense is active (Sense entity subtype replaces this).
     entity_classifier: Option<EntityClassifier>,
-    /// Optional Sense classifier for broad semantic category prediction.
-    /// When present, enables the Sense→Sharpen pipeline in classify_column_with_header.
-    sense: Option<SenseClassifier>,
-    /// Shared Model2Vec resources for Sense encoding.
-    /// Required when `sense` is Some.
+    /// Shared Model2Vec resources for sibling-context header encoding (multi-branch).
     model2vec: Option<Model2VecResources>,
-    /// Label → category mapping for Sense output masking.
-    /// Required when `sense` is Some.
-    label_map: Option<LabelCategoryMap>,
     /// Optional sibling-context attention module.
     /// When present and Sense is active, enriches column header embeddings with
     /// cross-column context before Sense classification. Requires `model2vec` to
@@ -619,9 +610,7 @@ impl ColumnClassifier {
             taxonomy: None,
             skip_sharpen: false,
             entity_classifier: None,
-            sense: None,
             model2vec: None,
-            label_map: None,
             sibling_context: None,
             multi_branch: None,
         }
@@ -648,9 +637,7 @@ impl ColumnClassifier {
             semantic_hint: Some(semantic),
             taxonomy: None,
             entity_classifier: None,
-            sense: None,
             model2vec: None,
-            label_map: None,
             sibling_context: None,
             multi_branch: None,
             skip_sharpen: false,
@@ -681,32 +668,11 @@ impl ColumnClassifier {
         self.entity_classifier = Some(entity);
     }
 
-    /// Attach a Sense classifier with its required resources.
-    ///
-    /// When all three are present, `classify_column_with_header` uses the
-    /// Sense→Sharpen pipeline instead of the legacy header-hint path.
-    /// `classify_column` (no header) is unchanged.
-    pub fn set_sense(
-        &mut self,
-        sense: SenseClassifier,
-        model2vec: Model2VecResources,
-        label_map: LabelCategoryMap,
-    ) {
-        self.sense = Some(sense);
-        self.model2vec = Some(model2vec);
-        self.label_map = Some(label_map);
-    }
-
-    /// Check whether the Sense→Sharpen pipeline is active.
-    pub fn has_sense(&self) -> bool {
-        self.sense.is_some() && self.model2vec.is_some() && self.label_map.is_some()
-    }
-
     /// Attach a sibling-context attention module.
     ///
-    /// When present and Sense is active, `classify_columns_with_context` will
-    /// encode all column headers with Model2Vec, run sibling-context attention
-    /// to enrich them, then pass enriched headers to Sense.
+    /// When present (multi-branch), `classify_columns_with_context` encodes all
+    /// column headers with Model2Vec, runs sibling-context attention to enrich
+    /// them, then feeds the enriched header into the multi-branch header branch.
     pub fn set_sibling_context(&mut self, sibling: SiblingContextAttention) {
         self.sibling_context = Some(sibling);
     }
@@ -744,9 +710,7 @@ impl ColumnClassifier {
             semantic_hint: None,
             taxonomy: None,
             entity_classifier: None,
-            sense: None,
             model2vec: None,
-            label_map: None,
             sibling_context: None,
             multi_branch: Some(multi_branch),
             skip_sharpen: false,
@@ -1077,14 +1041,14 @@ impl ColumnClassifier {
                 .collect();
         }
 
-        // Sense path requires Sense classifier; multi-branch path doesn't
-        let needs_sense = !self.has_multi_branch();
-        if needs_sense && !self.has_sense() {
+        // Only the multi-branch path consumes sibling-context enrichment; any
+        // other model classifies per-column.
+        let Some(ref mb) = self.multi_branch else {
             return columns
                 .iter()
                 .map(|(values, header)| self.classify_column_with_header(values, header))
                 .collect();
-        }
+        };
 
         let sibling_ctx = self.sibling_context.as_ref().unwrap();
         let m2v = self.model2vec.as_ref().unwrap();
@@ -1096,25 +1060,16 @@ impl ColumnClassifier {
         // Step 2: Run sibling-context attention → enriched [N_cols, D]
         let enriched = sibling_ctx.forward(&header_embs)?;
 
-        // Step 3: For each column, run the active pipeline with enriched header
+        // Step 3: multi-branch with the enriched header (header branch MLP + Sharpen)
         let mut results = Vec::with_capacity(columns.len());
-
-        if let Some(ref mb) = self.multi_branch {
-            // Multi-branch path: enriched header → header branch MLP + Sharpen
-            for (i, (values, header)) in columns.iter().enumerate() {
-                let enriched_header = enriched.get(i)?; // [D]
-                let result =
-                    self.classify_multi_branch_with_enriched(mb, values, header, &enriched_header)?;
-                results.push(result);
-            }
-        } else {
-            // Sense→Sharpen path: enriched header → Sense classification
-            for (i, (values, header)) in columns.iter().enumerate() {
-                let enriched_header = enriched.get(i)?; // [D]
-                let result =
-                    self.classify_sense_sharpen_with_context(values, header, &enriched_header)?;
-                results.push(result);
-            }
+        for (i, (values, header)) in columns.iter().enumerate() {
+            let enriched_header = enriched.get(i)?; // [D]
+            results.push(self.classify_multi_branch_with_enriched(
+                mb,
+                values,
+                header,
+                &enriched_header,
+            )?);
         }
 
         Ok(results)
@@ -1122,13 +1077,9 @@ impl ColumnClassifier {
 
     /// Classify a column of values with an optional header name hint.
     ///
-    /// When the Sense classifier is active, uses the Sense→Sharpen pipeline:
-    /// Sense predicts broad category → CharCNN votes masked to that category →
-    /// entity demotion via Sense subtype → scoped disambiguation rules.
-    /// Header hints, EntityClassifier, and geography protection are all subsumed.
-    ///
-    /// When Sense is absent, falls back to the legacy pipeline:
-    /// CharCNN → vote → disambiguation → entity demotion → header hints.
+    /// When multi-branch is active (the shipped default), uses the multi-branch
+    /// column-level pipeline. Otherwise falls back to the legacy ValueClassifier
+    /// pipeline: CharCNN → vote → disambiguation → entity demotion → header hints.
     pub fn classify_column_with_header(
         &self,
         values: &[String],
@@ -1136,15 +1087,9 @@ impl ColumnClassifier {
     ) -> Result<ColumnResult, InferenceError> {
         // Multi-branch pipeline: when multi-branch is active, use it directly.
         // Multi-branch is column-level (features → MLP → label), bypassing
-        // both ValueClassifier and Sense→Sharpen entirely.
+        // the ValueClassifier path entirely.
         if let Some(ref mb) = self.multi_branch {
             return self.classify_multi_branch(mb, values, header);
-        }
-
-        // Sense→Sharpen pipeline: when Sense is active, use it
-        // instead of the legacy header-hint path.
-        if self.has_sense() {
-            return self.classify_sense_sharpen(values, header);
         }
 
         let mut result = self.classify_column(values)?;
@@ -1429,745 +1374,6 @@ impl ColumnClassifier {
                     .and_then(|t| detect_locale_from_validation(values, &result.label, t));
             }
         }
-
-        self.finalize_is_generic(&mut result);
-        Ok(result)
-    }
-
-    /// Sense → Sharpen pipeline.
-    ///
-    /// 1. Sample 100 values → encode header + first 50 with Model2Vec
-    /// 2. Run Sense for broad category + entity subtype
-    /// 3. Run CharCNN batch on all 100 values
-    /// 4. Masked vote aggregation (only category-eligible labels count)
-    /// 5. Disambiguation rules (scoped to winning category)
-    /// 6. Entity demotion via Sense subtype (replaces Rule 18 + EntityClassifier)
-    /// 7. Post-hoc locale detection
-    fn classify_sense_sharpen(
-        &self,
-        values: &[String],
-        header: &str,
-    ) -> Result<ColumnResult, InferenceError> {
-        self.classify_sense_sharpen_inner(values, header, None)
-    }
-
-    /// Sense → Sharpen with a pre-computed context-enriched header.
-    ///
-    /// Same as `classify_sense_sharpen` but uses the enriched header embedding
-    /// from sibling-context attention instead of encoding the header from scratch.
-    fn classify_sense_sharpen_with_context(
-        &self,
-        values: &[String],
-        header: &str,
-        enriched_header_emb: &candle_core::Tensor,
-    ) -> Result<ColumnResult, InferenceError> {
-        self.classify_sense_sharpen_inner(values, header, Some(enriched_header_emb))
-    }
-
-    /// Inner implementation of the Sense → Sharpen pipeline.
-    ///
-    /// When `enriched_header_emb` is Some, uses the pre-computed context-enriched
-    /// header for Sense classification. When None, encodes the header
-    /// normally via Model2Vec (standard path).
-    fn classify_sense_sharpen_inner(
-        &self,
-        values: &[String],
-        header: &str,
-        enriched_header_emb: Option<&candle_core::Tensor>,
-    ) -> Result<ColumnResult, InferenceError> {
-        let sense = self.sense.as_ref().unwrap();
-        let m2v = self.model2vec.as_ref().unwrap();
-        let label_map = self.label_map.as_ref().unwrap();
-
-        if values.is_empty() {
-            return Ok(ColumnResult {
-                label: "unknown".to_string(),
-                confidence: 0.0,
-                vote_distribution: vec![],
-                disambiguation_applied: false,
-                disambiguation_rule: None,
-                samples_used: 0,
-                detected_locale: None,
-                is_generic: false,
-                column_features: None,
-            });
-        }
-
-        // Step 1: Sample values (same as classify_column)
-        let sample = if values.len() <= self.config.sample_size {
-            values.to_vec()
-        } else {
-            let step = values.len() as f64 / self.config.sample_size as f64;
-            (0..self.config.sample_size)
-                .map(|i| values[(i as f64 * step) as usize].clone())
-                .collect()
-        };
-        let n_samples = sample.len();
-
-        // Step 1b: Extract deterministic features for all sampled values.
-        // Runs before Sense and CharCNN — features are used both for CharCNN
-        // augmentation (when model supports it) and for disambiguation rules.
-        let per_value_features: Vec<[f32; FEATURE_DIM]> =
-            sample.iter().map(|v| extract_features(v)).collect();
-
-        // Compute aggregated column-level features (mean, variance, min, max).
-        // Used by disambiguation rules for column-level decisions.
-        let column_features = aggregate_features(&per_value_features);
-
-        // Step 2: Run Sense — encode header + first 50 values
-        let sense_values: Vec<&str> = sample.iter().take(50).map(|s| s.as_str()).collect();
-        let sense_result = if let Some(enriched_emb) = enriched_header_emb {
-            // use pre-computed context-enriched header embedding
-            sense.classify_with_enriched_header(m2v, enriched_emb, &sense_values)?
-        } else {
-            // Standard path: encode header from scratch
-            let header_opt = if header.is_empty() {
-                None
-            } else {
-                Some(header)
-            };
-            sense.classify(m2v, header_opt, &sense_values)?
-        };
-
-        // Trace point 1: Sense prediction
-        tracing::debug!(
-            column = %header,
-            sense_category = %sense_result.broad_category,
-            sense_confidence = sense_result.broad_confidence,
-            entity_subtype = ?sense_result.entity_subtype,
-            "Sense prediction"
-        );
-
-        // Step 3: Run CharCNN batch on all sampled values.
-        // Pass per-value features for augmented inference when the model supports it.
-        let flat_features: Vec<f32> = per_value_features.iter().flatten().copied().collect();
-        let results =
-            self.classifier
-                .classify_batch_with_features(&sample, &flat_features, FEATURE_DIM)?;
-
-        // Step 4: Aggregate votes — collapse 4-level locale labels to 3-level.
-        let mut vote_counts_3level: HashMap<String, usize> = HashMap::new();
-        let mut locale_votes: HashMap<String, HashMap<String, usize>> = HashMap::new();
-        for result in &results {
-            let (base_label, locale) = strip_locale_suffix(&result.label);
-            *vote_counts_3level
-                .entry(base_label.to_string())
-                .or_default() += 1;
-            if let Some(loc) = locale {
-                *locale_votes
-                    .entry(base_label.to_string())
-                    .or_default()
-                    .entry(loc.to_string())
-                    .or_default() += 1;
-            }
-        }
-
-        // Save unmasked vote distribution for geography rescue (Step 6).
-        // Must be saved BEFORE masking, as masked votes won't contain location
-        // types when Sense routes to Entity category.
-        let unmasked_votes: Vec<(String, usize)> = {
-            let mut v: Vec<(String, usize)> = vote_counts_3level
-                .iter()
-                .map(|(k, v)| (k.clone(), *v))
-                .collect();
-            v.sort_by_key(|b| std::cmp::Reverse(b.1));
-            v
-        };
-
-        // Trace point 2: Raw CharCNN votes before masking
-        tracing::debug!(
-            column = %header,
-            top_votes = ?unmasked_votes.iter().take(5).collect::<Vec<_>>(),
-            total_votes = n_samples,
-            "Raw CharCNN votes (before mask)"
-        );
-
-        // Step 5: Masked vote aggregation — only count votes for types
-        // eligible under the Sense-predicted category.
-        let category = sense_result.broad_category;
-
-        let mut masked_votes: Vec<(String, usize)> = vote_counts_3level
-            .iter()
-            .filter(|(label, _)| label_map.is_eligible(label, category))
-            .map(|(label, count)| (label.clone(), *count))
-            .collect();
-        masked_votes.sort_by_key(|b| std::cmp::Reverse(b.1));
-
-        // Safety valve: fall back to unmasked aggregation when Sense routing
-        // is likely wrong:
-        // 1. All votes masked out (category completely wrong)
-        // 2. Low Sense confidence (<0.75) AND masking removes >40% of total
-        //    votes — Sense is uncertain and masking discards too much signal
-        // 3. Masking removes >90% of votes regardless of Sense confidence —
-        //    when the model overwhelmingly votes for types outside the Sense
-        //    category, the mask is discarding too much signal
-        //    (e.g. earthquake horizontalError: 98% decimal_number masked by Text)
-        let total_unmasked: usize = vote_counts_3level.values().sum();
-        let total_masked: usize = masked_votes.iter().map(|(_, c)| *c).sum();
-        let masked_out_frac = if total_unmasked > 0 {
-            1.0 - (total_masked as f64 / total_unmasked as f64)
-        } else {
-            0.0
-        };
-        let should_fallback = masked_votes.is_empty()
-            || masked_votes[0].1 == 0
-            || (sense_result.broad_confidence < 0.75 && masked_out_frac > 0.4)
-            || masked_out_frac > 0.9;
-        // Trace point 3: Mask application
-        tracing::debug!(
-            column = %header,
-            masked_top_votes = ?masked_votes.iter().take(5).collect::<Vec<_>>(),
-            total_unmasked = total_unmasked,
-            total_masked = total_masked,
-            masked_out_fraction = %format!("{:.2}", masked_out_frac),
-            sense_confidence = sense_result.broad_confidence,
-            safety_valve_fired = should_fallback,
-            "Mask application"
-        );
-
-        let (mut votes, mask_applied) = if should_fallback {
-            let mut all_votes: Vec<(String, usize)> = vote_counts_3level.into_iter().collect();
-            all_votes.sort_by_key(|b| std::cmp::Reverse(b.1));
-            (all_votes, false)
-        } else {
-            (masked_votes, true)
-        };
-
-        // Validation-based candidate elimination: reject candidates
-        // whose JSON Schema validation contract is violated by >50% of sample
-        // values. The type's own contract becomes the arbiter — if a type says
-        // its values look like `^\d{4}-\d{2}-\d{2}T...` and 100% of the column's
-        // values fail that pattern, the model is wrong regardless of confidence.
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            let non_empty_count = sample.iter().filter(|v| !v.trim().is_empty()).count();
-            if non_empty_count >= 3 {
-                let validated: Vec<(String, usize)> = votes
-                    .iter()
-                    .filter(|(label, _)| {
-                        taxonomy
-                            .get_validator(label)
-                            .map(|validator| {
-                                let pass_count = sample
-                                    .iter()
-                                    .filter(|v| validator.is_valid(v.trim()))
-                                    .count();
-                                pass_count as f32 / non_empty_count as f32 >= 0.5
-                            })
-                            .unwrap_or(true) // no validator → keep
-                    })
-                    .cloned()
-                    .collect();
-                // Safety: if ALL eliminated, keep original votes
-                if !validated.is_empty() {
-                    votes = validated;
-                }
-            }
-        }
-
-        let vote_distribution: Vec<(String, f32)> = votes
-            .iter()
-            .map(|(label, count)| (label.clone(), *count as f32 / n_samples as f32))
-            .collect();
-
-        // Majority winner
-        let (majority_label, majority_count) = votes.first().cloned().unwrap_or_default();
-        let majority_fraction = majority_count as f32 / n_samples as f32;
-
-        // Determine dominant locale for the winning type
-        let detected_locale = locale_votes.get(&majority_label).and_then(|locales| {
-            locales
-                .iter()
-                .max_by_key(|(_, count)| *count)
-                .map(|(locale, _)| locale.clone())
-                .filter(|l| l != "UNIVERSAL")
-        });
-
-        // Step 6: Disambiguation rules (same rules, but votes are already scoped)
-        let disambiguation =
-            disambiguate(&sample, &results, &votes, n_samples, self.taxonomy.as_ref());
-
-        let mut result = if let Some((label, rule_name)) = disambiguation {
-            let disambig_locale = locale_votes.get(&label).and_then(|locales| {
-                locales
-                    .iter()
-                    .max_by_key(|(_, count)| *count)
-                    .map(|(locale, _)| locale.clone())
-                    .filter(|l| l != "UNIVERSAL")
-            });
-            let confidence = if rule_name.starts_with("attractor_demotion") {
-                majority_fraction.max(0.5)
-            } else {
-                majority_fraction.max(0.8)
-            };
-            ColumnResult {
-                label,
-                confidence,
-                vote_distribution,
-                disambiguation_applied: true,
-                disambiguation_rule: Some(rule_name),
-                samples_used: n_samples,
-                detected_locale: disambig_locale,
-                is_generic: false,
-                column_features: None,
-            }
-        } else {
-            let confidence = if majority_fraction >= self.config.min_agreement {
-                majority_fraction
-            } else {
-                majority_fraction * 0.5
-            };
-            ColumnResult {
-                label: majority_label,
-                confidence,
-                vote_distribution,
-                disambiguation_applied: mask_applied,
-                disambiguation_rule: if mask_applied {
-                    Some(format!("sense_mask:{}", category))
-                } else {
-                    None
-                },
-                samples_used: n_samples,
-                detected_locale,
-                is_generic: false,
-                column_features: None,
-            }
-        };
-
-        // Attach column features to result for downstream analysis (spike AC-2).
-        result.column_features = Some(column_features.clone());
-
-        // Step 6b: Feature-based disambiguation.
-        // Use aggregated deterministic features to resolve known confusion pairs
-        // that the CharCNN model struggles with.
-        feature_disambiguate(&mut result, &column_features, &votes, n_samples);
-
-        // Step 7: Entity handling via Sense subtype (replaces Rule 18 + EntityClassifier).
-        // When Sense predicts Entity category:
-        //   - Non-person subtype + majority is full_name → demote to entity_name
-        //   - Non-person subtype + other entity type → keep majority
-        //   - Person subtype → keep as-is (no demotion needed)
-        if category == BroadCategory::Entity {
-            if let Some(subtype) = sense_result.entity_subtype {
-                match subtype {
-                    EntitySubtype::Person => {
-                        // Person — keep full_name or other person type as-is
-                    }
-                    _ => {
-                        // Non-person (Place, Organization, CreativeWork)
-                        if result.label == "identity.person.full_name" {
-                            result.label = "representation.text.entity_name".to_string();
-                            result.disambiguation_applied = true;
-                            result.disambiguation_rule =
-                                Some(format!("sense_entity_demotion:{}", subtype));
-                            result.detected_locale = None;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Step 7b: Geography rescue from unmasked votes.
-        // When Sense misroutes (e.g., country names → Temporal or Entity),
-        // location types get masked out. Check unmasked CharCNN votes for
-        // geography signal. Only fire when location types are the PLURALITY
-        // (top vote) in unmasked votes — this ensures CharCNN genuinely sees
-        // geography, not just incidental location votes from text overlap.
-        // Skip when a hardcoded header hint points to a specific non-location,
-        // non-person type (e.g., "publisher" → entity_name should not be
-        // overridden). Person-name hints (full_name, first_name, etc.) are
-        // ambiguous with location names so we still allow rescue for those.
-        //
-        // Step 7b-pre: Header-hint location override.
-        // When the hardcoded header hint IS a location type (country, city,
-        // state, region, continent) but the current result is NOT a location
-        // type, the header is authoritative. This catches Sense misrouting
-        // where CharCNN v12 can't produce enough location votes in unmasked
-        // distribution (e.g., "Afghanistan" → day_of_week, "Albania" →
-        // first_name, so unmasked top vote is NOT a location type). Only
-        // uses LOCATION_TYPES (not address types) to avoid false positives
-        // from keyword matches like "mac_address" → street_address.
-        let header_location_hint = header_hint(header).filter(|h| LOCATION_TYPES.contains(h));
-        if !LOCATION_TYPES.contains(&result.label.as_str()) {
-            if let Some(loc_hint) = header_location_hint {
-                result.label = loc_hint.to_string();
-                result.confidence = result.confidence.max(0.6);
-                result.disambiguation_applied = true;
-                result.disambiguation_rule =
-                    Some(format!("sense_geo_hint_override:{}", header.to_lowercase()));
-            } else {
-                // Original rescue: check unmasked votes for location signal
-                let header_hint_blocks_rescue = header_hint(header).is_some_and(|h| {
-                    !LOCATION_TYPES.contains(&h) && !PERSON_NAME_HINTS.contains(&h)
-                });
-                if !header_hint_blocks_rescue {
-                    if let Some((top_label, top_count)) = unmasked_votes.first() {
-                        if LOCATION_TYPES.contains(&top_label.as_str()) {
-                            let loc_frac = *top_count as f32 / n_samples as f32;
-                            if loc_frac >= 0.15 {
-                                result.label = top_label.clone();
-                                result.confidence = loc_frac.max(0.5);
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule =
-                                    Some(format!("sense_geo_rescue:{}", header.to_lowercase()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Step 7c: Epoch seconds detection.
-        // 10-digit integers in the Unix epoch range (2000-01-01 to 2050-01-01)
-        // are consistently misclassified as NPI or other identity types by
-        // CharCNN. Value-range detection is high-confidence and runs before
-        // header hints to prevent "created_date" → iso_8601 mismatch.
-        if !result.label.starts_with("datetime.") {
-            let epoch_result = detect_epoch_seconds(&sample);
-            if let Some(epoch_label) = epoch_result {
-                result.label = epoch_label;
-                result.confidence = 0.85;
-                result.disambiguation_applied = true;
-                result.disambiguation_rule = Some("epoch_seconds_range_detection".to_string());
-            }
-        }
-
-        // Step 8: Header hint application (complements Sense masking).
-        // Sense narrows the broad category, but header hints resolve
-        // within-category ambiguity. Skipped when Sense entity demotion
-        // was applied (the entity classifier's decision is authoritative).
-        let label_before_hints = result.label.clone();
-        let entity_demoted = result
-            .disambiguation_rule
-            .as_ref()
-            .is_some_and(|r| r.starts_with("sense_entity_demotion"));
-        if !entity_demoted && !header.is_empty() {
-            // Hardcoded first (curated knowledge), then Model2Vec.
-            let hardcoded_hint = header_hint(header).map(|h| h.to_string());
-            let hinted_type: Option<String> = hardcoded_hint.clone().or_else(|| {
-                self.semantic_hint
-                    .as_ref()
-                    .and_then(|sh| sh.classify_header(header))
-                    .map(|r| r.label.clone())
-            });
-            let hint_is_hardcoded = hardcoded_hint.is_some();
-
-            if let Some(hinted_type) = hinted_type.as_deref() {
-                // Already predicts the hinted type — boost confidence
-                if result.label == hinted_type {
-                    result.confidence = (result.confidence + 0.1).min(1.0);
-                } else {
-                    // Measurement disambiguation: height/weight
-                    const MEASUREMENT_TYPES: &[&str] =
-                        &["identity.person.height", "identity.person.weight"];
-                    // Coordinate types that can be confused with measurement data
-                    const COORDINATE_TYPES: &[&str] = &[
-                        "geography.coordinate.latitude",
-                        "geography.coordinate.longitude",
-                    ];
-                    if MEASUREMENT_TYPES.contains(&hinted_type)
-                        && MEASUREMENT_TYPES.contains(&result.label.as_str())
-                    {
-                        result.label = hinted_type.to_string();
-                        result.confidence = 0.9;
-                        result.disambiguation_applied = true;
-                        result.disambiguation_rule = Some(format!(
-                            "sense_header_hint_measurement:{}",
-                            header.to_lowercase()
-                        ));
-                    } else if hinted_type == "representation.numeric.decimal_number"
-                        && COORDINATE_TYPES.contains(&result.label.as_str())
-                    {
-                        // Scientific measurement override: when the
-                        // header contains measurement keywords (pressure,
-                        // temperature, etc.) and the model predicts latitude/
-                        // longitude, the header is authoritative. Small decimal
-                        // values like pressure_atm (0.685-9.544) are in latitude
-                        // range but the header says "pressure", not "latitude".
-                        result.label = hinted_type.to_string();
-                        result.confidence = 0.8;
-                        result.disambiguation_applied = true;
-                        result.disambiguation_rule = Some(format!(
-                            "sense_header_hint_sci_measurement:{}",
-                            header.to_lowercase()
-                        ));
-                    } else {
-                        // Check hint in votes and generic status
-                        let hint_in_votes = result
-                            .vote_distribution
-                            .iter()
-                            .any(|(label, _)| label == hinted_type);
-
-                        let is_generic = is_generic_prediction(
-                            &result.label,
-                            &result.disambiguation_rule,
-                            self.taxonomy.as_ref(),
-                        );
-
-                        // Geography protection: person-name hints don't override
-                        // location types. Uses early-continue pattern
-                        // so non-location cases fall through to general logic.
-                        let mut geo_handled = false;
-                        if PERSON_NAME_HINTS.contains(&hinted_type) {
-                            if LOCATION_TYPES.contains(&result.label.as_str()) {
-                                // Result is already a location type. If the hint
-                                // is a hardcoded person-name hint (e.g., "first_name"
-                                // header → first_name), trust the header over CharCNN's
-                                // location prediction — person names and place names
-                                // overlap in CharCNN vocabulary but the header is
-                                // authoritative.
-                                if hint_is_hardcoded {
-                                    result.label = hinted_type.to_string();
-                                    result.confidence = result.confidence.max(0.6);
-                                    result.disambiguation_applied = true;
-                                    result.disambiguation_rule = Some(format!(
-                                        "sense_header_hint_person_override:{}",
-                                        header.to_lowercase()
-                                    ));
-                                } else {
-                                    result.confidence = result.confidence.max(0.5);
-                                    result.disambiguation_applied = true;
-                                    result.disambiguation_rule = Some(format!(
-                                        "sense_header_hint_location_keep:{}",
-                                        header.to_lowercase()
-                                    ));
-                                }
-                                geo_handled = true;
-                            } else if !hint_is_hardcoded && (is_generic || result.confidence < 0.3)
-                            {
-                                // Model2Vec person-name hint + generic/very-low-confidence →
-                                // check UNMASKED votes for location types. Low confidence
-                                // (<0.3) suggests Sense may have misrouted this column,
-                                // so masked votes are unreliable. Unmasked CharCNN votes
-                                // give the true value-level signal.
-                                // Skip this for hardcoded hints — they're authoritative
-                                // and should fall through to general hint logic.
-                                let top_unmasked_location = unmasked_votes
-                                    .iter()
-                                    .find(|(label, _)| LOCATION_TYPES.contains(&label.as_str()));
-                                if let Some((loc_label, loc_count)) = top_unmasked_location {
-                                    let loc_frac = *loc_count as f32 / n_samples as f32;
-                                    if loc_frac >= 0.10 {
-                                        result.label = loc_label.clone();
-                                        result.confidence = loc_frac.max(0.5);
-                                        result.disambiguation_applied = true;
-                                        result.disambiguation_rule = Some(format!(
-                                            "sense_header_hint_location:{}",
-                                            header.to_lowercase()
-                                        ));
-                                        geo_handled = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Same-domain geographic override:
-                        // when both hint and prediction are location types (e.g.,
-                        // city vs country), the header is authoritative. Hardcoded
-                        // hints (e.g., "Country" → country) override at any
-                        // confidence — the header explicitly names the geo type.
-                        // Model2Vec hints use the original ≤0.90 threshold since
-                        // semantic similarity is less precise.
-                        if !geo_handled
-                            && LOCATION_TYPES.contains(&hinted_type)
-                            && LOCATION_TYPES.contains(&result.label.as_str())
-                            && result.label != hinted_type
-                            && (hint_is_hardcoded || result.confidence <= 0.90)
-                        {
-                            result.label = hinted_type.to_string();
-                            result.confidence = result.confidence.max(0.6);
-                            result.disambiguation_applied = true;
-                            result.disambiguation_rule = Some(format!(
-                                "sense_header_hint_geo_override:{}",
-                                header.to_lowercase()
-                            ));
-                            geo_handled = true;
-                        }
-
-                        // Same-category hardcoded hint override:
-                        // When the hardcoded header hint and prediction share the
-                        // same domain.category (e.g., both datetime.timestamp.*),
-                        // the header is authoritative for distinguishing format
-                        // variants. Headers like "rfc_2822_timestamp" explicitly
-                        // name the format — trust them over CharCNN's inability
-                        // to distinguish similar timestamp formats. Only applies
-                        // when confidence is moderate (≤0.80).
-                        if !geo_handled
-                            && hint_is_hardcoded
-                            && result.label != hinted_type
-                            && result.confidence <= 0.80
-                        {
-                            let hint_category = hinted_type.rsplitn(2, '.').last().unwrap_or("");
-                            let pred_category = result.label.rsplitn(2, '.').last().unwrap_or("");
-                            if !hint_category.is_empty()
-                                && hint_category == pred_category
-                                && hint_category.contains('.')
-                            {
-                                result.label = hinted_type.to_string();
-                                result.confidence = result.confidence.max(0.7);
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_same_category:{}",
-                                    header.to_lowercase()
-                                ));
-                                geo_handled = true;
-                            }
-                        }
-
-                        // Cross-domain hardcoded hint override:
-                        // When a hardcoded hint and prediction differ in domain AND
-                        // the predicted type's base name differs from the hint's base
-                        // name, the header is authoritative. This catches cases where
-                        // structurally identical patterns (5-digit numbers) get
-                        // classified as the wrong type entirely:
-                        //   "postal" → postal_code vs CPT (medical code)
-                        //   "epoch" → unix_seconds vs NPI (medical ID)
-                        //   "cabin" → alphanumeric_id vs ICD10 (medical code)
-                        // Does NOT fire when the base type name matches (e.g.,
-                        // representation.identifier.uuid vs technology.identifier.uuid)
-                        // or when only the domain prefix differs for the same concept.
-                        if !geo_handled && hint_is_hardcoded && result.label != hinted_type {
-                            let hint_domain = hinted_type.split('.').next().unwrap_or("");
-                            let pred_domain = result.label.split('.').next().unwrap_or("");
-                            let hint_base = hinted_type.rsplit('.').next().unwrap_or("");
-                            let pred_base = result.label.rsplit('.').next().unwrap_or("");
-                            if !hint_domain.is_empty()
-                                && !pred_domain.is_empty()
-                                && hint_domain != pred_domain
-                                && hint_base != pred_base
-                            {
-                                result.label = hinted_type.to_string();
-                                result.confidence = result.confidence.max(0.5);
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_cross_domain:{}",
-                                    header.to_lowercase()
-                                ));
-                                geo_handled = true;
-                            }
-                        }
-
-                        // General hint logic (runs for all non-person hints,
-                        // and also for person hints not handled by geography protection)
-                        if !geo_handled {
-                            let original_label = result.label.clone();
-
-                            if (result.confidence < 0.5 || is_generic) && hint_in_votes {
-                                let hint_fraction = result
-                                    .vote_distribution
-                                    .iter()
-                                    .find(|(label, _)| label == hinted_type)
-                                    .map(|(_, frac)| *frac)
-                                    .unwrap_or(0.0);
-
-                                result.label = hinted_type.to_string();
-                                result.confidence = hint_fraction.max(0.6);
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule =
-                                    Some(format!("sense_header_hint:{}", header.to_lowercase()));
-                            } else if is_generic && !hint_in_votes {
-                                // Financial model2vec guard: when model2vec suggests a
-                                // financial type (basis_points, yield, amount variants)
-                                // but the CharCNN saw zero financial signal in values
-                                // (hint NOT in votes), don't override. Headers like
-                                // "points" (vote counts), "yield" (crop yield), "pct"
-                                // (general percentages) trigger false financial hints.
-                                // Only block model2vec financial hints — hardcoded hints
-                                // are curated and handled separately below.
-                                let is_financial_hint = hinted_type.starts_with("finance.");
-                                if is_financial_hint && !hint_is_hardcoded {
-                                    // Model2vec financial hint with no value evidence —
-                                    // skip, let the generic prediction stand.
-                                    tracing::debug!(
-                                        column = %header,
-                                        blocked_hint = %hinted_type,
-                                        current_label = %result.label,
-                                        "Financial model2vec hint blocked (no vote evidence)"
-                                    );
-                                } else {
-                                    result.label = hinted_type.to_string();
-                                    result.confidence = 0.5;
-                                    result.disambiguation_applied = true;
-                                    result.disambiguation_rule = Some(format!(
-                                        "sense_header_hint_generic:{}",
-                                        header.to_lowercase()
-                                    ));
-                                }
-                            } else if hint_is_hardcoded && !hint_in_votes {
-                                // Hardcoded hint authority (refined):
-                                // Hardcoded hints are curated knowledge. Threshold depends
-                                // on domain relationship:
-                                // - Cross-domain (hint=repr, pred=identity): 0.85 threshold
-                                //   because the header encodes semantic knowledge the model
-                                //   lacks (e.g., "age" → integer vs numeric_code at 0.78)
-                                // - Same-domain (hint=datetime, pred=datetime): 0.5 threshold
-                                //   because within-domain the model is more reliable (e.g.,
-                                //   eu_date → dmy_slash vs iso_8601, model at 0.80 is right)
-                                let h_domain = hinted_type.split('.').next().unwrap_or("");
-                                let p_domain = result.label.split('.').next().unwrap_or("");
-                                let threshold = if h_domain != p_domain { 0.85 } else { 0.5 };
-                                if result.confidence < threshold {
-                                    result.label = hinted_type.to_string();
-                                    result.confidence = 0.5;
-                                    result.disambiguation_applied = true;
-                                    result.disambiguation_rule = Some(format!(
-                                        "sense_header_hint_hardcoded:{}",
-                                        header.to_lowercase()
-                                    ));
-                                }
-                            } else if result.confidence < 0.3 && !hint_in_votes {
-                                result.label = hinted_type.to_string();
-                                result.confidence = 0.4;
-                                result.disambiguation_applied = true;
-                                result.disambiguation_rule = Some(format!(
-                                    "sense_header_hint_fallback:{}",
-                                    header.to_lowercase()
-                                ));
-                            }
-
-                            // Re-detect locale if label changed
-                            if result.label != original_label {
-                                if let Some(taxonomy) = self.taxonomy.as_ref() {
-                                    result.detected_locale = detect_locale_from_validation(
-                                        &sample,
-                                        &result.label,
-                                        taxonomy,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Trace point 4: Header hint outcome
-        if result.label != label_before_hints {
-            tracing::debug!(
-                column = %header,
-                hint_rule = ?result.disambiguation_rule,
-                old_label = %label_before_hints,
-                new_label = %result.label,
-                "Header hint applied"
-            );
-        }
-
-        // Step 9: Post-hoc locale detection (unchanged from legacy pipeline)
-        if let Some(taxonomy) = self.taxonomy.as_ref() {
-            if let Some(locale) = detect_locale_from_validation(&sample, &result.label, taxonomy) {
-                result.detected_locale = Some(locale);
-            }
-        }
-
-        // Trace point 6: Final column classification result
-        tracing::debug!(
-            column = %header,
-            final_label = %result.label,
-            confidence = result.confidence,
-            disambiguation_rule = ?result.disambiguation_rule,
-            samples_used = result.samples_used,
-            detected_locale = ?result.detected_locale,
-            "Column classification complete"
-        );
 
         self.finalize_is_generic(&mut result);
         Ok(result)

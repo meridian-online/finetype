@@ -833,7 +833,6 @@ fn cmd_mcp() -> Result<()> {
                 eprintln!("Loaded entity classifier (full_name demotion gate)");
                 cc.set_entity_classifier(entity);
             }
-            wire_sense(&mut cc);
             wire_sibling_context(&mut cc);
             cc
         } else {
@@ -841,7 +840,6 @@ fn cmd_mcp() -> Result<()> {
                 Box::new(char_classifier) as Box<dyn finetype_model::ValueClassifier>,
                 config,
             );
-            wire_sense(&mut cc);
             wire_sibling_context(&mut cc);
             cc
         }
@@ -1567,12 +1565,6 @@ fn cmd_infer(
                 column_classifier.set_taxonomy(taxonomy);
             }
 
-            // Wire up Sense classifier (Sense → Sharpen) for legacy non-multi-branch
-            // models. `infer` classifies a single column, so sibling-context
-            // attention (cross-column) is never invoked — skip its load (card 0006).
-            if !column_classifier.has_multi_branch() {
-                wire_sense(&mut column_classifier);
-            }
             // Multi-branch path: wire Model2Vec for header enrichment, no siblings.
             if column_classifier.has_multi_branch() {
                 wire_model2vec_only(&mut column_classifier);
@@ -1860,12 +1852,6 @@ fn cmd_infer_batch(model: PathBuf, model_type: ModelType, sample_size: usize) ->
         column_classifier.set_taxonomy(taxonomy);
     }
 
-    // Wire up Sense classifier (Sense → Sharpen pipeline) for legacy non-multi-branch models.
-    // Batch infer classifies one column per JSONL line — never the cross-column context path —
-    // so sibling-context attention is dead weight here (card 0006).
-    if !column_classifier.has_multi_branch() {
-        wire_sense(&mut column_classifier);
-    }
     // Multi-branch path: wire Model2Vec for header enrichment, no sibling context.
     if column_classifier.has_multi_branch() {
         wire_model2vec_only(&mut column_classifier);
@@ -2164,37 +2150,6 @@ fn load_entity_classifier(
     None
 }
 
-/// Load the Sense classifier for broad category prediction.
-///
-/// Resolution order:
-///  1. models/sense directory on disk (development)
-///  2. Embedded Sense bytes (release binaries)
-///  3. None — Sense pipeline disabled, uses legacy header hints
-fn load_sense() -> Option<finetype_model::SenseClassifier> {
-    // Try disk-based model first (development workflow)
-    let model_dir = std::path::PathBuf::from("models/sense");
-    if model_dir.join("model.safetensors").exists() {
-        return finetype_model::SenseClassifier::load(&model_dir)
-            .map_err(|e| eprintln!("Warning: Failed to load Sense classifier from disk: {e}"))
-            .ok();
-    }
-
-    // Try embedded model bytes (release binary)
-    #[cfg(feature = "embed-models")]
-    {
-        if embedded::HAS_SENSE_CLASSIFIER {
-            return finetype_model::SenseClassifier::from_bytes(
-                embedded::SENSE_MODEL,
-                embedded::SENSE_CONFIG,
-            )
-            .map_err(|e| eprintln!("Warning: Failed to load embedded Sense classifier: {e}"))
-            .ok();
-        }
-    }
-
-    None
-}
-
 /// Load shared Model2Vec resources (tokenizer + embeddings).
 ///
 /// Resolution order:
@@ -2224,27 +2179,6 @@ fn load_model2vec_resources() -> Option<finetype_model::Model2VecResources> {
     }
 
     None
-}
-
-/// Wire up the Sense classifier into a ColumnClassifier.
-///
-/// Loads Model2VecResources + SenseClassifier + LabelCategoryMap and calls
-/// `set_sense()`. Silently skips if any component is unavailable.
-fn wire_sense(cc: &mut finetype_model::ColumnClassifier) {
-    let sense = match load_sense() {
-        Some(s) => s,
-        None => return,
-    };
-    let m2v = match load_model2vec_resources() {
-        Some(r) => r,
-        None => {
-            eprintln!("Warning: Sense classifier loaded but Model2Vec resources unavailable — Sense disabled");
-            return;
-        }
-    };
-    let label_map = finetype_model::LabelCategoryMap::new();
-    eprintln!("Loaded Sense classifier (broad category prediction)");
-    cc.set_sense(sense, m2v, label_map);
 }
 
 /// Wire Model2Vec + sibling context for multi-branch classifiers.
