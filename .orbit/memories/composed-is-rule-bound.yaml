@@ -1,0 +1,4 @@
+key: composed-is-rule-bound
+body: 'Three independent retrains now confirm the **composed (shipped) metric is rule-bound at ~0.79**, capped by the Sense->Sharpen rule layer, NOT the representation: bigger potion (flat), gte-tiny transformer (Sense 0.502->0.571 / composed tied 0.787), per-value cross-value attention (Sense 0.522->0.561 / composed tied 0.794; spec 2026-06-24-per-value-attention-pooling, choice 0106). Each lifted Sense by +4-7pp and none moved composed. **Implication:** the encoder/pool axis for Sense is exhausted as a path to the shipped number; the real ceiling-break is the rule layer (Sense->composed conversion). Per-value attention ALSO validated as a cheap Sense lever (~80% of gte''s lift at ~2.3ms/col vs 100x). Substrate: output/per-value-attention/RESULT.md, output/embed-frontier/ac02_FINAL_verdict.md. Builds on choice 0096.'
+timestamp: 2026-06-24T22:43:03.67014Z
+labels: []
