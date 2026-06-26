@@ -410,7 +410,6 @@ enum Commands {
         #[arg(long)]
         validation: bool,
     },
-
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
@@ -499,7 +498,6 @@ fn main() -> Result<()> {
             seed,
             localized,
         } => cmd_generate(samples, priority, output, taxonomy, seed, localized),
-
 
         Commands::Taxonomy {
             type_key,

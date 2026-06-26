@@ -1084,22 +1084,10 @@ fn test_header_hint_date() {
 #[test]
 fn test_header_hint_categorical() {
     // text types confused with region/country
-    assert_eq!(
-        header_hint("language"),
-        Some("representation.text.word")
-    );
-    assert_eq!(
-        header_hint("sport"),
-        Some("representation.text.word")
-    );
-    assert_eq!(
-        header_hint("species"),
-        Some("representation.text.word")
-    );
-    assert_eq!(
-        header_hint("exchange"),
-        Some("representation.text.word")
-    );
+    assert_eq!(header_hint("language"), Some("representation.text.word"));
+    assert_eq!(header_hint("sport"), Some("representation.text.word"));
+    assert_eq!(header_hint("species"), Some("representation.text.word"));
+    assert_eq!(header_hint("exchange"), Some("representation.text.word"));
 }
 
 #[test]
@@ -2019,14 +2007,8 @@ fn test_header_hint_ticket_cabin() {
 
 #[test]
 fn test_header_hint_embarked() {
-    assert_eq!(
-        header_hint("Embarked"),
-        Some("representation.text.word")
-    );
-    assert_eq!(
-        header_hint("terminal"),
-        Some("representation.text.word")
-    );
+    assert_eq!(header_hint("Embarked"), Some("representation.text.word"));
+    assert_eq!(header_hint("terminal"), Some("representation.text.word"));
 }
 
 #[test]
