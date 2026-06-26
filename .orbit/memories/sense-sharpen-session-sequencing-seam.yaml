@@ -1,0 +1,6 @@
+key: sense-sharpen-session-sequencing-seam
+body: 'Sequencing the Sense thread and the Sharpen thread (decided 2026-06-27): they meet at two seams — the GOLD RULER (upstream of both) and the SENSE->SHARPEN boundary (Sharpen is downstream). Order that avoids rework: (1) clean the ruler FIRST (re-score live + gold re-adjudication + values re-pull) since both threads measure against gold; (2) ship SWAP-PROOF Sharpen rules now (value-determined checksums/closed-sets survive a Sense swap) but BRACKET the model-COUPLED vetoes (veto-misfire/decline rules co-adapted to the current model) for re-fit AFTER the swap; (3) pull the batch-path latency plumbing FORWARD because it speeds the eval loop both threads use. THIS session = Sharpen + eval win (banked). NEXT session = Sense accuracy (two-stage head) + speed (single-4M, fast-path) from the clean baseline, then re-fit the co-adapted vetoes. Spec 2026-06-27-composed-accuracy-roadmap (tasks step-1..step-5 + next-session marker). Links [[composed-accuracy-ceiling-and-backlog]] [[sense-stage-ceiling-and-free-latency-wins]].'
+timestamp: 2026-06-26T20:59:40.129667Z
+labels:
+- project
+- sequencing

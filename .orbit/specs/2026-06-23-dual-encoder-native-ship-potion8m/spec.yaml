@@ -50,24 +50,6 @@ goal: |
 cards:
 - 0002-semantic-type-detection
 status: open
-resolution: |
-  ac-00 + ac-01 DONE (2026-06-23). Dual-encoder native inference built and verified
-  byte-faithful (value features == offline potion_embed; matrix == HF potion-base-8M;
-  encode == model2vec cos 1.0000). The native gold gate initially looked like a −11pp
-  HALT, but that was a FALSE ALARM from a training-pipeline config bug: potion configs
-  were missing type_index_keys, so native silently zeroed the validation branch while
-  the model was trained on real validation features. Fixed (commit fb44b26: derive the
-  key order from the live taxonomy when absent). CORRECTED result: native gold composed
-  best-of-3 = 0.794, TIES v19 0.797 (within CI), reproducing the offline number.
-  potion-8M is a live candidate on gold. ac-02 corpus-honest gate (faithful, correct
-  binary + working validation branch + categorical→word remap): **NO-GO, 14 triggers**
-  — numeric_code collapse (7,014 confirmed→0), isbn collapse, user_agent 7.2× over-emit,
-  si_number/compact_dmy/etc. Far past the ~4-rule cap → per spec, fix the DATA DRIFT, not
-  rules. Same signature as m2v-244 (whose config HAD the keys → its NO-GO was real, not
-  this bug; the drift is in the shared data blend). FINAL: potion-8M ties v19 on gold but
-  is corpus-honest NO-GO; **STAY ON v19**. Dual-encoder kept as proven infrastructure.
-  Real next bet = fix fresh-retrain data drift (task t-000133e418, premise now validated).
-  See RESULTS_LEDGER.md + ac01-native-verdict.md + memory potion8m-native-halt-veto-exposes-drift.
 labels:
 - architecture
 - embed-branch
