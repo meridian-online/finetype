@@ -2194,10 +2194,12 @@ impl ColumnClassifier {
         result.detected_locale = None;
     }
 
-    /// `structured_string_refinement` (default ON). Three value-determinable types mined
-    /// from the `plain_text` residual (spec 2026-06-19-plain-text-type-discovery):
+    /// `structured_string_refinement` (default ON). Four value-determinable readers. Three
+    /// were mined from the `plain_text` residual (spec 2026-06-19-plain-text-type-discovery):
     /// `technology.filesystem.windows_path`, `technology.internet.message_id`,
-    /// `technology.code.qualified_name`. Each has a precise validator (qualified_name:
+    /// `technology.code.qualified_name`; the fourth, `technology.internet.url`, RECOVERS a
+    /// confident model `url` prediction that header/sibling context demoted to plain_text
+    /// (spec 2026-06-27-composed-accuracy-roadmap). Each has a precise validator (qualified_name:
     /// zero prose false positives across the 447k-column corpus). The shipped 240-dim Sense
     /// model cannot predict them, so — exactly like `datetime_format_refinement` — they are
     /// recovered deterministically in the Sharpen layer, gated so they cannot relocate
@@ -2229,7 +2231,7 @@ impl ColumnClassifier {
             "representation.text.word",
             "unknown",
         ];
-        let readers: [(&str, &[&str]); 3] = [
+        let readers: [(&str, &[&str]); 4] = [
             (
                 "technology.filesystem.windows_path",
                 &[
@@ -2249,6 +2251,13 @@ impl ColumnClassifier {
                     "identity.person.email",
                 ],
             ),
+            // `url` is a RECOVERY, not a residual-mined type: the model predicts url
+            // confidently, but header/sibling context (e.g. a `parent_id` header) demotes a
+            // column of bare URLs to plain_text. Re-assert url where >=90% of values pass the
+            // url validator; the scheme://host mandate self-limits, so prose and bare
+            // hostnames (no scheme) never validate. Mutually exclusive with qualified_name
+            // (dotted reverse-DNS has no scheme/slash). Spec 2026-06-27-composed-accuracy-roadmap.
+            ("technology.internet.url", RESIDUAL),
             ("technology.code.qualified_name", RESIDUAL),
         ];
         for (leaf, fire_on) in readers {
