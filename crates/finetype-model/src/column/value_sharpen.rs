@@ -403,14 +403,31 @@ pub(crate) fn value_sharpen(
     // utc/url columns (which validate ~100%) are untouched. This is the additive
     // hard-negative retrain's job done with a value-based rule instead — see the v24
     // memo: retrain was 0-for-2 and moved the over-emit rather than removing it.
-    // Scoped to these four labels only, so unlike the attractor lists (which also arm
-    // cardinality/confidence signals) it cannot regress unrelated columns. Last-resort
-    // value-based Sharpen (decisions 0038/0048).
+    // Scoped to a closed set of strict-validator labels, so unlike the attractor lists
+    // (which also arm cardinality/confidence signals) it cannot regress unrelated
+    // columns. Last-resort value-based Sharpen (decisions 0038/0048).
+    //
+    // Identifier/code over-emit additions (spec 2026-06-27-composed-accuracy-roadmap,
+    // gold audit): aws_arn / ethereum_address / orcid / cpt / http_method / boolean.terms
+    // are closed-validator types the flat softmax over-emits onto generic alphanumeric
+    // ids (hipc_* / BenchmarkName), status vocabularies (*_status) and boolean-adjacent
+    // columns. A genuine ARN / ORCID / CPT / HTTP-method / boolean-term column validates
+    // ~100%; the offending columns fail the label's own validator ~100%, so the >50% bar
+    // fires cleanly and the cardinality fallback lands the gold residual (alphanumeric_id
+    // for high-card ids, word for small status vocabularies). Same schema-contradicted
+    // demote discipline as utc/url above; the additive hard-negative retrain's job done
+    // with a value-based rule (the over-emit retrains were 0-for-6).
     if result_label == "representation.scientific.measurement_unit"
         || result_label == "geography.coordinate.geohash"
         || result_label == "datetime.offset.utc"
         || result_label == "technology.internet.url"
         || result_label == "geography.index.h3"
+        || result_label == "technology.cloud.aws_arn"
+        || result_label == "finance.crypto.ethereum_address"
+        || result_label == "identity.academic.orcid"
+        || result_label == "identity.medical.cpt"
+        || result_label == "technology.internet.http_method"
+        || result_label == "representation.boolean.terms"
     {
         if let Some(taxonomy) = taxonomy {
             if let Some((label, rule)) = schema_fail_demotion(values, result_label, taxonomy) {
