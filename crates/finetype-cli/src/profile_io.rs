@@ -156,8 +156,13 @@ pub(crate) fn read_csv_input(
     // dialect (honouring an explicit delimiter when given) with `all_varchar`
     // + `null_padding` — short ragged rows are padded with NULLs, the duckdb
     // analogue of the csv crate's `flexible(true)`.
-    let source = if is_parquet {
-        format!("SELECT COLUMNS(*)::VARCHAR FROM read_parquet({input_literal})")
+    // Build the SELECT source. Parquet has no fallback; CSV keeps its `opts`
+    // string so we can retry single-threaded on a parallel-scanner failure.
+    let (source, csv_opts) = if is_parquet {
+        (
+            format!("SELECT COLUMNS(*)::VARCHAR FROM read_parquet({input_literal})"),
+            None,
+        )
     } else {
         let mut opts = String::from("auto_detect=true, all_varchar=true, null_padding=true");
         if let Some(delim) = delimiter {
@@ -166,7 +171,10 @@ pub(crate) fn read_csv_input(
             opts.push_str(", sep=");
             opts.push_str(&crate::sql::sql_quote(&delim.to_string()));
         }
-        format!("SELECT * FROM read_csv({input_literal}, {opts})")
+        (
+            format!("SELECT * FROM read_csv({input_literal}, {opts})"),
+            Some(opts),
+        )
     };
 
     // Re-emit as canonical CSV on the child's stdout via duckdb's `-csv` output
@@ -182,24 +190,39 @@ pub(crate) fn read_csv_input(
     // outside NULLISH_TOKENS (e.g. "\\N"), a real NULL would survive as a kept
     // value and corrupt the column. Pinning it makes ingestion environment-
     // independent.
-    let query = format!("{source};");
-
-    let out = std::process::Command::new("duckdb")
-        .arg("-csv")
-        .arg("-c")
-        .arg(".nullvalue ''")
-        .arg("-c")
-        .arg(&query)
-        .output();
-    let out = match out {
-        Ok(o) => o,
-        Err(e) => {
-            anyhow::bail!(
-                "could not invoke duckdb CLI (is duckdb on PATH?): {e}. \
-                 Install it from https://duckdb.org/docs/installation"
-            );
-        }
+    let run_duckdb = |source: &str| -> Result<std::process::Output> {
+        let query = format!("{source};");
+        std::process::Command::new("duckdb")
+            .arg("-csv")
+            .arg("-c")
+            .arg(".nullvalue ''")
+            .arg("-c")
+            .arg(&query)
+            .output()
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "could not invoke duckdb CLI (is duckdb on PATH?): {e}. \
+                     Install it from https://duckdb.org/docs/installation"
+                )
+            })
     };
+
+    let mut out = run_duckdb(&source)?;
+
+    // duckdb's PARALLEL CSV scanner rejects `null_padding` combined with a
+    // quoted field containing a newline ("parallel scanner does not support
+    // null_padding in conjunction with quoted new lines"). Its own remedy is
+    // `parallel=false`, so on a first-pass read failure we retry single-threaded
+    // before giving up: clean files keep the fast parallel path, while
+    // ragged/quoted files now parse rather than aborting the profile (and, in
+    // batch mode, taking the rest of the run down with them).
+    if !out.status.success() {
+        if let Some(opts) = csv_opts {
+            let retry =
+                format!("SELECT * FROM read_csv({input_literal}, {opts}, parallel=false)");
+            out = run_duckdb(&retry)?;
+        }
+    }
     if !out.status.success() {
         anyhow::bail!(
             "duckdb failed to read {:?}: {}",

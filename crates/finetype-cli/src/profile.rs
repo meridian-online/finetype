@@ -142,6 +142,35 @@ pub(crate) fn cmd_profile(
         eprintln!("WARNING: --raw-model active — Sharpen post-processing disabled");
     }
 
+    // Load taxonomy for enrichment ONCE for the whole batch (reused across
+    // every file in the per-file loop below). `taxonomy_path` is already bound
+    // above for the classifier's validation taxonomy. Hoisting this out of the
+    // loop is the batch-mode amortisation point — load + validator-compile of
+    // 245 types is per-batch work, not per-file (accuracy-identical; the loop
+    // body only ever reads `enrichment_taxonomy` immutably after this).
+    let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
+
+    // ac-06: validation-as-veto. Compile the enrichment taxonomy's validators
+    // once for the batch (the per-column veto checks sample values against the
+    // predicted type's schema) and load the audited-safe allowlist that scopes
+    // the HARD veto. Skipped entirely under --no-validation-veto.
+    let veto_enabled = !no_validation_veto;
+    let veto_safe = if veto_enabled {
+        finetype_core::audited_safe_labels()
+    } else {
+        std::collections::HashSet::new()
+    };
+    if veto_enabled {
+        if let Some(ref mut tax) = enrichment_taxonomy {
+            tax.compile_validators();
+        }
+    }
+
+    // Count successfully-profiled files so a batch where every file fails
+    // (e.g. a systemic error) exits non-zero rather than silently producing
+    // nothing (see the post-loop backstop).
+    let mut batch_success = 0usize;
+
     // Per-file loop. Model + taxonomy + classifier are loaded above and
     // reused across iterations — that's the batch-mode amortisation
     // point. Single-file mode (--file) runs this loop once with stdout
@@ -149,6 +178,37 @@ pub(crate) fn cmd_profile(
     // listed paths and routes each iteration's output to a file.
     for path in &paths {
         let file: &std::path::Path = path.as_path();
+
+        eprintln!("Reading {:?}", file);
+
+        // Detect file format by extension
+        let ext = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .unwrap_or_default();
+        let is_json_input = matches!(ext.as_str(), "json" | "ndjson" | "jsonl");
+
+        // Read BEFORE opening the output writer so a file that fails to ingest
+        // leaves no empty output behind. In batch mode an unreadable file is
+        // skipped-and-logged — one bad file must not abort the whole `--files`
+        // run; in single-file mode the error propagates as before.
+        let read_result = if is_json_input {
+            read_json_input(file, &ext)
+        } else {
+            read_csv_input(file, delimiter)
+        };
+        let (headers, columns, row_count) = match read_result {
+            Ok(r) => r,
+            Err(e) => {
+                if batch_mode {
+                    eprintln!("WARNING: skipping {:?}: {}", file, e);
+                    continue;
+                }
+                return Err(e);
+            }
+        };
+
         let mut writer: Box<dyn std::io::Write> = if batch_mode {
             let stem = path
                 .file_stem()
@@ -165,22 +225,6 @@ pub(crate) fn cmd_profile(
             ))
         } else {
             Box::new(std::io::BufWriter::new(std::io::stdout()))
-        };
-
-        eprintln!("Reading {:?}", file);
-
-        // Detect file format by extension
-        let ext = file
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_lowercase())
-            .unwrap_or_default();
-        let is_json_input = matches!(ext.as_str(), "json" | "ndjson" | "jsonl");
-
-        let (headers, columns, row_count) = if is_json_input {
-            read_json_input(file, &ext)?
-        } else {
-            read_csv_input(file, delimiter)?
         };
 
         let n_cols = headers.len();
@@ -236,26 +280,6 @@ pub(crate) fn cmd_profile(
             null_count: usize,
             score: finetype_core::ColumnQualityScore,
             invalid_samples: Vec<String>,
-        }
-
-        // Load taxonomy for enrichment (may already be loaded for validation)
-        let taxonomy_path = std::path::PathBuf::from("labels");
-        let mut enrichment_taxonomy = load_taxonomy(&taxonomy_path).ok();
-
-        // ac-06: validation-as-veto. Compile the enrichment taxonomy's
-        // validators once (the per-column veto checks sample values against
-        // the predicted type's schema) and load the audited-safe allowlist
-        // that scopes the HARD veto. Skipped entirely under --no-validation-veto.
-        let veto_enabled = !no_validation_veto;
-        let veto_safe = if veto_enabled {
-            finetype_core::audited_safe_labels()
-        } else {
-            std::collections::HashSet::new()
-        };
-        if veto_enabled {
-            if let Some(ref mut tax) = enrichment_taxonomy {
-                tax.compile_validators();
-            }
         }
 
         let mut profiles: Vec<ColProfile> = Vec::new();
@@ -991,7 +1015,22 @@ pub(crate) fn cmd_profile(
         }
 
         writer.flush()?;
+        batch_success += 1;
     } // end per-file loop
+
+    // Batch resilience backstop: a per-file read failure is skipped-and-logged
+    // above, but if EVERY listed file failed (e.g. duckdb is not on PATH, or
+    // none parsed) the run must not exit 0 having produced nothing — that would
+    // hide a systemic failure from a caller gating on exit status. Single-file
+    // mode already surfaces the error directly via `?` and never reaches here.
+    if batch_mode && batch_success == 0 && !paths.is_empty() {
+        anyhow::bail!(
+            "no input files could be profiled — all {} failed (see the warnings \
+             above). If duckdb is not installed, install it from \
+             https://duckdb.org/docs/installation.",
+            paths.len()
+        );
+    }
 
     Ok(())
 }
