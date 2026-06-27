@@ -105,7 +105,7 @@ acceptance_criteria:
     |cede-set|, every dropped leaf has a live recovery validator (ac-0 audit), and
     NO excluded open-vocab leaf was removed.
   gate: false
-  checked: false
+  checked: true
 - id: ac-2
   description: |
     LOAD-BEARING MEASUREMENT — does the reshape clear the retrain NO-GO blocker?
