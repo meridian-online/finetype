@@ -288,9 +288,14 @@ pub(crate) fn value_sharpen(
         return Some((label, rule));
     }
 
-    // Rule 16: Text length demotion
-    // ADAPTED: check result.label directly for full_address
-    if result_label == "geography.address.full_address" {
+    // Rule 16: Text length demotion (BACKLOG #7 extends from full_address to the
+    // entity_name / word long-prose overcalls).
+    if matches!(
+        result_label,
+        "geography.address.full_address"
+            | "representation.text.entity_name"
+            | "representation.text.word"
+    ) {
         if let Some((label, rule)) = disambiguate_text_length_demotion(
             values,
             &[(result_label.to_string(), 1)], // Minimal vote entry for the function signature
@@ -1750,7 +1755,18 @@ pub(crate) fn disambiguate_text_length_demotion(
 ) -> Option<(String, String)> {
     let top_label = votes.first().map(|(l, _)| l.as_str())?;
 
-    if top_label != "geography.address.full_address" {
+    // LENGTH direction ONLY — orthogonal to the litigated short-vocab
+    // text_vocab_override NO-GO (R32), which fires on LOW cardinality
+    // (distinct 2..=12, distinct/n <= 0.6). Long prose is HIGH cardinality with
+    // median length > 100, so the two signals can never co-fire. A real
+    // entity_name / word / address is never 100+ chars, so the demotion is
+    // safe-by-construction (precedent: 0% false-demotion on the full_address arm).
+    const LONG_PROSE_SOURCES: &[&str] = &[
+        "geography.address.full_address",
+        "representation.text.entity_name",
+        "representation.text.word",
+    ];
+    if !LONG_PROSE_SOURCES.contains(&top_label) {
         return None;
     }
 
@@ -1769,10 +1785,14 @@ pub(crate) fn disambiguate_text_length_demotion(
     let median = lengths[lengths.len() / 2];
 
     if median > 100 {
-        Some((
-            "representation.text.plain_text".to_string(),
-            "text_length_demotion_full_address".to_string(),
-        ))
+        // Keep the existing rule string on the full_address arm (preserves
+        // test_text_length_demotion_long_text_as_address); tag the new arms.
+        let rule = if top_label == "geography.address.full_address" {
+            "text_length_demotion_full_address".to_string()
+        } else {
+            format!("text_length_demotion_long_prose:{top_label}")
+        };
+        Some(("representation.text.plain_text".to_string(), rule))
     } else {
         None
     }

@@ -2139,6 +2139,7 @@ impl ColumnClassifier {
         self.amount_bare_number_veto(result, header, sample);
         self.url_bare_number_veto(result, header, sample);
         self.checksum_substance_guard(result, header, sample);
+        self.isbn_header_recovery(result, header, sample);
         self.binary_vocab_veto(result, header, sample);
         self.increment_substance_veto(result, values);
         self.city_region_header_corroboration(result, header, sample);
@@ -2192,6 +2193,50 @@ impl ColumnClassifier {
             }
             _ => {}
         }
+    }
+
+    /// `isbn_header_recovery` (default ON). Recovers `identity.commerce.isbn` on a
+    /// column whose header names ISBN and whose values carry a valid ISBN check
+    /// digit, but which the 240-dim model funnelled into a digit-shaped lookalike
+    /// (numeric_code / integer_number / npi / alphanumeric_id) — an ISBN is just
+    /// digits, so neither the model nor `checksum_substance_guard` can tell it from
+    /// a bare number. The mod-11 (ISBN-10) / mod-10 (ISBN-13) check digit is exactly
+    /// what distinguishes a real ISBN column from a same-length integer, and the
+    /// header confirms intent. Promote when the header matches AND >=90% of values
+    /// pass `finetype_core::checksum::isbn`. Recovery-only: a non-ISBN numeric column
+    /// fails the checksum and is untouched. Runs AFTER `checksum_substance_guard`
+    /// (re-promotes from the integer that guard may have demoted to). Value-based
+    /// (0048), RHH-disableable.
+    fn isbn_header_recovery(&self, result: &mut ColumnResult, header: &str, sample: &[String]) {
+        if rhh::is_disabled("isbn_header_recovery") {
+            return;
+        }
+        const LEAF: &str = "identity.commerce.isbn";
+        if result.label == LEAF || !header_corroborates_isbn(header) {
+            return;
+        }
+        let non_empty: Vec<&str> = sample
+            .iter()
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if non_empty.len() < 3 {
+            return;
+        }
+        let valid = non_empty
+            .iter()
+            .filter(|v| finetype_core::checksum::isbn(v))
+            .count();
+        // >=90% pass the ISBN check digit (valid*10 >= len*9).
+        if valid * 10 < non_empty.len() * 9 {
+            return;
+        }
+        result.label = LEAF.to_string();
+        result.confidence = result.confidence.max(0.95);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule =
+            Some(format!("isbn_header_recovery:{}", header.to_lowercase()));
+        result.detected_locale = None;
     }
 
     /// `increment_substance_veto` (default ON). The first full-column-statistics

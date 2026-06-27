@@ -70,6 +70,12 @@ pub(crate) fn header_corroborates_timezone(header: &str) -> bool {
         .any(|tok| matches!(tok, "tz" | "tzname" | "tzabbr" | "zone"))
 }
 
+/// True if the header names an ISBN column (`isbn`, `Primary ISBN10`, `ISBNs`).
+/// Substring match: ISBN is a distinctive token unlikely to false-friend.
+pub(crate) fn header_corroborates_isbn(header: &str) -> bool {
+    header.to_lowercase().contains("isbn")
+}
+
 /// True if the header names an administrative division ABOVE city level — the
 /// disambiguator that separates the value-identical `region`/`city` siblings.
 /// Token-aware so `region`/`county`/`district`/`borough`/`province` match but
@@ -359,7 +365,12 @@ pub(crate) fn header_hint(header: &str) -> Option<&'static str> {
                 return Some("geography.location.city");
             }
             "state" | "province" => {
-                return Some("geography.location.state");
+                // geography.location.state is a RETIRED alias — the taxonomy merged
+                // state into geography.location.region (title "Region / State",
+                // aliases: [state, province, subdivision]); the 244-dim model never
+                // emits it (model2vec_prep maps state/province/region → region). Hint
+                // to the live successor so the override can corroborate, not relocate.
+                return Some("geography.location.region");
             }
             // "region" removed — model predicts region correctly; exact-matching it
             // to state was wrong for datasets where subcountry values are regions

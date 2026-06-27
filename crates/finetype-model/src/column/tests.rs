@@ -1700,9 +1700,17 @@ fn v15_upc_maps_to_upc_not_ean() {
 fn v15_region_not_mapped_to_state() {
     // "region" should NOT map to state — model handles this correctly
     assert_eq!(header_hint("region"), None);
-    // But "state" and "province" still map to state
-    assert_eq!(header_hint("state"), Some("geography.location.state"));
-    assert_eq!(header_hint("province"), Some("geography.location.state"));
+    // "state"/"province" now map to the LIVE region leaf (state is a retired alias)
+    assert_eq!(header_hint("state"), Some("geography.location.region"));
+    assert_eq!(header_hint("province"), Some("geography.location.region"));
+}
+
+#[test]
+fn state_hint_uses_live_region_leaf() {
+    // Regression guard: the dead alias geography.location.state must never be
+    // reintroduced as a header hint (BACKLOG #9).
+    assert_ne!(header_hint("state"), Some("geography.location.state"));
+    assert_ne!(header_hint("province"), Some("geography.location.state"));
 }
 
 #[test]
@@ -3905,6 +3913,38 @@ fn test_text_length_demotion_ignores_non_address() {
 }
 
 #[test]
+fn test_text_length_demotion_long_prose_entity_name() {
+    // BACKLOG #7: long news-prose misread as entity_name → plain_text.
+    let values: Vec<String> = vec![
+        "(Reuters) - Citigroup Inc said on Friday it recorded an additional charge related to its previously announced restructuring and severance programme.",
+        "(Bloomberg) - The central bank held rates steady on Thursday, signalling caution amid mixed signals on inflation and a cooling labour market this quarter.",
+        "LONDON - Shares in the mining group fell sharply after it warned that full-year production would land below guidance owing to disruption at two key sites.",
+        "NEW YORK - The technology company unveiled a sweeping reorganisation on Tuesday, consolidating its hardware and services divisions under a single leader.",
+        "PARIS - The luxury conglomerate reported quarterly sales that beat analyst expectations, lifted by resilient demand across its leather goods business.",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let votes = vec![("representation.text.entity_name".to_string(), 5)];
+    let result = disambiguate_text_length_demotion(&values, &votes);
+    assert!(result.is_some(), "Should demote long entity_name prose");
+    let (label, rule) = result.unwrap();
+    assert_eq!(label, "representation.text.plain_text");
+    assert!(rule.starts_with("text_length_demotion_long_prose:"));
+}
+
+#[test]
+fn test_text_length_demotion_short_entity_not_demoted() {
+    // Real entity names are short — must NOT be demoted.
+    let values: Vec<String> = vec!["Apple Inc", "Microsoft", "Sony", "Nestle", "Adobe"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let votes = vec![("representation.text.entity_name".to_string(), 5)];
+    assert!(disambiguate_text_length_demotion(&values, &votes).is_none());
+}
+
+#[test]
 fn test_text_length_demotion_borderline_not_demoted() {
     // Values right at the boundary (median ~95 chars) should NOT be demoted
     let values: Vec<String> = vec![
@@ -5143,6 +5183,55 @@ fn test_rule_f5_numeric_code_with_decimals_becomes_decimal_number() {
 }
 
 #[test]
+fn test_rule_f5b_decimal_demoted_to_integer_when_whole() {
+    // BACKLOG #10: decimal_number prediction over whole values (IS_FLOAT≈0) → integer.
+    // Lives in feature_sharpen (the composed path; classify_multi_branch:1437 +
+    // compose_from_sense:1537 both call it), so the gate and native agree.
+    let mut result = ColumnResult {
+        label: "representation.numeric.decimal_number".to_string(),
+        confidence: 1.0,
+        vote_distribution: vec![("representation.numeric.decimal_number".to_string(), 1.0)],
+        disambiguation_applied: false,
+        disambiguation_rule: None,
+        samples_used: 100,
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+    let mut cf = ColumnFeatures::empty();
+    cf.mean[feature_idx::IS_FLOAT] = 0.0; // no fractional values
+    feature_sharpen(&mut result, &cf);
+    assert_eq!(result.label, "representation.numeric.integer_number");
+    assert!(result.disambiguation_applied);
+    assert!(result
+        .disambiguation_rule
+        .as_ref()
+        .unwrap()
+        .starts_with("feature_decimal_to_integer_is_float"));
+}
+
+#[test]
+fn test_rule_f5b_keeps_decimal_when_fractional() {
+    // Negative: a genuine decimal column (IS_FLOAT=1.0) stays decimal_number.
+    let mut result = ColumnResult {
+        label: "representation.numeric.decimal_number".to_string(),
+        confidence: 1.0,
+        vote_distribution: vec![("representation.numeric.decimal_number".to_string(), 1.0)],
+        disambiguation_applied: false,
+        disambiguation_rule: None,
+        samples_used: 100,
+        detected_locale: None,
+        is_generic: false,
+        column_features: None,
+    };
+    let mut cf = ColumnFeatures::empty();
+    cf.mean[feature_idx::IS_FLOAT] = 1.0;
+    feature_sharpen(&mut result, &cf);
+    assert_eq!(result.label, "representation.numeric.decimal_number");
+    assert!(!result.disambiguation_applied);
+}
+
+#[test]
 fn test_hs_code_float_parseability() {
     // HS codes with 3 segments don't parse as float
     let codes = [
@@ -6293,6 +6382,90 @@ technology.internet.url:
         .compose_from_sense("notes", &prose, "representation.text.plain_text", 1.0)
         .unwrap();
     assert_eq!(r2.label, "representation.text.plain_text");
+}
+
+// ── isbn_header_recovery (BACKLOG #6b) ──
+
+#[test]
+fn isbn_header_recovery_promotes_checked_isbn() {
+    let yaml = r#"
+identity.commerce.isbn:
+  title: ISBN
+  designation: universal
+  tier: [VARCHAR, commerce]
+  release_priority: 3
+  samples: ["0306406152"]
+"#;
+    let mut tax = Taxonomy::from_yaml(yaml).unwrap();
+    tax.compile_validators();
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy(tax);
+
+    // ISBN header + check-digit-valid ISBN-10s funnelled into numeric_code → recovered.
+    let isbns: Vec<String> = vec!["0306406152", "0140449132", "043942089X", "0201633612"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "Primary ISBN10",
+            &isbns,
+            "representation.identifier.numeric_code",
+            1.0,
+        )
+        .unwrap();
+    assert_eq!(r.label, "identity.commerce.isbn", "isbn recovery must fire");
+}
+
+#[test]
+fn isbn_header_recovery_declines_failed_checksum_and_no_header() {
+    let mut cc =
+        ColumnClassifier::with_defaults(Box::new(crate::inference::MockClassifier::new("unknown")));
+    cc.set_taxonomy({
+        let mut t = Taxonomy::from_yaml(
+            "identity.commerce.isbn:\n  title: ISBN\n  designation: universal\n  tier: [VARCHAR, commerce]\n  samples: [\"0306406152\"]\n",
+        )
+        .unwrap();
+        t.compile_validators();
+        t
+    });
+
+    // ISBN header but financial integers that FAIL the check digit → untouched.
+    let bad: Vec<String> = vec!["5150000128", "5150000129", "5150000130"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r = cc
+        .compose_from_sense(
+            "Primary ISBN10",
+            &bad,
+            "representation.numeric.integer_number",
+            1.0,
+        )
+        .unwrap();
+    assert_ne!(
+        r.label, "identity.commerce.isbn",
+        "must decline failed checksum"
+    );
+
+    // Valid ISBNs but NO isbn header → untouched (header gate is load-bearing).
+    let isbns: Vec<String> = vec!["0306406152", "0140449132", "043942089X"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let r2 = cc
+        .compose_from_sense(
+            "book_code",
+            &isbns,
+            "representation.identifier.numeric_code",
+            1.0,
+        )
+        .unwrap();
+    assert_ne!(
+        r2.label, "identity.commerce.isbn",
+        "must decline without header"
+    );
 }
 
 // ── structured_string_refinement (spec 2026-06-19-plain-text-type-discovery) ──

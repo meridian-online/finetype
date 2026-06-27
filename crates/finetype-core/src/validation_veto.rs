@@ -118,6 +118,17 @@ pub fn evaluate_validation_veto(
 /// Why a rule and not training data: categorical trained as a flat-softmax
 /// shape class is a presence-driven attractor (memory
 /// `categorical-is-a-residual-category`; v23 +529%, v27 proxy 5.76×/6.22×).
+/// A plain base-10 number: an optional sign then digits with at most one '.'.
+/// Deliberately excludes scientific notation / NaN / inf so f64::parse edge
+/// cases cannot masquerade as numeric residuals.
+fn is_plain_number(v: &str) -> bool {
+    let body = v.strip_prefix(['+', '-']).unwrap_or(v);
+    !body.is_empty()
+        && body.chars().all(|c| c.is_ascii_digit() || c == '.')
+        && body.chars().filter(|c| *c == '.').count() <= 1
+        && body.chars().any(|c| c.is_ascii_digit())
+}
+
 pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
     let non_null: Vec<&str> = values
         .iter()
@@ -143,6 +154,29 @@ pub fn veto_shape_fallback(values: &[Option<&str>]) -> Option<&'static str> {
             .count();
         if mixed as f64 / n as f64 >= 0.6 {
             return Some("representation.identifier.alphanumeric_id");
+        }
+        // numeric residual (BACKLOG #4, idx 74/103/104): letter-free, mostly-distinct
+        // values that are all plain numbers are integers/decimals, not unknown. Post-
+        // hard-veto only (this fn IS the veto fallback), so it cannot relocate a
+        // non-vetoed column. Leading-zero guard: a multi-digit integer part starting
+        // with '0' ("007", "00123") is a zero-padded CODE, not an integer — bail to
+        // unknown rather than strip the semantically load-bearing padding.
+        if non_null.iter().all(|v| is_plain_number(v)) {
+            let zero_padded = non_null.iter().any(|v| {
+                let int_part = v
+                    .trim_start_matches(['+', '-'])
+                    .split('.')
+                    .next()
+                    .unwrap_or("");
+                int_part.len() > 1 && int_part.starts_with('0')
+            });
+            if !zero_padded {
+                return Some(if non_null.iter().any(|v| v.contains('.')) {
+                    "representation.numeric.decimal_number"
+                } else {
+                    "representation.numeric.integer_number"
+                });
+            }
         }
         return None;
     }
@@ -301,10 +335,27 @@ identity.person.gender_code:
     }
 
     #[test]
-    fn fallback_none_on_pure_numeric_ids() {
-        // Distinct numerics carry no letter — numeric territory, not alnum.
-        let nums = opts(&["10234", "10235", "10240", "10299"]);
-        assert_eq!(veto_shape_fallback(&nums), None);
+    fn fallback_none_on_zero_padded_codes() {
+        // Zero-padded codes are NOT integers — the padding is load-bearing, so the
+        // numeric-residual arm (BACKLOG #4) bails to unknown rather than strip it.
+        let padded = opts(&["00123", "00456", "00789", "00321"]);
+        assert_eq!(veto_shape_fallback(&padded), None);
+    }
+
+    #[test]
+    fn fallback_numeric_residual_beats_unknown() {
+        // BACKLOG #4: post-veto, letter-free distinct numbers are integers/decimals,
+        // not unknown.
+        let ints = opts(&["10234", "10235", "10240", "10299"]);
+        assert_eq!(
+            veto_shape_fallback(&ints),
+            Some("representation.numeric.integer_number")
+        );
+        let floats = opts(&["10.5", "10.6", "10.7", "10.8"]);
+        assert_eq!(
+            veto_shape_fallback(&floats),
+            Some("representation.numeric.decimal_number")
+        );
     }
 
     #[test]

@@ -77,6 +77,24 @@ pub(crate) fn feature_sharpen(result: &mut ColumnResult, column_features: &Colum
         }
     }
 
+    // Rule F5b: decimal_number → integer_number when no value is fractional
+    // (BACKLOG #10). The Sense head emits decimal_number on whole-number columns
+    // (e.g. "1","2","3"). IS_FLOAT is the fraction of values carrying a decimal
+    // point; a hard-zero IS_FLOAT means NOT ONE value is fractional, so the column
+    // is integer_number, not decimal — the exact mirror of F5's float branch. The
+    // 0.01 floor (rather than 0.0) absorbs float imprecision in the mean
+    // aggregation, so it fires only on a genuinely all-integer column. Values
+    // rendered WITH a point ("1.0","2.0") carry IS_FLOAT≈1.0 and stay decimal.
+    if result.label == "representation.numeric.decimal_number" && is_float_ratio < 0.01 {
+        result.label = "representation.numeric.integer_number".to_string();
+        result.confidence = result.confidence.max(0.7);
+        result.disambiguation_applied = true;
+        result.disambiguation_rule = Some(format!(
+            "feature_decimal_to_integer_is_float:{:.2}",
+            is_float_ratio
+        ));
+    }
+
     // Rule F6: Short alphabetic codes misclassified as file.extension.
     // ADAPTED: uses fixed categorical fallback instead of next-vote lookup.
     // Multi-branch single-entry votes have no second-place candidate.
